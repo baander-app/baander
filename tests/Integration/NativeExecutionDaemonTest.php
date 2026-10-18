@@ -99,6 +99,98 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertTrue($this->client->handshake()['ready']);
     }
 
+    public function testTermWithActiveFfmpegLeavesNoLiveOwnedProcessGroupAndRemovesSocket(): void
+    {
+        if (!is_readable('/proc/self/stat')) {
+            self::markTestSkipped('Requires Linux process identity observations.');
+        }
+        $daemonPid = proc_get_status($this->daemon)['pid'];
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-threads', '1', '-filter_threads', '1',
+            '-re', '-f', 'lavfi', '-i', 'anullsrc=r=8000:cl=mono', '-threads', '1', '-f', 'null', '-'], 20);
+        $owned = null;
+        try {
+            $deadline = microtime(true) + 3;
+            do {
+                foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
+                    $pid = (int) basename(dirname($path));
+                    $process = $this->processObservation($pid);
+                    if ($process !== null && $process['parent'] === $daemonPid && $process['group'] === $pid
+                        && !in_array($process['state'], ['Z', 'X'], true) && @readlink('/proc/' . $pid . '/exe') === '/usr/bin/ffmpeg'
+                    ) {
+                        $owned = ['pid' => $pid, ...$process];
+                        break;
+                    }
+                }
+                if ($owned !== null) {
+                    break;
+                }
+                usleep(10_000);
+            } while (microtime(true) < $deadline);
+            self::assertNotNull($owned, 'An independently observed FFmpeg child must own a live process group before TERM.');
+            self::assertNotSame(posix_getpgrp(), $owned['group']);
+            self::assertGreaterThan(0, (int) $owned['startTicks']);
+            self::assertNotEmpty($this->liveProcessGroup($owned['group']));
+            self::assertSame('running', $this->client->inspect($handle)['state']);
+            self::assertTrue(proc_terminate($this->daemon, SIGTERM));
+
+            $deadline = microtime(true) + 3;
+            do {
+                $status = proc_get_status($this->daemon);
+                if (!$status['running']) {
+                    break;
+                }
+                usleep(10_000);
+            } while (microtime(true) < $deadline);
+            self::assertFalse($status['running'], 'TERM must drain the active native daemon within the fixture deadline.');
+            self::assertSame(0, $status['exitcode']);
+            self::assertSame([], $this->liveProcessGroup($owned['group']), 'Daemon exit must leave no live member of the observed owned group.');
+            $remaining = $this->processObservation($owned['pid']);
+            self::assertFalse($remaining !== null && $remaining['startTicks'] === $owned['startTicks']
+                && !in_array($remaining['state'], ['Z', 'X'], true), 'The captured FFmpeg process identity must no longer be live.');
+            clearstatcache(true, $this->directory . '/native.sock');
+            self::assertFileDoesNotExist($this->directory . '/native.sock');
+        } finally {
+            // Cleanup follows the containment assertions and targets only the captured identity.
+            if ($owned !== null) {
+                $remaining = $this->processObservation($owned['pid']);
+                if ($remaining !== null && $remaining['startTicks'] === $owned['startTicks'] && $remaining['group'] === $owned['group']) {
+                    @posix_kill(-$owned['group'], SIGKILL);
+                }
+            }
+        }
+    }
+
+    /** @return array{parent:int, group:int, state:string, startTicks:string}|null */
+    private function processObservation(int $pid): ?array
+    {
+        $stat = @file_get_contents('/proc/' . $pid . '/stat');
+        if ($stat === false) {
+            return null;
+        }
+        $end = strrpos($stat, ') ');
+        if ($end === false) {
+            return null;
+        }
+        $fields = explode(' ', substr($stat, $end + 2));
+
+        return ['parent' => (int) $fields[1], 'group' => (int) $fields[2], 'state' => $fields[0], 'startTicks' => $fields[19]];
+    }
+
+    /** @return list<array{pid:int, startTicks:string}> */
+    private function liveProcessGroup(int $group): array
+    {
+        $live = [];
+        foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
+            $pid = (int) basename(dirname($path));
+            $process = $this->processObservation($pid);
+            if ($process !== null && $process['group'] === $group && !in_array($process['state'], ['Z', 'X'], true)) {
+                $live[] = ['pid' => $pid, 'startTicks' => $process['startTicks']];
+            }
+        }
+
+        return $live;
+    }
+
     public function testWrongBootCannotInspectOrSignalCurrentAttempt(): void
     {
         $wrong = new NativeExecutionClient($this->directory . '/native.sock', 'baander.app:workers', str_repeat('b', 32), 1, 'media', 1);

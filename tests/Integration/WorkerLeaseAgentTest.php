@@ -71,6 +71,57 @@ final class WorkerLeaseAgentTest extends TestCase
         self::assertSame($before, $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases'));
     }
 
+    public function testFreshHelperUsesIndependentBackendWhileParentTransactionRemainsUsable(): void
+    {
+        $this->connection->executeStatement('CREATE TABLE parent_transaction_markers (marker text NOT NULL)');
+        $this->connection->executeStatement('CREATE TABLE helper_session_observations (backend_pid integer NOT NULL, parent_markers integer NOT NULL)');
+        $this->connection->executeStatement(<<<'SQL'
+            CREATE FUNCTION capture_helper_session() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+                INSERT INTO helper_session_observations
+                SELECT pg_backend_pid(), count(*) FROM parent_transaction_markers;
+                RETURN NEW;
+            END;
+            $$
+            SQL);
+        $this->connection->executeStatement('CREATE TRIGGER capture_helper_session AFTER INSERT ON worker_deployment_leases FOR EACH ROW EXECUTE FUNCTION capture_helper_session()');
+        $observer = DriverManager::getConnection($this->connection->getParams());
+        try {
+            $observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
+            $observerPid = (int) $observer->fetchOne('SELECT pg_backend_pid()');
+            $parentPid = (int) $this->connection->fetchOne('SELECT pg_backend_pid()');
+            self::assertNotSame($parentPid, $observerPid);
+            $this->connection->beginTransaction();
+            $transactionId = $this->connection->fetchOne('SELECT txid_current()');
+            $this->connection->executeStatement('INSERT INTO parent_transaction_markers (marker) VALUES (?)', ['before-helper']);
+
+            self::assertTrue($this->finish($this->start($this->request()))['success']);
+            $observation = $observer->fetchAssociative('SELECT backend_pid, parent_markers FROM helper_session_observations');
+            self::assertNotFalse($observation, 'The real helper lease write must record its own backend.');
+            self::assertNotSame($parentPid, (int) $observation['backend_pid']);
+            self::assertNotSame($observerPid, (int) $observation['backend_pid']);
+            self::assertSame(0, (int) $observation['parent_markers']);
+            self::assertSame(0, (int) $observer->fetchOne('SELECT count(*) FROM parent_transaction_markers'));
+            self::assertTrue($this->connection->isTransactionActive());
+            self::assertSame($parentPid, (int) $this->connection->fetchOne('SELECT pg_backend_pid()'));
+            self::assertSame($transactionId, $this->connection->fetchOne('SELECT txid_current()'));
+            $this->connection->executeStatement('INSERT INTO parent_transaction_markers (marker) VALUES (?)', ['after-helper']);
+            self::assertSame(2, (int) $this->connection->fetchOne('SELECT count(*) FROM parent_transaction_markers'));
+            self::assertSame(0, (int) $observer->fetchOne('SELECT count(*) FROM parent_transaction_markers'));
+
+            $this->connection->rollBack();
+            self::assertSame(0, (int) $observer->fetchOne('SELECT count(*) FROM parent_transaction_markers'));
+            self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM parent_transaction_markers'));
+            self::assertSame('active', $observer->fetchOne('SELECT state FROM worker_deployment_leases'), 'Parent rollback cannot undo the independently committed helper lease.');
+            self::assertSame($parentPid, (int) $this->connection->fetchOne('SELECT pg_backend_pid()'));
+        } finally {
+            if ($this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            $observer->close();
+        }
+    }
+
     public function testRealHelperDeniesWrongOwnerExpiredOwnerAndDuplicateAcquisition(): void
     {
         self::assertTrue($this->finish($this->start($this->request()))['success']);
