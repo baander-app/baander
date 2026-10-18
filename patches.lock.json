@@ -1,5 +1,5 @@
 {
-    "_hash": "051e86427fc07da8738b9cf88f6e4db3064d1e460814f877e9379e56bcf43f81",
+    "_hash": "66b129b2525538575ab227fdfcd3af0e4d49eaf2b03a9cce3abf9218e8bb0946",
     "patches": {
         "swoole-bundle/z-engine": [
             {
@@ -18,7 +18,7 @@
                 "package": "symfony/redis-messenger",
                 "description": "Keep delayed deliveries recoverable until stream insertion succeeds",
                 "url": "patches/symfony-redis-messenger-recoverable-delays.patch",
-                "sha256": "4aa129bfac98f360f12943842e22272b721d3e4e1a46a2c399cf1e0d256a7afc",
+                "sha256": "57b1f4a448f589c6d1127fcb5b913743dde88f910c22d2cad5f0985a20ffe593",
                 "depth": 1,
                 "extra": {
                     "provenance": "root"

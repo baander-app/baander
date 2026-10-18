@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use App\Tests\Fixtures\Messaging\DelayedPromotionRedis;
+use PHPUnit\Framework\Attributes\DataProvider;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
@@ -80,6 +82,29 @@ final class MessengerDelayedPromotionTest extends TestCase
         self::assertSame(0, $this->redis->xLen($this->stream));
     }
 
+    public function testMissingEvalPermissionRetainsAcceptedRetry(): void
+    {
+        $user = 'delayed_test_' . bin2hex(random_bytes(8));
+        $this->aclUsers[] = $user;
+        $this->redis->rawCommand('ACL', 'SETUSER', $user, 'on', '>test-only', 'resetkeys', '~' . $this->stream . '*', '+@all', '-eval');
+        $transport = $this->transport(['auth' => [$user, 'test-only']]);
+        $transport->send($this->delayedEnvelope());
+        $member = $this->onlyMember();
+        $this->makeDue($member);
+        try {
+            iterator_to_array($transport->get());
+            self::fail('Delayed promotion requires permission to execute EVAL.');
+        } catch (TransportException $error) {
+            self::assertStringContainsString('NOPERM', $error->getMessage());
+        }
+        self::assertSame([$member], $this->members());
+        self::assertSame(0, $this->redis->xLen($this->stream));
+        $this->redis->rawCommand('ACL', 'SETUSER', $user, '+eval');
+        $received = $this->receive($transport);
+        $transport->ack($received);
+        self::assertSame([], $this->members());
+    }
+
     public function testInterruptedRemovalRetainsRetryAndAllowsDuplicateSafeRecovery(): void
     {
         $user = 'delayed_test_' . bin2hex(random_bytes(8));
@@ -94,7 +119,7 @@ final class MessengerDelayedPromotionTest extends TestCase
             iterator_to_array($transport->get());
             self::fail('Actual delayed removal must fail when Redis denies ZREM.');
         } catch (TransportException $error) {
-            self::assertStringContainsString('NOPERM', $error->getMessage());
+            self::assertMatchesRegularExpression('/NOPERM|cannot run|can.t run|no permissions/i', $error->getMessage());
         }
         self::assertSame([$member], $this->members(), 'Uncertain promotion must preserve the accepted retry.');
         self::assertGreaterThanOrEqual(1, $this->redis->xLen($this->stream), 'XADD succeeded before delayed removal was interrupted.');
@@ -102,7 +127,7 @@ final class MessengerDelayedPromotionTest extends TestCase
 
         $deliveries = 0;
         // At-least-once promotion may duplicate a payload when a writer succeeds
-        // before removal fails or competing promoters read the same due member.
+        // before removal fails.
         for ($attempt = 0; $attempt < 3; ++$attempt) {
             $received = iterator_to_array($transport->get());
             foreach ($received as $envelope) {
@@ -183,6 +208,143 @@ final class MessengerDelayedPromotionTest extends TestCase
         }
         self::assertSame([$member], $this->members());
         self::assertSame(0, $this->redis->xLen($this->stream));
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function redisSerializers(): iterable
+    {
+        yield 'raw strings' => [\Redis::SERIALIZER_NONE];
+        yield 'PHP serialization' => [\Redis::SERIALIZER_PHP];
+        yield 'JSON serialization' => [\Redis::SERIALIZER_JSON];
+    }
+
+    #[DataProvider('redisSerializers')]
+    public function testPromotionPreservesImmediateWriteBytesAndEmptyHeaderShapes(int $serializer): void
+    {
+        $redis = $this->instrumentedRedis($serializer);
+        $connection = $this->connection($redis);
+        $body = 'escaped " payload ' . "\n" . 'æ';
+        $headers = ['empty' => [], 'object' => (object) [], 'nested' => ['empty' => []]];
+        // Delayed promotion historically decodes the envelope as an associative
+        // array before handing body and headers to the immediate writer.
+        $decodedHeaders = json_decode(json_encode($headers, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+        $connection->add($body, $decodedHeaders);
+        $expected = $this->redis->rawCommand('XRANGE', $this->stream, '-', '+')[0][1][1];
+        $this->redis->del($this->stream);
+        $connection->setup();
+        $connection->add($body, $headers, 3600000);
+        $this->makeDue($this->onlyMember());
+        $connection->get();
+        self::assertSame($expected, $this->redis->rawCommand('XRANGE', $this->stream, '-', '+')[0][1][1]);
+        self::assertSame([], $this->members());
+    }
+
+    public function testCandidateMovedIntoFutureIsRecheckedAndContentionAttemptsAreBounded(): void
+    {
+        $redis = $this->instrumentedRedis();
+        $connection = $this->connection($redis);
+        for ($index = 0; $index < 101; ++$index) {
+            $connection->add('retry', [], 3600000);
+        }
+        foreach ($this->members() as $member) {
+            $this->makeDue($member);
+        }
+        $future = (string) ((int) floor(microtime(true) * 1000) + 3600000);
+        $redis->afterSelection = function (string $member) use ($future): void {
+            $this->redis->rawCommand('ZADD', $this->queue, 'XX', $future, $member);
+        };
+        $connection->get();
+        self::assertSame(100, $redis->selections, 'Stale candidates count toward the fixed attempt budget.');
+        self::assertSame(0, $this->redis->xLen($this->stream));
+        self::assertCount(101, $this->members());
+        self::assertSame(1, $this->redis->rawCommand('ZCOUNT', $this->queue, 0, (string) ((int) floor(microtime(true) * 1000))));
+    }
+
+    public function testConcurrentPollersPromoteTheSameCandidateOnce(): void
+    {
+        if (!function_exists('pcntl_fork')) {
+            self::markTestSkipped('Concurrent delayed promotion requires pcntl.');
+        }
+        $transport = $this->transport();
+        $transport->send($this->delayedEnvelope());
+        $this->makeDue($this->onlyMember());
+        $children = [];
+        $channels = [];
+        try {
+            for ($index = 0; $index < 2; ++$index) {
+                $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+                self::assertNotFalse($pair);
+                $pid = pcntl_fork();
+                self::assertGreaterThanOrEqual(0, $pid);
+                if ($pid === 0) {
+                    fclose($pair[0]);
+                    stream_set_timeout($pair[1], 10);
+                    try {
+                        $redis = $this->instrumentedRedis();
+                        $connection = $this->connection($redis, 'poller_' . $index);
+                        $redis->afterSelection = static function () use ($redis, $pair): void {
+                            $redis->afterSelection = null;
+                            fwrite($pair[1], "selected\n");
+                            if (fgets($pair[1]) !== "go\n") {
+                                throw new \RuntimeException('Promotion barrier timed out.');
+                            }
+                        };
+                        $connection->get();
+                        fwrite($pair[1], "done\n");
+                        exit(0);
+                    } catch (\Throwable $error) {
+                        fwrite($pair[1], 'error: ' . $error->getMessage() . "\n");
+                        exit(1);
+                    }
+                }
+                fclose($pair[1]);
+                stream_set_timeout($pair[0], 10);
+                $children[] = $pid;
+                $channels[] = $pair[0];
+            }
+            foreach ($channels as $channel) {
+                self::assertSame("selected\n", fgets($channel));
+            }
+            foreach ($channels as $channel) {
+                fwrite($channel, "go\n");
+            }
+            foreach ($channels as $channel) {
+                self::assertSame("done\n", fgets($channel));
+            }
+        } finally {
+            foreach ($channels as $channel) {
+                fclose($channel);
+            }
+            foreach ($children as $pid) {
+                pcntl_waitpid($pid, $status);
+                self::assertTrue(pcntl_wifexited($status));
+                self::assertSame(0, pcntl_wexitstatus($status));
+            }
+        }
+        self::assertSame([], $this->members());
+        self::assertSame(1, $this->redis->xLen($this->stream));
+    }
+
+    private function instrumentedRedis(int $serializer = \Redis::SERIALIZER_PHP): DelayedPromotionRedis
+    {
+        $parts = parse_url($this->dsn);
+        self::assertIsArray($parts);
+        $redis = new DelayedPromotionRedis();
+        $redis->connect($parts['host'], $parts['port'] ?? 6379, 2.0);
+        if (isset($parts['pass'])) {
+            $redis->auth(isset($parts['user']) ? [rawurldecode($parts['user']), rawurldecode($parts['pass'])] : rawurldecode($parts['pass']));
+        }
+        $redis->setOption(\Redis::OPT_READ_TIMEOUT, 2.0);
+        $redis->setOption(\Redis::OPT_SERIALIZER, $serializer);
+        return $redis;
+    }
+
+    private function connection(DelayedPromotionRedis $redis, string $consumer = 'test'): Connection
+    {
+        $connection = new Connection(['stream' => $this->stream, 'group' => 'test', 'consumer' => $consumer], $redis);
+        $this->connections[] = $connection;
+        $connection->setup();
+        return $connection;
     }
 
     private function delayedEnvelope(): Envelope
