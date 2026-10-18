@@ -107,8 +107,9 @@ only one agent host has.
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
 - **Next.** Continue the remaining
   [worker architecture items](#worker-architecture-and-resource-control), starting
-  with validated routes/resource classes. The two-command deployment item is closed
-  by the production and browser checkpoint below.
+  with reserved responsive control capacity. Validated routes/resource classes are
+  closed by the [2026-10-18 checkpoint](#validated-asynchronous-routes-2026-10-18).
+  The two-command deployment item retains its production and browser checkpoint.
   Provider live qualification and regional acceptance remain separate work.
   React Native and Android remain deferred. The local dev database note below
   stands.
@@ -2336,10 +2337,85 @@ version 2, shared media storage, worker execution and explicit recovery. Later
 route/resource qualification, control capacity, autoscaling, failure/load coverage
 and media saturation items remain open.
 
+#### Validated asynchronous routes (2026-10-18)
+
+The [validated-route plan](docs/plans/2026-10-18-1126-fix-validated-async-routes-plan.md)
+is implemented. One catalog now supplies the default Messenger routes, resource
+classes, retry policies and worker receiver order. Container compilation checks
+eligible handlers, independent JSON codecs and effective transport configuration.
+Producer dispatch validates the complete sender selection before sending, including
+explicit transport overrides. Synchronous, inline and received-message handling
+retain their existing paths.
+
+The final production inventory contains **17 workloads**: **15 default routes**
+and explicit-only lyrics fetching and webhook delivery. The plan's sixteen-workload
+inventory missed webhook delivery through the notification intent relay. The real
+worker drill exposed that omission; the catalog and regression coverage now include
+all three relay channels: email, push and webhook. The test environment adds only
+`FailureTransportProbe`, for **18 workloads / 16 default routes**.
+
+Host admission and direct worker startup reject Redis URL options that replace the
+configured stream, group or generated consumer identity. Host admission rejects
+invalid URLs before container creation. Direct startup rejects them before worker
+locks, lease acquisition or child launch. Invalid worker transport configuration
+exits with code **2**, names the setting and omits its value.
+Accepted launches retain identities derived from deployment, boot, role and launch
+generation on both Redis streams. Resource classes remain descriptions; this item
+does not reserve control capacity or qualify saturation behavior.
+
+Verification uses the CI image `baander-ci-two-command:local` with the current
+checkout streamed into disposable containers. The final worker-command drill passes
+in **248.11 seconds**, exit **0**, covering three hostile startup configurations,
+the generated consumer identity on both streams, outbox and pre-acknowledgment
+crash recovery, replay, scheduler authority and shutdown. Log:
+`/tmp/validated-async-worker-final.log`.
+
+Composer platform checks, PHPStan, Deptrac, container lint and OpenAPI drift checks
+pass, with no baseline expansion. The full PHPStan run takes **54.06 seconds**;
+the other gates take **0.4 / 5.3 / 2.1 / 2.3 seconds** respectively. Static-run
+cleanup succeeds. Evidence: `/tmp/validated-async-static/results.json` and
+`/tmp/validated-async-phpstan-final/results.json`; the first records the initial
+missing test-type annotations, corrected before the passing PHPStan rerun.
+The final three-file PHPStan check passes in **8.71 seconds**, covering the
+post-review tests and corrected transport fixture. Evidence:
+`/tmp/validated-async-review-phpstan/results.json`.
+
+The full coordinator executed **9,818 tests in 932 files / 75,546 assertions**
+in **884.4 seconds**. Ordinary, native and service lane 1 pass. Service lane 2 reported
+**130 errors**, all from the catalog firewall fixture replacing Symfony's transport
+with a bare in-memory definition. The fixture now changes only the DSN, preserving
+the factory, serializer and receiver metadata. Its focused correction and the
+catalog/compiler tests pass: **172 tests in 3 files / 3,549 assertions** in
+**84.9 seconds**, including all **130 firewall cases / 3,488 assertions** and the
+three post-review rejection cases. This records the full run and its focused
+correction, not an uninterrupted passing full-suite rerun. Artifacts:
+`var/test-runs/20261018-120906-40a1ac74` and
+`var/test-runs/20261018-122500-9ee9b819`; logs:
+`/tmp/validated-async-backend-full.log` and `/tmp/validated-async-firewall-fix.log`.
+
+The no-Swoole selection passes **42 tests in 3 files / 164 assertions** in
+**72.9 seconds**, with no skipped cases. Artifacts:
+`var/test-runs/20261018-122643-f6e41e0f`; log:
+`/tmp/validated-async-no-swoole.log`.
+
+Independent `ce-code-review` completed with **zero actionable findings**. Its
+initial verdict held completion for the full/no-Swoole checks and roadmap evidence
+recorded here. A coverage suggestion added three explicit-only workload rejection
+cases for missing codecs, missing handlers and wrong-transport handlers. Receipt:
+`/tmp/compound-engineering-1000/ce-code-review/20261018-121042-caadf11b/review.json`.
+The final simplification pass found no further changes; documentation passed
+`prose-fix`, link checks and `git diff --check`.
+
+Frontend gates and backend runner/isolation self-tests were not repeated: no web
+code, runner protocol, backend isolation fixtures or native-test classification
+changed. Local application databases, baseline services and media remain untouched;
+all verification infrastructure is disposable. Reserved control capacity,
+autoscaling, broader failure/load coverage and media saturation remain open.
+
 - [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.
-- [ ] Use validated routes/resource classes with a handler, independent JSON codec,
+- [x] Use validated routes/resource classes with a handler, independent JSON codec,
   retry policy, and unique consumer identity for every asynchronous message type.
 - [ ] Reserve responsive control capacity independently of catalog/metadata/media
   backlog. Bound CPU, RAM, device slots, restarts, and shutdown for entire child trees.

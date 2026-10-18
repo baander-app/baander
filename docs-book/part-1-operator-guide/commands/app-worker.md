@@ -33,6 +33,22 @@ php bin/console app:worker --no-interaction --deployment=worker.baander.app --bo
 
 When the environment sets `BAANDER_WORKER_NAMESPACE` or `BAANDER_WORKER_BOOT_ID`, the matching option must be absent or equal to it. Memory values are whole MiB up to 1048576. The reservations are admission limits, not measured usage or limits the operating system enforces.
 
+The consumer's receiver list comes from the validated workload catalog, in the
+order `async` then `scheduler`. Container compilation checks default routes,
+handlers registered for the transport, payload codecs, JSON serialization and
+bounded retry policies. Producer dispatch checks the actual selected senders,
+including explicit transport stamps. Catalog resource classes describe work; the
+reservation options above remain the admission policy.
+
+The supervisor checks `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` before launching
+children. Accepted forms preserve the configured streams and `baander` group;
+consumer overrides are rejected. Each admitted consumer receives an identity
+derived from the deployment, boot, worker role and launch generation, replacing
+an inherited `MESSENGER_CONSUMER_NAME`. See [Messenger configuration](../configuration.md#messenger)
+for URL forms. Invalid configuration exits without child launch, and errors omit
+credential-bearing values. The host deployment controller applies the same URL
+checks before container creation.
+
 The deployment drains when a child exits, when the deployment loses its lease, or on `SIGTERM` or `SIGINT`: the supervisor stops every child and exits. If children are still running 35 seconds after the drain starts, the supervisor exits with code 1 and leaves them to the container's teardown. After a drain the supervisor prints one JSON line with the event `worker_supervisor_stopped`, the number of launch attempts and the exit code.
 
 The media role admits at most three video jobs and one audio rendition at once. Each job starts a fresh PHP kernel; video helpers start before database or Redis connections open. Encoder descendants belong to the worker container. The host manifest requires at least 128 PID slots, or eight plus the media descendant reservation when that is larger; Docker counts threads toward this ceiling too. Each private media job bounds asynchronous file I/O to one thread before helper fork or reactor startup. These reservations do not certify measured capacity.
@@ -45,4 +61,4 @@ The supervisor does not restart itself. A failed deployment must be reconciled w
 |------|---------|
 | 0 | The deployment drained after a stop signal |
 | 1 | A child or the lease failed, the drain timed out, or the supervisor could not start; error output omits diagnostics that could contain secrets |
-| 2 | An option is missing or invalid, or it differs from the container's deployment or boot identity |
+| 2 | An option is missing or invalid, it differs from the container's deployment or boot identity, or worker transport configuration is invalid |

@@ -1,6 +1,6 @@
 # Worker runtime inventory
 
-## Current ownership on 2026-10-17
+## Current ownership on 2026-10-18
 
 `app:serve` owns request handling, file delivery, client connections and web health
 checks. `app:worker` runs independently as its container's PID 1 and supervises
@@ -18,30 +18,55 @@ a running web server.
 
 ### Routing and synchronous admission
 
-[messenger.yaml](../config/packages/messenger.yaml) declares fifteen production
-routes: fourteen to Redis `async` and one to `scheduler`. No `swoole_task`
-transport remains. The independent
-[JSON codec](../src/Shared/Infrastructure/Messaging/JsonMessageCodec.php) and its
-context codecs carry supported payloads; transport-specific handler registration
-must agree with each route.
+[messenger.php](../config/packages/messenger.php) declares the validated
+asynchronous workload catalog: seventeen production workloads, fifteen with default
+routes and two admitted only through an explicit transport selection:
+`FetchLyricsCommand` and `SendWebhookCommand`. Fourteen default routes use Redis
+`async`; the scheduled occurrence route uses `scheduler`. No `swoole_task`
+transport remains.
 
-| Message | Transport |
-| --- | --- |
-| `BatchExtractCoversCommand` | `async` |
-| `ScanLibraryCommand` | `async` |
-| `FilesDiscovered` | `async` |
-| `ExtractAlbumCoverCommand` | `async` |
-| `SyncSongMessage` | `async` |
-| `SyncAlbumMessage` | `async` |
-| `SyncLibraryMessage` | `async` |
-| `SendEmailCommand` | `async` |
-| `SendPushCommand` | `async` |
-| `PruneMissingImagesCommand` | `async` |
-| `SyncCountryStationsCommand` | `async` |
-| `ExecuteScheduledOccurrenceCommand` | `scheduler` |
-| `RelayOutboxCommand` | `async` |
-| `ExecuteRecommendationJobCommand` | `async` |
-| `GenerateImageDerivativeCommand` | `async` |
+| Message | Transport | Resource class | Routing |
+| --- | --- | --- | --- |
+| `BatchExtractCoversCommand` | `async` | `coordination` | Default |
+| `ScanLibraryCommand` | `async` | `io` | Default |
+| `FilesDiscovered` | `async` | `io` | Default |
+| `ExtractAlbumCoverCommand` | `async` | `cpu` | Default |
+| `SyncSongMessage` | `async` | `io` | Default |
+| `SyncAlbumMessage` | `async` | `io` | Default |
+| `SyncLibraryMessage` | `async` | `coordination` | Default |
+| `SendEmailCommand` | `async` | `io` | Default |
+| `SendPushCommand` | `async` | `io` | Default |
+| `PruneMissingImagesCommand` | `async` | `io` | Default |
+| `SyncCountryStationsCommand` | `async` | `io` | Default |
+| `ExecuteScheduledOccurrenceCommand` | `scheduler` | `coordination` | Default |
+| `RelayOutboxCommand` | `async` | `coordination` | Default |
+| `ExecuteRecommendationJobCommand` | `async` | `cpu` | Default |
+| `GenerateImageDerivativeCommand` | `async` | `cpu` | Default |
+| `FetchLyricsCommand` | `async` | `io` | Explicit selection only |
+| `SendWebhookCommand` | `async` | `io` | Explicit selection only |
+
+Resource classes describe the work. They do not reserve memory, CPU or execution
+slots; worker admission retains those policies. The catalog supplies the consumer
+receiver order, `async` then `scheduler`, and the bounded retry policies.
+
+[AsyncWorkloadCompilerPass](../src/Shared/Infrastructure/Messaging/AsyncWorkloadCompilerPass.php)
+checks the compiled default routes, eligible handlers on the default bus, payload
+codec registrations used by the
+[JSON codec](../src/Shared/Infrastructure/Messaging/JsonMessageCodec.php),
+JSON transport serializer and retry policies. A mismatch
+fails container compilation. The producer-side sender locator then checks actual
+sender aliases before sending, including explicit transport stamps. Received
+deliveries bypass that producer check so
+normal handling and manual failed-message retry retain their existing behavior.
+Unrouted inline commands remain synchronous; lyrics fetches may still run inline
+unless explicitly sent to `async`.
+
+Worker credential admission and supervisor startup validate the Redis DSNs before
+container creation or child launch respectively. They preserve the `messages` and
+`scheduler_occurrences` streams, `baander` group and generated launch identity;
+see [configuration](../docs-book/part-1-operator-guide/configuration.md#messenger)
+for accepted URL forms. These checks do not discover network endpoints or measure
+capacity.
 
 Recommendation admission remains synchronous and returns typed results; its
 worker command contains the persisted job identifier. Foreground CLI counts and
@@ -49,7 +74,8 @@ exit behavior are preserved. Image derivative requests queue work and serve the
 original until worker publication succeeds. Video/audio admission and playback
 controls use durable PostgreSQL authority directly. They do not wait behind the
 ordinary Messenger backlog. Notification delivery intents continue to override
-the transport to `async` through their dedicated relay.
+the transport to `async` through their dedicated relay, including the explicit-only
+webhook command after payload decoding and intent resolution.
 
 ### Media lifetime and shared state
 
@@ -151,9 +177,10 @@ state. Final containment verifies fourteen identities with zero survivors, and
 cleanup passes. The optional browser checkpoint records engine/version and uses
 native HLS without a media library or feature override.
 
-Only the two-command deployment item is closed. Later route/resource validation,
-responsive control capacity, autoscaling, measured capacity, failure/load coverage
-and media saturation qualification remain open.
+The two-command deployment checkpoint above retains its recorded scope.
+Responsive control capacity, autoscaling, measured capacity, failure/load coverage
+and media saturation qualification remain open. Route validation is described in
+the current routing section; its verification checkpoints belong in the roadmap.
 
 ## Historical inventory and incremental evidence
 
@@ -180,7 +207,7 @@ an invalid float type. A fresh export matches the checked-in specification.
 
 ## Historical asynchronous routes
 
-[messenger.yaml](../config/packages/messenger.yaml) declares **13 routes**: ten
+The historical `messenger.yaml` declared **13 routes**: ten
 to `swoole_task`, two to Redis `async`, and one to Redis `scheduler`. The table records current handler
 registration separately from the proposed family. `Any` means no `fromTransport`
 restriction; it does not mean the handler is asynchronously routed everywhere.

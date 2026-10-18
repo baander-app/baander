@@ -27,7 +27,7 @@ The test database uses `baander_test` as the database name — configured in `.e
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**. Used by cache pools, messenger transport, and session storage. |
-| `REDIS_URL` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379` | Full Redis DSN. The password is interpolated from `REDIS_PASSWORD`. |
+| `REDIS_URL` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379` | Redis endpoint URL. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. The password is interpolated from `REDIS_PASSWORD`. |
 
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
@@ -50,8 +50,39 @@ the narrow logout/revocation exceptions.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MESSENGER_TRANSPORT_DSN` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379/messages` | DSN for the message queue transport. Uses Redis by default. Set to `in-memory://` for testing. |
-| `MESSENGER_CONSUMER_NAME` | `${HOSTNAME:-worker}` | Consumer identifier for the messenger worker. Defaults to the container hostname. |
+| `MESSENGER_TRANSPORT_DSN` | `redis://default:%env(REDIS_PASSWORD)%@redis:6379/messages` | Redis URL for the `async` transport. Worker deployments accept no path, `/messages` or `/messages/baander`. |
+| `MESSENGER_CONSUMER_NAME` | `${HOSTNAME:-worker}` | Standalone consumer fallback. The admitted worker replaces it with an identity derived from the deployment, boot, worker role and launch generation. |
+
+Worker deployments accept a single `redis://` or `rediss://` endpoint in each URL,
+including percent-encoded credentials and bracketed IPv6 hosts. A host is required;
+percent escapes in hosts and port zero are rejected. URLs cannot contain
+fragments, ASCII whitespace or control characters, commas, backslashes, malformed
+percent escapes or multiple unescaped `@` separators. `REDIS_URL` must have no path or
+query. `MESSENGER_TRANSPORT_DSN` may carry unique scalar query options:
+`stream=messages`, `group=baander`, non-negative integer `dbindex` and
+`retry_interval`, or finite non-negative decimal `timeout` and `read_timeout`.
+Integer values use `0` or digits without leading zeroes; decimal values may add a
+fraction to that form. Unknown options, duplicates and nested option names are
+rejected. Consumer overrides are rejected, including a consumer path segment.
+
+Credential admission rejects invalid URLs before Docker creation. The supervisor
+checks again before launching children; diagnostics identify the setting without
+printing its credential-bearing value. These checks preserve the configured
+streams, group and generated identity. They do not test endpoint connectivity.
+
+The validated workload catalog in `config/packages/messenger.php` supplies fifteen
+default production routes and two explicit-only workloads: lyrics fetch and
+webhook delivery. Container compilation checks routes, handlers, codecs, JSON
+serialization and bounded retry policies; producer dispatch checks the selected
+senders. The admitted consumer receives `async` then `scheduler`. Resource classes
+`io`, `cpu` and `coordination` describe work and do not change worker reservations. The `test` environment
+configures both receivers as `in-memory://` in that file; changing a production
+worker DSN to `in-memory://` is rejected.
+
+Both `async` and `scheduler` configure `max_retries: 3`, `delay: 1000` milliseconds,
+`multiplier: 2` and `max_delay: 60000` milliseconds. Symfony recoverable exceptions
+can bypass the retry count and supply their own retry delay. These values bound
+the configured retry policy; they do not impose an unconditional execution cap.
 
 ## OAuth 2.0
 

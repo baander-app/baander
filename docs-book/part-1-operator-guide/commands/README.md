@@ -117,6 +117,14 @@ Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
 `noreply@localhost`. Values cannot contain
 line breaks and their complete env-file is limited to 4 KiB.
 
+Worker credentials admit only canonical Redis URL forms that preserve the
+`messages` and `scheduler_occurrences` streams, the `baander` group and the
+generated consumer identity. Invalid forms fail before container creation;
+`app:worker` checks again before child launch. Errors identify the setting without
+printing its credential-bearing value. See [Messenger configuration](../configuration.md#messenger)
+for accepted paths and query options. These checks do not establish connectivity
+or Redis durability.
+
 Apply an external deadline to every action. DBAL does not enforce a hard connection
 deadline through `connect_timeout`; that query option is rejected here.
 

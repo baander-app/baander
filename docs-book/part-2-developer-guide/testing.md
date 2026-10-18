@@ -497,6 +497,34 @@ Full coverage qualification matched 9,098 selected/completed test identities,
 and ParaTest. Timings and subsequent verification are recorded in the
 [roadmap](../../ROADMAP.md#parallel-backend-verification).
 
+### Validated asynchronous workloads
+
+`config/packages/messenger.php` declares seventeen production workloads: fifteen
+default routes and explicit-only `FetchLyricsCommand` and `SendWebhookCommand`
+entries. The test configuration adds `FailureTransportProbe` and uses in-memory
+transports for `async` and `scheduler`. Resource classes `io`, `cpu` and `coordination` describe
+work; they do not allocate capacity.
+
+Catalog and compiler-pass unit tests cover invalid workload declarations, codec
+registrations, effective default routes, transport-eligible handlers, JSON
+serialization and bounded retry policies. `AsyncWorkloadWiringTest` boots the real
+container to check the compiled catalog and sender-locator decorator.
+`ValidatedSendersLocatorTest` checks actual sender selection, including explicit
+transport stamps, interface/wildcard routes, rejected fan-out and unrouted inline
+commands. Received deliveries retain normal handling and manual failed-message
+retry behavior. Lyrics remain synchronous unless explicitly selected for `async`.
+The notification delivery relay decodes committed intents, resolves their channel
+and selects `async` explicitly, including webhook delivery. Relay-intent coverage
+checks that these produced commands belong to the admitted catalog.
+
+`WorkerTransportConfigurationTest` checks canonical Redis URL forms and rejects
+stream, group and consumer overrides, ambiguous query options and alternate
+transports. Controller and supervisor tests verify admission before Docker
+creation or child launch, preserved catalog receiver order and generated consumer
+identity. These checks establish configuration behavior rather than connectivity,
+network discovery or measured capacity. The messaging and worker-command runners
+below exercise the corresponding container and runtime paths.
+
 ### Messenger without Swoole
 
 To check Redis fallback with the Swoole extension unavailable, use the same CI
@@ -758,7 +786,11 @@ It verifies durable creation admission, refusal to recreate, exact-recipe
 reconciliation without process activity, and registered startup/recovery.
 
 The worker-command runner boots the actual `app:worker` as PID 1 against disposable
-production-mode PostgreSQL and Redis after fresh and repeat migrations. It verifies
+production-mode PostgreSQL and Redis after fresh and repeat migrations.
+It also supplies Redis consumer overrides through path and query forms and a
+conflicting scheduler path, requiring rejection before locks, lease authority or
+child launch, with credential values absent from output. Accepted startup checks
+both catalog receivers and the generated consumer identity. It verifies
 four direct child roles, media readiness after runtime/authority initialization,
 their exact committed deployment tuple (overriding a bogus
 inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the

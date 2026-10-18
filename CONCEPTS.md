@@ -150,6 +150,26 @@ A durable record that one session has applied a request identity. It prevents th
 same request from applying again after other controls have intervened. Controls
 fan out transactionally to sibling renditions of the same playback owner and video.
 
+## Asynchronous execution
+
+### Asynchronous workload catalog
+
+The admitted message classes, transport selections, resource classes and routing
+modes checked against compiled Messenger wiring. A default workload routes to its
+transport without a stamp; an explicit-only workload can run inline and enters its
+transport only through an explicit selection.
+
+### Workload resource class
+
+A catalog description of a workload as `io`, `cpu` or `coordination`. It describes
+the work without reserving execution slots, CPU or memory.
+
+### Consumer identity
+
+The Redis consumer name generated from a deployment namespace digest, supervisor
+boot ID, worker role and launch generation. Its registration is scoped to a Redis
+stream and consumer group.
+
 ## Backend verification
 
 ### Test lane
