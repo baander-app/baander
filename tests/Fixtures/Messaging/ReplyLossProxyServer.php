@@ -3,7 +3,11 @@
 declare(strict_types=1);
 
 // Standalone fresh exec: no application bootstrap or inherited DBAL sessions.
-$prefix = $argv[1];
+$arguments = $_SERVER['argv'] ?? [];
+if (PHP_SAPI !== 'cli' || count($arguments) !== 2 || !is_string($arguments[1]) || $arguments[1] === '') {
+    throw new InvalidArgumentException('Expected one reply-loss proxy fixture path.');
+}
+$prefix = $arguments[1];
 $config = json_decode((string) file_get_contents($prefix . '.config'), true, flags: JSON_THROW_ON_ERROR);
 $deadline = microtime(true) + 12;
 $bytes = 0;
