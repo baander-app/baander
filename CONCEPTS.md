@@ -177,6 +177,14 @@ namespace and boot identity. Each has its own memory, CPU and PID ceilings and a
 disjoint CPU set. Control owns the lease and coordination; execution observes the
 lease and owns native processes. A private IPC volume connects the pair.
 
+### Ordinary admission target
+
+The desired number of concurrent ordinary asynchronous receives and owned deliveries within a worker deployment pair's admitted resident-consumer maximum. Lowering the target leaves existing occupied permits held until their work completes.
+
+### Occupied permit
+
+A grant held by one ordinary consumer while it receives work and through any returned delivery's handler and transport completion. An uncertain receive or completion keeps the permit occupied until exact evidence resolves ownership; it does not authorize replacement work.
+
 ### Joint retirement barrier
 
 The retained boot reservation that prevents replacement until both worker units
