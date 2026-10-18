@@ -578,6 +578,7 @@ bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-recovery-container.sh
 bash scripts/test-worker-command-container.sh
 bash scripts/test-worker-operator-container.sh
+bash scripts/test-worker-lifecycle-container.sh
 bash scripts/test-docker-context.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
@@ -642,6 +643,59 @@ blocking operator lifecycle step using container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
 image. Adding that gate does not establish a passing Forgejo run. Status does not
 certify readiness.
+
+The standalone lifecycle runner pauses Redis and PostgreSQL in separate disposable
+operator projects, with no HTTP container and an ordinary maximum of two:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  bash scripts/test-worker-lifecycle-container.sh
+```
+
+Use the application CI image built for the current checkout. The runner takes no
+arguments, defaults to container controller mode and uses the operator runner's
+Docker, image and PostgreSQL settings. `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` selects
+source and dependencies from the image. `BAANDER_TEST_ARTIFACTS` selects the evidence
+directory; otherwise it creates `var/test-runs/worker-lifecycle-*`. Each phase
+writes `qualification.json`, `cleanup.json`, exact lease/work receipts and process
+observations beneath its own subdirectory, with a sibling phase log. The outer
+timeout is 1300 seconds, followed by a 40-second kill grace.
+
+With Redis paused, status must report unavailable queue measurements while
+controller evidence and deployment authority remain fresh. The fixture commits
+an identified outbox event and manual scheduler occurrence, observes their
+unfinished state, then sends TERM to the control unit's PID 1. Both units must
+stop within 50 seconds of TERM, before Redis is restored. This checks explicit
+shutdown during blocked transport I/O; Redis observation loss alone does not
+revoke PostgreSQL lease authority. The Redis server identity must survive the
+pause. With PostgreSQL paused, the fixture sends no stop signal: failed lease
+renewal must drain both units automatically within 50 seconds of the fault.
+Neither phase permits a restart or OOM kill as its shutdown evidence.
+
+After restoration, the predecessor's exact boot and epoch still reserve ownership.
+A different boot cannot replace it until recovery records removal of both captured
+immutable unit IDs. Repeated recovery must remain idempotent. The successor uses a
+fresh boot and epoch two; delayed predecessor recovery, renewal and start must
+leave that successor intact. The Redis phase checks the exact work retained before
+shutdown. The PostgreSQL phase seeds work after successor admission, because it
+cannot assume earlier work remained unconsumed. After the stale predecessor
+operations, both phases seed a fresh outbox event and manual occurrence and require
+their completion under the successor. Each work batch has a 90-second deadline.
+
+Completion requires the identified outbox event, one notification projection,
+both intended channel deliveries and one returned scheduler execution under the
+successor's exact authority, with no failed messages or residual stream, pending
+or delayed entries. The scheduler publication receipt `dispatched_at` can remain
+null when Redis accepted a send whose reply was lost before the old worker stopped;
+`dispatch_token` and the exact returned effect establish this check's completion.
+An execution already consumed without a return receipt remains uncertain and
+cannot be replayed merely to obtain a completion marker. This drill does not
+establish exactly-once delivery, broker crash durability, automatic replacement,
+unconditional transport I/O deadlines or new autoscaling performance results.
+Cleanup restores any paused dependency and verifies absence of run-owned resources;
+cleanup cannot substitute for the earlier shutdown and retirement observations.
+CI runs this same container controller path as a blocking step; the configuration
+alone is not evidence of a completed remote run.
 
 To check the actual production worker target, build it separately and pass its
 local image reference to the production runner:
@@ -854,6 +908,35 @@ against PostgreSQL, including blocked calls, parent deadlines, cancellation,
 malformed responses and output limits. Unit tests separately exercise monotonic
 lease authority and the runtime coordinator with controlled helper responses;
 they verify that pending renewal cannot block worker shutdown at lease expiry.
+`WorkerLeaseAgentTest` also keeps a parent transaction open while the real
+fresh-exec helper writes through a distinct PostgreSQL backend. An independent
+observer cannot see the parent's uncommitted writes; the parent's backend and
+transaction remain usable, and rollback leaves the helper's committed lease intact.
+`NativeExecutionDaemonTest` captures a live FFmpeg process identity and its owned
+process group before daemon TERM, then requires daemon exit, no live group member
+and removal of the native socket within the fixture deadline.
+
+To run these checks with the real transport response-loss cases:
+
+```bash
+bash scripts/test-backend-container.sh \
+  tests/Integration/WorkerLeaseAgentTest.php \
+  tests/Integration/NativeExecutionDaemonTest.php \
+  tests/Integration/MessengerAdmissionLifecycleTest.php
+BAANDER_TEST_DISABLE_SWOOLE=1 bash scripts/test-backend-container.sh \
+  tests/Integration/WorkerLeaseAgentTest.php \
+  tests/Integration/MessengerAdmissionLifecycleTest.php
+```
+
+The response-loss proxy forwards the selected Redis command and captures its
+successful server response before dropping only that response. Accepted
+`XREADGROUP` must leave the exact stream ID owned by the named consumer in the
+pending-entry list, without a handler effect. Accepted `XACK` must remove that
+pending entry after one handler effect. In both cases, the admission ledger keeps
+the same request uncertain and occupied, faults admission and refuses another
+receive. An ordinary disconnect without a confirmed accepted command does not
+satisfy this test. Existing retry-publication checks remain in the same file.
+
 The separate schema test above uses the fully migrated application kernel to check
 that ORM introspection preserves the DBAL-owned lease table. The search tests exercise
 production Doctrine filtering and scored SQL against mapped PGroonga indexes;

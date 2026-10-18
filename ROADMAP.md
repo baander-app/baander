@@ -105,10 +105,12 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Continue the remaining
-  [worker architecture items](#worker-architecture-and-resource-control), starting
-  with lease, scheduler-occurrence, retirement, orphan-cleanup, recovery and
-  transport-outage coverage. Measured autoscaling and admission profiles are
+- **Next.** Qualify the remaining
+  [shared web/worker media-control contract](#worker-architecture-and-resource-control):
+  leased ownership, ordered revisions, session generations, stale-segment exclusion,
+  cancellation under saturation, seek/pause/resume/reconnect and no duplicate
+  encoders on reattachment. Worker lifecycle and outage qualification is accepted
+  at the checkpoint below. Measured autoscaling and admission profiles are
   delivered by the [2026-10-18 checkpoint](#measured-ordinary-worker-autoscaling-2026-10-18).
   Reserved control capacity and validated routes/resource classes retain their
   [control](#reserved-worker-control-capacity-2026-10-18) and
@@ -2729,6 +2731,95 @@ smaller-host, live-provider, regional and longer failure/load qualification rema
 Existing historical checkpoints retain their own profiles and acceptance scope.
 Baseline application data and media are preserved.
 
+Worker lifecycle and outage qualification checkpoint (2026-10-18), implementing
+the [reviewed plan](docs/plans/2026-10-18-1713-test-worker-lifecycle-outage-qualification-plan.md):
+
+The new standalone runner exercises Redis and PostgreSQL pauses in separate
+maximum-two deployments without HTTP. Redis unavailability is observed while
+lease authority remains valid, followed by explicit PID 1 TERM; PostgreSQL
+unavailability must cause automatic authority-loss drain. Both stopped immutable
+unit IDs retain their reservation until joint retirement is recorded, and a
+premature successor is refused. Repeated recovery, a fresh successor boot at a
+higher epoch and stale predecessor operations are checked independently.
+
+Redis recovery follows the exact outbox event and manual occurrence retained
+before shutdown. PostgreSQL recovery verifies identified work seeded after
+successor admission. After the stale predecessor operations, both phases seed
+and complete another independently identified event and occurrence. Each batch
+requires one notification projection, both intended channel deliveries, one returned
+occurrence effect, empty stream/pending/delayed state and no failed messages. A lost publication
+reply can leave `dispatched_at` null after successful execution; completion uses
+`dispatch_token` and the exact returned effect. Consumed executions without return
+receipts remain uncertain. These checks add no production behavior or transport
+timeout policy and make no exactly-once, automatic-replacement or broker
+crash-durability claim.
+
+The real Redis transport cases drop a successful `XREADGROUP` or `XACK` reply and
+independently inspect the exact pending entry and effect count. Both preserve the
+same uncertain occupied permit and deny further receive. The lease-helper test
+observes a separate PostgreSQL backend while the parent's transaction remains
+usable and rollback remains effective. The native daemon test sends TERM with a
+live identified FFmpeg group and checks exit, group containment and socket removal.
+
+Characterization checkpoints: helper/native selections pass **32 tests / 516
+assertions** in **71.0 seconds** (`var/test-runs/20261018-171837-43f554d9`), and
+transport admission cases pass **5 tests / 180 assertions** in **42.3 seconds**
+(`var/test-runs/20261018-172110-2d536e09`). The no-Swoole transport/helper selection
+passes **37 tests / 696 assertions** in **86.4 seconds**
+(`var/test-runs/20261018-172707-aa370178`). These focused results overlap later
+qualification and do not establish a full-suite pass.
+
+The standalone lifecycle drill passes through the container controller with
+checkout-in-image source in **271.775 seconds**, including setup and cleanup.
+Redis explicit-stop drain takes **30 seconds**; PostgreSQL automatic authority-loss
+drain takes **32 seconds**. Their phase checkpoints take **73 / 57 seconds**,
+respectively. Both phases record maximum two, absent HTTP, epochs **1 → 2**,
+exact returned work and a subsequent independently identified batch, empty queues
+and verified cleanup with exit status zero. Evidence:
+`var/test-runs/worker-lifecycle-qualified`. This local run exercises the configured
+CI path; no completed remote run is claimed. An earlier fixture run incorrectly
+required a publication receipt after an accepted send with a lost reply. Its cleanup
+was verified; the corrected assertion follows existing scheduler semantics and
+required no production change.
+
+All **69 Python runner regressions** pass in **0.745 seconds**. Operator cleanup
+checks pass **16 cleanup, two final-drill and five phase-receipt cases**. Logs:
+`/tmp/lifecycle-runner-regressions.log` and `/tmp/lifecycle-cleanup-tests.log`.
+Three simplification reviewers and seven final code reviewers report no findings;
+the code review verdict is ready to merge. Receipts:
+`/tmp/baander-lifecycle-simplify-receipt.md` and
+`/tmp/compound-engineering-1000/ce-code-review/lifecycle-20261018-review/review.json`.
+Authoritative backend qualification passes **10,010 tests in 945 files / 81,813
+assertions** in **909.281 seconds**. The finalizer verified completed test identities
+and cleanup with status zero. Lane results (tests / assertions) are ordinary
+**6,420 / 25,776** in **64.4 seconds**, native **682 / 7,964** in **114.3 seconds**,
+and PostgreSQL lanes **1,680 / 23,166** in **693.4 seconds** and **1,228 / 24,907**
+in **528.5 seconds**. Artifacts: `var/test-runs/20261018-173431-7196b3a0`.
+This snapshot precedes a fixture-only CLI entry guard correction in `9bd34d6a`:
+PHPStan found an undefined `$argv` in `ReplyLossProxyServer.php`. After correction,
+the actual proxy selection passes **5 tests / 180 assertions** in **49.9 seconds**
+(`var/test-runs/20261018-175245-849c5e9a`); focused review reports no findings.
+
+All final static gates pass: Composer platform requirements (**0.40 seconds**),
+PHPStan (**58.66 seconds**), Deptrac (**5.40 seconds**), container lint (**2.20
+seconds**) and OpenAPI drift (**2.30 seconds**). No baseline or production changes
+were needed. Receipts: `/tmp/lifecycle-core-static/results.json` records four
+passing gates and the initial PHPStan failure;
+`/tmp/lifecycle-phpstan-final/results.json` records the corrected pass.
+Affected runtime drills pass: worker command (**328.423 seconds**), external paired
+recovery (**16.363 seconds**), TERM/KILL containment (**19.904 seconds**) and
+production operator (**34.706 seconds**). The production drill uses the existing
+`baander-worker-autoscaling-final:local` image; application files are unchanged.
+The new lifecycle CI path uses the current image. Timings and exit statuses:
+`/tmp/lifecycle-gates.json`; logs: `/tmp/lifecycle-gate-worker-command.log`,
+`/tmp/lifecycle-gate-recovery.log`, `/tmp/lifecycle-gate-containment.log` and
+`/tmp/lifecycle-gate-production-operator.log`.
+All **20 backend stack-isolation checks** pass in **43.373 seconds**. Evidence:
+`var/test-runs/lifecycle-stack-isolation` and
+`/tmp/lifecycle-gate-stack-isolation.log`. The reviewed lifecycle and outage scope
+is accepted; shared web/worker media control, live-provider and regional
+qualification retain their separate open scope.
+
 - [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.
@@ -2738,7 +2829,7 @@ Baseline application data and media are preserved.
   backlog. Bound CPU, RAM, device slots, restarts, and shutdown for entire child trees.
 - [x] Make autoscaling use measured backlog age, job duration, utilization, and
   admission budgets with stable scale-up/down behavior and measured default profiles.
-- [ ] Exercise leases, scheduler occurrences, process retirement, orphan cleanup,
+- [x] Exercise leases, scheduler occurrences, process retirement, orphan cleanup,
   deployment recovery, and transport outages. Do not inherit live Doctrine
   connections across forks or depend on a running HTTP server to supervise workers.
 - [ ] Qualify shared web/worker media control: leased ownership, ordered revisions,
