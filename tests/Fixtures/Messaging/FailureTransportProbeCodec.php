@@ -10,7 +10,7 @@ final readonly class FailureTransportProbeCodec implements MessagePayloadCodecIn
 {
     private const string TYPE = 'test.failure_transport_probe';
 
-    public function types(): array
+    public static function types(): array
     {
         return [self::TYPE => FailureTransportProbe::class];
     }

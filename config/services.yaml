@@ -862,6 +862,16 @@ services:
             - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent', method: 'onMessageHandled' }
             - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent', method: 'onMessageFailed' }
 
+    App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog:
+        arguments:
+            $workloads: '%app.messenger.workloads%'
+            $transportPolicies: '%app.messenger.transport_policies%'
+
+    App\Shared\Infrastructure\Messenger\ValidatedSendersLocator:
+        decorates: messenger.senders_locator
+        arguments:
+            $inner: '@App\Shared\Infrastructure\Messenger\ValidatedSendersLocator.inner'
+
     App\Shared\Infrastructure\Messaging\JsonMessageCodec:
         arguments:
             $payloadCodecs: !tagged_iterator baander.message_payload_codec

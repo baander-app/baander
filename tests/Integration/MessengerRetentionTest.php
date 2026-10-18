@@ -13,7 +13,7 @@ use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
-use Symfony\Component\Yaml\Yaml;
+use App\Tests\Fixtures\Messaging\MessengerConfiguration;
 
 /** Real Redis retention and ownership, using production async transport options. */
 final class MessengerRetentionTest extends TestCase
@@ -162,9 +162,9 @@ final class MessengerRetentionTest extends TestCase
     /** @param array<string, mixed> $overrides */
     private function transport(string $consumer, array $overrides = []): RedisTransport
     {
-        $config = Yaml::parseFile(dirname(__DIR__, 2) . '/config/packages/messenger.yaml');
+        $config = MessengerConfiguration::messenger();
         // Read the production block explicitly, excluding the in-memory test override.
-        $options = $config['framework']['messenger']['transports']['async']['options'];
+        $options = $config['transports']['async']['options'];
         $options = array_replace($options, ['stream' => $this->stream, 'group' => $this->group, 'consumer' => $consumer, 'timeout' => 2.0, 'read_timeout' => 2.0], $overrides);
         $connection = Connection::fromDsn($this->dsn, $options);
         $this->connections[] = $connection;

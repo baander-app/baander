@@ -20,7 +20,7 @@ final readonly class NotificationMessagePayloadCodec implements MessagePayloadCo
         'notification.send_webhook' => ['user_id', 'category', 'title', 'body', 'notification_id'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'notification.send_email' => SendEmailCommand::class,

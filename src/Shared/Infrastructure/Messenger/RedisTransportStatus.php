@@ -14,7 +14,7 @@ use Throwable;
 
 /**
  * Probes the async transport's Redis stream and counts the failure transport.
- * The stream and group names match the `async` transport in config/packages/messenger.yaml.
+ * The stream and group names match the `async` transport in config/packages/messenger.php.
  */
 final readonly class RedisTransportStatus implements TransportStatusInterface
 {

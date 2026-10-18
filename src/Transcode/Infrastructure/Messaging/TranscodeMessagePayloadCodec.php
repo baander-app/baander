@@ -14,7 +14,7 @@ final readonly class TranscodeMessagePayloadCodec implements MessagePayloadCodec
         'transcode.update_position' => ['session_id', 'position', 'action', 'request_id', 'expected_generation', 'expected_revision'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'transcode.update_position' => UpdateTranscodePositionCommand::class,

@@ -48,6 +48,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new MonologHandlerResetterPass());
         $container->addCompilerPass(new OutboxSubscriberPass());
         $container->addCompilerPass(new RateLimiterCatalogPass());
+        $container->addCompilerPass(new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCompilerPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
         $container->addCompilerPass(new ServeCommandPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
     }
 

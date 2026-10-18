@@ -15,7 +15,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\TransportException;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
-use Symfony\Component\Yaml\Yaml;
+use App\Tests\Fixtures\Messaging\MessengerConfiguration;
 
 /** Real Redis failures at both sides of delayed-to-stream promotion. */
 final class MessengerDelayedPromotionTest extends TestCase
@@ -237,8 +237,8 @@ final class MessengerDelayedPromotionTest extends TestCase
     /** @param array<string, mixed> $overrides */
     private function transport(array $overrides = []): RedisTransport
     {
-        $config = Yaml::parseFile(dirname(__DIR__, 2) . '/config/packages/messenger.yaml');
-        $options = $config['framework']['messenger']['transports']['async']['options'];
+        $config = MessengerConfiguration::messenger();
+        $options = $config['transports']['async']['options'];
         $options = array_replace($options, ['stream' => $this->stream, 'group' => 'test', 'consumer' => 'test', 'timeout' => 2.0, 'read_timeout' => 2.0], $overrides);
         $connection = Connection::fromDsn($this->dsn, $options);
         $this->connections[] = $connection;

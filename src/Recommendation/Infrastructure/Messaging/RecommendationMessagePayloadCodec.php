@@ -10,7 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 
 final readonly class RecommendationMessagePayloadCodec implements MessagePayloadCodecInterface
 {
-    public function types(): array
+    public static function types(): array
     {
         return ['recommendation.execute_job' => ExecuteRecommendationJobCommand::class];
     }

@@ -22,7 +22,7 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
         'metadata.sync' => ['source'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'metadata.extract_album_cover' => ExtractAlbumCoverCommand::class,

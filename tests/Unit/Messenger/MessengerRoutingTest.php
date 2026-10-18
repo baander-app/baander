@@ -4,80 +4,49 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Messenger;
 
+use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
+use App\Tests\Fixtures\Messaging\FailureTransportProbe;
+use App\Tests\Fixtures\Messaging\MessengerConfiguration;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Yaml\Yaml;
 
-/**
- * Unit test verifying Messenger routing configuration in messenger.yaml.
- *
- * Tests that ExtractAlbumCoverCommand is routed to the 'async' transport
- * to avoid Swoole task-worker nesting issues when dispatched from ScanLibraryHandler.
- */
 final class MessengerRoutingTest extends TestCase
 {
-    private const MESSENGER_CONFIG_PATH = __DIR__ . '/../../../config/packages/messenger.yaml';
-
-    public function testExtractAlbumCoverCommandRoutesToAsyncTransport(): void
+    public function testProductionRoutesPreserveLyricsSynchronousDispatchAndSchedulerIsolation(): void
     {
-        $config = $this->loadMessengerConfig();
-
-        $this->assertArrayHasKey('routing', $config['framework']['messenger']);
-        $routing = $config['framework']['messenger']['routing'];
-
-        // Verify ExtractAlbumCoverCommand is routed to async transport
-        $this->assertArrayHasKey(
-            'App\\Metadata\\Application\\Command\\ExtractAlbumCoverCommand',
-            $routing
-        );
-
-        $this->assertSame(
-            'async',
-            $routing['App\\Metadata\\Application\\Command\\ExtractAlbumCoverCommand'],
-            'ExtractAlbumCoverCommand must be routed to async transport to avoid Swoole task-worker nesting'
-        );
+        $config = MessengerConfiguration::messenger();
+        self::assertCount(15, $config['routing']);
+        self::assertSame('scheduler', $config['routing'][ExecuteScheduledOccurrenceCommand::class]);
+        self::assertCount(14, array_filter($config['routing'], static fn (string $queue): bool => $queue === 'async'));
+        self::assertArrayNotHasKey(FetchLyricsCommand::class, $config['routing']);
+        self::assertArrayNotHasKey(FailureTransportProbe::class, $config['routing']);
+        $workloads = MessengerConfiguration::container()->getParameter('app.messenger.workloads');
+        self::assertCount(16, $workloads);
+        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[FetchLyricsCommand::class]);
     }
 
-    public function testScanLibraryCommandRoutesToAsyncTransport(): void
+    public function testTestEnvironmentAddsOnlyTheExplicitFailureProbe(): void
     {
-        $config = $this->loadMessengerConfig();
-
-        $this->assertArrayHasKey('routing', $config['framework']['messenger']);
-        $routing = $config['framework']['messenger']['routing'];
-
-        // Verify ScanLibraryCommand is routed to async transport
-        $this->assertArrayHasKey(
-            'App\\Library\\Application\\Command\\ScanLibraryCommand',
-            $routing
-        );
-
-        $this->assertSame(
-            'async',
-            $routing['App\\Library\\Application\\Command\\ScanLibraryCommand'],
-            'ScanLibraryCommand should be routed to async transport'
-        );
+        $prod = MessengerConfiguration::messenger();
+        $test = MessengerConfiguration::messenger('test');
+        self::assertSame([FailureTransportProbe::class => 'async'], array_diff_key($test['routing'], $prod['routing']));
+        self::assertSame('in-memory://', $test['transports']['async']['dsn']);
+        self::assertSame('in-memory://', $test['transports']['scheduler']['dsn']);
+        self::assertSame('doctrine://default', $test['transports']['failed']['dsn']);
     }
 
-    public function testOnlyDurableWorkerTransportsAreConfigured(): void
+    public function testDurableReceiversKeepTheirRetryAndRetentionPolicies(): void
     {
-        $transports = $this->loadMessengerConfig()['framework']['messenger']['transports'];
-        self::assertArrayNotHasKey('swoole_task', $transports);
-        self::assertStringContainsString('%env(MESSENGER_TRANSPORT_DSN)%', $transports['async']['dsn']);
-    }
-
-    /** @return array<string, mixed> */
-    private function loadMessengerConfig(): array
-    {
-        $content = file_get_contents(self::MESSENGER_CONFIG_PATH);
-        if ($content === false) {
-            $this->fail('Cannot load messenger.yaml configuration file');
+        $transports = MessengerConfiguration::messenger()['transports'];
+        self::assertSame(['async', 'scheduler', 'failed'], array_keys($transports));
+        self::assertSame('%env(MESSENGER_TRANSPORT_DSN)%', $transports['async']['dsn']);
+        self::assertSame('%env(REDIS_URL)%/scheduler_occurrences/baander', $transports['scheduler']['dsn']);
+        foreach (['async' => 'messages', 'scheduler' => 'scheduler_occurrences'] as $name => $stream) {
+            self::assertSame($stream, $transports[$name]['options']['stream']);
+            self::assertSame('%env(MESSENGER_CONSUMER_NAME)%', $transports[$name]['options']['consumer']);
+            self::assertSame(0, $transports[$name]['options']['stream_max_entries']);
+            self::assertTrue($transports[$name]['options']['delete_after_ack']);
+            self::assertSame(['max_retries' => 3, 'delay' => 1000, 'multiplier' => 2, 'max_delay' => 60000], $transports[$name]['retry_strategy']);
         }
-
-        $config = Yaml::parse($content);
-
-        if (!isset($config['framework']['messenger'])) {
-            $this->fail('messenger.yaml does not contain framework.messenger configuration');
-        }
-
-        return $config;
     }
 }

@@ -40,8 +40,23 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new SyncCountryStationsCommand($id, 'de'),
             new ExecuteScheduledOccurrenceCommand($id),
             new RelayOutboxCommand(50),
+            new \App\Library\Application\Message\FilesDiscovered($id, 'music', '/media/music', []),
+            new \App\Metadata\Application\Message\SyncSongMessage($id, true),
+            new \App\Metadata\Application\Message\SyncAlbumMessage($id, true),
+            new \App\Metadata\Application\Message\SyncLibraryMessage($id, true, true, true),
+            new \App\Lyrics\Application\Command\FetchLyricsCommand($id),
+            new \App\Notification\Application\DTO\SendEmailCommand($id, 'listener@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable('2026-10-18T04:00:00Z')),
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
         ];
+
+        self::assertCount(17, $messages);
+        $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
+        self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
+        $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);
+        $probe = new \App\Tests\Fixtures\Messaging\FailureTransportProbe('round-trip', false);
+        self::assertEquals($probe, $codec->decode($codec->encode($probe))->message);
+        $covered[$probe::class] = true;
+        self::assertSame([], array_diff_key($catalog->workloads(), $covered));
 
         foreach ($messages as $message) {
             $wire = $codec->encode($message, ['correlation_id' => 'local-test']);

@@ -11,7 +11,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
 {
     private const string BATCH_EXTRACT_COVERS = 'catalog.batch_extract_covers';
 
-    public function types(): array
+    public static function types(): array
     {
         return [self::BATCH_EXTRACT_COVERS => BatchExtractCoversCommand::class];
     }

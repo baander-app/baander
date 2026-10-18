@@ -14,7 +14,7 @@ final readonly class RadioMessagePayloadCodec implements MessagePayloadCodecInte
         'radio.sync_country_stations' => ['source_id', 'country_code'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'radio.sync_country_stations' => SyncCountryStationsCommand::class,

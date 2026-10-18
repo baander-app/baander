@@ -13,7 +13,7 @@ final readonly class OutboxMessagePayloadCodec implements MessagePayloadCodecInt
         'outbox.relay' => ['batch_size'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'outbox.relay' => RelayOutboxCommand::class,

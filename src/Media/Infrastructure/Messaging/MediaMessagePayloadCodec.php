@@ -15,7 +15,7 @@ final readonly class MediaMessagePayloadCodec implements MessagePayloadCodecInte
         'media.generate_image_derivative' => ['source_path', 'preset'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'media.prune_missing_images' => PruneMissingImagesCommand::class,

@@ -16,7 +16,7 @@ final readonly class LyricsMessagePayloadCodec implements MessagePayloadCodecInt
         'lyrics.bulk_fetch' => ['limit', 'delay_ms'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'lyrics.fetch' => FetchLyricsCommand::class,

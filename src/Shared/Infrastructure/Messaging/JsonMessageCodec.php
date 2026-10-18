@@ -22,7 +22,7 @@ final readonly class JsonMessageCodec
         $codecs = [];
         $types = [];
         foreach ($payloadCodecs as $codec) {
-            foreach ($codec->types() as $type => $class) {
+            foreach ($codec::types() as $type => $class) {
                 if ($type === '' || isset($codecs[$type]) || isset($types[$class])) {
                     throw new \LogicException('Duplicate or empty message payload registration.');
                 }

@@ -19,7 +19,7 @@ final readonly class LibraryMessagePayloadCodec implements MessagePayloadCodecIn
         'library.files_discovered' => ['library_id', 'library_type', 'directory', 'files'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'library.scan' => ScanLibraryCommand::class,

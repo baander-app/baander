@@ -8,7 +8,7 @@ namespace App\Shared\Application\Messaging;
 interface MessagePayloadCodecInterface
 {
     /** @return array<string, class-string> Wire type to message class. */
-    public function types(): array;
+    public static function types(): array;
 
     /** @return list<string> Ordered fields for this wire type. */
     public function fields(string $type): array;

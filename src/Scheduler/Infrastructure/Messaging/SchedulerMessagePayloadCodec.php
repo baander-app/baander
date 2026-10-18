@@ -16,7 +16,7 @@ final readonly class SchedulerMessagePayloadCodec implements MessagePayloadCodec
         'scheduler.execute_occurrence' => ['occurrence_id'],
     ];
 
-    public function types(): array
+    public static function types(): array
     {
         return [
             'scheduler.execute_job' => ExecuteScheduledJobCommand::class,
