@@ -135,7 +135,8 @@ jobs:
                       bash scripts/test-backend-container.sh \
                       tests/Fixtures/MessengerWithoutSwooleTest.php \
                       tests/Unit/Shared/Infrastructure/Messenger/SwooleFallbackHandlerRegistrationTest.php \
-                      tests/Integration/MessengerJsonDeliveryTest.php
+                      tests/Integration/MessengerJsonDeliveryTest.php \
+                      tests/Integration/MessengerAdmissionLifecycleTest.php
 
             -   name: Container startup contract
                 run: bash scripts/test-container-startup.sh
@@ -161,6 +162,14 @@ jobs:
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                     BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
                       bash scripts/test-worker-operator-container.sh
+
+            -   name: Standalone worker dependency outages and recovery
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
+                    BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+                      bash scripts/test-worker-lifecycle-container.sh
 
             -   name: Outbox notification replay
                 run: |

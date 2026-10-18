@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 python3 - <<'PY'
+import hashlib
 import json
 import os
 import pathlib
@@ -20,6 +21,8 @@ mode = state['mode']
 code = 0
 if args[0] == 'logs':
     pass
+elif args[0] == 'unpause':
+    code = 1 if mode == 'paused-error' else 0
 elif len(args) >= 2 and args[1] == 'ls':
     kind = args[0]
     state['queries'][kind] = state['queries'].get(kind, 0) + 1
@@ -62,7 +65,8 @@ owned = {
 cases = [('transport', 0, None, 1), ('clean', 0, None, 0), ('absent', 0, None, 0),
          ('verification-transport', 0, None, 1), ('remove-failure', 0, 'fixture-controller', 1),
          ('remove-failure', 7, 'fixture-controller', 7), ('checkpoint', 0, None, 1),
-         ('clean', 7, None, 7), ('remove-error-absent', 0, 'fixture-controller', 1)]
+         ('clean', 7, None, 7), ('remove-error-absent', 0, 'fixture-controller', 1),
+         ('paused-clean', 0, None, 0), ('paused-error', 0, None, 1), ('paused-error', 7, None, 7)]
 for kind, names in owned.items():
     cases.append(('false-removal', 0, names[0], 1))
 
@@ -102,7 +106,9 @@ storage_volume=fixture-storage
 state_volume=fixture-media-state
 secrets_volume=fixture-web-secrets
 ipc_volume=fixture-worker-ipc
-two_command=1
+two_command=${CLEANUP_TWO_COMMAND:-1}
+lifecycle_phase=${CLEANUP_LIFECYCLE_PHASE:-}
+lifecycle_fault_container=${CLEANUP_FAULT_CONTAINER:-}
 operator_in_container=1
 docker_endpoint=unused
 docker_binary=$1
@@ -113,24 +119,31 @@ docker_local() { "$docker_binary" "$@"; }
         environment = dict(os.environ, CLEANUP_STUB_STATE=str(state_path))
         environment.pop('BAANDER_TEST_DOCKER_ENDPOINT', None)
         environment['BAANDER_TEST_TWO_COMMAND_CHECKPOINT'] = str(hook) if mode == 'checkpoint' else ''
+        for key in ('CLEANUP_TWO_COMMAND', 'CLEANUP_LIFECYCLE_PHASE', 'CLEANUP_FAULT_CONTAINER'):
+            environment.pop(key, None)
+        if mode.startswith('paused-'):
+            environment.update(CLEANUP_TWO_COMMAND='0', CLEANUP_LIFECYCLE_PHASE='redis',
+                               CLEANUP_FAULT_CONTAINER=hashlib.sha256(b'fixture-redis').hexdigest())
         result = subprocess.run(['bash', str(script), str(binary), str(work), str(artifacts)], env=environment,
                                 text=True, capture_output=True, timeout=30)
         receipt = json.loads((artifacts / 'cleanup.json').read_text())
         assert result.returncode == expected, (mode, blocked, result.returncode, expected, result.stderr)
         assert receipt['exitStatus'] == expected, (mode, receipt)
-        assert receipt['cleanupVerified'] is (mode in ['clean', 'absent']), (mode, receipt)
+        assert receipt['cleanupVerified'] is (mode in ['clean', 'absent', 'paused-clean']), (mode, receipt)
         final = json.loads(state_path.read_text())
+        if mode.startswith('paused-'):
+            assert final['calls'][0] == ['unpause', hashlib.sha256(b'fixture-redis').hexdigest()], final['calls']
         for call in final['calls']:
             if call[:3] == ['container', 'rm', '-f']:
                 assert len(call[3]) == 64 and all(c in '0123456789abcdef' for c in call[3]), call
         for kind in owned:
             assert 'unrelated-' + kind in final['resources'][kind], (mode, kind, 'unrelated resource removed')
-        if mode in ['clean', 'absent', 'checkpoint']:
+        if mode in ['clean', 'absent', 'checkpoint', 'paused-clean', 'paused-error']:
             for kind in owned:
                 assert final['resources'][kind] == ['unrelated-' + kind], (mode, kind, final['resources'][kind])
         if mode == 'remove-failure':
             assert final['resources']['volume'] == ['unrelated-volume'], 'Cleanup stopped at the first failed removal'
-    print('PASS: 13 cleanup cases; authoritative inventories, failures, original status, callback and unrelated resources verified.')
+    print('PASS: 16 cleanup cases; inventories, failures, original status, callbacks, paused dependencies and unrelated resources verified.')
 
 # Exercise the actual final drill block against a dependency failure that stops
 # the deployment, as well as a deployment still draining when recovery starts.

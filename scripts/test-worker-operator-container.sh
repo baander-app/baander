@@ -2,7 +2,7 @@
 set -euo pipefail
 if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     timeout_seconds=240
-    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then timeout_seconds=600; fi
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}" ]; then timeout_seconds=600; fi
     exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout "${timeout_seconds}s" bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
@@ -37,8 +37,13 @@ control_name=''
 web_name="$run_id-web"
 web_port=''
 two_command="${BAANDER_TEST_TWO_COMMAND:-0}"
+lifecycle_phase="${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}"
+case "$lifecycle_phase" in ''|redis|postgres) ;; *) echo 'Invalid worker lifecycle phase.' >&2; exit 2 ;; esac
+if [ -n "$lifecycle_phase" ] && { [ "$two_command" != 0 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; }; then
+    echo 'Worker lifecycle qualification requires standalone operator mode.' >&2; exit 2
+fi
 artifacts="${BAANDER_TEST_ARTIFACTS:-$(pwd)/var/test-runs/$run_id}"
-if [ "$two_command" = 1 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
+if [ "$two_command" = 1 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}$lifecycle_phase" ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
 source_volume="$run_id-source-media"
 storage_volume="$run_id-storage"
 state_volume="$run_id-media-state"
@@ -72,7 +77,10 @@ cleanup() {
             image) cleanup_docker image ls --format '{{.Repository}}:{{.Tag}}' ;;
         esac
     }
-    if [ "$two_command" = 1 ]; then
+    if [ -n "${lifecycle_fault_container:-}" ]; then
+        cleanup_docker unpause "$lifecycle_fault_container" >/dev/null 2>&1 || cleanup_status=1
+    fi
+    if [ "$two_command" = 1 ] || [ -n "${lifecycle_phase:-}" ]; then
         cleanup_docker logs "$run_id-postgres" > "$artifacts/postgres.log" 2>&1 || true
         cleanup_docker inspect --format '{{json .State}}' "$run_id-postgres" > "$artifacts/postgres-state.json" 2>&1 || true
         cleanup_docker logs "$web_name" > "$artifacts/web.log" 2>&1 || true
@@ -155,7 +163,7 @@ cleanup() {
     timeout 5s rm -rf "$work" || cleanup_status=1
     local final_status=$status
     if [ "$final_status" = 0 ] && [ "$cleanup_status" != 0 ]; then final_status=1; fi
-    if [ "$two_command" = 1 ]; then
+    if [ "$two_command" = 1 ] || [ -n "${lifecycle_phase:-}" ]; then
         if ! python3 - "$artifacts/cleanup.json" "$final_status" "$run_id" "$status" "$cleanup_status" <<'PYRECEIPT'
 import json, sys
 with open(sys.argv[1], 'w') as stream:
@@ -597,6 +605,11 @@ assert 0 <= status['desired'] <= maximum and status['occupied'] <= maximum, stat
 assert status['resourceFresh'] and status['resources']['state'] == 'known', status
 assert status['evidence']['queueState'] == 'known', status
 PYAUTOSCALING
+if [ -n "$lifecycle_phase" ]; then
+    source tests/Fixtures/Worker/lifecycle-checkpoint.sh
+    lifecycle_checkpoint
+    exit 0
+fi
 if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
     "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-$BAANDER_TEST_AUTOSCALING_CHECKPOINT}" "$artifacts" "$control_name" "$worker_name" "$ipc_volume" "$run_id-postgres" worker_operator_test
     operator recover 0
