@@ -191,6 +191,43 @@ reserved() {
         -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php reserved "$1" "$2"
 }
 
+# Invalid transport topology must fail before locks, lease authority or child launch.
+for invalid_case in path query scheduler; do
+    invalid_container="$run_id-invalid-$invalid_case"
+    invalid_namespace="baander.app:invalid-$invalid_case"
+    invalid_setting=MESSENGER_TRANSPORT_DSN
+    case "$invalid_case" in
+        path) invalid_dsn='redis://default:fixture-secret@redis:6379/messages/baander/fixed' ;;
+        query) invalid_dsn='redis://default:fixture-secret@redis:6379/messages?consumer=fixed' ;;
+        scheduler) invalid_setting=REDIS_URL; invalid_dsn='redis://default:fixture-secret@redis:6379/other' ;;
+    esac
+    containers+=("$invalid_container")
+    docker run -d --name "$invalid_container" "${common[@]}" -e "$invalid_setting=$invalid_dsn" \
+        --entrypoint php "$app_image" -d memory_limit=256M bin/console app:worker \
+        --deployment="$invalid_namespace" --boot-id=ffffffffffffffffffffffffffffffff \
+        --memory-mib=4288 --management-mib=256 --consumer-mib=384 --relay-mib=384 --scheduler-mib=320 --scheduled-console-mib=320 \
+        --media-mib=2624 --media-descendant-pids=14 --lock-dir=/tmp/baander-invalid-lock --no-interaction >/dev/null
+    invalid_exit="$(timeout 15s docker wait "$invalid_container")"
+    test "$invalid_exit" != 0
+    docker logs "$invalid_container" > "/tmp/$invalid_container-log" 2>&1
+    python3 - "/tmp/$invalid_container-log" "$invalid_setting" <<'PYINVALID'
+from pathlib import Path
+import sys
+output = Path(sys.argv[1]).read_text()
+assert sys.argv[2] in output, output
+assert 'fixture-secret' not in output
+assert 'worker_supervisor_stopped' not in output
+PYINVALID
+    rm -f "/tmp/$invalid_container-log"
+    if docker diff "$invalid_container" | grep -q '/tmp/baander-invalid-lock'; then
+        echo 'Invalid topology created a worker lock directory.' >&2
+        exit 1
+    fi
+    test "$(docker exec "$run_id-postgres" psql -U baander -d worker_command_test -Atc \
+        "SELECT count(*) FROM worker_deployment_leases WHERE namespace = '$invalid_namespace'")" = 0
+done
+echo 'Transport topology rejected before locks and authority; credentials redacted (3 cases).'
+
 # Block only the first renewal, after the event claim's autocommit boundary.
 claim_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 claim_namespace=baander.app:commandclaimcrash

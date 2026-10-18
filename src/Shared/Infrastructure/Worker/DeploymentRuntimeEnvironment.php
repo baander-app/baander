@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 use Closure;
 use InvalidArgumentException;
 use JsonSerializable;
@@ -61,6 +62,7 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         if ($bytes > 4096) {
             throw new InvalidArgumentException('Runtime environment file exceeds 4096 bytes.');
         }
+        WorkerTransportConfiguration::validate($validated);
         ksort($validated, SORT_STRING);
         $this->variables = $validated;
     }

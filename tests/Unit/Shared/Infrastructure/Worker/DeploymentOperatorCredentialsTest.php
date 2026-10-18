@@ -176,6 +176,11 @@ final class DeploymentOperatorCredentialsTest extends TestCase
             $document['controllerDatabaseUrl'] = $url;
             yield 'invalid DSN ' . $index => [json_encode($document, JSON_THROW_ON_ERROR)];
         }
+        foreach (['REDIS_URL' => 'redis://operator:runtime-private@redis.baander.app/0', 'MESSENGER_TRANSPORT_DSN' => 'redis://operator:runtime-private@redis.baander.app/messages/baander/foreign'] as $key => $value) {
+            $document = $base;
+            $document['runtimeEnvironment'][$key] = $value;
+            yield 'invalid transport topology ' . $key => [json_encode($document, JSON_THROW_ON_ERROR)];
+        }
         yield 'depth bound' => ['{"controllerDatabaseUrl":"controller-private","runtimeEnvironment":{"APP_SECRET":[[[[[["controller-private"]]]]]]}}'];
     }
 
@@ -211,7 +216,7 @@ final class DeploymentOperatorCredentialsTest extends TestCase
             'runtimeEnvironment' => [
                 'APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'APP_SECRET' => 'runtime-private',
                 'DATABASE_URL' => 'postgresql://runtime:runtime-private@db.baander.app/baander',
-                'REDIS_URL' => 'redis://redis.baander.app/0', 'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages',
+                'REDIS_URL' => 'redis://redis.baander.app', 'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages',
             ],
         ], JSON_THROW_ON_ERROR);
     }

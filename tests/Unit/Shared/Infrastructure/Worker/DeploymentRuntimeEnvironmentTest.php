@@ -12,6 +12,13 @@ use RuntimeException;
 
 final class DeploymentRuntimeEnvironmentTest extends TestCase
 {
+    public function testRejectsTransportOverridesBeforeCreatingAnEnvironmentFile(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('MESSENGER_TRANSPORT_DSN');
+        new DeploymentRuntimeEnvironment(['MESSENGER_TRANSPORT_DSN' => 'redis://operator:private@redis.baander.app/messages/baander/foreign']);
+    }
+
     public function testFilePreservesLiteralValuesSortingPermissionsAndReturnValue(): void
     {
         $secret = 'Bånder=# "quoted" $(touch /tmp/unsafe);`echo unsafe`';
@@ -92,7 +99,7 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
     public function testAdmitsConfiguredApplicationInputsAndEmptyValues(): void
     {
         $variables = ['APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'DATABASE_URL' => 'postgresql://db.baander.app/baander',
-            'REDIS_URL' => 'redis://redis.baander.app/0', 'REDIS_PASSWORD' => '', 'APP_SECRET' => 'secret',
+            'REDIS_URL' => 'redis://redis.baander.app', 'REDIS_PASSWORD' => '', 'APP_SECRET' => 'secret',
             'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages', 'MAILER_DSN' => 'smtp://mail.baander.app',
             'MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder',
             'CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions', 'MEDIA_STORAGE_PATH' => '/media/library'];

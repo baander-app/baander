@@ -6,11 +6,13 @@ namespace App\Shared\Infrastructure\Worker;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
+use App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog;
+use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 
 /** Initial fixed-role PID-1 runtime; child replacement requires external deployment recovery. */
 final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInterface
 {
-    public function __construct(private string $projectDirectory, private string $databaseUrl)
+    public function __construct(private string $projectDirectory, private string $databaseUrl, private AsyncWorkloadCatalog $workloads)
     {
         if (!str_starts_with($projectDirectory, '/') || realpath($projectDirectory) !== $projectDirectory
             || !is_file($projectDirectory . '/bin/console') || !is_file($projectDirectory . '/bin/worker-lease-agent.php')
@@ -28,6 +30,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         ) {
             throw new \RuntimeException('Worker supervisor must run as deployment PID 1 with pcntl and posix support.');
         }
+        $environment = $this->environment();
         if (!is_dir($configuration->lockDirectory) && !mkdir($configuration->lockDirectory, 0700)) {
             throw new \RuntimeException('Cannot create private worker lock directory.');
         }
@@ -40,7 +43,6 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         pcntl_signal(SIGTERM, $stop);
         pcntl_signal(SIGINT, $stop);
         try {
-            $environment = $this->environment();
             $environment['DATABASE_URL'] = $this->databaseUrl;
             $environment['BAANDER_WORKER_NAMESPACE'] = $configuration->namespace;
             $environment['BAANDER_WORKER_BOOT_ID'] = $configuration->bootId;
@@ -136,7 +138,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
     {
         return [
             new WorkerDefinition('consumer', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
-                'messenger:consume', 'async', 'scheduler', '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
+                'messenger:consume', ...$this->workloads->receivers(), '--memory-limit=256M', '--keepalive=30', '--no-interaction'],
                 $this->projectDirectory, $configuration->consumerReservationBytes + $configuration->scheduledConsoleReservationBytes, 30.0,
                 descendantProcessReservation: $configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1),
             new WorkerDefinition('relay', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/console',
@@ -192,6 +194,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
         unset($environment['SYMFONY_DOTENV_VARS']);
         // Only the admitted consumer may receive a nested console reservation.
         $environment['BAANDER_SCHEDULED_CONSOLE_RESERVATION_BYTES'] = '0';
+        WorkerTransportConfiguration::validate($environment, required: true);
         return $environment;
     }
 

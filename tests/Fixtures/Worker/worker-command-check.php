@@ -643,10 +643,12 @@ if (count($roles) !== 4 || !isset($roles['consumer'], $roles['relay'], $roles['s
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
 $redis->auth(['default', 'test-only']);
-$consumers = $redis->xInfo('CONSUMERS', 'messages', 'baander');
 $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-consumer-1';
-if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
-    throw new RuntimeException('Expected Redis consumer ' . $expected . '; observed ' . json_encode($consumers, JSON_THROW_ON_ERROR));
+foreach (['messages', 'scheduler_occurrences'] as $stream) {
+    $consumers = $redis->xInfo('CONSUMERS', $stream, 'baander');
+    if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
+        throw new RuntimeException('Expected admitted Redis consumer on ' . $stream . ': ' . $expected);
+    }
 }
 if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-after-send'], true)
     && !posix_kill($roles['relay'], SIGKILL)) {
