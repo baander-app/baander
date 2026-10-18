@@ -743,11 +743,59 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
+        $generation = $payload['generation'] ?? null;
+        $revision = $payload['revision'] ?? null;
+        if ((!is_int($position) && !is_float($position)) || !is_finite((float) $position) || $position < 0
+            || !in_array($action, ['seek', 'pause', 'resume', 'progress'], true)) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Position must be a nonnegative number and action must be seek, pause, resume, or progress.',
+            ]);
+
+            return;
+        }
+        if ($action === 'seek' && array_key_exists('generation', $payload) && (!is_int($generation) || $generation < 1)) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Seek generation must be a positive integer when provided.',
+            ]);
+
+            return;
+        }
+        if ($action === 'progress' && (!is_int($generation) || $generation < 1 || !is_int($revision) || $revision < 1)) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Progress requires the current positive generation and revision.',
+            ]);
+
+            return;
+        }
+        $requestId = $payload['requestId'] ?? null;
+        if (array_key_exists('requestId', $payload)) {
+            try {
+                if (!is_string($requestId)) {
+                    throw new InvalidArgumentException('Invalid request identity.');
+                }
+                Uuid::fromString($requestId);
+            } catch (InvalidArgumentException) {
+                $this->pusher->pushToConnection($fd, [
+                    'type' => 'error',
+                    'message' => 'Request identity must be a UUID when provided.',
+                ]);
+
+                return;
+            }
+        }
+        $position = (float) $position;
+
         try {
             $this->bus->dispatch(new UpdateTranscodePositionCommand(
                 sessionId: $sessionUuid,
-                position: (float) ($position ?? 0.0),
-                action: (string) $action,
+                position: $position,
+                action: $action,
+                requestId: $requestId,
+                expectedGeneration: in_array($action, ['seek', 'progress'], true) ? $generation : null,
+                expectedRevision: $action === 'progress' ? $revision : null,
             ));
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, [
@@ -758,10 +806,15 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
-        $this->pusher->pushToConnection($fd, [
+        $acknowledgement = [
             'type' => 'transcode.position_ack',
             'sessionId' => $sessionId,
-            'position' => (float) ($position ?? 0.0),
-        ]);
+            'position' => $position,
+            'status' => 'processed',
+        ];
+        if ($requestId !== null) {
+            $acknowledgement['requestId'] = $requestId;
+        }
+        $this->pusher->pushToConnection($fd, $acknowledgement);
     }
 }

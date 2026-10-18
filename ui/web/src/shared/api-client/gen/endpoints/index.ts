@@ -7314,11 +7314,22 @@ export type PostTranscodeSessionPositionBody = {
      * @minimum 1
      */
   revision?: number;
+  /** Optional control identity; reuse across retries of the same command */
+  requestId?: string;
 };
 
+export type PostTranscodeSessionPosition200Status = typeof PostTranscodeSessionPosition200Status[keyof typeof PostTranscodeSessionPosition200Status];
+
+
+export const PostTranscodeSessionPosition200Status = {
+  ok: 'ok',
+} as const;
+
 export type PostTranscodeSessionPosition200 = {
-  status?: string;
+  status?: PostTranscodeSessionPosition200Status;
   position?: number;
+  /** Echoed when supplied in the request */
+  requestId?: string;
 };
 
 export type GetAccentColorIndex200 = {

@@ -117,6 +117,116 @@ final class WebSocketControllerTest extends TestCase
         );
     }
 
+    #[DataProvider('transcodePositionCommands')]
+    public function testTranscodePositionPreservesFencesAndRetryIdentity(string $action, ?int $generation, ?int $revision): void
+    {
+        $owner = Uuid::generate();
+        $session = Uuid::generate();
+        $requestId = Uuid::generate()->toString();
+        $this->identities->method('transcodeSessionId')->willReturnCallback(static function (PublicId $id, Uuid $user) use ($owner, $session): Uuid {
+            self::assertSame(str_repeat('s', 21), $id->toString());
+            self::assertTrue($user->equals($owner));
+
+            return $session;
+        });
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(
+            static function (\App\Transcode\Application\Command\UpdateTranscodePositionCommand $command) use ($session, $requestId, $action, $generation, $revision): Envelope {
+                self::assertTrue($command->sessionId->equals($session));
+                self::assertSame(12.5, $command->position);
+                self::assertSame($action, $command->action);
+                self::assertSame($generation, $command->expectedGeneration);
+                self::assertSame($revision, $command->expectedRevision);
+                self::assertSame($requestId, $command->requestId);
+
+                // Successful handling can intentionally ignore a stale fence.
+                return new Envelope($command);
+            },
+        );
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller->onOpen(1, $owner->toString(), 'token-1');
+        $payload = ['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5, 'action' => $action, 'requestId' => $requestId];
+        if ($generation !== null) {
+            $payload['generation'] = $generation;
+        }
+        if ($revision !== null) {
+            $payload['revision'] = $revision;
+        }
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            $controller->onMessage(1, json_encode($payload, JSON_THROW_ON_ERROR));
+            self::assertSame([
+                'type' => 'transcode.position_ack', 'sessionId' => str_repeat('s', 21),
+                'position' => 12.5, 'status' => 'processed', 'requestId' => $requestId,
+            ], $this->lastPushedPayload());
+        }
+    }
+
+    /** @return iterable<string, array{string, ?int, ?int}> */
+    public static function transcodePositionCommands(): iterable
+    {
+        yield 'explicit current seek' => ['seek', null, null];
+        yield 'native seek' => ['seek', 3, null];
+        yield 'stale native seek' => ['seek', 1, null];
+        yield 'current progress' => ['progress', 3, 5];
+        yield 'stale progress' => ['progress', 1, 2];
+        yield 'pause' => ['pause', null, null];
+        yield 'resume' => ['resume', null, null];
+    }
+
+    /** @param array<string, mixed> $fields */
+    #[DataProvider('invalidTranscodePositions')]
+    public function testTranscodePositionRejectsMalformedFieldsBeforeDispatch(array $fields): void
+    {
+        $this->identities->method('transcodeSessionId')->willReturn(Uuid::generate());
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
+        $controller->onMessage(1, json_encode(array_replace(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], $fields), JSON_THROW_ON_ERROR));
+        self::assertSame('error', $this->lastPushedPayload()['type']);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function invalidTranscodePositions(): iterable
+    {
+        foreach ([null, -1, '12', [], true] as $index => $position) {
+            yield 'position ' . $index => [['position' => $position]];
+        }
+        yield 'action' => [['action' => 'delete']];
+        foreach ([null, 0, -1, '3', 3.5, true, []] as $index => $fence) {
+            yield 'seek generation ' . $index => [['generation' => $fence]];
+            yield 'progress generation ' . $index => [['action' => 'progress', 'generation' => $fence, 'revision' => 5]];
+            yield 'progress revision ' . $index => [['action' => 'progress', 'generation' => 3, 'revision' => $fence]];
+        }
+        yield 'progress requires fences' => [['action' => 'progress']];
+        foreach ([null, '', 'invalid', 3, []] as $index => $requestId) {
+            yield 'request identity ' . $index => [['requestId' => $requestId]];
+        }
+    }
+
+    public function testTranscodePositionDispatchFailureDoesNotAcknowledgeAndSocketRemainsResponsive(): void
+    {
+        $this->identities->method('transcodeSessionId')->willReturn(Uuid::generate());
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willThrowException(new \RuntimeException('Dispatch failed'));
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
+        $controller->onMessage(1, json_encode(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], JSON_THROW_ON_ERROR));
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Failed to update transcode position']);
+        $controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'pong');
+    }
+
+    public function testTranscodePositionCannotDispatchForAnUnownedSession(): void
+    {
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
+        $controller->onMessage(1, json_encode(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], JSON_THROW_ON_ERROR));
+        self::assertSame('error', $this->lastPushedPayload()['type']);
+    }
+
     public function testIdentityReadOutageRefusesMutationAndKeepsTheSocketResponsive(): void
     {
         foreach (['party.join', 'party.leave', 'party.playback', 'party.sync', 'transcode.position'] as $type) {

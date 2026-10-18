@@ -19659,6 +19659,11 @@
                                         "description": "Required for progress; desired revision currently attached by the player",
                                         "type": "integer",
                                         "minimum": 1
+                                    },
+                                    "requestId": {
+                                        "description": "Optional control identity; reuse across retries of the same command",
+                                        "type": "string",
+                                        "format": "uuid"
                                     }
                                 },
                                 "type": "object"
@@ -19668,16 +19673,24 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Position updated",
+                        "description": "Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "status": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "enum": [
+                                                "ok"
+                                            ]
                                         },
                                         "position": {
                                             "type": "number"
+                                        },
+                                        "requestId": {
+                                            "description": "Echoed when supplied in the request",
+                                            "type": "string",
+                                            "format": "uuid"
                                         }
                                     },
                                     "type": "object"

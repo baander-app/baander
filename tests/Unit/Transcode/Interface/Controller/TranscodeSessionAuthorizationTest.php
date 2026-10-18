@@ -112,6 +112,9 @@ final class TranscodeSessionAuthorizationTest extends TestCase
                 self::assertSame($payload['action'] ?? 'seek', $command->action);
                 self::assertSame($payload['generation'] ?? null, $command->expectedGeneration);
                 self::assertSame($command->action === 'progress' ? 5 : null, $command->expectedRevision);
+                if (isset($payload['requestId'])) {
+                    self::assertSame($payload['requestId'], $command->requestId);
+                }
                 if ($command->action === 'progress') {
                     self::assertSame(3, $command->expectedGeneration);
                     self::assertSame(5, $command->expectedRevision);
@@ -121,6 +124,39 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
         $response = $controller->updatePosition($session->getPublicId()->toString(), Request::create('/', 'POST', content: $json));
         self::assertSame($status, $response->getStatusCode());
+    }
+
+    public function testPositionRetriesKeepTheirIdentityAndDispatchFailuresPropagate(): void
+    {
+        $owner = Uuid::generate();
+        $session = TranscodeSession::create($owner, Uuid::generate(), Uuid::generate(), AudioProfile::streamingStereo());
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $port = $this->createStub(TranscodeSessionPortInterface::class);
+        $port->method('findByPublicId')->willReturn($session);
+        $requestId = Uuid::generate()->toString();
+        $attempts = 0;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(3))->method('dispatch')->willReturnCallback(
+            static function (UpdateTranscodePositionCommand $command) use ($requestId, &$attempts): Envelope {
+                self::assertSame($requestId, $command->requestId);
+                if (++$attempts === 3) {
+                    throw new \RuntimeException('Dispatch unavailable');
+                }
+
+                return new Envelope($command);
+            },
+        );
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $request = Request::create('/', 'POST', content: json_encode(['position' => 12.5, 'action' => 'pause', 'requestId' => $requestId], JSON_THROW_ON_ERROR));
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            $response = $controller->updatePosition($session->getPublicId()->toString(), $request);
+            self::assertSame(200, $response->getStatusCode());
+            self::assertSame(['data' => ['status' => 'ok', 'position' => 12.5, 'requestId' => $requestId]], json_decode((string) $response->getContent(), true));
+        }
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Dispatch unavailable');
+        $controller->updatePosition($session->getPublicId()->toString(), $request);
     }
 
     /** @return iterable<array{string, int}> */
@@ -133,6 +169,10 @@ final class TranscodeSessionAuthorizationTest extends TestCase
             yield ['{"position":12.5,"action":"seek","generation":' . $generation . '}', 422];
         }
         yield ['{"position":12.5,"action":"progress","generation":3,"revision":5}', 200];
+        yield ['{"position":12.5,"action":"pause","requestId":"01900000-0000-7000-8000-000000000001"}', 200];
+        foreach (['null', '""', '"invalid"', '3', '[]'] as $requestId) {
+            yield ['{"position":12.5,"requestId":' . $requestId . '}', 422];
+        }
         yield ['{"position":12.5,"action":"progress"}', 422];
         yield ['{"position":12.5,"action":"progress","generation":0,"revision":5}', 422];
         yield ['{"position":-1}', 422];

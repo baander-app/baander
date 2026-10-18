@@ -68,6 +68,22 @@ The controller dispatches messages by `type` field:
 
 Rate limiting is enforced per connection: 30 messages per second. Exceeding this returns an `error` message and the excess messages are dropped.
 
+### Transcode position controls
+
+`transcode.position` requires an owned `sessionId` and a finite, nonnegative `position` in seconds.
+Its `action` is `seek` by default, or `pause`, `resume` or `progress`.
+A native seek supplies the positive integer `generation` attached to the player so a delayed event cannot seek a replacement generation.
+An explicit seek may omit it.
+Progress requires both the current positive `generation` and `revision`; stale reports leave playback unchanged.
+
+An optional UUID `requestId` identifies one control across retries, including reconnects.
+Reusing it after another control has committed does not apply the earlier control again.
+The WebSocket reply echoes a supplied identity and reports `status: "processed"`.
+This means dispatch completed; a stale fence, replay or terminal session can still leave state unchanged.
+It does not acknowledge worker execution.
+Read the session's playback state separately for its current generation, revision, desired status and readiness.
+The HTTP position endpoint accepts the same fields and echoes a supplied identity; its existing `status: "ok"` has the same processing meaning.
+
 ### Identity
 
 A connection's user is fixed at its handshake, which redeems a ticket bound to the

@@ -284,6 +284,7 @@ final class TranscodeSessionController
                         new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume', 'progress']),
                         new OA\Property(property: 'generation', type: 'integer', minimum: 1, description: 'Required for progress; optional for seek to fence native events to the attached generation'),
                         new OA\Property(property: 'revision', type: 'integer', minimum: 1, description: 'Required for progress; desired revision currently attached by the player'),
+                        new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Optional control identity; reuse across retries of the same command'),
                     ],
                 ),
             ),
@@ -292,7 +293,7 @@ final class TranscodeSessionController
             new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Position updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'position', type: 'number')])),
+            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Echoed when supplied in the request')])),
         ],
     )]
     #[Route('/{publicId}/position', name: 'position', methods: ['POST'])]
@@ -321,17 +322,34 @@ final class TranscodeSessionController
         if ($action === 'progress' && (!is_int($generation) || $generation < 1 || !is_int($revision) || $revision < 1)) {
             return $this->errorResponse('Progress requires the current positive generation and revision.', 422);
         }
+        $requestId = $payload['requestId'] ?? null;
+        if (array_key_exists('requestId', $payload)) {
+            try {
+                if (!is_string($requestId)) {
+                    throw new \InvalidArgumentException('Invalid request identity.');
+                }
+                Uuid::fromString($requestId);
+            } catch (\InvalidArgumentException) {
+                return $this->errorResponse('Request identity must be a UUID when provided.', 422);
+            }
+        }
         $position = (float) $position;
 
         $this->commandBus->dispatch(new UpdateTranscodePositionCommand(
             sessionId: $sessionId,
             position: $position,
             action: $action,
+            requestId: $requestId,
             expectedGeneration: in_array($action, ['seek', 'progress'], true) ? $generation : null,
             expectedRevision: $action === 'progress' ? $revision : null,
         ));
 
-        return $this->successResponse(['status' => 'ok', 'position' => $position]);
+        $response = ['status' => 'ok', 'position' => $position];
+        if ($requestId !== null) {
+            $response['requestId'] = $requestId;
+        }
+
+        return $this->successResponse($response);
     }
     private function requireOwnedSession(string $publicId): Uuid
     {
