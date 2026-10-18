@@ -44,9 +44,15 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
     }
 
     #[DataProvider('invalidMetadata')]
-    public function testRejectsInvalidEffectiveMetadata(string $mutation, string $reason): void
+    public function testRejectsInvalidEffectiveMetadata(string $mutation, string $reason, bool $explicitOnly = false): void
     {
         $container = $this->container();
+        if ($explicitOnly) {
+            $workloads = $container->getParameter('app.messenger.workloads');
+            $workloads[CompilerWorkload::class]['default'] = false;
+            $container->setParameter('app.messenger.workloads', $workloads);
+            $container->getDefinition('messenger.senders_locator')->setArgument(0, []);
+        }
         switch ($mutation) {
             case 'missing-route':
                 $container->getDefinition('messenger.senders_locator')->setArgument(0, []);
@@ -95,6 +101,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         (new AsyncWorkloadCompilerPass())->process($container);
     }
 
+    /** @return iterable<int, array{0: string, 1: string, 2?: bool}> */
     public static function invalidMetadata(): iterable
     {
         yield ['missing-route', 'routing'];
@@ -110,6 +117,9 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         yield ['serializer', 'serializer'];
         yield ['retry', 'retry'];
         yield ['retry-missing', 'retry'];
+        yield ['codec-missing', 'codec', true];
+        yield ['handler-missing', 'handler', true];
+        yield ['handler-transport', 'handler', true];
     }
 
     public function testDecoratedDefaultBusUsesItsOriginalCompiledHandlers(): void

@@ -10,7 +10,6 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * The production kernel for the catalog and library mutation matrix. The real firewall, the ORM
@@ -42,9 +41,8 @@ final class CatalogMutationOAuthKernel extends ProductionOAuthKernel
                 ];
                 foreach ($transports as $name => $alias) {
                     $id = 'messenger.transport.' . $name;
-                    // The receiver tag keeps the transport's name known to the receiver locator.
-                    $tags = $container->getDefinition($id)->getTags();
-                    $container->setDefinition($id, (new Definition(InMemoryTransport::class))->setTags($tags)->setPublic(true));
+                    // Keep the framework factory, serializer and receiver metadata.
+                    $container->getDefinition($id)->setArgument(0, 'in-memory://')->setPublic(true);
                     $container->setAlias($alias, $id)->setPublic(true);
                 }
                 // The replaced Redis transport was the only reader of this variable, and the

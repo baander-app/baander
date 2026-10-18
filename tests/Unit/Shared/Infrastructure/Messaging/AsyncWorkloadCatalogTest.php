@@ -22,6 +22,7 @@ final class AsyncWorkloadCatalogTest extends TestCase
         $catalog->assertSenders(new \stdClass(), []);
     }
 
+    /** @param list<string> $aliases */
     #[DataProvider('invalidSenders')]
     public function testInvalidSenderSelectionFailsBeforeDispatch(object $message, array $aliases): void
     {
@@ -29,6 +30,7 @@ final class AsyncWorkloadCatalogTest extends TestCase
         $this->catalog()->assertSenders($message, $aliases);
     }
 
+    /** @return iterable<string, array{object, list<string>}> */
     public static function invalidSenders(): iterable
     {
         yield 'unknown workload' => [new \stdClass(), ['async']];
@@ -45,6 +47,10 @@ final class AsyncWorkloadCatalogTest extends TestCase
         new AsyncWorkloadCatalog([CatalogWorkload::class => ['transport' => 'async', 'resource_class' => 'unbounded', 'default' => true]], self::policies());
     }
 
+    /**
+     * @param array<string, mixed> $workloads
+     * @param array<string, mixed> $policies
+     */
     #[DataProvider('invalidCatalogs')]
     public function testMalformedCatalogFails(array $workloads, array $policies): void
     {
@@ -52,6 +58,7 @@ final class AsyncWorkloadCatalogTest extends TestCase
         new AsyncWorkloadCatalog($workloads, $policies);
     }
 
+    /** @return iterable<string, array{array<string, mixed>, array<string, mixed>}> */
     public static function invalidCatalogs(): iterable
     {
         $row = ['transport' => 'async', 'resource_class' => 'io', 'default' => true];
@@ -78,6 +85,7 @@ final class AsyncWorkloadCatalogTest extends TestCase
         ], self::policies());
     }
 
+    /** @return array<string, array{max_retries: int, delay: int, multiplier: int, max_delay: int}> */
     public static function policies(): array
     {
         $policy = ['max_retries' => 3, 'delay' => 1000, 'multiplier' => 2, 'max_delay' => 60000];
