@@ -324,6 +324,11 @@ services:
         arguments:
             $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
 
+    App\Shared\Infrastructure\Worker\Autoscaling\RedisQueueSampler:
+        arguments:
+            $dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+            $options: '%app.messenger.async_observation_options%'
+
     App\Shared\Infrastructure\Messenger\FailureTransportAdministration:
         arguments:
             $receiver: '@messenger.transport.failed'

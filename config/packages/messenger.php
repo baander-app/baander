@@ -55,6 +55,7 @@ return static function (ContainerConfigurator $container): void {
         'redeliver_timeout' => 3600,
         'claim_interval' => 60000,
     ];
+    $parameters->set('app.messenger.async_observation_options', ['stream' => 'messages'] + $redisOptions);
     $container->extension('framework', ['messenger' => [
         'serializer' => ['default_serializer' => JsonTransportSerializer::class],
         'transports' => [
