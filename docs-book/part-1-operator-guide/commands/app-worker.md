@@ -1,24 +1,28 @@
 # app:worker
 
 Run one unit of the paired worker deployment as its container's PID 1. Control
-supervises the outbox relay, scheduler poller and media coordination. Execution
-runs separate `async` and `scheduler` consumers and the native execution daemon.
+supervises the outbox relay, scheduler poller, independent autoscaler and media
+coordination. Execution runs resident ordinary `async` consumers, one separate
+`scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-3 manifest; see [Worker deployment](README.md#worker-deployment).
+4 manifest; see [Worker deployment](README.md#worker-deployment).
 
 ## Quick start
 
-The deployment tool runs the command as the container's PID 1, in this form:
+The deployment tool runs the command as the container's PID 1. These examples use
+the measured minimum-one/maximum-two admission envelope and the complete `autoscaling` object from the
+admitted manifest:
 
 ```bash
+profile=$(php -r '$m = json_decode(file_get_contents($argv[1]), true, 8, JSON_THROW_ON_ERROR); echo json_encode($m["autoscaling"], JSON_THROW_ON_ERROR);' /etc/baander/worker-manifest.json)
 php bin/console app:worker --no-interaction --deployment=worker.baander.app --boot-id=0123456789abcdef0123456789abcdef \
-  --unit=control --memory-mib=2624 --pids-limit=128 --scheduled-console-mib=0 \
-  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker
+  --unit=control --memory-mib=2944 --pids-limit=129 --scheduled-console-mib=0 \
+  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --autoscaling-profile="$profile"
 
 php bin/console app:worker --no-interaction --deployment=worker.baander.app --boot-id=0123456789abcdef0123456789abcdef \
-  --unit=execution --memory-mib=4480 --pids-limit=256 --scheduled-console-mib=320 \
-  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker
+  --unit=execution --memory-mib=4800 --pids-limit=257 --scheduled-console-mib=320 \
+  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --autoscaling-profile="$profile"
 ```
 
 ## Options
@@ -28,9 +32,10 @@ php bin/console app:worker --no-interaction --deployment=worker.baander.app --bo
 | `--deployment` | `BAANDER_WORKER_NAMESPACE` | Deployment namespace |
 | `--boot-id` | `BAANDER_WORKER_BOOT_ID` | Fresh 32-character hexadecimal boot identity |
 | `--unit` | `BAANDER_WORKER_UNIT` | Required unit identity: `control` or `execution` |
-| `--memory-mib` | — | Required unit ceiling: at least 2624 MiB for control or 4160 MiB plus the scheduled console reservation for execution |
-| `--pids-limit` | — | Required unit PID capacity: at least 128 for control or 256 for execution; at most 4096 |
+| `--memory-mib` | — | Required unit ceiling: at least 2944 MiB for control or `4160 + 320 * (maximumConcurrency - 1)` MiB plus the scheduled console reservation for execution |
+| `--pids-limit` | — | Required unit PID capacity: at least 129 for control or `256 + maximumConcurrency - 1` for execution; at most 4096 |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
+| `--autoscaling-profile` | — | Required complete JSON profile from the version 4 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 
@@ -38,8 +43,22 @@ php bin/console app:worker --no-interaction --deployment=worker.baander.app --bo
 
 When the environment sets `BAANDER_WORKER_NAMESPACE`, `BAANDER_WORKER_BOOT_ID` or `BAANDER_WORKER_UNIT`, the matching option must be absent or equal to it. Memory values are whole MiB up to 1048576. The host manifest binds these admission values to separate Docker memory, CPU and PID ceilings and disjoint CPU sets. They do not certify measured usage or capacity.
 
-The execution unit runs a consumer for each validated catalog receiver, `async`
-and `scheduler`. Container compilation checks default routes,
+Execution starts `consumer-0` through `consumer-(maximumConcurrency - 1)` for
+`async`, plus one separate `scheduler` consumer. Every ordinary slot remains
+resident and fully reserved, including when parked. Parking gates the next receive
+without reclaiming RSS or interrupting handling, acknowledgment, retry publication
+or keepalive. A shrink waits for occupied permits to drain below the target before
+admitting more work. Control's independent private autoscaler collects queue and
+execution cgroup evidence and updates admission through boot/epoch-fenced IPC;
+it does not consume ordinary work. It reserves 320 MiB within control's ceiling.
+
+The [manifest reference](README.md#worker-deployment) defines profile bounds and
+the measured maximum-two example and its workload limits. Missing measurements prevent growth and reduce
+ordinary admission to at most one. Severe memory/PID pressure closes admission;
+recovery needs fresh samples. Status exposes slot counts, decision reason and
+freshness without treating missing consumers as idle.
+
+Container compilation checks default routes,
 handlers registered for the transport, payload codecs, JSON serialization and
 bounded retry policies. Producer dispatch checks the actual selected senders,
 including explicit transport stamps. Catalog resource classes describe work; the

@@ -617,17 +617,17 @@ by its user, and it reaches PostgreSQL on a separate controller network with
 no published database port. The controller verifies that its socket reaches the
 same daemon before issuing an operator action. The worker keeps its private
 network and receives only its admitted named media volumes, with no Docker
-authority. Version 3 manifests require control/execution budgets and disjoint
-CPU sets, read-only source and writable derived volumes, and a private IPC volume.
+authority. Version 4 manifests require a complete autoscaling profile, separate
+control/execution budgets and disjoint CPU sets, read-only source and writable derived volumes, and a private IPC volume.
 Each unit has separate memory/CPU/PID ceilings, including encoder threads;
 see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
 With no explicit endpoint override, setup uses the
 runner's ambient Docker connection, supporting CI runners outside the daemon host.
 
 The paired operator fixture requires at least four host CPUs and 13 GiB of host
-memory. Combined web/media and control-capacity runs require 15 GiB: 7104 MiB
-for the worker pair, 4352 MiB for PostgreSQL/Redis (4096/256 MiB), 2048 MiB for
-web and 1024 MiB of headroom. The standalone sum is 12480 MiB; adding web raises it to 14528 MiB,
+memory. Combined web/media and control-capacity runs require 15 GiB: 7424 MiB
+for the one-slot worker pair, 4352 MiB for PostgreSQL/Redis (4096/256 MiB), 2048 MiB for
+web and 1024 MiB of headroom. The standalone sum is 12800 MiB; adding web raises it to 14848 MiB,
 rounded up to the stated host requirements. These are fixture admission
 ceilings, not measured universal capacity defaults.
 
@@ -719,11 +719,13 @@ remain separate gates.
 The reserved-control pressure drill runs separately from the full backend suite:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-worker-control-capacity-container.sh
+docker buildx build --target worker --load -t baander-worker:test .
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  bash scripts/test-worker-control-capacity-container.sh
 ```
 
-It uses disposable services and a version 3 paired deployment, with control
-2624 MiB/128 PIDs on one available CPU and execution 4480 MiB/256 PIDs on two
+It uses disposable services and a version 4 paired deployment, with control
+2944 MiB/129 PIDs on one available CPU and execution 4480 MiB/256 PIDs on two
 other available CPUs, including 320 MiB for scheduled console execution. The
 runner selects the first three available CPUs and records their explicit sets in
 the manifest; its host preflight requires four CPUs and 15 GiB, including the
@@ -731,8 +733,114 @@ web/dependency ceilings and headroom described above. Inspect its resource and p
 receipts before claiming pressure qualification. Separate OOM, PID exhaustion,
 peer-loss and containment results from ordinary backend correctness results.
 The [roadmap](../../ROADMAP.md#worker-architecture-and-resource-control) records
-verified CPU, memory and PID outcomes for this explicit profile. Adding or
-invoking the drill does not establish a passing result for another profile.
+verified CPU, memory and PID outcomes for both the earlier explicit profile and
+the version 4 maximum-one envelope. The latter passed all three phases in
+281.436 seconds, with verified cleanup and joint retirement. Execution OOM/PID
+exhaustion left control alive with no control OOM event. These exhaustion results
+do not qualify maxima two or four.
+
+### Ordinary worker autoscaling qualification
+
+Build the current worker image as above. The bounded comparison runner creates
+separate disposable pairs for resident
+ordinary maxima 1, 2 and 4, using the operator runner's dependency, lifecycle and
+cleanup ownership:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  bash scripts/test-worker-autoscaling-container.sh
+```
+
+Each profile has a 600-second bound, including setup; its observation callback has
+a separate 480-second deadline and a 470-second evidence-wait budget. Individual
+Docker observations have 12-second bounds. The runner also enforces a 2000-second
+deadline for the complete three-profile comparison. Image acquisition/build time depends on
+the selected runner mode. Retain the printed artifact directory after a failure;
+a skipped profile or scenario is an acceptance gap.
+
+The fixture writes thresholds before dispatch, then runs first and repeated bursts
+of 48 synthetic ordinary messages with two-second I/O waits. Each burst must finish
+within 150 seconds and return to target one within 110 seconds. Maxima 2 and 4 must
+reach their admitted maximum and improve burst throughput by at least 1.15 and 1.4
+times the one-slot baseline respectively. The pressure phase combines three video
+jobs and one audio rendition with execution CPU pressure. The audio encoder is
+deliberately stopped after initial output to retain its occupied slot, while the
+three video encoders remain active; this does not measure uninterrupted audio
+throughput during pressure. Desired-state controls
+must finish within three seconds and pressure must block ordinary growth. Sampling
+gaps must stay within five seconds, deployment authority must remain continuous,
+and both units must remain running at the final inspection.
+
+Artifacts include declared thresholds, daemon/container details, manifest
+fingerprints, startup timing, timestamped slot/queue/resource/status observations,
+completion receipts and media results. Every resident consumer remains fully
+reserved even when parked: execution is `4480 + 320 * (max - 1)` MiB and
+`256 + max - 1` PID slots for this fixture, including its 320 MiB scheduled console
+reservation. Control remains 2944 MiB/129 PIDs. The four-slot pair therefore needs
+8384 MiB; with dependencies, web and headroom the declared total is 15808 MiB,
+requiring at least 16 GiB of host memory. Use four available CPUs with the recorded
+explicit placement. These are admission envelopes, not measured RSS or throughput.
+
+Local qualification used an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
+and 64 GiB of physical RAM (Docker reported 67337879552 bytes), Docker
+29.7.2-ce and kernel 7.2.10-1-default. Control used CPU 0 with a one-CPU quota;
+execution used CPUs 1–2 with a two-CPU quota; dependencies and web shared CPU 3.
+The operator example recommends maximum two for this measured envelope. The
+internal constructor and unmodified fixture profile retain maximum one, and
+production manifests require every field explicitly.
+
+| Resident maximum | First/repeat I/O burst (seconds) | Speedup over maximum one | Execution peak cgroup memory (MiB) | Execution peak PIDs | Peak database connections | Checkpoint (seconds) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 97.42 / 97.43 | 1.00× | 878.5 | 31 | 35 | 358 |
+| 2 | 56.99 / 56.97 | 1.71× / 1.71× | 973.6 | 32 | 37 | 336 |
+| 4 | 39.21 / 38.48 | 2.48× / 2.53× | 1021.4 | 34 | 39 | 422 |
+
+Maximum four is a measured option for I/O-heavy work within this envelope, with
+5440 MiB/259 PID slots for execution including scheduled console. Its ordinary
+CPU workload took 27.87 seconds, compared with 26.50 seconds at maximum two;
+its CPU target reached only two before pressure returned it to one. The example
+therefore retains maximum two as the general starting profile, with fewer resident
+processes and connections.
+
+Maximum two grew to two for each burst and returned to one between bursts. During
+ordinary CPU work it grew to two, then resource pressure lowered the target to one.
+Its execution cgroup recorded 35.22 CPU seconds for that phase. Media-control
+p99/max were 0.198/0.250 seconds and heartbeat p99/max were 0.0103/0.0163 seconds.
+All five scheduled occurrences returned; ordinary pressure work acknowledged
+1369 deliveries. A paused-controller probe left one message unread while the
+controller was stale and completed it after recovery, which took 2.83 seconds.
+
+The first execution checkpoint arrived 17.38 seconds after container start for
+maximum two, with 379887616 bytes of cgroup memory and seven observed processes.
+That interval includes readiness, harness checks and the observation-gap probe;
+it excludes dependency/media preparation. Process counts and summed resident RSS
+include the qualification observer and shared pages; they are not idle application
+RSS. The first burst is labeled `cold` in artifacts but follows initialized
+duration history. Blocking waits model I/O rather than a provider latency
+distribution. Retry races are covered separately through real Messenger tests.
+
+Full harness startup to first checkpoint took 77.25, 106.28 and 66.33 seconds
+for maxima one, two and four, with one-second precision in the harness start clock.
+These intervals include fixture-image preparation, dependencies/media, web and
+pair readiness and the gap probe; they do not isolate production startup latency.
+PostgreSQL, Redis and web each had a 0.5-CPU quota on CPU 3, with configured
+memory/PID ceilings of 4096 MiB/64, 256 MiB/64 and 2048 MiB/128 respectively.
+Together with the pair, the five containers' memory ceilings sum to 13.5,
+13.8125 and 14.4375 GiB. These are configured limits, not measured dependency
+utilization; operator helper overhead is outside those sums.
+
+Artifacts are `var/test-runs/autoscaling-qualified-v3/{1,2,4}/qualification.json`,
+`startup-accounting.json` in each profile directory and `comparison.json` in the
+parent. The one-slot baseline was retained from the valid earlier run and accepted
+by the current stricter verifier; maxima two and four are fresh runs. All three
+profiles passed their checkpoints, comparison thresholds and cleanup. Earlier
+failed attempts remain failed evidence. The fresh production-image contract,
+maximum-two production media drill, real worker-command lifecycle and all twenty
+backend isolation checks pass. The version 4 reserved-control CPU/memory/PID drill
+also passes at maximum one; its exhaustion results do not qualify maxima two or
+four. Final independent review reconciliation is in progress. The [roadmap](../../ROADMAP.md#worker-architecture-and-resource-control) records exact
+acceptance scope. This ordinary gate does not replace backend, native, retry,
+media, lease-loss or joint-retirement gates.
 
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also

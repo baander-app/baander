@@ -107,10 +107,12 @@ only one agent host has.
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
 - **Next.** Continue the remaining
   [worker architecture items](#worker-architecture-and-resource-control), starting
-  with measured autoscaling and admission profiles. Reserved control capacity is
-  closed by the [2026-10-18 checkpoint](#reserved-worker-control-capacity-2026-10-18),
-  and validated routes/resource classes by their
-  [checkpoint](#validated-asynchronous-routes-2026-10-18).
+  with lease, scheduler-occurrence, retirement, orphan-cleanup, recovery and
+  transport-outage coverage. Measured autoscaling and admission profiles are
+  delivered by the [2026-10-18 checkpoint](#measured-ordinary-worker-autoscaling-2026-10-18).
+  Reserved control capacity and validated routes/resource classes retain their
+  [control](#reserved-worker-control-capacity-2026-10-18) and
+  [route](#validated-asynchronous-routes-2026-10-18) checkpoints.
   The two-command deployment item retains its production and browser checkpoint.
   Provider live qualification and regional acceptance remain separate work.
   React Native and Android remain deferred. The local dev database note below
@@ -2545,6 +2547,188 @@ longer failure/load coverage remain open. Earlier production/browser checkpoints
 retain their original scope. Baseline services, application databases and media
 remain untouched; all new verification resources are disposable.
 
+#### Measured ordinary worker autoscaling (2026-10-18)
+
+Implementation on `plan/measured-worker-autoscaling` follows the
+[reviewed plan](docs/plans/2026-10-18-1500-feat-measured-worker-autoscaling-plan.md).
+The user confirmed scaling workers within each admitted pair. The production
+profile, resident ordinary pool, receive gate, independent controller and status
+evidence are implemented. Resident maxima one, two and four passed local measured
+qualification and comparison; the operator example selects maximum two within
+that envelope. Implementation and qualification are delivered. Final independent
+review reports **Ready to merge**, with all **six** original findings resolved and
+**zero** subsequent actionable findings. Receipt:
+`/tmp/compound-engineering-1000/ce-code-review/20261018-164437-autoscale-reconcile/final-readiness.json`.
+
+Version 4 manifests require a complete, fingerprinted autoscaling profile. Control
+reserves **2944 MiB / 129 PIDs**, including **320 MiB** for its independent
+controller. Execution reserves **4160 + 320 × (maximumConcurrency − 1) MiB** plus
+any scheduled console reservation, and **256 + maximumConcurrency − 1 PID slots**.
+All admitted ordinary consumers start at boot and remain resident and fully
+reserved when parked. Scaling changes permission to receive; it reclaims no RSS
+or connections. The scheduler consumer and three-video/one-audio media topology
+retain separate reservations and the existing joint retirement barrier.
+
+The receive gate retains global occupancy through handling, acknowledgment and
+retry publication. Lower targets wait for held permits to drain before admitting
+replacement receives. Independent queue, slot and execution-cgroup observations
+feed the bounded policy; stale evidence prevents growth, severe memory/PID pressure
+closes ordinary admission, and recovery requires fresh samples. Status exposes
+desired, occupied, busy and parked counts, missing or uncertain evidence, sample
+ages, pressure and decision reasons. Atomic Redis retry promotion checks the
+current score and inserts/removes a due member in one Redis script, preventing
+competing successful promotions of the same member. A later removal failure can
+retain already-published work for redelivery; transport semantics remain
+at-least-once.
+
+Verified implementation checkpoints:
+
+- Profile and recipe arithmetic passed **216 tests / 416 assertions in 6 files**
+  in **30.7 seconds**. Artifacts: `var/test-runs/20261018-150855-1688c041`.
+- Real Redis retry-promotion checks passed **11 tests / 321 assertions**, with a
+  **36.4-second** service lane, covering competing pollers, a rescored future
+  member, serialization bytes, retention and denied Redis operations. Artifacts:
+  `var/test-runs/20261018-150724-00eb4111`.
+- Observation adapters passed **21 tests / 134 assertions in 3 files** in
+  **60.3 seconds**, including alternate transport database selection, unread,
+  pending, due and future work, unknown lag, bounded timeouts and cgroup sampling.
+  Artifacts: `var/test-runs/20261018-151442-7b1bef60`.
+- Integrated controller/runtime checks passed **72 tests / 1,272 assertions in
+  9 files** in **24.6 seconds**. Artifacts:
+  `var/test-runs/20261018-153427-9846b098`. These focused selections overlap.
+- The full backend coordinator passed **10,002 tests in 944 files / 81,597
+  assertions** in **833.826 seconds**. Ordinary: **6,419 / 25,767**,
+  **64.0 seconds**; native: **681 / 7,952**, **114.7 seconds**; service lanes:
+  **1,490 / 29,190**, **590.4 seconds**, and **1,412 / 18,688**,
+  **618.3 seconds**. Artifacts: `var/test-runs/20261018-154531-d27650c8`.
+  This snapshot precedes the added queue-state regression and three retry
+  lifecycle cases. Their focused CI run passed **49 tests / 1,224 assertions**
+  in **62.3 seconds**: ordinary **46 / 1,100**, **10.8 seconds**, and actual
+  worker lifecycle **3 / 124**, **29.1 seconds**. Artifacts:
+  `var/test-runs/20261018-155931-45b5cb2a`.
+- Qualification-verifier regressions with stricter idle checks passed **46 tests**
+  in **27.813 seconds**. Live observation-gap and ordinary CPU checks passed for
+  all three profiles; retry lifecycle coverage is recorded above.
+- The no-Swoole selection passed **45 tests / 288 assertions** in
+  **90.1 seconds**. Artifacts: `var/test-runs/20261018-160504-aad2e2f3`.
+- The latest static run passed Composer platform requirements in **0.40 seconds**,
+  Deptrac in **5.30 seconds**, container lint in **2.10 seconds** and OpenAPI drift
+  in **2.30 seconds**. PHPStan passed after its fixture reference-parameter
+  annotation correction in **74.82 seconds**. All five gates are green and cleanup
+  passed. Evidence: `/tmp/autoscale-final-static.log` (the four passing gates and
+  initial PHPStan failure) and `/tmp/autoscale-final-phpstan/results.json` (the
+  corrected PHPStan pass).
+- The first live one-slot comparison failed when Messenger's thirty-second alarm
+  interrupted three fixture I/O waits. A real alarm reproduced a **0.999785-second**
+  wait; waiting until the remaining monotonic deadline completed in
+  **2.000089 seconds** after the correction. The deployment comparison rerun is
+  recorded below; this failed run is not a qualification pass.
+- All **69 Python runner regressions** passed in **0.729 seconds**.
+- Two phase simplification reviews completed with **zero accepted changes**.
+  One connection-reuse proposal was declined because it would change
+  authentication, DNS and failure behavior. Receipts:
+  `/tmp/baander-u1-u2-simplify-wmqvkj7i/receipt.md` and
+  `/tmp/baander-u3-u5-simplify-tn4g6uit/receipt.md`.
+- The qualification-phase simplification applied shared threshold reuse and
+  declined a reverse-reader proposal because it added parser complexity without
+  measured benefit. Receipt: `/tmp/baander-u6-simplify-ucrcj1_t/receipt.md`.
+- A fresh production worker image built in **43.624 seconds**:
+  `sha256:b97ce7781e526b67249eb7af1f679e01fe8fb3679e227c35b97dc932076f06ee`.
+  The real worker-command drill passed in **291.914 seconds**, covering relay,
+  projection/handoff and consumer-acknowledgment crashes, scheduler failure, TERM,
+  lease expiry and retirement. The full production media wrapper passed in
+  **201.971 seconds** with the recommended maximum-two profile, **eight phases**
+  and verified cleanup. The wrapper verified the image contract, production
+  platform, exclusion of development dependencies and coroutine file I/O. Artifacts:
+  `var/test-runs/autoscale-production-media`; runtime evidence:
+  `/tmp/autoscale-final-runtime-gates.log`.
+- All **20 backend stack-isolation checks** passed in **43.198 seconds**, with
+  no cleanup errors. Evidence: `var/test-runs/autoscale-stack-isolation/results.json`.
+  The unchanged native lane is covered by the full backend run above.
+- The version 4 reserved-control CPU/memory/PID drill passed in **281.436
+  seconds**. CPU pressure retained a minimum backlog of **1986**, acknowledged
+  **1359 deliveries** and returned **five** scheduled occurrences while execution
+  consumed **157.371644 CPU seconds**. Control recorded **1503 heartbeat
+  samples**, maximum **0.017274801 seconds**; **206 media-control observations**
+  had maximum **0.251185469 seconds**. Memory exhaustion advanced execution's
+  `oom_kill` counter **0 → 1** and triggered an automatic **five-second** drain.
+  PID exhaustion advanced its max counter **0 → 44** and triggered automatic
+  draining within the same integer-second observation interval. Control survived
+  both faults. All three phases left control's OOM-kill counter unchanged and
+  recorded **zero exact-container Docker OOM events** for control. Every phase
+  verified cleanup, completed joint retirement and no remaining reservation.
+  Artifacts: `var/test-runs/autoscale-control-capacity-v4/{cpu,memory,pid}/`,
+  including `qualification.json`, `cleanup.json` and `capacity-retirement.json`;
+  total result: `/tmp/autoscale-final-control-capacity.json`.
+
+Local measured qualification used an **AMD Ryzen 7 5800X3D**, **8 cores /
+16 threads**, **64 GiB physical RAM** host; Docker reported **67337879552 bytes**.
+Control had one reserved CPU, execution two disjoint CPUs, and web/dependencies
+shared a fourth CPU. All three profiles used the same workload, declared thresholds
+and production code. The one-slot baseline was retained from the valid earlier
+run and accepted by the current stricter verifier; maxima two and four are fresh
+runs. Earlier failed maximum-two attempts remain failed evidence.
+
+| Resident maximum | First/repeat I/O burst (seconds) | Speedup over maximum one | Execution peak cgroup memory (MiB) | Execution peak PIDs | Peak database connections | Checkpoint (seconds) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 97.42 / 97.43 | 1.00× | 878.5 | 31 | 35 | 358 |
+| 2 | 56.99 / 56.97 | 1.71× / 1.71× | 973.6 | 32 | 37 | 336 |
+| 4 | 39.21 / 38.48 | 2.48× / 2.53× | 1021.4 | 34 | 39 | 422 |
+
+All three checkpoints and the comparative thresholds passed, with cleanup
+verified for every profile. Artifacts:
+`var/test-runs/autoscaling-qualified-v3/{1,2,4}/qualification.json` and
+`var/test-runs/autoscaling-qualified-v3/comparison.json`; host CPU receipt:
+`var/test-runs/autoscaling-qualified-v3/host-cpu.json`.
+The operator example recommends minimum one/maximum two with execution
+**4800 MiB / 257 PID slots**, including **320 MiB** for scheduled console work;
+control remains **2944 MiB / 129 PIDs**. Every manifest field remains required.
+The internal constructor retains conservative maximum one. Maximum four is an
+I/O-heavy option within the same qualified envelope with execution **5440 MiB /
+259 PID slots**, including console. It improved I/O completion but not ordinary
+CPU-work completion: **27.87 seconds**, compared with **26.50 seconds** at maximum
+two. Maximum two is the general starting profile with fewer resident processes
+and connections.
+
+Maximum two reached two in both I/O bursts and returned to one between them.
+Ordinary CPU work grew to two before pressure reduced it to one, with execution
+using **35.22 CPU seconds** in that phase. Media-control p99/max were
+**0.197508 / 0.249981 seconds**; heartbeat p99/max were **0.010339 / 0.016336
+seconds**. All **five** scheduled occurrences returned, with maximum completion
+**2.811135 seconds**; ordinary pressure work acknowledged **1369 deliveries**.
+The stale-controller probe kept work unread and completed it after recovery;
+recovery took **2.830745 seconds**.
+
+The media phase retained three active video encoders and one audio slot held by
+stopping its encoder after initial output. It does not establish uninterrupted
+audio throughput under pressure. The first burst follows harness work with
+initialized duration history; it is not pristine cold-start performance. Blocking
+waits model I/O, not a provider latency distribution. Startup and RSS observations
+include the qualification observer; dependency/media preparation is outside the
+reported container-start-to-checkpoint interval. Full resident reservations remain
+required despite lower sampled usage.
+
+Full harness startup to first checkpoint took **77.25 / 106.28 / 66.33 seconds**
+for maxima one/two/four, with **one-second** start-clock precision. These include
+fixture-image preparation, dependencies/media, web/pair readiness and the gap
+probe; they are not isolated production startup measurements. PostgreSQL, Redis
+and web each used **0.5 CPU** on CPU 3, with configured memory/PID ceilings
+**4096 MiB / 64**, **256 MiB / 64** and **2048 MiB / 128**. Five-container memory
+ceilings, including the pair, sum to **13.5 / 13.8125 / 14.4375 GiB**. These are
+configured limits rather than measured dependency use; operator helper overhead
+is outside the totals. Receipts:
+`var/test-runs/autoscaling-qualified-v3/{1,2,4}/startup-accounting.json`.
+
+The version 4 reserved-control pressure drill uses maximum one at
+**2944 MiB / 129 control PIDs** and **4480 MiB / 256 execution PIDs**, including console; it does not qualify
+OOM or PID exhaustion for maxima two or four. Those profiles have separate
+CPU/native pressure evidence above. Final independent review is complete, with
+no remaining blockers, as recorded in the review receipt above. The recommendation
+covers this hardware, placement and workload;
+smaller-host, live-provider, regional and longer failure/load qualification remain separate.
+Existing historical checkpoints retain their own profiles and acceptance scope.
+Baseline application data and media are preserved.
+
 - [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.
@@ -2552,7 +2736,7 @@ remain untouched; all new verification resources are disposable.
   retry policy, and unique consumer identity for every asynchronous message type.
 - [x] Reserve responsive control capacity independently of catalog/metadata/media
   backlog. Bound CPU, RAM, device slots, restarts, and shutdown for entire child trees.
-- [ ] Make autoscaling use measured backlog age, job duration, utilization, and
+- [x] Make autoscaling use measured backlog age, job duration, utilization, and
   admission budgets with stable scale-up/down behavior and measured default profiles.
 - [ ] Exercise leases, scheduler occurrences, process retirement, orphan cleanup,
   deployment recovery, and transport outages. Do not inherit live Doctrine

@@ -16,7 +16,7 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 3 recipe admits a fixed pair
+locally available immutable image ID. The version 4 recipe admits a fixed pair
 of control and execution containers,
 with separate resource ceilings and disjoint CPU sets. It requires explicitly
 authorized shared media volumes and a private named IPC volume; devices and bind
@@ -28,12 +28,12 @@ Build the worker target locally before selecting its immutable image ID:
 docker buildx build --target worker --load -t baander-worker:local .
 ```
 
-The manifest is a JSON object of at most 8192 bytes. Version 3 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 4 requires exactly
 these fields, with JSON integers for version and resource values:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
   "daemonId": "replace-with-docker-info-ID",
@@ -41,15 +41,31 @@ these fields, with JSON integers for version and resource values:
   "network": "baander-workers",
   "dockerBinary": "/usr/bin/docker",
   "dockerEndpoint": "unix:///var/run/docker.sock",
-  "controlMemoryMiB": 2624,
-  "executionMemoryMiB": 4480,
+  "controlMemoryMiB": 2944,
+  "executionMemoryMiB": 4800,
   "controlNanoCpus": 1000000000,
   "executionNanoCpus": 2000000000,
-  "controlPidsLimit": 128,
-  "executionPidsLimit": 256,
+  "controlPidsLimit": 129,
+  "executionPidsLimit": 257,
   "controlCpuSet": [0],
   "executionCpuSet": [1, 2],
   "scheduledConsoleMiB": 320,
+  "autoscaling": {
+    "minimumConcurrency": 1,
+    "maximumConcurrency": 2,
+    "sampleIntervalMs": 1000,
+    "maxSampleAgeMs": 3000,
+    "targetBacklogAgeMs": 10000,
+    "scaleUpSustainMs": 3000,
+    "scaleDownSustainMs": 30000,
+    "changeCooldownMs": 5000,
+    "cpuCeilingPercent": 85,
+    "memoryCeilingPercent": 85,
+    "pidsCeilingPercent": 85,
+    "memoryStopPercent": 95,
+    "pidsStopPercent": 95,
+    "coldDurationMs": 1000
+  },
   "ipcVolume": "baander-worker-ipc",
   "mediaMounts": [
     {"volume": "baander-source", "target": "/media", "readOnly": true, "role": "source"},
@@ -63,16 +79,63 @@ these fields, with JSON integers for version and resource values:
 Replace the daemon/image examples with `docker info --format '{{.ID}}'` and the
 local image's `docker image inspect --format '{{.Id}}'` values on the same endpoint.
 Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
-attempt. Control requires at least 2624 MiB and 128 PID slots; execution requires
-at least 4160 MiB plus its scheduled console reservation and 256 PID slots.
+attempt. Control requires at least 2944 MiB and 129 PID slots, including a 320 MiB
+reservation for its independent autoscaler. With maximum ordinary concurrency
+`max`, execution requires at least `4160 + 320 * (max - 1)` MiB plus its scheduled
+console reservation, and `256 + max - 1` PID slots.
 Scheduled console execution is disabled at `0` or reserves at least 320 MiB in
-execution. The example enables it with a 4480 MiB execution ceiling. CPU sets must
+execution. The example enables it with a 4800 MiB execution ceiling. CPU sets must
 be nonempty and disjoint; select available host CPUs explicitly. The example's
-CPU placement and quotas are operator choices, not universal defaults or measured
-capacity recommendations. Docker counts threads toward each unit's PID ceiling.
+CPU placement and quotas must fit the host; the measured envelope below applies
+to the recorded hardware and fixture. Docker counts threads toward each unit's
+PID ceiling.
 Creation also requires host memory for both ceilings plus 1 GiB and verifies that
 the declared CPU identifiers are available on that daemon.
-The fixed workload admits three video jobs, one audio rendition and no devices.
+
+The `autoscaling` object is required. Every field must be a JSON integer; missing
+or unknown fields are rejected. All fields contribute to both unit recipe
+fingerprints, including timing and pressure thresholds. There is no compatibility
+parser for older manifests. Changing any profile field requires retirement and a
+fresh boot; see [Upgrading](../upgrading.md#standard-update).
+
+The example recommends minimum one and maximum two for ordinary work on the
+measured envelope: an AMD Ryzen 7 5800X3D host with eight cores, sixteen threads
+and 64 GiB of physical RAM, with one CPU reserved for control, two disjoint CPUs
+for execution, and dependencies/web on another CPU.
+Two 48-message bursts of two-second simulated I/O completed in 56.99 and
+56.97 seconds, compared with 97.42 and 97.43 seconds at maximum one, about 1.71×
+faster. The maximum-two run returned to target one between bursts and reduced the
+target under CPU pressure. Maximum four completed the bursts in 39.21 and
+38.48 seconds, 2.48× and 2.53× faster than maximum one. It is an option for this
+I/O-heavy envelope with an execution ceiling of 5440 MiB and 259 PID slots,
+including the same 320 MiB scheduled console reservation. Maximum two is the
+general starting recommendation: it uses fewer resident processes and connections,
+and maximum four did not improve the measured CPU-work completion time.
+
+This recommendation covers the recorded synthetic workload and placement; it does
+not establish external-provider latency, unrestricted concurrency or smaller-host
+capacity. The first burst follows harness work and already initialized duration
+history. During media pressure, three video encoders were active and one audio
+encoder was deliberately stopped after initial output to retain its occupied slot;
+uninterrupted audio throughput during pressure was not measured. See the
+[qualification record](../../part-2-developer-guide/testing.md#ordinary-worker-autoscaling-qualification)
+for results and limits. The internal profile constructor remains conservative at
+maximum one; every production manifest must supply all fourteen fields explicitly.
+
+Concurrency bounds must satisfy `1 <= minimumConcurrency <= maximumConcurrency <= 4`. Durations are
+100 through 3600000 milliseconds. Sample age must cover at least two intervals;
+scale-up sustain and cooldown must cover an interval; scale-down sustain must
+exceed scale-up sustain. Percentages are 1 through 100, with memory/PID stop
+thresholds strictly above their growth ceilings.
+
+Execution starts all `consumer-0` through `consumer-(max - 1)` ordinary consumers
+at boot. A lower admission target parks free consumers before transport receive;
+it does not stop them or reclaim their RSS, connections or reservations. Occupied
+permits remain held through handling and completion. After a shrink, new receives
+wait until occupied permits fall below the new target. The scheduler consumer and
+media slots retain separate reservations.
+
+The fixed media workload admits three video jobs, one audio rendition and no devices.
 The worker argv,
 PHP management limit, identity and lock directory are fixed by the manifest parser;
 arbitrary commands, environment fields and secret paths are rejected.
@@ -162,7 +225,16 @@ An unclaimed unit can be cancelled; a claimed unit requires containment evidence
 Keep the old manifest for
 recovery; a replacement needs a fresh boot ID. `status` reports committed
 observations and always returns `readiness: "not_checked"`; it does not certify
-application readiness. Control owns and renews the deployment lease; execution
+application readiness. Runtime autoscaling status reports desired, occupied,
+busy, idle, parked, missing, uncertain and disconnected slots, together with
+controller/resource freshness, sample ages, pressure and the decision reason.
+Unavailable evidence remains unknown; it is not an empty queue or an idle slot.
+Stale measurements prohibit growth and lower ordinary admission to at most one;
+severe memory/PID pressure closes ordinary admission. Recovery requires fresh
+samples and respects stabilization and cooldown. Authority loss closes admission
+and starts the existing deployment drain.
+
+Control owns and renews the deployment lease; execution
 observes it. Both units must exchange matching boot/epoch evidence before business
 admission, within 30 seconds of startup. Peer loss, stale evidence or authority
 loss closes admission and drains the pair. Each supervisor has a 35-second drain

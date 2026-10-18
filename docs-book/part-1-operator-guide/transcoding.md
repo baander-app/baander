@@ -61,7 +61,13 @@ forks or reactor startup. The shipped Swoole build uses its thread backend for
 coroutine file reads under the worker's default Docker security restrictions.
 AIO threads and encoder threads both count toward the container PID ceiling.
 
-The host manifest reserves at least 2624 MiB for media and 14 descendant processes, with a container PID ceiling of at least 128 to include bounded encoder threads. These are admission reservations, not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
+The version 4 host manifest reserves control at least 2944 MiB and 129 PID slots.
+Execution requires at least `4160 + 320 * (maximumConcurrency - 1)` MiB plus any
+scheduled console reservation, and `256 + maximumConcurrency - 1` PID slots,
+including encoder threads. Ordinary admission can change within the profile's
+bounds; all ordinary consumers remain resident and fully reserved when parked.
+The three video slots and one audio slot remain independent of that target.
+These are admission reservations, not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
 
 ## Job Monitoring and State
 

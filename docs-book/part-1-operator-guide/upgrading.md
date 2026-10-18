@@ -10,6 +10,15 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
+Version 4 manifests require the complete ordinary autoscaling profile. The new
+controller refuses version 3 manifests, including recovery actions; keep the old
+checkout, controller, manifest and credentials available to retire an existing
+version 3 pair before switching code. Confirm both units' retirement and the joint
+reservation release, then create a version 4 manifest with a fresh boot ID and the
+new image. Retire through the old controller explicitly; lease expiry or a stopped
+container is insufficient. Preserve the database, pending work and media. This
+manifest change requires no data reset and provides no compatibility path.
+
 Then run these commands in order:
 
 ```bash
@@ -55,8 +64,10 @@ session/request control receipts; `Version20261017170000` scopes video jobs to
 playback owners without rewriting the initial migration or existing histories.
 `Version20261018130000` imports confirmed singleton retirement history and adds
 the control/execution journals and joint retirement barrier. It is irreversible.
-New deployments require a version 3 manifest with separate budgets, disjoint CPU
-sets and a private IPC volume; version 2 manifests are refused.
+New deployments require a version 4 manifest with separate budgets, disjoint CPU
+sets, a private IPC volume and a complete autoscaling profile; earlier manifest
+versions are refused. Every profile field is fingerprinted in both recipes, so
+changing thresholds or concurrency also requires retirement and a fresh boot.
 
 Ownership is derived from the recorded runtime session or an unambiguous session
 owner. Ambiguous or unattached historical jobs retain a null owner. Existing
