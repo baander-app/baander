@@ -68,11 +68,13 @@ LUA;
         try {
             [$dsn, $options, $stream, $group] = $this->configuration();
             $redis = new class extends \Redis {
+                /** @param array<string, mixed>|null $context */
                 public function connect(string $host, int $port = 6379, float $timeout = 0, ?string $persistent_id = null, int $retry_interval = 0, float $read_timeout = 0, ?array $context = null): bool
                 {
                     return parent::connect($host, $port, $timeout > 0 ? min(0.2, $timeout) : 0.2, null, 0, $read_timeout > 0 ? min(0.2, $read_timeout) : 0.2, $context);
                 }
 
+                /** @param array<string, mixed>|null $context */
                 public function pconnect(string $host, int $port = 6379, float $timeout = 0, ?string $persistent_id = null, int $retry_interval = 0, float $read_timeout = 0, ?array $context = null): bool
                 {
                     return $this->connect($host, $port, $timeout, null, 0, $read_timeout, $context);

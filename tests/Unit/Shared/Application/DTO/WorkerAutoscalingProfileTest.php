@@ -46,7 +46,7 @@ final class WorkerAutoscalingProfileTest extends TestCase
                 new WorkerAutoscalingProfile(...$invalid);
                 self::fail('Invalid autoscaling profile accepted.');
             } catch (\InvalidArgumentException) {
-                self::assertTrue(true);
+                self::addToAssertionCount(1);
             }
         }
     }
