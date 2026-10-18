@@ -65,6 +65,10 @@ final class AsyncWorkloadCompilerPass implements CompilerPassInterface
         $retryReferences = $container->findDefinition('messenger.retry_strategy_locator')->getArgument(0);
         foreach ($catalog->transportPolicies() as $transport => $policy) {
             $definition = $container->findDefinition('messenger.transport.' . $transport);
+            if ($definition->getFactory() === [\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, 'forEnvironment']) {
+                $definition = $this->definition($container, $definition->getArgument(0))
+                    ?? throw new \LogicException('Admission requires a concrete inner transport.');
+            }
             $serializer = $this->definition($container, $definition->getArgument(2));
             if ($serializer?->getClass() === SigningSerializer::class) {
                 $serializer = $this->definition($container, $serializer->getArgument(0));

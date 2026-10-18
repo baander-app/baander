@@ -123,7 +123,21 @@ try {
             $result = ['manifestMatches' => $boot?->manifestHash === $manifestHash,
                 'retirement' => $boot === null ? 'unregistered' : ($boot->retired ? 'completed' : ($boot->retirementRequested ? 'pending' : 'none')),
                 'reservation' => $lease === null ? 'none' : ($lease->bootId === $manifest->bootId ? 'this_boot' : 'another_boot'),
-                'readiness' => 'not_checked'];
+                'readiness' => 'not_checked', 'autoscaling' => ['state' => 'unavailable']];
+            if ($boot?->manifestHash === $manifestHash && !$boot->retirementRequested && !$boot->retired
+                && $boot->control->binding !== null && $lease?->bootId === $manifest->bootId) {
+                try {
+                    $status = json_decode($docker->execute(['exec', $boot->control->binding->containerId,
+                        '/usr/local/bin/php', '-d', 'memory_limit=64M', '/var/www/html/bin/worker-autoscaling-status.php',
+                        $manifest->namespace, $manifest->bootId, (string) $lease->epoch, $manifest->autoscaling->toJson()]), true, 8, JSON_THROW_ON_ERROR);
+                    if (!is_array($status)) {
+                        throw new RuntimeException('Invalid autoscaling status.');
+                    }
+                    $result['autoscaling'] = $status;
+                } catch (Throwable) {
+                    // Observation cannot alter deployment ownership or retirement.
+                }
+            }
             break;
     }
     $boot = $inventory->findBoot($manifest->namespace, $manifest->bootId);

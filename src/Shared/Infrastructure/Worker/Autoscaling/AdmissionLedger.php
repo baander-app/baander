@@ -146,6 +146,12 @@ final class AdmissionLedger
         return $this->locked(fn (): array => $this->read());
     }
 
+    public function authorityValid(float $now): bool
+    {
+        $this->time($now);
+        return $this->peersReady($now);
+    }
+
     private function transition(WorkerLaunchIdentity $identity, string $requestId, float $now, string $from, string $to, string $timestamp): void
     {
         $this->identity($identity, $requestId, $now);

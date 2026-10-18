@@ -329,6 +329,15 @@ services:
             $dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
             $options: '%app.messenger.async_observation_options%'
 
+    worker.autoscaling_runner:
+        alias: App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingRunner
+        public: true
+
+    App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport:
+        decorates: messenger.transport.async
+        factory: ['App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport', 'forEnvironment']
+        arguments: ['@App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport.inner']
+
     App\Shared\Infrastructure\Messenger\OrdinaryAdmissionSubscriber:
         arguments:
             $transport: '@messenger.transport.async'

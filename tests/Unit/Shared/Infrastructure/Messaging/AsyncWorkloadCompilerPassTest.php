@@ -30,6 +30,20 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testAdmissionDecoratorPreservesSerializerValidation(): void
+    {
+        $container = $this->container();
+        $inner = $container->getDefinition('messenger.transport.async');
+        $container->setDefinition('admission.inner', $inner);
+        $container->setDefinition('messenger.transport.async', (new Definition(\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, [new Reference('admission.inner')]))
+            ->setFactory([\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, 'forEnvironment']));
+        (new AsyncWorkloadCompilerPass())->process($container);
+        $inner->setArgument(2, new Definition(\stdClass::class));
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('JSON transport serializer');
+        (new AsyncWorkloadCompilerPass())->process($container);
+    }
+
     public function testExplicitOnlyWorkloadRequiresCoverageWithoutADefaultRoute(): void
     {
         $container = $this->container();
