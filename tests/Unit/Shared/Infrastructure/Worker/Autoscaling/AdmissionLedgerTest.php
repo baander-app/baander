@@ -117,6 +117,18 @@ final class AdmissionLedgerTest extends TestCase
         self::assertSame('parked', $this->ledger->snapshot(13)['slots']['consumer-0']['state']);
     }
 
+    public function testConcurrentPublicationWithinPeerReadSkewDoesNotRevokeAdmission(): void
+    {
+        $this->heartbeat(10.01);
+        $this->ledger->publishDecision(4, 'demand', [], 10.01);
+        self::assertTrue($this->ledger->authorityValid(10));
+        self::assertTrue($this->ledger->acquire($this->identity(), 1, $this->request(), 10));
+        $this->ledger->complete($this->identity(), $this->request(), 10.02);
+        $this->heartbeat(10.3);
+        self::assertFalse($this->ledger->authorityValid(10));
+        self::assertFalse($this->ledger->acquire($this->identity(), 2, $this->request(1), 10.02));
+    }
+
     public function testFutureControllerParks(): void
     {
         $this->ledger->publishDecision(4, 'demand', [], 11);

@@ -146,7 +146,7 @@ final class AutoscalingPolicy
 
     private function fresh(float $sampledAt, float $now): bool
     {
-        return is_finite($sampledAt) && $sampledAt >= 0 && $sampledAt <= $now
+        return is_finite($sampledAt) && $sampledAt >= 0 && $sampledAt <= $now + 0.25
             && $now - $sampledAt <= $this->profile->maxSampleAgeMs / 1000;
     }
 
@@ -192,14 +192,14 @@ final class AutoscalingPolicy
     /** @return array<string, int|float|string|null> */
     private function evidence(QueueObservation $queue, ResourceObservation $resources, PoolObservation $pool, float $now): array
     {
-        $age = static fn (float $at): ?float => is_finite($at) && is_finite($now) && $at >= 0 && $at <= $now ? $now - $at : null;
+        $age = static fn (float $at): ?float => is_finite($at) && is_finite($now) && $at >= 0 && $at <= $now + 0.25 ? max(0.0, $now - $at) : null;
         $finite = fn (?float $value): ?float => $this->measurement($value) ? $value : null;
         $count = static fn (?int $value): ?int => $value !== null && $value >= 0 ? $value : null;
         $state = static fn (string $value): string => in_array($value, ['known', 'unknown', 'unavailable'], true) ? $value : 'unknown';
         $completedDuration = $finite($pool->completedOccupancySeconds);
         $inFlightDuration = $finite($pool->maxInFlightSeconds);
         return [
-            'queueState' => $state($queue->state),
+            'queueState' => in_array($queue->state, ['known', 'unknown_lag', 'uninitialized', 'unavailable'], true) ? $queue->state : 'unknown',
             'resourceState' => $state($resources->state),
             'unreadCount' => $count($queue->unreadCount),
             'pendingCount' => $count($queue->pendingCount),

@@ -104,6 +104,17 @@ final class AutoscalingPolicyTest extends TestCase
         self::assertSame(2, $this->tick($policy, 16)->target);
     }
 
+    public function testQueueObservationStatesRemainDistinctInDecisionEvidence(): void
+    {
+        foreach (['unknown_lag', 'uninitialized', 'unavailable'] as $state) {
+            $decision = $this->policy()->decide(new QueueObservation($state, 10), $this->resources(10),
+                new PoolObservation(10, 0, 0, 4, 4), 10);
+            self::assertSame($state, $decision->evidence['queueState']);
+            self::assertSame('known', $decision->evidence['resourceState']);
+            self::assertSame('conservative', $decision->confidence);
+        }
+    }
+
     public function testAuthorityLossParksAndRequiresDistinctRecoverySamples(): void
     {
         $policy = $this->policy();
@@ -258,6 +269,36 @@ final class AutoscalingPolicyTest extends TestCase
         }
         for ($time = 21; $time <= 40; ++$time) {
             self::assertSame(4, $this->tick($policy, $time, cpu: $time % 2 === 0 ? 0.9 : 0.2)->target);
+        }
+    }
+
+    public function testConcurrentSamplesRetainGrownAdmissionAndClampEvidenceAges(): void
+    {
+        $policy = $this->policy();
+        for ($time = 0; $time <= 20; ++$time) {
+            $this->tick($policy, $time);
+        }
+        foreach ([0.001, 0.25] as $offset) {
+            $time = 21 + $offset;
+            $decision = $policy->decide(new QueueObservation('known', $time, 100, 0, 0, 0, 20, 0),
+                $this->resources($time), new PoolObservation($time, 4, 4, 0, 4, 10, 10), 21);
+            self::assertSame(4, $decision->target);
+            self::assertSame('known', $decision->confidence);
+            foreach (['queueSampleAgeSeconds', 'resourceSampleAgeSeconds', 'poolSampleAgeSeconds'] as $key) {
+                self::assertSame(0.0, $decision->evidence[$key]);
+            }
+        }
+    }
+
+    public function testImplausiblyFutureSamplesRemainUnavailableForEverySource(): void
+    {
+        foreach ([0, 1, 2] as $futureSource) {
+            $times = [10.0, 10.0, 10.0];
+            $times[$futureSource] = 10.251;
+            $decision = $this->policy()->decide(new QueueObservation('known', $times[0], 100, 0, 0, 0, 20, 0),
+                $this->resources($times[1]), new PoolObservation($times[2], 4, 4, 0, 4, 10, 10), 10);
+            self::assertSame('measurements_unavailable', $decision->reason);
+            self::assertNull($decision->evidence[['queueSampleAgeSeconds', 'resourceSampleAgeSeconds', 'poolSampleAgeSeconds'][$futureSource]]);
         }
     }
 

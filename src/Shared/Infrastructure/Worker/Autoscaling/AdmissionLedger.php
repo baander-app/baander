@@ -79,7 +79,7 @@ final class AdmissionLedger
             $slot['sequence'] = $sequence;
             $slot['seenAt'] = $now;
             $held = count(array_filter($state['slots'], static fn (array $value): bool => $value['requestId'] !== null));
-            if ($state['fatal'] || $state['controllerAt'] > $now || $now - $state['controllerAt'] >= $this->profile->maxSampleAgeMs / 1000
+            if ($state['fatal'] || $state['controllerAt'] > $now + 0.25 || $now - $state['controllerAt'] >= $this->profile->maxSampleAgeMs / 1000
                 || $held >= $state['target'] || $held >= $this->profile->maximumConcurrency || !$this->peersReady($now)) {
                 $slot['state'] = 'parked';
                 return false;
@@ -403,7 +403,7 @@ final class AdmissionLedger
                 throw new \RuntimeException('Foreign admission peer heartbeat.');
             }
             $this->number($peer['time'] ?? null);
-            if (($peer['ready'] ?? null) !== true || ($peer['draining'] ?? null) !== false || $peer['time'] > $now || $now - $peer['time'] >= 2.0) { return false; }
+            if (($peer['ready'] ?? null) !== true || ($peer['draining'] ?? null) !== false || $peer['time'] > $now + 0.25 || $now - $peer['time'] >= 2.0) { return false; }
         }
         return true;
     }

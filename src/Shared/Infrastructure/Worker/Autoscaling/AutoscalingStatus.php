@@ -27,7 +27,7 @@ final readonly class AutoscalingStatus
         $authority = $this->ledger->authorityValid($now);
         $counts = self::slotSummary($state, $this->profile, $now, $authority);
         $resource = $this->resources->read($now);
-        $controllerAge = $state['controllerAt'] <= $now ? $now - $state['controllerAt'] : null;
+        $controllerAge = $state['controllerAt'] <= $now + 0.25 ? max(0.0, $now - $state['controllerAt']) : null;
         $fresh = $controllerAge !== null && $controllerAge < $this->profile->maxSampleAgeMs / 1000;
         return ['state' => $authority && $fresh && !$state['fatal'] ? 'known' : 'unavailable',
             'desired' => $state['target'], 'occupied' => $counts['occupied'], 'busy' => $counts['busy'],
@@ -50,7 +50,7 @@ final readonly class AutoscalingStatus
             'uncertain' => 0, 'disconnected' => 0, 'known' => 0, 'maxInFlight' => null];
         foreach ($state['slots'] as $slot) {
             $held = $slot['requestId'] !== null;
-            $fresh = $slot['sequence'] > 0 && $slot['seenAt'] !== null && $slot['seenAt'] <= $now
+            $fresh = $slot['sequence'] > 0 && $slot['seenAt'] !== null && $slot['seenAt'] <= $now + 0.25
                 && $now - $slot['seenAt'] < $profile->maxSampleAgeMs / 1000;
             if ($held) {
                 ++$counts['occupied'];

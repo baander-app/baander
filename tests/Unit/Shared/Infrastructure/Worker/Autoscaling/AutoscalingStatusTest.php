@@ -68,6 +68,46 @@ final class AutoscalingStatusTest extends TestCase
         self::assertFalse($status['controllerFresh']);
     }
 
+    public function testConcurrentControllerPublicationHasZeroAgeWithinSkewBound(): void
+    {
+        foreach ([10.001, 10.25] as $time) {
+            $this->ledger->publishDecision(2, 'startup', [], $time);
+            $status = $this->probe()->snapshot(10);
+            self::assertSame('known', $status['state']);
+            self::assertTrue($status['controllerFresh']);
+            self::assertSame(0.0, $status['controllerAgeSeconds']);
+        }
+        $this->ledger->publishDecision(2, 'startup', [], 10.251);
+        $status = $this->probe()->snapshot(10);
+        self::assertFalse($status['controllerFresh']);
+        self::assertNull($status['controllerAgeSeconds']);
+        self::assertSame('unavailable', $status['state']);
+    }
+
+    public function testConcurrentSlotPublicationStaysConnectedWithinSkewBound(): void
+    {
+        $this->ledger->publishDecision(2, 'startup', [], 10);
+        $identity = new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1);
+        self::assertTrue($this->ledger->acquire($identity, 1, str_repeat('b', 32), 10.001));
+        $held = AutoscalingStatus::slotSummary($this->ledger->snapshot(10), $this->profile, 10, true);
+        self::assertEquals(0, $held['maxInFlight']);
+        $this->ledger->complete($identity, str_repeat('b', 32), 10.001);
+        foreach ([10.001, 10.25] as $time) {
+            if ($time > 10.001) {
+                self::assertTrue($this->ledger->acquire($identity, 2, str_repeat('c', 32), $time));
+                $this->ledger->complete($identity, str_repeat('c', 32), $time);
+            }
+            $status = $this->probe()->snapshot(10);
+            self::assertSame(1, $status['idle']);
+            self::assertSame(0, $status['disconnected']);
+        }
+        self::assertTrue($this->ledger->acquire($identity, 3, str_repeat('d', 32), 10.251));
+        $this->ledger->complete($identity, str_repeat('d', 32), 10.251);
+        $status = $this->probe()->snapshot(10);
+        self::assertSame(0, $status['idle']);
+        self::assertSame(1, $status['disconnected']);
+    }
+
     public function testForeignLeaseEpochCannotReadCurrentSnapshot(): void
     {
         $status = new AutoscalingStatus($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), $this->profile);

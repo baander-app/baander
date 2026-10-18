@@ -55,6 +55,18 @@ final class ResourceChannelTest extends TestCase
         self::assertSame('unavailable', $channel->read(10)->state);
     }
 
+    public function testConcurrentPublicationAllowsOnlyBoundedClockSkew(): void
+    {
+        $channel = $this->channel();
+        foreach ([10.001, 10.25] as $sampledAt) {
+            $channel->publish(new ResourceObservation('known', $sampledAt, 0.2, 0.01, 0.3, 0.4));
+            self::assertSame('known', $channel->read(10)->state);
+            self::assertSame($sampledAt, $channel->read(10)->sampledAt);
+        }
+        $channel->publish(new ResourceObservation('known', 10.251, 0.2, 0.01, 0.3, 0.4));
+        self::assertSame('unavailable', $channel->read(10)->state);
+    }
+
     public function testPublicFileIsNeverAccepted(): void
     {
         $channel = $this->channel();

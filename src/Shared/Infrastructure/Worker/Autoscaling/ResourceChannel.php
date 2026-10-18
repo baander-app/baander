@@ -66,7 +66,7 @@ final readonly class ResourceChannel
                 throw new \RuntimeException('Foreign resource sample.');
             }
             $observation = ResourceObservation::fromArray($value['observation']);
-            if ($observation->sampledAt > $now) {
+            if ($observation->sampledAt > $now + 0.25) {
                 throw new \RuntimeException('Future resource sample.');
             }
             return $observation;
