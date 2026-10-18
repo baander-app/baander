@@ -613,6 +613,7 @@ if ($mode === 'reserved') {
 }
 
 $roles = [];
+$profile = null;
 foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     $pid = (int) basename(dirname($path));
     $command = @file_get_contents($path);
@@ -625,6 +626,9 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
             : (in_array(dirname(__DIR__, 3) . '/bin/worker-scheduler.php', $arguments, true) ? 'scheduler'
                 : (in_array(dirname(__DIR__, 3) . '/bin/worker-media.php', $arguments, true) ? 'media'
                     : (in_array(dirname(__DIR__, 3) . '/bin/worker-native.php', $arguments, true) ? 'native' : null))));
+    if (in_array(dirname(__DIR__, 3) . '/bin/worker-autoscaler.php', $arguments, true)) {
+        $role = 'autoscaler';
+    }
     if ($role === null) {
         continue;
     }
@@ -636,12 +640,26 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     if ($status === false || preg_match('/^PPid:\s+(\d+)$/m', $status, $matches) !== 1 || (int) $matches[1] !== 1) {
         throw new RuntimeException('Production role is not a direct child of PID 1.');
     }
-    if (isset($roles[$role])) {
-        throw new RuntimeException('Duplicate production worker role.');
-    }
     $environment = @file_get_contents(dirname($path) . '/environ');
     if ($environment === false) {
         throw new RuntimeException('Could not inspect production role launch identity.');
+    }
+    if (preg_match('/(?:^|\x00)BAANDER_WORKER_AUTOSCALING_PROFILE=([^\x00]+)(?:\x00|$)/', $environment, $profileMatch) !== 1) {
+        throw new RuntimeException('Production role has no inherited autoscaling profile.');
+    }
+    $roleProfile = \App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson($profileMatch[1]);
+    if ($profile !== null && $profile->toJson() !== $roleProfile->toJson()) {
+        throw new RuntimeException('Production roles disagree on the admitted autoscaling profile.');
+    }
+    $profile = $roleProfile;
+    if ($role === 'consumer') {
+        if (preg_match('/(?:^|\x00)BAANDER_WORKER_ID=(consumer-[0-3])(?:\x00|$)/', $environment, $match) !== 1) {
+            throw new RuntimeException('Ordinary consumer has no admitted slot identity.');
+        }
+        $role = $match[1];
+    }
+    if (isset($roles[$role])) {
+        throw new RuntimeException('Duplicate production worker role.');
     }
     $identity = [];
     $expectedIdentity = [
@@ -673,8 +691,8 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
 }
 $unit = getenv('BAANDER_WORKER_UNIT');
 $expectedRoles = match ($unit) {
-    'control' => ['relay', 'scheduler', 'media'],
-    'execution' => ['consumer', 'scheduled-consumer', 'native'],
+    'control' => ['relay', 'scheduler', 'media', 'autoscaler'],
+    'execution' => [...($profile ?? throw new RuntimeException('No resident autoscaling profile.'))->consumerIds(), 'scheduled-consumer', 'native'],
     default => throw new RuntimeException('Fixture requires an explicit deployment unit.'),
 };
 if (count($roles) !== count($expectedRoles) || array_diff($expectedRoles, array_keys($roles)) !== []) {
@@ -683,11 +701,11 @@ if (count($roles) !== count($expectedRoles) || array_diff($expectedRoles, array_
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
 $redis->auth(['default', 'test-only']);
-foreach (['messages' => 'consumer', 'scheduler_occurrences' => 'scheduled-consumer'] as $stream => $consumerRole) {
-    $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $consumerRole . '-1';
+foreach (['messages' => ($profile ?? throw new RuntimeException('No resident autoscaling profile.'))->consumerIds(), 'scheduler_occurrences' => ['scheduled-consumer']] as $stream => $consumerRoles) {
+    $expected = array_map(static fn (string $role): string => 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1', $consumerRoles);
     $consumers = $redis->xInfo('CONSUMERS', $stream, 'baander');
-    if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
-        throw new RuntimeException('Expected admitted Redis consumer on ' . $stream . ': ' . $expected);
+    if (!is_array($consumers) || array_intersect($expected, array_column($consumers, 'name')) === []) {
+        throw new RuntimeException('Expected an admitted Redis consumer on ' . $stream);
     }
 }
 if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-after-send'], true)
@@ -695,7 +713,7 @@ if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-
     throw new RuntimeException('Could not kill the direct relay child at its verified crash boundary.');
 }
 if (in_array($mode, ['kill-consumer', 'kill-consumer-before-ack'], true)
-    && !posix_kill($roles[$mode === 'kill-consumer-before-ack' ? 'scheduled-consumer' : 'consumer'], SIGKILL)) {
+    && !posix_kill($roles[$mode === 'kill-consumer-before-ack' ? 'scheduled-consumer' : 'consumer-0'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');
 }
 if ($mode === 'kill-scheduler' && !posix_kill($roles['scheduler'], SIGKILL)) {

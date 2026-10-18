@@ -192,7 +192,7 @@ PYSUMMARY
 }
 await_exit() {
     local container="$1" expected="$2" launches="$3" wait_seconds="${4:-45}"
-    local control_launches=3 execution_launches=2 control_exit=1 execution_exit=1
+    local control_launches=4 execution_launches=2 control_exit=1 execution_exit=1
     if [ "$launches" = 0 ]; then
         control_launches=0; execution_launches=0
     else
@@ -307,7 +307,7 @@ claim_token="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["leas
 claim_until="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["lease_until"])' "$claim_snapshot")"
 [[ "$claim_token" =~ ^[a-f0-9]{64}$ ]]
 docker exec "$run_id-claim-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-relay-claimed "$claim_namespace" "$claim_boot"
-await_exit "$run_id-claim-crash" 1 5
+await_exit "$run_id-claim-crash" 1 6
 reserved "$claim_namespace" "$claim_boot"
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-contained "$claim_namespace" "$claim_boot" "$claim_token" "$claim_until"
@@ -367,7 +367,7 @@ projection_until="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])[
 docker exec "$run_id-projection-crash" php -d memory_limit=64M \
     tests/Fixtures/Worker/worker-command-check.php kill-relay-projecting \
     "$projection_namespace" "$projection_boot"
-await_exit "$run_id-projection-crash" 1 5
+await_exit "$run_id-projection-crash" 1 6
 reserved "$projection_namespace" "$projection_boot"
 
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
@@ -431,7 +431,7 @@ docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
 docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
     tests/Fixtures/Worker/worker-command-check.php kill-relay-after-send \
     "$delivery_namespace" "$delivery_boot"
-await_exit "$run_id-delivery-ack-crash" 1 5
+await_exit "$run_id-delivery-ack-crash" 1 6
 reserved "$delivery_namespace" "$delivery_boot"
 
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
@@ -499,7 +499,7 @@ fi
 
 docker exec "$run_id-crash-execution" php -d memory_limit=64M \
     tests/Fixtures/Worker/worker-command-check.php kill-consumer-before-ack "$namespace" "$boot"
-await_exit "$run_id-crash" 1 5
+await_exit "$run_id-crash" 1 6
 reserved "$namespace" "$boot"
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
@@ -525,7 +525,7 @@ docker exec "$run_id-consumer-ack-recovery" php -d memory_limit=64M \
 await_scheduler "$run_id-consumer-ack-recovery" "$namespace" "$boot"
 docker exec "$run_id-consumer-ack-recovery-execution" php -d memory_limit=64M \
     tests/Fixtures/Worker/worker-command-check.php kill-consumer "$consumer_recovery_namespace" "$consumer_recovery_boot"
-await_exit "$run_id-consumer-ack-recovery" 1 5
+await_exit "$run_id-consumer-ack-recovery" 1 6
 reserved "$consumer_recovery_namespace" "$consumer_recovery_boot"
 
 # An active predecessor reservation denies even its original boot; admission has no retry shortcut.
@@ -538,7 +538,7 @@ scheduler_namespace=baander.app:commandschedulercrash
 launch "$run_id-scheduler-crash" "$scheduler_namespace" "$scheduler_boot"
 await_ready "$run_id-scheduler-crash" "$scheduler_namespace" "$scheduler_boot"
 docker exec "$run_id-scheduler-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-scheduler "$scheduler_namespace" "$scheduler_boot"
-await_exit "$run_id-scheduler-crash" 1 5
+await_exit "$run_id-scheduler-crash" 1 6
 reserved "$scheduler_namespace" "$scheduler_boot"
 
 term_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
@@ -546,7 +546,7 @@ term_namespace=baander.app:commandterm
 launch "$run_id-term" "$term_namespace" "$term_boot"
 await_ready "$run_id-term" "$term_namespace" "$term_boot"
 docker kill --signal=TERM "$run_id-term" >/dev/null
-await_exit "$run_id-term" 0 5
+await_exit "$run_id-term" 0 6
 reserved "$term_namespace" "$term_boot"
 expiry_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 expiry_namespace=baander.app:commandexpiry
@@ -555,6 +555,6 @@ await_ready "$run_id-expiry" "$expiry_namespace" "$expiry_boot"
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php expire "$expiry_namespace" "$expiry_boot"
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
-await_exit "$run_id-expiry" 1 5 60
+await_exit "$run_id-expiry" 1 6 60
 reserved "$expiry_namespace" "$expiry_boot"
 echo 'Paired app:worker claim, projection, transport handoff, pre-XACK consumer crash recovery, replay, and lifecycle acceptance passed.'

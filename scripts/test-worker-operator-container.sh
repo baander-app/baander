@@ -2,7 +2,7 @@
 set -euo pipefail
 if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     timeout_seconds=240
-    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then timeout_seconds=600; fi
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then timeout_seconds=600; fi
     exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout "${timeout_seconds}s" bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
@@ -38,7 +38,7 @@ web_name="$run_id-web"
 web_port=''
 two_command="${BAANDER_TEST_TWO_COMMAND:-0}"
 artifacts="${BAANDER_TEST_ARTIFACTS:-$(pwd)/var/test-runs/$run_id}"
-if [ "$two_command" = 1 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
+if [ "$two_command" = 1 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
 source_volume="$run_id-source-media"
 storage_volume="$run_id-storage"
 state_volume="$run_id-media-state"
@@ -178,6 +178,8 @@ python3 - "$work/host.json" "$two_command" <<'PYHOST'
 import json, sys
 host = json.load(open(sys.argv[1]))
 minimum_gib = 15 if sys.argv[2] == '1' else 13
+if int(__import__('os').environ.get('BAANDER_TEST_AUTOSCALING_MAXIMUM', '1')) == 4:
+    minimum_gib += 1
 assert host['NCPU'] >= 4 and host['MemTotal'] >= minimum_gib * 1024**3, f'Worker qualification requires four CPUs and {minimum_gib} GiB including dependency/web ceilings and headroom'
 assert host['CgroupVersion'] == '2', 'Worker qualification requires cgroup v2'
 PYHOST
@@ -197,7 +199,7 @@ echo json_encode(array_slice($cpus, 0, 4), JSON_THROW_ON_ERROR);
 docker_local image tag "$base_id" "$fixture_base"
 test "$(docker_local image inspect --format '{{.Id}}' "$fixture_base")" = "$base_id"
 # Docker recipe isolation forbids both supplied mounts and inherited image VOLUMEs.
-test "$(docker_local image inspect --format '{{json .Config.Volumes}}' "$base_id")" = null || {
+test "$(docker_local image inspect --format '{{json (index .Config "Volumes")}}' "$base_id")" = null || {
     echo 'The local fixture base must not declare volumes.' >&2; exit 1;
 }
 image_id="$base_id"
@@ -214,6 +216,20 @@ if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
 else
     tar --exclude=config/secrets -cf - vendor src tests config packages migrations bin docker/general templates public \
         .env .env.test composer.json composer.lock translations | tar -xf - -C "$work/checkout"
+fi
+if [ -n "${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
+    # Register synthetic workload services only in this disposable fixture image.
+    cat > "$work/checkout/config/services_prod.yaml" <<'YAML'
+services:
+    App\Tests\Fixtures\Worker\Autoscaling\WorkloadCodec:
+        autowire: false
+        autoconfigure: false
+        tags: ['baander.message_payload_codec']
+    App\Tests\Fixtures\Worker\Autoscaling\WorkloadHandler:
+        autowire: false
+        autoconfigure: false
+        tags: [{name: messenger.message_handler}]
+YAML
 fi
 cat > "$work/Dockerfile" <<'DOCKERFILE'
 ARG FIXTURE_BASE=scratch
@@ -278,7 +294,7 @@ docker_local network create --internal "$run_id" >/dev/null
 # database joins this controller bridge; the worker keeps its sole private network.
 docker_local network create "$run_id-control" >/dev/null
 dependency_limits=()
-if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
+if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
     dependency_cpu="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])[3])' "$available_cpus")"
     dependency_limits=(--cpuset-cpus "$dependency_cpu" --cpus 0.5 --pids-limit 64)
 fi
@@ -326,11 +342,15 @@ python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$mani
 import json, os, sys
 work, namespace, boot, daemon, image, network, binary, endpoint, port, host, available = sys.argv[1:]
 cpus = json.loads(available)
+profile = json.load(open('tests/Fixtures/Worker/autoscaling-profile.json'))
+maximum = int(os.environ.get('BAANDER_TEST_AUTOSCALING_MAXIMUM', profile['maximumConcurrency']))
+assert maximum in (1, 2, 4)
+profile['maximumConcurrency'] = maximum
 manifest = dict(version=4, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
     network=network, dockerBinary=binary, dockerEndpoint=endpoint,
-    controlMemoryMiB=2944, executionMemoryMiB=4480, controlNanoCpus=1000000000, executionNanoCpus=2000000000,
-    controlPidsLimit=129, executionPidsLimit=256, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
-    autoscaling=json.load(open('tests/Fixtures/Worker/autoscaling-profile.json')),
+    controlMemoryMiB=2944, executionMemoryMiB=4480+320*(maximum-1), controlNanoCpus=1000000000, executionNanoCpus=2000000000,
+    controlPidsLimit=129, executionPidsLimit=256+maximum-1, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
+    autoscaling=profile,
     scheduledConsoleMiB=320, ipcVolume=network+"-worker-ipc",
     mediaMounts=[dict(volume=network+'-source-media', target='/media/source', readOnly=True, role='source'),
         dict(volume=network+'-storage', target='/var/www/html/storage', readOnly=False, role='derived'),
@@ -384,7 +404,10 @@ docker_local run --rm --name "$run_id-prepare" --network "$run_id" --env-file "$
             php tests/Fixtures/TwoCommand/deployment.php prepare
         fi
     ' sh "$namespace" "$boot" > "$work/prepare.log" 2>&1 || {
-    tail -40 "$work/prepare.log" >&2; exit 1;
+    mkdir -p "$artifacts"; chmod 700 "$artifacts"
+    cp "$work/prepare.log" "$artifacts/prepare.log"
+    head -25 "$work/prepare.log" >&2
+    tail -15 "$work/prepare.log" >&2; exit 1;
 }
 if [ "$operator_in_container" = 1 ]; then
     # This trusted controller needs the host socket's existing SELinux label.
@@ -465,7 +488,7 @@ checkpoint() {
 }
 start_web() {
     local -a web_cpu_limits=()
-    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then web_cpu_limits=(--cpuset-cpus "$dependency_cpu" --cpus 0.5); fi
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then web_cpu_limits=(--cpuset-cpus "$dependency_cpu" --cpus 0.5); fi
     # Relative signed URLs work both inside the web namespace and through its published port.
     docker_local run -d --name "$web_name" --network "$run_id-control" --publish "127.0.0.1:${web_port}:9501" \
         --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 2g --memory-swap 2g "${web_cpu_limits[@]}" \
@@ -494,7 +517,7 @@ with os.fdopen(fd, 'w') as stream:
     json.dump(dict(email='two-command-admin@baander.app', password='Two-command-drill-only-123!', moviePublicId=catalog['movie'], videoPublicId=catalog['video'], expectedSeekPosition=30), stream)
 PYLOGIN
     checkpoint authenticated
-    if [ -z "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
+    if [ -z "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
         combined_phase absent
         snapshot web "$web_name" web-without-worker
     fi
@@ -514,6 +537,7 @@ assert set(result['units']) == {'control', 'execution'}, result
 assert all(u['containerId'] and not u['startClaimed'] for u in result['units'].values()), result
 assert result['retirement'] == 'none' and result['reservation'] == 'none', result
 assert result['readiness'] == 'not_checked', result
+assert result['autoscaling'] == {'state': 'unavailable'}, result
 assert result['namespace'] == sys.argv[2] and result['bootId'] == sys.argv[3], result
 PY
 # Changing an authorized source volume cannot reuse an existing creation intent.
@@ -563,8 +587,18 @@ await_check ready
 await_check ready "$worker_name"
 await_check verify-outbox
 await_check verify-scheduler
-if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
-    "$BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT" "$artifacts" "$control_name" "$worker_name" "$ipc_volume" "$run_id-postgres" worker_operator_test
+operator status 0
+python3 - "$work/status.json" "$work/manifest.json" <<'PYAUTOSCALING'
+import json, sys
+status = json.load(open(sys.argv[1]))['result']['autoscaling']
+maximum = json.load(open(sys.argv[2]))['autoscaling']['maximumConcurrency']
+assert status['state'] == 'known' and status['authorityValid'] and status['controllerFresh'], status
+assert 0 <= status['desired'] <= maximum and status['occupied'] <= maximum, status
+assert status['resourceFresh'] and status['resources']['state'] == 'known', status
+assert status['evidence']['queueState'] == 'known', status
+PYAUTOSCALING
+if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
+    "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-$BAANDER_TEST_AUTOSCALING_CHECKPOINT}" "$artifacts" "$control_name" "$worker_name" "$ipc_volume" "$run_id-postgres" worker_operator_test
     operator recover 0
     operator recover 0
     operator status 0
