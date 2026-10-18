@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messaging;
 
-use InvalidArgumentException;
+use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use SensitiveParameter;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -18,7 +18,7 @@ final class WorkerTransportConfiguration
         foreach (['REDIS_URL', 'MESSENGER_TRANSPORT_DSN'] as $key) {
             if (!array_key_exists($key, $environment)) {
                 if ($required) {
-                    throw new InvalidArgumentException($key . ' is required for worker transport configuration.');
+                    throw new WorkerTransportConfigurationException($key . ' is required for worker transport configuration.');
                 }
                 continue;
             }
@@ -26,23 +26,23 @@ final class WorkerTransportConfiguration
             if (!is_string($dsn) || $dsn === '' || preg_match('/[\x00-\x20\x7f,\\\\]/', $dsn) !== 0
                 || substr_count($dsn, '@') > 1 || preg_match('/%(?![0-9a-fA-F]{2})/', $dsn) !== 0
             ) {
-                throw new InvalidArgumentException($key . ' requires an unambiguous single Redis endpoint.');
+                throw new WorkerTransportConfigurationException($key . ' requires an unambiguous single Redis endpoint.');
             }
             $parts = parse_url($dsn);
             if ($parts === false || !in_array($parts['scheme'] ?? '', ['redis', 'rediss'], true)
                 || !isset($parts['host']) || $parts['host'] === '' || str_contains($parts['host'], '%')
                 || (isset($parts['port']) && $parts['port'] === 0) || isset($parts['fragment'])
             ) {
-                throw new InvalidArgumentException($key . ' requires an unambiguous single Redis endpoint.');
+                throw new WorkerTransportConfigurationException($key . ' requires an unambiguous single Redis endpoint.');
             }
             if ($key === 'REDIS_URL') {
                 if (isset($parts['path']) || isset($parts['query'])) {
-                    throw new InvalidArgumentException('REDIS_URL must be pathless and queryless for the scheduler transport.');
+                    throw new WorkerTransportConfigurationException('REDIS_URL must be pathless and queryless for the scheduler transport.');
                 }
                 continue;
             }
             if (!in_array($parts['path'] ?? '', ['', '/messages', '/messages/baander'], true)) {
-                throw new InvalidArgumentException('MESSENGER_TRANSPORT_DSN must retain the messages stream, baander group and generated consumer.');
+                throw new WorkerTransportConfigurationException('MESSENGER_TRANSPORT_DSN must retain the messages stream, baander group and generated consumer.');
             }
             if (isset($parts['query'])) {
                 self::validateQuery($parts['query']);
@@ -60,7 +60,7 @@ final class WorkerTransportConfiguration
             // Symfony parse_str merges DSN options over configured options. Admit only
             // exact scalar keys; duplicates and nested/normalized keys are ambiguous.
             if (count($parts) !== 2 || isset($seen[$key]) || !self::isAllowedOption($key, $value)) {
-                throw new InvalidArgumentException('MESSENGER_TRANSPORT_DSN query must use unique scalar connection options or the configured stream and group.');
+                throw new WorkerTransportConfigurationException('MESSENGER_TRANSPORT_DSN query must use unique scalar connection options or the configured stream and group.');
             }
             $seen[$key] = true;
         }

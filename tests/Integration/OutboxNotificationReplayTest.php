@@ -87,9 +87,15 @@ final class OutboxNotificationReplayTest extends TestCase
 
         $this->replayer($this->second, $this->notificationListeners($this->second))->dispatch($event, 1);
         $this->assertCounts($this->first, 2, 3, 1);
+        $configuration = \App\Tests\Fixtures\Messaging\MessengerConfiguration::container();
+        $catalog = new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog(
+            $configuration->getParameter('app.messenger.workloads'), $configuration->getParameter('app.messenger.transport_policies'),
+        );
         foreach ($this->first->fetchAllAssociative('SELECT payload FROM domain_event_outbox_delivery') as $row) {
             $message = (MessageCodecFactory::create())->decode($row['payload'])->message;
             self::assertContains($message::class, [SendEmailCommand::class, SendPushCommand::class, SendWebhookCommand::class]);
+            (new NotificationDeliveryIntentResolver())->resolve($message);
+            $catalog->assertSenders($message, ['async']);
         }
     }
 

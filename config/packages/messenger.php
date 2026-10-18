@@ -29,6 +29,7 @@ return static function (ContainerConfigurator $container): void {
         \App\Shared\Domain\Event\Outbox\RelayOutboxCommand::class => ['transport' => 'async', 'resource_class' => 'coordination', 'default' => true],
         \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],
         \App\Media\Application\Command\GenerateImageDerivativeCommand::class => ['transport' => 'async', 'resource_class' => 'cpu', 'default' => true],
+        \App\Notification\Application\DTO\SendWebhookCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => false],
         FetchLyricsCommand::class => ['transport' => 'async', 'resource_class' => 'io', 'default' => false],
     ];
     if ($container->env() === 'test') {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
+use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -58,6 +59,9 @@ final class WorkerCommand extends Command
         }
         try {
             return $this->runner->run($configuration);
+        } catch (WorkerTransportConfigurationException $error) {
+            $io->error($error->getMessage());
+            return Command::INVALID;
         } catch (\Throwable) {
             // Environment, transport and database diagnostics can contain secrets.
             $io->error('Worker supervisor failed; the deployment must be reconciled before replacement.');

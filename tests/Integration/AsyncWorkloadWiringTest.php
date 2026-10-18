@@ -19,7 +19,7 @@ final class AsyncWorkloadWiringTest extends KernelTestCase
         self::bootKernel();
         $container = self::getContainer();
         $catalog = $container->get(AsyncWorkloadCatalog::class);
-        self::assertCount(17, $catalog->workloads());
+        self::assertCount(18, $catalog->workloads());
         self::assertCount(16, array_filter($catalog->workloads(), static fn (array $workload): bool => $workload['default']));
         self::assertSame(['async', 'scheduler'], $catalog->receivers());
         self::assertFalse($catalog->workloads()[FetchLyricsCommand::class]['default']);

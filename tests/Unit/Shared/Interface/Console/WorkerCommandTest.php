@@ -114,6 +114,24 @@ final class WorkerCommandTest extends TestCase
         }
     }
 
+    public function testTransportConfigurationFailureNamesTheSettingWithoutCredentials(): void
+    {
+        $runner = new class implements WorkerSupervisorRunnerInterface {
+            public function run(WorkerRuntimeConfiguration $configuration): int
+            {
+                \App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration::validate([
+                    'MESSENGER_TRANSPORT_DSN' => 'redis://operator:private-password@redis.baander.app/messages/baander/fixed',
+                ]);
+                return 0;
+            }
+        };
+        $tester = new CommandTester(new WorkerCommand($runner));
+        self::assertSame(2, $tester->execute($this->options()));
+        self::assertStringContainsString('MESSENGER_TRANSPORT_DSN', $tester->getDisplay());
+        self::assertStringNotContainsString('private-password', $tester->getDisplay());
+        self::assertStringNotContainsString('reconciled', $tester->getDisplay());
+    }
+
     /** @return array<string, string> */
     private function options(): array
     {

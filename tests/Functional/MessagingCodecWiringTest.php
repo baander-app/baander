@@ -36,6 +36,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new \App\Media\Application\Command\GenerateImageDerivativeCommand('image.png', 'thumb'),
             new \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand($id),
             new ExtractAlbumCoverCommand($id),
+            new \App\Notification\Application\DTO\SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification'),
             new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification'),
             new SyncCountryStationsCommand($id, 'de'),
             new ExecuteScheduledOccurrenceCommand($id),
@@ -49,7 +50,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
         ];
 
-        self::assertCount(17, $messages);
+        self::assertCount(18, $messages);
         $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
         self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

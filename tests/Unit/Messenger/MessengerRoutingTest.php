@@ -19,10 +19,12 @@ final class MessengerRoutingTest extends TestCase
         self::assertSame('scheduler', $config['routing'][ExecuteScheduledOccurrenceCommand::class]);
         self::assertCount(14, array_filter($config['routing'], static fn (string $queue): bool => $queue === 'async'));
         self::assertArrayNotHasKey(FetchLyricsCommand::class, $config['routing']);
+        self::assertArrayNotHasKey(\App\Notification\Application\DTO\SendWebhookCommand::class, $config['routing']);
         self::assertArrayNotHasKey(FailureTransportProbe::class, $config['routing']);
         $workloads = MessengerConfiguration::container()->getParameter('app.messenger.workloads');
-        self::assertCount(16, $workloads);
+        self::assertCount(17, $workloads);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[FetchLyricsCommand::class]);
+        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[\App\Notification\Application\DTO\SendWebhookCommand::class]);
     }
 
     public function testTestEnvironmentAddsOnlyTheExplicitFailureProbe(): void
