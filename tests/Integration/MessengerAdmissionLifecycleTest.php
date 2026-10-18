@@ -17,6 +17,7 @@ use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
 use App\Tests\Fixtures\Messaging\AdmissionObservedTransport;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Fixtures\Messaging\MessengerConfiguration;
+use App\Tests\Fixtures\Messaging\ReplyLossProxy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ServiceLocator;
@@ -83,6 +84,107 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     {
         yield 'all consumers parked' => [0];
         yield 'remaining permit held by another consumer' => [1];
+    }
+
+    /** @return iterable<string, array{string, int, string}> */
+    public static function lostReplies(): iterable
+    {
+        yield 'accepted receive' => ['XREADGROUP', 0, 'receiving'];
+        yield 'accepted acknowledgment' => ['XACK', 1, 'completing'];
+    }
+
+    #[DataProvider('lostReplies')]
+    public function testAcceptedRedisCommandWithLostReplyRetainsItsPermit(string $command, int $expectedEffects, string $stateAtCommand): void
+    {
+        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
+        $original = new RedisTransport($this->connection, $serializer);
+        $original->setup();
+        $message = new ExtractAlbumCoverCommand(Uuid::v4());
+        $id = $original->send(new Envelope($message))->last(TransportMessageIdStamp::class)?->getId();
+        self::assertNotNull($id);
+        $dsn = getenv('MESSENGER_TEST_REDIS_DSN');
+        self::assertIsString($dsn);
+        $parts = parse_url($dsn);
+        self::assertIsArray($parts);
+        $proxy = new ReplyLossProxy($this->directory, $parts['host'], $parts['port'] ?? 6379, $command,
+            $this->directory . '/' . $this->boot . '/admission.json');
+        $connection = null;
+        try {
+            $proxyDsn = preg_replace_callback('#(?<=://)[^/]+#', static function (array $match) use ($proxy): string {
+                $at = strrpos($match[0], '@');
+                return ($at === false ? '' : substr($match[0], 0, $at + 1)) . '127.0.0.1:' . $proxy->port();
+            }, $dsn, 1);
+            self::assertIsString($proxyDsn);
+            $options = array_replace(MessengerConfiguration::messenger()['transports']['async']['options'], [
+                'stream' => $this->stream, 'group' => 'test', 'consumer' => 'consumer-0',
+                'timeout' => 2.0, 'read_timeout' => 2.0,
+            ]);
+            $connection = Connection::fromDsn($proxyDsn, $options);
+            $transport = new OrdinaryAdmissionTransport(new RedisTransport($connection, $serializer), new WorkerAdmissionContext($this->ledger,
+                new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1)));
+            $dispatcher = new EventDispatcher();
+            $dispatcher->addSubscriber(new OrdinaryAdmissionSubscriber($transport));
+            $effects = 0;
+            $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+                ExtractAlbumCoverCommand::class => [static function (ExtractAlbumCoverCommand $received) use ($message, &$effects): void {
+                    self::assertEquals($message, $received);
+                    ++$effects;
+                }],
+            ]))]);
+            $this->publishTarget(1);
+            try {
+                $this->runOneDelivery($transport, $bus, $dispatcher);
+                self::fail('A lost accepted Redis reply must leave ownership uncertain.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('reconciliation', $error->getMessage());
+            }
+            $receipt = $proxy->receipt();
+            self::assertSame($command, strtoupper($receipt['command'][0]));
+            self::assertSame($stateAtCommand, $receipt['slot']['state']);
+            $request = $receipt['slot']['requestId'];
+            self::assertNotNull($request);
+            self::assertSame($expectedEffects, $effects);
+            $pending = $this->redis->xPending($this->stream, 'test', $id, $id, 1);
+            if ($command === 'XREADGROUP') {
+                self::assertSame($id, $receipt['response'][0][1][0][0]);
+                self::assertCount(1, $pending);
+                self::assertSame($id, $pending[0][0]);
+                self::assertSame('consumer-0', $pending[0][1]);
+            } else {
+                self::assertSame([$this->stream, 'test', $id], array_slice($receipt['command'], 1));
+                self::assertSame(1, $receipt['response']);
+                self::assertSame([], $pending);
+            }
+            $snapshot = $this->snapshot();
+            self::assertTrue($snapshot['fatal']);
+            self::assertSame(0, $snapshot['target']);
+            self::assertSame(0, $snapshot['completed']);
+            self::assertSame('uncertain', $snapshot['slots']['consumer-0']['state']);
+            self::assertSame($request, $snapshot['slots']['consumer-0']['requestId']);
+            $this->publishTarget(1);
+            try {
+                iterator_to_array($transport->get());
+                self::fail('An uncertain permit must deny another receive.');
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('reconciliation', $error->getMessage());
+            }
+            $afterDeniedReceive = $this->snapshot();
+            self::assertSame($request, $afterDeniedReceive['slots']['consumer-0']['requestId']);
+            self::assertSame('uncertain', $afterDeniedReceive['slots']['consumer-0']['state']);
+            self::assertTrue($afterDeniedReceive['fatal']);
+            self::assertSame(0, $afterDeniedReceive['target']);
+            self::assertSame(0, $afterDeniedReceive['completed']);
+            self::assertSame($expectedEffects, $effects);
+            $after = $this->redis->xPending($this->stream, 'test', $id, $id, 1);
+            self::assertCount(count($pending), $after);
+            if ($command === 'XREADGROUP') {
+                self::assertSame($id, $after[0][0]);
+                self::assertSame('consumer-0', $after[0][1]);
+            }
+        } finally {
+            $connection?->close();
+            $proxy->close();
+        }
     }
 
     #[DataProvider('reducedTargets')]
