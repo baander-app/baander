@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
@@ -49,12 +51,13 @@ final class DeploymentContainerRecipeTest extends TestCase
     {
         $recipe = $this->recipe(['command' => ['/usr/local/bin/php', '/app/bin/worker.php', '--name=literal $(touch /tmp/unsafe);`echo unsafe`']]);
         self::assertSame([
-            'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName('recipe.baander.app', self::BOOT),
-            '--network', 'none', '--memory', '67108864', '--memory-swap', '67108864', '--cpus', '1', '--pids-limit', '32',
+            'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName('recipe.baander.app', self::BOOT, DeploymentUnit::Control),
+            '--network', 'none', '--memory', '67108864', '--memory-swap', '67108864', '--cpus', '1', '--cpuset-cpus', '0', '--pids-limit', '32',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--cgroupns', 'private', '--restart', 'no',
             '--label', 'app.baander.worker.namespace=recipe.baander.app', '--label', 'app.baander.worker.boot-id=' . self::BOOT,
-            '--label', 'app.baander.worker.role=deployment', '--env', 'BAANDER_WORKER_NAMESPACE=recipe.baander.app',
-            '--env', 'BAANDER_WORKER_BOOT_ID=' . self::BOOT, '--entrypoint', '/usr/local/bin/php', self::IMAGE,
+            '--label', 'app.baander.worker.role=control', '--env', 'BAANDER_WORKER_NAMESPACE=recipe.baander.app',
+            '--env', 'BAANDER_WORKER_BOOT_ID=' . self::BOOT, '--env', 'BAANDER_WORKER_UNIT=control',
+            '--mount', 'type=volume,src=worker-ipc,dst=/run/baander-worker,volume-nocopy', '--entrypoint', '/usr/local/bin/php', self::IMAGE,
             '/app/bin/worker.php', '--name=literal $(touch /tmp/unsafe);`echo unsafe`',
         ], $recipe->createArguments());
     }
@@ -67,7 +70,8 @@ final class DeploymentContainerRecipeTest extends TestCase
         foreach ([
             'namespace' => 'other.baander.app', 'bootId' => str_repeat('f', 32), 'daemonId' => 'other-daemon',
             'imageId' => 'sha256:' . str_repeat('f', 64), 'command' => ['/usr/local/bin/php', '/app/bin/other.php'],
-            'network' => 'worker-network', 'memoryBytes' => 67108865, 'nanoCpus' => 1000000001, 'pidsLimit' => 33,
+            'unit' => DeploymentUnit::Execution, 'cpuSet' => [1], 'ipcVolume' => 'other-ipc',
+            'network' => 'worker-network', 'memoryBytes' => 67108865, 'nanoCpus' => 999999999, 'pidsLimit' => 33,
         ] as $field => $value) {
             self::assertNotSame($original, $this->recipe([$field => $value])->fingerprint(), $field . ' must affect durable create identity.');
         }
@@ -77,7 +81,7 @@ final class DeploymentContainerRecipeTest extends TestCase
     #[DataProvider('exactCpuValues')]
     public function testCpuFormattingUsesExactIntegerNanoseconds(int $nanoCpus, string $expected): void
     {
-        $arguments = $this->recipe(['nanoCpus' => $nanoCpus])->createArguments();
+        $arguments = $this->recipe(['nanoCpus' => $nanoCpus, 'cpuSet' => range(0, 63)])->createArguments();
         $position = array_search('--cpus', $arguments, true);
         self::assertNotFalse($position);
         self::assertSame($expected, $arguments[$position + 1]);
@@ -99,7 +103,7 @@ final class DeploymentContainerRecipeTest extends TestCase
     {
         $minimum = $this->recipe(['memoryBytes' => 16 * 1024 * 1024, 'nanoCpus' => 1_000_000, 'pidsLimit' => 8, 'command' => ['/x']]);
         self::assertSame(['/x'], $minimum->command);
-        $maximum = $this->recipe(['memoryBytes' => 1024 * 1024 * 1024 * 1024, 'nanoCpus' => 64_000_000_000, 'pidsLimit' => 4096,
+        $maximum = $this->recipe(['memoryBytes' => 1024 * 1024 * 1024 * 1024, 'nanoCpus' => 64_000_000_000, 'cpuSet' => range(0, 63), 'pidsLimit' => 4096,
             'command' => ['/' . str_repeat('x', 4095), str_repeat('x', 4096), str_repeat('x', 4096), str_repeat('x', 4096)]]);
         self::assertSame(16384, array_sum(array_map(strlen(...), $maximum->command)));
         self::assertCount(64, $this->recipe(['command' => ['/x', ...array_fill(0, 63, 'x')]])->command);
@@ -135,6 +139,9 @@ final class DeploymentContainerRecipeTest extends TestCase
         yield 'CPU above maximum' => ['nanoCpus', 64_000_000_001];
         yield 'PID below minimum' => ['pidsLimit', 7];
         yield 'PID above maximum' => ['pidsLimit', 4097];
+        yield 'empty affinity' => ['cpuSet', []];
+        yield 'negative affinity' => ['cpuSet', [-1]];
+        yield 'invalid IPC volume' => ['ipcVolume', '/run/host'];
         yield 'no command' => ['command', []];
         yield 'relative executable' => ['command', ['php']];
         yield 'empty argument' => ['command', ['/x', '']];
@@ -152,7 +159,7 @@ final class DeploymentContainerRecipeTest extends TestCase
         return new DeploymentContainerRecipe(...array_replace([
             'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
             'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none', 'memoryBytes' => 64 * 1024 * 1024,
-            'nanoCpus' => 1_000_000_000, 'pidsLimit' => 32,
+            'nanoCpus' => 1_000_000_000, 'pidsLimit' => 32, 'unit' => DeploymentUnit::Control, 'cpuSet' => [0], 'ipcVolume' => 'worker-ipc',
         ], $overrides));
     }
 }

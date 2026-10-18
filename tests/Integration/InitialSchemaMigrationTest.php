@@ -108,10 +108,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(5, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(6, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(83, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(84, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -129,7 +129,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(6, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(7, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -256,7 +256,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $before = $snapshot();
 
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame(5, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(6, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         $after = $snapshot();
         self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
         $withoutVersion = $after;
@@ -335,6 +335,97 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         }
         self::assertNotSame($jobs[0]['public_id'], $jobs[1]['public_id']);
         self::assertNotSame($jobs[0]['revision'], $jobs[1]['revision']);
+    }
+
+    public function testCompletedSingletonUpgradePreservesOriginalEvidenceAsTerminalImportedBoot(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017170000'));
+        $namespace = 'baander.app:upgrade';
+        $boot = str_repeat('a', 32);
+        $daemon = 'baander.app:daemon';
+        $container = str_repeat('c', 64);
+        $recipe = str_repeat('f', 64);
+        $created = '2026-10-17 10:20:30.123456+00';
+        $intended = '2026-10-17 10:21:30.234567+00';
+        $completed = '2026-10-17 10:22:30.345678+00';
+        $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash,created_at) VALUES (?,?,?,?,?)', [$namespace,$boot,$daemon,$recipe,$created]);
+        $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id,created_at,start_claimed_at) VALUES (?,?,?,?,?,?)', [$namespace,$boot,$daemon,$container,$created,$created]);
+        $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,intended_at,completed_at) VALUES (?,?,?,?,?,?)', [$namespace,$boot,$daemon,$container,$intended,$completed]);
+        $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,3,'available',?)", [$namespace,$boot,$completed]);
+        $before = [];
+        foreach (['creations','containers','retirements','leases'] as $table) {
+            $before[$table] = $this->connection->fetchAssociative('SELECT * FROM worker_deployment_' . $table);
+        }
+        self::assertSame(0, $this->migrate($this->factory()));
+        foreach (['creations','containers','retirements'] as $table) {
+            $row = $this->connection->fetchAssociative("SELECT * FROM worker_deployment_" . $table . " WHERE unit = 'control'");
+            self::assertIsArray($row);
+            foreach ($before[$table] as $column => $value) {
+                self::assertSame($value, $row[$column], $table . '.' . $column);
+            }
+        }
+        self::assertSame($before['leases'], $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases'));
+        $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($this->connection);
+        $snapshot = $inventory->findBoot($namespace, $boot);
+        self::assertNotNull($snapshot);
+        self::assertTrue($snapshot->importedSingleton);
+        self::assertTrue($snapshot->retired);
+        self::assertTrue($snapshot->retirementRequested);
+        self::assertNull($snapshot->manifestHash);
+        self::assertSame($recipe, $snapshot->control->recipeHash);
+        self::assertTrue($snapshot->control->retirement?->completed);
+        self::assertTrue($snapshot->execution->cancelled);
+        self::assertFalse($snapshot->execution->createClaimed);
+        self::assertNull($snapshot->execution->binding);
+        self::assertNull($snapshot->execution->recipeHash);
+        self::assertNull((new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($this->connection))->acquire($namespace, $boot, 60));
+        self::assertNotNull($snapshot->control->binding);
+        self::assertFalse($inventory->claimStart($snapshot->control->binding));
+        self::assertSame(0, $this->migrate($this->factory()));
+    }
+
+    #[DataProvider('unresolvedSingletons')]
+    public function testSingletonUpgradeRejectsUnresolvedOrInconsistentEvidenceWithoutMutation(string $kind): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017170000'));
+        $namespace = 'baander.app:blocked-upgrade';
+        $boot = str_repeat('a', 32);
+        if ($kind === 'active lease') {
+            $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,1,'active',clock_timestamp())", [$namespace,$boot]);
+        } else {
+            if ($kind !== 'completed binding without recipe') {
+                $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash) VALUES (?,?,?,?)', [$namespace,$boot,'baander.app:daemon',str_repeat('f',64)]);
+            }
+            if ($kind !== 'uncertain unbound create') {
+                $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id) VALUES (?,?,?,?)', [$namespace,$boot,'baander.app:daemon',str_repeat('c',64)]);
+            }
+            if ($kind === 'completed binding without recipe') {
+                $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,completed_at) VALUES (?,?,?,?,clock_timestamp())', [$namespace,$boot,'baander.app:daemon',str_repeat('c',64)]);
+            }
+        }
+        $snapshot = function (): array {
+            $rows = [];
+            foreach (['worker_deployment_creations','worker_deployment_containers','worker_deployment_retirements','worker_deployment_leases','scheduled_jobs','doctrine_migration_versions'] as $table) {
+                $rows[$table] = $this->connection->fetchAllAssociative('SELECT * FROM ' . $table);
+            }
+            return $rows;
+        };
+        $before = $snapshot();
+        $catalog = $this->catalog('public');
+        $failure = $this->refused($this->factory());
+        self::assertStringContainsString('Unresolved or inconsistent singleton deployments', $failure);
+        self::assertStringContainsString($namespace . '/' . $boot, $failure);
+        self::assertSame($before, $snapshot());
+        self::assertSame($catalog, $this->catalog('public'));
+        self::assertNull($this->connection->fetchOne("SELECT to_regclass('worker_deployment_boots')::text"));
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function unresolvedSingletons(): iterable
+    {
+        foreach (['active lease', 'uncertain unbound create', 'binding without removal proof', 'completed binding without recipe'] as $kind) {
+            yield $kind => [$kind];
+        }
     }
 
     private function assertIdentitiesAllocate(): void

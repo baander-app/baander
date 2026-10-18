@@ -45,11 +45,11 @@ make migrate
 ```
 
 This initializes both the main and test databases with `Version20261017000000`,
-then applies the forward migrations through `Version20261017170000`. The initial
+then applies the forward migrations through `Version20261018130000`. The initial
 migration creates the 80-table schema and two daily schedules: OAuth code purging
 at 03:30 UTC and recommendation generation at 04:00 UTC. The forward migrations
 add playlist persistence versions, video/audio execution authority, durable
-control receipts and playback-owner scoping. Running migrations again leaves no
+control receipts, playback-owner scoping and paired worker deployment journals. Running migrations again leaves no
 pending work.
 
 Each target must be empty before the initial migration; preinstalled extensions
@@ -63,9 +63,10 @@ with an older migration history, follow the [manual reset procedure](upgrading.m
 
 The web container runs `app:serve`; it handles requests, streams files and keeps
 client connections. Background work requires a separately admitted `app:worker`
-container. After migrations, follow [Worker deployment](commands/README.md#worker-deployment)
-to build the worker image, provision shared named media volumes and create/start
-the deployment. The development Compose file starts only web and dependencies;
+control and execution pair. After migrations, follow [Worker deployment](commands/README.md#worker-deployment)
+to build the worker image, provision shared named media volumes and a private IPC
+volume owned by that image's runtime UID/GID with mode `0700`, select disjoint
+control/execution CPU sets, and create/start the deployment. The development Compose file starts only web and dependencies;
 `make start` alone does not start consumers, scheduling or media encoding.
 
 ### 3. Create an admin user

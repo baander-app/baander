@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use Closure;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -12,28 +13,29 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class RegisteredDeploymentStart
 {
     /** @param Closure(list<string>): string $dockerExecutor Fixed trusted daemon endpoint; bounded I/O; failures throw. */
-    public function __construct(private DoctrineDeploymentInventory $inventory, private Closure $dockerExecutor, private ?DeploymentContainerRecipe $recipe = null)
+    public function __construct(private DoctrineDeploymentInventory $inventory, private Closure $dockerExecutor, private DeploymentContainerRecipe $recipe)
     {
     }
 
     /** Use this unique Docker name when creating the stopped container for a fresh boot. */
-    public static function containerName(string $namespace, string $bootId): string
+    public static function containerName(string $namespace, string $bootId, DeploymentUnit $unit): string
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
-        return 'baander-worker-' . substr(hash('sha256', $namespace), 0, 32) . '-' . $bootId;
+        return 'baander-worker-' . substr(hash('sha256', $namespace), 0, 32) . '-' . $bootId . '-' . $unit->value;
     }
 
     /**
      * A false result means registration/start admission was denied. Exceptions,
      * including an uncertain Docker reply, never authorize repeating a start.
      * The controller must create exactly one stopped container under containerName
-     * per boot and reconcile uncertain create outcomes by that name, not create again.
+     * per unit and boot and reconcile uncertain create outcomes by that name, not create again.
+     * @phpstan-impure
      */
     public function start(DeploymentContainer $binding): bool
     {
-        if ($this->recipe !== null && ($this->recipe->namespace !== $binding->namespace
-            || $this->recipe->bootId !== $binding->bootId || $this->recipe->daemonId !== $binding->daemonId
-            || !$this->inventory->matchesCreate($this->recipe))) {
+        if ($this->recipe->namespace !== $binding->namespace
+            || $this->recipe->bootId !== $binding->bootId || $this->recipe->unit !== $binding->unit || $this->recipe->daemonId !== $binding->daemonId
+            || !$this->inventory->matchesCreate($this->recipe->namespace, $this->recipe->bootId, $this->recipe->unit, $this->recipe->daemonId, $this->recipe->fingerprint())) {
             throw new \RuntimeException('Startup recipe does not match committed deployment creation.');
         }
         $execute = function (array $arguments) use ($binding): string {
@@ -44,14 +46,14 @@ final readonly class RegisteredDeploymentStart
             return ($this->dockerExecutor)($arguments);
         };
         $containment = new DockerWorkerContainment($execute, $this->recipe);
-        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId);
+        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
         $this->verifyCreated($binding, $execute);
         if (!$this->inventory->register($binding) || !$this->inventory->claimStart($binding)) {
             return false;
         }
         // The one-shot claim is committed before any start call. A failed second
         // inspection burns that claim as well: automatic retries are unsafe.
-        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId);
+        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
         $this->verifyCreated($binding, $execute);
         $started = $execute(['container', 'start', $binding->containerId]);
         if (trim($started) !== $binding->containerId) {
@@ -70,7 +72,7 @@ final readonly class RegisteredDeploymentStart
             throw new \RuntimeException('Invalid deployment startup inspection.', 0, $error);
         }
         if (!is_array($state) || count($state) !== 8 || ($state['id'] ?? null) !== $binding->containerId
-            || ($state['name'] ?? null) !== '/' . self::containerName($binding->namespace, $binding->bootId)
+            || ($state['name'] ?? null) !== '/' . self::containerName($binding->namespace, $binding->bootId, $binding->unit)
             || ($state['status'] ?? null) !== 'created' || ($state['running'] ?? null) !== false
             || ($state['pid'] ?? null) !== 0 || ($state['restarting'] ?? null) !== false
             || ($state['restart'] ?? null) !== 'no' || ($state['retryCount'] ?? null) !== 0) {

@@ -84,12 +84,12 @@ final readonly class StreamClient
     }
 
     /** @param list<string> $headers */
-    public function open(string $query, array $headers = [], ?int $stopAfterBytes = null, ?int $maxBytesPerSecond = null): HttpExchange
+    public function open(string $query, array $headers = [], ?int $stopAfterBytes = null, ?int $maxBytesPerSecond = null, int $timeoutSeconds = 60): HttpExchange
     {
         return new HttpExchange($this->endpoint . '?' . $query, [
             ...$headers,
             'Authorization: DPoP ' . $this->jwt,
             'DPoP: ' . $this->proof->create('GET', $this->endpoint, $this->jwt),
-        ], stopAfterBytes: $stopAfterBytes, maxBytesPerSecond: $maxBytesPerSecond);
+        ], stopAfterBytes: $stopAfterBytes, maxBytesPerSecond: $maxBytesPerSecond, timeoutSeconds: $timeoutSeconds);
     }
 }

@@ -4,41 +4,52 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
-use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
+use App\Shared\Application\DTO\DeploymentUnit;
 use InvalidArgumentException;
 use JsonException;
 use stdClass;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Versioned operator input; worker argv and its container layout are fixed. */
+/** Fixed paired topology; every admitted field participates in the boot fingerprint. */
 #[Exclude]
 final readonly class DeploymentOperatorManifest
 {
-    private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint'];
-    private const array INTEGER_FIELDS = ['version', 'memoryMiB', 'managementMiB', 'consumerMiB', 'relayMiB', 'schedulerMiB', 'scheduledConsoleMiB', 'mediaMiB', 'mediaDescendantPids', 'nanoCpus', 'pidsLimit'];
+    private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint', 'ipcVolume'];
+    private const array INTEGER_FIELDS = ['version', 'controlMemoryMiB', 'executionMemoryMiB', 'controlNanoCpus', 'executionNanoCpus', 'controlPidsLimit', 'executionPidsLimit', 'scheduledConsoleMiB'];
     private const int MIB = 1024 * 1024;
 
+    /** @param list<array{volume:string,target:string,readOnly:bool,role:string}> $mediaMounts */
     private function __construct(
-        public WorkerRuntimeConfiguration $configuration,
+        public string $namespace,
+        public string $bootId,
         public string $daemonId,
         public string $imageId,
         public string $network,
         public string $dockerBinary,
         public string $dockerEndpoint,
-        public int $nanoCpus,
-        public int $pidsLimit,
-        /** @var list<array{volume:string,target:string,readOnly:bool,role:string}> */
+        public DeploymentResourceBudget $control,
+        public DeploymentResourceBudget $execution,
+        public int $scheduledConsoleBytes,
+        public string $ipcVolume,
         public array $mediaMounts,
     ) {
         if (!str_starts_with($dockerBinary, '/') || strlen($dockerBinary) > 4096
             || preg_match('/[\x00-\x1f\x7f]/', $dockerBinary) !== 0
             || strlen($dockerEndpoint) > 4096
-            || preg_match('~\Aunix:///[^\x00-\x20\x7f]+\z~D', $dockerEndpoint) !== 1
-        ) {
+            || preg_match('~\Aunix:///[^\x00-\x20\x7f]+\z~D', $dockerEndpoint) !== 1) {
             throw new InvalidArgumentException('Operator manifest requires an absolute Docker binary and local Unix endpoint.');
         }
-        // Validate Docker isolation and immutable image before any operator action.
-        $this->recipe(new DeploymentRuntimeEnvironment());
+        if (array_intersect($control->cpuSet, $execution->cpuSet) !== []) {
+            throw new InvalidArgumentException('Control and execution require disjoint CPU sets.');
+        }
+        if ($control->memoryBytes < 2624 * self::MIB || $execution->memoryBytes < 4160 * self::MIB + $scheduledConsoleBytes
+            || $control->pidsLimit < 128 || $execution->pidsLimit < 256
+            || ($scheduledConsoleBytes !== 0 && $scheduledConsoleBytes < 320 * self::MIB)) {
+            throw new InvalidArgumentException('Worker budgets must cover control management and media PHP, two consumers, native execution and any scheduled console child.');
+        }
+        foreach (DeploymentUnit::cases() as $unit) {
+            $this->recipe($unit, new DeploymentRuntimeEnvironment());
+        }
     }
 
     public static function fromJson(string $json): self
@@ -55,20 +66,22 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator manifest must be a JSON object.');
         }
         $fields = get_object_vars($decoded);
-        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts'];
+        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'controlCpuSet', 'executionCpuSet', 'mediaMounts'];
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 2) {
-            throw new InvalidArgumentException('Operator manifest version must be 2.');
+        if (self::integer($fields, 'version') !== 3) {
+            throw new InvalidArgumentException('Operator manifest version must be 3.');
         }
-        $configuration = new WorkerRuntimeConfiguration(
-            self::string($fields, 'namespace'), self::string($fields, 'bootId'),
-            self::bytes($fields, 'memoryMiB'), self::bytes($fields, 'managementMiB'),
-            self::bytes($fields, 'consumerMiB'), self::bytes($fields, 'relayMiB'),
-            '/tmp/baander-worker-locks', self::bytes($fields, 'scheduledConsoleMiB'),
-            self::bytes($fields, 'schedulerMiB'), self::bytes($fields, 'mediaMiB'), self::integer($fields, 'mediaDescendantPids'),
-        );
+        $budgets = [];
+        foreach (DeploymentUnit::cases() as $unit) {
+            $prefix = $unit->value;
+            if (!is_array($fields[$prefix . 'CpuSet'])) {
+                throw new InvalidArgumentException('Worker CPU sets require integer lists.');
+            }
+            $budgets[$prefix] = new DeploymentResourceBudget(self::bytes($fields, $prefix . 'MemoryMiB'),
+                self::integer($fields, $prefix . 'NanoCpus'), self::integer($fields, $prefix . 'PidsLimit'), $fields[$prefix . 'CpuSet']);
+        }
         if (!is_array($fields['mediaMounts']) || !array_is_list($fields['mediaMounts'])) {
             throw new InvalidArgumentException('Operator media mounts require an ordered list.');
         }
@@ -79,37 +92,21 @@ final readonly class DeploymentOperatorManifest
             }
             $mounts[] = get_object_vars($mount);
         }
-        if (self::integer($fields, 'pidsLimit') < max(128, 8 + $configuration->mediaDescendantPids)) {
-            throw new InvalidArgumentException('Worker PID ceiling must reserve at least 128 tasks for management, four roles, media descendants and bounded encoder threads.');
-        }
-        return new self(
-            $configuration, self::string($fields, 'daemonId'), self::string($fields, 'imageId'),
-            self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
-            self::integer($fields, 'nanoCpus'), self::integer($fields, 'pidsLimit'), $mounts,
-        );
+        return new self(self::string($fields, 'namespace'), self::string($fields, 'bootId'), self::string($fields, 'daemonId'),
+            self::string($fields, 'imageId'), self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
+            $budgets['control'], $budgets['execution'], self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts);
     }
 
-    public function recipe(DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
+    public function recipe(DeploymentUnit $unit, DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
     {
-        $configuration = $this->configuration;
-        $recipe = new DeploymentContainerRecipe(
-            $configuration->namespace, $configuration->bootId, $this->daemonId, $this->imageId,
-            [
-                '/usr/local/bin/php', '-d', 'memory_limit=' . intdiv($configuration->managementReservationBytes, self::MIB) . 'M',
-                '/var/www/html/bin/console', 'app:worker', '--no-interaction',
-                '--deployment=' . $configuration->namespace, '--boot-id=' . $configuration->bootId,
-                '--memory-mib=' . intdiv($configuration->memoryLimitBytes, self::MIB),
-                '--management-mib=' . intdiv($configuration->managementReservationBytes, self::MIB),
-                '--consumer-mib=' . intdiv($configuration->consumerReservationBytes, self::MIB),
-                '--relay-mib=' . intdiv($configuration->relayReservationBytes, self::MIB),
-                '--scheduler-mib=' . intdiv($configuration->schedulerReservationBytes, self::MIB),
-                '--scheduled-console-mib=' . intdiv($configuration->scheduledConsoleReservationBytes, self::MIB),
-                '--media-mib=' . intdiv($configuration->mediaReservationBytes, self::MIB),
-                '--media-descendant-pids=' . $configuration->mediaDescendantPids,
-                '--lock-dir=' . $configuration->lockDirectory,
-            ],
-            $this->network, $configuration->memoryLimitBytes, $this->nanoCpus, $this->pidsLimit, $environment, $this->mediaMounts,
-        );
+        $budget = $unit === DeploymentUnit::Control ? $this->control : $this->execution;
+        $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
+            ['/usr/local/bin/php', '-d', 'memory_limit=256M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
+                '--deployment=' . $this->namespace, '--boot-id=' . $this->bootId, '--unit=' . $unit->value,
+                '--memory-mib=' . intdiv($budget->memoryBytes, self::MIB), '--pids-limit=' . $budget->pidsLimit,
+                '--scheduled-console-mib=' . ($unit === DeploymentUnit::Control ? 0 : intdiv($this->scheduledConsoleBytes, self::MIB)),
+                '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
+            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $environment, $this->mediaMounts);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source volume.');
         }
@@ -119,8 +116,7 @@ final readonly class DeploymentOperatorManifest
                 continue;
             }
             $path = $environment->variables[$key];
-            if (strlen($path) > 4096
-                || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $path) !== 1
+            if (strlen($path) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $path) !== 1
                 || preg_match('~(?:^|/)\.\.?(?:/|$)~', $path) !== 0) {
                 throw new InvalidArgumentException('Media storage requires a canonical absolute shared-media path.');
             }
@@ -139,6 +135,12 @@ final readonly class DeploymentOperatorManifest
             }
         }
         return $recipe;
+    }
+
+    public function fingerprint(DeploymentRuntimeEnvironment $environment): string
+    {
+        return hash('sha256', $this->recipe(DeploymentUnit::Control, $environment)->fingerprint()
+            . $this->recipe(DeploymentUnit::Execution, $environment)->fingerprint());
     }
 
     /** @param array<string,mixed> $fields */

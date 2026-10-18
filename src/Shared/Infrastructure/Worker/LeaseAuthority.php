@@ -25,6 +25,7 @@ final class LeaseAuthority
         private readonly int $ttlSeconds,
         private readonly float $renewAheadSeconds,
         private readonly float $safetyMarginSeconds = 0.1,
+        private readonly bool $observer = false,
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if ($ttlSeconds < 1 || $ttlSeconds > 3600 || !is_finite($renewAheadSeconds)
@@ -38,7 +39,7 @@ final class LeaseAuthority
     /**
      * Reserve one asynchronous request. No database or process work runs here.
      *
-     * @return array{action: 'acquire'|'renew', sequence: int, namespace: string, bootId: string, epoch: ?int, ttlSeconds: int}|null
+     * @return array{action: 'acquire'|'renew'|'observe', sequence: int, namespace: string, bootId: string, epoch: ?int, ttlSeconds: int}|null
      */
     public function request(float $now): ?array
     {
@@ -57,7 +58,7 @@ final class LeaseAuthority
         $this->pendingDeadline = $deadline;
 
         return [
-            'action' => $this->grant === null ? 'acquire' : 'renew',
+            'action' => $this->observer ? 'observe' : ($this->grant === null ? 'acquire' : 'renew'),
             'sequence' => $this->pendingSequence,
             'namespace' => $this->namespace,
             'bootId' => $this->bootId,

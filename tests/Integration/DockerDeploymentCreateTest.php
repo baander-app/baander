@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
@@ -52,13 +54,13 @@ final class DockerDeploymentCreateTest extends TestCase
         $creator = $this->creator($recipe, onCreate: function (array $arguments) use ($recipe): string {
             self::assertSame($recipe->createArguments(), $arguments);
             self::assertSame(0, $this->first->getTransactionNestingLevel());
-            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe), 'Independent observer sees committed intent before the external create.');
+            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe->namespace, $recipe->bootId, $recipe->unit, $recipe->daemonId, $recipe->fingerprint()), 'Independent observer sees committed intent before the external create.');
             return $this->containerId() . "\n";
         });
         $binding = $creator->create($recipe);
         self::assertEquals($this->binding(), $binding);
         self::assertSame(0, $this->first->getTransactionNestingLevel());
-        self::assertEquals($binding, (new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+        self::assertEquals($binding, (new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertNull($this->second->fetchOne('SELECT start_claimed_at FROM worker_deployment_containers'));
         self::assertSame(1, $this->createCount());
         self::assertSame(0, $this->startCount());
@@ -83,8 +85,8 @@ final class DockerDeploymentCreateTest extends TestCase
                 self::assertSame($failure, $caught);
             }
         }
-        self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe));
-        self::assertNull((new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+        self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe->namespace, $recipe->bootId, $recipe->unit, $recipe->daemonId, $recipe->fingerprint()));
+        self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
         try {
             $this->creator($recipe)->create($recipe);
             self::fail('A fresh controller cannot repeat a consumed create intent.');
@@ -93,6 +95,35 @@ final class DockerDeploymentCreateTest extends TestCase
         }
         self::assertEquals($this->binding(), $this->creator($recipe)->reconcile($recipe));
         self::assertSame(1, $this->createCount());
+        self::assertSame(0, $this->startCount());
+    }
+
+    public function testControlBindingSurvivesLostExecutionCreateReplyWithoutAuthorizingAnotherCreate(): void
+    {
+        $control = $this->recipe();
+        $execution = $this->recipe(unit: DeploymentUnit::Execution);
+        $controlBinding = $this->creator($control)->create($control);
+        $failure = new \RuntimeException('Execution create reply lost.');
+        try {
+            $this->creator($execution, onCreate: static function () use ($failure): string { throw $failure; })->create($execution);
+            self::fail('Lost execution reply cannot admit the pair.');
+        } catch (\RuntimeException $error) {
+            self::assertSame($failure, $error);
+        }
+        $inventory = new DoctrineDeploymentInventory($this->second);
+        self::assertEquals($controlBinding, $inventory->findUnit($control->namespace, $control->bootId, DeploymentUnit::Control));
+        self::assertNull($inventory->findUnit($control->namespace, $control->bootId, DeploymentUnit::Execution));
+        self::assertFalse($inventory->claimStart($controlBinding), 'The control unit cannot start before both bindings commit.');
+        try {
+            $this->creator($execution)->create($execution);
+            self::fail('A partial pair cannot retry an uncertain execution create.');
+        } catch (\RuntimeException) {
+            self::assertSame(2, $this->createCount());
+        }
+        $executionBinding = $this->creator($execution)->reconcile($execution);
+        self::assertSame($this->containerId(DeploymentUnit::Execution), $executionBinding->containerId);
+        self::assertSame(DeploymentUnit::Execution, $executionBinding->unit);
+        self::assertSame(2, $this->createCount());
         self::assertSame(0, $this->startCount());
     }
 
@@ -106,6 +137,8 @@ final class DockerDeploymentCreateTest extends TestCase
     public function testExistingBootRefusesCreateWithoutDockerMutation(): void
     {
         $recipe = $this->recipe();
+        $this->reserve($recipe);
+        self::assertTrue((new DoctrineDeploymentInventory($this->first))->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertTrue((new DoctrineDeploymentInventory($this->first))->register($this->binding()));
         try {
             $this->creator($recipe)->create($recipe);
@@ -126,10 +159,11 @@ final class DockerDeploymentCreateTest extends TestCase
         } catch (\RuntimeException) {
             self::assertCount(0, $this->commands);
         }
-        self::assertTrue($inventory->claimCreate($recipe));
+        $this->reserve($recipe);
+        self::assertTrue($inventory->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertEquals($this->binding(), $this->creator($recipe)->reconcile($recipe));
         $targets = array_map(static fn (array $command): string => $command[array_key_last($command)], array_values(array_filter($this->commands, static fn (array $command): bool => $command[0] === 'container' && $command[1] === 'inspect')));
-        self::assertSame([RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId), $this->containerId()], $targets);
+        self::assertSame([RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit), $this->containerId()], $targets);
         self::assertSame(0, $this->createCount());
         self::assertSame(0, $this->startCount());
     }
@@ -146,7 +180,7 @@ final class DockerDeploymentCreateTest extends TestCase
             $this->creator($recipe, state: $state, isolation: $isolation)->create($recipe);
             self::fail('A mismatched actual container must not be admitted.');
         } catch (\RuntimeException) {
-            self::assertNull((new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+            self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
             self::assertSame(1, $this->createCount());
             self::assertSame(0, $this->startCount());
         }
@@ -165,6 +199,8 @@ final class DockerDeploymentCreateTest extends TestCase
         yield 'wrong memory' => [['memory' => 1], []];
         yield 'unbounded swap' => [['memorySwap' => -1], []];
         yield 'wrong CPU' => [['nanoCpus' => 0], []];
+        yield 'wrong CPU affinity' => [['cpuSet' => '1'], []];
+        yield 'wrong unit environment' => [['env' => ['BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32), 'BAANDER_WORKER_UNIT=execution']], []];
         yield 'wrong PID cap' => [['pidsLimit' => 0], []];
         yield 'already exited' => [['status' => 'exited'], []];
         yield 'duplicate identity environment' => [['env' => ['BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32)]], []];
@@ -181,7 +217,7 @@ final class DockerDeploymentCreateTest extends TestCase
             self::fail('Daemon mismatch must fail before external mutation.');
         } catch (\RuntimeException) {
             self::assertSame(0, $this->createCount());
-            self::assertNull((new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+            self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
         }
     }
 
@@ -189,13 +225,14 @@ final class DockerDeploymentCreateTest extends TestCase
     {
         $recipe = $this->recipe();
         $inventory = new DoctrineDeploymentInventory($this->first);
-        self::assertTrue($inventory->claimCreate($recipe));
+        $this->reserve($recipe);
+        self::assertTrue($inventory->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertTrue($inventory->register($this->binding()));
         try {
             $this->creator($recipe, state: ['id' => str_repeat('d', 64)])->reconcile($recipe);
             self::fail('Reconciliation must never overwrite the boot binding.');
         } catch (\RuntimeException) {
-            self::assertEquals($this->binding(), (new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+            self::assertEquals($this->binding(), (new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
             self::assertSame(0, $this->createCount());
         }
     }
@@ -208,8 +245,9 @@ final class DockerDeploymentCreateTest extends TestCase
         self::assertInstanceOf(DockerCreateCommitThenThrowConnection::class, $uncertain);
         $this->extras[] = $uncertain;
         $uncertain->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        $uncertain->throwOnCommit = 3; // find, durable create intent, then registration.
         $recipe = $this->recipe();
+        $this->reserve($recipe);
+        $uncertain->throwOnCommit = 4; // Boot read, binding read, create claim, registration.
         $creator = new DockerDeploymentCreate(new DoctrineDeploymentInventory($uncertain), $this->executor($recipe));
         try {
             $creator->create($recipe);
@@ -218,7 +256,7 @@ final class DockerDeploymentCreateTest extends TestCase
             self::assertSame('Fixture registration commit acknowledgment lost.', $caught->getMessage());
         }
         self::assertFalse($uncertain->isConnected());
-        self::assertEquals($this->binding(), (new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+        self::assertEquals($this->binding(), (new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertEquals($this->binding(), $this->creator($recipe)->reconcile($recipe));
         self::assertSame(1, $this->createCount());
         self::assertSame(0, $this->startCount());
@@ -230,9 +268,10 @@ final class DockerDeploymentCreateTest extends TestCase
         $reordered = $this->recipe(['DATABASE_URL' => 'postgresql://worker:fixture@db.baander.app/worker', 'APP_ENV' => 'prod']);
         $changed = $this->recipe(['APP_ENV' => 'prod', 'DATABASE_URL' => 'postgresql://worker:changed@db.baander.app/worker']);
         $inventory = new DoctrineDeploymentInventory($this->first);
-        self::assertTrue($inventory->claimCreate($recipe));
-        self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($reordered));
-        self::assertFalse((new DoctrineDeploymentInventory($this->second))->matchesCreate($changed));
+        $this->reserve($recipe);
+        self::assertTrue($inventory->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit));
+        self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($reordered->namespace, $reordered->bootId, $reordered->unit, $reordered->daemonId, $reordered->fingerprint()));
+        self::assertFalse((new DoctrineDeploymentInventory($this->second))->matchesCreate($changed->namespace, $changed->bootId, $changed->unit, $changed->daemonId, $changed->fingerprint()));
         try {
             $this->creator($changed)->reconcile($changed);
             self::fail('Changed runtime credentials must not reconcile the committed recipe.');
@@ -260,7 +299,7 @@ final class DockerDeploymentCreateTest extends TestCase
             foreach ($arguments as $argument) {
                 self::assertStringNotContainsString($secret, $argument);
             }
-            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe));
+            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe->namespace, $recipe->bootId, $recipe->unit, $recipe->daemonId, $recipe->fingerprint()));
             if ($throw) {
                 throw $failure;
             }
@@ -272,7 +311,7 @@ final class DockerDeploymentCreateTest extends TestCase
         } catch (\RuntimeException $caught) {
             self::assertTrue($throw);
             self::assertSame($failure, $caught);
-            self::assertNull((new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+            self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
         }
         self::assertNotNull($path);
         self::assertFileDoesNotExist($path);
@@ -290,8 +329,8 @@ final class DockerDeploymentCreateTest extends TestCase
             $this->creator($recipe, state: ['env' => $environment])->create($recipe);
             self::fail('Missing, duplicate or changed runtime configuration must not register a binding.');
         } catch (\RuntimeException) {
-            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe));
-            self::assertNull((new DoctrineDeploymentInventory($this->second))->find($recipe->namespace, $recipe->bootId));
+            self::assertTrue((new DoctrineDeploymentInventory($this->second))->matchesCreate($recipe->namespace, $recipe->bootId, $recipe->unit, $recipe->daemonId, $recipe->fingerprint()));
+            self::assertNull((new DoctrineDeploymentInventory($this->second))->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit));
             self::assertSame(1, $this->createCount());
             self::assertSame(0, $this->startCount());
         }
@@ -300,7 +339,7 @@ final class DockerDeploymentCreateTest extends TestCase
     /** @return iterable<string, array{list<string>}> */
     public static function mismatchedRuntimeEnvironments(): iterable
     {
-        $identity = ['BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32)];
+        $identity = ['BAANDER_WORKER_UNIT=control', 'BAANDER_WORKER_NAMESPACE=baander.app:create', 'BAANDER_WORKER_BOOT_ID=' . str_repeat('a', 32)];
         $database = 'DATABASE_URL=postgresql://worker:fixture@db.baander.app/worker';
         yield 'missing credential' => [[...$identity, 'APP_ENV=prod']];
         yield 'duplicate credential' => [[...$identity, 'APP_ENV=prod', $database, $database]];
@@ -310,20 +349,28 @@ final class DockerDeploymentCreateTest extends TestCase
     }
 
     /** @param array<string, string> $environment */
-    private function recipe(array $environment = []): DeploymentContainerRecipe
+    private function recipe(array $environment = [], DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, new DeploymentRuntimeEnvironment($environment));
+        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', new DeploymentRuntimeEnvironment($environment));
     }
 
-    private function containerId(): string
+    private function reserve(DeploymentContainerRecipe $recipe): void
     {
-        return str_repeat('c', 64);
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        if ($inventory->findBoot($recipe->namespace, $recipe->bootId) === null) {
+            self::assertTrue($inventory->reserveBoot($recipe->namespace, $recipe->bootId, str_repeat('f', 64), $recipe->daemonId, $this->recipe($recipe->runtimeEnvironment->variables)->fingerprint(), $this->recipe($recipe->runtimeEnvironment->variables, DeploymentUnit::Execution)->fingerprint()));
+        }
+    }
+
+    private function containerId(DeploymentUnit $unit = DeploymentUnit::Control): string
+    {
+        return str_repeat($unit === DeploymentUnit::Control ? 'c' : 'd', 64);
     }
 
     private function binding(): DeploymentContainer
     {
         $recipe = $this->recipe();
-        return new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $this->containerId());
+        return new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $this->containerId(), $recipe->unit);
     }
 
     /**
@@ -332,6 +379,7 @@ final class DockerDeploymentCreateTest extends TestCase
      */
     private function creator(DeploymentContainerRecipe $recipe, ?\Closure $onCreate = null, array $state = [], array $isolation = [], bool $wrongDaemon = false): DockerDeploymentCreate
     {
+        $this->reserve($recipe);
         return new DockerDeploymentCreate(new DoctrineDeploymentInventory($this->first), $this->executor($recipe, $onCreate, $state, $isolation, $wrongDaemon));
     }
 
@@ -352,7 +400,10 @@ final class DockerDeploymentCreateTest extends TestCase
                 $index = array_search('--env-file', $arguments, true);
                 $environmentFile = $index === false ? null : $arguments[$index + 1];
                 self::assertSame($recipe->createArguments($environmentFile), $arguments);
-                return $onCreate !== null ? $onCreate($arguments) : $this->containerId();
+                return $onCreate !== null ? $onCreate($arguments) : $this->containerId($recipe->unit);
+            }
+            if ($arguments[0] === 'volume') {
+                return json_encode(['name' => 'worker-ipc', 'driver' => 'local', 'options' => null, 'scope' => 'local', 'mountpoint' => '/var/lib/docker/volumes/worker-ipc/_data'], JSON_THROW_ON_ERROR);
             }
             self::assertSame('inspect', $arguments[1], 'Creation and reconciliation must never start/remove a container.');
             if ($environmentFile !== null) {
@@ -361,18 +412,19 @@ final class DockerDeploymentCreateTest extends TestCase
             }
             if (str_contains($arguments[3], '"entrypoint"')) {
                 return json_encode(array_replace([
-                    'id' => $this->containerId(), 'name' => '/' . RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId),
+                    'id' => $this->containerId($recipe->unit), 'name' => '/' . RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit),
                     'image' => $recipe->imageId, 'entrypoint' => [$recipe->command[0]], 'cmd' => array_slice($recipe->command, 1),
-                    'env' => ['PATH=/usr/local/bin:/usr/bin', 'BAANDER_WORKER_NAMESPACE=' . $recipe->namespace, 'BAANDER_WORKER_BOOT_ID=' . $recipe->bootId,
+                    'env' => ['PATH=/usr/local/bin:/usr/bin', 'BAANDER_WORKER_NAMESPACE=' . $recipe->namespace, 'BAANDER_WORKER_BOOT_ID=' . $recipe->bootId, 'BAANDER_WORKER_UNIT=' . $recipe->unit->value,
                         ...array_map(static fn (string $key, string $value): string => $key . '=' . $value, array_keys($recipe->runtimeEnvironment->variables), array_values($recipe->runtimeEnvironment->variables))],
                     'network' => $recipe->network, 'networks' => [$recipe->network => []], 'memory' => $recipe->memoryBytes, 'memorySwap' => $recipe->memoryBytes,
-                    'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit,
+                    'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit, 'cpuSet' => implode(',', $recipe->cpuSet),
                     'status' => 'created', 'running' => false, 'pid' => 0, 'restarting' => false, 'restart' => 'no', 'retryCount' => 0,
                 ], $state), JSON_THROW_ON_ERROR);
             }
             return json_encode(array_replace([
-                'id' => $state['id'] ?? $this->containerId(), 'namespace' => $recipe->namespace, 'bootId' => $recipe->bootId, 'role' => 'deployment',
-                'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [], 'binds' => null, 'tmpfs' => null,
+                'id' => $state['id'] ?? $this->containerId($recipe->unit), 'namespace' => $recipe->namespace, 'bootId' => $recipe->bootId, 'role' => $recipe->unit->value,
+                'memory' => $recipe->memoryBytes, 'memorySwap' => $recipe->memoryBytes, 'nanoCpus' => $recipe->nanoCpus, 'pidsLimit' => $recipe->pidsLimit, 'cpuSet' => implode(',', $recipe->cpuSet), 'restart' => 'no', 'retryCount' => 0,
+                'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
                 'devices' => null, 'deviceRequests' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges:true'],
             ], $isolation), JSON_THROW_ON_ERROR);
         };

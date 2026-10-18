@@ -5,74 +5,105 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Application\DTO;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
-use InvalidArgumentException;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class WorkerRuntimeConfigurationTest extends TestCase
 {
-    public function testInclusiveMinimumReservationsFitExactCeiling(): void
+    public function testUnitQualificationBudgetsAndConsoleReservation(): void
     {
-        $configuration = $this->configuration();
-        self::assertSame(3712 * 1024 * 1024, $configuration->memoryLimitBytes);
-        self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes + $configuration->mediaReservationBytes);
-        self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
+        $control = $this->configuration('control', 2624, 128);
+        self::assertSame('control', $control->unit);
+        self::assertSame(384 * 1024 * 1024, $control->managementReservationBytes);
+        $execution = $this->configuration('execution', 4480, 256, 320);
+        self::assertSame(320 * 1024 * 1024, $execution->scheduledConsoleReservationBytes);
+        self::assertSame(3520 * 1024 * 1024, $execution->managementReservationBytes);
     }
 
-    public function testConsoleReservationIsAdditionalAndFitsAnExactCeiling(): void
+    public function testWeakerUnitMemoryIsRejected(): void
     {
-        $configuration = $this->configuration(['memoryLimitBytes' => 3904 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
-        self::assertSame($configuration->memoryLimitBytes,
-            $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes + $configuration->mediaReservationBytes + $configuration->scheduledConsoleReservationBytes);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->configuration('execution', 4159, 256);
+    }
+
+    public function testControlCannotReserveScheduledConsole(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->configuration('control', 4480, 128, 320);
+    }
+
+    public function testTraversalDirectoryIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2624 * 1024 * 1024, 128, 0, '/tmp/../tmp/locks', '/run/baander-worker');
     }
 
     #[DataProvider('invalidFields')]
-    public function testRejectsInvalidIdentityAndAdmissionBudget(string $field, mixed $value): void
+    public function testIdentityCapacityAndDirectoryBoundariesAreRejected(string $field, mixed $value): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->configuration([$field => $value]);
+        $this->expectException(\InvalidArgumentException::class);
+        new WorkerRuntimeConfiguration(...array_replace([
+            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'unit' => 'execution',
+            'memoryLimitBytes' => 4160 * 1024 * 1024, 'pidsLimit' => 256, 'scheduledConsoleReservationBytes' => 0,
+            'lockDirectory' => '/tmp/worker-locks', 'ipcDirectory' => '/run/baander-worker',
+        ], [$field => $value]));
     }
 
-    /** @return iterable<string,array{string,mixed}> */
+    /** @return iterable<string, array{string, mixed}> */
     public static function invalidFields(): iterable
     {
         yield 'unsafe namespace' => ['namespace', 'worker baander.app'];
+        yield 'oversized namespace' => ['namespace', str_repeat('a', 129)];
         yield 'short boot' => ['bootId', 'abcd'];
         yield 'uppercase boot' => ['bootId', str_repeat('A', 32)];
-        yield 'zero total' => ['memoryLimitBytes', 0];
-        yield 'unbounded total' => ['memoryLimitBytes', 1024 * 1024 * 1024 * 1024 + 1];
-        yield 'sum exceeds ceiling' => ['memoryLimitBytes', 3712 * 1024 * 1024 - 1];
-        yield 'insufficient management' => ['managementReservationBytes', 128 * 1024 * 1024 - 1];
-        yield 'insufficient consumer' => ['consumerReservationBytes', 320 * 1024 * 1024 - 1];
-        yield 'legacy total excludes scheduler' => ['memoryLimitBytes', 768 * 1024 * 1024];
-        yield 'insufficient scheduler' => ['schedulerReservationBytes', 320 * 1024 * 1024 - 1];
-        yield 'oversized scheduler' => ['schedulerReservationBytes', PHP_INT_MAX];
-        yield 'insufficient relay' => ['relayReservationBytes', 320 * 1024 * 1024 - 1];
-        yield 'oversized management' => ['managementReservationBytes', PHP_INT_MAX];
-        yield 'oversized consumer' => ['consumerReservationBytes', PHP_INT_MAX];
-        yield 'oversized relay' => ['relayReservationBytes', PHP_INT_MAX];
+        yield 'unknown unit' => ['unit', 'combined'];
+        yield 'minimum integer memory' => ['memoryLimitBytes', PHP_INT_MIN];
+        yield 'maximum integer memory' => ['memoryLimitBytes', PHP_INT_MAX];
+        yield 'zero memory' => ['memoryLimitBytes', 0];
+        yield 'unbounded memory' => ['memoryLimitBytes', 1024 ** 4 + 1];
+        yield 'below execution memory' => ['memoryLimitBytes', 4160 * 1024 * 1024 - 1];
+        yield 'zero pids' => ['pidsLimit', 0];
+        yield 'below execution pids' => ['pidsLimit', 255];
+        yield 'unbounded pids' => ['pidsLimit', 4097];
         yield 'negative console reservation' => ['scheduledConsoleReservationBytes', -1];
-        yield 'insufficient console reservation' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024 - 1];
-        yield 'console exceeds remaining ceiling' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024];
+        yield 'insufficient console reservation' => ['scheduledConsoleReservationBytes', 320 * 1024 * 1024 - 1];
+        yield 'console exceeds remaining memory' => ['scheduledConsoleReservationBytes', 320 * 1024 * 1024];
         yield 'oversized console reservation' => ['scheduledConsoleReservationBytes', PHP_INT_MAX];
-        yield 'insufficient media memory' => ['mediaReservationBytes', 2624 * 1024 * 1024 - 1];
-        yield 'insufficient descendant capacity' => ['mediaDescendantPids', 13];
-        yield 'excess descendant capacity' => ['mediaDescendantPids', 4089];
-        yield 'oversized media reservation' => ['mediaReservationBytes', PHP_INT_MAX];
-        yield 'relative lock path' => ['lockDirectory', 'worker-lock'];
-        yield 'NUL lock path' => ['lockDirectory', "/tmp/worker\0lock"];
-        yield 'oversized lock path' => ['lockDirectory', '/' . str_repeat('x', 4096)];
+        foreach (['lockDirectory', 'ipcDirectory'] as $field) {
+            yield $field . ' relative' => [$field, 'worker-lock'];
+            yield $field . ' NUL' => [$field, "/tmp/worker\0lock"];
+            yield $field . ' oversized' => [$field, '/' . str_repeat('x', 4096)];
+            yield $field . ' traversal' => [$field, '/tmp/../tmp/worker'];
+        }
     }
 
-    /** @param array<string,mixed> $overrides */
-    private function configuration(array $overrides = []): WorkerRuntimeConfiguration
+    public function testControlMemoryAndPidMinimumsAreEnforcedIndependently(): void
     {
-        return new WorkerRuntimeConfiguration(...array_replace([
-            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'memoryLimitBytes' => 3712 * 1024 * 1024,
-            'managementReservationBytes' => 128 * 1024 * 1024, 'consumerReservationBytes' => 320 * 1024 * 1024,
-            'scheduledConsoleReservationBytes' => 0, 'schedulerReservationBytes' => 320 * 1024 * 1024,
-            'mediaReservationBytes' => 2624 * 1024 * 1024, 'mediaDescendantPids' => 14,
-            'relayReservationBytes' => 320 * 1024 * 1024, 'lockDirectory' => '/tmp/baander-worker',
-        ], $overrides));
+        foreach ([[2623, 128], [2624, 127]] as [$memory, $pids]) {
+            try {
+                $this->configuration('control', $memory, $pids);
+                self::fail('Control resources below either qualification minimum must be rejected.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('Worker requires', $error->getMessage());
+            }
+        }
+    }
+
+    public function testBothUnitsAcceptTheirExactMemoryAndPidBoundaries(): void
+    {
+        foreach ([['control', 2624, 128], ['execution', 4160, 256]] as [$unit, $memory, $pids]) {
+            $configuration = $this->configuration($unit, $memory, $pids);
+            self::assertSame($memory * 1024 * 1024, $configuration->memoryLimitBytes);
+            self::assertSame($pids, $configuration->pidsLimit);
+            self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
+        }
+        $maximum = $this->configuration('execution', 1048576, 4096);
+        self::assertSame(1024 ** 4, $maximum->memoryLimitBytes);
+        self::assertSame(4096, $maximum->pidsLimit);
+    }
+
+    private function configuration(string $unit, int $mib, int $pids, int $console = 0): WorkerRuntimeConfiguration
+    {
+        return new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), $unit, $mib * 1024 * 1024, $pids, $console * 1024 * 1024, '/tmp/worker-locks', '/run/baander-worker');
     }
 }

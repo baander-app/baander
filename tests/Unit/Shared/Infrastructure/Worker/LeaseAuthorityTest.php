@@ -15,6 +15,18 @@ final class LeaseAuthorityTest extends TestCase
     private const string NAMESPACE = 'lease-policy.baander.app';
     private const string BOOT = '0123456789abcdef0123456789abcdef';
 
+    public function testObserverNeverRequestsAcquisitionOrRenewalAndCannotChangeEpoch(): void
+    {
+        $authority = new LeaseAuthority(self::NAMESPACE, self::BOOT, 3, 2, 0.1, true);
+        self::assertSame('observe', $authority->request(0)['action']);
+        self::assertTrue($authority->accept(1, $this->grant(), 0.1));
+        $request = $authority->request(1);
+        self::assertSame('observe', $request['action']);
+        self::assertSame(7, $request['epoch']);
+        self::assertFalse($authority->accept(2, new DeploymentLease(self::NAMESPACE, self::BOOT, 8), 1.1));
+        self::assertTrue($authority->isRevoked(1.1));
+    }
+
     public function testInitialAcquireIsUnreadyAndSingleFlight(): void
     {
         $authority = $this->authority();

@@ -67,9 +67,9 @@ final class LeaseAgentProcess
     public static function validateRequest(array $request): array
     {
         if (count($request) !== 6 || !isset($request['action'], $request['sequence'], $request['namespace'], $request['bootId'], $request['ttlSeconds']) || !array_key_exists('epoch', $request)
-            || !in_array($request['action'], ['acquire', 'renew'], true) || !is_int($request['sequence']) || $request['sequence'] < 1
+            || !in_array($request['action'], ['acquire', 'renew', 'observe'], true) || !is_int($request['sequence']) || $request['sequence'] < 1
             || !is_string($request['namespace']) || !is_string($request['bootId']) || !is_int($request['ttlSeconds']) || $request['ttlSeconds'] < 1 || $request['ttlSeconds'] > 3600
-            || ($request['action'] === 'acquire' ? $request['epoch'] !== null : (!is_int($request['epoch']) || $request['epoch'] < 1))) {
+            || ($request['action'] === 'acquire' ? $request['epoch'] !== null : ($request['action'] === 'renew' || $request['epoch'] !== null) && (!is_int($request['epoch']) || $request['epoch'] < 1))) {
             throw new \InvalidArgumentException('Invalid lease helper request.');
         }
         DeploymentLease::validateIdentity($request['namespace'], $request['bootId']);
@@ -171,8 +171,8 @@ final class LeaseAgentProcess
             }
             $lease = $reply['lease'];
             if (!is_array($lease) || count($lease) !== 3 || ($lease['namespace'] ?? null) !== $this->request['namespace'] || ($lease['bootId'] ?? null) !== $this->request['bootId']
-                || !isset($lease['epoch']) || !is_int($lease['epoch']) || $lease['epoch'] < 1 || $reply['category'] !== ($this->request['action'] === 'acquire' ? 'acquired' : 'renewed')
-                || ($this->request['action'] === 'renew' && $lease['epoch'] !== $this->request['epoch'])) {
+                || !isset($lease['epoch']) || !is_int($lease['epoch']) || $lease['epoch'] < 1 || $reply['category'] !== match ($this->request['action']) { 'acquire' => 'acquired', 'observe' => 'observed', default => 'renewed' }
+                || ($this->request['epoch'] !== null && $lease['epoch'] !== $this->request['epoch'])) {
                 return $this->failureResult('invalid_response');
             }
             return ['action' => $reply['action'], 'sequence' => $reply['sequence'], 'success' => true, 'category' => $reply['category'], 'lease' => ['namespace' => $lease['namespace'], 'bootId' => $lease['bootId'], 'epoch' => $lease['epoch']]];

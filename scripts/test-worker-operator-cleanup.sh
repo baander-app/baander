@@ -11,7 +11,7 @@ import tempfile
 source = pathlib.Path('scripts/test-worker-operator-container.sh').read_text()
 cleanup = source[source.index('cleanup() {'):source.index('\ntrap cleanup EXIT')]
 stub = r'''#!/usr/bin/env python3
-import json, os, sys
+import hashlib, json, os, sys
 path = os.environ['CLEANUP_STUB_STATE']
 state = json.load(open(path))
 args = sys.argv[1:]
@@ -28,14 +28,16 @@ elif len(args) >= 2 and args[1] == 'ls':
     else:
         for name in state['resources'][kind]:
             if kind == 'container':
-                namespace = 'fixture-namespace' if name in ['worker-current', 'worker-retired'] else ''
-                print(name + '|' + namespace + '|deployment')
+                namespace = 'fixture-namespace' if name in ['worker-current', 'control-current', 'worker-retired', 'control-retired'] else ''
+                print(hashlib.sha256(name.encode()).hexdigest() + '|' + name + '|' + namespace + ('|control' if name.startswith('control-') else '|execution'))
             else:
                 print(name)
 elif len(args) >= 2 and args[1] == 'rm':
     kind = args[0]
     names = [name for name in args[2:] if not name.startswith('-')]
     for name in names:
+        if kind == 'container':
+            name = next((candidate for candidate in state['resources'][kind] if hashlib.sha256(candidate.encode()).hexdigest() == name), name)
         blocked = name == state.get('blocked')
         if blocked and mode == 'remove-failure':
             code = 1
@@ -52,9 +54,9 @@ sys.exit(code)
 owned = {
     'container': ['fixture-web', 'fixture-controller', 'fixture-media-prepare', 'fixture-host-probe',
                   'fixture-client', 'fixture-prepare', 'fixture-source', 'fixture-redis', 'fixture-postgres',
-                  'worker-current', 'worker-retired'],
+                  'worker-current', 'control-current', 'worker-retired', 'control-retired'],
     'network': ['fixture', 'fixture-control'],
-    'volume': ['fixture-source-media', 'fixture-storage', 'fixture-media-state', 'fixture-web-secrets'],
+    'volume': ['fixture-source-media', 'fixture-storage', 'fixture-media-state', 'fixture-web-secrets', 'fixture-worker-ipc'],
     'image': ['fixture:controller', 'fixture:cli', 'fixture:fixture', 'fixture:base'],
 }
 cases = [('transport', 0, None, 1), ('clean', 0, None, 0), ('absent', 0, None, 0),
@@ -89,6 +91,7 @@ set -euo pipefail
 run_id=fixture
 namespace=fixture-namespace
 worker_name=worker-current
+control_name=control-current
 web_name=fixture-web
 fixture_image=fixture:fixture
 fixture_base=fixture:base
@@ -98,6 +101,7 @@ source_volume=fixture-source-media
 storage_volume=fixture-storage
 state_volume=fixture-media-state
 secrets_volume=fixture-web-secrets
+ipc_volume=fixture-worker-ipc
 two_command=1
 operator_in_container=1
 docker_endpoint=unused
@@ -116,6 +120,9 @@ docker_local() { "$docker_binary" "$@"; }
         assert receipt['exitStatus'] == expected, (mode, receipt)
         assert receipt['cleanupVerified'] is (mode in ['clean', 'absent']), (mode, receipt)
         final = json.loads(state_path.read_text())
+        for call in final['calls']:
+            if call[:3] == ['container', 'rm', '-f']:
+                assert len(call[3]) == 64 and all(c in '0123456789abcdef' for c in call[3]), call
         for kind in owned:
             assert 'unrelated-' + kind in final['resources'][kind], (mode, kind, 'unrelated resource removed')
         if mode in ['clean', 'absent', 'checkpoint']:
@@ -140,6 +147,7 @@ artifacts=$1
 stopped=$2
 run_id=fixture
 worker_name=worker-current
+control_name=control-current
 web_name=fixture-web
 docker_local() {
     printf '%s\n' "$*" >> "$artifacts/calls"

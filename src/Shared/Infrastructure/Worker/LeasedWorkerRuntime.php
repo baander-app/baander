@@ -25,7 +25,7 @@ final class LeasedWorkerRuntime
      *
      * @param list<WorkerDefinition> $definitions
      * @param Closure(WorkerDefinition, WorkerLaunchIdentity): WorkerChildProcess $workerLauncher
-     * @param Closure(array{action: 'acquire'|'renew', sequence: int, namespace: string, bootId: string, epoch: ?int, ttlSeconds: int}, float): LeaseAgentProcess $leaseLauncher
+     * @param Closure(array{action: 'acquire'|'renew'|'observe', sequence: int, namespace: string, bootId: string, epoch: ?int, ttlSeconds: int}, float): LeaseAgentProcess $leaseLauncher
      * @param (Closure(): float)|null $clock
      */
     public function __construct(
@@ -37,6 +37,7 @@ final class LeasedWorkerRuntime
         Closure $workerLauncher,
         private readonly Closure $leaseLauncher,
         ?Closure $clock = null,
+        private readonly ?Closure $admissionGate = null,
     ) {
         $this->clock = $clock ?? static fn (): float => hrtime(true) / 1e9;
         $this->supervisor = new WorkerSupervisor($definitions, $maxChildProcesses - 1, $memoryLimitBytes, $managementReservationBytes,
@@ -73,7 +74,7 @@ final class LeasedWorkerRuntime
                 return;
             }
             // Pending initial acquisition must not irreversibly drain an unstarted core.
-            if ($this->authority->hasAuthority($this->now())) {
+            if ($this->authority->hasAuthority($this->now()) && ($this->admissionGate === null || ($this->admissionGate)())) {
                 $this->supervisor->tick($this->now(), true);
             }
             if ($this->authority->isRevoked($this->now())) {

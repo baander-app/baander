@@ -52,6 +52,7 @@ services:
         resource: '../src/'
         exclude:
             - '../src/Kernel.php'
+            - '../src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php'
             - '../src/Transcode/Infrastructure/Redis/RedisTranscodeLoopLease.php'
             - '../src/Transcode/Infrastructure/Swoole/TranscodeLoopOwnership.php'
             - '../src/**/Entity/'
@@ -964,9 +965,9 @@ services:
 
     # --- Transcode Stream Manager (long-lived FFmpeg processes) ---
     App\Transcode\Infrastructure\Swoole\ProcessSpawnerInterface:
-        alias: App\Transcode\Infrastructure\Swoole\ProcOpenSpawner
+        alias: App\Transcode\Infrastructure\Swoole\NativeProcessSpawner
 
-    App\Transcode\Infrastructure\Swoole\ProcOpenSpawner: ~
+    App\Transcode\Infrastructure\Swoole\NativeProcessSpawner: ~
 
     App\Transcode\Infrastructure\Swoole\TranscodeStreamManager:
         arguments:
@@ -1025,13 +1026,6 @@ services:
             $ffprobeAdapter: '@App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter'
             $fmp4Writer: '@App\Transcode\Infrastructure\HLS\FMP4SegmentWriter'
 
-    # --- CPU Process Pool ---
-    # Generic pool infrastructure — tagged handlers auto-discovered at boot.
-    # Workers run in isolated processes with SWOOLE_IPC_UNIXSOCK.
-    App\Transcode\Infrastructure\Swoole\TranscodePoolWorker:
-        tags:
-            - { name: 'swoole.cpu_pool_worker' }
-
     # --- Track audio renditions (on-the-fly audio transcoding) ---
     App\Transcode\Infrastructure\Transcode\AudioRenditionCache:
         arguments:
@@ -1039,9 +1033,6 @@ services:
 
     App\Transcode\Application\Port\AudioRenditionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\AudioRenditionCache
-
-    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool:
-        alias: worker.media.cpu_pool
 
     # --- Web server drain (stop and restart) ---
     # One drain path from onBeforeShutdown; see DrainCoordinator.
@@ -1072,9 +1063,7 @@ services:
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler
 
-    App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
-        arguments:
-            $pool: '@worker.media.cpu_pool'
+    App\Transcode\Infrastructure\Swoole\TranscodeProcessPool: ~
 
     App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
         arguments:
@@ -1277,14 +1266,10 @@ services:
         autoconfigure: false
         public: true
 
-    worker.media.cpu_pool:
-        class: App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool
+    App\Shared\Infrastructure\Worker\NativeExecutionClientInterface:
         synthetic: true
         autoconfigure: false
         public: true
-
-    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface:
-        alias: worker.media.cpu_pool
 
     App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor:
         arguments:

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use InvalidArgumentException;
@@ -15,11 +17,11 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testConfiguredSourceRootMustBelongToAnAdmittedSourceVolume(): void
     {
         $manifest = DeploymentOperatorManifest::fromJson($this->json());
-        $recipe = $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/audio']));
+        $recipe = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/audio']));
         self::assertSame('/media/library/audio', $recipe->runtimeEnvironment->variables['MEDIA_STORAGE_PATH']);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('source storage');
-        $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/var/www/html/storage/media']));
+        $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/var/www/html/storage/media']));
     }
 
     public function testConfiguredSourceRootCannotEscapeItsVolume(): void
@@ -27,40 +29,40 @@ final class DeploymentOperatorManifestTest extends TestCase
         $manifest = DeploymentOperatorManifest::fromJson($this->json());
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('canonical absolute');
-        $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/../private']));
+        $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/../private']));
     }
 
     public function testRecipeBindsIdentityBudgetsAndFixedWorkerCommand(): void
     {
         $manifest = DeploymentOperatorManifest::fromJson($this->json());
         $environment = new DeploymentRuntimeEnvironment(['APP_ENV' => 'prod']);
-        $recipe = $manifest->recipe($environment);
+        $recipe = $manifest->recipe(DeploymentUnit::Control, $environment);
         self::assertSame([
-            '/usr/local/bin/php', '-d', 'memory_limit=128M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
-            '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32),
-            '--memory-mib=3904', '--management-mib=128', '--consumer-mib=320', '--relay-mib=320',
-            '--scheduler-mib=320', '--scheduled-console-mib=192', '--media-mib=2624', '--media-descendant-pids=14', '--lock-dir=/tmp/baander-worker-locks',
+            '/usr/local/bin/php', '-d', 'memory_limit=256M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
+            '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32), '--unit=control',
+            '--memory-mib=2624', '--pids-limit=128', '--scheduled-console-mib=0',
+            '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker',
         ], $recipe->command);
-        self::assertSame(3904 * 1024 * 1024, $recipe->memoryBytes);
-        self::assertSame($manifest->configuration->memoryLimitBytes, $recipe->memoryBytes);
+        self::assertSame(2624 * 1024 * 1024, $recipe->memoryBytes);
+        self::assertSame($manifest->control->memoryBytes, $recipe->memoryBytes);
         self::assertSame($environment, $recipe->runtimeEnvironment);
         self::assertSame('/usr/bin/docker', $manifest->dockerBinary);
         self::assertSame('unix:///var/run/docker.sock', $manifest->dockerEndpoint);
-        self::assertSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json())->recipe($environment)->fingerprint());
+        self::assertSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json())->recipe(DeploymentUnit::Control, $environment)->fingerprint());
         $arguments = $recipe->createArguments('/tmp/baander-worker-test.env');
         $memory = array_search('--memory', $arguments, true);
         self::assertNotFalse($memory);
-        self::assertSame((string) $manifest->configuration->memoryLimitBytes, $arguments[$memory + 1]);
+        self::assertSame((string) $manifest->control->memoryBytes, $arguments[$memory + 1]);
     }
 
     public function testManifestMountsAreValidatedAndParticipateInCreateIdentity(): void
     {
         $mounts = self::mounts();
-        $recipe = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(new DeploymentRuntimeEnvironment());
+        $recipe = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
         self::assertSame($mounts, $recipe->mediaMounts);
         self::assertContains('type=volume,src=baander-source,dst=/media/library,readonly,volume-nocopy', $recipe->createArguments());
         $mounts[0]['volume'] = 'replacement-source';
-        self::assertNotSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(new DeploymentRuntimeEnvironment())->fingerprint());
+        self::assertNotSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->fingerprint());
         $mounts[0]['readOnly'] = false;
         $this->expectException(InvalidArgumentException::class);
         DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]));
@@ -83,10 +85,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testConversionPathMustBelongToWritableSharedStorage(): void
     {
         $manifest = DeploymentOperatorManifest::fromJson($this->json());
-        $recipe = $manifest->recipe(new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions']));
+        $recipe = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions']));
         self::assertSame('/var/www/html/storage/conversions', $recipe->runtimeEnvironment->variables['CONVERT_STORAGE_PATH']);
         $this->expectException(InvalidArgumentException::class);
-        $manifest->recipe(new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']));
+        $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']));
     }
 
     public function testAlternateConversionPathUsesAnExplicitVolumeAtThatPath(): void
@@ -94,7 +96,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         $mounts = [...self::mounts(), ['volume' => 'baander-conversions', 'target' => '/storage/conversions', 'readOnly' => false, 'role' => 'derived']];
         $manifest = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]));
         self::assertContains('type=volume,src=baander-conversions,dst=/storage/conversions,volume-nocopy',
-            $manifest->recipe(new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']))->createArguments('/tmp/baander-test.env'));
+            $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']))->createArguments('/tmp/baander-test.env'));
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -105,9 +107,9 @@ final class DeploymentOperatorManifestTest extends TestCase
 
     public function testDisabledScheduledConsoleAndMaximumMemoryAreAccepted(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['memoryMiB' => 1048576, 'scheduledConsoleMiB' => 0]));
-        self::assertSame(1024 * 1024 * 1024 * 1024, $manifest->configuration->memoryLimitBytes);
-        self::assertContains('--scheduled-console-mib=0', $manifest->recipe(new DeploymentRuntimeEnvironment())->command);
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['controlMemoryMiB' => 1048576, 'scheduledConsoleMiB' => 0]));
+        self::assertSame(1024 * 1024 * 1024 * 1024, $manifest->control->memoryBytes);
+        self::assertContains('--scheduled-console-mib=0', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->command);
     }
 
     public function testDockerBinaryExistenceIsDeferredToExecutor(): void
@@ -170,24 +172,25 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'relative binary' => ['dockerBinary', 'docker'];
         yield 'empty binary' => ['dockerBinary', ''];
         yield 'binary NUL' => ['dockerBinary', "/usr/bin/docker\0"];
-        yield 'MiB multiplication overflow' => ['memoryMiB', PHP_INT_MAX];
-        yield 'oversized memory' => ['memoryMiB', 1048577];
-        yield 'negative memory' => ['memoryMiB', -1];
-        yield 'insufficient total budget' => ['memoryMiB', 1727];
-        yield 'insufficient management' => ['managementMiB', 127];
-        yield 'insufficient consumer' => ['consumerMiB', 319];
-        yield 'insufficient relay' => ['relayMiB', 319];
-        yield 'insufficient scheduler' => ['schedulerMiB', 319];
+        foreach (['control', 'execution'] as $unit) {
+            yield $unit . ' memory overflow' => [$unit . 'MemoryMiB', PHP_INT_MAX];
+            yield $unit . ' oversized memory' => [$unit . 'MemoryMiB', 1048577];
+            yield $unit . ' negative memory' => [$unit . 'MemoryMiB', -1];
+            yield $unit . ' zero CPU' => [$unit . 'NanoCpus', 0];
+            yield $unit . ' excess CPU' => [$unit . 'NanoCpus', 64000000001];
+            yield $unit . ' excess PIDs' => [$unit . 'PidsLimit', 4097];
+            yield $unit . ' empty affinity' => [$unit . 'CpuSet', []];
+            yield $unit . ' negative affinity' => [$unit . 'CpuSet', [-1]];
+            yield $unit . ' duplicate affinity' => [$unit . 'CpuSet', [4, 4]];
+        }
+        yield 'insufficient control memory' => ['controlMemoryMiB', 2303];
+        yield 'insufficient execution memory' => ['executionMemoryMiB', 4095];
+        yield 'insufficient control PIDs' => ['controlPidsLimit', 127];
+        yield 'insufficient execution PIDs' => ['executionPidsLimit', 255];
         yield 'insufficient scheduled console' => ['scheduledConsoleMiB', 191];
-        yield 'excess reservation' => ['managementMiB', 1048576];
-        yield 'zero CPU' => ['nanoCpus', 0];
-        yield 'excess CPU' => ['nanoCpus', 64000000001];
-        yield 'encoder thread headroom' => ['pidsLimit', 127];
-        yield 'insufficient media memory' => ['mediaMiB', 2623];
-        yield 'insufficient descendant capacity' => ['mediaDescendantPids', 0];
-        yield 'insufficient PID reservation' => ['pidsLimit', 9];
-        yield 'low PIDs' => ['pidsLimit', 7];
-        yield 'excess PIDs' => ['pidsLimit', 4097];
+        yield 'overlapping affinity' => ['executionCpuSet', [0]];
+        yield 'IPC aliases media' => ['ipcVolume', 'baander-source'];
+
     }
 
     #[DataProvider('invalidJson')]
@@ -207,7 +210,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":2', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":3', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */
@@ -219,12 +222,6 @@ final class DeploymentOperatorManifestTest extends TestCase
     /** @return array<string,mixed> */
     private static function fields(): array
     {
-        return [
-            'version' => 2, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
-            'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
-            'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'memoryMiB' => 3904, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
-            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'mediaMiB' => 2624, 'mediaDescendantPids' => 14, 'mediaMounts' => self::mounts(), 'nanoCpus' => 1000000000, 'pidsLimit' => 128,
-        ];
+        return array_replace(DeploymentPairManifestTest::fields(), ['mediaMounts' => self::mounts()]);
     }
 }

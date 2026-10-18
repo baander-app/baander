@@ -4,72 +4,89 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use Closure;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Trusted external recovery using committed inventory, never a caller-selected container. */
+/** Only joint containment of the fixed pair releases the deployment namespace. */
 #[Exclude]
 final readonly class RegisteredDeploymentRecovery
 {
     /**
-     * The executor must use a fixed trusted Docker endpoint and bounded I/O.
-     * @param Closure(list<string>): string $dockerExecutor Successful commands return stdout; failures throw.
+     * @param Closure(list<string>): string $dockerExecutor Fixed trusted endpoint and bounded I/O.
+     * @param array<string,DeploymentContainerRecipe> $recipes
      */
     public function __construct(
         private DoctrineDeploymentInventory $inventory,
         private DoctrineDeploymentRetirement $retirements,
         private Closure $dockerExecutor,
-        private ?DeploymentContainerRecipe $recipe = null,
+        private array $recipes,
     ) {
+        if (array_keys($recipes) !== ['control', 'execution']) {
+            throw new \InvalidArgumentException('Recovery requires exactly the control and execution recipes.');
+        }
+        foreach (DeploymentUnit::cases() as $unit) {
+            if (!isset($recipes[$unit->value]) || $recipes[$unit->value]->unit !== $unit) {
+                throw new \InvalidArgumentException('Recovery requires both unit recipes.');
+            }
+        }
     }
 
-    /**
-     * Mutates Docker and durable ownership state; repeated calls re-observe committed outcomes.
-     * @phpstan-impure
-     */
+    /** @phpstan-impure */
     public function recover(string $namespace, string $expectedBootId): bool
     {
-        DeploymentLease::validateIdentity($namespace, $expectedBootId);
-        $binding = $this->inventory->find($namespace, $expectedBootId);
-        if ($binding === null) {
+        $boot = $this->inventory->findBoot($namespace, $expectedBootId);
+        if ($boot === null) {
             return false;
         }
-        if ($this->recipe !== null && ($this->recipe->namespace !== $namespace
-            || $this->recipe->bootId !== $expectedBootId || $this->recipe->daemonId !== $binding->daemonId
-            || !$this->inventory->matchesCreate($this->recipe))) {
-            throw new \RuntimeException('Recovery recipe does not match committed deployment creation.');
-        }
-        $retirement = $this->retirements->find($namespace, $expectedBootId);
-        if ($retirement !== null && ($retirement->binding->namespace !== $binding->namespace
-            || $retirement->binding->bootId !== $binding->bootId
-            || $retirement->binding->daemonId !== $binding->daemonId
-            || $retirement->binding->containerId !== $binding->containerId)) {
-            throw new \RuntimeException('Retirement intent does not match immutable deployment inventory.');
-        }
-        if ($retirement?->completed === true) {
+        if ($boot->retired) {
             return true;
         }
-        $containment = new DockerWorkerContainment(function (array $arguments) use ($binding): string {
-            // Recheck before both inspection and removal; a daemon change after
-            // inspection must not turn a different daemon into containment proof.
-            $daemonId = ($this->dockerExecutor)(['info', '--format', '{{.ID}}']);
-            if (strlen($daemonId) > 256 || trim($daemonId) !== $binding->daemonId) {
-                throw new \RuntimeException('Docker daemon does not match the registered deployment.');
+        foreach ([$boot->control, $boot->execution] as $state) {
+            $recipe = $this->recipes[$state->unit->value];
+            if ($recipe->namespace !== $namespace || $recipe->bootId !== $expectedBootId
+                || $recipe->daemonId !== $boot->daemonId || $recipe->fingerprint() !== $state->recipeHash) {
+                throw new \RuntimeException('Recovery recipes differ from the committed deployment.');
             }
-            return ($this->dockerExecutor)($arguments);
-        }, $this->recipe);
-        if ($retirement === null) {
-            // Absence without a committed, previously verified binding supplies
-            // no containment evidence. Never interpret an inspect error as absence.
-            $containment->verifyIsolation($binding->containerId, $namespace, $expectedBootId);
-            if (!$this->retirements->begin($binding)) {
+        }
+        if (!$this->retirements->requestRetirement($namespace, $expectedBootId)) {
+            return false;
+        }
+        $boot = $this->inventory->findBoot($namespace, $expectedBootId);
+        if ($boot === null) {
+            throw new \RuntimeException('Deployment reservation disappeared during recovery.');
+        }
+        // Keep control available while execution drains. Each successful proof is
+        // committed independently, so a controller interruption can resume safely.
+        foreach ([$boot->execution, $boot->control] as $state) {
+            if ($state->cancelled || $state->retirement?->completed === true) {
+                continue;
+            }
+            $recipe = $this->recipes[$state->unit->value];
+            $binding = $state->binding;
+            if ($binding === null) {
+                // A claimed but unbound create remains uncertain until a real
+                // immutable binding can be verified. A missing name proves nothing.
+                $binding = (new DockerDeploymentCreate($this->inventory, $this->dockerExecutor))->reconcile($recipe, forRetirement: true);
+            }
+            $containment = new DockerWorkerContainment(function (array $arguments) use ($binding): string {
+                $daemon = ($this->dockerExecutor)(['info', '--format', '{{.ID}}']);
+                if (strlen($daemon) > 256 || trim($daemon) !== $binding->daemonId) {
+                    throw new \RuntimeException('Docker daemon differs from the registered deployment.');
+                }
+                return ($this->dockerExecutor)($arguments);
+            }, $recipe);
+            if ($state->retirement === null) {
+                $containment->verifyIsolation($binding->containerId, $namespace, $expectedBootId, $state->unit);
+                if (!$this->retirements->beginUnitRetirement($binding)) {
+                    return false;
+                }
+            }
+            $containment->reconcileRemoval($binding->containerId, $namespace, $expectedBootId, $state->unit);
+            if (!$this->retirements->completeUnitRetirement($binding)) {
                 return false;
             }
         }
-        // The intent blocks further admission for this boot before any removal.
-        // A lost removal reply can now be reconciled by exact-ID absence on the
-        // same daemon. Completion and own-boot lease release commit together.
-        $containment->reconcileRemoval($binding->containerId, $namespace, $expectedBootId);
-        return $this->retirements->complete($binding);
+        return $this->retirements->completeBootRetirement($namespace, $expectedBootId);
     }
 }

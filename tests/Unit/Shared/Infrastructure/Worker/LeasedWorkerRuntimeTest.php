@@ -59,6 +59,21 @@ PHP);
         self::assertNull($runtime->failureCode());
     }
 
+    public function testPeerGatePreventsBusinessAdmissionAfterLeaseAcquisition(): void
+    {
+        $ready = false;
+        $runtime = $this->createRuntime(gate: static function () use (&$ready): bool { return $ready; });
+        for ($tick = 0; $tick < 50; ++$tick) {
+            $runtime->tick();
+            usleep(1000);
+        }
+        self::assertSame(0, $this->launches);
+        self::assertNull($runtime->failureCode());
+        $ready = true;
+        $this->await($this->hasLaunchedWorker(...));
+        self::assertSame(1, $this->launches);
+    }
+
     public function testDeniedAcquisitionNeverStartsWorkers(): void
     {
         $runtime = $this->createRuntime('deny');
@@ -149,7 +164,7 @@ PHP);
             static fn (): never => throw new \LogicException('No helper should launch.'));
     }
 
-    private function createRuntime(string $mode = 'success', bool $advanceDuringLaunch = false, int $workers = 1): LeasedWorkerRuntime
+    private function createRuntime(string $mode = 'success', bool $advanceDuringLaunch = false, int $workers = 1, ?\Closure $gate = null): LeasedWorkerRuntime
     {
         $definitions = [$this->definition('first')];
         if ($workers === 2) {
@@ -167,7 +182,7 @@ PHP);
                 return $child;
             },
             fn (array $request, float $now): LeaseAgentProcess => LeaseAgentProcess::start($request, $this->directory, $now, 10, ['LEASE_FIXTURE_MODE' => $mode]),
-            fn (): float => $this->now);
+            fn (): float => $this->now, $gate);
     }
 
     private function definition(string $id): WorkerDefinition

@@ -26,14 +26,23 @@ final class DoctrineDeploymentLease
         }
     }
 
-    /** A null result includes duplicate same-boot claims; uncertain outcomes require reconciliation, not blind retries. */
+    /**
+     * A null result includes duplicate same-boot claims; uncertain outcomes require reconciliation, not blind retries.
+     * @phpstan-impure
+     */
     public function acquire(string $namespace, string $bootId, int $ttlSeconds): ?DeploymentLease
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
         $this->validateTtl($ttlSeconds);
         $row = $this->operation(function () use ($namespace, $bootId, $ttlSeconds): array|false {
             DeploymentNamespaceLock::acquire($this->connection, $namespace);
-            if ($this->connection->fetchOne('SELECT 1 FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $namespace, 'boot' => $bootId]) !== false) {
+            if ($this->connection->fetchOne(<<<'SQL'
+                SELECT 1 FROM worker_deployment_boots b
+                WHERE b.namespace = :namespace AND b.boot_id = :boot AND b.retirement_requested_at IS NULL
+                    AND b.retired_at IS NULL AND b.manifest_hash IS NOT NULL
+                    AND (SELECT count(*) FROM worker_deployment_containers i WHERE i.namespace = b.namespace AND i.boot_id = b.boot_id) = 2
+                    AND EXISTS (SELECT 1 FROM worker_deployment_containers i WHERE i.namespace = b.namespace AND i.boot_id = b.boot_id AND i.unit = 'control' AND i.start_claimed_at IS NOT NULL)
+                SQL, ['namespace' => $namespace, 'boot' => $bootId]) === false) {
                 return false;
             }
             return $this->connection->fetchAssociative(<<<'SQL'
@@ -64,6 +73,10 @@ final class DoctrineDeploymentLease
     {
         $this->validateTtl($ttlSeconds);
         return $this->operation(function () use ($lease, $ttlSeconds): int {
+            DeploymentNamespaceLock::acquire($this->connection, $lease->namespace);
+            if ($this->connection->fetchOne('SELECT 1 FROM worker_deployment_boots WHERE namespace = :namespace AND boot_id = :boot AND retirement_requested_at IS NULL', ['namespace' => $lease->namespace, 'boot' => $lease->bootId]) === false) {
+                return 0;
+            }
             // Acquire the row lock before evaluating expiry. An UPDATE predicate
             // alone can be evaluated before waiting for an unchanged locked row.
             $params = ['namespace' => $lease->namespace, 'boot' => $lease->bootId, 'epoch' => $lease->epoch];
@@ -80,15 +93,6 @@ final class DoctrineDeploymentLease
                     AND state = 'active' AND expires_at > clock_timestamp()
                 SQL, [...$params, 'ttl' => $ttlSeconds]);
         }) === 1;
-    }
-
-    /** Only a trusted controller may call this AFTER verifying predecessor cleanup; elapsed TTL is insufficient. */
-    public function acknowledgeContainment(DeploymentLease $lease): bool
-    {
-        return $this->operation(fn (): int => $this->connection->executeStatement(<<<'SQL'
-            UPDATE worker_deployment_leases SET state = 'available'
-            WHERE namespace = :namespace AND owner_boot_id = :boot AND epoch = :epoch AND state = 'active'
-            SQL, ['namespace' => $lease->namespace, 'boot' => $lease->bootId, 'epoch' => $lease->epoch])) === 1;
     }
 
     private function validateTtl(int $ttlSeconds): void

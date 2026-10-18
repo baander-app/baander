@@ -13,80 +13,69 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 final class WorkerCommandTest extends TestCase
 {
-    public function testExplicitBudgetsAndIdentityReachRunnerAndExitStatusIsPreserved(): void
+    public function testExplicitUnitBudgetsReachRunner(): void
     {
         $runner = new RecordingWorkerRunner();
-        $tester = new CommandTester(new WorkerCommand($runner));
-        self::assertSame(7, $tester->execute($this->options()));
+        self::assertSame(7, (new CommandTester(new WorkerCommand($runner)))->execute($this->options()));
         self::assertNotNull($runner->configuration);
+        self::assertSame('execution', $runner->configuration->unit);
         self::assertSame('baander.app:workers', $runner->configuration->namespace);
         self::assertSame(str_repeat('a', 32), $runner->configuration->bootId);
-        self::assertSame(3968 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
-        self::assertSame(384 * 1024 * 1024, $runner->configuration->consumerReservationBytes);
         self::assertSame(0, $runner->configuration->scheduledConsoleReservationBytes);
-        self::assertSame(320 * 1024 * 1024, $runner->configuration->schedulerReservationBytes);
+        self::assertSame(4160 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
+        self::assertSame(256, $runner->configuration->pidsLimit);
     }
 
-    public function testMediaReservationAndDescendantCapacityReachRunner(): void
+    public function testScheduledConsoleRequiresItsAdditionalReservation(): void
     {
         $runner = new RecordingWorkerRunner();
         $tester = new CommandTester(new WorkerCommand($runner));
-        self::assertSame(7, $tester->execute($this->options()));
+        self::assertSame(2, $tester->execute(array_replace($this->options(), ['--scheduled-console-mib' => '320'])));
+        self::assertNull($runner->configuration);
+        self::assertSame(7, $tester->execute(array_replace($this->options(), ['--memory-mib' => '4480', '--scheduled-console-mib' => '320'])));
         self::assertNotNull($runner->configuration);
-        self::assertSame(2624 * 1024 * 1024, $runner->configuration->mediaReservationBytes);
-        self::assertSame(14, $runner->configuration->mediaDescendantPids);
-    }
-
-    public function testExplicitConsoleReservationCanFitWithoutIncreasingTotalCeiling(): void
-    {
-        $runner = new RecordingWorkerRunner();
-        $tester = new CommandTester(new WorkerCommand($runner));
-        $options = array_replace($this->options(), ['--management-mib' => '128', '--consumer-mib' => '320', '--relay-mib' => '320', '--scheduled-console-mib' => '192']);
-        self::assertSame(7, $tester->execute($options));
-        self::assertNotNull($runner->configuration);
-        self::assertSame(3968 * 1024 * 1024, $runner->configuration->memoryLimitBytes);
-        self::assertSame(192 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
+        self::assertSame(320 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
     }
 
     #[DataProvider('invalidOptions')]
     public function testInvalidConfigurationNeverStartsSupervisor(string $option, mixed $value): void
     {
         $runner = new RecordingWorkerRunner();
-        $tester = new CommandTester(new WorkerCommand($runner));
         $options = $this->options();
         if ($value === null) {
             unset($options[$option]);
         } else {
             $options[$option] = $value;
         }
-        self::assertSame(2, $tester->execute($options));
+        self::assertSame(2, (new CommandTester(new WorkerCommand($runner)))->execute($options));
         self::assertNull($runner->configuration);
     }
 
-    /** @return iterable<string, array{string, mixed}> */
+    /** @return iterable<array{string, mixed}> */
     public static function invalidOptions(): iterable
     {
-        yield 'missing media budget' => ['--media-mib', null];
-        yield 'missing media capacity' => ['--media-descendant-pids', null];
-        yield 'invalid media capacity' => ['--media-descendant-pids', '0'];
-        yield 'missing scheduler budget' => ['--scheduler-mib', null];
-        yield 'scheduler below minimum' => ['--scheduler-mib', '319'];
-        yield 'legacy total excludes scheduler' => ['--memory-mib', '1024'];
-        yield 'missing budget' => ['--memory-mib', null];
-        yield 'fractional budget' => ['--memory-mib', '1024.5'];
-        yield 'negative budget' => ['--memory-mib', '-1'];
-        yield 'too large' => ['--memory-mib', '1048577'];
-        yield 'overcommitted' => ['--memory-mib', '768'];
-        yield 'no management reserve' => ['--management-mib', '64'];
-        yield 'no native reserve' => ['--consumer-mib', '256'];
-        yield 'console without available capacity' => ['--scheduled-console-mib', '192'];
-        yield 'console below minimum' => ['--scheduled-console-mib', '191'];
-        yield 'negative console reservation' => ['--scheduled-console-mib', '-1'];
-        yield 'fractional console reservation' => ['--scheduled-console-mib', '192.5'];
-        yield 'noncanonical zero console reservation' => ['--scheduled-console-mib', '00'];
-        yield 'oversized console reservation' => ['--scheduled-console-mib', '1048577'];
-        yield 'bad boot' => ['--boot-id', 'baander.app'];
-        yield 'relative lock directory' => ['--lock-dir', 'locks'];
+        yield ['--memory-mib', null];
+        yield ['--memory-mib', '4160.5'];
+        yield ['--memory-mib', '-1'];
+        yield ['--memory-mib', '1048577'];
+        yield ['--pids-limit', null];
+        yield ['--pids-limit', '0'];
+        yield ['--pids-limit', '-1'];
+        yield ['--pids-limit', '4097'];
+        yield ['--scheduled-console-mib', '-1'];
+        yield ['--scheduled-console-mib', '320.5'];
+        yield ['--scheduled-console-mib', '1048577'];
+        yield ['--lock-dir', 'locks'];
+        yield ['--unit', null];
+        yield ['--unit', 'combined'];
+        yield ['--memory-mib', '4159'];
+        yield ['--memory-mib', '0'];
+        yield ['--pids-limit', '255'];
+        yield ['--pids-limit', '256.0'];
+        yield ['--scheduled-console-mib', '319'];
+        yield ['--scheduled-console-mib', '00'];
+        yield ['--ipc-dir', 'relative'];
+        yield ['--boot-id', 'bad'];
     }
 
     public function testEnvironmentIdentityDefaultsAndErrorsDoNotExposeSecrets(): void
@@ -114,6 +103,19 @@ final class WorkerCommandTest extends TestCase
         }
     }
 
+    public function testUnitCannotOverrideTheRegisteredContainerIdentity(): void
+    {
+        $previous = $_SERVER['BAANDER_WORKER_UNIT'] ?? null;
+        $_SERVER['BAANDER_WORKER_UNIT'] = 'control';
+        try {
+            $runner = new RecordingWorkerRunner();
+            self::assertSame(2, (new CommandTester(new WorkerCommand($runner)))->execute($this->options()));
+            self::assertNull($runner->configuration);
+        } finally {
+            if ($previous === null) { unset($_SERVER['BAANDER_WORKER_UNIT']); } else { $_SERVER['BAANDER_WORKER_UNIT'] = $previous; }
+        }
+    }
+
     public function testTransportConfigurationFailureNamesTheSettingWithoutCredentials(): void
     {
         $runner = new class implements WorkerSupervisorRunnerInterface {
@@ -136,8 +138,8 @@ final class WorkerCommandTest extends TestCase
     private function options(): array
     {
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
-            '--memory-mib' => '3968', '--management-mib' => '256', '--consumer-mib' => '384', '--relay-mib' => '384', '--scheduler-mib' => '320',
-            '--media-mib' => '2624', '--media-descendant-pids' => '14', '--lock-dir' => '/tmp/baander-worker-locks'];
+            '--unit' => 'execution', '--memory-mib' => '4160', '--pids-limit' => '256',
+            '--lock-dir' => '/tmp/baander-worker-locks', '--ipc-dir' => '/run/baander-worker'];
     }
 }
 

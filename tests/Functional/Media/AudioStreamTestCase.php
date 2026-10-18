@@ -19,6 +19,8 @@ use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Tests\Support\NativeExecutionFixture;
 use Psr\Log\NullLogger;
 
 /**
@@ -32,6 +34,7 @@ abstract class AudioStreamTestCase extends TestCase
     protected string $sourceFile;
     protected PublicId $trackId;
     protected Uuid $libraryId;
+    private ?NativeExecutionFixture $native = null;
 
     protected function setUp(): void
     {
@@ -74,6 +77,8 @@ abstract class AudioStreamTestCase extends TestCase
         ));
         self::getContainer()->set(StreamPortInterface::class, $stream);
         self::getContainer()->set(SegmentFileResolver::class, new SegmentFileResolver($this->cacheRoot));
+        $this->native = new NativeExecutionFixture('baander.app:test', str_repeat('a', 32));
+        ProcessExecutor::configureNativeExecution($this->native->client);
         $this->installAudioWorkerFixture();
     }
 
@@ -118,6 +123,8 @@ abstract class AudioStreamTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        ProcessExecutor::configureNativeExecution(null);
+        $this->native?->close();
         $this->removeTree($this->libraryDirectory);
         $this->removeTree($this->cacheRoot);
 

@@ -13,5 +13,5 @@ use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 
 $command = new DockerWorkerCommand($argv[1], $argv[2]);
 $containment = new DockerWorkerContainment($command->execute(...));
-$containment->retire($argv[3], new DeploymentLease('baander.app:retirement-test', $argv[4], 1));
+$containment->retire($argv[3], new DeploymentLease('baander.app:retirement-test', $argv[4], 1), \App\Shared\Application\DTO\DeploymentUnit::Execution);
 echo "deployment_retired\n";

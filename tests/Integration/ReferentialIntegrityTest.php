@@ -68,20 +68,17 @@ final class ReferentialIntegrityTest extends TestCase
         'transcode_runtime_state.worker_id' => 'worker role label within a launch, not a row identifier',
         'user_favorites.entity_public_id' => 'polymorphic with entity_type',
         'webhook_delivery_logs.notification_id' => 'delivery history that outlives the notification',
-        'worker_deployment_containers.boot_id' => 'worker boot identifier with no table',
+        'worker_deployment_boots.boot_id' => 'boot journal identity at the root of the deployment lifecycle',
+        'worker_deployment_boots.daemon_id' => 'external Docker daemon identifier recorded by the boot journal',
         'worker_deployment_containers.container_id' => 'Docker container identifier',
-        'worker_deployment_containers.daemon_id' => 'Docker daemon identifier',
-        'worker_deployment_creations.boot_id' => 'worker boot identifier with no table',
-        'worker_deployment_creations.daemon_id' => 'Docker daemon identifier',
-        'worker_deployment_leases.owner_boot_id' => 'worker boot identifier with no table',
-        'worker_deployment_retirements.boot_id' => 'worker boot identifier with no table',
-        'worker_deployment_retirements.container_id' => 'Docker container identifier',
-        'worker_deployment_retirements.daemon_id' => 'Docker daemon identifier',
+        'worker_deployment_leases.owner_boot_id' => 'lease owner token retained independently of boot journal references; admission checks the matching boot',
     ];
 
     /** Foreign keys whose rows are found without an index that leads with all their columns, and why. */
     private const UNINDEXED = [
         'fk_scheduler_occurrence_executions_occurrence_id_job_id' => 'the primary key on occurrence_id finds the single referencing row',
+        'fk_worker_deployment_creations_namespace_boot_id_daemon_id' => 'the namespace and boot primary key prefix finds at most the two checked control and execution units',
+        'fk_worker_deployment_retirements_binding' => 'the namespace, boot and unit primary key finds the single referencing row before checking daemon and container identity',
     ];
 
     /** ON DELETE rules chosen by the referential integrity audit. */

@@ -170,6 +170,25 @@ The Redis consumer name generated from a deployment namespace digest, supervisor
 boot ID, worker role and launch generation. Its registration is scoped to a Redis
 stream and consumer group.
 
+### Worker deployment pair
+
+The fixed control and execution containers admitted together under one deployment
+namespace and boot identity. Each has its own memory, CPU and PID ceilings and a
+disjoint CPU set. Control owns the lease and coordination; execution observes the
+lease and owns native processes. A private IPC volume connects the pair.
+
+### Joint retirement barrier
+
+The retained boot reservation that prevents replacement until both worker units
+have confirmed containment or cancellation of an unclaimed creation intent.
+Lease expiry and a direct-child exit do not satisfy this barrier.
+
+### Native execution attempt
+
+A bounded request owned by the execution daemon and identified by deployment,
+boot, lease epoch, client generation and attempt identity. An uncertain reply does
+not authorize another process or release its reserved slot.
+
 ## Backend verification
 
 ### Test lane

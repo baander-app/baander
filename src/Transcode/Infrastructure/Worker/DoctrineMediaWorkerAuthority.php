@@ -31,6 +31,7 @@ final readonly class DoctrineMediaWorkerAuthority implements MediaWorkerAuthorit
                 SELECT 1 FROM worker_deployment_leases
                 WHERE namespace = :namespace AND owner_boot_id = :boot AND epoch = :epoch
                     AND state = 'active' AND expires_at > clock_timestamp()
+                AND EXISTS (SELECT 1 FROM worker_deployment_boots b WHERE b.namespace = :namespace AND b.boot_id = :boot AND b.retirement_requested_at IS NULL AND b.retired_at IS NULL)
                 SQL, ['namespace' => $this->identity->namespace, 'boot' => $this->identity->bootId, 'epoch' => $this->identity->leaseEpoch]) !== false;
             if (!$active) {
                 throw new \RuntimeException('Media requires active deployment authority.');

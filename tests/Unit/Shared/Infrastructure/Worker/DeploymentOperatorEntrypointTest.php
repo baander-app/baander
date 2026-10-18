@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
 use PHPUnit\Framework\TestCase;
 
@@ -137,17 +139,6 @@ final class DeploymentOperatorEntrypointTest extends TestCase
     /** @return array<string,mixed> */
     private static function manifest(): array
     {
-        return [
-            'version' => 2, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
-            'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
-            'dockerBinary' => '/bin/true', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'memoryMiB' => 3904, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
-            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'mediaMiB' => 2624, 'mediaDescendantPids' => 14,
-            'mediaMounts' => [
-                ['volume' => 'baander-source', 'target' => '/media', 'role' => 'source', 'readOnly' => true],
-                ['volume' => 'baander-derived', 'target' => '/var/www/html/storage', 'role' => 'derived', 'readOnly' => false],
-                ['volume' => 'baander-state', 'target' => '/var/www/html/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
-            ], 'nanoCpus' => 1000000000, 'pidsLimit' => 128,
-        ];
+        return array_replace(DeploymentPairManifestTest::fields(), ['dockerBinary' => '/bin/true']);
     }
 }

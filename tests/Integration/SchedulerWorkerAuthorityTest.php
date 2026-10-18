@@ -44,6 +44,7 @@ final class SchedulerWorkerAuthorityTest extends TestCase
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
         $this->lease = new DeploymentLease('baander.app:scheduler-authority-test', str_repeat('a', 32), 1);
+        $this->first->executeStatement("INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash) VALUES (:namespace, :boot, 'authority.baander.app', :manifest)", ['namespace' => $this->lease->namespace, 'boot' => $this->lease->bootId, 'manifest' => str_repeat('f', 64)]);
         $this->first->executeStatement("INSERT INTO worker_deployment_leases (namespace, owner_boot_id, epoch, state, expires_at) VALUES (:namespace, :boot, :epoch, 'active', clock_timestamp() + interval '1 hour')", ['namespace' => $this->lease->namespace, 'boot' => $this->lease->bootId, 'epoch' => $this->lease->epoch]);
         foreach (['BAANDER_WORKER_ID', 'BAANDER_WORKER_NAMESPACE', 'BAANDER_WORKER_BOOT_ID', 'BAANDER_WORKER_LEASE_EPOCH', 'PGOPTIONS'] as $name) {
             $this->environment[$name] = getenv($name);
@@ -111,6 +112,15 @@ final class SchedulerWorkerAuthorityTest extends TestCase
         $adapter->assertActive();
         // The fixture controller assumes predecessor cleanup was verified externally.
         $this->second->executeStatement("UPDATE worker_deployment_leases SET state = 'available'");
+        $this->expectException(\RuntimeException::class);
+        $adapter->assertActive();
+    }
+
+    public function testBootRetirementRevokesAnOtherwiseActiveUnexpiredLease(): void
+    {
+        $adapter = new DoctrineSchedulerWorkerAuthority($this->first, $this->lease);
+        $adapter->assertActive();
+        $this->second->executeStatement('UPDATE worker_deployment_boots SET retirement_requested_at = clock_timestamp()');
         $this->expectException(\RuntimeException::class);
         $adapter->assertActive();
     }

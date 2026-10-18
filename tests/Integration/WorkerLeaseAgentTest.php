@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
 use App\Shared\Infrastructure\Worker\LeaseAgentProcess;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -34,6 +35,7 @@ final class WorkerLeaseAgentTest extends TestCase
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->connection);
+        DeploymentJournalFixture::ready($this->connection, 'baander.app:workers', str_repeat('a', 32));
         $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public'];
     }
 
@@ -50,6 +52,23 @@ final class WorkerLeaseAgentTest extends TestCase
         self::assertSame('renewed', $renew['category']);
         self::assertSame(2, $renew['sequence']);
         self::assertSame($result['lease'], $renew['lease']);
+    }
+
+    public function testRealObserverReadsAuthorityWithoutRenewingAndRejectsRetirement(): void
+    {
+        self::assertTrue($this->finish($this->start($this->request()))['success']);
+        $before = $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases');
+        $observe = $this->request('observe', 2, 1);
+        $observe['ttlSeconds'] = 3;
+        $result = $this->finish($this->start($observe));
+        self::assertTrue($result['success']);
+        self::assertSame('observed', $result['category']);
+        self::assertSame(1, $result['lease']['epoch']);
+        self::assertSame($before, $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases'));
+        $this->connection->executeStatement('UPDATE worker_deployment_boots SET retirement_requested_at = clock_timestamp()');
+        self::assertSame('denied', $this->finish($this->start($observe))['category']);
+        self::assertSame('denied', $this->finish($this->start($this->request('renew', 3, 1)))['category']);
+        self::assertSame($before, $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases'));
     }
 
     public function testRealHelperDeniesWrongOwnerExpiredOwnerAndDuplicateAcquisition(): void

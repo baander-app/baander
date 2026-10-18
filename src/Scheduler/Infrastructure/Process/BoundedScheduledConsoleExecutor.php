@@ -16,7 +16,7 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
         private readonly string $projectDirectory,
         private readonly float $timeoutSeconds = 300.0,
         private readonly int $outputLimitBytes = 10000,
-        private readonly int $memoryLimitMiB = 128,
+        private readonly int $memoryLimitMiB = 256,
         private readonly float $terminationGraceSeconds = 1.0,
         private readonly int $reservationBytes = 0,
     ) {
@@ -43,8 +43,8 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
             return new self($projectDirectory);
         }
         $bytes = filter_var($raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1024 * 1024 * 1024 * 1024]]);
-        if (preg_match('/\A[1-9][0-9]*\z/D', $raw) !== 1 || $bytes === false || getenv('BAANDER_WORKER_ID') !== 'consumer') {
-            throw new \InvalidArgumentException('Scheduled console requires an explicit consumer subprocess reservation.');
+        if (preg_match('/\A[1-9][0-9]*\z/D', $raw) !== 1 || $bytes === false || getenv('BAANDER_WORKER_ID') !== 'scheduled-consumer' || getenv('BAANDER_WORKER_UNIT') !== 'execution') {
+            throw new \InvalidArgumentException('Scheduled console requires an explicit execution scheduled-consumer subprocess reservation.');
         }
         return new self($projectDirectory, reservationBytes: $bytes);
     }

@@ -216,6 +216,71 @@ if ($mode === 'prepare') {
     ensure(in_array($direct->status(), [200, 206], true) && strlen($direct->body) > 0, 'Direct delivery failed without a worker.');
     ensure((new HttpExchange(BASE . '/live', []))->complete()->status() === 200, 'Web liveness failed without a worker.');
     $result = ['videoStatus' => $video->status(), 'audioStatus' => $status, 'directStatus' => $direct->status()];
+} elseif ($mode === 'capacity') {
+    $state = state(); $auth = $client(); $sessions = [];
+    foreach (['360p', '480p', '720p'] as $quality) {
+        $response = twoCommandExchange($auth, '/api/transcode/sessions/', 'POST', ['videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
+        ensure($response->status() === 201, 'Capacity video admission failed: ' . $response->body);
+        $sessions[] = jsonBody($response);
+    }
+    ensure(count(array_unique(array_column($sessions, 'jobId'))) === 3, 'Capacity needs three distinct video jobs.');
+    $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000', timeoutSeconds: 120);
+    ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Capacity audio did not start.');
+    await(static fn (): bool => (int) $db->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL") >= 3,
+        'three durable video slots');
+    ensure((int) $db->fetchOne("SELECT count(*) FROM audio_rendition_runtime WHERE state='running'") >= 1, 'Capacity audio slot is not occupied.');
+    require_once $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
+    $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
+        Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
+        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(App\Tests\Fixtures\Messaging\MessageCodecFactory::create()),
+    );
+    $redis = new Redis(); $redis->connect('redis', 6379, 1); $redis->auth(['default', 'test-only']);
+    $sent = 0;
+    $feed = static function () use ($transport, $redis, &$sent): void {
+        $needed = max(0, 2000 - $redis->xLen('messages'));
+        for ($index = 0; $index < $needed; ++$index) {
+            $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand()));
+            ++$sent;
+        }
+    };
+    $feed();
+    $schedulerJob = $db->fetchOne("SELECT id FROM scheduled_jobs WHERE command='app:transcode:cache-sweep'");
+    ensure(is_string($schedulerJob), 'Capacity scheduler fixture missing.');
+    $recorder = App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder::fromDsn((string) getenv('DATABASE_URL'));
+    $occurrences = []; $nextOccurrence = 0.0; $backlog = [];
+    file_put_contents(ROOT . '/capacity-ready', 'ready');
+    await(static fn (): bool => is_file(ROOT . '/capacity-pressure-start'), 'capacity pressure barrier', 60);
+    $samples = []; $deadline = hrtime(true) + 60_000_000_000; $paused = false;
+    while (hrtime(true) < $deadline) {
+        $feed();
+        $depth = $redis->xLen('messages');
+        $backlog[] = ['monotonic' => hrtime(true) / 1e9, 'receiverDepth' => $depth, 'sent' => $sent, 'acknowledged' => $sent - $depth,
+            'relayedEvents' => (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox WHERE relayed_at IS NOT NULL')];
+        if (hrtime(true) / 1e9 >= $nextOccurrence && hrtime(true) < $deadline - 10_000_000_000) {
+            $request = App\Shared\Domain\Model\Uuid::v7();
+            ensure($recorder->record(App\Shared\Domain\Model\Uuid::fromString($schedulerJob), $request) !== null, 'Due occurrence was not recorded.');
+            $occurrences[] = ['id' => $request->toString(), 'recordedAt' => hrtime(true) / 1e9];
+            $nextOccurrence = hrtime(true) / 1e9 + 10;
+        }
+        $paused = !$paused;
+        $startedAt = hrtime(true);
+        $session = $sessions[0];
+        $response = twoCommandExchange($auth, '/api/transcode/sessions/' . $session['publicId'] . ($paused ? '/pause' : '/resume'), 'PATCH')->complete(3);
+        ensure($response->status() === 200, 'Desired state request failed during pressure.');
+        $observed = acknowledged($db, ['job' => $session['jobId']], $paused ? 'paused' : 'running');
+        $samples[] = ['seconds' => (hrtime(true) - $startedAt) / 1e9, 'desiredRevision' => $observed['desired_revision'], 'observedRevision' => $observed['observed_revision']];
+        // Feed real ordinary outbox work, with disabled outbound preferences.
+        $user = $manager->getRepository(App\Auth\Infrastructure\Doctrine\Entity\UserEntity::class)->findOneBy(['email' => 'worker-command@baander.app']);
+        ensure($user !== null, 'Capacity backlog fixture user missing.');
+        $kernel->getContainer()->get('event_dispatcher')->dispatch(new App\Auth\Domain\Event\UserRegistered($user->getId(), $user->getPublicId(), App\Shared\Domain\Model\Email::fromString($user->getEmail()), $user->getName()));
+        $audio->until(static fn (HttpExchange $value): bool => $value->done, .01);
+        usleep(100000);
+    }
+    foreach ($occurrences as &$occurrence) {
+        $occurrence['execution'] = $db->fetchAssociative('SELECT e.deployment_namespace, e.deployment_boot_id, e.deployment_epoch, EXTRACT(EPOCH FROM (e.returned_at - o.created_at)) AS completion_seconds, e.returned_at IS NOT NULL AS returned FROM scheduler_occurrence_executions e JOIN scheduler_occurrences o ON o.id=e.occurrence_id WHERE o.id=?', [$occurrence['id']]);
+    }
+    unset($occurrence);
+    $result = ['ordinaryBacklog' => $backlog, 'dueOccurrences' => $occurrences, 'videoJobs' => array_column($sessions, 'jobId'), 'desiredStateSamples' => $samples, 'audioBytes' => strlen($audio->body), 'pressureStartedAt' => ($deadline - 60_000_000_000) / 1e9, 'pressureEndedAt' => hrtime(true) / 1e9];
 } elseif ($mode === 'attach') {
     $state = state(); $auth = $client();
     $requests = [];

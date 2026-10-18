@@ -13,6 +13,7 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -49,6 +50,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         }
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
+        DeploymentJournalFixture::ready($this->first, 'baander.app:scheduler-test', str_repeat('a', 32));
         $authority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:scheduler-test', str_repeat('a', 32), 3600);
         self::assertNotNull($authority);
         $this->authority = $authority;
@@ -260,6 +262,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
             'expired' => $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second'"),
             'boot' => $this->second->executeStatement('UPDATE worker_deployment_leases SET owner_boot_id = :boot', ['boot' => str_repeat('b', 32)]),
             'epoch' => $this->second->executeStatement('UPDATE worker_deployment_leases SET epoch = epoch + 1'),
+            'boot-retiring' => $this->second->executeStatement('UPDATE worker_deployment_boots SET retirement_requested_at = clock_timestamp()'),
             'retired' => $this->second->executeStatement("UPDATE worker_deployment_leases SET state = 'available'"),
             default => throw new \LogicException('Unexpected test lease state.'),
         };
@@ -276,7 +279,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function invalidLeaseStates(): iterable
     {
-        foreach (['missing', 'expired', 'boot', 'epoch', 'retired'] as $state) {
+        foreach (['missing', 'expired', 'boot', 'epoch', 'retired', 'boot-retiring'] as $state) {
             yield $state => [$state];
         }
     }
@@ -414,6 +417,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
         $otherJob = $this->seed();
         self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($running->id, Uuid::v7()));
+        DeploymentJournalFixture::ready($this->second, 'baander.app:other-scheduler', str_repeat('b', 32));
         $otherAuthority = (new DoctrineDeploymentLease($this->second))->acquire('baander.app:other-scheduler', str_repeat('b', 32), 3600);
         self::assertNotNull($otherAuthority);
         $this->assertJobBusy($pending, $this->authority);
@@ -457,7 +461,8 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second'");
         $leaseStore = new DoctrineDeploymentLease($this->second);
         self::assertNull($leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600));
-        self::assertTrue($leaseStore->acknowledgeContainment($this->authority));
+        self::assertTrue(DeploymentJournalFixture::retire($this->second, $this->authority->namespace, $this->authority->bootId));
+        DeploymentJournalFixture::ready($this->second, $this->authority->namespace, str_repeat('b', 32));
         $replacement = $leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600);
         self::assertNotNull($replacement);
         self::assertGreaterThan($this->authority->epoch, $replacement->epoch);
@@ -495,6 +500,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $running = $this->seed();
         $pending = $this->seed($running->jobId, $running->scheduledFor->modify('+1 minute'));
+        DeploymentJournalFixture::ready($this->first, 'baander.app:other-scheduler', str_repeat('b', 32));
         $otherAuthority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:other-scheduler', str_repeat('b', 32), 3600);
         self::assertNotNull($otherAuthority);
         $this->second->beginTransaction();

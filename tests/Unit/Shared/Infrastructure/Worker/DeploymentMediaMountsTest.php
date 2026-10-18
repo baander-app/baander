@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use InvalidArgumentException;
@@ -55,6 +57,8 @@ final class DeploymentMediaMountsTest extends TestCase
         ] as $label => $changes) {
             yield $label => [[array_replace(self::mounts()[0], $changes)]];
         }
+        yield 'media aliases IPC volume' => [[['volume' => 'worker-ipc', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source']]];
+        yield 'media shadows IPC path' => [[['volume' => 'media', 'target' => '/run/baander-worker', 'readOnly' => true, 'role' => 'source']]];
         yield 'overlapping targets' => [[...self::mounts(), ['volume' => 'nested', 'target' => '/media/library/nested', 'readOnly' => true, 'role' => 'source']]];
         yield 'same volume writable alias' => [[...self::mounts(), ['volume' => 'baander-source', 'target' => '/media/alias', 'readOnly' => false, 'role' => 'derived']]];
     }
@@ -66,8 +70,8 @@ final class DeploymentMediaMountsTest extends TestCase
             $calls[] = $arguments;
             return json_encode($arguments[0] === 'container' ? self::inspection() : self::volume($arguments[4]), JSON_THROW_ON_ERROR);
         }, self::recipe(self::mounts()));
-        $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32));
-        self::assertCount(3, $calls);
+        $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
+        self::assertCount(4, $calls);
         self::assertSame(['volume', 'inspect'], array_slice($calls[1], 0, 2));
         self::assertSame(['volume', 'inspect'], array_slice($calls[2], 0, 2));
     }
@@ -79,6 +83,14 @@ final class DeploymentMediaMountsTest extends TestCase
             $inspection = self::inspection();
             if ($arguments[0] === 'container') {
                 match ($kind) {
+                    'missing IPC mount' => array_pop($inspection['mounts']),
+                    'read-only IPC mount' => $inspection['mounts'][2]['RW'] = false,
+                    'wrong IPC volume' => $inspection['mounts'][2]['Name'] = 'foreign-ipc',
+                    'wrong memory ceiling' => $inspection['memory'] = 1,
+                    'unlimited swap' => $inspection['memorySwap'] = -1,
+                    'wrong CPU ceiling' => $inspection['nanoCpus'] = 0,
+                    'wrong PID ceiling' => $inspection['pidsLimit'] = 0,
+                    'wrong CPU set' => $inspection['cpuSet'] = '1',
                     'writable source' => $inspection['mounts'][0]['RW'] = true,
                     'different volume' => $inspection['mounts'][0]['Name'] = 'unlisted',
                     'bind mount' => $inspection['mounts'][0]['Type'] = 'bind',
@@ -100,13 +112,13 @@ final class DeploymentMediaMountsTest extends TestCase
             return json_encode($volume, JSON_THROW_ON_ERROR);
         }, self::recipe(self::mounts()));
         $this->expectException(RuntimeException::class);
-        $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32));
+        $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
     }
 
     /** @return iterable<string,array{string}> */
     public static function mismatchedStorage(): iterable
     {
-        foreach (['writable source', 'different volume', 'bind mount', 'missing mount', 'extra mount', 'different target', 'source substitution', 'driver options', 'remote driver', 'global volume'] as $kind) {
+        foreach (['missing IPC mount', 'read-only IPC mount', 'wrong IPC volume', 'wrong memory ceiling', 'unlimited swap', 'wrong CPU ceiling', 'wrong PID ceiling', 'wrong CPU set', 'writable source', 'different volume', 'bind mount', 'missing mount', 'extra mount', 'different target', 'source substitution', 'driver options', 'remote driver', 'global volume'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -116,14 +128,15 @@ final class DeploymentMediaMountsTest extends TestCase
     {
         return [
             'id' => str_repeat('c', 64), 'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32),
-            'role' => 'deployment', 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private',
+            'role' => 'control', 'memory' => 2 * 1024 * 1024 * 1024, 'memorySwap' => 2 * 1024 * 1024 * 1024,
+            'nanoCpus' => 1000000000, 'pidsLimit' => 64, 'cpuSet' => '0', 'restart' => 'no', 'retryCount' => 0, 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private',
             'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges'],
             'binds' => null, 'tmpfs' => null, 'devices' => null, 'deviceRequests' => null, 'capAdd' => null,
             'mounts' => array_map(static fn (array $mount): array => [
                 'Type' => 'volume', 'Name' => $mount['volume'], 'Driver' => 'local',
                 'Source' => '/var/lib/docker/volumes/' . $mount['volume'] . '/_data',
                 'Destination' => $mount['target'], 'RW' => !$mount['readOnly'],
-            ], self::mounts()),
+            ], [...self::mounts(), ['volume' => 'worker-ipc', 'target' => '/run/baander-worker', 'readOnly' => false, 'role' => 'ipc']]),
         ];
     }
 
@@ -146,6 +159,6 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, mediaMounts: $mounts);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', mediaMounts: $mounts);
     }
 }

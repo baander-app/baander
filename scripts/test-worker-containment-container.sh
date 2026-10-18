@@ -3,20 +3,24 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 test -f vendor/autoload.php || { echo 'Install Composer dependencies first.' >&2; exit 1; }
 
-# Test the proposed dedicated-worker boundary, without privileged mode, host PID
+# Test one unit of the paired worker boundary, without privileged mode, host PID
 # sharing, writable host cgroups, or a Docker socket inside the container.
 run_id="baander-containment-$(date +%s)-$$"
+owned_ids=()
 cleanup() {
-    docker rm -f "$run_id-term" "$run_id-kill" >/dev/null 2>&1 || true
+    for owned_id in "${owned_ids[@]}"; do
+        docker rm -f "$owned_id" >/dev/null 2>&1 || true
+    done
 }
 trap cleanup EXIT
 
 for scenario in term kill; do
-    container="$run_id-$scenario"
-    docker create --name "$container" --network none --memory 256m --memory-swap 256m \
+    container_name="$run_id-$scenario"
+    container="$(docker create --name "$container_name" --network none --memory 256m --memory-swap 256m \
         --cpus 1 --pids-limit 32 --cap-drop ALL --security-opt no-new-privileges \
         --entrypoint php "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" \
-        /tmp/tests/Fixtures/Worker/contained-supervisor.php >/dev/null
+        /tmp/tests/Fixtures/Worker/contained-supervisor.php)"
+    owned_ids+=("$container")
     tar -cf - vendor packages src tests/Fixtures/Worker | docker cp - "$container:/tmp/"
     docker start "$container" >/dev/null
     ready=false

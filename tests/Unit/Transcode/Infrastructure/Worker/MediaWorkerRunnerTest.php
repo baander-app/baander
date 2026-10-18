@@ -23,7 +23,7 @@ final class MediaWorkerRunnerTest extends TestCase
         mkdir($directory);
         $script = $directory . '/child.php';
         $log = $directory . '/launches';
-        file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], $argv[2], getmypid()])."\n", FILE_APPEND | LOCK_EX); sleep(10);');
+        file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], $argv[2], getmypid(), getenv("BAANDER_NATIVE_CLIENT_ID"), getenv("BAANDER_NATIVE_CLIENT_GENERATION")])."\n", FILE_APPEND | LOCK_EX); sleep(10);');
         $video = $this->createMock(TranscodeExecutionOwnershipPort::class);
         $video->expects(self::never())->method('claim');
         $jobs = [];
@@ -57,12 +57,45 @@ final class MediaWorkerRunnerTest extends TestCase
             self::assertTrue($ready);
             $launches = array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
             self::assertCount(4, $launches);
+            $clientIds = array_column($launches, 3);
+            sort($clientIds);
+            self::assertSame(['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], $clientIds);
+            self::assertSame(['1'], array_values(array_unique(array_column($launches, 4))));
             self::assertCount(4, array_unique(array_column($launches, 1)));
             self::assertSame(3, count(array_filter($launches, static fn (array $launch): bool => $launch[0] === 'video')));
             self::assertSame(1, count(array_filter($launches, static fn (array $launch): bool => $launch[0] === 'audio')));
             foreach ($launches as $launch) {
                 self::assertDirectoryDoesNotExist('/proc/' . $launch[2], 'A drained child must be reaped.');
             }
+        } finally {
+            @unlink($log);
+            unlink($script);
+            rmdir($directory);
+        }
+    }
+
+    public function testSerialAudioJobsReuseOneSlotWithIncreasingLaunchGenerations(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-media-generations-' . bin2hex(random_bytes(8));
+        mkdir($directory);
+        $script = $directory . '/child.php';
+        $log = $directory . '/launches';
+        file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([getenv("BAANDER_NATIVE_CLIENT_ID"), getenv("BAANDER_NATIVE_CLIENT_GENERATION")])."\n", FILE_APPEND | LOCK_EX);');
+        $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
+        $video->method('pending')->willReturn([]);
+        $audio = $this->createStub(AudioRenditionRuntimePort::class);
+        $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', \App\Transcode\Application\Port\AudioRenditionFormat::Opus, 128000, '/media/derived');
+        $audio->method('pending')->willReturn([new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 0, null, null, null)]);
+        $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
+        $deadline = hrtime(true) + 10_000_000_000;
+        try {
+            (new MediaWorkerRunner($video, $audio, $authority, $script))->run(static function () use ($log, $deadline): bool {
+                return (is_file($log) && count(file($log)) >= 65) || hrtime(true) >= $deadline;
+            });
+            $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
+            self::assertCount(65, $launches);
+            self::assertSame(['media-audio-0'], array_values(array_unique(array_column($launches, 0))));
+            self::assertSame(array_map(strval(...), range(1, 65)), array_column($launches, 1));
         } finally {
             @unlink($log);
             unlink($script);

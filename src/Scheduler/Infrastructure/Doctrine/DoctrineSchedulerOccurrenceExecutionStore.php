@@ -136,12 +136,14 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
     /** The lock serializes admission with lease replacement; it cannot fence effects after commit. */
     private function requireActiveAuthority(DeploymentLease $authority): void
     {
+        \App\Shared\Infrastructure\Worker\DeploymentNamespaceLock::acquire($this->connection, $authority->namespace);
         $locked = $this->connection->fetchOne('SELECT 1 FROM worker_deployment_leases WHERE namespace = :namespace FOR UPDATE', ['namespace' => $authority->namespace]);
         // Evaluate database time after lock acquisition, not in a pre-wait predicate.
         $active = $locked !== false && $this->connection->fetchOne(<<<'SQL'
             SELECT 1 FROM worker_deployment_leases
             WHERE namespace = :namespace AND owner_boot_id = :boot AND epoch = :epoch
                 AND state = 'active' AND expires_at > clock_timestamp()
+                AND EXISTS (SELECT 1 FROM worker_deployment_boots b WHERE b.namespace = :namespace AND b.boot_id = :boot AND b.retirement_requested_at IS NULL AND b.retired_at IS NULL)
             SQL, ['namespace' => $authority->namespace, 'boot' => $authority->bootId, 'epoch' => $authority->epoch]) !== false;
         if (!$active) {
             throw new \RuntimeException('Scheduler execution admission requires active deployment authority.');

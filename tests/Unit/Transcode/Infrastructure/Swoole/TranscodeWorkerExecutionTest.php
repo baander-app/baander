@@ -8,7 +8,8 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
@@ -78,10 +79,12 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $sessions->method('findByUuid')->willReturnCallback(fn() => $this->session);
         $videos = $this->createStub(VideoRepositoryInterface::class);
         $videos->method('findByUuid')->willReturn($video);
-        $pool = $this->createStub(CpuProcessPoolInterface::class);
-        $pool->method('isRunning')->willReturn(true);
-        $pool->method('dispatch')->willReturnCallback(function (): void { ($this->onDispatch)?->__invoke(); });
-        $pool->method('readResult')->willReturnCallback(fn(): array => ['status' => 'ok', 'data' => json_encode([
+        $pool = $this->createStub(NativeExecutionClientInterface::class);
+        $pool->method('handshake')->willReturn(['ready' => true]);
+        $pool->method('signal')->willReturn(['state' => 'exited']);
+        $pool->method('release')->willReturn(true);
+        $pool->method('submit')->willReturnCallback(function (): NativeExecutionHandle { ($this->onDispatch)?->__invoke(); return new NativeExecutionHandle(str_repeat('a', 64), 1); });
+        $pool->method('inspect')->willReturnCallback(fn(): array => ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode([
             'format' => ['duration' => $this->sourceDuration], 'streams' => [['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720]],
         ], JSON_THROW_ON_ERROR)]);
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
@@ -187,6 +190,20 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(0, $this->releases);
         self::assertSame(0, $this->allocations);
         self::assertContains('kill:1', $this->spawner->events);
+    }
+
+    public function testShutdownDuringLaunchRetiresCapturedAttemptBeforePolling(): void
+    {
+        $stopped = false;
+        $polled = 0;
+        $this->spawner->onSpawn = static function () use (&$stopped): void { $stopped = true; };
+        $this->spawner->onRunning = static function () use (&$polled): void { ++$polled; };
+        $this->worker->run($this->current, static function () use (&$stopped): bool { return $stopped; });
+        self::assertSame(0, $polled);
+        self::assertSame(['accepted'], $this->observed);
+        self::assertContains('kill:1', $this->spawner->events);
+        self::assertContains('close:1', $this->spawner->events);
+        self::assertSame(0, $this->allocations);
     }
 
     public function testProbeOwnershipLossCannotLaunchEncoder(): void
@@ -453,8 +470,9 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
     public bool $running = false;
     public string $initBytes = "\0\0\0\x0cftypisom\0\0\0\x08moov";
     public ?Closure $onRunning = null;
+    public ?Closure $onSpawn = null;
 
-    public function spawn(array $command): array
+    public function spawn(array $command): mixed
     {
         $this->commands[] = $command;
         $pid = count($this->commands);
@@ -464,11 +482,11 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
         $number = array_search('-start_number', $command, true);
         $start = $number === false ? 0 : (int) $command[$number + 1];
         file_put_contents($directory . '/v0_a0_720p_' . $start . '.m4s', 'segment');
-        return ['resource' => $pid, 'pipes' => [], 'pid' => $pid];
+        ($this->onSpawn)?->__invoke();
+        return $pid;
     }
-    public function isRunning(mixed $resource): bool { ($this->onRunning)?->__invoke(); return $this->running; }
-    public function exitCode(mixed $resource): int { return 0; }
-    public function signal(int $pid, int $signal): void { $this->events[] = ($signal === 9 ? 'kill:' : 'signal-' . $signal . ':') . $pid; }
+    public function status(mixed $handle): array { ($this->onRunning)?->__invoke(); return ['state' => $this->running ? 'running' : 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '', 'error' => null]; }
+    public function signal(mixed $pid, string $signal): void { $this->events[] = ($signal === 'stop' ? 'kill:' : 'signal-' . ($signal === 'pause' ? '19' : '18') . ':') . $pid; }
     public function close(mixed $resource): void { $this->events[] = 'close:' . $resource; }
 }
 

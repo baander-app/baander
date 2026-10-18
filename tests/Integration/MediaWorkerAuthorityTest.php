@@ -30,6 +30,7 @@ final class MediaWorkerAuthorityTest extends TestCase
             }
             FinalSchemaBootstrap::bootstrap($first);
             $identity = new MediaWorkerIdentity('authority.baander.app', str_repeat('a', 32), 'media', 7, 3);
+            $first->executeStatement("INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash) VALUES (:namespace, :boot, 'authority.baander.app', :manifest)", ['namespace' => $identity->namespace, 'boot' => $identity->bootId, 'manifest' => str_repeat('f', 64)]);
             $first->executeStatement("INSERT INTO worker_deployment_leases (namespace, owner_boot_id, epoch, state, expires_at) VALUES (:namespace, :boot, 3, 'active', clock_timestamp() + interval '1 hour')", ['namespace' => $identity->namespace, 'boot' => $identity->bootId]);
             $before = $second->fetchAssociative('SELECT * FROM worker_deployment_leases');
             $authority = new DoctrineMediaWorkerAuthority($first, $identity);
@@ -45,6 +46,16 @@ final class MediaWorkerAuthorityTest extends TestCase
             try {
                 $authority->assertActive();
                 self::fail('Committed successor authority did not revoke the old media worker.');
+            } catch (\RuntimeException $error) {
+                self::assertSame('Media requires active deployment authority.', $error->getMessage());
+            }
+            self::assertFalse($first->isConnected());
+            $second->executeStatement('UPDATE worker_deployment_leases SET epoch = 3');
+            $second->executeStatement('UPDATE worker_deployment_boots SET retirement_requested_at = clock_timestamp()');
+            $first->executeStatement('SET search_path TO ' . $schema . ', public');
+            try {
+                $authority->assertActive();
+                self::fail('Boot retirement did not revoke media authority with an otherwise active lease.');
             } catch (\RuntimeException $error) {
                 self::assertSame('Media requires active deployment authority.', $error->getMessage());
             }

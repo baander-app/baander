@@ -32,19 +32,15 @@ use RuntimeException;
  * Audio is muxed inline into each segment — the long process maps both
  * -map 0:v:0 -map 0:a:0, producing muxed fMP4 segments.
  *
- * Runs outside the CpuProcessPool — the one-shot handle()→string pool contract
- * is incompatible with a process that lives for minutes and emits N availability
- * events.
+ * Native attempts run in execution; control polls their bounded status and
+ * generation output without owning local child descriptors.
  */
 final class TranscodeStreamManager
 {
-    private const int SIGSTOP = 19;
-    private const int SIGCONT = 18;
-    private const int SIGKILL = 9;
     private const int DEFAULT_MAX_CONCURRENT = 4;
     private const float POLL_INTERVAL_SECONDS = 0.1;
 
-    /** @var array<string, array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string}> */
+    /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool}> */
     private array $streams = [];
 
     public function __construct(
@@ -115,15 +111,12 @@ final class TranscodeStreamManager
 
         $this->streams[$jobKey] = [
             'identity' => new \stdClass(),
-            'resource' => $spawned['resource'],
-            'pipes' => $spawned['pipes'],
-            'pid' => $spawned['pid'],
+            'handle' => $spawned,
             'output_dir' => $outputDir,
             'tier_name' => $tier->name,
             'availability_tier' => $generation === null ? $tier->name : $tier->name . '/generation-' . $generation,
             'marked' => [],
             'init_marked' => false,
-            'stderr_buffer' => '',
         ];
 
         return $outputDir;
@@ -151,10 +144,14 @@ final class TranscodeStreamManager
             $this->scanForNewSegments($jobKey, $entry);
             $this->assertStreamIdentity($jobKey, $entry['identity']);
 
-            // Write back the modified entry (marked indices, init_marked, stderr_buffer)
+            // Preserve segment publication state across status RPCs.
             $this->streams[$jobKey] = $entry;
 
-            $running = $this->spawner->isRunning($entry['resource']);
+            $status = $this->spawner->status($entry['handle']);
+            $running = $status['state'] === 'running';
+            if (!in_array($status['state'], ['running', 'exited'], true)) {
+                throw new RuntimeException('Native video attempt outcome is uncertain.');
+            }
             $this->assertStreamIdentity($jobKey, $entry['identity']);
 
             if (!$running) {
@@ -165,19 +162,19 @@ final class TranscodeStreamManager
 
                 // Only a confirmed zero exit can acknowledge completion. Existing
                 // cache fragments or an init hint cannot hide failure/unknown status.
-                $exitCode = $this->spawner->exitCode($entry['resource']);
+                $exitCode = $status['exitCode'] ?? -1;
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
                 $producedCount = $this->countProducedSegments($entry['output_dir'], $entry['tier_name']);
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
                 if ($exitCode !== 0) {
                     throw new FFmpegProcessFailedException(
                         $exitCode === -1 ? 'FFmpeg exited without a confirmed exit status.' : sprintf('FFmpeg exited with code %d.', $exitCode),
-                        $entry['stderr_buffer'],
+                        $status['stderr'],
                         $exitCode,
                     );
                 }
                 if ($producedCount === 0) {
-                    throw FFmpegProcessFailedException::fromProcess($entry['stderr_buffer'], $exitCode);
+                    throw FFmpegProcessFailedException::fromProcess($status['stderr'], $exitCode);
                 }
             }
 
@@ -217,16 +214,14 @@ final class TranscodeStreamManager
         unset($this->streams[$jobKey]);
         try {
             $this->logger->info('Stopping video stream', ['jobId' => $jobKey]);
-            if ($this->spawner->isRunning($entry['resource'])) {
-                $this->spawner->signal($entry['pid'], self::SIGKILL);
-            }
+            $this->spawner->signal($entry['handle'], 'stop');
         } finally {
-            $this->spawner->close($entry['resource']);
+            $this->spawner->close($entry['handle']);
         }
     }
 
     /**
-     * Pause a stream via SIGSTOP (buffer-depth throttle).
+     * Pause a stream via SIGSTOP (buffer throttle).
      *
      * The FFmpeg process is frozen in memory — its encoder state and internal
      * buffers are preserved. Resume with resumeStream().
@@ -234,8 +229,8 @@ final class TranscodeStreamManager
     public function pauseStream(Uuid $jobId): void
     {
         $entry = $this->streams[$jobId->toString()] ?? null;
-        if ($entry !== null && $this->spawner->isRunning($entry['resource'])) {
-            $this->spawner->signal($entry['pid'], self::SIGSTOP);
+        if ($entry !== null) {
+            $this->spawner->signal($entry['handle'], 'pause');
             $this->logger->debug('Stream paused (SIGSTOP)', ['jobId' => $jobId->toString()]);
         }
     }
@@ -247,7 +242,7 @@ final class TranscodeStreamManager
     {
         $entry = $this->streams[$jobId->toString()] ?? null;
         if ($entry !== null) {
-            $this->spawner->signal($entry['pid'], self::SIGCONT);
+            $this->spawner->signal($entry['handle'], 'resume');
             $this->logger->debug('Stream resumed (SIGCONT)', ['jobId' => $jobId->toString()]);
         }
     }
@@ -287,44 +282,11 @@ final class TranscodeStreamManager
     }
 
     /**
-     * @param array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string} $entry
+     * @param array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool} $entry
      */
     private function scanForNewSegments(string $jobKey, array &$entry): void
     {
         $this->assertStreamIdentity($jobKey, $entry['identity']);
-        // Drain FFmpeg stdout/stderr pipes to prevent pipe-buffer deadlock on
-        // long encodes. FFmpeg writes progress/stats continuously; if the pipe
-        // buffer (~64KB) fills and is never read, FFmpeg blocks on its next
-        // write and the encode stalls.
-        //
-        // stderr is accumulated (not discarded) so that if the process exits
-        // without producing output, FFmpegProcessFailedException can surface
-        // the real reason. stdout is discarded (progress noise).
-        foreach ($entry['pipes'] as $idx => $pipe) {
-            if (!is_resource($pipe)) {
-                continue;
-            }
-            stream_set_blocking($pipe, false);
-            while (true) {
-                $this->assertStreamIdentity($jobKey, $entry['identity']);
-                $chunk = fread($pipe, 65536);
-                $this->assertStreamIdentity($jobKey, $entry['identity']);
-                if ($chunk === '' || $chunk === false) {
-                    break;
-                }
-                // pipes array is [1 => stdout, 2 => stderr] after stdin was
-                // closed in the spawner. Index 2 is stderr.
-                if ($idx === 2) {
-                    $entry['stderr_buffer'] .= $chunk;
-                    // Bound the buffer — FFmpeg progress can be verbose on long
-                    // encodes, but only the tail carries the fatal error.
-                    if (strlen($entry['stderr_buffer']) > 65536) {
-                        $entry['stderr_buffer'] = substr($entry['stderr_buffer'], -65536);
-                    }
-                }
-            }
-        }
-
         $dir = $entry['output_dir'];
         $jobId = Uuid::fromString($jobKey);
 

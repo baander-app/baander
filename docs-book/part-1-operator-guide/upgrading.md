@@ -2,7 +2,15 @@
 
 ## Standard Update
 
-Run these commands in order every time you pull changes:
+Before pulling this update, retire any singleton worker deployment with the old
+checkout, controller, manifest and credentials. Stop controller activity before
+applying migrations. The paired-deployment migration refuses active leases,
+unresolved creations, incomplete retirements or inconsistent singleton history;
+lease expiry is insufficient. Resolve these through the old controller while its
+schema is still installed. Preserve the database, pending work and media; no reset
+is required or authorized by this upgrade.
+
+Then run these commands in order:
 
 ```bash
 git pull
@@ -39,12 +47,16 @@ git log --oneline <current-tag>..HEAD
 If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
 
 Fresh databases start with the transactional migration `Version20261017000000`,
-then apply forward migrations through `Version20261017170000`. The initial
+then apply forward migrations through `Version20261018130000`. The initial
 migration creates the schema, including microsecond `timestamptz` columns, and
 cannot be downgraded. Forward migrations add playlist persistence versions and
 video/audio execution authority. `Version20261017160000` preserves durable
 session/request control receipts; `Version20261017170000` scopes video jobs to
 playback owners without rewriting the initial migration or existing histories.
+`Version20261018130000` imports confirmed singleton retirement history and adds
+the control/execution journals and joint retirement barrier. It is irreversible.
+New deployments require a version 3 manifest with separate budgets, disjoint CPU
+sets and a private IPC volume; version 2 manifests are refused.
 
 Ownership is derived from the recorded runtime session or an unambiguous session
 owner. Ambiguous or unattached historical jobs retain a null owner. Existing

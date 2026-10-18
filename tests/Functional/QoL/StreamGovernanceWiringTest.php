@@ -8,7 +8,7 @@ use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Infrastructure\AllowedQualityTiersService;
 use App\QoL\Infrastructure\StreamAdmissionService;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Infrastructure\Swoole\TranscodeJobEventSubscriber;
@@ -44,7 +44,7 @@ final class StreamGovernanceWiringTest extends KernelTestCase
         self::assertContains(OutboxSubscriber::class, $completionListeners);
         $admission = $container->get(StreamAdmissionPortInterface::class);
         self::assertInstanceOf(StreamAdmissionService::class, $admission);
-        $container->set('worker.media.cpu_pool', $this->createStub(CpuProcessPoolInterface::class));
+        $container->set(NativeExecutionClientInterface::class, $this->createStub(NativeExecutionClientInterface::class));
         $container->set('worker.media.encoder_profile', EncoderProfile::software());
         $executor = $container->get('transcode.loop_starter');
         self::assertInstanceOf(TranscodeSessionSubscriber::class, $executor);

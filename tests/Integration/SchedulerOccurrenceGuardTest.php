@@ -25,6 +25,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -81,6 +82,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         }
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
         $this->writer->executeStatement('DELETE FROM scheduled_jobs');
+        DeploymentJournalFixture::ready($this->writer, 'baander.app:scheduler-guard', str_repeat('a', 32));
         $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-guard', str_repeat('a', 32), 300);
         self::assertInstanceOf(DeploymentLease::class, $authority);
         $this->authority = $authority;

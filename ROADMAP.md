@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-17. This is the working delivery record for the remediation,
+Updated: 2026-10-18. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -107,8 +107,10 @@ only one agent host has.
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
 - **Next.** Continue the remaining
   [worker architecture items](#worker-architecture-and-resource-control), starting
-  with reserved responsive control capacity. Validated routes/resource classes are
-  closed by the [2026-10-18 checkpoint](#validated-asynchronous-routes-2026-10-18).
+  with measured autoscaling and admission profiles. Reserved control capacity is
+  closed by the [2026-10-18 checkpoint](#reserved-worker-control-capacity-2026-10-18),
+  and validated routes/resource classes by their
+  [checkpoint](#validated-asynchronous-routes-2026-10-18).
   The two-command deployment item retains its production and browser checkpoint.
   Provider live qualification and regional acceptance remain separate work.
   React Native and Android remain deferred. The local dev database note below
@@ -2412,12 +2414,143 @@ changed. Local application databases, baseline services and media remain untouch
 all verification infrastructure is disposable. Reserved control capacity,
 autoscaling, broader failure/load coverage and media saturation remain open.
 
+#### Reserved worker control capacity (2026-10-18)
+
+The [reserved-control plan](docs/plans/2026-10-18-1245-feat-reserved-worker-control-plan.md)
+implements a fixed control/execution pair under one boot and a joint retirement
+barrier. Control owns lease renewal, relay, scheduler polling and media
+coordination. Execution observes committed authority and owns separate ordinary
+and scheduled consumers, native probes, encoders, CPU helpers and scheduled console
+children. Peer boot/epoch evidence and native readiness gate business admission;
+missing peers fail startup after thirty seconds, and draining is bounded to
+thirty-five seconds per unit.
+
+Version 3 manifests require separate memory/CPU/PID ceilings, disjoint CPU sets
+and a private named IPC volume. The revised admission profile reserves control
+2624 MiB/128 PIDs and execution 4480 MiB/256 PIDs, including a 320 MiB console
+reservation, for three video slots, one audio slot and no devices. CPU placements
+are selected explicitly from available daemon CPUs. The paired fixture requires
+four CPUs and 13 GiB; combined web/media and pressure runs require 15 GiB including
+4352 MiB dependencies, 2048 MiB web and 1024 MiB headroom. Standalone admission
+totals 12480 MiB; with web it totals 14528 MiB. PHP kernel heaps are 256 MiB.
+These are declared admission limits, not universal measured capacity defaults.
+
+Forward migration `Version20261018130000` imports confirmed singleton retirement
+history and refuses active leases, unresolved creation claims, incomplete
+retirements and inconsistent journals. Operators must retire old deployments with
+the old controller before upgrading and quiesce controller activity. The migration
+preserves application data; no local application database reset is included.
+
+Verification uses the CI image with the checkout copied into disposable services:
+
+- The final journal/pair-manifest selection passed **66 tests / 704 assertions**
+  in **121.9 seconds**. Artifacts: `var/test-runs/20261018-130004-6ca0c972`.
+- The final real paired worker-command drill passed in **296.3 seconds**, with
+  cleanup. It covers startup, relay claim/projection/handoff crashes, retained
+  original leases and receipts, scheduler-consumer death before XACK, natural
+  redelivery, duplicate refusal, scheduler failure, TERM and lease-expiry draining.
+  Log: `/tmp/reserved-control-command-final.log`.
+- The full coordinator executed **9,857 tests in 934 files / 79,728 assertions**
+  in **825.3 seconds**, with zero skipped cases, four errors and eight failures
+  from fixture expectations, constraint naming and absent native bootstrap. The
+  corrected selection passed **283 tests / 1,370 assertions** in **120.2 seconds**,
+  including fifteen new native cases. A subsequent post-profile selection covering
+  restored runtime regressions and parent-owned native cleanup passed **246 tests /
+  621 assertions** in **78.8 seconds**, with zero skipped cases. Artifacts:
+  `var/test-runs/20261018-132006-2c7bbea0`,
+  `var/test-runs/20261018-133633-70437957` and
+  `var/test-runs/20261018-134727-431ba2bc`. These are a failed full run plus focused
+  corrections and additions, not an uninterrupted passing full-suite rerun.
+- Latest discovery contains **9,909 tests in 934 files**; it was not run as one
+  full suite. Compared with the prior 9,818-case full checkpoint, discovery adds
+  **110 cases** and removes **19**. Three additions were already verified in that
+  checkpoint's post-full-run catalog correction. Removed coverage comprises nine
+  singleton containment cases, superseded by paired retirement/inventory/recovery,
+  and six local-spawner plus four helper-process cases, superseded by remote
+  spawner/native-daemon/protocol coverage. Restored runtime files contain 67 cases
+  against their prior 63, including two overflow cases.
+- The no-Swoole selection passed **42 tests / 164 assertions** in **71.2 seconds**,
+  without skips. Artifacts: `var/test-runs/20261018-134955-07e96464`.
+- All five static gates pass without baseline expansion. Composer platform,
+  Deptrac, container lint and OpenAPI checks took **0.4 / 5.4 / 2.1 / 2.3 seconds**;
+  corrected PHPStan passed with zero errors in **56.26 seconds** (**68.85 seconds**
+  with its runner). The first PHPStan run's twenty annotation/inference errors were
+  corrected. Evidence: `/tmp/reserved-control-static-final/results.json`.
+- All **69 Python runner regressions** passed in **0.732 seconds**.
+- The production-worker, operator and combined media drill passed in **198.3
+  seconds** on the revised profile, including actual audio/video decoding,
+  attachment, persisted pause/seek/resume, web replacement, worker containment and
+  recovery, final retirement and verified cleanup. Artifacts:
+  `var/test-runs/baander-worker-operator-1792324276-1876507`; image:
+  `baander-worker-reserved-control:local`. Earlier production attempts failed on a
+  128 MiB kernel heap and an OOM-killed 512 MiB PostgreSQL fixture; neither is
+  counted as a pass, and both motivated the documented profile corrections.
+- Containment, retirement, recovery and isolation passed in **18.83 / 9.55 /
+  15.91 / 43.12 seconds**, respectively. Evidence:
+  `/tmp/reserved-control-lifecycle-results.json`.
+- The web-ownership regression passed **1 test / 56 assertions** in **50.97
+  seconds** including coordination (**31.5 seconds** in the service lane). Artifacts:
+  `var/test-runs/20261018-142144-3d3eaf75`.
+- Final scoped fixture PHPStan passed with zero errors in **11.31 seconds**.
+- Final monitored CPU qualification passed with **1,135 occupied-slot samples**
+  across the sixty-second window: three video encoders and one deliberately paused
+  audio encoder remained admitted. Desired-state observation p99/max were
+  **0.233721 / 0.258274 seconds**; heartbeat p99/max were **0.010040 / 0.029077
+  seconds**. The ordinary backlog stayed at least **1,984**, while **1,920**
+  deliveries were acknowledged and **five** due scheduled occurrences returned.
+  Execution consumed **156.918957 CPU seconds** over the measured pressure period;
+  drain took **one second**. Artifacts:
+  `var/test-runs/control-capacity-qualified/cpu/qualification.json`.
+- Final monitored memory exhaustion passed: the exact native-daemon victim was
+  selected, execution's `oom_kill` counter advanced **0 → 1**, and owned failure
+  triggered an automatic **five-second** drain. Control survived without an OOM.
+  CPU and memory receipts include successful bounded Docker event capture for
+  both immutable IDs, a live observer through drain and intentional monitor
+  shutdown. Artifacts:
+  `var/test-runs/control-capacity-qualified/memory/qualification.json`.
+- Five negative replays reject missing/failed capture, unexpected observer exit,
+  absent output and a control OOM event. A separate saved-evidence replay hides
+  the cgroup OOM-kill observation and verifies exact-container Docker-event fallback.
+  These validate evidence interpretation, not additional live pressure passes.
+  Evidence: `/tmp/reserved-control-observer-negative.json` and
+  `/tmp/reserved-control-oom-fallback-replay.json`.
+- Final PID qualification passed in **60.740 seconds** including setup and
+  verified cleanup. Execution's kernel `pids.events max` counter advanced
+  **0 → 19**; native launch failed on attempt **3**, triggering automatic joint
+  drain in **one second**. Control's heartbeat maximum was **0.009744 seconds**,
+  its peak PID usage was **11 / 128**, and its PID-max counter stayed zero. It
+  suffered no OOM; complete exact-ID event capture remained live through drain.
+  Artifacts: `var/test-runs/control-capacity-pid-verified/qualification.json`;
+  result: `/tmp/reserved-control-pid-verified-result.json`.
+- Earlier PID fixtures correctly failed qualification: the first left released
+  slots available after the first fork refusal; subsequent rapid drains outran
+  baseline/counter sampling. The final fixture waits for valid baseline samples,
+  refills slots for a bounded interval and captures the same-cgroup kernel counter
+  at refusal. No application drain or responsiveness threshold changed.
+  CPU/memory used image
+  `sha256:08cfba69d7b955a2a699d63ee06697f4b8bf15f6c96981b41bd9ba0f6be5e228`;
+  final PID used
+  `sha256:a0c71f217a8e3310daccb525351afbc90dfc273e86614b9c9f81fb54331c5e72`.
+  The image difference contains fixture corrections, with no application change.
+
+The reserved-control item is delivered by these monitored CPU/memory/PID results,
+the production media and worker-command drills, backend full-run evidence plus
+focused corrections, static gates and reviewed implementation. Final pressure
+fixture PHPStan after the counter-capture correction passed with zero errors in
+**9.01 seconds**, with cleanup verified; evidence:
+`/tmp/reserved-control-static-pressure/results.json`.
+
+Autoscaling, broader capacity/default-profile selection, regional acceptance and
+longer failure/load coverage remain open. Earlier production/browser checkpoints
+retain their original scope. Baseline services, application databases and media
+remain untouched; all new verification resources are disposable.
+
 - [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.
 - [x] Use validated routes/resource classes with a handler, independent JSON codec,
   retry policy, and unique consumer identity for every asynchronous message type.
-- [ ] Reserve responsive control capacity independently of catalog/metadata/media
+- [x] Reserve responsive control capacity independently of catalog/metadata/media
   backlog. Bound CPU, RAM, device slots, restarts, and shutdown for entire child trees.
 - [ ] Make autoscaling use measured backlog age, job duration, utilization, and
   admission budgets with stable scale-up/down behavior and measured default profiles.

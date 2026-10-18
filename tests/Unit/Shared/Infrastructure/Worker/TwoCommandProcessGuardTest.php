@@ -44,6 +44,36 @@ final class TwoCommandProcessGuardTest extends TestCase
         }
     }
 
+    public function testExecutionEncoderBelongsToNativeManager(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-native-ancestry-' . bin2hex(random_bytes(8));
+        foreach ([2 => ['/usr/local/bin/php', '/app/bin/worker-native.php'], 3 => ['/usr/bin/ffmpeg', '-version']] as $pid => $arguments) {
+            mkdir($directory . '/' . $pid, 0700, true);
+            $fields = array_fill(0, 22, '0');
+            $fields[0] = 'S';
+            $fields[1] = $pid === 3 ? '2' : '1';
+            file_put_contents($directory . '/' . $pid . '/stat', $pid . ' (native) ' . implode(' ', $fields));
+            file_put_contents($directory . '/' . $pid . '/cmdline', implode("\0", $arguments) . "\0");
+        }
+        try {
+            $process = new Process([PHP_BINARY, dirname(__DIR__, 4) . '/Fixtures/TwoCommand/processes.php', 'worker', $directory]);
+            $process->setTimeout(5);
+            $process->run();
+            self::assertTrue($process->isSuccessful(), $process->getErrorOutput());
+            self::assertCount(1, json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR)['encoders']);
+            file_put_contents($directory . '/2/cmdline', "/usr/local/bin/php\0/app/bin/worker-media-job.php\0");
+            $process->run();
+            self::assertFalse($process->isSuccessful(), 'Control-side local encoding must be rejected.');
+        } finally {
+            foreach ([2, 3] as $pid) {
+                unlink($directory . '/' . $pid . '/stat');
+                unlink($directory . '/' . $pid . '/cmdline');
+                rmdir($directory . '/' . $pid);
+            }
+            rmdir($directory);
+        }
+    }
+
     /** @return iterable<string, array{list<string>, bool, 2?: string}> */
     public static function processArguments(): iterable
     {
@@ -53,6 +83,7 @@ final class TwoCommandProcessGuardTest extends TestCase
         yield 'another CPU worker' => [['cpu-pool-worker-27'], true];
         yield 'actual relay command' => [['/usr/local/bin/php', '-d', 'memory_limit=256M', '/app/bin/console', 'app:outbox:consume', '--time-limit=86400'], true];
         yield 'actual consumer command' => [['/usr/local/bin/php', '-d', 'memory_limit=256M', '/app/bin/console', 'messenger:consume', 'async'], true];
+        yield 'native manager' => [['/usr/local/bin/php', '/app/bin/worker-native.php'], true];
         yield 'media manager' => [['/usr/local/bin/php', '-d', 'memory_limit=256M', '/app/bin/worker-media.php'], true];
         yield 'media child' => [['/usr/local/bin/php', '/app/bin/worker-media-job.php', 'video', 'job'], true];
         yield 'lease agent' => [['/usr/local/bin/php', '/app/bin/worker-lease-agent.php'], true];

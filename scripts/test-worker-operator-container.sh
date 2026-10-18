@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout 240s bash "$0" "$@"
+    timeout_seconds=240
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then timeout_seconds=600; fi
+    exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout "${timeout_seconds}s" bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
@@ -31,15 +33,17 @@ controller_cli="$run_id:cli"
 work="$(mktemp -d /tmp/baander-worker-operator.XXXXXXXX)"
 chmod 700 "$work"
 worker_name=''
+control_name=''
 web_name="$run_id-web"
 web_port=''
 two_command="${BAANDER_TEST_TWO_COMMAND:-0}"
 artifacts="${BAANDER_TEST_ARTIFACTS:-$(pwd)/var/test-runs/$run_id}"
-if [ "$two_command" = 1 ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
+if [ "$two_command" = 1 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then mkdir -p "$artifacts"; chmod 700 "$artifacts"; fi
 source_volume="$run_id-source-media"
 storage_volume="$run_id-storage"
 state_volume="$run_id-media-state"
 secrets_volume="$run_id-web-secrets"
+ipc_volume="$run_id-worker-ipc"
 docker_binary="$(command -v docker)"
 docker_endpoint="${BAANDER_TEST_DOCKER_ENDPOINT:-unix:///var/run/docker.sock}"
 # A CI runner can reach a remote daemon through its ambient Docker configuration.
@@ -62,15 +66,18 @@ cleanup() {
     }
     cleanup_inventory() {
         case "$1" in
-            container) cleanup_docker container ls --all --format '{{.Names}}|{{.Label "app.baander.worker.namespace"}}|{{.Label "app.baander.worker.role"}}' ;;
+            container) cleanup_docker container ls --all --no-trunc --format '{{.ID}}|{{.Names}}|{{.Label "app.baander.worker.namespace"}}|{{.Label "app.baander.worker.role"}}' ;;
             network) cleanup_docker network ls --format '{{.Name}}' ;;
             volume) cleanup_docker volume ls --format '{{.Name}}' ;;
             image) cleanup_docker image ls --format '{{.Repository}}:{{.Tag}}' ;;
         esac
     }
     if [ "$two_command" = 1 ]; then
+        cleanup_docker logs "$run_id-postgres" > "$artifacts/postgres.log" 2>&1 || true
+        cleanup_docker inspect --format '{{json .State}}' "$run_id-postgres" > "$artifacts/postgres-state.json" 2>&1 || true
         cleanup_docker logs "$web_name" > "$artifacts/web.log" 2>&1 || true
         if [ -n "$worker_name" ]; then cleanup_docker logs "$worker_name" > "$artifacts/worker.log" 2>&1 || true; fi
+        if [ -n "$control_name" ]; then cleanup_docker logs "$control_name" > "$artifacts/control.log" 2>&1 || true; fi
     fi
     if [ "$two_command" = 1 ] && [ -n "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; then
         timeout 30s "$BAANDER_TEST_TWO_COMMAND_CHECKPOINT" cleanup "$artifacts" "${web_base:-}" || cleanup_status=1
@@ -79,22 +86,29 @@ cleanup() {
     local -a container_names=("$run_id-controller" "$web_name" "$run_id-media-prepare" "$run_id-host-probe" "$run_id-client"
         "$run_id-prepare" "$run_id-source" "$run_id-redis" "$run_id-postgres")
     if [ -n "$worker_name" ]; then container_names+=("$worker_name"); fi
+    if [ -n "$control_name" ]; then container_names+=("$control_name"); fi
     local -a network_names=("$run_id" "$run_id-control")
-    local -a volume_names=("$source_volume" "$storage_volume" "$state_volume" "$secrets_volume")
+    local -a volume_names=("$source_volume" "$storage_volume" "$state_volume" "$secrets_volume" "$ipc_volume")
     local -a image_names=("$controller_image" "$controller_cli" "$fixture_image" "$fixture_base")
-    local kind listing name owner role inventory_ok
+    local kind listing name owner role resource_id inventory_ok
+    local -A container_ids=()
     for kind in container network volume image; do
         local -n names="${kind}_names"
         local -A present=() removed=()
         inventory_ok=false
         if listing="$(cleanup_inventory "$kind")"; then
             inventory_ok=true
-            while IFS='|' read -r name owner role; do
+            while IFS='|' read -r name owner role resource_id; do
+                if [ -z "$name" ]; then continue; fi
+                if [ "$kind" = container ]; then
+                    container_ids["$owner"]="$name"
+                    name="$owner"; owner="$role"; role="$resource_id"
+                fi
                 if [ -z "$name" ]; then continue; fi
                 present["$name"]=1
                 # A replacement boot may have changed worker_name; its exact
                 # namespace and role still identify this drill's other worker.
-                if [ "$kind" = container ] && [ -n "${namespace:-}" ] && [ "$owner" = "$namespace" ] && [ "$role" = deployment ]; then
+                if [ "$kind" = container ] && [ -n "${namespace:-}" ] && [ "$owner" = "$namespace" ] && [[ "$role" = control || "$role" = execution ]]; then
                     names+=("$name")
                 fi
             done <<< "$listing"
@@ -107,7 +121,10 @@ cleanup() {
             removed["$name"]=1
             if [ "$inventory_ok" = true ] && [ -z "${present[$name]:-}" ]; then continue; fi
             case "$kind" in
-                container|image) cleanup_docker "$kind" rm -f "$name" >/dev/null 2>&1 || cleanup_status=1 ;;
+                container)
+                    if [ -z "${container_ids[$name]:-}" ]; then cleanup_status=1; continue; fi
+                    cleanup_docker container rm -f "${container_ids[$name]}" >/dev/null 2>&1 || cleanup_status=1 ;;
+                image) cleanup_docker image rm -f "$name" >/dev/null 2>&1 || cleanup_status=1 ;;
                 network|volume) cleanup_docker "$kind" rm "$name" >/dev/null 2>&1 || cleanup_status=1 ;;
             esac
         done
@@ -118,9 +135,14 @@ cleanup() {
         local -A owned=()
         for name in "${names[@]}"; do owned["$name"]=1; done
         if listing="$(cleanup_inventory "$kind")"; then
-            while IFS='|' read -r name owner role; do
+            while IFS='|' read -r name owner role resource_id; do
                 if [ -z "$name" ]; then continue; fi
-                if [ -n "${owned[$name]:-}" ] || { [ "$kind" = container ] && [ -n "${namespace:-}" ] && [ "$owner" = "$namespace" ] && [ "$role" = deployment ]; }; then
+                if [ "$kind" = container ]; then
+                    container_ids["$owner"]="$name"
+                    name="$owner"; owner="$role"; role="$resource_id"
+                fi
+                if [ -z "$name" ]; then continue; fi
+                if [ -n "${owned[$name]:-}" ] || { [ "$kind" = container ] && [ -n "${namespace:-}" ] && [ "$owner" = "$namespace" ] && [[ "$role" = control || "$role" = execution ]]; }; then
                     echo "Cleanup left owned $kind resource: $name" >&2
                     cleanup_status=1
                 fi
@@ -151,6 +173,25 @@ PYRECEIPT
 trap cleanup EXIT
 app_image="${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}"
 base_id="$(docker_local image inspect --format '{{.Id}}' "$app_image")"
+docker_local info --format '{{json .}}' > "$work/host.json"
+python3 - "$work/host.json" "$two_command" <<'PYHOST'
+import json, sys
+host = json.load(open(sys.argv[1]))
+minimum_gib = 15 if sys.argv[2] == '1' else 13
+assert host['NCPU'] >= 4 and host['MemTotal'] >= minimum_gib * 1024**3, f'Worker qualification requires four CPUs and {minimum_gib} GiB including dependency/web ceilings and headroom'
+assert host['CgroupVersion'] == '2', 'Worker qualification requires cgroup v2'
+PYHOST
+available_cpus="$(docker_local run --rm --name "$run_id-host-probe" --network none --entrypoint /usr/local/bin/php "$base_id" -r '
+$status = file_get_contents("/proc/self/status");
+if ($status === false || preg_match("/^Cpus_allowed_list:\s+(.+)$/m", $status, $match) !== 1) { exit(1); }
+$cpus = [];
+foreach (explode(",", trim($match[1])) as $range) {
+    $limits = array_map(intval(...), explode("-", $range));
+    foreach (range($limits[0], $limits[1] ?? $limits[0]) as $cpu) { $cpus[] = $cpu; }
+}
+if (count($cpus) < 4) { exit(1); }
+echo json_encode(array_slice($cpus, 0, 4), JSON_THROW_ON_ERROR);
+')"
 # Dockerfile FROM resolves image references, unlike container create's image IDs.
 # Give the already inspected local image an isolated reference without pulling.
 docker_local image tag "$base_id" "$fixture_base"
@@ -226,7 +267,7 @@ DOCKERFILE
     }
     controller_id="$(docker_local image inspect --format '{{.Id}}' "$controller_image")"
 fi
-for volume in "$source_volume" "$storage_volume" "$state_volume" "$secrets_volume"; do
+for volume in "$source_volume" "$storage_volume" "$state_volume" "$secrets_volume" "$ipc_volume"; do
     docker_local volume create --label "app.baander.test.project=$run_id" "$volume" >/dev/null
 done
 media_mounts=(--mount "type=volume,source=$source_volume,target=/media/source,readonly,volume-nocopy"
@@ -236,11 +277,18 @@ docker_local network create --internal "$run_id" >/dev/null
 # Docker 29 suppresses published ports on internal bridges. Only the disposable
 # database joins this controller bridge; the worker keeps its sole private network.
 docker_local network create "$run_id-control" >/dev/null
+dependency_limits=()
+if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
+    dependency_cpu="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])[3])' "$available_cpus")"
+    dependency_limits=(--cpuset-cpus "$dependency_cpu" --cpus 0.5 --pids-limit 64)
+fi
 docker_local run -d --name "$run_id-redis" --network "$run_id" --network-alias redis \
+    "${dependency_limits[@]}" --memory 256m --memory-swap 256m \
     -e REDIS_ARGS='--requirepass test-only' redis/redis-stack-server:edge >/dev/null
 pg_publish=()
 if [ "$operator_in_container" = 0 ]; then pg_publish=(--publish 127.0.0.1::5432); fi
 docker_local run -d --name "$run_id-postgres" --network "$run_id-control" --network-alias postgres \
+    "${dependency_limits[@]}" --memory 4g --memory-swap 4g \
     "${pg_publish[@]}" -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=worker_operator_test \
     "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" >/dev/null
 docker_local network connect --alias postgres "$run_id" "$run_id-postgres"
@@ -267,18 +315,22 @@ else
 fi
 daemon_id="$(docker_local info --format '{{.ID}}')"
 boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
-namespace=baander.app:commandtest
+namespace="baander.app:$run_id"
 worker_name="$(python3 - "$namespace" "$boot" <<'PY'
 import hashlib, sys
-print('baander-worker-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32] + '-' + sys.argv[2])
+print('baander-worker-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32] + '-' + sys.argv[2] + '-execution')
 PY
 )"
-python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$manifest_docker_binary" "$manifest_docker_endpoint" "$pg_port" "$controller_db_host" <<'PY'
+control_name="${worker_name%-execution}-control"
+python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$manifest_docker_binary" "$manifest_docker_endpoint" "$pg_port" "$controller_db_host" "$available_cpus" <<'PY'
 import json, os, sys
-work, namespace, boot, daemon, image, network, binary, endpoint, port, host = sys.argv[1:]
-manifest = dict(version=2, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
-    network=network, dockerBinary=binary, dockerEndpoint=endpoint, memoryMiB=4288, managementMiB=256,
-    consumerMiB=384, relayMiB=384, schedulerMiB=320, scheduledConsoleMiB=320, mediaMiB=2624, mediaDescendantPids=14, nanoCpus=1000000000, pidsLimit=128,
+work, namespace, boot, daemon, image, network, binary, endpoint, port, host, available = sys.argv[1:]
+cpus = json.loads(available)
+manifest = dict(version=3, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
+    network=network, dockerBinary=binary, dockerEndpoint=endpoint,
+    controlMemoryMiB=2624, executionMemoryMiB=4480, controlNanoCpus=1000000000, executionNanoCpus=2000000000,
+    controlPidsLimit=128, executionPidsLimit=256, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
+    scheduledConsoleMiB=320, ipcVolume=network+"-worker-ipc",
     mediaMounts=[dict(volume=network+'-source-media', target='/media/source', readOnly=True, role='source'),
         dict(volume=network+'-storage', target='/var/www/html/storage', readOnly=False, role='derived'),
         dict(volume=network+'-media-state', target='/var/www/html/var/transcode_state', readOnly=False, role='derived')])
@@ -301,12 +353,13 @@ docker_local run --rm --name "$run_id-media-prepare" --user root --network none 
     --mount "type=volume,source=$storage_volume,target=/var/www/html/storage,volume-nocopy" \
     --mount "type=volume,source=$state_volume,target=/var/www/html/var/transcode_state,volume-nocopy" \
     --mount "type=volume,source=$secrets_volume,target=/scratch-secrets,volume-nocopy" \
+    --mount "type=volume,source=$ipc_volume,target=/run/baander-worker,volume-nocopy" \
     --entrypoint /bin/sh "$image_id" -c '
         set -eu
         mkdir -p /var/www/html/storage/media /var/www/html/storage/conversions /scratch-secrets/oauth
         openssl genrsa -out /scratch-secrets/oauth/private.key 2048 2>/dev/null
         openssl rsa -in /scratch-secrets/oauth/private.key -pubout -out /scratch-secrets/oauth/public.key 2>/dev/null
-        chown -R www-data:www-data /media/source /var/www/html/storage /var/www/html/var/transcode_state /scratch-secrets
+        chown -R www-data:www-data /media/source /var/www/html/storage /var/www/html/var/transcode_state /scratch-secrets /run/baander-worker
         chmod 700 /scratch-secrets /scratch-secrets/oauth
         chmod 600 /scratch-secrets/oauth/private.key /scratch-secrets/oauth/public.key
     '
@@ -410,9 +463,11 @@ checkpoint() {
     fi
 }
 start_web() {
+    local -a web_cpu_limits=()
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then web_cpu_limits=(--cpuset-cpus "$dependency_cpu" --cpus 0.5); fi
     # Relative signed URLs work both inside the web namespace and through its published port.
     docker_local run -d --name "$web_name" --network "$run_id-control" --publish "127.0.0.1:${web_port}:9501" \
-        --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 2g \
+        --cap-drop ALL --security-opt no-new-privileges --pids-limit 128 --memory 2g --memory-swap 2g "${web_cpu_limits[@]}" \
         --env-file "$work/runtime.env" -e STREAM_URL_HMAC_SECRET=two-command-drill-only -e OTEL_ENABLED=false \
         -e APP_URL=https://baander.app -e DEFAULT_URI=https://baander.app -e APP_DOMAIN= \
         "${media_mounts[@]}" --mount "type=volume,source=$secrets_volume,target=/var/www/html/config/secrets,readonly,volume-nocopy" \
@@ -438,19 +493,24 @@ with os.fdopen(fd, 'w') as stream:
     json.dump(dict(email='two-command-admin@baander.app', password='Two-command-drill-only-123!', moviePublicId=catalog['movie'], videoPublicId=catalog['video'], expectedSeekPosition=30), stream)
 PYLOGIN
     checkpoint authenticated
-    combined_phase absent
-    snapshot web "$web_name" web-without-worker
+    if [ -z "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
+        combined_phase absent
+        snapshot web "$web_name" web-without-worker
+    fi
 fi
 operator create 0
 test "$(docker_local inspect --format '{{.State.Status}} {{.State.Pid}}' "$worker_name")" = 'created 0'
+test "$(docker_local inspect --format '{{.State.Status}} {{.State.Pid}}' "$control_name")" = 'created 0'
 operator reconcile-create 0
 test "$(docker_local inspect --format '{{.State.Status}} {{.State.Pid}}' "$worker_name")" = 'created 0'
+test "$(docker_local inspect --format '{{.State.Status}} {{.State.Pid}}' "$control_name")" = 'created 0'
 operator status 0
 python3 - "$work/status.json" "$namespace" "$boot" <<'PY'
 import json, sys
 with open(sys.argv[1]) as stream: result = json.load(stream)['result']
-assert result['creationIntentMatches'] is True, result
-assert result['registered'] is True and result['startClaimed'] is False, result
+assert result['manifestMatches'] is True, result
+assert set(result['units']) == {'control', 'execution'}, result
+assert all(u['containerId'] and not u['startClaimed'] for u in result['units'].values()), result
 assert result['retirement'] == 'none' and result['reservation'] == 'none', result
 assert result['readiness'] == 'not_checked', result
 assert result['namespace'] == sys.argv[2] and result['bootId'] == sys.argv[3], result
@@ -470,9 +530,9 @@ fi
 operator status 0
 python3 - "$work/status.json" <<'PYDRIFTSTATUS'
 import json, sys
-assert json.load(open(sys.argv[1]))['result']['creationIntentMatches'] is False
+assert json.load(open(sys.argv[1]))['result']['manifestMatches'] is False
 PYDRIFTSTATUS
-operator start 1
+operator start 3
 test "$(docker_local inspect --format '{{.State.Status}} {{.State.Pid}}' "$worker_name")" = 'created 0'
 mv "$work/manifest-original.json" "$work/manifest.json"
 if [ "$operator_in_container" = 1 ]; then
@@ -482,8 +542,10 @@ operator start 0
 operator start 3
 await_check() {
     local mode="$1" passed=false
+    local check_container="$worker_name"
+    if [[ "$mode" = ready* ]]; then check_container="${2:-$control_name}"; fi
     for attempt in $(seq 1 50); do
-        if docker_local exec "$worker_name" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+        if docker_local exec "$check_container" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
             "$mode" "$namespace" "$boot" > "$work/$mode.log" 2>&1; then
             passed=true; break
         fi
@@ -497,16 +559,34 @@ await_check() {
     fi
 }
 await_check ready
+await_check ready "$worker_name"
 await_check verify-outbox
 await_check verify-scheduler
+if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}" ]; then
+    "$BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT" "$artifacts" "$control_name" "$worker_name" "$ipc_volume" "$run_id-postgres" worker_operator_test
+    operator recover 0
+    operator recover 0
+    operator status 0
+    python3 - "$work/status.json" <<'PYCAPACITYRETIRE'
+import json, sys
+result = json.load(open(sys.argv[1]))['result']
+assert result['manifestMatches'] is True and result['retirement'] == 'completed', result
+assert result['reservation'] == 'none', result
+assert set(result['units']) == {'control', 'execution'}, result
+assert all(unit['removed'] for unit in result['units'].values()), result
+PYCAPACITYRETIRE
+    cp "$work/status.json" "$artifacts/capacity-retirement.json"
+    echo 'PASS: capacity checkpoint completed and both immutable worker units retired.'
+    exit 0
+fi
 operator status 0
 python3 - "$work/status.json" <<'PY'
 import json, sys
 with open(sys.argv[1]) as stream: result = json.load(stream)['result']
-assert result['creationIntentMatches'] is True and result['registered'] is True, result
-assert result['startClaimed'] is True and result['retirement'] == 'none', result
+assert result['manifestMatches'] is True, result
+assert all(u['startClaimed'] for u in result['units'].values()) and result['retirement'] == 'none', result
 assert result['reservation'] == 'this_boot' and result['readiness'] == 'not_checked', result
-assert isinstance(result['containerId'], str) and len(result['containerId']) == 64, result
+assert all(isinstance(u['containerId'], str) and len(u['containerId']) == 64 for u in result['units'].values()), result
 PY
 if [ "$two_command" = 1 ]; then
     combined_phase attach
@@ -546,7 +626,8 @@ import json, sys
 worker = json.load(open(sys.argv[1]))[0]
 assert worker['Image'] == sys.argv[2]
 assert all(m['Type'] == 'volume' and 'docker.sock' not in m['Destination'] for m in worker['Mounts'])
-assert len(worker['Mounts']) == 3
+assert len(worker['Mounts']) == 4
+assert any(m['Destination'] == '/run/baander-worker' for m in worker['Mounts'])
 source = next(m for m in worker['Mounts'] if m['Destination'] == '/media/source')
 assert source['RW'] is False
 assert all(m['RW'] for m in worker['Mounts'] if m is not source)
@@ -560,14 +641,16 @@ operator status 0
 python3 - "$work/status.json" <<'PY'
 import json, sys
 with open(sys.argv[1]) as stream: result = json.load(stream)['result']
-assert result['creationIntentMatches'] is True and result['registered'] is True, result
-assert result['startClaimed'] is True and result['retirement'] == 'completed', result
+assert result['manifestMatches'] is True, result
+assert all(u['startClaimed'] and u['removed'] for u in result['units'].values()) and result['retirement'] == 'completed', result
 assert result['reservation'] == 'none' and result['readiness'] == 'not_checked', result
 PY
 # The old boot cannot acquire a second container or a new start after retirement.
 operator create 3
 operator start 3
-test -z "$(docker_local container ls --all --no-trunc --filter "name=^/$worker_name$" --format '{{.ID}}')"
+for unit_name in "$control_name" "$worker_name"; do
+    test -z "$(docker_local container ls --all --no-trunc --filter "name=^/$unit_name$" --format '{{.ID}}')"
+done
 if [ "$two_command" = 1 ]; then
     host_identities verify < "$artifacts/worker-host-identities.json" > "$artifacts/containment.json"
     snapshot web "$web_name" web-worker-contained
@@ -576,9 +659,10 @@ if [ "$two_command" = 1 ]; then
     boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     worker_name="$(python3 - "$namespace" "$boot" <<'PYNAME'
 import hashlib, sys
-print('baander-worker-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32] + '-' + sys.argv[2])
+print('baander-worker-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:32] + '-' + sys.argv[2] + '-execution')
 PYNAME
 )"
+    control_name="${worker_name%-execution}-control"
     python3 - "$work/manifest.json" "$boot" <<'PYBOOT'
 import json, sys
 path, boot = sys.argv[1:]
@@ -592,6 +676,7 @@ PYBOOT
     operator create 0
     operator start 0
     await_check ready-recovered
+    await_check ready-recovered "$worker_name"
     combined_phase recovered
     snapshot worker "$worker_name" worker-recovered
     snapshot web "$web_name" web-worker-recovered
@@ -625,4 +710,4 @@ with (root/'summary.json').open('w') as stream:
 PYSUMMARY
     echo 'PASS: production web and admitted worker delivered decoded media, converged attachments, persisted controls, survived web replacement, recovered after containment and retired without surviving containers.'
 fi
-echo 'PASS: trusted operator created and reconciled one stopped immutable fixture, started real application roles, processed outbox/scheduler effects, and retired the exact deployment without same-boot reuse.'
+echo 'PASS: trusted operator created and reconciled both stopped immutable units, started real application roles, processed outbox/scheduler effects, and retired the exact deployment without same-boot reuse.'

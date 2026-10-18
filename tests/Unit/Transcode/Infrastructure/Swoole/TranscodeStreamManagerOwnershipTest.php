@@ -41,29 +41,26 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
         $storage->method('resolveJobDirectory')->willReturn($this->directory);
         $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class), $storage, EncoderProfile::software('libx265'));
         $spawner = $this->createStub(ProcessSpawnerInterface::class);
-        $spawner->method('spawn')->willReturnCallback(function (): array {
+        $spawner->method('spawn')->willReturnCallback(function (): mixed {
             // Deliberately reuse the process resource to prove stream identity
             // does not depend on a reusable resource handle or PID.
             ++$this->spawned;
-            return ['resource' => 'reused-handle', 'pipes' => [], 'pid' => 100];
+            return 'reused-handle';
         });
-        $spawner->method('isRunning')->willReturnCallback(function (): bool {
+        $spawner->method('status')->willReturnCallback(function (): array {
             $callback = $this->onRunning;
             $this->onRunning = null;
             $callback?->__invoke();
-            return $this->running;
+            $callback = $this->onExit;
+            $this->onExit = null;
+            $callback?->__invoke();
+            return ['state' => $this->running ? 'running' : 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => -1, 'error' => null];
         });
         $spawner->method('close')->willReturnCallback(function (mixed $resource): void {
             $this->closed[] = $resource;
             $callback = $this->onClose;
             $this->onClose = null;
             $callback?->__invoke();
-        });
-        $spawner->method('exitCode')->willReturnCallback(function (): int {
-            $callback = $this->onExit;
-            $this->onExit = null;
-            $callback?->__invoke();
-            return -1;
         });
         $availability = $this->createStub(SegmentAvailabilityInterface::class);
         $availability->method('markReady')->willReturnCallback(function (Uuid $jobId, string $tier, int $index): void {

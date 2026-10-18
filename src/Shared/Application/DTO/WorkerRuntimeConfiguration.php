@@ -4,45 +4,44 @@ declare(strict_types=1);
 
 namespace App\Shared\Application\DTO;
 
-use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Explicit admission reservations, not measurements or resource enforcement. */
+/** Admission reservations within each independently enforced worker unit. */
 #[Exclude]
 final readonly class WorkerRuntimeConfiguration
 {
+    public int $managementReservationBytes;
+
     public function __construct(
         public string $namespace,
         public string $bootId,
+        public string $unit,
         public int $memoryLimitBytes,
-        public int $managementReservationBytes,
-        public int $consumerReservationBytes,
-        public int $relayReservationBytes,
-        public string $lockDirectory,
+        public int $pidsLimit,
         public int $scheduledConsoleReservationBytes,
-        public int $schedulerReservationBytes,
-        public int $mediaReservationBytes,
-        public int $mediaDescendantPids,
+        public string $lockDirectory,
+        public string $ipcDirectory,
     ) {
+        // Management covers a 256 MiB supervisor, a 64 MiB lease helper and 64 MiB
+        // of native headroom. Execution also reserves its 3136 MiB native process envelope.
+        $this->managementReservationBytes = ($unit === 'control' ? 384 : 3520) * 1024 * 1024;
+        $minimum = ($unit === 'control' ? 2624 : 4160) * 1024 * 1024;
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
-            || $memoryLimitBytes < 1 || $memoryLimitBytes > 1024 * 1024 * 1024 * 1024
-            || $managementReservationBytes < 128 * 1024 * 1024
-            || $consumerReservationBytes < 320 * 1024 * 1024 || $relayReservationBytes < 320 * 1024 * 1024
-            || $managementReservationBytes > $memoryLimitBytes
-            || $consumerReservationBytes > $memoryLimitBytes - $managementReservationBytes
-            || $relayReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes
-            || $schedulerReservationBytes < 320 * 1024 * 1024
-            || $schedulerReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes
-            || $mediaDescendantPids < 14 || $mediaDescendantPids > 4088
-            || $mediaReservationBytes < 2624 * 1024 * 1024
-            || $mediaReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes
+            || !in_array($unit, ['control', 'execution'], true)
+            || $memoryLimitBytes < $minimum || $memoryLimitBytes > 1024 ** 4
+            || $pidsLimit < ($unit === 'control' ? 128 : 256) || $pidsLimit > 4096
             || $scheduledConsoleReservationBytes < 0
-            || ($scheduledConsoleReservationBytes !== 0 && $scheduledConsoleReservationBytes < 192 * 1024 * 1024)
-            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes - $mediaReservationBytes
-            || !str_starts_with($lockDirectory, '/') || strlen($lockDirectory) > 4096 || str_contains($lockDirectory, "\0")
+            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $minimum
+            || ($scheduledConsoleReservationBytes !== 0 && ($unit !== 'execution' || $scheduledConsoleReservationBytes < 320 * 1024 * 1024))
+            || !$this->validPath($lockDirectory) || !$this->validPath($ipcDirectory)
         ) {
-            throw new InvalidArgumentException('Worker runtime requires bounded identity, an absolute lock directory, management reservation at least 128 MiB, consumer, relay and scheduler reservations at least 320 MiB, media reservation at least 2624 MiB and 14 descendants for three video slots and one audio slot, and scheduled console reservation either disabled or at least 192 MiB, all fitting its memory ceiling.');
+            throw new \InvalidArgumentException('Worker requires a control or execution unit, bounded identity, absolute private directories, sufficient memory (control 2624 MiB; execution 4160 MiB plus scheduled console), and PID capacity (control 128; execution 256). Scheduled console requires at least 320 MiB in execution.');
         }
+    }
+
+    private function validPath(string $path): bool
+    {
+        return str_starts_with($path, '/') && strlen($path) <= 4000 && !str_contains($path, "\0") && !in_array('..', explode('/', $path), true);
     }
 }

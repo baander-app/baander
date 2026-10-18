@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DockerDeploymentCreate
 {
     private const string FORMAT = <<<'FORMAT'
-{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},"env":{{json .Config.Env}},"network":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"pidsLimit":{{json .HostConfig.PidsLimit}},"status":{{json .State.Status}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"restarting":{{json .State.Restarting}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
+{"id":{{json .Id}},"name":{{json .Name}},"image":{{json .Image}},"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},"env":{{json .Config.Env}},"network":{{json .HostConfig.NetworkMode}},"networks":{{json .NetworkSettings.Networks}},"memory":{{json .HostConfig.Memory}},"memorySwap":{{json .HostConfig.MemorySwap}},"nanoCpus":{{json .HostConfig.NanoCpus}},"pidsLimit":{{json .HostConfig.PidsLimit}},"cpuSet":{{json .HostConfig.CpusetCpus}},"status":{{json .State.Status}},"running":{{json .State.Running}},"pid":{{json .State.Pid}},"restarting":{{json .State.Restarting}},"restart":{{json .HostConfig.RestartPolicy.Name}},"retryCount":{{json .HostConfig.RestartPolicy.MaximumRetryCount}}}
 FORMAT;
 
     /** @param Closure(list<string>): string $dockerExecutor Fixed trusted endpoint; bounded output and deadlines; failures throw. */
@@ -23,10 +23,15 @@ FORMAT;
     /** One create attempt; any error leaves the caller responsible for reconciliation. Does not start processes. */
     public function create(DeploymentContainerRecipe $recipe): DeploymentContainer
     {
-        if ($this->inventory->find($recipe->namespace, $recipe->bootId) !== null) {
+        $boot = $this->inventory->findBoot($recipe->namespace, $recipe->bootId);
+        $state = $recipe->unit === \App\Shared\Application\DTO\DeploymentUnit::Control ? $boot?->control : $boot?->execution;
+        if ($boot === null || $boot->daemonId !== $recipe->daemonId || $state?->recipeHash !== $recipe->fingerprint()) {
+            throw new \RuntimeException('Creation requires the exact reserved unit recipe.');
+        }
+        if ($this->inventory->findUnit($recipe->namespace, $recipe->bootId, $recipe->unit) !== null) {
             throw new \RuntimeException('Deployment boot is already registered; creation is forbidden.');
         }
-        if (!$this->inventory->claimCreate($recipe)) {
+        if (!$this->inventory->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit)) {
             throw new \RuntimeException('Deployment creation was already attempted; reconcile without recreating.');
         }
         $id = trim($recipe->runtimeEnvironment->variables === []
@@ -39,15 +44,15 @@ FORMAT;
     }
 
     /** Recover a lost create/registration reply by name, without creating or starting anything. */
-    public function reconcile(DeploymentContainerRecipe $recipe): DeploymentContainer
+    public function reconcile(DeploymentContainerRecipe $recipe, bool $forRetirement = false): DeploymentContainer
     {
-        if (!$this->inventory->matchesCreate($recipe)) {
+        if (!$this->inventory->matchesCreate($recipe->namespace, $recipe->bootId, $recipe->unit, $recipe->daemonId, $recipe->fingerprint())) {
             throw new \RuntimeException('Deployment recipe does not match a committed creation intent.');
         }
-        return $this->inspectAndRegister($recipe, RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId));
+        return $this->inspectAndRegister($recipe, RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit), $forRetirement);
     }
 
-    private function inspectAndRegister(DeploymentContainerRecipe $recipe, string $target): DeploymentContainer
+    private function inspectAndRegister(DeploymentContainerRecipe $recipe, string $target, bool $forRetirement = false): DeploymentContainer
     {
         $raw = $this->execute($recipe, ['container', 'inspect', '--format', self::FORMAT, $target]);
         try {
@@ -55,10 +60,10 @@ FORMAT;
         } catch (\JsonException $error) {
             throw new \RuntimeException('Invalid deployment creation inspection.', 0, $error);
         }
-        if (!is_array($state) || count($state) !== 18 || !is_string($state['id'] ?? null)
+        if (!is_array($state) || count($state) !== 19 || !is_string($state['id'] ?? null)
             || preg_match('/\A[0-9a-f]{64}\z/D', $state['id']) !== 1
-            || ($target !== RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId) && $state['id'] !== $target)
-            || ($state['name'] ?? null) !== '/' . RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId)
+            || ($target !== RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit) && $state['id'] !== $target)
+            || ($state['name'] ?? null) !== '/' . RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit)
             || ($state['image'] ?? null) !== $recipe->imageId
             || ($state['entrypoint'] ?? null) !== [$recipe->command[0]]
             || !array_key_exists('cmd', $state) || ($state['cmd'] ?? []) !== array_slice($recipe->command, 1)
@@ -68,13 +73,14 @@ FORMAT;
             || ($state['memorySwap'] ?? null) !== $recipe->memoryBytes
             || ($state['nanoCpus'] ?? null) !== $recipe->nanoCpus
             || ($state['pidsLimit'] ?? null) !== $recipe->pidsLimit
+            || ($state['cpuSet'] ?? null) !== implode(',', $recipe->cpuSet)
             || ($state['status'] ?? null) !== 'created' || ($state['running'] ?? null) !== false
             || ($state['pid'] ?? null) !== 0 || ($state['restarting'] ?? null) !== false
             || ($state['restart'] ?? null) !== 'no' || ($state['retryCount'] ?? null) !== 0
             || !is_array($state['env'] ?? null)) {
             throw new \RuntimeException('Created container does not match the deployment recipe.');
         }
-        $expected = ['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId,
+        $expected = ['BAANDER_WORKER_NAMESPACE' => $recipe->namespace, 'BAANDER_WORKER_BOOT_ID' => $recipe->bootId, 'BAANDER_WORKER_UNIT' => $recipe->unit->value,
             ...$recipe->runtimeEnvironment->variables];
         foreach ($state['env'] as $item) {
             if (!is_string($item) || !str_contains($item, '=')) {
@@ -91,10 +97,10 @@ FORMAT;
                 throw new \RuntimeException('Created container environment does not match its committed recipe.');
             }
         }
-        $binding = new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $state['id']);
+        $binding = new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $state['id'], $recipe->unit);
         (new DockerWorkerContainment(fn (array $arguments): string => $this->execute($recipe, $arguments), $recipe))
-            ->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId);
-        if (!$this->inventory->register($binding)) {
+            ->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        if (!($forRetirement ? $this->inventory->registerForRetirement($binding) : $this->inventory->register($binding))) {
             throw new \RuntimeException('Created container conflicts with immutable deployment inventory.');
         }
         return $binding;

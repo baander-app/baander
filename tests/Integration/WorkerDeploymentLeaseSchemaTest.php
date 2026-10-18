@@ -28,7 +28,10 @@ final class WorkerDeploymentLeaseSchemaTest extends TestCase
             self::assertSame('worker_deployment_creations', $connection->fetchOne("SELECT to_regclass('worker_deployment_creations')::text"));
             self::assertSame('scheduler_occurrences', $connection->fetchOne("SELECT to_regclass('scheduler_occurrences')::text"));
             self::assertSame('scheduler_occurrence_executions', $connection->fetchOne("SELECT to_regclass('scheduler_occurrence_executions')::text"));
+            self::assertSame('worker_deployment_boots', $connection->fetchOne("SELECT to_regclass('worker_deployment_boots')::text"));
             $tables = $connection->createSchemaManager()->listTableNames();
+            self::assertNotContains('worker_deployment_boots', $tables, 'ORM introspection must preserve the root retirement barrier.');
+            self::assertNotContains('worker_deployment_retirements', $tables, 'ORM introspection must preserve unit removal proofs.');
             self::assertNotContains('scheduler_occurrence_executions', $tables, 'ORM introspection must preserve consumed execution attempts.');
             self::assertNotContains('scheduler_occurrences', $tables, 'ORM introspection must preserve durable scheduler intents.');
             self::assertNotContains('worker_deployment_creations', $tables, 'ORM introspection must preserve creation intents.');

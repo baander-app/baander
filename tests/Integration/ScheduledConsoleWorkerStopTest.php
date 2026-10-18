@@ -53,6 +53,33 @@ final class ScheduledConsoleWorkerStopTest extends TestCase
         self::assertCount($unknown ? 1 : 0, iterator_to_array($transport->get()));
     }
 
+    public function testUncertainScheduledDeliveryLeavesOrdinaryConsumerAvailable(): void
+    {
+        $async = new InMemoryTransport();
+        $scheduled = new InMemoryTransport();
+        $async->send(new Envelope(new \stdClass()));
+        $scheduled->send(new Envelope(new \stdClass()));
+        $scheduled->send(new Envelope(new \stdClass()));
+        $scheduledEvents = new EventDispatcher();
+        $scheduledEvents->addSubscriber(new StopWorkerOnUnknownScheduledConsole());
+        $scheduledBus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            \stdClass::class => [static function (): void { throw new ScheduledConsoleCompletionUnknown('Scheduled child completion unknown.'); }],
+        ]))]);
+        (new Worker(['scheduler' => $scheduled], $scheduledBus, $scheduledEvents))->run(['sleep' => 0]);
+        self::assertCount(1, iterator_to_array($async->get()));
+        self::assertCount(1, iterator_to_array($scheduled->get()));
+        $asyncEvents = new EventDispatcher();
+        $asyncEvents->addSubscriber(new StopWorkerOnMessageLimitListener(1));
+        $handled = 0;
+        $asyncBus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            \stdClass::class => [static function () use (&$handled): void { ++$handled; }],
+        ]))]);
+        (new Worker(['async' => $async], $asyncBus, $asyncEvents))->run(['sleep' => 0]);
+        self::assertSame(1, $handled);
+        self::assertCount(1, $async->getAcknowledged());
+        self::assertCount(1, iterator_to_array($scheduled->get()));
+    }
+
     /** @return iterable<string, array{bool, bool}> */
     public static function failures(): iterable
     {

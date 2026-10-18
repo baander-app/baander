@@ -165,6 +165,76 @@ Start qualification at 2304 MiB/128 PIDs for control and 4096 MiB/256 PIDs for e
 These are test inputs and admission limits, not measured universal defaults.
 Verify available host memory and leave at least 1 GiB outside the two ceilings for the disposable dependency stack; record the actual host and dependency limits.
 
+Implementation evidence revises this initial profile. The production cold-boot
+attempt failed at the 128 MiB PHP heap ceiling; the 2304/4096 MiB pair above is
+retained as the attempted starting profile, not a qualified deployment default.
+Kernel processes now receive a 256 MiB PHP heap ceiling. The revised control
+reservation is 2624 MiB/128 PIDs; execution requires 4160 MiB plus at least 320 MiB
+when scheduled console execution is enabled, yielding 4480 MiB/256 PIDs in the
+qualification fixture. Control management reserves 384 MiB and five media PHP
+processes reserve 1600 MiB. Execution management/native capacity reserves 3520 MiB,
+including 3136 MiB for native work.
+
+The revised pair totals 7104 MiB. With 768 MiB for disposable PostgreSQL/Redis and
+1024 MiB headroom, standalone admission totals 8896 MiB and requires at least
+9 GiB host RAM. Combined web/media and pressure runs add a 2048 MiB web ceiling,
+for 10944 MiB total and an 11 GiB host minimum. Four available logical CPUs remain
+required; the actual qualification host exposes sixteen CPUs and 64 GiB RAM.
+These revised values remain explicit test inputs and admission limits; passing
+pressure receipts must establish any responsiveness claim.
+
+A second production attempt reached `worker_media_ready`, then Docker recorded an
+OOM kill of the disposable PostgreSQL container at event timestamp 1792323993
+(artifacts `var/test-runs/baander-worker-operator-1792323879-1858109`). Its 512 MiB
+fixture ceiling was insufficient. PostgreSQL now receives 2048 MiB and Redis
+retains 256 MiB, for 2304 MiB of dependency ceilings. The worker pair is unchanged.
+With 1024 MiB headroom, standalone admission now totals 10432 MiB and requires
+11 GiB host RAM; adding the 2048 MiB web ceiling totals 12480 MiB and requires
+13 GiB. The preceding 9/11 GiB thresholds record the earlier attempted profile.
+This correction changes disposable fixture limits only; it introduces no database
+tuning, application configuration or schema change. Runtime qualification was
+still pending at that point; the final monitored results are recorded below.
+
+The first CPU-pressure attempt also OOM-killed the 2048 MiB PostgreSQL fixture
+before a qualified window. Its revised 4096 MiB ceiling was observed over 104
+samples spanning 64.37 seconds: peak sampled memory was 2656.74 MiB, with 35 client
+backends and 44 total processes at peak. Client counts stayed at 34–35 during
+seconds 5–60, then fell to 26 after eight web connections closed; OOM counters
+remained zero. Evidence: `var/test-runs/control-capacity-1792325154-1940806/cpu`.
+These observations establish this disposable fixture's demand, not its cause or
+universal PostgreSQL sizing.
+
+PostgreSQL/Redis ceilings now total 4352 MiB (4096/256). With the unchanged
+7104 MiB worker pair and 1024 MiB headroom, standalone admission totals 12480 MiB
+and requires 13 GiB host RAM; the additional 2048 MiB web ceiling brings combined
+runs to 14528 MiB and a 15 GiB minimum. Earlier thresholds above remain attempted
+profiles. The revised CPU attempt then hit the fixture's sixty-second HTTP timeout
+while deliberately holding an encoder for sixty seconds plus setup. Increasing
+that fixture request timeout to 120 seconds permits the intended measurement;
+application responsiveness thresholds are unchanged. Final qualification follows.
+
+The final monitored CPU phase passed on the revised profile: desired-state
+observation p99/max were 0.233721/0.258274 seconds and heartbeat p99/max were
+0.010040/0.029077 seconds. Its 1135 occupied-slot samples preserve three video
+and one audio execution slots; ordinary backlog remained at least 1984 while
+1920 deliveries were acknowledged and five due scheduled occurrences returned.
+Drain took one second. The final memory phase advanced execution's `oom_kill`
+counter from zero to one against the identified native daemon and automatically
+drained in five seconds. Control suffered no OOM in either phase; exact-ID bounded
+Docker event capture remained live through drain. Receipts are under
+`var/test-runs/control-capacity-qualified/{cpu,memory}/qualification.json`.
+The final PID phase passed in 60.740 seconds including setup and cleanup:
+execution's kernel PID-max counter advanced from zero to nineteen and native
+launch failed on attempt three, triggering a one-second automatic joint drain.
+Control peaked at 11 of 128 PID slots with no PID-max event or OOM, and its maximum
+heartbeat age was 0.009744 seconds. The final fixture waits for valid baseline
+samples and records the same-cgroup kernel counter at fork refusal: earlier
+attempts left reusable slots or missed the rapid drain in periodic sampling and
+correctly failed qualification. No application threshold changed. Receipt:
+`var/test-runs/control-capacity-pid-verified/qualification.json`.
+These three live phases qualify the stated profile; autoscaling, universal
+defaults and broader saturation behavior remain outside it.
+
 During 60 seconds of execution CPU pressure with ordinary backlog and occupied native slots, require control heartbeat and desired-state observation p99 at most one second and maximum at most two seconds, with uninterrupted lease continuity.
 Normal native control RPCs have a one-second maximum client deadline; timeout is an explicit uncertain/failure result, not a successful action.
 Memory/PID exhaustion must remain in the execution unit and cause bounded failure/drain rather than control OOM or loss of its management processes.

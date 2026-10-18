@@ -11,8 +11,11 @@ use Closure;
 /** Each executable child owns a fresh kernel and at most one claimed media job. */
 final class MediaWorkerRunner
 {
-    /** @var array<string, array{process: resource, kind: string}> */
+    /** @var array<string, array{process: resource, kind: string, slot: string}> */
     private array $children = [];
+
+    /** @var array<string, int> */
+    private array $slotGenerations = [];
 
     public function __construct(
         private readonly TranscodeExecutionOwnershipPort $video,
@@ -102,12 +105,33 @@ final class MediaWorkerRunner
         if ($this->shouldStop($stopRequested)) {
             return;
         }
-        // Array command bypasses a shell; all configuration and identity stay inherited.
-        $process = proc_open([$this->phpBinary, $this->jobScript, $kind, $key], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $used = array_column($this->children, 'slot');
+        $slot = null;
+        for ($index = 0; $index < $capacity; ++$index) {
+            $candidate = 'media-' . $kind . '-' . $index;
+            if (!in_array($candidate, $used, true)) {
+                $slot = $candidate;
+                break;
+            }
+        }
+        if ($slot === null) {
+            throw new \LogicException('Media capacity has no free native client slot.');
+        }
+        $previous = $this->slotGenerations[$slot] ?? 0;
+        if ($previous === PHP_INT_MAX) {
+            throw new \RuntimeException('Media native client generation is exhausted.');
+        }
+        $generation = $this->slotGenerations[$slot] = $previous + 1;
+        $environment = array_replace(getenv(), [
+            'BAANDER_NATIVE_CLIENT_ID' => $slot,
+            'BAANDER_NATIVE_CLIENT_GENERATION' => (string) $generation,
+        ]);
+        // Fresh children inherit authority, with a bounded native slot and launch fence.
+        $process = proc_open([$this->phpBinary, $this->jobScript, $kind, $key], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes, env_vars: $environment);
         if (!is_resource($process)) {
             throw new \RuntimeException('Media execution child could not launch.');
         }
-        $this->children[$childKey] = ['process' => $process, 'kind' => $kind];
+        $this->children[$childKey] = ['process' => $process, 'kind' => $kind, 'slot' => $slot];
     }
 
     private function hasCapacity(string $kind, int $capacity): bool

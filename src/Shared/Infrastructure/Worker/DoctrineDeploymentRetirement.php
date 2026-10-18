@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Trusted-controller retirement journal on a dedicated idle autocommit PostgreSQL connection. */
+/** Trusted controller records unit proofs; only joint boot completion releases ownership. */
 #[Exclude]
 final class DoctrineDeploymentRetirement
 {
@@ -21,72 +22,113 @@ final class DoctrineDeploymentRetirement
         }
     }
 
-    public function find(string $namespace, string $bootId): ?DeploymentRetirement
+    public function findUnit(string $namespace, string $bootId, DeploymentUnit $unit): ?DeploymentRetirement
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
-        return $this->operation(fn (): ?DeploymentRetirement => $this->select($namespace, $bootId));
+        return $this->operation(fn (): ?DeploymentRetirement => $this->select($namespace, $bootId, $unit));
     }
 
-    /** Call only after trusted isolation verification. Exact retries reconcile uncertain commits without rebinding. */
-    public function begin(DeploymentContainer $binding): bool
+    /** Cancellation is safe only for units whose create claim never committed. */
+    public function requestRetirement(string $namespace, string $bootId): bool
     {
-        return $this->operation(function () use ($binding): bool {
-            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
-            $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO worker_deployment_retirements (namespace, boot_id, daemon_id, container_id)
-                SELECT namespace, boot_id, daemon_id, container_id FROM worker_deployment_containers
-                WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon AND container_id = :container
-                ON CONFLICT DO NOTHING
-                SQL, $this->parameters($binding));
-            $intent = $this->select($binding->namespace, $binding->bootId);
-            return $intent !== null && $this->matches($intent->binding, $binding);
-        });
-    }
-
-    /** Call only after trusted removal/absence on the pinned daemon. Completion and own-boot lease release commit together. */
-    public function complete(DeploymentContainer $binding): bool
-    {
-        return $this->operation(function () use ($binding): bool {
-            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
-            $intent = $this->select($binding->namespace, $binding->bootId);
-            if ($intent === null || !$this->matches($intent->binding, $binding)) {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(function () use ($namespace, $bootId): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $namespace);
+            $params = ['namespace' => $namespace, 'boot' => $bootId];
+            if ($this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_boots SET retirement_requested_at = COALESCE(retirement_requested_at, clock_timestamp())
+                WHERE namespace = :namespace AND boot_id = :boot
+                SQL, $params) !== 1) {
                 return false;
             }
-            if ($intent->completed) {
-                return true;
-            }
-            // Acquisition must commit before begin can pass its shared barrier.
-            // The tombstone thereafter forbids all epochs for this boot, so the
-            // current same-boot row is the only owner that can need release.
             $this->connection->executeStatement(<<<'SQL'
-                UPDATE worker_deployment_leases SET state = 'available'
-                WHERE namespace = :namespace AND owner_boot_id = :boot AND state = 'active'
-                SQL, ['namespace' => $binding->namespace, 'boot' => $binding->bootId]);
-            $this->connection->executeStatement(<<<'SQL'
-                UPDATE worker_deployment_retirements SET completed_at = clock_timestamp()
-                WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon AND container_id = :container
-                    AND completed_at IS NULL
-                SQL, $this->parameters($binding));
+                UPDATE worker_deployment_creations SET cancelled_at = COALESCE(cancelled_at, clock_timestamp())
+                WHERE namespace = :namespace AND boot_id = :boot AND claimed_at IS NULL
+                SQL, $params);
             return true;
         });
     }
 
-    private function select(string $namespace, string $bootId): ?DeploymentRetirement
+    /** Call after trusted isolation verification of the exact reserved immutable binding. */
+    public function beginUnitRetirement(DeploymentContainer $binding): bool
     {
-        $row = $this->connection->fetchAssociative('SELECT daemon_id, container_id, completed_at FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $namespace, 'boot' => $bootId]);
-        return $row === false ? null : new DeploymentRetirement(new DeploymentContainer($namespace, $bootId, $row['daemon_id'], $row['container_id']), $row['completed_at'] !== null);
+        return $this->operation(function () use ($binding): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
+            $this->connection->executeStatement(<<<'SQL'
+                INSERT INTO worker_deployment_retirements (namespace, boot_id, unit, daemon_id, container_id)
+                SELECT i.namespace, i.boot_id, i.unit, i.daemon_id, i.container_id
+                FROM worker_deployment_containers i JOIN worker_deployment_boots b USING (namespace, boot_id, daemon_id)
+                WHERE i.namespace = :namespace AND i.boot_id = :boot AND i.unit = :unit AND i.daemon_id = :daemon AND i.container_id = :container
+                    AND b.retirement_requested_at IS NOT NULL
+                ON CONFLICT DO NOTHING
+                SQL, $this->parameters($binding));
+            $intent = $this->select($binding->namespace, $binding->bootId, $binding->unit);
+            return $intent !== null && $intent->binding->matches($binding);
+        });
     }
 
-    private function matches(DeploymentContainer $left, DeploymentContainer $right): bool
+    /** Trusted exact-ID absence proof for this unit only; never makes the namespace available. */
+    public function completeUnitRetirement(DeploymentContainer $binding): bool
     {
-        return $left->namespace === $right->namespace && $left->bootId === $right->bootId
-            && $left->daemonId === $right->daemonId && $left->containerId === $right->containerId;
+        return $this->operation(function () use ($binding): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
+            return $this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_retirements SET completed_at = COALESCE(completed_at, clock_timestamp())
+                WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND daemon_id = :daemon AND container_id = :container
+                SQL, $this->parameters($binding)) === 1;
+        });
     }
 
-    /** @return array{namespace: string, boot: string, daemon: string, container: string} */
+    /** Root completion and release commit together; delayed old completion cannot release a newer boot. */
+    public function completeBootRetirement(string $namespace, string $bootId): bool
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(function () use ($namespace, $bootId): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $namespace);
+            $params = ['namespace' => $namespace, 'boot' => $bootId];
+            $root = $this->connection->fetchAssociative('SELECT retirement_requested_at, retired_at FROM worker_deployment_boots WHERE namespace = :namespace AND boot_id = :boot', $params);
+            if ($root === false || $root['retirement_requested_at'] === null) {
+                return false;
+            }
+            if ($root['retired_at'] !== null) {
+                return true;
+            }
+            if ((int) $this->connection->fetchOne('SELECT count(*) FROM worker_deployment_creations WHERE namespace = :namespace AND boot_id = :boot', $params) !== 2
+                || $this->connection->fetchOne(<<<'SQL'
+                    SELECT 1 FROM worker_deployment_creations c
+                    WHERE c.namespace = :namespace AND c.boot_id = :boot AND NOT (
+                        (c.claimed_at IS NULL AND c.cancelled_at IS NOT NULL)
+                        OR EXISTS (
+                            SELECT 1 FROM worker_deployment_containers i
+                            JOIN worker_deployment_retirements r USING (namespace, boot_id, unit, daemon_id, container_id)
+                            WHERE i.namespace = c.namespace AND i.boot_id = c.boot_id AND i.unit = c.unit AND i.daemon_id = c.daemon_id
+                                AND r.completed_at IS NOT NULL
+                        )
+                    )
+                    SQL, $params) !== false) {
+                return false;
+            }
+            $this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_boots SET retired_at = clock_timestamp() WHERE namespace = :namespace AND boot_id = :boot
+                SQL, $params);
+            $this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_leases SET state = 'available'
+                WHERE namespace = :namespace AND owner_boot_id = :boot AND state = 'active'
+                SQL, $params);
+            return true;
+        });
+    }
+
+    private function select(string $namespace, string $bootId, DeploymentUnit $unit): ?DeploymentRetirement
+    {
+        $row = $this->connection->fetchAssociative('SELECT daemon_id, container_id, completed_at FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit', ['namespace' => $namespace, 'boot' => $bootId, 'unit' => $unit->value]);
+        return $row === false ? null : new DeploymentRetirement(new DeploymentContainer($namespace, $bootId, $row['daemon_id'], $row['container_id'], $unit), $row['completed_at'] !== null);
+    }
+
+    /** @return array{namespace:string, boot:string, unit:string, daemon:string, container:string} */
     private function parameters(DeploymentContainer $binding): array
     {
-        return ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'daemon' => $binding->daemonId, 'container' => $binding->containerId];
+        return ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'unit' => $binding->unit->value, 'daemon' => $binding->daemonId, 'container' => $binding->containerId];
     }
 
     /**

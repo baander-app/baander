@@ -86,6 +86,12 @@ final class TranscodeStreamManagerTest extends TestCase
         self::assertSame(1, $this->spawner->spawnCount);
     }
 
+    public function testOpaqueNativeAttemptCarriesNoLocalProcessDescriptors(): void
+    {
+        $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '');
+        self::assertSame('attempt-1', $this->spawner->lastHandle);
+    }
+
     public function testStartStreamIdempotentReturnsExistingDir(): void
     {
         $job = $this->makeJob();
@@ -126,7 +132,7 @@ final class TranscodeStreamManagerTest extends TestCase
         $this->spawner->running = true;
         $this->manager->pauseStream($job->getId());
 
-        self::assertContains(19, $this->spawner->signals, 'Should send SIGSTOP (19)');
+        self::assertContains('pause', $this->spawner->signals, 'Should send SIGSTOP (19)');
     }
 
     public function testResumeStreamSendsSigcont(): void
@@ -136,7 +142,7 @@ final class TranscodeStreamManagerTest extends TestCase
 
         $this->manager->resumeStream($job->getId());
 
-        self::assertContains(18, $this->spawner->signals, 'Should send SIGCONT (18)');
+        self::assertContains('resume', $this->spawner->signals, 'Should send SIGCONT (18)');
     }
 
     public function testPauseNoOpIfNotRunning(): void
@@ -443,43 +449,31 @@ final class TranscodeStreamManagerTest extends TestCase
 final class StubSpawner implements ProcessSpawnerInterface
 {
     public int $spawnCount = 0;
+    public mixed $lastHandle = null;
     public bool $running = true;
     public int $exitCode = 0;
-    /** @var array<int, int> */
+    /** @var list<string> */
     public array $signals = [];
 
     /** @var list<string>|null */
     public ?array $lastCommand = null;
 
-    public function spawn(array $command): array
+    public function spawn(array $command): mixed
     {
         $this->spawnCount++;
         $this->lastCommand = $command;
-
-        return [
-            'resource' => new \stdClass(),
-            'pipes' => [],
-            'pid' => 10000 + $this->spawnCount,
-        ];
+        return $this->lastHandle = 'attempt-' . $this->spawnCount;
     }
 
-    public function isRunning(mixed $resource): bool
+    public function status(mixed $handle): array
     {
-        return $this->running;
+        return ['state' => $this->running ? 'running' : 'exited', 'stdout' => '', 'stderr' => '', 'exitCode' => $this->exitCode, 'error' => null];
     }
 
-    public function exitCode(mixed $resource): int
-    {
-        return $this->exitCode;
-    }
-
-    public function signal(int $pid, int $signal): void
+    public function signal(mixed $handle, string $signal): void
     {
         $this->signals[] = $signal;
     }
 
-    public function close(mixed $resource): void
-    {
-        // no-op
-    }
+    public function close(mixed $handle): void {}
 }

@@ -15,6 +15,11 @@ if (!is_array($arguments)) {
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
 $allowedModes = [
+    'reserve-pair',
+    'claim-unit',
+    'register-unit',
+    'start-unit',
+    'lease-ready',
     'prepare-consumer-ack',
     'hold-consumer-ack',
     'release-consumer-ack',
@@ -67,6 +72,27 @@ if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
 $db = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'], true)) {
+    $inventory = new App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($db);
+    $daemon = 'baander.app:command-drill';
+    if ($mode === 'reserve-pair') {
+        $controlRecipe = hash('sha256', 'control:2624:128:cpu0');
+        $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
+        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), $daemon, $controlRecipe, $executionRecipe);
+    } else {
+        $unit = App\Shared\Application\DTO\DeploymentUnit::from($arguments[4] ?? '');
+        if ($mode === 'claim-unit') {
+            $accepted = $inventory->claimCreate($namespace, $bootId, $unit);
+        } else {
+            $binding = new App\Shared\Infrastructure\Worker\DeploymentContainer($namespace, $bootId, $daemon, $arguments[5] ?? '', $unit);
+            $accepted = $mode === 'register-unit' ? $inventory->register($binding) : $inventory->claimStart($binding);
+        }
+    }
+    if (!$accepted) {
+        throw new RuntimeException('Paired deployment journal transition denied: ' . $mode);
+    }
+    exit(0);
+}
 if ($mode === 'prepare-consumer-ack') {
     $db->executeStatement(<<<'SQL'
         CREATE TABLE worker_command_consumer_ack_gate (
@@ -578,6 +604,9 @@ if ($mode === 'expire') {
     echo "Expired the exact original reservation; ownership remains active.\n";
     exit(0);
 }
+if ($mode === 'lease-ready') {
+    exit(0);
+}
 if ($mode === 'reserved') {
     echo "Original deployment lease remains reserved.\n";
     exit(0);
@@ -591,15 +620,17 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
         continue;
     }
     $arguments = explode("\0", rtrim($command, "\0"));
-    $role = in_array('messenger:consume', $arguments, true) ? 'consumer'
+    $role = in_array('messenger:consume', $arguments, true) ? (in_array('scheduler', $arguments, true) ? 'scheduled-consumer' : 'consumer')
         : (in_array('app:outbox:consume', $arguments, true) ? 'relay'
             : (in_array(dirname(__DIR__, 3) . '/bin/worker-scheduler.php', $arguments, true) ? 'scheduler'
-                : (in_array(dirname(__DIR__, 3) . '/bin/worker-media.php', $arguments, true) ? 'media' : null)));
+                : (in_array(dirname(__DIR__, 3) . '/bin/worker-media.php', $arguments, true) ? 'media'
+                    : (in_array(dirname(__DIR__, 3) . '/bin/worker-native.php', $arguments, true) ? 'native' : null))));
     if ($role === null) {
         continue;
     }
-    if ($role === 'consumer' && (!in_array('async', $arguments, true) || !in_array('scheduler', $arguments, true))) {
-        throw new RuntimeException('Consumer must receive both durable async and scheduler transports.');
+    if (($role === 'consumer' && (!in_array('async', $arguments, true) || in_array('scheduler', $arguments, true)))
+        || ($role === 'scheduled-consumer' && in_array('async', $arguments, true))) {
+        throw new RuntimeException('Execution consumers must use separate async and scheduler transports.');
     }
     $status = @file_get_contents(dirname($path) . '/status');
     if ($status === false || preg_match('/^PPid:\s+(\d+)$/m', $status, $matches) !== 1 || (int) $matches[1] !== 1) {
@@ -619,8 +650,11 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
         'BAANDER_WORKER_LEASE_EPOCH' => (string) $row['epoch'],
         'BAANDER_WORKER_ID' => $role,
         'BAANDER_WORKER_GENERATION' => '1',
-        'MESSENGER_CONSUMER_NAME' => 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1',
+        'BAANDER_WORKER_UNIT' => getenv('BAANDER_WORKER_UNIT'),
     ];
+    if ($role !== 'native') {
+        $expectedIdentity['MESSENGER_CONSUMER_NAME'] = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1';
+    }
     foreach (explode("\0", $environment) as $entry) {
         $pair = explode('=', $entry, 2);
         if (count($pair) === 2 && array_key_exists($pair[0], $expectedIdentity)) {
@@ -637,14 +671,20 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     }
     $roles[$role] = $pid;
 }
-if (count($roles) !== 4 || !isset($roles['consumer'], $roles['relay'], $roles['scheduler'], $roles['media'])) {
-    throw new RuntimeException('All four production roles have not started.');
+$unit = getenv('BAANDER_WORKER_UNIT');
+$expectedRoles = match ($unit) {
+    'control' => ['relay', 'scheduler', 'media'],
+    'execution' => ['consumer', 'scheduled-consumer', 'native'],
+    default => throw new RuntimeException('Fixture requires an explicit deployment unit.'),
+};
+if (count($roles) !== count($expectedRoles) || array_diff($expectedRoles, array_keys($roles)) !== []) {
+    throw new RuntimeException('All production roles for ' . $unit . ' have not started.');
 }
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
 $redis->auth(['default', 'test-only']);
-$expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-consumer-1';
-foreach (['messages', 'scheduler_occurrences'] as $stream) {
+foreach (['messages' => 'consumer', 'scheduler_occurrences' => 'scheduled-consumer'] as $stream => $consumerRole) {
+    $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $consumerRole . '-1';
     $consumers = $redis->xInfo('CONSUMERS', $stream, 'baander');
     if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
         throw new RuntimeException('Expected admitted Redis consumer on ' . $stream . ': ' . $expected);
@@ -655,7 +695,7 @@ if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-
     throw new RuntimeException('Could not kill the direct relay child at its verified crash boundary.');
 }
 if (in_array($mode, ['kill-consumer', 'kill-consumer-before-ack'], true)
-    && !posix_kill($roles['consumer'], SIGKILL)) {
+    && !posix_kill($roles[$mode === 'kill-consumer-before-ack' ? 'scheduled-consumer' : 'consumer'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');
 }
 if ($mode === 'kill-scheduler' && !posix_kill($roles['scheduler'], SIGKILL)) {

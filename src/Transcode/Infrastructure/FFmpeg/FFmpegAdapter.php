@@ -70,8 +70,8 @@ final class FFmpegAdapter implements FFmpegPortInterface
 
         $codecOptions = AudioProcessingRules::codecOptions(AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo'));
 
-        $vf = $videoFilters !== '' ? sprintf('-vf %s', escapeshellarg($videoFilters)) : '';
-        $af = $audioFilters !== '' ? sprintf('-af %s', escapeshellarg($audioFilters)) : '';
+        $vf = $videoFilters !== '' ? ['-vf', $videoFilters] : [];
+        $af = $audioFilters !== '' ? ['-af', $audioFilters] : [];
 
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
 
@@ -80,35 +80,21 @@ final class FFmpegAdapter implements FFmpegPortInterface
         try {
             $probe = $this->ffprobeAdapter->probeVideo($sourcePath);
             $sourceCodec = $probe->videoCodec;
+        } catch (\App\Shared\Infrastructure\Worker\NativeExecutionException $error) {
+            throw $error;
         } catch (\Throwable) {
             // ffprobe may fail for some sources; continue without hardware decode
         }
         $resolvedProfile = $this->encoderProfile->withDecoderForSource($sourceCodec);
-        $hwAccelFlags = $resolvedProfile->hwaccelInputFlags();
-        $decoderFlags = $resolvedProfile->decoderFlags();
-
-        $cmd = sprintf(
-            '%s -y %s%s -ss %.6f -t %.6f -i %s'
-            . ' %s'
-            . ' -b:v %d -maxrate %d -bufsize %d'
-            . ' %s'
-            . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
-            . ' %s'
-            . ' -f mp4 %s',
-            $this->ffmpegPath,
-            $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
-            $decoderFlags !== '' ? $decoderFlags . ' ' : '',
-            $startTime,
-            $duration,
-            escapeshellarg($sourcePath),
-            $encoderFlags,
-            $qualityTier->videoBitrate,
-            $qualityTier->maxBitrate,
-            $qualityTier->bufferSize,
-            $vf,
-            $af . ' ' . $codecOptions,
-            escapeshellarg($outputPath),
-        );
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::input($resolvedProfile),
+            '-ss', sprintf('%.6f', $startTime), '-t', sprintf('%.6f', $duration), '-i', $sourcePath,
+            ...FFmpegArguments::flags($encoderFlags),
+            '-b:v', (string) $qualityTier->videoBitrate, '-maxrate', (string) $qualityTier->maxBitrate,
+            '-bufsize', (string) $qualityTier->bufferSize, ...$vf,
+            '-movflags', '+frag_keyframe+separate_moof+default_base_moof',
+            ...$af, ...FFmpegArguments::flags($codecOptions), '-f', 'mp4', $outputPath,
+        ];
 
         $this->logger->debug('Encoding segment', [
             'start' => $startTime,
@@ -130,12 +116,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
     {
         $filter = AudioProcessingRules::loudnessFilter($standard);
 
-        $cmd = sprintf(
-            '%s -i %s -af %s -f null -',
-            $this->ffmpegPath,
-            escapeshellarg($sourcePath),
-            escapeshellarg($filter),
-        );
+        $cmd = [$this->ffmpegPath, '-nostdin', '-i', $sourcePath, '-af', $filter, '-f', 'null', '-'];
 
         $result = ProcessExecutor::exec($cmd, 600);
 
@@ -165,19 +146,12 @@ final class FFmpegAdapter implements FFmpegPortInterface
         $profile = AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo');
         $codecOptions = AudioProcessingRules::codecOptions($profile);
 
-        $cmd = sprintf(
-            '%s -y -i %s'
-            . ' -vn -t 0.001'
-            . ' %s -ar %d -ac %d'
-            . ' -movflags +frag_keyframe+empty_moov+default_base_moof'
-            . ' -f mp4 %s',
-            $this->ffmpegPath,
-            escapeshellarg($sourcePath),
-            $codecOptions,
-            $audioProfile['sampleRate'] ?? 48000,
-            $audioProfile['channelCount'] ?? 2,
-            escapeshellarg($outputPath),
-        );
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', '-y', '-i', $sourcePath, '-vn', '-t', '0.001',
+            ...FFmpegArguments::flags($codecOptions), '-ar', (string) ($audioProfile['sampleRate'] ?? 48000),
+            '-ac', (string) ($audioProfile['channelCount'] ?? 2),
+            '-movflags', '+frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', $outputPath,
+        ];
 
         $result = ProcessExecutor::exec($cmd, 120);
         if ($result['code'] !== 0) {
@@ -206,27 +180,17 @@ final class FFmpegAdapter implements FFmpegPortInterface
             mkdir($dir, 0755, true);
         }
 
-        $afArg = $audioFilters !== '' ? '-af ' . escapeshellarg($audioFilters) : '';
+        $afArg = $audioFilters !== '' ? ['-af', $audioFilters] : [];
         $profile = AudioProfile::fromString($audioProfile['name'] ?? 'streaming_stereo');
         $codecOptions = AudioProcessingRules::codecOptions($profile);
 
-        $cmd = sprintf(
-            '%s -y -ss %.6f -t %.6f -i %s'
-            . ' -vn'
-            . ' %s -ar %d -ac %d'
-            . ' %s'
-            . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
-            . ' -f mp4 %s',
-            $this->ffmpegPath,
-            $startTime,
-            $duration,
-            escapeshellarg($sourcePath),
-            $codecOptions,
-            $audioProfile['sampleRate'] ?? 48000,
-            $audioProfile['channelCount'] ?? 2,
-            $afArg,
-            escapeshellarg($outputPath),
-        );
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', '-y', '-ss', sprintf('%.6f', $startTime),
+            '-t', sprintf('%.6f', $duration), '-i', $sourcePath, '-vn',
+            ...FFmpegArguments::flags($codecOptions), '-ar', (string) ($audioProfile['sampleRate'] ?? 48000),
+            '-ac', (string) ($audioProfile['channelCount'] ?? 2), ...$afArg,
+            '-movflags', '+frag_keyframe+separate_moof+default_base_moof', '-f', 'mp4', $outputPath,
+        ];
 
         $result = ProcessExecutor::exec($cmd, 300);
         if ($result['code'] !== 0) {
@@ -247,13 +211,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
             mkdir($dir, 0755, true);
         }
 
-        $cmd = sprintf(
-            '%s -y -i %s -map 0:s:m:language:%s -vn -an -f webvtt %s',
-            $this->ffmpegPath,
-            escapeshellarg($sourcePath),
-            escapeshellarg($language),
-            escapeshellarg($outputPath),
-        );
+        $cmd = [$this->ffmpegPath, '-nostdin', '-y', '-i', $sourcePath, '-map', '0:s:m:language:' . $language, '-vn', '-an', '-f', 'webvtt', $outputPath];
 
         $result = ProcessExecutor::exec($cmd, 120);
         if ($result['code'] !== 0) {

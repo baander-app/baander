@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Immutable bindings and irreversible start claims, on a dedicated idle autocommit PostgreSQL connection. */
+/** Fixed unit reservations and irreversible claims on a dedicated idle autocommit connection. */
 #[Exclude]
 final class DoctrineDeploymentInventory
 {
@@ -21,80 +22,175 @@ final class DoctrineDeploymentInventory
         }
     }
 
-    /** Commit one creation attempt before contacting Docker. Uncertain outcomes never permit a retry. */
-    public function claimCreate(DeploymentContainerRecipe $recipe): bool
-    {
-        return $this->operation(fn (): bool => $this->connection->executeStatement(<<<'SQL'
-            INSERT INTO worker_deployment_creations (namespace, boot_id, daemon_id, recipe_hash)
-            VALUES (:namespace, :boot, :daemon, :recipe)
-            ON CONFLICT DO NOTHING
-            SQL, ['namespace' => $recipe->namespace, 'boot' => $recipe->bootId, 'daemon' => $recipe->daemonId, 'recipe' => $recipe->fingerprint()]) === 1);
-    }
-
-    /** Reconciliation may observe the exact reserved recipe; matching never grants another create attempt. */
-    public function matchesCreate(DeploymentContainerRecipe $recipe): bool
-    {
-        return $this->operation(fn (): bool => $this->connection->fetchOne(<<<'SQL'
-            SELECT 1 FROM worker_deployment_creations
-            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon AND recipe_hash = :recipe
-            SQL, ['namespace' => $recipe->namespace, 'boot' => $recipe->bootId, 'daemon' => $recipe->daemonId, 'recipe' => $recipe->fingerprint()]) !== false);
-    }
-
-    /** Register after creating a stopped container, before starting it. Exact retries are idempotent; no rebind is permitted. */
-    public function register(DeploymentContainer $container): bool
-    {
-        return $this->operation(function () use ($container): bool {
-            $this->connection->executeStatement(<<<'SQL'
-                INSERT INTO worker_deployment_containers (namespace, boot_id, daemon_id, container_id)
-                VALUES (:namespace, :boot, :daemon, :container)
-                ON CONFLICT DO NOTHING
-                SQL, ['namespace' => $container->namespace, 'boot' => $container->bootId, 'daemon' => $container->daemonId, 'container' => $container->containerId]);
-            $registered = $this->select($container->namespace, $container->bootId);
-            return $registered !== null && $registered->daemonId === $container->daemonId && $registered->containerId === $container->containerId;
-        });
-    }
-
-    /**
-     * Commit one start permission for this exact binding. Only acknowledged true
-     * permits one Docker start attempt. Never reset or retry after uncertainty,
-     * even when container inspection shows it has not started or already exited.
-     */
-    public function claimStart(DeploymentContainer $container): bool
-    {
-        return $this->operation(function () use ($container): bool {
-            DeploymentNamespaceLock::acquire($this->connection, $container->namespace);
-            if ($this->connection->fetchOne('SELECT 1 FROM worker_deployment_retirements WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $container->namespace, 'boot' => $container->bootId]) !== false) {
-                return false;
-            }
-            return $this->connection->executeStatement(<<<'SQL'
-            UPDATE worker_deployment_containers SET start_claimed_at = clock_timestamp()
-            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon
-                AND container_id = :container AND start_claimed_at IS NULL
-            SQL, ['namespace' => $container->namespace, 'boot' => $container->bootId, 'daemon' => $container->daemonId, 'container' => $container->containerId]) === 1;
-        });
-    }
-
-    public function find(string $namespace, string $bootId): ?DeploymentContainer
+    /** Exact retries observe the reservation; they never reset a unit's permission. */
+    public function reserveBoot(string $namespace, string $bootId, string $manifestHash, string $daemonId, string $controlRecipeHash, string $executionRecipeHash): bool
     {
         DeploymentLease::validateIdentity($namespace, $bootId);
-        return $this->operation(fn (): ?DeploymentContainer => $this->select($namespace, $bootId));
+        if (!preg_match('/\A[A-Za-z0-9_.:-]{1,128}\z/D', $daemonId)) {
+            throw new \InvalidArgumentException('A deployment requires a bounded safe daemon identity.');
+        }
+        foreach ([$manifestHash, $controlRecipeHash, $executionRecipeHash] as $hash) {
+            if (!preg_match('/\A[0-9a-f]{64}\z/D', $hash)) {
+                throw new \InvalidArgumentException('Deployment manifests and recipes require SHA-256 fingerprints.');
+            }
+        }
+        return $this->operation(function () use ($namespace, $bootId, $manifestHash, $daemonId, $controlRecipeHash, $executionRecipeHash): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $namespace);
+            $existing = $this->selectBoot($namespace, $bootId);
+            if ($existing !== null) {
+                return !$existing->retirementRequested && $existing->manifestHash === $manifestHash && $existing->daemonId === $daemonId
+                    && $existing->control->recipeHash === $controlRecipeHash && $existing->execution->recipeHash === $executionRecipeHash;
+            }
+            if ($this->connection->fetchOne(<<<'SQL'
+                SELECT 1 FROM worker_deployment_boots WHERE namespace = :namespace AND retired_at IS NULL
+                UNION ALL SELECT 1 FROM worker_deployment_leases WHERE namespace = :namespace AND state = 'active'
+                SQL, ['namespace' => $namespace]) !== false) {
+                return false;
+            }
+            $this->connection->executeStatement(<<<'SQL'
+                INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash) VALUES (:namespace, :boot, :daemon, :manifest)
+                SQL, ['namespace' => $namespace, 'boot' => $bootId, 'daemon' => $daemonId, 'manifest' => $manifestHash]);
+            $this->connection->executeStatement(<<<'SQL'
+                INSERT INTO worker_deployment_creations (namespace, boot_id, daemon_id, unit, recipe_hash)
+                VALUES (:namespace, :boot, :daemon, 'control', :control), (:namespace, :boot, :daemon, 'execution', :execution)
+                SQL, ['namespace' => $namespace, 'boot' => $bootId, 'daemon' => $daemonId, 'control' => $controlRecipeHash, 'execution' => $executionRecipeHash]);
+            return true;
+        });
     }
 
-    /** Observes the irreversible claim; it never grants permission to issue a start. */
+    /** Only acknowledged true permits one Docker create attempt for the reserved unit. */
+    public function claimCreate(string $namespace, string $bootId, DeploymentUnit $unit): bool
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(function () use ($namespace, $bootId, $unit): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $namespace);
+            return $this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_creations c SET claimed_at = clock_timestamp()
+                FROM worker_deployment_boots b
+                WHERE c.namespace = :namespace AND c.boot_id = :boot AND c.unit = :unit
+                    AND b.namespace = c.namespace AND b.boot_id = c.boot_id AND b.retirement_requested_at IS NULL
+                    AND c.claimed_at IS NULL AND c.cancelled_at IS NULL AND c.recipe_hash IS NOT NULL
+                    AND (SELECT count(*) FROM worker_deployment_creations sibling WHERE sibling.namespace = b.namespace AND sibling.boot_id = b.boot_id) = 2
+                SQL, ['namespace' => $namespace, 'boot' => $bootId, 'unit' => $unit->value]) === 1;
+        });
+    }
+
+    /** Matching committed intent is observation only, including during retirement recovery. */
+    public function matchesCreate(string $namespace, string $bootId, DeploymentUnit $unit, string $daemonId, string $recipeHash): bool
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(fn (): bool => $this->connection->fetchOne(<<<'SQL'
+            SELECT 1 FROM worker_deployment_creations
+            WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND daemon_id = :daemon AND recipe_hash = :recipe AND claimed_at IS NOT NULL
+            SQL, ['namespace' => $namespace, 'boot' => $bootId, 'unit' => $unit->value, 'daemon' => $daemonId, 'recipe' => $recipeHash]) !== false);
+    }
+
+    public function register(DeploymentContainer $binding): bool
+    {
+        return $this->registerBinding($binding, false);
+    }
+
+    /** Caller must verify the reserved recipe; this path grants removal authority only. */
+    public function registerForRetirement(DeploymentContainer $binding): bool
+    {
+        return $this->registerBinding($binding, true);
+    }
+
+    private function registerBinding(DeploymentContainer $binding, bool $retirement): bool
+    {
+        return $this->operation(function () use ($binding, $retirement): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
+            $params = $this->parameters($binding);
+            $boot = $this->connection->fetchAssociative('SELECT retirement_requested_at, retired_at FROM worker_deployment_boots WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $binding->namespace, 'boot' => $binding->bootId]);
+            if ($boot === false || $boot['retired_at'] !== null || (($boot['retirement_requested_at'] !== null) !== $retirement)) {
+                return false;
+            }
+            $this->connection->executeStatement(<<<'SQL'
+                INSERT INTO worker_deployment_containers (namespace, boot_id, unit, daemon_id, container_id)
+                SELECT namespace, boot_id, unit, daemon_id, :container FROM worker_deployment_creations
+                WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND daemon_id = :daemon
+                    AND claimed_at IS NOT NULL AND cancelled_at IS NULL
+                ON CONFLICT DO NOTHING
+                SQL, $params);
+            return $this->selectUnit($binding->namespace, $binding->bootId, $binding->unit)?->matches($binding) === true;
+        });
+    }
+
+    /** A committed claim permits one start attempt; neither observation nor retries restore it. */
+    public function claimStart(DeploymentContainer $binding): bool
+    {
+        return $this->operation(function () use ($binding): bool {
+            DeploymentNamespaceLock::acquire($this->connection, $binding->namespace);
+            return $this->connection->executeStatement(<<<'SQL'
+                UPDATE worker_deployment_containers c SET start_claimed_at = clock_timestamp()
+                FROM worker_deployment_boots b
+                WHERE c.namespace = :namespace AND c.boot_id = :boot AND c.unit = :unit AND c.daemon_id = :daemon AND c.container_id = :container
+                    AND c.start_claimed_at IS NULL AND b.namespace = c.namespace AND b.boot_id = c.boot_id
+                    AND b.retirement_requested_at IS NULL AND b.manifest_hash IS NOT NULL
+                    AND (SELECT count(*) FROM worker_deployment_containers sibling WHERE sibling.namespace = b.namespace AND sibling.boot_id = b.boot_id) = 2
+                SQL, $this->parameters($binding)) === 1;
+        });
+    }
+
+    public function findUnit(string $namespace, string $bootId, DeploymentUnit $unit): ?DeploymentContainer
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(fn (): ?DeploymentContainer => $this->selectUnit($namespace, $bootId, $unit));
+    }
+
+    public function findBoot(string $namespace, string $bootId): ?DeploymentBoot
+    {
+        DeploymentLease::validateIdentity($namespace, $bootId);
+        return $this->operation(fn (): ?DeploymentBoot => $this->selectBoot($namespace, $bootId));
+    }
+
     public function hasStartClaim(DeploymentContainer $binding): bool
     {
         return $this->operation(fn (): bool => $this->connection->fetchOne(<<<'SQL'
             SELECT 1 FROM worker_deployment_containers
-            WHERE namespace = :namespace AND boot_id = :boot AND daemon_id = :daemon
-                AND container_id = :container AND start_claimed_at IS NOT NULL
-            SQL, ['namespace' => $binding->namespace, 'boot' => $binding->bootId,
-                'daemon' => $binding->daemonId, 'container' => $binding->containerId]) !== false);
+            WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND daemon_id = :daemon AND container_id = :container AND start_claimed_at IS NOT NULL
+            SQL, $this->parameters($binding)) !== false);
     }
 
-    private function select(string $namespace, string $bootId): ?DeploymentContainer
+    private function selectUnit(string $namespace, string $bootId, DeploymentUnit $unit): ?DeploymentContainer
     {
-        $row = $this->connection->fetchAssociative('SELECT daemon_id, container_id FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot', ['namespace' => $namespace, 'boot' => $bootId]);
-        return $row === false ? null : new DeploymentContainer($namespace, $bootId, $row['daemon_id'], $row['container_id']);
+        $row = $this->connection->fetchAssociative('SELECT daemon_id, container_id FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit', ['namespace' => $namespace, 'boot' => $bootId, 'unit' => $unit->value]);
+        return $row === false ? null : new DeploymentContainer($namespace, $bootId, $row['daemon_id'], $row['container_id'], $unit);
+    }
+
+    private function selectBoot(string $namespace, string $bootId): ?DeploymentBoot
+    {
+        // A single statement gives a consistent root-and-pair snapshot at READ COMMITTED.
+        $rows = $this->connection->fetchAllAssociative(<<<'SQL'
+            SELECT b.*, c.unit, c.recipe_hash, c.claimed_at, c.cancelled_at, i.container_id, i.start_claimed_at,
+                r.intended_at, r.completed_at
+            FROM worker_deployment_boots b
+            JOIN worker_deployment_creations c USING (namespace, boot_id, daemon_id)
+            LEFT JOIN worker_deployment_containers i USING (namespace, boot_id, unit, daemon_id)
+            LEFT JOIN worker_deployment_retirements r USING (namespace, boot_id, unit, daemon_id, container_id)
+            WHERE b.namespace = :namespace AND b.boot_id = :boot
+            SQL, ['namespace' => $namespace, 'boot' => $bootId]);
+        if ($rows === []) {
+            return null;
+        }
+        $units = [];
+        foreach ($rows as $row) {
+            $unit = DeploymentUnit::from($row['unit']);
+            $binding = $row['container_id'] === null ? null : new DeploymentContainer($namespace, $bootId, $row['daemon_id'], $row['container_id'], $unit);
+            $retirement = $row['intended_at'] === null || $binding === null ? null : new DeploymentRetirement($binding, $row['completed_at'] !== null);
+            $units[$unit->value] = new DeploymentUnitState($unit, $row['recipe_hash'], $row['claimed_at'] !== null, $row['cancelled_at'] !== null, $binding, $row['start_claimed_at'] !== null, $retirement);
+        }
+        if (!isset($units['control'], $units['execution'])) {
+            throw new \UnexpectedValueException('A deployment boot must contain both fixed unit reservations.');
+        }
+        $root = $rows[0];
+        return new DeploymentBoot($namespace, $bootId, $root['manifest_hash'], $root['daemon_id'], $units['control'], $units['execution'], $root['retirement_requested_at'] !== null, $root['retired_at'] !== null, (bool) $root['imported_singleton']);
+    }
+
+    /** @return array{namespace:string, boot:string, unit:string, daemon:string, container:string} */
+    private function parameters(DeploymentContainer $binding): array
+    {
+        return ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'unit' => $binding->unit->value, 'daemon' => $binding->daemonId, 'container' => $binding->containerId];
     }
 
     /**

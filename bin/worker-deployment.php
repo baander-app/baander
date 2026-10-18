@@ -12,6 +12,7 @@ ini_set('log_errors', '0');
 $action = null;
 $connection = null;
 $configured = false;
+$operationOwnsBoot = false;
 $exitCode = 1;
 $response = ['success' => false, 'action' => null, 'error' => 'operation_unconfirmed'];
 try {
@@ -38,83 +39,114 @@ try {
     }
     $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json);
     $credentials = \App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials::fromFile($arguments[3]);
-    $recipe = $manifest->recipe($credentials->runtimeEnvironment);
+    $recipes = [
+        'control' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $credentials->runtimeEnvironment),
+        'execution' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Execution, $credentials->runtimeEnvironment),
+    ];
+    $manifestHash = $manifest->fingerprint($credentials->runtimeEnvironment);
     $connection = \App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($credentials->connectionParameters());
     $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection);
     $retirements = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement($connection);
     $docker = new \App\Shared\Infrastructure\Worker\DockerWorkerCommand($manifest->dockerBinary, $manifest->dockerEndpoint);
     $creator = new \App\Shared\Infrastructure\Worker\DockerDeploymentCreate($inventory, $docker->execute(...));
     $configured = true;
-    $binding = null;
-    $result = [];
     $success = true;
+    $result = [];
+    $boot = $inventory->findBoot($manifest->namespace, $manifest->bootId);
     switch ($action) {
         case 'create':
-            if ($inventory->find($recipe->namespace, $recipe->bootId) !== null
-                || $inventory->matchesCreate($recipe)) {
+            if ($boot !== null) {
                 $success = false;
                 $result = ['state' => 'creation_already_attempted'];
                 break;
             }
-            $binding = $creator->create($recipe);
+            $host = json_decode($docker->execute(['info', '--format', '{"id":{{json .ID}},"cpus":{{.NCPU}},"memory":{{.MemTotal}},"cgroupVersion":{{json .CgroupVersion}}}']), true, 8, JSON_THROW_ON_ERROR);
+            if (!is_array($host) || ($host['id'] ?? null) !== $manifest->daemonId
+                || ($host['cgroupVersion'] ?? null) !== '2' || !is_int($host['cpus'] ?? null) || !is_int($host['memory'] ?? null)
+                || max([...$manifest->control->cpuSet, ...$manifest->execution->cpuSet]) >= $host['cpus']
+                || $manifest->control->memoryBytes + $manifest->execution->memoryBytes + 1024 * 1024 * 1024 > $host['memory']) {
+                throw new RuntimeException('Docker host cannot admit the declared worker resource pair.');
+            }
+            if (!$inventory->reserveBoot($manifest->namespace, $manifest->bootId, $manifestHash, $manifest->daemonId,
+                $recipes['control']->fingerprint(), $recipes['execution']->fingerprint())) {
+                $success = false;
+                $result = ['state' => 'reservation_denied'];
+                break;
+            }
+            $operationOwnsBoot = true;
+            foreach ($recipes as $recipe) {
+                $creator->create($recipe);
+            }
             $result = ['state' => 'created'];
             break;
         case 'reconcile-create':
-            $binding = $creator->reconcile($recipe);
+            foreach ($recipes as $recipe) {
+                $creator->reconcile($recipe);
+            }
             $result = ['state' => 'created'];
             break;
         case 'start':
-            $binding = $inventory->find($recipe->namespace, $recipe->bootId);
-            if ($binding === null) {
-                $success = false;
-                $result = ['state' => 'unregistered'];
-                break;
-            }
-            if ($inventory->hasStartClaim($binding) || $retirements->find($recipe->namespace, $recipe->bootId) !== null) {
+            if ($boot === null || $boot->manifestHash !== $manifestHash || $boot->retirementRequested
+                || $boot->control->binding === null || $boot->execution->binding === null
+                || $boot->control->startClaimed || $boot->execution->startClaimed) {
                 $success = false;
                 $result = ['state' => 'start_denied', 'readiness' => 'not_checked'];
                 break;
             }
-            // Reconciliation checks the full committed recipe and never creates.
-            // A running/exited container fails here; start claims are not retries.
-            $checked = $creator->reconcile($recipe);
-            if ($binding->namespace !== $checked->namespace || $binding->bootId !== $checked->bootId
-                || $binding->daemonId !== $checked->daemonId || $binding->containerId !== $checked->containerId) {
-                throw new RuntimeException('Immutable binding changed.');
+            $operationOwnsBoot = true;
+            foreach ([$boot->control, $boot->execution] as $state) {
+                $recipe = $recipes[$state->unit->value];
+                $binding = $creator->reconcile($recipe);
+                if ($binding != $state->binding) {
+                    throw new RuntimeException('Immutable unit binding changed.');
+                }
             }
-            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart($inventory, $docker->execute(...), $recipe))->start($binding);
+            foreach ([$boot->control, $boot->execution] as $state) {
+                $recipe = $recipes[$state->unit->value];
+                if ($state->binding === null || !(new \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart($inventory, $docker->execute(...), $recipe))->start($state->binding)) {
+                    $success = false;
+                    break;
+                }
+            }
             $result = ['state' => $success ? 'start_confirmed' : 'start_denied', 'readiness' => 'not_checked'];
+            if (!$success) {
+                $retirements->requestRetirement($manifest->namespace, $manifest->bootId);
+            }
             break;
         case 'recover':
-            $binding = $inventory->find($recipe->namespace, $recipe->bootId);
-            if ($binding !== null && $binding->daemonId !== $recipe->daemonId) {
-                throw new RuntimeException('Manifest and inventory daemon differ.');
-            }
-            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipe))
-                ->recover($recipe->namespace, $recipe->bootId);
-            $result = ['state' => $success ? 'retired' : 'unregistered'];
+            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipes))
+                ->recover($manifest->namespace, $manifest->bootId);
+            $result = ['state' => $success ? 'retired' : 'unconfirmed'];
             break;
         case 'status':
-            // Separate committed observations, not an atomic snapshot or a grant.
-            $binding = $inventory->find($recipe->namespace, $recipe->bootId);
-            $retirement = $retirements->find($recipe->namespace, $recipe->bootId);
-            $lease = (new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection))->findForContainment($recipe->namespace);
-            $result = [
-                'creationIntentMatches' => $inventory->matchesCreate($recipe),
-                'registered' => $binding !== null,
-                'startClaimed' => $binding !== null && $inventory->hasStartClaim($binding),
-                'retirement' => $retirement === null ? 'none' : ($retirement->completed ? 'completed' : 'pending'),
-                'reservation' => $lease === null ? 'none' : ($lease->bootId === $recipe->bootId ? 'this_boot' : 'another_boot'),
-                'readiness' => 'not_checked',
-            ];
+            $lease = (new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection))->findForContainment($manifest->namespace);
+            $result = ['manifestMatches' => $boot?->manifestHash === $manifestHash,
+                'retirement' => $boot === null ? 'unregistered' : ($boot->retired ? 'completed' : ($boot->retirementRequested ? 'pending' : 'none')),
+                'reservation' => $lease === null ? 'none' : ($lease->bootId === $manifest->bootId ? 'this_boot' : 'another_boot'),
+                'readiness' => 'not_checked'];
             break;
     }
+    $boot = $inventory->findBoot($manifest->namespace, $manifest->bootId);
+    $units = [];
+    foreach ([$boot?->control, $boot?->execution] as $state) {
+        if ($state !== null) {
+            $units[$state->unit->value] = ['containerId' => $state->binding?->containerId,
+                'createClaimed' => $state->createClaimed, 'startClaimed' => $state->startClaimed,
+                'cancelled' => $state->cancelled, 'removed' => $state->retirement?->completed === true];
+        }
+    }
     $response = ['success' => $success, 'action' => $action, 'result' => [
-        'namespace' => $recipe->namespace, 'bootId' => $recipe->bootId,
-        'containerId' => $binding?->containerId, ...$result,
+        'namespace' => $manifest->namespace, 'bootId' => $manifest->bootId, 'units' => $units, ...$result,
     ]];
     $exitCode = $success ? 0 : 3;
 } catch (Throwable) {
+    if ($operationOwnsBoot && isset($retirements, $manifest)) {
+        try {
+            $retirements->requestRetirement($manifest->namespace, $manifest->bootId);
+        } catch (Throwable) {
+            // Unknown journal outcomes remain reserved; recovery must reconcile.
+        }
+    }
     // Driver, JSON, Docker and filesystem diagnostics can contain credentials.
     $response = ['success' => false, 'action' => $action,
         'error' => $configured ? 'operation_unconfirmed' : 'invalid_configuration'];

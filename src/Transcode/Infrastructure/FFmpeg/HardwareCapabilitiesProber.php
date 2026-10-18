@@ -31,7 +31,17 @@ class HardwareCapabilitiesProber
 
     public function probeForWorker(): EncoderProfile
     {
-        return $this->profile ??= $this->probe();
+        if ($this->profile !== null) {
+            return $this->profile;
+        }
+        if (ProcessExecutor::usesNativeExecution()) {
+            $encoder = in_array($this->preferredEncoder, ['libx264', 'libx265', 'libsvtav1'], true) ? $this->preferredEncoder : 'libx265';
+            if (!$this->validateEncoder(HardwareAccelerator::None, $encoder)) {
+                throw new RuntimeException('The execution runtime failed software encoder qualification.');
+            }
+            return $this->profile = EncoderProfile::software($encoder);
+        }
+        return $this->profile = $this->probe();
     }
 
     public function getProfile(): EncoderProfile
@@ -198,6 +208,11 @@ class HardwareCapabilitiesProber
     /** @param list<string> $command */
     protected function exec(array $command): string
     {
+        if (ProcessExecutor::usesNativeExecution()) {
+            $result = ProcessExecutor::exec($command, 30);
+            $this->lastExitCode = $result['code'];
+            return $result['output'] . $result['error'];
+        }
         $output = tmpfile();
         if ($output === false) {
             throw new RuntimeException('Cannot create hardware probe output stream');

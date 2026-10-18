@@ -36,12 +36,16 @@ final class HttpExchange
         ?string $payload = null,
         private readonly ?int $stopAfterBytes = null,
         ?int $maxBytesPerSecond = null,
+        int $timeoutSeconds = 60,
     ) {
+        if ($timeoutSeconds < 1 || $timeoutSeconds > 120) {
+            throw new \InvalidArgumentException('Fixture HTTP timeout must be between one and 120 seconds.');
+        }
         $this->handle = curl_init($url);
         curl_setopt_array($this->handle, [
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_TIMEOUT => 60,
+            CURLOPT_TIMEOUT => $timeoutSeconds,
             CURLOPT_HEADERFUNCTION => function (CurlHandle $handle, string $line): int {
                 $trimmed = rtrim($line, "\r\n");
                 if ($trimmed !== '') {

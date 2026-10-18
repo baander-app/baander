@@ -27,15 +27,12 @@ final class WorkerCommand extends Command
         $this->addOption('deployment', null, InputOption::VALUE_REQUIRED, 'Deployment namespace; defaults to BAANDER_WORKER_NAMESPACE.')
             ->addOption('boot-id', null, InputOption::VALUE_REQUIRED, 'Fresh 32-hex boot identity; defaults to BAANDER_WORKER_BOOT_ID.')
             ->addOption('memory-mib', null, InputOption::VALUE_REQUIRED, 'Required total admission ceiling in MiB.')
-            ->addOption('management-mib', null, InputOption::VALUE_REQUIRED, 'Required supervisor/helper reservation in MiB (at least 128).')
-            ->addOption('consumer-mib', null, InputOption::VALUE_REQUIRED, 'Required Redis consumer reservation in MiB (at least 320).')
-            ->addOption('relay-mib', null, InputOption::VALUE_REQUIRED, 'Required outbox relay reservation in MiB (at least 320).')
-            ->addOption('scheduler-mib', null, InputOption::VALUE_REQUIRED, 'Required scheduler reservation in MiB (at least 320).')
-            ->addOption('media-mib', null, InputOption::VALUE_REQUIRED, 'Required media role and encoder reservation in MiB (at least 2624 for three video slots and one audio slot).')
-            ->addOption('media-descendant-pids', null, InputOption::VALUE_REQUIRED, 'Required media descendant process reservation (at least 14).')
-            ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Reservation for one synchronous scheduled console child in MiB (0 disables, otherwise at least 192).', '0')
-            ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private local lock directory.', '/tmp/baander-worker-locks');
-        $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. The media role owns encoders within its explicit descendant reservation. Autoscaling is not part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
+            ->addOption('unit', null, InputOption::VALUE_REQUIRED, 'Worker unit: control or execution.')
+            ->addOption('pids-limit', null, InputOption::VALUE_REQUIRED, 'Enforced unit PID capacity.')
+            ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Execution reservation for one scheduled console child (0 disables).', '0')
+            ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private unit lock directory.', '/tmp/baander-worker-locks')
+            ->addOption('ipc-dir', null, InputOption::VALUE_REQUIRED, 'Shared private worker IPC directory.', '/run/baander-worker');
+        $this->setHelp('Run as unit PID 1. Control owns the deployment lease. Both units require a matching peer before business admission and drain on peer or authority failure.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,13 +42,10 @@ final class WorkerCommand extends Command
             $configuration = new WorkerRuntimeConfiguration(
                 $this->identity($input, 'deployment', 'BAANDER_WORKER_NAMESPACE'),
                 $this->identity($input, 'boot-id', 'BAANDER_WORKER_BOOT_ID'),
-                $this->bytes($input, 'memory-mib'), $this->bytes($input, 'management-mib'),
-                $this->bytes($input, 'consumer-mib'), $this->bytes($input, 'relay-mib'),
-                $this->stringOption($input, 'lock-dir'),
+                $this->identity($input, 'unit', 'BAANDER_WORKER_UNIT'),
+                $this->bytes($input, 'memory-mib'), $this->pids($input),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
-                $this->bytes($input, 'scheduler-mib'),
-                $this->bytes($input, 'media-mib'),
-                $this->descendantPids($input),
+                $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());
@@ -69,11 +63,11 @@ final class WorkerCommand extends Command
         }
     }
 
-    private function descendantPids(InputInterface $input): int
+    private function pids(InputInterface $input): int
     {
-        $value = $this->stringOption($input, 'media-descendant-pids');
-        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value < 14 || (int) $value > 4088) {
-            throw new \InvalidArgumentException('Media descendant capacity must be an integer between 14 and 4088.');
+        $value = $this->stringOption($input, 'pids-limit');
+        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value > 4096) {
+            throw new \InvalidArgumentException('Worker PID capacity must be a positive integer at most 4096.');
         }
         return (int) $value;
     }
@@ -83,13 +77,13 @@ final class WorkerCommand extends Command
         $value = $input->getOption($option);
         $configured = $_SERVER[$environment] ?? $_ENV[$environment] ?? getenv($environment);
         if (is_string($configured) && $configured !== '' && $value !== null && $value !== $configured) {
-            throw new \InvalidArgumentException('Worker options must match the container deployment and boot identity.');
+            throw new \InvalidArgumentException('Worker options must match the container deployment, boot and unit identity.');
         }
         if ($value === null) {
             $value = $configured;
         }
         if (!is_string($value) || $value === '') {
-            throw new \InvalidArgumentException('Worker deployment and boot identity are required.');
+            throw new \InvalidArgumentException('Worker deployment, boot and unit identity are required.');
         }
         return $value;
     }

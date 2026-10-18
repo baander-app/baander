@@ -9,6 +9,7 @@ use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
 use RuntimeException;
 
 final class FMP4SegmentWriter
@@ -37,20 +38,11 @@ final class FMP4SegmentWriter
         }
 
         $encoderFlags = VideoProcessingRules::initSegmentFlags($this->encoderProfile->encoder);
-        $hwAccelFlags = $this->encoderProfile->hwaccelInputFlags();
-        $decoderFlags = $this->encoderProfile->decoderFlags();
-
-        $cmd = sprintf(
-            '%s -y %s%s -i %s %s'
-            . ' -an -t 0.001 -movflags +frag_keyframe+empty_moov+default_base_moof'
-            . ' -f mp4 %s',
-            $this->ffmpegPath,
-            $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
-            $decoderFlags !== '' ? $decoderFlags . ' ' : '',
-            escapeshellarg($sourcePath),
-            $encoderFlags,
-            escapeshellarg($outputPath),
-        );
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::input($this->encoderProfile),
+            '-i', $sourcePath, ...FFmpegArguments::flags($encoderFlags), '-an', '-t', '0.001',
+            '-movflags', '+frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', $outputPath,
+        ];
 
         $result = ProcessExecutor::exec($cmd, 120);
 

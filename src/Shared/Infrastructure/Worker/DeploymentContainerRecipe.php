@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
@@ -17,9 +18,13 @@ final readonly class DeploymentContainerRecipe
     /** @var list<array{volume:string,target:string,readOnly:bool,role:string}> */
     public array $mediaMounts;
 
+    /** @var list<int> */
+    public array $cpuSet;
+
     /**
      * @param array<array-key, mixed> $command Validated argv, never a shell command.
      * @param array<array-key, mixed> $mediaMounts
+     * @param array<array-key, mixed> $cpuSet
      */
     public function __construct(
         public string $namespace,
@@ -31,17 +36,21 @@ final readonly class DeploymentContainerRecipe
         public int $memoryBytes,
         public int $nanoCpus,
         public int $pidsLimit,
+        public DeploymentUnit $unit,
+        array $cpuSet,
+        public string $ipcVolume,
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
+        $this->cpuSet = (new DeploymentResourceBudget($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet))->cpuSet;
+        if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $ipcVolume) !== 1) {
+            throw new InvalidArgumentException('Worker IPC requires an explicitly named private volume.');
+        }
         if (preg_match('/\A[A-Za-z0-9_.:-]{1,128}\z/D', $daemonId) !== 1
             || preg_match('/\Asha256:[0-9a-f]{64}\z/D', $imageId) !== 1
             || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $network) !== 1
             || in_array(strtolower($network), ['host', 'container'], true)
-            || $memoryBytes < 16 * 1024 * 1024 || $memoryBytes > 1024 * 1024 * 1024 * 1024
-            || $nanoCpus < 1_000_000 || $nanoCpus > 64_000_000_000
-            || $pidsLimit < 8 || $pidsLimit > 4096
         ) {
             throw new InvalidArgumentException('Deployment recipe requires bounded identity, immutable image, private network and explicit resource ceilings.');
         }
@@ -62,6 +71,9 @@ final readonly class DeploymentContainerRecipe
         }
         $this->command = $validatedCommand;
         $this->mediaMounts = self::validateMounts($mediaMounts);
+        if (in_array($ipcVolume, array_column($this->mediaMounts, 'volume'), true)) {
+            throw new InvalidArgumentException('Worker IPC volume cannot alias media storage.');
+        }
     }
 
     /** Stable create-intent identity; every admitted configuration field participates. */
@@ -71,6 +83,7 @@ final readonly class DeploymentContainerRecipe
             'namespace' => $this->namespace, 'bootId' => $this->bootId, 'daemonId' => $this->daemonId,
             'imageId' => $this->imageId, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
+            'unit' => $this->unit->value, 'cpuSet' => $this->cpuSet, 'ipcVolume' => $this->ipcVolume,
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
         ], JSON_THROW_ON_ERROR));
     }
@@ -87,15 +100,17 @@ final readonly class DeploymentContainerRecipe
         $cpus = (string) $wholeCpus . ($fraction === '' ? '' : '.' . $fraction);
 
         return [
-            'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId),
+            'container', 'create', '--pull=never', '--name', RegisteredDeploymentStart::containerName($this->namespace, $this->bootId, $this->unit),
             '--network', $this->network, '--memory', (string) $this->memoryBytes, '--memory-swap', (string) $this->memoryBytes,
-            '--cpus', $cpus, '--pids-limit', (string) $this->pidsLimit,
+            '--cpus', $cpus, '--cpuset-cpus', implode(',', $this->cpuSet), '--pids-limit', (string) $this->pidsLimit,
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--cgroupns', 'private', '--restart', 'no',
             '--label', 'app.baander.worker.namespace=' . $this->namespace,
-            '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=deployment',
+            '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=' . $this->unit->value,
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
+            '--env', 'BAANDER_WORKER_UNIT=' . $this->unit->value,
             ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
             ...$this->mountArguments(),
+            '--mount', 'type=volume,src=' . $this->ipcVolume . ',dst=/run/baander-worker,volume-nocopy',
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
     }

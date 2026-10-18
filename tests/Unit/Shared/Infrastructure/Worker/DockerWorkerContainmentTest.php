@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
+
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use InvalidArgumentException;
@@ -23,7 +25,7 @@ final class DockerWorkerContainmentTest extends TestCase
             $calls[] = $argv;
             return count($calls) === 1 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : self::ID . "\n";
         });
-        $containment->retire(self::ID, $this->lease());
+        $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
         self::assertCount(2, $calls);
         self::assertSame(['container', 'inspect', '--format'], array_slice($calls[0], 0, 3));
         self::assertSame(self::ID, $calls[0][4]);
@@ -40,7 +42,7 @@ final class DockerWorkerContainmentTest extends TestCase
             self::assertSame('inspect', $argv[1], 'Verification cannot start or remove a container.');
             return json_encode(self::inspection(), JSON_THROW_ON_ERROR);
         });
-        $containment->verifyIsolation(self::ID, 'worker.baander.app', self::BOOT);
+        $containment->verifyIsolation(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
         self::assertCount(1, $calls);
         self::assertSame(self::ID, $calls[0][4]);
     }
@@ -52,7 +54,7 @@ final class DockerWorkerContainmentTest extends TestCase
             $calls[] = $argv;
             return '';
         });
-        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
         self::assertSame([[
             'container', 'ls', '--all', '--no-trunc', '--filter', 'id=' . self::ID, '--format', '{{.ID}}',
         ]], $calls);
@@ -65,7 +67,7 @@ final class DockerWorkerContainmentTest extends TestCase
             $calls[] = $argv;
             return count($calls) === 2 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : self::ID . "\n";
         });
-        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
         self::assertCount(3, $calls);
         self::assertSame('ls', $calls[0][1]);
         self::assertSame('inspect', $calls[1][1]);
@@ -83,7 +85,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return $output;
         });
         try {
-            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
             self::fail('Ambiguous listing cannot reconcile removal.');
         } catch (RuntimeException) {
             self::assertSame(1, $calls);
@@ -112,7 +114,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return $calls === 2 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : self::ID;
         });
         try {
-            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
             self::fail('Transport failure cannot reconcile removal.');
         } catch (RuntimeException $error) {
             self::assertSame($original, $error);
@@ -140,7 +142,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return $calls === 1 ? self::ID : json_encode($inspection, JSON_THROW_ON_ERROR);
         });
         try {
-            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+            $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
             self::fail('Unsafe remaining container cannot reconcile removal.');
         } catch (RuntimeException) {
             self::assertSame(2, $calls);
@@ -159,7 +161,7 @@ final class DockerWorkerContainmentTest extends TestCase
             };
         });
         $this->expectException(RuntimeException::class);
-        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT);
+        $containment->reconcileRemoval(self::ID, 'worker.baander.app', self::BOOT, DeploymentUnit::Control);
     }
 
     #[DataProvider('invalidReconciliationIdentities')]
@@ -169,7 +171,7 @@ final class DockerWorkerContainmentTest extends TestCase
             self::fail('Invalid identity must not reach Docker.');
         });
         $this->expectException(InvalidArgumentException::class);
-        $containment->reconcileRemoval($containerId, $namespace, $bootId);
+        $containment->reconcileRemoval($containerId, $namespace, $bootId, DeploymentUnit::Control);
     }
 
     /** @return iterable<string,array{string,string,string}> */
@@ -189,7 +191,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return json_encode(self::inspection(), JSON_THROW_ON_ERROR);
         });
         try {
-            $containment->verifyIsolation(self::ID, 'worker.baander.app', str_repeat('f', 32));
+            $containment->verifyIsolation(self::ID, 'worker.baander.app', str_repeat('f', 32), DeploymentUnit::Control);
             self::fail('Wrong boot cannot pass prestart verification.');
         } catch (RuntimeException) {
             self::assertSame(1, $calls);
@@ -202,7 +204,7 @@ final class DockerWorkerContainmentTest extends TestCase
             self::fail('Invalid identity must be rejected before inspection.');
         });
         $this->expectException(InvalidArgumentException::class);
-        $containment->verifyIsolation(self::ID, 'unsafe namespace', self::BOOT);
+        $containment->verifyIsolation(self::ID, 'unsafe namespace', self::BOOT, DeploymentUnit::Control);
     }
 
     #[DataProvider('unsafeInspections')]
@@ -217,7 +219,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return json_encode($inspection, JSON_THROW_ON_ERROR);
         });
         try {
-            $containment->retire(self::ID, $this->lease());
+            $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
             self::fail('Unsafe containment evidence must be rejected.');
         } catch (RuntimeException) {
             self::assertSame(1, $calls);
@@ -227,6 +229,9 @@ final class DockerWorkerContainmentTest extends TestCase
     /** @return iterable<string,array{string,mixed}> */
     public static function unsafeInspections(): iterable
     {
+        yield 'wrong fixed unit' => ['role', 'execution'];
+        yield 'restart enabled' => ['restart', 'always'];
+        yield 'restart attempts' => ['retryCount', 1];
         yield 'other immutable ID' => ['id', str_repeat('f', 64)];
         yield 'other deployment' => ['namespace', 'other.baander.app'];
         yield 'other boot' => ['bootId', str_repeat('f', 32)];
@@ -262,7 +267,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return $output;
         });
         try {
-            $containment->retire(self::ID, $this->lease());
+            $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
             self::fail('Malformed or absent evidence cannot prove containment.');
         } catch (RuntimeException) {
             self::assertSame(1, $calls);
@@ -289,7 +294,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return ++$calls === 1 ? json_encode(self::inspection(), JSON_THROW_ON_ERROR) : $output;
         });
         $this->expectException(RuntimeException::class);
-        $containment->retire(self::ID, $this->lease());
+        $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
     }
 
     /** @return iterable<string,array{string}> */
@@ -313,7 +318,7 @@ final class DockerWorkerContainmentTest extends TestCase
             return json_encode(self::inspection(), JSON_THROW_ON_ERROR);
         });
         try {
-            $containment->retire(self::ID, $this->lease());
+            $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
             self::fail('Command failure cannot supply containment proof.');
         } catch (RuntimeException $error) {
             self::assertSame($original, $error);
@@ -334,7 +339,7 @@ final class DockerWorkerContainmentTest extends TestCase
             self::fail('Invalid ID must not reach Docker.');
         });
         $this->expectException(InvalidArgumentException::class);
-        $containment->retire('--all', $this->lease());
+        $containment->retire('--all', $this->lease(), DeploymentUnit::Control);
     }
 
     public function testNullEmptyResourcesAndExplicitPrivilegeFlagAreAccepted(): void
@@ -348,14 +353,15 @@ final class DockerWorkerContainmentTest extends TestCase
         $containment = new DockerWorkerContainment(static function () use ($inspection, &$calls): string {
             return ++$calls === 1 ? json_encode($inspection, JSON_THROW_ON_ERROR) : self::ID;
         });
-        $containment->retire(self::ID, $this->lease());
+        $containment->retire(self::ID, $this->lease(), DeploymentUnit::Control);
         self::assertSame(2, $calls);
     }
 
     /** @return array<string,mixed> */
     private static function inspection(): array
     {
-        return ['id' => self::ID, 'namespace' => 'worker.baander.app', 'bootId' => self::BOOT, 'role' => 'deployment',
+        return ['id' => self::ID, 'namespace' => 'worker.baander.app', 'bootId' => self::BOOT, 'role' => 'control',
+            'memory' => 67108864, 'memorySwap' => 67108864, 'nanoCpus' => 1000000000, 'pidsLimit' => 32, 'cpuSet' => '0', 'restart' => 'no', 'retryCount' => 0,
             'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [], 'binds' => [], 'tmpfs' => [],
             'devices' => [], 'deviceRequests' => [], 'capAdd' => [], 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']];
     }

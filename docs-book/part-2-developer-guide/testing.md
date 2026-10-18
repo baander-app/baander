@@ -617,11 +617,19 @@ by its user, and it reaches PostgreSQL on a separate controller network with
 no published database port. The controller verifies that its socket reaches the
 same daemon before issuing an operator action. The worker keeps its private
 network and receives only its admitted named media volumes, with no Docker
-authority. Version 2 manifests require read-only source and writable derived
-volumes, media memory/descendant reservations and a PID ceiling that includes
-encoder threads; see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
+authority. Version 3 manifests require control/execution budgets and disjoint
+CPU sets, read-only source and writable derived volumes, and a private IPC volume.
+Each unit has separate memory/CPU/PID ceilings, including encoder threads;
+see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
 With no explicit endpoint override, setup uses the
 runner's ambient Docker connection, supporting CI runners outside the daemon host.
+
+The paired operator fixture requires at least four host CPUs and 13 GiB of host
+memory. Combined web/media and control-capacity runs require 15 GiB: 7104 MiB
+for the worker pair, 4352 MiB for PostgreSQL/Redis (4096/256 MiB), 2048 MiB for
+web and 1024 MiB of headroom. The standalone sum is 12480 MiB; adding web raises it to 14528 MiB,
+rounded up to the stated host requirements. These are fixture admission
+ceilings, not measured universal capacity defaults.
 
 Both modes exercise `bin/worker-deployment.php` create, reconciliation, start,
 status and recovery against disposable PostgreSQL/Redis with canonical private
@@ -659,9 +667,9 @@ source, dependencies, keys or cache into the worker. Test preparation and Docker
 authority remain in separate containers. The scope is the worker lifecycle,
 outbox and scheduler, without OAuth certification. Forgejo now includes blocking
 context-exclusion, production-worker build and production-lifecycle steps. Their
-configuration does not establish a passing Forgejo run. The current immutable-image
-lifecycle and combined Chromium playback/recovery gate pass locally; exact image,
-phase, containment and cleanup evidence is recorded in the
+configuration does not establish a passing Forgejo run. The recorded immutable-image
+lifecycle and combined Chromium playback/recovery gates passed before the paired
+deployment change; exact image, phase, containment and cleanup evidence is recorded in the
 [worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control).
 Native Swoole is pinned to Composer's required 6.2.0. PIE installation failures
 fail the image build.
@@ -699,13 +707,32 @@ checks the server's fence independently of whether a browser reproduces the race
 
 The hook retains browser evidence with the drill artifacts and removes its browser
 container during cleanup. The standard runner does not require this hook. The
-current combined gate with this hook passes authenticated playback, paused seek,
+recorded gate before the paired deployment change passed authenticated playback,
+paused seek,
 web restart, worker containment and recovery, and final completion. It also proves
 both stale-generation probes leave paused state unchanged, checks fourteen
 contained process identities with no survivors and verifies cleanup. The
 [worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control)
 records the exact local result. Autoscaling, saturation and regional qualification
 remain separate gates.
+
+The reserved-control pressure drill runs separately from the full backend suite:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-worker-control-capacity-container.sh
+```
+
+It uses disposable services and a version 3 paired deployment, with control
+2624 MiB/128 PIDs on one available CPU and execution 4480 MiB/256 PIDs on two
+other available CPUs, including 320 MiB for scheduled console execution. The
+runner selects the first three available CPUs and records their explicit sets in
+the manifest; its host preflight requires four CPUs and 15 GiB, including the
+web/dependency ceilings and headroom described above. Inspect its resource and progress
+receipts before claiming pressure qualification. Separate OOM, PID exhaustion,
+peer-loss and containment results from ordinary backend correctness results.
+The [roadmap](../../ROADMAP.md#worker-architecture-and-resource-control) records
+verified CPU, memory and PID outcomes for this explicit profile. Adding or
+invoking the drill does not establish a passing result for another profile.
 
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also
@@ -790,8 +817,9 @@ production-mode PostgreSQL and Redis after fresh and repeat migrations.
 It also supplies Redis consumer overrides through path and query forms and a
 conflicting scheduler path, requiring rejection before locks, lease authority or
 child launch, with credential values absent from output. Accepted startup checks
-both catalog receivers and the generated consumer identity. It verifies
-four direct child roles, media readiness after runtime/authority initialization,
+both catalog receivers in separate execution consumers and their generated
+identities. It verifies
+the control and execution roles, peer/native admission before business launch,
 their exact committed deployment tuple (overriding a bogus
 inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the
 consumer and scheduler separately to require whole-container draining, tests TERM and forced database lease
@@ -815,9 +843,11 @@ server name resolve to the same real command and preserve its options.
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs Doctrine migrations twice before
 executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
-A fresh database executes `Version20261017000000` followed by
-`Version20261017130000`; the second run checks that the two recorded migrations
-leave no pending work. Integration tests and runtime fixtures use
+A fresh database executes `Version20261017000000` and the forward migrations
+through `Version20261018130000`; the second run checks that recorded migrations
+leave no pending work. The paired-deployment migration must also reject unresolved
+or inconsistent singleton history and preserve confirmed retirement records.
+Integration tests and runtime fixtures use
 `tests/Support/FinalSchemaBootstrap.php` to create the same final schema by applying
 the current migration files in timestamp order. Isolated-schema fixtures require
 their own schema to be empty and reuse extensions already provisioned in the

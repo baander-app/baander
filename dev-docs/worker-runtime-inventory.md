@@ -3,15 +3,16 @@
 ## Current ownership on 2026-10-18
 
 `app:serve` owns request handling, file delivery, client connections and web health
-checks. `app:worker` runs independently as its container's PID 1 and supervises
-four roles: the Redis consumer, outbox relay, scheduler and media execution.
+checks. `app:worker` runs as PID 1 in each of two independently bounded units.
+Control supervises the outbox relay, scheduler and media coordination; execution
+runs separate `async` and `scheduler` consumers and the native execution daemon.
 Web starts no task workers, CPU pool, encoder, scheduler or relay. The historical
 records below describe earlier implementations; this section supersedes their
 routing, ownership, deployment and completion descriptions.
 
 [WorkerSupervisorRunner](../src/Shared/Infrastructure/Worker/WorkerSupervisorRunner.php)
-defines the four child roles. The consumer receives `async` and `scheduler` with
-a deployment/boot/launch-qualified identity. Scheduler polling records immutable
+defines the unit roles. Each consumer has a deployment/boot/launch-qualified
+identity. Scheduler polling records immutable
 occurrences and publishes their IDs to the dedicated receiver. The relay handles
 committed outbox events and notification delivery intents. Neither role requires
 a running web server.
@@ -81,9 +82,10 @@ webhook command after payload decoding and intent resolution.
 
 [MediaWorkerRunner](../src/Transcode/Infrastructure/Worker/MediaWorkerRunner.php)
 admits three video jobs and one audio rendition at once. Each job has a fresh
-kernel; a video's private CPU helper starts before live database or Redis
-connections exist. Encoders, helper processes and their groups belong to the
-worker container. Web performs no lazy hardware probe or inline encode fallback.
+kernel in control. Native probes, encoders, CPU helpers and scheduled console
+children run through the execution daemon over a private Unix socket. Fresh
+execution processes do not inherit control database or Redis connections. Web
+performs no lazy hardware probe or inline encode fallback.
 
 [TranscodeRuntimeState](../src/Transcode/Infrastructure/Doctrine/TranscodeRuntimeState.php)
 and [AudioRenditionRuntime](../src/Transcode/Infrastructure/Doctrine/AudioRenditionRuntime.php)
@@ -126,20 +128,46 @@ owners as null and fencing old active/complete output for re-encoding.
 ### Admitted deployment recipe
 
 The host-only [deployment controller](../bin/worker-deployment.php) admits immutable
-version 2 recipes. Named local Docker volumes provide read-only worker sources
-and writable derived storage at identical web/worker paths. Set
-`MEDIA_STORAGE_PATH` explicitly, for example `/media/library`, inside a source
-volume; `CONVERT_STORAGE_PATH` belongs inside a derived volume. Derived mounts
-also cover `/var/www/html/storage` and `/var/www/html/var/transcode_state`.
-The controller verifies volume names, mountpoints and access modes. Bind mounts,
-devices, extra mounts and Docker authority in the worker are refused.
+version 3 recipes for a fixed control/execution pair. Named local Docker volumes
+provide read-only sources and writable derived storage at identical web/worker
+paths. Set `MEDIA_STORAGE_PATH` inside a source volume, for example
+`/media/library`; `CONVERT_STORAGE_PATH` belongs inside a derived volume. Derived
+mounts also cover `/var/www/html/storage` and
+`/var/www/html/var/transcode_state`. The pair shares a private named IPC volume
+at `/run/baander-worker`. Before creation, provision its root with the selected
+worker image's runtime UID/GID and mode `0700`; the `volume-nocopy` mount cannot
+repair Docker's initial root ownership. Runtime creates private boot directories
+with mode `0700` and the native socket with mode `0600`.
+The controller verifies volume names, mountpoints and
+access modes. Bind mounts, devices, extra mounts and Docker authority in either
+unit are refused.
 
-The media reservation is at least 2624 MiB and fourteen descendant processes.
-Management reserves 128 MiB, and consumer, relay and scheduler each reserve
-320 MiB. Scheduled console execution is disabled at zero or reserves at least
-192 MiB. All reservations must fit the total ceiling. The PID ceiling is at
-least 128, or eight plus media descendants when larger; encoder threads consume
-PID slots too. These are admission policies, not measured resource defaults.
+Control requires at least 2624 MiB and 128 PID slots. Execution requires at least
+4160 MiB plus scheduled console memory and 256 PID slots. Scheduled console
+execution is disabled at zero or reserves at least 320 MiB in execution. Separate
+Docker memory/CPU/PID ceilings and nonempty disjoint CPU sets reserve control
+capacity from execution pressure. The example profile assigns control CPU `[0]`
+and execution CPUs `[1, 2]`, with 4480 MiB execution memory when console is enabled;
+these are explicit operator choices, not universal defaults or measured capacity.
+The PHP kernel heap ceiling is 256 MiB. Control reserves 384 MiB for management
+and 1600 MiB for five media PHP processes at 320 MiB each. Execution reserves
+3520 MiB for management/native execution, including 3136 MiB for native work.
+Three video jobs and one audio rendition remain the fixed media admission limits.
+Threads count toward each unit's PID ceiling. The paired operator fixture
+requires four host CPUs and 13 GiB; its combined web/media and control-capacity
+variants require 15 GiB to include the 2048 MiB web ceiling. These host thresholds
+include 4352 MiB for PostgreSQL/Redis and 1024 MiB of headroom; they are admission
+limits for the fixture, not measured universal capacity defaults.
+
+Control alone acquires and renews the lease. Execution observes committed
+authority and cannot take it over. Matching peer boot/epoch evidence and a ready
+native daemon gate business admission; a missing peer fails startup after thirty
+seconds. Peer or authority loss closes admission permanently for that boot.
+Native requests carry deployment, boot, epoch, client generation and attempt
+identity; uncertain completion retains the slot until confirmed cleanup. The
+joint retirement barrier releases the boot only after both unit outcomes are
+confirmed, including cancellation of a creation intent that was never claimed.
+Lease expiry and direct-child reaping do not release that reservation.
 
 Compose starts web and dependencies; the separately admitted worker has no
 automatic restart. Child failure, lost authority or a termination signal drains
@@ -157,35 +185,40 @@ selects a fallback. Private media jobs cap AIO at one core/maximum thread before
 helper fork or reactor startup. Web caps AIO at one core and four maximum threads.
 These threads remain inside the existing container PID budget. The production
 wrapper now tests real coroutine file read/write under the admitted restrictions;
-the current rebuilt image passes the combined production/browser gate.
+the earlier rebuilt image passed the combined production/browser gate.
+That checkpoint does not qualify the paired deployment.
 
 ### Verification boundary
 
 [ROADMAP.md](../ROADMAP.md#worker-architecture-and-resource-control) records the
-current static, frontend, runtime and production/browser checkpoints. The full
+static, frontend, runtime and production/browser checkpoints. The
+following full-run and browser results predate the paired deployment change. The full
 backend run completed with one obsolete index-test expectation; its corrected
 file passes a focused rerun. This is full-run evidence plus a focused correction,
 not an uninterrupted passing full-suite rerun.
 
 The gate runs through `scripts/test-two-command-deployment-container.sh` with
-its optional browser checkpoint. The current production image passes all seven
+its optional browser checkpoint. The earlier production image passed all seven
 combined browser phases using
 Chromium 148.0.7778.96 from the pinned Playwright image: authenticated playback,
 attachment, paused seek, web restart, worker containment, recovery and completion.
-Both live-worker and worker-absent stale-generation probes preserve paused desired
-state. Final containment verifies fourteen identities with zero survivors, and
-cleanup passes. The optional browser checkpoint records engine/version and uses
+Both live-worker and worker-absent stale-generation probes preserved paused desired
+state. Final containment verified fourteen identities with zero survivors, and
+cleanup passed. The optional browser checkpoint records engine/version and uses
 native HLS without a media library or feature override.
 
 The two-command deployment checkpoint above retains its recorded scope.
-Responsive control capacity, autoscaling, measured capacity, failure/load coverage
-and media saturation qualification remain open. Route validation is described in
+The reserved control/execution boundary is implemented. The dedicated drill has
+passed monitored CPU, memory and PID phases on the declared fixture profile.
+The [reserved-control checkpoint](../ROADMAP.md#reserved-worker-control-capacity-2026-10-18)
+records the exact profile and evidence. Autoscaling, broader measured capacity
+and failure/load coverage remain open. Route validation is described in
 the current routing section; its verification checkpoints belong in the roadmap.
 
 ## Historical inventory and incremental evidence
 
 The remaining inventory and verification records describe their original stage
-boundaries. Old routes, web-owned executors, version 1 recipes, resource totals
+boundaries. Old routes, web-owned executors, version 1/2 recipes, resource totals
 and completion statements are retained as historical evidence. Use the current
 ownership section and operator recipe above for present deployment decisions.
 

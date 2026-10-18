@@ -8,11 +8,13 @@ use App\Transcode\Application\DTO\AudioRenditionClaim;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
 
-/** Runs in a fresh worker job process, with one connection and one bounded encoder child. */
+/** Coordinates one remote audio attempt and publishes while holding ownership. */
 final class AudioRenditionExecutor
 {
     private const int TIMEOUT_SECONDS = 3600;
@@ -71,6 +73,12 @@ final class AudioRenditionExecutor
                     throw new RuntimeException('Audio rendition ownership expired before completion.');
                 }
             });
+        } catch (NativeExecutionException $error) {
+            if ($error->uncertain) {
+                throw $error;
+            }
+            $this->runtime->fail($claim, $error->getMessage());
+            $this->logger->error('Audio rendition native execution rejected: {reason}', ['reason' => $error->getMessage()]);
         } catch (Throwable $error) {
             $this->runtime->fail($claim, $error->getMessage());
             $this->logger->error('Audio rendition worker failed: {reason}', ['reason' => $error->getMessage(), 'rendition' => $claim->runtime->key]);
@@ -95,61 +103,29 @@ final class AudioRenditionExecutor
             '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', '-i', $input->sourcePath, '-map', '0:a:0',
             ...self::codecArguments($input->format), '-threads', '1', '-b:a', (string) $input->bitrate, $partial,
         ];
-        $process = proc_open($arguments, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
-        if ($process === false) {
-            throw new RuntimeException('Unable to start the audio encoder.');
-        }
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
-        $started = microtime(true);
-        $renewAt = $started;
-        $error = '';
-        try {
-            while (true) {
-                // Drain both pipes every iteration and retain bounded diagnostics.
-                fread($pipes[1], 65_536);
-                $error = substr($error . fread($pipes[2], 65_536), -2000);
-                $status = proc_get_status($process);
-                if ($stopRequested()) {
-                    return false;
-                }
-                if (microtime(true) >= $renewAt) {
-                    if (!$this->runtime->renew($claim)) {
-                        throw new RuntimeException('Audio rendition worker lost ownership.');
-                    }
-                    $renewAt = microtime(true) + 1.0;
-                }
-                if (!$status['running']) {
-                    $error = substr($error . fread($pipes[2], 65_536), -2000);
-                    clearstatcache(true, $partial);
-                    if ($status['exitcode'] !== 0 || !is_file($partial) || filesize($partial) === 0) {
-                        throw new RuntimeException(sprintf('Audio encoder exited with code %d: %s', $status['exitcode'], trim($error)));
-                    }
-                    return true;
-                }
-                if (microtime(true) - $started >= self::TIMEOUT_SECONDS) {
-                    throw new RuntimeException('Audio encoder exceeded its execution deadline.');
-                }
-                usleep(50_000);
+        $renewAt = 0.0;
+        $stopped = false;
+        $result = ProcessExecutor::execNative($arguments, self::TIMEOUT_SECONDS, function () use ($claim, $stopRequested, &$renewAt, &$stopped): bool {
+            if ($stopRequested()) {
+                $stopped = true;
+                return false;
             }
-        } finally {
-            $status = proc_get_status($process);
-            if ($status['running']) {
-                proc_terminate($process);
-                $deadline = microtime(true) + .5;
-                do {
-                    usleep(10_000);
-                    $status = proc_get_status($process);
-                } while ($status['running'] && microtime(true) < $deadline);
-                if ($status['running']) {
-                    proc_terminate($process, 9);
+            if (hrtime(true) >= $renewAt) {
+                if (!$this->runtime->renew($claim)) {
+                    throw new RuntimeException('Audio rendition worker lost ownership.');
                 }
+                $renewAt = hrtime(true) + 1_000_000_000;
             }
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            proc_close($process);
+            return true;
+        });
+        if ($stopped) {
+            return false;
         }
+        clearstatcache(true, $partial);
+        if ($result['code'] !== 0 || !is_file($partial) || filesize($partial) === 0) {
+            throw new RuntimeException(sprintf('Audio encoder exited with code %d: %s', $result['code'], substr(trim($result['error']), -2000)));
+        }
+        return true;
     }
 
     /** @return list<string> */

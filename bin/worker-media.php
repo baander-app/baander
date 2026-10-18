@@ -23,11 +23,18 @@ try {
     ) {
         throw new RuntimeException('Media requires inherited kernel configuration.');
     }
+    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::requireNativeExecution();
+    $native = \App\Shared\Infrastructure\Worker\NativeExecutionClient::fromEnvironment('media-control', $identity->launchGeneration);
+    if (($native->handshake()['ready'] ?? null) !== true) {
+        throw new RuntimeException('Native execution peer is not ready.');
+    }
+    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::configureNativeExecution($native);
     $authority = \App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority::fromDsn($databaseUrl);
     $authority->assertActive();
     $kernel = new \App\Kernel($environment, $debug === '1');
     $kernel->boot();
     $container = $kernel->getContainer();
+    $container->set(\App\Shared\Infrastructure\Worker\NativeExecutionClientInterface::class, $native);
     $prober = $container->get('worker.media.hardware_prober');
     if (!$prober instanceof \App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber) {
         throw new RuntimeException('Media hardware prober is not configured.');

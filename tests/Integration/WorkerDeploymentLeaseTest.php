@@ -6,6 +6,8 @@ namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
@@ -38,6 +40,8 @@ final class WorkerDeploymentLeaseTest extends TestCase
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        DeploymentJournalFixture::ready($this->first, 'deployment', str_repeat('a', 32));
+        DeploymentJournalFixture::ready($this->first, 'baander.app:workers', str_repeat('a', 32));
     }
 
     public function testOnlyOneOwnerCanClaimAndRenewCommittedNamespace(): void
@@ -53,7 +57,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertNull($second->acquire($lease->namespace, $lease->bootId, 60), 'Duplicate same-boot calls do not grant admission.');
         self::assertTrue($first->renew($lease, 120));
         self::assertFalse($second->renew(new DeploymentLease($lease->namespace, str_repeat('b', 32), 1), 60));
-        self::assertFalse($second->acknowledgeContainment(new DeploymentLease($lease->namespace, $lease->bootId, 2)));
+        self::assertFalse((new DoctrineDeploymentRetirement($this->second))->completeBootRetirement($lease->namespace, $lease->bootId));
         self::assertSame('timestamp with time zone', $this->second->fetchOne("SELECT data_type FROM information_schema.columns WHERE table_schema = :schema AND table_name = 'worker_deployment_leases' AND column_name = 'expires_at'", ['schema' => $this->schema]));
         self::assertSame('0', $this->first->fetchOne('SHOW lock_timeout'), 'Transaction-local timeouts do not leak into later work.');
     }
@@ -69,14 +73,15 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertFalse($first->renew($old, 60));
         $this->assertAcquisitionDenied($second, 'deployment', str_repeat('b', 32));
         self::assertEquals($old, $second->findForContainment('deployment'));
-        self::assertTrue($second->acknowledgeContainment($old), 'Fixture controller assumes predecessor cleanup was verified externally.');
-        self::assertFalse($second->acknowledgeContainment($old));
+        self::assertTrue(DeploymentJournalFixture::retire($this->second, $old->namespace, $old->bootId));
         self::assertNull($second->findForContainment('deployment'));
+        DeploymentJournalFixture::ready($this->second, 'deployment', str_repeat('b', 32));
         $new = $second->acquire('deployment', str_repeat('b', 32), 60);
         self::assertNotNull($new);
         self::assertSame(2, $new->epoch);
         self::assertFalse($first->renew($old, 60));
-        self::assertFalse($first->acknowledgeContainment($old));
+        self::assertTrue((new DoctrineDeploymentRetirement($this->first))->completeBootRetirement($old->namespace, $old->bootId));
+        self::assertEquals($new, $first->findForContainment('deployment'));
         self::assertTrue($second->renew($new, 60));
     }
 
@@ -90,7 +95,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
         $this->second->executeQuery('SELECT namespace FROM worker_deployment_leases FOR UPDATE')->free();
         $started = microtime(true);
         try {
-            $first->acquire('deployment', str_repeat('b', 32), 60);
+            $first->acquire('deployment', str_repeat('a', 32), 60);
             self::fail('Independent contender must hit the real PostgreSQL row lock timeout.');
         } catch (DriverException $error) {
             self::assertSame('55P03', $error->getSQLState());
@@ -210,7 +215,8 @@ PHP;
         $reserved = $controller->findForContainment('deployment');
         self::assertNotNull($reserved);
         self::assertSame(1, $reserved->epoch);
-        self::assertTrue($controller->acknowledgeContainment($reserved), 'No child was launched by this fixture; containment is verified externally.');
+        self::assertTrue(DeploymentJournalFixture::retire($this->second, $reserved->namespace, $reserved->bootId));
+        DeploymentJournalFixture::ready($this->second, 'deployment', str_repeat('b', 32));
         $replacement = $controller->acquire('deployment', str_repeat('b', 32), 60);
         self::assertNotNull($replacement);
         self::assertSame(2, $replacement->epoch);

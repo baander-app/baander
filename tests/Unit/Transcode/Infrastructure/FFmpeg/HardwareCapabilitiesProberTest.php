@@ -7,6 +7,9 @@ namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -24,6 +27,38 @@ final class HardwareCapabilitiesProberTest extends TestCase
     protected function setUp(): void
     {
         $this->logger = $this->createStub(LoggerInterface::class);
+    }
+
+    protected function tearDown(): void
+    {
+        ProcessExecutor::configureNativeExecution(null);
+    }
+
+    public function testRemoteStartupQualifiesSoftwareInsteadOfConfiguredHardware(): void
+    {
+        $client = $this->createMock(NativeExecutionClientInterface::class);
+        $client->expects(self::once())->method('submit')->with(self::callback(static function (array $argv): bool {
+            return in_array('libx265', $argv, true) && !in_array('hevc_nvenc', $argv, true) && in_array('lavfi', $argv, true);
+        }), 30)->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+        $prober = new HardwareCapabilitiesProber($this->logger, preferredEncoder: 'hevc_nvenc');
+        $profile = $prober->probeForWorker();
+        self::assertSame('libx265', $profile->encoder);
+        self::assertFalse($profile->isHardware());
+        self::assertSame($profile, $prober->probeForWorker());
+    }
+
+    public function testRemoteStartupFailsWhenSoftwareQualificationFails(): void
+    {
+        $client = $this->createStub(NativeExecutionClientInterface::class);
+        $client->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 1, 'stderr' => 'encoder missing']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+        $this->expectException(\RuntimeException::class);
+        (new HardwareCapabilitiesProber($this->logger))->probeForWorker();
     }
 
     //

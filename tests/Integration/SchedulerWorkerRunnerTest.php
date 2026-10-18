@@ -11,6 +11,7 @@ use App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -49,6 +50,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->database->executeStatement('SET search_path TO ' . $this->schema . ', public');
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->database);
         $this->database->executeStatement('DELETE FROM scheduled_jobs');
+        DeploymentJournalFixture::ready($this->database, 'scheduler.baander.app', str_repeat('a', 32));
         $lease = (new DoctrineDeploymentLease($this->database))->acquire('scheduler.baander.app', str_repeat('a', 32), 300);
         self::assertNotNull($lease);
         $stream = 'scheduler_loop_' . bin2hex(random_bytes(8));

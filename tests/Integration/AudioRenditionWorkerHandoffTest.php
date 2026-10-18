@@ -13,6 +13,7 @@ use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionCache;
+use App\Tests\Support\NativeExecutionFixture;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Process\Process;
@@ -26,8 +27,8 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
     private string $root;
     private string $source;
-    private string $encoder;
     private ?Process $workerProcess = null;
+    private ?NativeExecutionFixture $native = null;
 
     protected function setUp(): void
     {
@@ -35,14 +36,19 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         $this->root = sys_get_temp_dir() . '/audio-handoff-' . bin2hex(random_bytes(8));
         mkdir($this->root);
         $this->source = $this->root . '/source.flac';
-        $this->encoder = $this->root . '/encoder';
-        file_put_contents($this->source, 'admitted source');
+        $source = new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3', '-ac', '2', '-ar', '44100', '-c:a', 'flac', $this->source]);
+        self::assertSame(0, $source->run(), $source->getErrorOutput());
     }
 
     protected function tearDown(): void
     {
         if (isset($this->root)) {
-            $this->workerProcess?->stop(.2);
+            try {
+                $this->workerProcess?->stop(.2);
+            } finally {
+                $this->native?->close();
+            }
             $entries = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
             foreach ($entries as $entry) {
                 $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
@@ -58,14 +64,14 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         $cache = $this->cache();
         $rendition = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertFalse($rendition->isComplete());
-        self::assertSame('first-second', implode('', iterator_to_array($rendition->chunks(), false)));
+        $encoded = implode('', iterator_to_array($rendition->chunks(), false));
+        self::assertNotSame('', $encoded);
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         $cached = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertTrue($cached->isComplete());
-        self::assertSame('first-second', file_get_contents($cached->path));
+        self::assertSame($encoded, file_get_contents($cached->path));
         self::assertSame(1, (int) $this->first->fetchOne('SELECT count(*) FROM audio_rendition_runtime'));
         self::assertSame('complete', $this->first->fetchOne('SELECT state FROM audio_rendition_runtime'));
-        self::assertSame(1, (int) file_get_contents($this->root . '/runs'));
     }
 
     public function testPinnedReaderRejectsLeaseLossAndExpiredWorkerCannotPublishACompletedFile(): void
@@ -74,7 +80,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         $rendition = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         $chunks = $rendition->chunks();
         self::assertInstanceOf(\Generator::class, $chunks);
-        self::assertSame('first-', $chunks->current());
+        self::assertNotSame('', $chunks->current());
         $final = (string) $this->first->fetchOne('SELECT final_path FROM audio_rendition_runtime');
         $this->first->executeStatement("UPDATE audio_rendition_runtime SET lease_expires_at = clock_timestamp() - interval '1 second'");
         try {
@@ -93,7 +99,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
             usleep(10_000);
         }
         $recovered = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-        self::assertSame('first-second', implode('', iterator_to_array($recovered->chunks(), false)));
+        self::assertNotSame('', implode('', iterator_to_array($recovered->chunks(), false)));
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertSame(2, (int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime'));
     }
@@ -103,7 +109,9 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         $cache = $this->cache();
         $this->startWorker(.1);
         $original = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-        self::assertSame('first-second', $original->isComplete() ? file_get_contents($original->path) : implode('', iterator_to_array($original->chunks(), false)));
+        $encoded = $original->isComplete() ? file_get_contents($original->path) : implode('', iterator_to_array($original->chunks(), false));
+        self::assertIsString($encoded);
+        self::assertNotSame('', $encoded);
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         $key = $this->first->fetchOne('SELECT rendition_key FROM audio_rendition_runtime');
         $final = $this->first->fetchOne('SELECT final_path FROM audio_rendition_runtime');
@@ -115,7 +123,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
         $this->startWorker(.1);
         $rebuilt = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-        self::assertSame('first-second', $rebuilt->isComplete() ? file_get_contents($rebuilt->path) : implode('', iterator_to_array($rebuilt->chunks(), false)));
+        self::assertSame($encoded, $rebuilt->isComplete() ? file_get_contents($rebuilt->path) : implode('', iterator_to_array($rebuilt->chunks(), false)));
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertSame($key, $this->first->fetchOne('SELECT rendition_key FROM audio_rendition_runtime'));
         self::assertSame(2, (int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime'));
@@ -130,13 +138,15 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
     private function startWorker(float $delay): void
     {
-        $script = "#!" . PHP_BINARY . "\n<?php\n";
-        $script .= '$out = $argv[count($argv) - 1];' . "\n";
-        $script .= 'file_put_contents(' . var_export($this->root . '/runs', true) . ', "1");' . "\n";
-        $script .= 'file_put_contents($out, "first-"); usleep(' . (int) ($delay * 1_000_000) . '); file_put_contents($out, "second", FILE_APPEND);' . "\n";
-        file_put_contents($this->encoder, $script);
-        chmod($this->encoder, 0700);
-        $this->workerProcess = new Process([PHP_BINARY, dirname(__DIR__) . '/Fixtures/Media/audio-rendition-worker.php', $this->schema, $this->encoder]);
+        $this->native?->close();
+        $this->native = null;
+        $this->native = new NativeExecutionFixture('baander.app:test', str_repeat('b', 32));
+        $this->workerProcess = new Process([PHP_BINARY, dirname(__DIR__) . '/Fixtures/Media/audio-rendition-worker.php', $this->schema, (string) $delay], env: [
+            'BAANDER_NATIVE_SOCKET' => $this->native->socketPath(),
+            'BAANDER_WORKER_NAMESPACE' => 'baander.app:test',
+            'BAANDER_WORKER_BOOT_ID' => str_repeat('b', 32),
+            'BAANDER_WORKER_LEASE_EPOCH' => '1',
+        ]);
         $this->workerProcess->setTimeout(8);
         $this->workerProcess->start();
     }

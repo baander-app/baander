@@ -6,9 +6,6 @@ declare(strict_types=1);
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
 $kernel = null;
-$pool = null;
-$poolGroups = [];
-$poolUncertain = false;
 $exitCode = 0;
 $stopping = false;
 try {
@@ -25,7 +22,7 @@ try {
     } elseif (preg_match('/\A[a-f0-9]{64}\z/D', $key) !== 1) {
         throw new RuntimeException('Media job requires a canonical runtime key.');
     }
-    ini_set('memory_limit', $kind === 'video' ? '128M' : '256M');
+    ini_set('memory_limit', '256M');
     pcntl_async_signals(true);
     $stop = static function () use (&$stopping): void { $stopping = true; };
     pcntl_signal(SIGTERM, $stop);
@@ -38,26 +35,29 @@ try {
     ) {
         throw new RuntimeException('Media job requires inherited kernel configuration.');
     }
-    // Cap the file-I/O thread fallback before the helper forks or a reactor starts.
     swoole_async_set(['aio_core_worker_num' => 1, 'aio_worker_num' => 1]);
-    if ($kind === 'video') {
-        // Fork the one helper before opening any kernel, Doctrine or Redis connection.
-        $pool = new \App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool(
-            [new \App\Transcode\Infrastructure\Swoole\TranscodePoolWorker()], 1, new \Psr\Log\NullLogger(), resultTableSize: 64,
-        );
-        $pool->boot();
-        $poolGroups = $pool->workerPids();
-        if (count($poolGroups) !== 1 || !function_exists('posix_kill')) {
-            throw new RuntimeException('Media job requires an owned pool process group.');
-        }
+    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::requireNativeExecution();
+    $clientId = getenv('BAANDER_NATIVE_CLIENT_ID');
+    $clientGeneration = getenv('BAANDER_NATIVE_CLIENT_GENERATION');
+    $generation = is_string($clientGeneration) ? filter_var($clientGeneration, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+    if (!is_string($clientId) || preg_match('/\Amedia-(?:video-[0-2]|audio-0)\z/D', $clientId) !== 1
+        || !str_starts_with($clientId, 'media-' . $kind . '-') || $generation === false
+        || !is_string($clientGeneration) || preg_match('/\A[1-9][0-9]*\z/D', $clientGeneration) !== 1
+    ) {
+        throw new RuntimeException('Media job requires a native client launch fence.');
     }
+    $native = \App\Shared\Infrastructure\Worker\NativeExecutionClient::fromEnvironment($clientId, $generation);
+    if (($native->handshake()['ready'] ?? null) !== true) {
+        throw new RuntimeException('Native execution peer is not ready.');
+    }
+    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::configureNativeExecution($native);
     $authority = \App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority::fromDsn($databaseUrl);
     $authority->assertActive();
     $kernel = new \App\Kernel($environment, $debug === '1');
     $kernel->boot();
     $container = $kernel->getContainer();
-    if ($pool !== null) {
-        $container->set('worker.media.cpu_pool', $pool);
+    $container->set(\App\Shared\Infrastructure\Worker\NativeExecutionClientInterface::class, $native);
+    if ($kind === 'video') {
         $snapshots = $container->get('worker.media.encoder_snapshot_store');
         if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
             throw new RuntimeException('Media encoder snapshot store is not configured.');
@@ -69,14 +69,7 @@ try {
         $container->set('worker.media.encoder_profile', $snapshot->profile);
     }
     $authorityChecking = false;
-    $stopRequested = static function () use (&$stopping, &$poolUncertain, &$authorityChecking, $poolGroups, $authority): bool {
-        foreach ($poolGroups as $pid) {
-            $info = [];
-            if (!pcntl_waitid(P_PID, $pid, $info, WEXITED | WNOHANG | WNOWAIT) || ($info['pid'] ?? 0) === $pid) {
-                $poolUncertain = true;
-                $stopping = true;
-            }
-        }
+    $stopRequested = static function () use (&$stopping, &$authorityChecking, $authority): bool {
         if ($stopping) {
             return true;
         }
@@ -141,21 +134,6 @@ try {
     fwrite(STDERR, "Media execution failed; deployment reconciliation is required.\n");
     $exitCode = 1;
 } finally {
-    try {
-        // Success is acknowledged only after every pool child and process group is reaped.
-        $pool?->shutdown();
-        foreach ($poolGroups as $group) {
-            if (posix_kill(-$group, 0) || posix_get_last_error() !== 3) {
-                throw new RuntimeException('Media pool process group exit is unconfirmed.');
-            }
-        }
-        if ($poolUncertain) {
-            throw new RuntimeException('Media pool child exited unexpectedly.');
-        }
-    } catch (Throwable) {
-        fwrite(STDERR, "Media execution pool shutdown is unconfirmed.\n");
-        $exitCode = 1;
-    }
     try {
         $kernel?->shutdown();
     } catch (Throwable) {

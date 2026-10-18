@@ -29,8 +29,8 @@ foreach ($processes as $process) {
     if (($argv[1] ?? '') === 'web') {
         throw new RuntimeException('An encoder or probe exists in the web container.');
     }
-    if (!str_contains(json_encode($ancestry, JSON_THROW_ON_ERROR), 'worker-media-job.php')) {
-        throw new RuntimeException('Encoder is outside an admitted media child.');
+    if (!str_contains(json_encode($ancestry, JSON_THROW_ON_ERROR), 'worker-native.php')) {
+        throw new RuntimeException('Encoder is outside the native execution manager.');
     }
     $encoders[] = $process + ['ancestry' => $ancestry];
 }
@@ -40,7 +40,7 @@ $isBackgroundExecutor = static function (array $arguments): bool {
     if (preg_match('/\Acpu-pool-worker-[0-9]+\z/D', $binary) === 1) {
         return true;
     }
-    $scripts = ['worker-media.php', 'worker-media-job.php', 'worker-scheduler.php', 'worker-deployment.php', 'worker-lease-agent.php'];
+    $scripts = ['worker-media.php', 'worker-media-job.php', 'worker-scheduler.php', 'worker-deployment.php', 'worker-lease-agent.php', 'worker-native.php'];
     if (in_array($binary, $scripts, true)) {
         return true;
     }

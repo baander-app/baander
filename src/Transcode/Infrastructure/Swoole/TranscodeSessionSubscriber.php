@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Swoole;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -54,6 +55,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $probe = null;
         $tier = null;
         $active = $claim;
+        $nativeFailure = null;
         try {
             if (!$this->processPool->isRunning() || $stopRequested() || !$local->renew(self::LEASE_SECONDS)) {
                 return;
@@ -165,6 +167,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $audioFilters = $this->segmentEncoder->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
                         $this->assertCurrent($active, $local, $stopRequested);
                         $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation);
+                        $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;
                         $seen = [];
@@ -259,6 +262,9 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         } catch (TranscodeLoopOwnershipLost) {
             $this->logger->info('Video execution stopped after authority changed', ['jobId' => $jobId->toString()]);
         } catch (Throwable $error) {
+            if ($error instanceof NativeExecutionException) {
+                $nativeFailure = $error;
+            }
             $this->streamManager->stopStream($jobId);
             if ($local->isActive() && !$stopRequested()) {
                 try {
@@ -275,6 +281,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 $cleanup[] = fn() => $this->renewalTimer->clear($timer);
             }
             $cleanup[] = fn() => $this->streamManager->stopStream($jobId);
+            $cleanup[] = fn() => $this->processPool->shutdown();
             $cleanup[] = fn() => $this->ownership->release($active);
             if ($admitted && $tier !== null) {
                 $sourceHeight = $probe === null ? 1080 : $probe->height;
@@ -285,8 +292,14 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 try {
                     $operation();
                 } catch (Throwable $error) {
+                    if ($error instanceof NativeExecutionException) {
+                        $nativeFailure ??= $error;
+                    }
                     $this->logger->error('Video execution cleanup failed', ['jobId' => $jobId->toString(), 'exception' => $error]);
                 }
+            }
+            if ($nativeFailure !== null) {
+                throw $nativeFailure;
             }
         }
     }

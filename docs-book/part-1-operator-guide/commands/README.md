@@ -16,8 +16,11 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 2 recipe requires explicitly
-authorized shared media volumes and rejects devices and bind mounts.
+locally available immutable image ID. The version 3 recipe admits a fixed pair
+of control and execution containers,
+with separate resource ceilings and disjoint CPU sets. It requires explicitly
+authorized shared media volumes and a private named IPC volume; devices and bind
+mounts are refused.
 
 Build the worker target locally before selecting its immutable image ID:
 
@@ -25,12 +28,12 @@ Build the worker target locally before selecting its immutable image ID:
 docker buildx build --target worker --load -t baander-worker:local .
 ```
 
-The manifest is a JSON object of at most 8192 bytes. Version 2 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 3 requires exactly
 these fields, with JSON integers for version and resource values:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
   "daemonId": "replace-with-docker-info-ID",
@@ -38,16 +41,16 @@ these fields, with JSON integers for version and resource values:
   "network": "baander-workers",
   "dockerBinary": "/usr/bin/docker",
   "dockerEndpoint": "unix:///var/run/docker.sock",
-  "memoryMiB": 3904,
-  "managementMiB": 128,
-  "consumerMiB": 320,
-  "relayMiB": 320,
-  "schedulerMiB": 320,
-  "scheduledConsoleMiB": 192,
-  "mediaMiB": 2624,
-  "mediaDescendantPids": 14,
-  "nanoCpus": 1000000000,
-  "pidsLimit": 128,
+  "controlMemoryMiB": 2624,
+  "executionMemoryMiB": 4480,
+  "controlNanoCpus": 1000000000,
+  "executionNanoCpus": 2000000000,
+  "controlPidsLimit": 128,
+  "executionPidsLimit": 256,
+  "controlCpuSet": [0],
+  "executionCpuSet": [1, 2],
+  "scheduledConsoleMiB": 320,
+  "ipcVolume": "baander-worker-ipc",
   "mediaMounts": [
     {"volume": "baander-source", "target": "/media", "readOnly": true, "role": "source"},
     {"volume": "baander-conversions", "target": "/storage/conversions", "readOnly": false, "role": "derived"},
@@ -60,19 +63,32 @@ these fields, with JSON integers for version and resource values:
 Replace the daemon/image examples with `docker info --format '{{.ID}}'` and the
 local image's `docker image inspect --format '{{.Id}}'` values on the same endpoint.
 Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
-attempt. Reservations must fit the memory ceiling: management requires at least
-128 MiB; consumer, relay and scheduler each require at least 320 MiB. Scheduled
-console execution requires at least 192 MiB or `0` to disable it. Media execution
-requires at least 2624 MiB and 14 descendant process reservations for three video
-slots and one audio slot. The PID ceiling must be at least 128, or eight plus
-`mediaDescendantPids` when that is larger; encoder and asynchronous file-I/O threads also consume PID slots.
+attempt. Control requires at least 2624 MiB and 128 PID slots; execution requires
+at least 4160 MiB plus its scheduled console reservation and 256 PID slots.
+Scheduled console execution is disabled at `0` or reserves at least 320 MiB in
+execution. The example enables it with a 4480 MiB execution ceiling. CPU sets must
+be nonempty and disjoint; select available host CPUs explicitly. The example's
+CPU placement and quotas are operator choices, not universal defaults or measured
+capacity recommendations. Docker counts threads toward each unit's PID ceiling.
+Creation also requires host memory for both ceilings plus 1 GiB and verifies that
+the declared CPU identifiers are available on that daemon.
+The fixed workload admits three video jobs, one audio rendition and no devices.
 The worker argv,
 PHP management limit, identity and lock directory are fixed by the manifest parser;
 arbitrary commands, environment fields and secret paths are rejected.
 
-Provision the named volumes before creation, with the local Docker volume driver
-and no driver options. Source volumes are read-only in worker; derived volumes are
-writable. The declarations must cover `/var/www/html/storage`,
+Provision the named media and IPC volumes before creation, with the local Docker
+volume driver and no driver options. The IPC volume is private to the pair and
+mounted at `/run/baander-worker`; do not share it with another boot or web. Before
+`create`, set the IPC volume root owner and group to the runtime UID/GID of the
+selected worker image, with mode `0700`. Docker creates a new volume root owned
+by root, and the admitted mount uses `volume-nocopy`; an unprepared root prevents
+the worker from creating its private boot directory. Read the image's runtime
+identity rather than assuming a numeric UID/GID. Runtime creates boot directories
+with mode `0700` and the native socket with mode `0600`.
+
+Source volumes are read-only in worker; derived volumes are writable. The
+declarations must cover `/var/www/html/storage`,
 `/var/www/html/var/transcode_state` and the configured `CONVERT_STORAGE_PATH`.
 At least one source volume is required. Set `MEDIA_STORAGE_PATH` explicitly to the
 source root inside that volume, for example `/media/library`; never point it at
@@ -135,15 +151,23 @@ timeout --kill-after=5s 60s php bin/worker-deployment.php start /etc/baander/wor
 timeout --kill-after=5s 60s php bin/worker-deployment.php status /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
 ```
 
-`create` commits one creation intent before Docker work. If its reply is uncertain,
-use `reconcile-create` with the identical manifest and credentials; it verifies and
-registers the existing never-started container without creating another. `start`
-consumes a one-shot claim before issuing Docker start. An uncertain start requires
+`create` reserves the boot and both unit intents before Docker work. If its reply
+is uncertain, use `reconcile-create` with the identical manifest and credentials;
+it verifies and registers existing never-started units without recreating a
+claimed unit. `start` consumes a one-shot claim for each unit before issuing Docker
+start. An uncertain start requires
 explicit `recover`, never another start. Recovery retires that immutable boot,
-verifies removal and releases only its reservation. Keep the old manifest for
+requires confirmed retirement of both units before releasing the joint reservation.
+An unclaimed unit can be cancelled; a claimed unit requires containment evidence.
+Keep the old manifest for
 recovery; a replacement needs a fresh boot ID. `status` reports committed
 observations and always returns `readiness: "not_checked"`; it does not certify
-application readiness. Timeout or interruption does not cancel an operation
+application readiness. Control owns and renews the deployment lease; execution
+observes it. Both units must exchange matching boot/epoch evidence before business
+admission, within 30 seconds of startup. Peer loss, stale evidence or authority
+loss closes admission and drains the pair. Each supervisor has a 35-second drain
+deadline; give external stop handling a longer grace period. Timeout or
+interruption does not cancel an operation
 already submitted to Docker or authorize a retry.
 
 Actions return bounded JSON on stdout. Exit codes are `0` for a confirmed result,
@@ -333,7 +357,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:server:spans](app-server-spans.md) | List the web server's recent request spans, or empty the span buffer |
 | [app:server:stats](app-server-stats.md) | Show memory, process and coroutine figures of every web server worker |
 | [app:server:workers](app-server-workers.md) | Show the web server's HTTP and user worker statistics |
-| [app:worker](app-worker.md) | Run a worker container's supervisor: Redis consumer, outbox relay, scheduler and media execution |
+| [app:worker](app-worker.md) | Run one unit of the paired worker deployment |
 
 ## System & Diagnostics
 

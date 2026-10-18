@@ -4,46 +4,101 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use RuntimeException;
-use Swoole\Coroutine\System;
 
-/**
- * Executes shell commands portably inside or outside a Swoole coroutine.
- *
- * Swoole\Coroutine\System::exec() only works inside a coroutine and its
- * signature differs between Swoole versions. This helper falls back to
- * proc_open when running outside the Swoole runtime so the same FFmpeg/FFprobe
- * adapters can be used from CLI scripts, tests, and Swoole workers.
- */
+/** Executes media work remotely in admitted workers and locally in standalone tools. */
 final class ProcessExecutor
 {
+    private static ?NativeExecutionClientInterface $nativeExecution = null;
+    private static bool $nativeRequired = false;
+
+    public static function configureNativeExecution(?NativeExecutionClientInterface $client): void
+    {
+        self::$nativeExecution = $client;
+    }
+
+    public static function requireNativeExecution(): void
+    {
+        self::$nativeRequired = true;
+    }
+
+    public static function usesNativeExecution(): bool
+    {
+        return self::$nativeRequired || self::$nativeExecution !== null;
+    }
+
     /**
      * Execute a command and return stdout, stderr, and exit code.
      *
      * @param string|list<string> $command
+     * @param null|callable(): bool $continue
      * @return array{code: int, output: string, error: string}
      */
-    public static function exec(string|array $command, int $timeoutSeconds = 300): array
+    public static function exec(string|array $command, int $timeoutSeconds = 300, ?callable $continue = null): array
     {
-        if (is_string($command) && \Swoole\Coroutine::getCid() !== -1) {
-            return self::execInCoroutine($command);
+        if (self::$nativeExecution !== null) {
+            if (!is_array($command)) {
+                throw new RuntimeException('Remote media execution requires an argument array.');
+            }
+            return self::execNative($command, $timeoutSeconds, $continue);
         }
-
+        if (self::$nativeRequired) {
+            throw new RuntimeException('The worker native execution client is unavailable.');
+        }
         return self::execWithProcOpen($command, $timeoutSeconds);
     }
 
     /**
+     * @param list<string> $command
+     * @param null|callable(): bool $continue
      * @return array{code: int, output: string, error: string}
      */
-    private static function execInCoroutine(string $command): array
+    public static function execNative(array $command, int $timeoutSeconds, ?callable $continue): array
     {
-        $result = System::exec($command, true);
-
-        return [
-            'code' => (int) ($result['code'] ?? -1),
-            'output' => (string) ($result['output'] ?? ''),
-            'error' => (string) ($result['error'] ?? ''),
-        ];
+        $client = self::$nativeExecution ?? throw new NativeExecutionException('Native execution is unavailable.', uncertain: false);
+        $handle = $client->submit($command, $timeoutSeconds);
+        $terminal = false;
+        try {
+            while (true) {
+                if ($continue !== null && !$continue()) {
+                    return ['code' => -1, 'output' => '', 'error' => 'Media execution stopped.'];
+                }
+                $status = $client->inspect($handle);
+                if (($status['state'] ?? '') === 'exited') {
+                    $terminal = true;
+                    return ['code' => (int) ($status['exitCode'] ?? -1), 'output' => (string) ($status['stdout'] ?? ''), 'error' => (string) ($status['stderr'] ?? '')];
+                }
+                if (($status['state'] ?? '') !== 'running') {
+                    throw new NativeExecutionException('Native media execution state is unknown.');
+                }
+                Async::sleep(0.05);
+            }
+        } finally {
+            if (!$terminal) {
+                $client->signal($handle, 'stop');
+                $deadline = hrtime(true) + 1_000_000_000;
+                do {
+                    $status = $client->inspect($handle);
+                    if (($status['state'] ?? '') === 'exited') {
+                        $terminal = true;
+                        break;
+                    }
+                    if (($status['state'] ?? '') !== 'running') {
+                        throw new NativeExecutionException('Native media termination state is unknown.');
+                    }
+                    Async::sleep(0.05);
+                } while (hrtime(true) < $deadline);
+                if (!$terminal) {
+                    throw new NativeExecutionException('Native media execution did not confirm termination.');
+                }
+            }
+            if (!$client->release($handle)) {
+                throw new NativeExecutionException('Native media execution did not confirm release.');
+            }
+        }
     }
 
     /**

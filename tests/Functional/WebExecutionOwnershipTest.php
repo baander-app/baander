@@ -17,6 +17,7 @@ use App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler;
 use App\Shared\Infrastructure\Swoole\Drain\DrainWorkerExitSubscriber;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\CommandHandler\UpdateTranscodePositionHandler;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
@@ -26,6 +27,8 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
 use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
+use App\Transcode\Infrastructure\Swoole\NativeProcessSpawner;
+use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
@@ -54,8 +57,11 @@ final class WebExecutionOwnershipTest extends TestCase
         try {
             $kernel->boot();
             $container = $kernel->getContainer();
-            self::assertFalse($container->initialized('worker.media.cpu_pool'));
-            self::assertFalse($container->initialized('worker.media.encoder_profile'));
+            self::assertInstanceOf(\Symfony\Component\DependencyInjection\Container::class, $container);
+            foreach (WebExecutionOwnershipKernel::WORKER_EXECUTION_SERVICES as $service) {
+                self::assertContains('web.ownership.' . $service, $container->getServiceIds());
+                self::assertFalse($container->initialized('web.ownership.' . $service));
+            }
 
             foreach (WebExecutionOwnershipKernel::WEB_SERVICES as $port) {
                 self::assertInstanceOf($port, $container->get('web.ownership.' . $port));
@@ -104,8 +110,9 @@ final class WebExecutionOwnershipTest extends TestCase
             self::assertInstanceOf(ServerControlOperationRegistry::class, $operations);
             self::assertInstanceOf(DebugWorkersOperation::class, $operations->get(DebugWorkersOperation::NAME));
             self::assertInstanceOf(WebSocketUserDisconnectOperation::class, $operations->get('websocket.user.disconnect'));
-            self::assertFalse($container->initialized('worker.media.cpu_pool'));
-            self::assertFalse($container->initialized('worker.media.encoder_profile'));
+            foreach (WebExecutionOwnershipKernel::WORKER_EXECUTION_SERVICES as $service) {
+                self::assertFalse($container->initialized('web.ownership.' . $service));
+            }
         } finally {
             $kernel->shutdown();
             (new Filesystem())->remove($directory);
@@ -115,6 +122,13 @@ final class WebExecutionOwnershipTest extends TestCase
 
 final class WebExecutionOwnershipKernel extends Kernel
 {
+    public const array WORKER_EXECUTION_SERVICES = [
+        NativeExecutionClientInterface::class,
+        NativeProcessSpawner::class,
+        TranscodeStreamManager::class,
+        'worker.media.encoder_profile',
+    ];
+
     public const array WEB_SERVICES = [
         CreateTranscodeSessionHandler::class,
         UpdateTranscodePositionHandler::class,
@@ -138,7 +152,7 @@ final class WebExecutionOwnershipKernel extends Kernel
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
-        foreach (self::WEB_SERVICES as $port) {
+        foreach ([...self::WEB_SERVICES, ...self::WORKER_EXECUTION_SERVICES] as $port) {
             $container->setAlias('web.ownership.' . $port, $port)->setPublic(true);
         }
         foreach ([

@@ -9,13 +9,13 @@ cleanup() {
 }
 trap cleanup EXIT
 boot_id=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-# Every supervisor/helper/worker lives in this one private PID namespace. The
+# A mechanical execution-unit fixture and its descendants share a private PID namespace. The
 # Docker socket is available only to the host-side test/controller.
 container_id=$(docker create --name "$run_id" --network none --memory 256m --memory-swap 256m \
     --cpus 1 --pids-limit 32 --cap-drop ALL --security-opt no-new-privileges \
     --cgroupns private --restart always \
     --label app.baander.worker.namespace=baander.app:retirement-test \
-    --label "app.baander.worker.boot-id=$boot_id" --label app.baander.worker.role=deployment \
+    --label "app.baander.worker.boot-id=$boot_id" --label app.baander.worker.role=execution \
     --entrypoint php "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" \
     /tmp/tests/Fixtures/Worker/contained-supervisor.php)
 tar -cf - vendor packages src tests/Fixtures/Worker | docker cp - "$container_id:/tmp/"
@@ -38,9 +38,15 @@ if php tests/Fixtures/Worker/retire-container.php "$docker_binary" "$endpoint" "
     exit 1
 fi
 test "$(docker inspect --format '{{.State.Running}}' "$container_id")" = true
+# An automatic restart policy is rejected before any physical removal.
+if php tests/Fixtures/Worker/retire-container.php "$docker_binary" "$endpoint" "$container_id" "$boot_id" > /tmp/"$run_id"-restart-rejected.log 2>&1; then
+    echo 'Restart-always unit unexpectedly satisfied isolation policy.' >&2; exit 1
+fi
+test "$(docker inspect --format '{{.State.Running}}' "$container_id")" = true
+docker update --restart=no "$container_id" >/dev/null
 php tests/Fixtures/Worker/retire-container.php "$docker_binary" "$endpoint" "$container_id" "$boot_id"
 # Successful immutable-ID removal, rather than stopped-state inspection, prevents
-# this restart-always predecessor from being restarted after database release.
+# this predecessor from being restarted after database release.
 if docker start "$container_id" >/dev/null 2>&1; then
     echo 'Retired predecessor could be restarted.' >&2
     exit 1
@@ -49,4 +55,4 @@ if php tests/Fixtures/Worker/retire-container.php "$docker_binary" "$endpoint" "
     echo 'Absent predecessor incorrectly treated as a retirement receipt.' >&2
     exit 1
 fi
-echo 'PASS: wrong-owner rejection and running deployment retirement with restart prevention'
+echo 'PASS: wrong-owner and restart-policy rejection and running deployment retirement with restart prevention'

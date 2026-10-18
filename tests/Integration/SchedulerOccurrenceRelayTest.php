@@ -19,6 +19,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Support\DeploymentJournalFixture;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -94,6 +95,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
         self::assertNotNull($this->row($occurrence)['dispatched_at']);
         self::assertSame(2, $transport->getMessageCount());
 
+        DeploymentJournalFixture::ready($this->writer, 'baander.app:scheduler-relay', str_repeat('a', 32));
         $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-relay', str_repeat('a', 32), 300);
         self::assertInstanceOf(DeploymentLease::class, $authority);
         $executions = new DoctrineSchedulerOccurrenceExecutionStore($this->writer, $authority);
