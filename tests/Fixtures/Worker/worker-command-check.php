@@ -76,7 +76,7 @@ if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'
     $inventory = new App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($db);
     $daemon = 'baander.app:command-drill';
     if ($mode === 'reserve-pair') {
-        $controlRecipe = hash('sha256', 'control:2624:128:cpu0');
+        $controlRecipe = hash('sha256', 'control:2944:129:cpu0');
         $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
         $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), $daemon, $controlRecipe, $executionRecipe);
     } else {

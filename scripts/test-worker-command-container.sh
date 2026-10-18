@@ -6,6 +6,7 @@ fi
 cd "$(dirname "$0")/.."
 run_id="baander-worker-command-$(date +%s)-$$"
 app_image="${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}"
+autoscaling_profile="$(cat tests/Fixtures/Worker/autoscaling-profile.json)"
 containers=()
 ipc_volumes=()
 cleanup() {
@@ -81,7 +82,7 @@ launch() {
         -c 'chown "$1:$2" /run/baander-worker; chmod 700 /run/baander-worker' sh "$app_uid" "$app_gid"
     if [ "$denied" != 1 ]; then journal reserve-pair "$namespace" "$boot"; fi
     for unit in control execution; do
-        name="$container"; memory=2624; pids=128; cpus=0; console=0
+        name="$container"; memory=2944; pids=129; cpus=0; console=0
         if [ "$unit" = execution ]; then name="$container-execution"; memory=4480; pids=256; cpus=1,2; console=320; fi
         containers+=("$name")
         if [ "$denied" != 1 ]; then journal claim-unit "$namespace" "$boot" "$unit"; fi
@@ -93,8 +94,8 @@ launch() {
                 mkdir -m 700 /tmp/baander-worker-locks
                 exec php -d memory_limit=256M bin/console app:worker --deployment="$1" --boot-id="$2" \
                     --unit="$3" --memory-mib="$4" --pids-limit="$5" --scheduled-console-mib="$6" \
-                    --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
-            ' sh "$namespace" "$boot" "$unit" "$memory" "$pids" "$console")"
+                    --autoscaling-profile="$7" --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --no-interaction
+            ' sh "$namespace" "$boot" "$unit" "$memory" "$pids" "$console" "$autoscaling_profile")"
         if [ "$denied" != 1 ]; then journal register-unit "$namespace" "$boot" "$unit" "$id"; fi
     done
     for unit in control execution; do
@@ -252,8 +253,8 @@ for invalid_case in path query scheduler; do
     docker run -d --name "$invalid_container" "${common[@]}" -e "$invalid_setting=$invalid_dsn" \
         --entrypoint php "$app_image" -d memory_limit=256M bin/console app:worker \
         --deployment="$invalid_namespace" --boot-id=ffffffffffffffffffffffffffffffff \
-        --unit=control --memory-mib=2624 --pids-limit=128 --scheduled-console-mib=0 \
-        --ipc-dir=/run/baander-worker --lock-dir=/tmp/baander-invalid-lock --no-interaction >/dev/null
+        --unit=control --memory-mib=2944 --pids-limit=129 --scheduled-console-mib=0 \
+        --autoscaling-profile="$autoscaling_profile" --ipc-dir=/run/baander-worker --lock-dir=/tmp/baander-invalid-lock --no-interaction >/dev/null
     invalid_exit="$(timeout 15s docker wait "$invalid_container")"
     test "$invalid_exit" != 0
     docker logs "$invalid_container" > "/tmp/$invalid_container-log" 2>&1

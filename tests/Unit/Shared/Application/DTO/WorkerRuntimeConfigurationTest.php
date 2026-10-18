@@ -12,7 +12,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
 {
     public function testUnitQualificationBudgetsAndConsoleReservation(): void
     {
-        $control = $this->configuration('control', 2624, 128);
+        $control = $this->configuration('control', 2944, 129);
         self::assertSame('control', $control->unit);
         self::assertSame(384 * 1024 * 1024, $control->managementReservationBytes);
         $execution = $this->configuration('execution', 4480, 256, 320);
@@ -29,13 +29,13 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     public function testControlCannotReserveScheduledConsole(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->configuration('control', 4480, 128, 320);
+        $this->configuration('control', 4480, 129, 320);
     }
 
     public function testTraversalDirectoryIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2624 * 1024 * 1024, 128, 0, '/tmp/../tmp/locks', '/run/baander-worker');
+        new WorkerRuntimeConfiguration('worker.baander.app', str_repeat('a', 32), 'control', 2944 * 1024 * 1024, 129, 0, '/tmp/../tmp/locks', '/run/baander-worker');
     }
 
     #[DataProvider('invalidFields')]
@@ -79,7 +79,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
 
     public function testControlMemoryAndPidMinimumsAreEnforcedIndependently(): void
     {
-        foreach ([[2623, 128], [2624, 127]] as [$memory, $pids]) {
+        foreach ([[2943, 129], [2944, 128]] as [$memory, $pids]) {
             try {
                 $this->configuration('control', $memory, $pids);
                 self::fail('Control resources below either qualification minimum must be rejected.');
@@ -91,7 +91,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
 
     public function testBothUnitsAcceptTheirExactMemoryAndPidBoundaries(): void
     {
-        foreach ([['control', 2624, 128], ['execution', 4160, 256]] as [$unit, $memory, $pids]) {
+        foreach ([['control', 2944, 129], ['execution', 4160, 256]] as [$unit, $memory, $pids]) {
             $configuration = $this->configuration($unit, $memory, $pids);
             self::assertSame($memory * 1024 * 1024, $configuration->memoryLimitBytes);
             self::assertSame($pids, $configuration->pidsLimit);

@@ -326,10 +326,11 @@ python3 - "$work" "$namespace" "$boot" "$daemon_id" "$image_id" "$run_id" "$mani
 import json, os, sys
 work, namespace, boot, daemon, image, network, binary, endpoint, port, host, available = sys.argv[1:]
 cpus = json.loads(available)
-manifest = dict(version=3, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
+manifest = dict(version=4, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
     network=network, dockerBinary=binary, dockerEndpoint=endpoint,
-    controlMemoryMiB=2624, executionMemoryMiB=4480, controlNanoCpus=1000000000, executionNanoCpus=2000000000,
-    controlPidsLimit=128, executionPidsLimit=256, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
+    controlMemoryMiB=2944, executionMemoryMiB=4480, controlNanoCpus=1000000000, executionNanoCpus=2000000000,
+    controlPidsLimit=129, executionPidsLimit=256, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
+    autoscaling=json.load(open('tests/Fixtures/Worker/autoscaling-profile.json')),
     scheduledConsoleMiB=320, ipcVolume=network+"-worker-ipc",
     mediaMounts=[dict(volume=network+'-source-media', target='/media/source', readOnly=True, role='source'),
         dict(volume=network+'-storage', target='/var/www/html/storage', readOnly=False, role='derived'),

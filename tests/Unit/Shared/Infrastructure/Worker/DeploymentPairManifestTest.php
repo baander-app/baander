@@ -17,11 +17,11 @@ final class DeploymentPairManifestTest extends TestCase
         $control = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
         $execution = $manifest->recipe(DeploymentUnit::Execution, new DeploymentRuntimeEnvironment());
 
-        self::assertSame(2624 * 1024 * 1024, $control->memoryBytes);
+        self::assertSame(2944 * 1024 * 1024, $control->memoryBytes);
         self::assertSame(4480 * 1024 * 1024, $execution->memoryBytes);
         self::assertSame([0], $control->cpuSet);
         self::assertSame([1, 2], $execution->cpuSet);
-        self::assertSame(128, $control->pidsLimit);
+        self::assertSame(129, $control->pidsLimit);
         self::assertSame(256, $execution->pidsLimit);
         self::assertSame($control->bootId, $execution->bootId);
         self::assertNotSame($control->fingerprint(), $execution->fingerprint());
@@ -42,17 +42,39 @@ final class DeploymentPairManifestTest extends TestCase
         DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
     }
 
+    public function testPolicyChangesAlterBothUnitRecipesAndFingerprint(): void
+    {
+        $fields = self::fields();
+        $original = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        $fields['autoscaling']['targetBacklogAgeMs'] = 20000;
+        $changed = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        $environment = new DeploymentRuntimeEnvironment();
+        self::assertNotSame($original->fingerprint($environment), $changed->fingerprint($environment));
+        foreach (DeploymentUnit::cases() as $unit) {
+            self::assertNotSame($original->recipe($unit, $environment)->command, $changed->recipe($unit, $environment)->command);
+        }
+    }
+
+    public function testMaximumPoolRequiresAllResidentReservationsBeforeLaunch(): void
+    {
+        $fields = self::fields();
+        $fields['autoscaling']['maximumConcurrency'] = 4;
+        $this->expectException(\InvalidArgumentException::class);
+        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+    }
+
     /** @return array<string,mixed> */
     public static function fields(): array
     {
         return [
-            'version' => 3, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 4, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'controlMemoryMiB' => 2624, 'executionMemoryMiB' => 4480,
+            'controlMemoryMiB' => 2944, 'executionMemoryMiB' => 4480,
             'controlNanoCpus' => 1000000000, 'executionNanoCpus' => 2000000000,
             'controlCpuSet' => [0], 'executionCpuSet' => [1, 2],
-            'controlPidsLimit' => 128, 'executionPidsLimit' => 256,
+            'controlPidsLimit' => 129, 'executionPidsLimit' => 256,
+            'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [
                 ['volume' => 'library', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'],

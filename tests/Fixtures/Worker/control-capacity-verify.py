@@ -96,7 +96,7 @@ oom_events = samples(oom_events_path.name) + samples(live_events_path.name)
 assert not any(entry.get('Type') == 'container' and entry.get('Action', entry.get('status')) == 'oom'
                and entry.get('Actor', {}).get('ID', entry.get('id')) == control['Id'] for entry in oom_events), 'Control container emitted Docker OOM event'
 
-for unit, memory, pids, cpu in [(control, 2624, 128, 1_000_000_000), (execution, 4480, 256, 2_000_000_000)]:
+for unit, memory, pids, cpu in [(control, 2944, 129, 1_000_000_000), (execution, 4480, 256, 2_000_000_000)]:
     config = unit['HostConfig']
     assert config['Memory'] == memory * 1024 * 1024 and config['PidsLimit'] == pids
     assert config['NanoCpus'] == cpu

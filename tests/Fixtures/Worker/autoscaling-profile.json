@@ -1,0 +1,16 @@
+{
+  "minimumConcurrency": 1,
+  "maximumConcurrency": 1,
+  "sampleIntervalMs": 1000,
+  "maxSampleAgeMs": 3000,
+  "targetBacklogAgeMs": 10000,
+  "scaleUpSustainMs": 3000,
+  "scaleDownSustainMs": 30000,
+  "changeCooldownMs": 5000,
+  "cpuCeilingPercent": 85,
+  "memoryCeilingPercent": 85,
+  "pidsCeilingPercent": 85,
+  "memoryStopPercent": 95,
+  "pidsStopPercent": 95,
+  "coldDurationMs": 1000
+}

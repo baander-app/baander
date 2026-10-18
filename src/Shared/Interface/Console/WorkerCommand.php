@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\Exception\WorkerTransportConfigurationException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,6 +30,7 @@ final class WorkerCommand extends Command
             ->addOption('memory-mib', null, InputOption::VALUE_REQUIRED, 'Required total admission ceiling in MiB.')
             ->addOption('unit', null, InputOption::VALUE_REQUIRED, 'Worker unit: control or execution.')
             ->addOption('pids-limit', null, InputOption::VALUE_REQUIRED, 'Enforced unit PID capacity.')
+            ->addOption('autoscaling-profile', null, InputOption::VALUE_REQUIRED, 'Complete admitted ordinary autoscaling profile as JSON.')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Execution reservation for one scheduled console child (0 disables).', '0')
             ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private unit lock directory.', '/tmp/baander-worker-locks')
             ->addOption('ipc-dir', null, InputOption::VALUE_REQUIRED, 'Shared private worker IPC directory.', '/run/baander-worker');
@@ -46,6 +48,7 @@ final class WorkerCommand extends Command
                 $this->bytes($input, 'memory-mib'), $this->pids($input),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->stringOption($input, 'lock-dir'), $this->stringOption($input, 'ipc-dir'),
+                WorkerAutoscalingProfile::fromJson($this->stringOption($input, 'autoscaling-profile')),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());

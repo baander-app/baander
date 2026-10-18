@@ -54,6 +54,8 @@ final class WorkerCommandTest extends TestCase
     /** @return iterable<array{string, mixed}> */
     public static function invalidOptions(): iterable
     {
+        yield ['--autoscaling-profile', null];
+        yield ['--autoscaling-profile', '{}'];
         yield ['--memory-mib', null];
         yield ['--memory-mib', '4160.5'];
         yield ['--memory-mib', '-1'];
@@ -138,6 +140,7 @@ final class WorkerCommandTest extends TestCase
     private function options(): array
     {
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
+            '--autoscaling-profile' => (new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(),
             '--unit' => 'execution', '--memory-mib' => '4160', '--pids-limit' => '256',
             '--lock-dir' => '/tmp/baander-worker-locks', '--ipc-dir' => '/run/baander-worker'];
     }

@@ -40,10 +40,11 @@ final class DeploymentOperatorManifestTest extends TestCase
         self::assertSame([
             '/usr/local/bin/php', '-d', 'memory_limit=256M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
             '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32), '--unit=control',
-            '--memory-mib=2624', '--pids-limit=128', '--scheduled-console-mib=0',
+            '--memory-mib=2944', '--pids-limit=129', '--scheduled-console-mib=0',
+            '--autoscaling-profile=' . $manifest->autoscaling->toJson(),
             '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker',
         ], $recipe->command);
-        self::assertSame(2624 * 1024 * 1024, $recipe->memoryBytes);
+        self::assertSame(2944 * 1024 * 1024, $recipe->memoryBytes);
         self::assertSame($manifest->control->memoryBytes, $recipe->memoryBytes);
         self::assertSame($environment, $recipe->runtimeEnvironment);
         self::assertSame('/usr/bin/docker', $manifest->dockerBinary);
@@ -210,7 +211,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":3', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":4', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */
