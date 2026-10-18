@@ -329,6 +329,10 @@ services:
             $dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
             $options: '%app.messenger.async_observation_options%'
 
+    App\Shared\Infrastructure\Messenger\OrdinaryAdmissionSubscriber:
+        arguments:
+            $transport: '@messenger.transport.async'
+
     App\Shared\Infrastructure\Messenger\FailureTransportAdministration:
         arguments:
             $receiver: '@messenger.transport.failed'
