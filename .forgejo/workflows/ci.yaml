@@ -401,6 +401,9 @@ jobs:
                 mode: [ release, sanitize ]
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            options: --tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700
+        env:
+            REGISTRY_FULL_DISK_ROOT: /run/baander-registry-full-disk
         steps:
             -   name: Checkout
                 run: |

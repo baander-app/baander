@@ -8,6 +8,14 @@ if [[ $# -gt 1 || ( "$mode" != release && "$mode" != sanitize && "$mode" != thre
     echo "Usage: $0 [release|sanitize|thread|fuzz]" >&2
     exit 2
 fi
+export PYTHONDONTWRITEBYTECODE=1
+if [[ "$mode" == release || "$mode" == sanitize ]]; then
+    if [[ -z "${REGISTRY_FULL_DISK_ROOT:-}" ]]; then
+        echo "REGISTRY_FULL_DISK_ROOT must name an empty dedicated tmpfs (at most 128 MiB)." >&2
+        exit 2
+    fi
+    python3 -c 'import sys; sys.path.insert(0, "relay/tests"); from run_storage_contract import validate_root; validate_root(sys.argv[1])' "$REGISTRY_FULL_DISK_ROOT"
+fi
 if [[ "$(uname -s)-$(uname -m)" != Linux-x86_64 ]]; then
     echo "The verified rqlite qualification artifact requires Linux x86_64." >&2
     exit 2
@@ -70,8 +78,8 @@ cmake -S relay -B "$work/build" -G Ninja \
     "${options[@]}"
 cmake --build "$work/build" --parallel 2
 ctest --test-dir "$work/build" --output-on-failure --no-tests=error
-export PYTHONDONTWRITEBYTECODE=1
 python3 relay/tests/test_cluster_cleanup.py
+python3 relay/tests/test_storage_cleanup.py
 python3 relay/tests/run_rqlite_contract.py \
     --rqlited "$work/rqlite/rqlited" --fixture "$work/build/registry_contract_fixture"
 python3 relay/tests/run_transport_contract.py --fixture "$work/build/registry_transport_fixture"
@@ -81,6 +89,11 @@ python3 relay/tests/run_cluster_contract.py --nodes 3 \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 python3 relay/tests/run_restore_contract.py \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
+if [[ "$mode" == release || "$mode" == sanitize ]]; then
+    python3 relay/tests/run_storage_contract.py \
+        --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry" \
+        --storage-root "$REGISTRY_FULL_DISK_ROOT"
+fi
 if [[ "$mode" == release ]]; then
     python3 relay/tests/run_load_smoke.py \
         --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"

@@ -67,6 +67,89 @@ final class PublicationWorkflowTest extends TestCase
         }
     }
 
+    public function testRegistryQualificationHasDedicatedBoundedStorage(): void
+    {
+        $job = $this->workflow('ci.yaml')['jobs']['registry-quality'];
+        self::assertSame(['release', 'sanitize'], $job['strategy']['matrix']['mode']);
+        self::assertSame('/run/baander-registry-full-disk', $job['env']['REGISTRY_FULL_DISK_ROOT'] ?? null);
+        self::assertSame(
+            '--tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700',
+            $job['container']['options'] ?? null,
+        );
+    }
+
+    #[DataProvider('requiredRegistryModeProvider')]
+    public function testRegistryQualificationRejectsMissingStorageBeforeDownloading(string $mode): void
+    {
+        $process = $this->registryRecipe($mode, false);
+        $process->run();
+
+        self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('REGISTRY_FULL_DISK_ROOT', $process->getErrorOutput());
+        self::assertStringNotContainsString('curl ', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+    }
+
+    #[DataProvider('requiredRegistryModeProvider')]
+    public function testRegistryQualificationRejectsUnsafeStorageBeforeDownloading(string $mode): void
+    {
+        $process = $this->registryRecipe($mode, true, 43);
+        $process->run();
+
+        self::assertSame(43, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('validate_root', $this->registryCalls());
+        self::assertStringNotContainsString('curl ', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+    }
+
+    #[DataProvider('requiredRegistryModeProvider')]
+    public function testRegistryStorageFailureStopsTheActualQualificationRecipe(string $mode): void
+    {
+        $process = $this->registryRecipe($mode, true);
+        $process->run();
+
+        self::assertSame(47, $process->getExitCode(), $process->getErrorOutput());
+        $calls = $this->registryCalls();
+        self::assertStringContainsString('validate_root', $calls);
+        self::assertStringContainsString('test_storage_cleanup.py', $calls);
+        self::assertStringContainsString('run_storage_contract.py', $calls);
+        self::assertStringContainsString('--storage-root /run/baander-registry-full-disk', $calls);
+        self::assertStringContainsString('--rqlited ', $calls);
+        self::assertStringContainsString('--server ', $calls);
+        self::assertStringContainsString('run_restore_contract.py', $calls);
+        self::assertLessThan(strpos($calls, 'curl '), strpos($calls, 'validate_root'));
+        self::assertLessThan(strpos($calls, 'run_storage_contract.py'), strpos($calls, 'run_restore_contract.py'));
+        self::assertStringNotContainsString('run_load_smoke.py', $calls);
+        self::assertStringNotContainsString('qualification passed', $process->getOutput());
+    }
+
+    #[DataProvider('registryModeProvider')]
+    public function testRegistryStorageHelperFailureStopsEveryQualificationMode(string $mode): void
+    {
+        $process = $this->registryRecipe($mode, in_array($mode, ['release', 'sanitize'], true), storageHelperExit: 49);
+        $process->run();
+
+        self::assertSame(49, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('test_storage_cleanup.py', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+        self::assertStringNotContainsString('qualification passed', $process->getOutput());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function requiredRegistryModeProvider(): iterable
+    {
+        yield 'release' => ['release'];
+        yield 'sanitize' => ['sanitize'];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function registryModeProvider(): iterable
+    {
+        yield from self::requiredRegistryModeProvider();
+        yield 'thread' => ['thread'];
+        yield 'fuzz' => ['fuzz'];
+    }
+
     #[DataProvider('failedQualificationProvider')]
     public function testFailedQualificationShellPropagatesFailureThroughRequiredDependency(
         string $job,
@@ -243,6 +326,55 @@ SH;
             '${{ forgejo.sha }}' => $sha,
             '${{ forgejo.ref }}' => 'refs/heads/master',
         ]);
+    }
+
+    private function registryRecipe(string $mode, bool $configured, int $validationExit = 0, int $storageHelperExit = 0): Process
+    {
+        $tools = $this->directory . '/tools';
+        (new Filesystem())->mkdir([$tools, $this->directory . '/scripts']);
+        copy(dirname(__DIR__, 5) . '/scripts/test-registry.sh', $this->directory . '/scripts/test-registry.sh');
+        $stub = <<<'SH'
+#!/bin/bash
+tool="${0##*/}"
+printf '%s %s\n' "$tool" "$*" >> "$CALL_LOG"
+case "$tool" in
+    python3)
+        case "$*" in
+            *validate_root*) exit "$VALIDATION_EXIT" ;;
+            *test_storage_cleanup.py*) exit "$STORAGE_HELPER_EXIT" ;;
+            *run_storage_contract.py*) exit 47 ;;
+        esac
+        ;;
+    tar)
+        if [[ "$*" == *openssl.tar.gz* ]]; then
+            mkdir -p "$4/openssl-3.5.3"
+            printf '#!/bin/sh\nexit 0\n' > "$4/openssl-3.5.3/Configure"
+            chmod +x "$4/openssl-3.5.3/Configure"
+        fi
+        ;;
+esac
+exit 0
+SH;
+        foreach (['cmake', 'ninja', 'c++', 'clang', 'clang++', 'make', 'perl', 'curl', 'openssl', 'python3', 'sha256sum', 'pkg-config', 'tar', 'ctest'] as $tool) {
+            file_put_contents($tools . '/' . $tool, $stub);
+            chmod($tools . '/' . $tool, 0755);
+        }
+
+        $process = new Process(['/bin/bash', 'scripts/test-registry.sh', $mode], $this->directory, [
+            'PATH' => $tools . ':' . getenv('PATH'),
+            'CALL_LOG' => $this->directory . '/registry-calls',
+            'VALIDATION_EXIT' => (string) $validationExit,
+            'STORAGE_HELPER_EXIT' => (string) $storageHelperExit,
+            'REGISTRY_FULL_DISK_ROOT' => $configured ? '/run/baander-registry-full-disk' : false,
+        ]);
+        $process->setTimeout(10);
+        return $process;
+    }
+
+    private function registryCalls(): string
+    {
+        $log = $this->directory . '/registry-calls';
+        return file_exists($log) ? file_get_contents($log) : '';
     }
 
     /** @param list<string> $arguments */

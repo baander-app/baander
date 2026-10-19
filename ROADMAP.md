@@ -106,7 +106,7 @@ only one agent host has.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
 - **Next.** Continue the remaining local [Registry release and growth](#registry-release-and-growth)
-  gates after the [stale-follower checkpoint](#stale-follower-verification-2026-10-19).
+  gates after the [full-disk checkpoint](#registry-disk-exhaustion-qualification-2026-10-19).
   The [shared media-control checkpoint](#shared-webworker-media-control-2026-10-19)
   accepts single-intention pause/seek/reconnect, saturated cancellation and encoder
   reuse on reattachment. Latest-target rapid native scrubbing remains a separate
@@ -1944,6 +1944,89 @@ injection, constrained hosts, regional networks, S3 destination restoration,
 fixed-runner performance, transitive dependency/license inventory and the 24-hour
 soak remain open.
 
+### Registry disk exhaustion qualification (2026-10-19)
+
+The native full-disk contract puts all three voter data directories on one private
+Docker tmpfs capped at **128 MiB**. It rejects missing, ordinary, oversized,
+symlinked or nonempty storage roots before allocation. Real filler writes must
+reach `ENOSPC`; valid public registrations then continue until a 503 is tied to a
+new voter storage diagnostic, within **2,048 requests or 120 seconds**. The API
+must remain live and return `Retry-After: 1` with its fixed error envelope.
+
+Every successful registration enters an acknowledgement ledger derived from the
+submitted metadata and returned revision and timestamps. After filler removal,
+the same voter directories restart; all three voters must reproduce every ledger
+row exactly, including credential digests, and the API must regain authority
+within **30 seconds**. The original credential retries the unavailable identity,
+whether it committed before restart or not, and a fresh identity must register
+and converge. Logs and the ledger stay outside the exhausted mount; cleanup
+removes only the fixture-owned child and closes the remaining resources even
+when another cleanup action fails.
+
+Release and ASan/LSan/UBSan recipes require `REGISTRY_FULL_DISK_ROOT` and the
+validated mount. Missing prerequisites and contract failures fail their required
+CI matrix variants and block publication. The local runner instructions describe
+the same Docker tmpfs setup.
+
+Verification checkpoint:
+
+- The complete optimized release recipe passed in **304.941 seconds** in a
+  disposable Debian trixie container with Clang **19.1.7**, Python **3.13.5**,
+  pinned static OpenSSL **3.5.3** and rqlite **10.5.1**. All **32 CTests** passed
+  in **0.30 seconds**, the **three existing cleanup regressions** in **0.026
+  seconds**, and the **13 storage ownership/oracle regressions** in **0.013
+  seconds**. Authenticated SQL/TLS, public HTTP, three-voter
+  partition/crash/quorum-loss, fresh binary restore and bounded load-smoke
+  contracts passed. The smoke recorded normal/burst lookup p99 of **14.17/13.95
+  ms** and sampled API peak RSS of **11.42 MiB**.
+- Release exhausted the **134,217,728-byte** mount with **133,664,768 bytes** of
+  filler and **zero available bytes**. The first pressure request returned 503
+  after **0.003321 seconds**, with voter `ENOSPC` evidence. After filler removal,
+  authority and exact acknowledged-row recovery returned in **1.794137 seconds**.
+  The unavailable identity was absent after restart; its original credential
+  retried successfully. All **five final ledger rows** converged across the
+  voters and public API, including the fresh post-recovery registration.
+- The complete ASan/LSan/UBSan recipe passed in **268.947 seconds** with the
+  same toolchain. All **32 CTests** passed in **0.74 seconds**, the **three
+  existing cleanup regressions** in **0.027 seconds**, and the strengthened
+  **14 storage regressions** in **0.014 seconds**. The authenticated transport,
+  public HTTP, three-voter failure/recovery and fresh binary restore contracts
+  also passed. Storage qualification again reached voter `ENOSPC` with the same
+  filler allocation and zero available bytes. Its first pressure request returned
+  503 after **0.007575 seconds**; recovery took **1.308930 seconds**, with all
+  **five final ledger rows** converged. The unavailable identity was absent before
+  its successful original-credential retry.
+- In the CI image, publication workflow regressions passed **37 tests / 274
+  assertions** in **1.318 seconds** of PHPUnit execution (**11.6 seconds** in the
+  ordinary lane). This adds **11 cases**; the first **seven** new cases failed
+  before gate integration. Artifacts: `var/test-runs/20261019-185645-c05adc6d`;
+  red-run log: `/tmp/baander-disk-workflow-red.log`.
+- Shell syntax, the workflow test's PHP syntax, syntax parsing of all **three**
+  changed Python files and whitespace checks pass. Log:
+  `/tmp/baander-registry-disk-20261019/static-checks.log`.
+- Final container inspection found the owned storage removed and no fixture
+  children remaining. The disposable container and tooling image tag were
+  removed; existing services and data were untouched.
+- Three-persona simplification reviews completed for both implementation units
+  without changes. Independent code review found no production defects and
+  identified one coverage gap: direct cluster cleanup failure aggregation. The
+  added regression verifies remaining teardown actions run after a cleanup
+  failure. The strengthened storage selection passed **14 tests in 0.014
+  seconds** in the isolated native container. This test-only addition follows
+  the release run's 13-test snapshot. Log:
+  `/tmp/baander-registry-disk-20261019/final-storage-tests.log`; review receipt:
+  `/tmp/compound-engineering-1000/ce-code-review/20261019-185753-d9ef317f`.
+
+Evidence: `/tmp/baander-registry-disk-20261019/`, including `release.log`,
+`sanitize.log`, `qualification-results.json`, `tool-versions.txt`,
+`final-storage-tests.log` and `static-checks.log`.
+
+The observed qualification covers bounded voter filesystem exhaustion. SQLite
+`SQLITE_FULL`, power-loss durability, whole-host capacity, further certificate
+injection, constrained snapshots/compaction, regional networks, S3 destination
+restoration, fixed-runner performance, transitive dependency/license inventory and
+the 24-hour soak retain their separate acceptance gates.
+
 ## Long-horizon acceptance backlog
 
 ### Application security and reliability
@@ -3010,6 +3093,10 @@ contracts; neither old prose nor the current branch name establishes completion.
   and five-voter partitions; reject both public lookups and verify exact row
   convergence after healing. See the
   [stale-follower checkpoint](#stale-follower-verification-2026-10-19).
+- [x] Prove public unavailability and exact acknowledged-row recovery after real
+  filesystem exhaustion across three voter data directories on a bounded tmpfs.
+  See the [full-disk checkpoint](#registry-disk-exhaustion-qualification-2026-10-19)
+  for the observed voter `ENOSPC` layer and remaining storage acceptance.
 - [ ] Complete failure qualification for simultaneous claims, wrong credentials,
   retry after uncertain commit, 3–2 partitions, total quorum loss, full disks,
   invalid TLS, graceful shutdown and rejoin without manual data merging. Existing

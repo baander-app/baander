@@ -54,16 +54,49 @@ metadata; revision, update and heartbeat milliseconds make the new lifecycle exp
 
 ## Local checks
 
-The CI entrypoint builds pinned dependencies in a disposable directory:
+The CI entrypoint builds pinned dependencies in a disposable directory. Both
+`release` and `sanitize` require `REGISTRY_FULL_DISK_ROOT` to name a dedicated,
+initially empty tmpfs mount of at most 128 MiB. Missing or unsafe storage fails the
+recipe before qualification; the full-disk contract cannot be skipped. CI mounts
+`/run/baander-registry-full-disk` with
+`rw,noexec,nosuid,nodev,size=128m,mode=0700` and sets the variable to that path.
+
+Run these modes in a disposable Linux amd64 container using the native CI runner
+image available to your environment. Set `RUNNER_IMAGE` to that existing image's
+reference; the CI job uses its configured registry and owner with
+`baander-runner:latest`. The example installs the same additional native tools as
+CI and runs the release recipe:
 
 ```sh
-bash scripts/test-registry.sh release
-bash scripts/test-registry.sh sanitize
+docker run --rm --platform linux/amd64 --user 0 \
+  --mount "type=bind,src=$PWD,dst=/workspace,readonly" \
+  --workdir /workspace \
+  --tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700 \
+  --env REGISTRY_FULL_DISK_ROOT=/run/baander-registry-full-disk \
+  "${RUNNER_IMAGE:?Set RUNNER_IMAGE to the native CI runner image}" \
+  bash -c 'apt-get update && apt-get install -y --no-install-recommends ninja-build openssl && bash scripts/test-registry.sh "$1"' bash release
+```
+
+Repeat with the final `release` argument changed to `sanitize`. Each container gets
+a new empty mount; run only one storage contract per mount at a time. Keep `/tmp`,
+logs, evidence, binaries and build outputs on a different filesystem from the
+bounded mount. Do not mount the bounded filesystem at `/tmp`, and do not attach
+existing registry data or operator volumes to these containers. The contract fills
+the filesystem with real writes and owns only its disposable child directory.
+
+Inside an equivalently provisioned runner, the entrypoints are:
+
+```sh
+REGISTRY_FULL_DISK_ROOT=/run/baander-registry-full-disk bash scripts/test-registry.sh release
+REGISTRY_FULL_DISK_ROOT=/run/baander-registry-full-disk bash scripts/test-registry.sh sanitize
 bash scripts/test-registry.sh thread
 bash scripts/test-registry.sh fuzz
 ```
 
-It compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
+The `thread` and `fuzz` recipes do not require the bounded mount or run the full-disk
+contract.
+
+The entrypoint compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
 against the official release SHA-256
 `c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf`.
 The `sanitize` mode instruments first-party targets with ASan/LSan and UBSan.
@@ -171,6 +204,28 @@ pool test replays the observed 200 error to verify next-request rotation without
 relying on that timing window. These are local emulations with TLS termination at
 the fixture forwarders, rather than certification of regional network behavior,
 physical disk/power loss or capacity.
+
+The full-disk contract places three native voters' data directories and its filler
+on the bounded tmpfs. After seeding registrations, it fills that filesystem until
+an actual write reports `ENOSPC`, then submits valid public registrations. Every
+HTTP 200 registration enters an acknowledgement ledger. Qualification requires
+both a new voter storage-capacity diagnostic and public HTTP 503 with
+`Retry-After: 1`; filler exhaustion alone is insufficient. The pressure phase fails
+if it cannot establish this evidence within 120 seconds or 2048 requests.
+
+The contract removes its filler and restarts the voters using their original data
+directories. Within 30 seconds of starting reclamation, readiness and public reads
+must recover and every voter's rows must match all acknowledged metadata,
+revisions, timestamps and credential digests. It then retries the uncertain request
+with its original credential, checks ownership whether that request committed or
+not, and verifies a fresh registration and convergence. The API stays running,
+and its liveness endpoint must return HTTP 200 during pressure and recovery.
+Readiness measures authoritative read availability; it is not a free-space oracle and may remain successful while writes fail. Logs and the
+ledger remain outside the exhausted filesystem.
+
+The local development trial observed a voter `ENOSPC` storage error. This establishes
+local filesystem-capacity failure and recovery; it does not establish SQLite's
+`SQLITE_FULL` path, physical disk or power-loss durability, or whole-host capacity.
 
 The binary restore contract writes registrations and an updated revision through
 the public API, downloads an authenticated leader SQLite backup, and checks its
