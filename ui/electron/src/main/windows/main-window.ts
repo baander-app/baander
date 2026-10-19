@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mainLog } from '../log';
+import { secureAppWindow } from '../security/harden';
+import { createRendererTrust } from '../security/renderer-trust';
 import { getThemeMoodSync } from '../../shared/config-store';
 
 let mainWindow: BrowserWindow | null = null;
@@ -107,11 +109,19 @@ export function createMainWindow() {
     },
   });
 
+  const rendererDirectory = app.isPackaged ? app.getAppPath() : join(__dirname, '../renderer');
+  const trust = createRendererTrust({
+    devServerUrl: process.env.VITE_DEV_SERVER_URL,
+    mainFilePath: join(rendererDirectory, 'index.html'),
+    configFilePath: join(rendererDirectory, 'config/index.html'),
+  });
+  secureAppWindow(mainWindow, trust);
+
   attachLoadGuards(mainWindow, 'Main window');
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
-    mainWindow.loadURL(devServerUrl).catch(err => {
+    mainWindow.loadURL(trust.mainUrl).catch(err => {
       mainLog.error('[fatal] Failed to load dev server URL', err);
       try {
         dialog.showMessageBoxSync(mainWindow!, {
@@ -124,12 +134,7 @@ export function createMainWindow() {
       app.exit(1);
     });
   } else {
-    // Determine path based on whether app is packed
-    const indexPath = app.isPackaged
-                      ? 'index.html'  // In packaged app.asar
-                      : join(__dirname, '../renderer/index.html');  // In development build
-
-    mainWindow.loadFile(indexPath).catch(err => {
+    mainWindow.loadURL(trust.mainUrl).catch(err => {
       mainLog.error('[fatal] Failed to load built index.html', err);
       try {
         dialog.showMessageBoxSync(mainWindow!, {
@@ -150,3 +155,7 @@ export function createMainWindow() {
 }
 
 (createMainWindow as any).get = () => mainWindow;
+
+export function getMainWindow() {
+  return mainWindow;
+}

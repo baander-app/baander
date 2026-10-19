@@ -2,6 +2,8 @@ import { BrowserWindow, app, dialog } from 'electron';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mainLog } from '../log';
+import { secureAppWindow } from '../security/harden';
+import { createRendererTrust } from '../security/renderer-trust';
 
 let configWindow: BrowserWindow | null = null;
 
@@ -104,12 +106,20 @@ export function createConfigWindow() {
     },
   });
 
+  const rendererDirectory = app.isPackaged ? app.getAppPath() : join(__dirname, '../renderer');
+  const trust = createRendererTrust({
+    devServerUrl: process.env.VITE_DEV_SERVER_URL,
+    mainFilePath: join(rendererDirectory, 'index.html'),
+    configFilePath: join(rendererDirectory, 'config/index.html'),
+  });
+  secureAppWindow(configWindow, trust);
+
   attachLoadGuards(configWindow, 'Config window');
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
     // Serve from Vite: /config/index.html
-    configWindow.loadURL(new URL('/config/index.html', devServerUrl).toString()).catch(err => {
+    configWindow.loadURL(trust.configUrl).catch(err => {
       mainLog.error('[fatal] Failed to load config URL', err);
       try {
         dialog.showMessageBoxSync(configWindow!, {
@@ -122,12 +132,7 @@ export function createConfigWindow() {
       app.exit(1);
     });
   } else {
-    // Determine path based on whether app is packed
-    const configPath = app.isPackaged
-                       ? 'config/index.html'  // In packaged app.asar
-                       : join(__dirname, '../renderer/config/index.html');  // In development build
-
-    configWindow.loadFile(configPath).catch(err => {
+    configWindow.loadURL(trust.configUrl).catch(err => {
       mainLog.error('[fatal] Failed to load built config HTML', err);
       try {
         dialog.showMessageBoxSync(configWindow!, {

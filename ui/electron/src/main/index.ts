@@ -1,4 +1,5 @@
 import { app, screen, globalShortcut, BrowserWindow } from 'electron';
+import { hardenSecurity } from './security/harden';
 import { installOrUpdateCorsShim } from './security/cors-shim';
 import { createMainWindow } from './windows/main-window';
 import { createConfigWindow } from './windows/config-window';
@@ -44,6 +45,7 @@ function getRendererOrigin() {
 }
 
 app.whenReady().then(async () => {
+  hardenSecurity();
   // Register custom protocol for serving WASM files (before creating windows)
   registerWasmProtocol();
 

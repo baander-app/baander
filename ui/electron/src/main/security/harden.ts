@@ -1,28 +1,25 @@
-import { app, session } from 'electron';
-import { getServerUrl } from '../../shared/config-store';
+import { session } from 'electron';
+import type { BrowserWindow } from 'electron';
+import { registerTrustedWindow, type RendererTrust } from './renderer-trust';
+
+export function secureAppWindow(window: BrowserWindow, trust: RendererTrust) {
+  registerTrustedWindow(window, trust);
+  const contents = window.webContents;
+  contents.on('will-navigate', (event, url) => {
+    if (!trust.isTrusted(url)) event.preventDefault();
+  });
+  contents.on('will-frame-navigate', event => {
+    if (!trust.isTrusted(event.url)) event.preventDefault();
+  });
+  contents.on('will-redirect', (event, url) => {
+    if (!trust.isTrusted(url)) event.preventDefault();
+  });
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+}
 
 export function hardenSecurity() {
-  app.commandLine.appendSwitch('disable-site-isolation-trials');
-
-  // Disable or restrict navigation to unknown origins
-  app.on('web-contents-created', (_event, contents) => {
-    contents.on('will-navigate', (e, url) => {
-      const allowed = ['file:', 'http://localhost:', 'https://localhost:', `${getServerUrl()}:`];
-      if (!allowed.some(a => url.startsWith(a))) e.preventDefault();
-    });
-
-    contents.setWindowOpenHandler(({ url }) => {
-      const allowed = ['https://', 'http://'];
-      if (allowed.some(a => url.startsWith(a))) {
-        return { action: 'allow' };
-      }
-      return { action: 'deny' };
-    });
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
+    callback(false);
   });
-
-  // Example CSP and permissions tightening
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    const allowed: Array<string> = [];
-    cb(allowed.includes(permission));
-  });
+  session.defaultSession.setPermissionCheckHandler(() => false);
 }
