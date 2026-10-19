@@ -64,14 +64,15 @@ def load_config(path):
 def validate_headers(headers):
     # curl retains HTTP/1.1 trailers in dump-header output. CONNECT and interim
     # response blocks may precede the actual response.
-    blocks = headers.decode('iso-8859-1').replace('\r\n', '\n').split('\n\n')
+    decoded = headers.decode('iso-8859-1')
+    blocks = decoded.replace('\r\n', '\n').split('\n\n')
     responses = [block for block in blocks if block.startswith('HTTP/')]
     if not responses or responses[-1].split('\n', 1)[0].split()[1:2] != ['200']:
         raise BackupError('snapshot HTTP status was not 200')
     fields = responses[-1].split('\n')[1:]
     if not any(line.lower().split(';', 1)[0].strip() == 'content-type: application/octet-stream' for line in fields):
         raise BackupError('snapshot content type was not binary')
-    for line in headers.decode('iso-8859-1').splitlines():
+    for line in decoded.splitlines():
         key, separator, value = line.partition(':')
         if separator and key.lower() == 'x-stream-error' and value.strip():
             raise BackupError('snapshot stream reported an error')
@@ -138,7 +139,7 @@ def capture(config, output, deadline):
                             selector.unregister(stream)
                             if plain_done:
                                 stream.close()
-                        if len(pending) < 65536 and not plain_done and curl.stdout not in [entry.fileobj for entry in selector.get_map().values()]:
+                        if len(pending) < 65536 and not plain_done and curl.stdout not in selector.get_map():
                             selector.register(curl.stdout, selectors.EVENT_READ, 'plain')
                         continue
                     data = os.read(stream.fileno(), 65536)
@@ -164,7 +165,7 @@ def capture(config, output, deadline):
                         pending.extend(data)
                         if len(pending) >= 65536:
                             selector.unregister(curl.stdout)
-                        if age.stdin not in [entry.fileobj for entry in selector.get_map().values()]:
+                        if age.stdin not in selector.get_map():
                             selector.register(age.stdin, selectors.EVENT_WRITE, 'input')
             for child in children:
                 try:
