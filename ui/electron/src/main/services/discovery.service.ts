@@ -167,28 +167,49 @@ export class DiscoveryService extends EventEmitter {
    * Handle discovery response from server
    */
   private handleResponse(msg: Buffer, rinfo: dgram.RemoteInfo): void {
+    let parsed: unknown;
     try {
-      const data = JSON.parse(msg.toString('utf-8'));
-      const server: DiscoveredServer = {
-        name: data.name,
-        url: data.url,
-        version: data.version,
-        apiVersion: data.api_version,
-        timestamp: data.timestamp,
-        lastSeen: Date.now(),
-      };
+      parsed = JSON.parse(msg.toString('utf-8'));
+    } catch {
+      return;
+    }
 
-      // Use URL as unique key
-      const key = server.url;
-      const existing = this.discoveredServers.get(key);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return;
+    }
 
-      if (!existing || server.lastSeen > existing.lastSeen) {
-        this.discoveredServers.set(key, server);
-        this.emit('server-found', server);
+    const data = parsed as Record<string, unknown>;
+    if (typeof data.name !== 'string' || typeof data.url !== 'string'
+      || typeof data.version !== 'string' || typeof data.api_version !== 'string'
+      || typeof data.timestamp !== 'string') {
+      return;
+    }
+
+    try {
+      const url = new URL(data.url);
+      if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !url.hostname) {
+        return;
       }
-    } catch (err) {
-      // Ignore invalid responses
-      this.emit('error', new Error(`Invalid discovery response: ${err}`));
+    } catch {
+      return;
+    }
+
+    const server: DiscoveredServer = {
+      name: data.name,
+      url: data.url,
+      version: data.version,
+      apiVersion: data.api_version,
+      timestamp: data.timestamp,
+      lastSeen: Date.now(),
+    };
+
+    // Use URL as unique key
+    const key = server.url;
+    const existing = this.discoveredServers.get(key);
+
+    if (!existing || server.lastSeen > existing.lastSeen) {
+      this.discoveredServers.set(key, server);
+      this.emit('server-found', server);
     }
   }
 
