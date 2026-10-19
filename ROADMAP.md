@@ -27,7 +27,10 @@ retain requirements or deferred scope, without making every item a next task.
   and [desktop renderer security](#desktop-renderer-security-2026-10-19)
   are delivered locally. The
   [desktop discovery rendering fix](#desktop-discovery-rendering-2026-10-19)
-  is also delivered locally. Actual-destination backup acceptance remains deferred.
+  is also delivered locally.
+  [Store timeline navigation](#store-timeline-navigation-2026-10-19) and inspection
+  of selected captured state are delivered locally. General reconstruction and
+  replay remain open; actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -3324,6 +3327,45 @@ Verification checkpoint:
 - Simplification review found no changes needed. Independent code review
   completed with zero findings.
 
+### Store timeline navigation (2026-10-19)
+
+The recorded store timeline now has an event cursor and read-only inspection,
+following the
+[reviewed plan](docs/plans/2026-10-19-store-timeline-navigation-plan.md). Developers
+can select a retained event and move through the filtered order. An update shows
+its own captured before and after values, completeness and existing redaction or
+truncation markers. Actions and completions report that they have no state capture.
+
+New live events preserve the selected event ID. Filtering it out, clearing the
+recorder or evicting the event removes selection. Navigation does not change live
+stores or trigger effects, and missing captures are never replaced with another
+event's values or the latest store map. Schema v1 has no store registration epoch
+or historical baseline; general multi-store reconstruction and replay remain open.
+
+Verification checkpoint:
+
+- In the frontend CI image built from `docker/runner/Dockerfile`, tagged
+  `baander-runner:desktop-verification`, the focused selection passes **16 tests
+  in 1.58 seconds**: five timeline cases, including four new cases, and eleven
+  existing recorder cases. The full web suite passed **2,104 tests in 186 files
+  in 33.21 seconds** before behavior-preserving simplification; the focused and
+  browser checks passed again afterward. The full suite was not repeated.
+- The extended debugger browser case passes **1/1 in 3.1 seconds**, through the
+  disposable local `debug.baander.app` HTTPS fixture. Desktop **1280×900** and
+  narrow **390×844** views show no document or capture overflow. It uses existing
+  Playwright tooling because the `agent-browser` CLI is unavailable.
+- Final web and worker TypeScript checks, affected-file ESLint and the Vite build
+  pass; the build takes **701 ms**. Full ESLint passed before simplification with
+  zero errors and seven existing warnings; the final affected-file check has zero
+  errors and warnings. Independent code review completed with zero findings or
+  testing gaps. Evidence:
+  `var/test-runs/store-timeline-navigation-20261019/`.
+- The adjacent release-image reconciliation uses existing source: `Dockerfile`
+  places source, local packages and patches before Composer; the production
+  container runner checks defaults, and CI builds and invokes that runner. No new
+  release-image build or runtime test was performed for this reconciliation.
+  Application backup restoration remains deferred.
+
 ### Registry release and growth
 
 The local contracts listed below are implemented and covered. The entries
@@ -3438,10 +3480,15 @@ automatic quorum reduction. This is not the current implementation priority.
   repeat no-op migration on disposable PostgreSQL. See
   [migration consolidation](#doctrine-migration-consolidation-2026-10-17).
   Worker/container startup and health checks retain their recorded scope.
-- [ ] Rehearse application backup restoration before migration rollout and reconcile
-  release-image dependency-copy ordering and environment defaults against existing
-  image checks. These release prerequisites do not reopen covered migration or
-  runtime behavior.
+- [x] Reconcile release-image dependency ordering and production defaults against
+  existing implementation and CI. `Dockerfile` copies application source, local
+  packages and patches before Composer; the production worker container check
+  validates production defaults and runs in CI. This source reconciliation adds
+  no image build or test run; see the
+  [timeline delivery checkpoint](#store-timeline-navigation-2026-10-19).
+- [ ] Rehearse application backup restoration before migration rollout. This
+  deferred release prerequisite does not reopen covered migration or runtime
+  behavior.
 - [x] Align first-party manifests/documentation to Apache-2.0 while retaining
   vendored third-party notices. See [license alignment](#first-party-license-alignment)
   and the Registry direct-license gate above. Packaged transitive-license
@@ -3459,8 +3506,13 @@ automatic quorum reduction. This is not the current implementation priority.
 - [ ] Define replay scope explicitly: pure state transitions versus asynchronous
   completion, external input, network effects, native media, and nonserializable
   objects. Record enough provenance for deterministic supported cases.
-- [ ] Add timeline navigation and isolated state reconstruction before any live replay.
-  Never execute stored functions or silently replay external effects from imported traces.
+- [x] Add timeline navigation and read-only inspection of the selected update's
+  own captured before and after values. See
+  [store timeline navigation](#store-timeline-navigation-2026-10-19).
+- [ ] Define general multi-store historical reconstruction before live replay.
+  Selected-event inspection does not reconstruct other stores or fill gaps from
+  newer captures. Never execute stored functions or silently replay external
+  effects from imported traces.
 - [ ] Add deterministic replay/reference tests and a version-upgrade policy when actual
   replay is implemented. A diagnostic timeline is not yet an event-sourced application.
 - [x] Retain disabled instrumentation and unrelated-render performance gates. Their
