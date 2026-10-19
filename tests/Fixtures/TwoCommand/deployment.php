@@ -141,12 +141,12 @@ function url(string $path): string
  * @param array<string, mixed> $state
  * @return array<string, mixed>
  */
-function decodeVideo(StreamClient $client, array $state): array
+function decodeVideo(StreamClient $client, array $state, float $readinessSeconds = 45): array
 {
     $playback = await(static function () use ($client, $state): array|false {
         $value = playback($client, $state);
         return ($value['ready'] ?? false) ? $value : false;
-    }, 'worker publishes current generation', 45);
+    }, 'worker publishes current generation', $readinessSeconds);
     $master = (new HttpExchange(url($playback['manifestUrl']), []))->complete();
     ensure($master->status() === 200, 'Master playlist is unavailable: ' . $master->body);
     preg_match('~^([^#\r\n][^\r\n]*)~m', $master->body, $mediaMatch);
@@ -163,7 +163,57 @@ function decodeVideo(StreamClient $client, array $state): array
     $path = ROOT . '/decoded-generation-' . $playback['generation'] . '.mp4';
     file_put_contents($path, $init->body . $segment->body);
     command(['ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', $path, '-map', '0:v:0', '-f', 'null', '-']);
-    return $playback + ['mediaUrl' => $mediaUrl, 'segmentUrl' => url($segmentMatch[1]), 'decodedBytes' => strlen($init->body) + strlen($segment->body)];
+    return $playback + ['mediaUrl' => $mediaUrl, 'initUrl' => url($initMatch[1]), 'segmentUrl' => url($segmentMatch[1]), 'decodedBytes' => strlen($init->body) + strlen($segment->body)];
+}
+/**
+ * @param array<string,mixed> $decoded
+ * @return array<string,mixed>
+ */
+function videoEvidence(array $decoded): array
+{
+    return array_intersect_key($decoded, array_flip([
+        'jobId', 'sessionId', 'ready', 'generation', 'revision', 'status',
+        'position', 'startTime', 'duration', 'renditionSet', 'decodedBytes',
+    ]));
+}
+/**
+ * @param array<string,mixed> $state
+ * @param array<string,mixed> $decoded
+ * @return array<string,mixed>
+ */
+function retainVideoOutput(Doctrine\DBAL\Connection $db, array $state, array $decoded, string $name): array
+{
+    $runtime = row($db, $state);
+    ensure((int) $runtime['generation'] === (int) $decoded['generation'], 'Output changed generation during retention.');
+    parse_str((string) parse_url($decoded['segmentUrl'], PHP_URL_QUERY), $query);
+    ensure(isset($query['index']) && ctype_digit((string) $query['index']), 'Retained fragment omitted its index.');
+    $fragments = glob($runtime['output_directory'] . '/*_' . $query['index'] . '.m4s') ?: [];
+    ensure(count($fragments) === 1, 'Cannot identify exact retained fragment.');
+    $files = [];
+    foreach (['init' => $runtime['output_directory'] . '/init.mp4', 'media' => $fragments[0]] as $kind => $path) {
+        $copy = ROOT . '/retained-' . $name . '-' . $kind . '.bin';
+        ensure(is_file($path) && filesize($path) > 0 && copy($path, $copy) && chmod($copy, 0600), 'Cannot retain closed native output.');
+        $files[$kind] = ['path' => $path, 'copy' => $copy, 'url' => $decoded[$kind === 'init' ? 'initUrl' : 'segmentUrl']];
+    }
+    return ['generation' => (int) $decoded['generation'], 'files' => $files];
+}
+/**
+ * @param array<string,mixed> $retained
+ * @return array<string,int>
+ */
+function rejectRetiredVideoOutput(array $retained): array
+{
+    $statuses = [];
+    foreach ($retained['files'] as $kind => $file) {
+        $directory = dirname($file['path']);
+        ensure(is_dir($directory) || mkdir($directory, 0750, true), 'Cannot restore retired output directory.');
+        ensure(copy($file['copy'], $file['path']) && filesize($file['path']) > 0, 'Retired output bytes are absent.');
+        // Each request starts after retirement; already-open responses have their own boundary.
+        $response = (new HttpExchange($file['url'], []))->complete(5);
+        ensure(in_array($response->status(), [403, 404, 410], true), 'Retired generation ' . $kind . ' remained deliverable: HTTP ' . $response->status());
+        $statuses[$kind] = $response->status();
+    }
+    return $statuses;
 }
 $mode = $argv[1] ?? '';
 $started = microtime(true);
@@ -216,6 +266,8 @@ if ($mode === 'prepare') {
     ensure(in_array($direct->status(), [200, 206], true) && strlen($direct->body) > 0, 'Direct delivery failed without a worker.');
     ensure((new HttpExchange(BASE . '/live', []))->complete()->status() === 200, 'Web liveness failed without a worker.');
     $result = ['videoStatus' => $video->status(), 'audioStatus' => $status, 'directStatus' => $direct->status()];
+} elseif ($mode === 'media-control') {
+    require __DIR__ . '/media-control.php';
 } elseif ($mode === 'capacity') {
     $state = state(); $auth = $client(); $sessions = [];
     foreach (['360p', '480p', '720p'] as $quality) {
@@ -303,7 +355,8 @@ if ($mode === 'prepare') {
     ensure(count(array_unique($sessions)) === 1, 'Concurrent web attachments did not converge.');
     $state['session'] = $sessions[0]; save($state);
     ensure((int) $db->fetchOne('SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id WHERE j.public_id=?', [$state['job']]) === 1, 'Duplicate durable video owner.');
-    $decoded = decodeVideo($auth, $state); $state['oldSegmentUrl'] = $decoded['segmentUrl']; save($state);
+    $decoded = decodeVideo($auth, $state);
+    $state['initialOutput'] = retainVideoOutput($db, $state, $decoded, 'initial'); save($state);
     $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000');
     ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Worker did not produce progressive audio.');
     $audioRow = $db->fetchAssociative("SELECT state, worker_boot_id FROM audio_rendition_runtime WHERE bitrate=192000");
@@ -322,7 +375,7 @@ if ($mode === 'prepare') {
     ensure($recommendation->status() === 202 && (jsonBody($recommendation)['data']['execution'] ?? null) === 'async', 'Recommendation admission lost its typed asynchronous response.');
     $recommendationId = jsonBody($recommendation)['data']['public_id'];
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
-    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => $decoded, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
     $state = state(); $auth = $client();
     if ($mode === 'seek-paused' || $mode === 'pause-absent') {
@@ -347,15 +400,15 @@ if ($mode === 'prepare') {
         $result['staleGenerationIgnored'] = true;
         if ($mode === 'seek-paused') {
             ensure((int) $current['generation'] > (int) $before['generation'], 'Seek did not advance the generation.');
-            $old = (new HttpExchange($state['oldSegmentUrl'], []))->complete();
-            ensure($old->status() !== 200, 'Old-generation media remained deliverable.');
-            $result['oldGenerationStatus'] = $old->status();
+            $result['retiredInitialOutputStatuses'] = rejectRetiredVideoOutput($state['initialOutput']);
         }
         $state['generation'] = (int) $current['generation']; save($state);
     } elseif ($mode === 'resume') {
         $resume = twoCommandExchange($auth, '/api/transcode/sessions/' . $state['session'] . '/resume', 'PATCH')->complete();
         ensure($resume->status() === 200, 'Resume failed: ' . $resume->body);
         $current = acknowledged($db, $state, 'running', 30);
+        $decoded = decodeVideo($auth, $state);
+        $state['preTakeoverOutput'] = retainVideoOutput($db, $state, $decoded, 'pre-takeover'); save($state);
     } else {
         $cancel = twoCommandExchange($auth, '/api/transcode/sessions/' . $state['session'], 'DELETE')->complete();
         ensure($cancel->status() === 200, 'Cancel failed: ' . $cancel->body);
@@ -368,7 +421,10 @@ if ($mode === 'prepare') {
     ensure((int) $current['generation'] >= $state['generation'], 'Recovery regressed generation.');
     $decoded = decodeVideo($auth, $state);
     ensure($decoded['status'] === 'paused' && (float) $decoded['position'] === 30.0, 'Recovered playback lost paused position.');
-    $result = ['workerBoot' => $current['worker_boot_id'], 'playback' => $decoded];
+    ensure((int) $current['generation'] > $state['preTakeoverOutput']['generation'], 'Successor did not advance the retired execution generation.');
+    $retiredStatuses = rejectRetiredVideoOutput($state['preTakeoverOutput']);
+    $result = ['workerBoot' => $current['worker_boot_id'], 'playback' => videoEvidence($decoded),
+        'retiredGeneration' => $state['preTakeoverOutput']['generation'], 'retiredOutputStatuses' => $retiredStatuses, 'retainedOutputFiles' => count($retiredStatuses)];
 } elseif ($mode === 'dependency') {
     $response = twoCommandExchange($client(), '/api/admin/recommendations/generate', 'POST', ['mode' => 'full'])->complete(15);
     ensure($response->status() >= 500, 'Unavailable queue did not refuse admission.');

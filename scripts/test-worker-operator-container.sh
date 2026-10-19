@@ -2,7 +2,7 @@
 set -euo pipefail
 if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     timeout_seconds=240
-    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}" ]; then timeout_seconds=600; fi
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-}" ]; then timeout_seconds=600; fi
     exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout "${timeout_seconds}s" bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
@@ -13,12 +13,19 @@ operator_in_container="${BAANDER_TEST_OPERATOR_IN_CONTAINER:-0}"
 [[ "$operator_in_container" = 0 || "$operator_in_container" = 1 ]] || {
     echo 'BAANDER_TEST_OPERATOR_IN_CONTAINER must be 0 or 1.' >&2; exit 1;
 }
+media_observation="${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-0}"
+[[ "$media_observation" = 0 || "$media_observation" = 1 ]] || {
+    echo 'BAANDER_TEST_MEDIA_CONTROL_OBSERVATION must be 0 or 1.' >&2; exit 2;
+}
 use_image="${BAANDER_TEST_USE_IMAGE:-0}"
 [[ "$use_image" = 0 || "$use_image" = 1 ]] || {
     echo 'BAANDER_TEST_USE_IMAGE must be 0 or 1.' >&2; exit 1;
 }
 if [ "$use_image" = 1 ] && { [ "$operator_in_container" != 1 ] || [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; }; then
     echo 'BAANDER_TEST_USE_IMAGE requires container operator mode and checkout in the image.' >&2; exit 1;
+fi
+if [ "$media_observation" = 1 ] && [ "$use_image" = 1 ]; then
+    echo 'Native launch observation requires a disposable fixture image.' >&2; exit 2
 fi
 php_binary="${BAANDER_TEST_PHP_BINARY:-php}"
 if [ "$operator_in_container" = 0 ]; then
@@ -89,6 +96,9 @@ cleanup() {
     fi
     if [ "$two_command" = 1 ] && [ -n "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; then
         timeout 30s "$BAANDER_TEST_TWO_COMMAND_CHECKPOINT" cleanup "$artifacts" "${web_base:-}" || cleanup_status=1
+    fi
+    if [ "$media_observation" = 1 ]; then
+        cleanup_docker cp "$web_name:/var/www/html/storage/two-command/native-launches.jsonl" "$artifacts/native-launches.jsonl" >/dev/null 2>&1 || true
     fi
     # Stop the operator before any worker it could create or control.
     local -a container_names=("$run_id-controller" "$web_name" "$run_id-media-prepare" "$run_id-host-probe" "$run_id-client"
@@ -244,6 +254,12 @@ ARG FIXTURE_BASE=scratch
 FROM ${FIXTURE_BASE}
 USER root
 COPY --chown=www-data:www-data checkout/ /var/www/html/
+ARG MEDIA_CONTROL_OBSERVATION=0
+RUN if [ "$MEDIA_CONTROL_OBSERVATION" = 1 ]; then \
+        mkdir -p /usr/lib/baander-fixture && mv /usr/bin/ffmpeg /usr/lib/baander-fixture/ffmpeg \
+        && cp /var/www/html/tests/Fixtures/Worker/media-control-ffmpeg.php /usr/bin/ffmpeg \
+        && chmod 755 /usr/bin/ffmpeg; \
+    fi
 RUN rm -rf /var/www/html/var/cache && mkdir -p /var/www/html/var/cache /var/www/html/var/log && chown -R www-data:www-data /var/www/html/var
 RUN rm -rf /var/www/html/config/secrets && mkdir -p /var/www/html/config/secrets/oauth \
     && openssl genrsa -out /var/www/html/config/secrets/oauth/private.key 2048 2>/dev/null \
@@ -256,11 +272,20 @@ HEALTHCHECK NONE
 ENTRYPOINT ["/usr/local/bin/php"]
 CMD []
 DOCKERFILE
-docker_local build --pull=false --build-arg "FIXTURE_BASE=$fixture_base" --tag "$fixture_image" "$work" > "$work/build.log" 2>&1 || {
+docker_local build --pull=false --build-arg "FIXTURE_BASE=$fixture_base" --build-arg "MEDIA_CONTROL_OBSERVATION=$media_observation" --tag "$fixture_image" "$work" > "$work/build.log" 2>&1 || {
     tail -40 "$work/build.log" >&2; exit 1;
 }
 image_id="$(docker_local image inspect --format '{{.Id}}' "$fixture_image")"
 controller_base="$fixture_image"
+fi
+if [ "$media_observation" = 1 ]; then
+    docker_local run --rm --name "$run_id-host-probe" --network none --entrypoint /usr/bin/ffmpeg \
+        "$image_id" -version > "$artifacts/ffmpeg-version.txt"
+    if docker_local run --rm --name "$run_id-host-probe" --network none --entrypoint /usr/bin/ffmpeg \
+        "$image_id" -baander-invalid-option > "$artifacts/ffmpeg-invalid.stdout" 2> "$artifacts/ffmpeg-invalid.stderr"; then
+        echo 'Native launch observer did not preserve a failing encoder exit.' >&2; exit 1
+    fi
+    test -s "$artifacts/ffmpeg-version.txt" && test -s "$artifacts/ffmpeg-invalid.stderr"
 fi
 if [ "$operator_in_container" = 1 ]; then
     # Docker's official CLI releases use static binaries. Check both that property
@@ -647,6 +672,9 @@ video = [p for p in snapshot['encoders'] if p['arguments'][0].endswith('ffmpeg')
 assert len(video) == 1, 'Concurrent attachments must have exactly one actual video encoder'
 PYOWNER
     checkpoint attached
+    if [ "$media_observation" = 1 ] && [ -n "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; then
+        checkpoint client-controls
+    fi
     combined_phase seek-paused
     snapshot worker "$worker_name" worker-paused
     checkpoint sought-paused
@@ -744,6 +772,9 @@ PYBOOT
     operator recover 0
     host_identities verify < "$artifacts/recovered-host-identities.json" > "$artifacts/final-containment.json"
     test -z "$(docker_local container ls --all --filter "name=^/$worker_name$" --format '{{.ID}}')"
+    if [ "$media_observation" = 1 ]; then
+        docker_local exec "$web_name" php tests/Fixtures/Worker/MediaControlObservation.php verify > "$artifacts/native-launch-summary.json"
+    fi
     checkpoint complete
     python3 - "$artifacts" <<'PYSUMMARY'
 import json, pathlib, sys

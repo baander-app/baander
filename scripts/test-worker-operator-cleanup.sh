@@ -107,6 +107,7 @@ state_volume=fixture-media-state
 secrets_volume=fixture-web-secrets
 ipc_volume=fixture-worker-ipc
 two_command=${CLEANUP_TWO_COMMAND:-1}
+media_observation=1
 lifecycle_phase=${CLEANUP_LIFECYCLE_PHASE:-}
 lifecycle_fault_container=${CLEANUP_FAULT_CONTAINER:-}
 operator_in_container=1
@@ -159,6 +160,7 @@ set -euo pipefail
 artifacts=$1
 stopped=$2
 run_id=fixture
+media_observation=0
 worker_name=worker-current
 control_name=control-current
 web_name=fixture-web

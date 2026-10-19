@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 // Runs only through docker exec in the disposable execution cgroup.
 $mode = $argv[1] ?? '';
-$deadline = hrtime(true) + 75_000_000_000;
+$seconds = filter_var($argv[2] ?? '75', FILTER_VALIDATE_INT);
+if ($seconds === false || $seconds < 1 || $seconds > 300) {
+    throw new InvalidArgumentException('Pressure duration must be between one and 300 seconds.');
+}
+$deadline = hrtime(true) + $seconds * 1_000_000_000;
 $startTicks = static function (int $pid): ?string {
     $stat = @file_get_contents('/proc/' . $pid . '/stat');
     if (!is_string($stat) || ($end = strrpos($stat, ') ')) === false) { return null; }
