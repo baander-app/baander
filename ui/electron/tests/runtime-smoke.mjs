@@ -72,6 +72,53 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     return result;
   }
 
+  async function exerciseDiscovery(page) {
+    const advertisedUrl = `${apiUrl}/music/" data-injected="yes`;
+    const announcement = {
+      name: '<img src="x" onerror="window.discoveryInjected = true">',
+      url: advertisedUrl,
+      version: '<img src="x" onerror="window.discoveryInjected = true">',
+      apiVersion: '1',
+      timestamp: '2026-10-19T00:00:00Z',
+      lastSeen: 1,
+    };
+    const send = server => application.evaluate(({ BrowserWindow }, value) => {
+      const config = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().includes('/config/index.html'));
+      config.webContents.send('baander:discovery:server-found', value);
+    }, server);
+    await send(announcement);
+    const row = page.locator('.server-item').first();
+    await row.waitFor();
+    assert.equal(await page.locator('#serversList img').count(), 0, 'discovery metadata must not create HTML elements');
+    assert.equal(await page.locator('[data-injected]').count(), 0, 'advertised URL must not create attributes');
+    assert.equal(await page.evaluate(() => window.discoveryInjected), undefined);
+    assert.equal(await row.locator('.server-name').textContent(), announcement.name);
+    assert.equal(await row.locator('.server-url').textContent(), advertisedUrl);
+    assert.equal(await row.locator('.server-meta').textContent(), `v${announcement.version}`);
+    await row.click();
+    assert.equal(await page.locator('#serverUrl').inputValue(), advertisedUrl);
+    assert.equal(await page.evaluate(() => window.BaanderElectron.config.getServerUrl()), '', 'selecting a row must not save configuration');
+
+    await send({ ...announcement, name: 'Local Baander', url: `${apiUrl}/music`, version: '1.0' });
+    await expect(page.locator('.server-item')).toHaveCount(2);
+    await page.locator('.server-item').last().click();
+    assert.equal(await page.locator('#serverUrl').inputValue(), `${apiUrl}/music`);
+    await send(announcement);
+    await expect(page.locator('.server-item')).toHaveCount(2);
+
+    // Clear the list through its scan button without sending UDP broadcasts.
+    await application.evaluate(({ ipcMain }) => {
+      ipcMain.removeHandler('baander:discovery:start-scan');
+      ipcMain.handle('baander:discovery:start-scan', () => ({ success: true }));
+    });
+    await page.locator('#discoverBtn').click();
+    await expect(page.locator('.server-item')).toHaveCount(0);
+    assert.equal(await page.locator('.no-servers').textContent(), 'No servers found on your network');
+    await send({ ...announcement, name: 'Local Baander', url: apiUrl, version: '1.0' });
+    await page.locator('.server-item').click();
+    assert.equal(await page.locator('#serverUrl').inputValue(), apiUrl);
+  }
+
   async function launch(mode, configured) {
     const userData = resolve(scratch, mode);
     const env = { ...process.env, DISPLAY: `:${displayNumber}`, BAANDER_SMOKE_DATA: userData };
@@ -83,6 +130,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await page.waitForFunction(() => Boolean(window.BaanderElectron?.config), null, { timeout: 10000 });
     if (!configured) {
       assert.match(page.url(), /config\/index.html$/);
+      await exerciseDiscovery(page);
       await page.evaluate(async server => {
         if (!await window.BaanderElectron.config.setServerUrl(server)) throw new Error('Save failed');
       }, apiUrl);
@@ -127,7 +175,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await exercise(page);
     await application.close();
     application = undefined;
-    console.log(`${mode}: setup handoff, configured startup, API access, reload, blocked navigation/popup and titlebar controls passed`);
+    console.log(`${mode}: literal discovery metadata/selection, setup handoff, configured startup, API access, reload, blocked navigation/popup and titlebar controls passed`);
   }
   assert.ok(apiCalls >= 4);
 } finally {

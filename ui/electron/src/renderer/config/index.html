@@ -169,26 +169,29 @@
     }
 
     discoveredServers.classList.add('has-servers');
-    serversList.innerHTML = discoveredServersData.map(server => `
-      <div class="server-item" data-url="${server.url}">
-        <div class="server-name">${escapeHtml(server.name)}</div>
-        <div class="server-url">${escapeHtml(server.url)}</div>
-        <div class="server-meta">v${server.version}</div>
-      </div>
-    `).join('');
+    const rows = discoveredServersData.map(server => {
+      const row = document.createElement('div');
+      row.className = 'server-item';
 
-    // Add click handlers
-    document.querySelectorAll('.server-item').forEach(item => {
-      item.addEventListener('click', () => {
-        input.value = item.getAttribute('data-url');
+      const name = document.createElement('div');
+      name.className = 'server-name';
+      name.textContent = server.name;
+
+      const url = document.createElement('div');
+      url.className = 'server-url';
+      url.textContent = server.url;
+
+      const version = document.createElement('div');
+      version.className = 'server-meta';
+      version.textContent = `v${server.version}`;
+
+      row.append(name, url, version);
+      row.addEventListener('click', () => {
+        input.value = server.url;
       });
+      return row;
     });
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    serversList.replaceChildren(...rows);
   }
 
   // Save button handler
