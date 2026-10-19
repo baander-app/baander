@@ -25,7 +25,9 @@ retain requirements or deferred scope, without making every item a next task.
   [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19),
   [encrypted Registry backup automation](#registry-encrypted-backups-2026-10-19)
   and [desktop renderer security](#desktop-renderer-security-2026-10-19)
-  are delivered locally. Actual-destination backup acceptance remains deferred.
+  are delivered locally. The
+  [desktop discovery rendering fix](#desktop-discovery-rendering-2026-10-19)
+  is also delivered locally. Actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -3281,6 +3283,46 @@ Electron version support, CSP redesign, main-window sandbox migration and the
 configuration page's discovery-result HTML interpolation remain outside this
 patch's acceptance scope. React Native and Android remain deferred. No release
 certification follows from the desktop checkpoint.
+
+The discovery-result interpolation deferred above is addressed by the later
+[desktop discovery rendering checkpoint](#desktop-discovery-rendering-2026-10-19).
+
+### Desktop discovery rendering (2026-10-19)
+
+The desktop discovery change follows the
+[reviewed plan](docs/plans/2026-10-19-desktop-discovery-rendering-plan.md).
+Discovered server rows use DOM elements and text nodes for the advertised name,
+URL and version. A row listener captures the accepted URL for selection; selecting
+a row fills the existing input and leaves saving to the user.
+
+Discovery receipt accepts only JSON objects with string name, URL, version, API
+version and timestamp fields, and an absolute HTTP(S) URL with a hostname. Local
+HTTP servers, IP literals, ports and paths remain supported. Invalid announcements
+leave the collection unchanged and are ignored without emitting an unhandled
+error; later valid responses still work. Discovery advertisements remain
+unauthenticated, and this patch does not change broadcast targets or timers.
+
+Verification checkpoint:
+
+- The real first-run renderer regression failed before the fix: crafted discovery
+  metadata created an injected image element instead of literal text.
+- The frontend CI image built from `docker/runner/Dockerfile`, tagged
+  `baander-runner:desktop-verification`, passes **37 Node tests in 303.287 ms**:
+  the 14 existing cases and 23 focused discovery cases. A fake datagram socket
+  proves accepted response shapes, invalid-input rejection and later recovery.
+- All three actual desktop TypeScript projects pass in that image. The desktop
+  build passes in **19.93 seconds**. Whitespace checks pass; the desktop workspace
+  has no lint script.
+- The native Electron smoke passes **four launches in 6.69 seconds**. Built-file
+  and development-origin first-run windows display crafted metadata literally,
+  create no injected elements or attributes, fill the selected URL without saving,
+  and preserve repeat rows and clearing. Existing startup, API, navigation and
+  titlebar checks remain green. The renderer receives crafted events through main
+  IPC; fake-socket service regressions cover UDP receipt separately. No real UDP
+  broadcast is used. Evidence:
+  `var/test-runs/desktop-discovery-rendering-20261019/`.
+- Simplification review found no changes needed. Independent code review
+  completed with zero findings.
 
 ### Registry release and growth
 
