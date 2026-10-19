@@ -20,16 +20,18 @@ selection and status summary. Dated handoffs, measurements and limitation lists
 below record their own checkpoints; they do not assign new work. Unchecked items
 retain requirements or deferred scope, without making every item a next task.
 
-- **Next implementation priority:** define and repair latest-target behavior for
-  [rapid native scrubbing](#worker-architecture-and-resource-control). Consecutive
-  targets can carry a generation retired by the first accepted seek. This is an
-  existing interaction gap; the single-intention media-control scope is accepted.
-  This documentation cleanup does not implement that repair.
+- **Next implementation priority:** select the next concrete bug, unfinished
+  feature or named release decision by the rule below. Latest-target
+  [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19) is delivered locally;
+  consecutive native targets settle at the latest target while pause/resume
+  ordering and generation fences remain enforced.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
-  and shared media control retain their recorded evidence. The latest full backend
-  checkpoint is **10,062 tests / 82,056 assertions**, followed by the focused
-  checks described in [shared media control](#shared-webworker-media-control-2026-10-19).
+  and shared media control retain their recorded evidence. The historical full
+  backend checkpoint remains **10,062 tests / 82,056 assertions**, followed by
+  focused checks for [shared media control](#shared-webworker-media-control-2026-10-19)
+  and [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19); it was not rerun
+  for the scrubbing fix.
   Registry registration, authoritative reads, local failure/recovery, transport TLS,
   sanitizers and bounded load checks are covered; see the reconciled
   [Registry status](#registry-release-and-growth).
@@ -1465,7 +1467,7 @@ replacement for it. Horizons express dependencies, not promised calendar dates.
 
 | Horizon | Deliverable | Exit condition |
 | --- | --- | --- |
-| Current local work | Latest-target rapid native scrubbing; other work selected by the rule in Resume here | The specific interaction gap is repaired and verified with affected existing checks and a focused regression |
+| Current local work | Next concrete bug, unfinished feature or named release decision selected by the rule in Resume here; rapid native scrubbing is delivered | The selected scope is implemented and verified with affected existing checks and any regression needed for its specific gap |
 | Completed foundation | Web-state architecture, render/persistence budgets, optional developer tracing | Local behavior and performance regressions passed; release-wide qualification remains separate |
 | Before application release | Backend/web security, asynchronous recovery, complete contracts and enforceable gates | Fresh install and critical workflows pass real integration tests; deliberately failing checks block publication |
 | Before registry rollout | C++ registry and five-voter deployment qualification | Consistency, constrained capacity, partition/failover, leak and restore gates pass |
@@ -2992,10 +2994,10 @@ prerequisites.
 - [x] Qualify shared web/worker media control: leased ownership, ordered revisions,
   session generations, stale-segment exclusion, cancellation under saturation,
   seek/pause/resume/reconnect, and no duplicate encoders on client reattachment.
-- [ ] Define and qualify latest-target behavior for rapid native scrubbing.
-  Consecutive seek targets can carry a generation retired by the first accepted
-  seek; stale targets remain fenced. Single-intention pause/seek/reconnect
-  qualification does not establish this interaction contract.
+- [x] Define and qualify latest-target behavior for rapid native scrubbing.
+  Consecutive native targets settle at the latest target while ordered pause/resume
+  intent and stale-generation fences remain enforced. See the
+  [delivery checkpoint](#rapid-native-scrubbing-2026-10-19).
 
 #### Shared web/worker media control (2026-10-19)
 
@@ -3114,6 +3116,64 @@ Related detailed media plans remain part of the roadmap until reconciled:
 and [FLAC/DSP CPU work](docs/plans/2026-07-08-001-perf-flac-dsp-cpu-plan.md).
 Existing implementation must be evaluated against their behavioral and resource
 contracts; neither old prose nor the current branch name establishes completion.
+
+#### Rapid native scrubbing (2026-10-19)
+
+Implementation on `plan/rapid-native-scrubbing` follows the
+[reviewed plan](docs/plans/2026-10-19-rapid-native-scrubbing-plan.md).
+Consecutive native seek gestures retain the latest target while an earlier seek
+replaces the attached execution generation. The player combines consecutive
+queued seek targets while keeping pause and resume commands in order. It
+dispatches the latest target using only the generation returned by its preceding
+freshly accepted seek. Same-session polling cannot replace the attachment during
+that chain. Session, track and component replacement invalidate pending intent;
+generation fences and the latest pause/resume intent remain enforced.
+
+A fresh accepted seek returns its resulting generation from the existing receipt
+transaction through the synchronous handler and HTTP response. Stale, replayed,
+terminal and otherwise unproven operations supply no continuation authority.
+Stored receipt and schema formats are unchanged. No retry framework or new browser
+runner was added. Local implementation commits: `98f7df17`, `014809bb`, `b4e97aec`.
+
+Verification:
+
+- The affected CI-image backend selection passes **207 tests / 4,769 assertions**
+  in **104.5 seconds**, using `baander-ci-lifecycle:local`. Artifacts:
+  `var/test-runs/20261019-193527-cef524ef`. The historical
+  **10,062 tests / 82,056 assertions** full backend checkpoint above was not rerun
+  for this change.
+- Full PHPStan passes with **zero errors**; Deptrac passes with **zero violations**.
+  Container lint, OpenAPI freshness, Orval generation and `generate:check` pass.
+- The player hook passes **43 tests** in **1.17 seconds**: the existing **39**
+  cases, **two** parameterized source-replacement/queued-pause cases, an
+  A/pause/C ordering regression and a final-acknowledgement/reconciliation case.
+  The initial regressions failed before their respective repairs; the final
+  reconciliation case was added after the repair.
+  Full lint passes with **zero errors and seven standing warnings**. Build
+  including typecheck passes; Vite's build portion takes **0.753 seconds**.
+- Three simplification reviewers covered reuse, quality and efficiency. Reuse of
+  the shared generated response type was applied; no other findings remained.
+  Focused verification logs: `var/test-runs/rapid-native-scrubbing-20261019/`.
+- Independent code review identified a queued-status ordering error and raised
+  the interval between the final acknowledgement and fresh read for verification.
+  Both are resolved in `b4e97aec`; fresh independent review found no new defects
+  in that correction. The final source simplification pass is clean. Receipts:
+  `var/test-runs/rapid-native-scrubbing-20261019/review/` and
+  `var/test-runs/rapid-native-scrubbing-20261019/review-resolution.json`.
+- The final existing native-HLS browser drill passes all **eight phases** and
+  **eleven client controls**, exit **0**. With the first real HTTP response held,
+  native targets **22 → 26 → 30 seconds** send only **22** and **30**; the first
+  response supplies accepted generation **4**. The canonical session/job reaches
+  paused position **30** at generation **5**, then resumes decoding. The rapid
+  seek takes **14.511 seconds**. Results:
+  `var/test-runs/rapid-native-scrubbing-browser-final-20261019/browser/result.json`.
+  Its `cleanup.json` records `originalExitStatus: 0`, `cleanupExitStatus: 0` and
+  `cleanupVerified: true`.
+
+The latest-target rapid native scrubbing item is delivered locally and closes the
+interaction gap left open at the shared media-control checkpoint above. Select
+subsequent work by the rule in [Resume here](#resume-here); deferred release
+acceptance retains its existing prerequisites.
 
 ### Registry release and growth
 

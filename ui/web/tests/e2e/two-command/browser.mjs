@@ -203,10 +203,10 @@ function samePlayback(owner, generation = owner.generation) {
   assert.equal(snapshot.generation, generation, 'Only an intentional seek may advance generation')
 }
 
-async function recordClientControl(action, started) {
+async function recordClientControl(action, started, details = {}) {
   const state = await mediaState()
   const { source, ...safeState } = state
-  clientControls.push({ action, at: Date.now(), elapsedMs: Date.now() - started,
+  clientControls.push({ action, at: Date.now(), elapsedMs: Date.now() - started, ...details,
     state: { ...safeState, source: source ? new URL(source).pathname : null },
     playback: safePlayback(snapshot) })
   await savePlaybackTimeline()
@@ -262,13 +262,78 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     const owner = ownedPlayback()
     await pausePlayback(owner, 'pause')
     const started = Date.now()
-    // Exercise the browser-native seek event path, not a test-only REST control.
-    const localTarget = credentials.expectedSeekPosition - snapshot.startTime
-    assert(localTarget >= 0, 'The requested seek must be inside the current native timeline')
-    await video.evaluate((element, position) => { element.currentTime = position }, localTarget)
-    await pausedAt(credentials.expectedSeekPosition, owner.generation + 1)
-    samePlayback(owner, owner.generation + 1)
-    await recordClientControl('seek-paused', started)
+    // Polling may update the observer snapshot while the player keeps its original attachment.
+    const timelineStart = snapshot.startTime
+    const targets = [credentials.expectedSeekPosition - 8, credentials.expectedSeekPosition - 4, credentials.expectedSeekPosition]
+    assert(targets.every(position => position >= timelineStart && position < snapshot.duration),
+      'All rapid seek targets must fit the original native timeline')
+    const controlsBeforeSeek = playbackControls.length
+    const originalSource = (await mediaState()).source
+    const positionRoute = `**/api/transcode/sessions/${owner.sessionId}/position`
+    let firstResponse
+    let firstRouteTask
+    let responseReleased = false
+    let releaseResponse
+    let releaseTimer
+    const heldResponse = new Promise(resolve => { releaseResponse = resolve })
+    const release = () => {
+      responseReleased = true
+      releaseResponse()
+    }
+    const holdFirstSeek = async route => {
+      if (route.request().method() !== 'POST' || route.request().postDataJSON()?.action !== 'seek' || firstRouteTask) {
+        await route.continue()
+        return
+      }
+      // Forward the real command, withholding only its response within the client's timeout.
+      releaseTimer = setTimeout(release, 3500)
+      firstRouteTask = (async () => {
+        const response = await route.fetch({ timeout: 3500 })
+        firstResponse = await response.json()
+        await heldResponse
+        await route.fulfill({ response })
+      })()
+      await firstRouteTask
+    }
+    await page.route(positionRoute, holdFirstSeek)
+    try {
+      for (const [index, position] of targets.entries()) {
+        // Each evaluation waits for a genuine native event before the next browser task.
+        await video.evaluate((element, localPosition) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            element.removeEventListener('seeking', onSeeking)
+            reject(new Error('Native rapid seek did not emit seeking'))
+          }, 1000)
+          const onSeeking = () => {
+            clearTimeout(timer)
+            resolve()
+          }
+          element.addEventListener('seeking', onSeeking, { once: true })
+          element.currentTime = localPosition
+        }), position - timelineStart)
+        if (index === 0) {
+          await until(() => firstResponse, 'the first real seek acceptance to be held', 1500)
+          assert(Number.isInteger(firstResponse?.data?.acceptedGeneration), 'The real seek must acknowledge its accepted generation')
+        }
+        assert(!responseReleased, 'Every rapid target must be observed while the first response is pending')
+        assert.equal((await mediaState()).source, originalSource, 'The active seek chain must retain its native attachment')
+      }
+    } finally {
+      clearTimeout(releaseTimer)
+      release()
+      try {
+        await firstRouteTask
+      } finally {
+        await page.unroute(positionRoute, holdFirstSeek)
+      }
+    }
+    await pausedAt(credentials.expectedSeekPosition, owner.generation + 2)
+    samePlayback(owner, owner.generation + 2)
+    const rapidSeeks = playbackControls.slice(controlsBeforeSeek).filter(control => control.action === 'seek')
+    assert.deepEqual(rapidSeeks.map(control => control.position), [targets[0], targets[2]], 'Rapid scrubbing must send only the first and latest targets')
+    assert.equal(rapidSeeks[0].generation, owner.generation, 'The first native seek must use its attached generation')
+    assert.equal(rapidSeeks[1].generation, firstResponse.data.acceptedGeneration, 'The latest target must use its predecessor acceptance')
+    await recordClientControl('seek-paused', started, { targets, acceptedGeneration: firstResponse.data.acceptedGeneration })
     owner.generation = snapshot.generation
     await resumeAndDecode(owner, 'resume-after-seek')
     await pausePlayback(owner, 'pause-before-network-interruption')
