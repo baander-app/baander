@@ -175,8 +175,9 @@ class FaultNetwork:
 
 
 class Cluster:
-    def __init__(self, directory, binary, count):
+    def __init__(self, directory, binary, count, data_root=None):
         self.directory = Path(directory)
+        self.data_root = Path(data_root) if data_root is not None else self.directory
         self.binary = binary
         self.count = count
         self.enrollment_key = secrets.token_bytes(32)
@@ -260,7 +261,6 @@ class Cluster:
                 check=True,
                 capture_output=True,
             )
-        self.network = FaultNetwork(self.directory, count)
         self.http_ports = [port() for _ in range(count)]
         (self.directory / "password").write_text("disposable-cluster-secret\n")
         (self.directory / "auth.json").write_text(
@@ -277,6 +277,10 @@ class Cluster:
         self.tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
         self.tls.load_cert_chain(self.client_cert, self.client_key)
         self.api_tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
+        self.network = FaultNetwork(self.directory, count)
+
+    def data_directory(self, index):
+        return self.data_root / f"data-{index}"
 
     def start_node(self, index):
         log = open(self.directory / f"node-{index}.log", "a")
@@ -323,7 +327,7 @@ class Cluster:
                 "-join-interval",
                 "200ms",
             ]
-        command.append(str(self.directory / f"data-{index}"))
+        command.append(str(self.data_directory(index)))
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
         if index < len(self.processes):
             self.processes[index] = process
@@ -387,16 +391,32 @@ class Cluster:
             time.sleep(0.1)
         raise AssertionError("Not all expected voters joined.")
 
-    def close(self):
-        for process in self.processes:
-            if process.poll() is None:
-                process.terminate()
+    def stop_nodes(self):
+        failures = []
         for process in self.processes:
             try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=3)
-        self.network.close()
-        for log in self.logs:
-            log.close()
+                if process.poll() is None:
+                    process.terminate()
+            except BaseException as failure:
+                failures.append(failure)
+        for process in self.processes:
+            try:
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=3)
+            except BaseException as failure:
+                failures.append(failure)
+        if failures:
+            raise BaseExceptionGroup("Voter shutdown failed", failures)
+
+    def close(self):
+        failures = []
+        for close in [self.stop_nodes, self.network.close, *(log.close for log in self.logs)]:
+            try:
+                close()
+            except BaseException as failure:
+                failures.append(failure)
+        if failures:
+            raise BaseExceptionGroup("Cluster cleanup failed", failures)
