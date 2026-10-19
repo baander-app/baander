@@ -1,8 +1,7 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { createStore } from 'zustand/vanilla'
-import { ThemeProvider } from 'styled-components'
-import { resolveTheme } from '@/shared/theme/resolve-theme'
+import { render } from '../../../../../tests/test-utils'
 import { createStoreDebugger, type StoreDebugSnapshot } from '@/shared/stores/debug'
 import { StoreTimeline } from '../StoreTimeline'
 
@@ -12,7 +11,7 @@ describe('store timeline UI', () => {
     const counter = createStore(recorder.instrument<{ count: number; increment: () => void }>('counter', (set, get) => ({
       count: 0, increment: () => set({ count: get().count + 1 }),
     })))
-    render(<ThemeProvider theme={resolveTheme('dark', 'violet')}><StoreTimeline debugger={recorder} /></ThemeProvider>)
+    render(<StoreTimeline debugger={recorder} />)
     return { recorder, counter }
   }
 
@@ -98,7 +97,7 @@ describe('store timeline UI', () => {
       droppedEvents: 0,
     }
     const recorder = { ...createStoreDebugger(true), getSnapshot: () => snapshot }
-    render(<ThemeProvider theme={resolveTheme('dark', 'violet')}><StoreTimeline debugger={recorder} /></ThemeProvider>)
+    render(<StoreTimeline debugger={recorder} />)
     const inspection = within(screen.getByRole('region', { name: 'Captured state' }))
     fireEvent.click(screen.getByRole('button', { name: 'Inspect event #1' }))
     expect(inspection.getByText('Incomplete capture')).toBeInTheDocument()
@@ -113,11 +112,7 @@ describe('store timeline UI', () => {
   })
 
   it('updates without polling, filters, shows state changes/stacks, exports and clears', () => {
-    const recorder = createStoreDebugger(true)
-    const counter = createStore(recorder.instrument<{ count: number; increment: () => void }>('counter', (set, get) => ({
-      count: 0, increment: () => set({ count: get().count + 1 }),
-    })))
-    render(<ThemeProvider theme={resolveTheme('dark', 'violet')}><StoreTimeline debugger={recorder} /></ThemeProvider>)
+    const { recorder, counter } = setup()
     expect(screen.getByText('No matching store events.')).toBeInTheDocument()
     act(() => { counter.getState().increment() })
     expect(screen.getByText(/counter · increment · action/)).toBeInTheDocument()

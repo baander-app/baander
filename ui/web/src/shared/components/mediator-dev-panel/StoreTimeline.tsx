@@ -1,6 +1,6 @@
-import { useState, useSyncExternalStore } from 'react'
+import { memo, useState, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
-import { storeDebugger, type createStoreDebugger, type StateCapture } from '@/shared/stores/debug'
+import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreTraceEvent } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
 
 const Container = styled.div`
@@ -31,14 +31,25 @@ const Inspection = styled.section`
 `
 
 function Capture({ label, capture }: { label: string; capture?: StateCapture }) {
-  return <div>
+  return <>
     <h3>{label}</h3>
     {capture ? <>
       <p>{capture.complete ? 'Complete capture' : 'Incomplete capture'}</p>
       <pre>{JSON.stringify(capture.value, null, 2)}</pre>
     </> : <p>Capture unavailable.</p>}
-  </div>
+  </>
 }
+
+const EventDetails = memo(function EventDetails({ event }: { event: StoreTraceEvent }) {
+  return <details>
+    <summary>#{event.id} {event.store} · {event.action} · {event.kind}{event.parentId !== null ? ` ← #${event.parentId}` : ''}</summary>
+    {event.changedKeys && <p>Changed: {event.changedKeys.join(', ')}</p>}
+    {event.args && <><strong>Arguments</strong><pre>{JSON.stringify(event.args, null, 2)}</pre></>}
+    {event.before && <><strong>Before</strong><pre>{JSON.stringify(event.before, null, 2)}</pre></>}
+    {event.after && <><strong>After</strong><pre>{JSON.stringify(event.after, null, 2)}</pre></>}
+    {event.stack && <><strong>Call stack</strong><pre>{event.stack}</pre></>}
+  </details>
+})
 
 export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger?: ReturnType<typeof createStoreDebugger> }) {
   const state = useSyncExternalStore(recorder.subscribe, recorder.getSnapshot, recorder.getSnapshot)
@@ -72,14 +83,7 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
     {events.length === 0 && <p>No matching store events.</p>}
     {events.map(event => <EventRow key={event.id} $selected={event.id === selectedId}>
       <Button size="sm" variant="ghost" aria-label={`Inspect event #${event.id}`} aria-pressed={event.id === selectedId} onClick={() => setSelectedId(event.id)}>Inspect event #{event.id}</Button>
-      <details>
-        <summary>#{event.id} {event.store} · {event.action} · {event.kind}{event.parentId !== null ? ` ← #${event.parentId}` : ''}</summary>
-        {event.changedKeys && <p>Changed: {event.changedKeys.join(', ')}</p>}
-        {event.args && <><strong>Arguments</strong><pre>{JSON.stringify(event.args, null, 2)}</pre></>}
-        {event.before && <><strong>Before</strong><pre>{JSON.stringify(event.before, null, 2)}</pre></>}
-        {event.after && <><strong>After</strong><pre>{JSON.stringify(event.after, null, 2)}</pre></>}
-        {event.stack && <><strong>Call stack</strong><pre>{event.stack}</pre></>}
-      </details>
+      <EventDetails event={event} />
     </EventRow>)}
   </Container>
 }
