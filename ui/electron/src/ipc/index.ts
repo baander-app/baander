@@ -13,9 +13,14 @@ export type IpcContext = {
   };
 };
 
+let registered = false;
+
 export function registerIpc(ctx: IpcContext) {
+  if (registered) return;
+  registered = true;
   // Add additional IPC module registrars here as your app grows
   registerConfigIpc(ctx);
+  registerWindowIpc();
   registerDeepLinkIpc(ctx);
   registerDiscoveryIpc();
   registerPlaybackIpc();

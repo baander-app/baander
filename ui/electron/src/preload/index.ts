@@ -22,11 +22,11 @@ contextBridge.exposeInMainWorld('BaanderElectron', {
     getUser: async (username: string): Promise<string |undefined> => {
       return ipcRenderer.invoke('baander:config:get-user', username);
     },
-    setUser: async (username: string, password: string): Promise<void> => {
+    setUser: async (username: string, password: string): Promise<boolean> => {
       return ipcRenderer.invoke('baander:config:set-user', username, password);
     },
-    clearUser: async (): Promise<void> => {
-      return ipcRenderer.invoke('baander:config:clear-user');
+    clearUser: async (username: string): Promise<boolean> => {
+      return ipcRenderer.invoke('baander:config:clear-user', username);
     },
     finishSetup: async (): Promise<boolean> => {
       return ipcRenderer.invoke('baander:config:finish');

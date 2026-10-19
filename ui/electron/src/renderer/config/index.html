@@ -83,7 +83,7 @@
 <div class="row">
     <label for="serverUrl">Server URL</label>
     <input id="serverUrl" type="url" placeholder="https://your-domain.example" required />
-    <div class="hint">Use HTTPS. Example: https://baander.test</div>
+    <div class="hint">Use HTTPS. Example: https://baander.app</div>
 </div>
 <div class="row-discover">
     <button id="discoverBtn">🔍 Discover Servers</button>
@@ -195,12 +195,19 @@
   saveBtn.addEventListener('click', async () => {
     const val = normalize(input.value.trim());
     if (!val) {
-      alert('Please enter a valid URL (e.g., https://baander.test)');
+      alert('Please enter a valid URL (e.g., https://baander.app)');
       input.focus();
       return;
     }
-    await window.BaanderElectron.config.setServerUrl(val);
-    await window.BaanderElectron.config.finishSetup();
+    try {
+      const saved = await window.BaanderElectron.config.setServerUrl(val);
+      if (!saved) throw new Error('Server configuration could not be saved');
+      const finished = await window.BaanderElectron.config.finishSetup();
+      if (!finished) throw new Error('Setup could not be completed');
+    } catch {
+      alert('Unable to save server configuration. Check the URL and try again.');
+      input.focus();
+    }
   });
 
   // Enter key handler

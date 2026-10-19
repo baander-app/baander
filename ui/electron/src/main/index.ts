@@ -1,10 +1,9 @@
-import { app, screen, globalShortcut, BrowserWindow } from 'electron';
+import { app, screen, globalShortcut } from 'electron';
 import { hardenSecurity } from './security/harden';
 import { installOrUpdateCorsShim } from './security/cors-shim';
-import { createMainWindow } from './windows/main-window';
+import { createMainWindow, getMainWindow } from './windows/main-window';
 import { createConfigWindow } from './windows/config-window';
 import { registerIpc } from '../ipc';
-import { registerWindowIpc } from '../ipc/modules/window.ipc';
 import { setupApplicationMenu } from './menu';
 import { createMenuTranslator } from './menu/i18n';
 import { destroyTray, setupTray } from './menu/tray';
@@ -94,29 +93,26 @@ app.whenReady().then(async () => {
   });
 
   // Register global media key shortcuts
-  const registerMediaKeys = (win: BrowserWindow) => {
-    globalShortcut.register('MediaPlayPause', () => {
-      win.webContents.send('baander:playback:toggle');
-    });
-    globalShortcut.register('MediaNextTrack', () => {
-      win.webContents.send('baander:playback:next');
-    });
-    globalShortcut.register('MediaPreviousTrack', () => {
-      win.webContents.send('baander:playback:previous');
-    });
+  const registerMediaKeys = () => {
+    for (const [key, channel] of [
+      ['MediaPlayPause', 'baander:playback:toggle'],
+      ['MediaNextTrack', 'baander:playback:next'],
+      ['MediaPreviousTrack', 'baander:playback:previous'],
+    ]) {
+      globalShortcut.register(key, () => {
+        const window = getMainWindow();
+        if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
+          window.webContents.send(channel);
+        }
+      });
+    }
   };
 
   const configured = getServerUrlSync();
   // Create the window first so we know which session it uses
   const win = configured ? createMainWindow() : createConfigWindow();
 
-  // Register window IPC (needs BrowserWindow reference)
-  if (configured) {
-    registerWindowIpc(win);
-  }
-
-  // Register global media keys after window is created
-  registerMediaKeys(win);
+  registerMediaKeys();
 
   win.webContents.openDevTools();
   win.show();

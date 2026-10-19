@@ -1,4 +1,5 @@
-import { app, ipcMain } from 'electron';
+import { handleTrusted } from '../guard';
+import { app } from 'electron';
 import { installOrUpdateCorsShim } from '../../main/security/cors-shim';
 import { createMainWindow } from '../../main/windows/main-window';
 import { getConfigWindow } from '../../main/windows/config-window';
@@ -11,30 +12,44 @@ import { mainLog } from '../../main/log';
 
 const mainProcessImpl = initMainProcessImpl(app, fs, path);
 
+function validateUsername(value: unknown): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) throw new Error('Invalid username');
+}
+
 export function registerConfigIpc(ctx: IpcContext) {
   if (!mainProcessImpl) {
     mainLog.error('Config IPC: mainProcessImpl is not available. Config functionality may be limited.');
   }
 
-  ipcMain.handle('baander:config:get-server-url', () => {
+  handleTrusted('baander:config:get-server-url', () => {
     return mainProcessImpl?.getServerUrl() || '';
   });
 
-  ipcMain.handle('baander:config:set-server-url', (_e, url: string) => {
+  handleTrusted('baander:config:set-server-url', (_e, url: unknown) => {
+    if (typeof url !== 'string') throw new Error('Invalid server URL');
+    if (url !== '') {
+      let parsed: URL;
+      try { parsed = new URL(url); } catch { throw new Error('Invalid server URL'); }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Invalid server URL');
+    }
     if (mainProcessImpl) {
-      mainProcessImpl.setServerUrl(url || '');
-      installOrUpdateCorsShim(url || '', ctx.rendererOrigin);
+      mainProcessImpl.setServerUrl(url);
+      installOrUpdateCorsShim(url, ctx.rendererOrigin);
       return true;
     }
     return false;
   });
 
-  ipcMain.handle('baander:config:get-user', (_, username: string) => getUser(username));
+  handleTrusted('baander:config:get-user', (_, username: unknown) => {
+    validateUsername(username);
+    return getUser(username);
+  });
 
-  ipcMain.handle('baander:config:set-user', async (_, username: string, password: string) => {
+  handleTrusted('baander:config:set-user', async (_, username: unknown, password: unknown) => {
+    validateUsername(username);
+    if (typeof password !== 'string') throw new Error('Invalid password');
     try {
-      const res = await setUser(username, password);
-      mainLog.log('User saved:', res);
+      await setUser(username, password);
       return true;
     } catch (e) {
       mainLog.error('Failed to save user:', e);
@@ -42,10 +57,10 @@ export function registerConfigIpc(ctx: IpcContext) {
     }
   });
 
-  ipcMain.handle('baander:config:clear-user', async (_, username: string) => {
+  handleTrusted('baander:config:clear-user', async (_, username: unknown) => {
+    validateUsername(username);
     try {
       const res = await clearUser(username);
-      mainLog.log('User cleared:', res);
       return res;
     } catch (e) {
       mainLog.error('Failed to clear user:', e);
@@ -53,24 +68,29 @@ export function registerConfigIpc(ctx: IpcContext) {
     }
   });
 
+  let finishing = false;
+
   // Close config window after main has finished loading
-  ipcMain.handle('baander:config:finish', async () => {
-    const main = createMainWindow();
-    main.webContents.once('did-finish-load', () => {
+  handleTrusted('baander:config:finish', async () => {
+    if (finishing) return true;
+    finishing = true;
+    createMainWindow((main) => {
       const cfg = getConfigWindow();
       if (cfg && !cfg.isDestroyed()) cfg.close();
       if (!main.isVisible()) main.show();
+      finishing = false;
     });
     return true;
   });
 
-  ipcMain.handle('baander:config:get-theme-mood', () => {
+  handleTrusted('baander:config:get-theme-mood', () => {
     return mainProcessImpl?.getThemeMood() || 'dark';
   });
 
-  ipcMain.handle('baander:config:set-theme-mood', (_e, mood: string) => {
+  handleTrusted('baander:config:set-theme-mood', (_e, mood: unknown) => {
+    if (typeof mood !== 'string' || !['dark', 'warm', 'cool', 'balanced'].includes(mood)) throw new Error('Invalid theme mood');
     if (mainProcessImpl) {
-      mainProcessImpl.setThemeMood(mood || 'dark');
+      mainProcessImpl.setThemeMood(mood);
       return true;
     }
     return false;

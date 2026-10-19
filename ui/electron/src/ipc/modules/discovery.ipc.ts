@@ -1,28 +1,29 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { handleTrusted } from '../guard';
+import { BrowserWindow } from 'electron';
 import { getDiscoveryService } from '../../main/services/discovery.service';
 
 export function registerDiscoveryIpc(): void {
   const discovery = getDiscoveryService();
 
   // Start discovery scan
-  ipcMain.handle('baander:discovery:start-scan', async () => {
+  handleTrusted('baander:discovery:start-scan', async () => {
     await discovery.startScan();
     return { success: true };
   });
 
   // Stop discovery scan
-  ipcMain.handle('baander:discovery:stop-scan', async () => {
+  handleTrusted('baander:discovery:stop-scan', async () => {
     discovery.stopScan();
     return { success: true };
   });
 
   // Get discovered servers
-  ipcMain.handle('baander:discovery:get-servers', async () => {
+  handleTrusted('baander:discovery:get-servers', async () => {
     return discovery.getServers();
   });
 
   // Check if scanning is active
-  ipcMain.handle('baander:discovery:is-scanning', async () => {
+  handleTrusted('baander:discovery:is-scanning', async () => {
     return discovery.isScanningActive();
   });
 

@@ -20,8 +20,8 @@ export type BaanderElectronAPI = {
     getServerUrl: () => Promise<string>;
     setServerUrl: (url: string) => Promise<boolean>;
     getUser: (username: string) => Promise<string | undefined>;
-    setUser: (username: string, password: string) => Promise<void>;
-    clearUser: () => Promise<void>;
+    setUser: (username: string, password: string) => Promise<boolean>;
+    clearUser: (username: string) => Promise<boolean>;
     finishSetup: () => Promise<boolean>;
   };
   discovery: DiscoveryBridge;

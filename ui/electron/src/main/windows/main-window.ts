@@ -85,8 +85,15 @@ function attachLoadGuards(win: BrowserWindow, label: string) {
   win.webContents.once('did-finish-load', () => clearTimeout(watchdog));
 }
 
-export function createMainWindow() {
-  if (mainWindow) return mainWindow;
+export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const window = mainWindow;
+    if (onLoaded) {
+      if (window.webContents.isLoadingMainFrame()) window.webContents.once('did-finish-load', () => onLoaded(window));
+      else onLoaded(window);
+    }
+    return window;
+  }
 
   mainWindow = new BrowserWindow({
     // do not remove fixes blurry text for some users
@@ -118,6 +125,10 @@ export function createMainWindow() {
   secureAppWindow(mainWindow, trust);
 
   attachLoadGuards(mainWindow, 'Main window');
+  const window = mainWindow;
+  window.on('maximize', () => window.webContents.send('baander:window:maximized-change', true));
+  window.on('unmaximize', () => window.webContents.send('baander:window:maximized-change', false));
+  if (onLoaded) window.webContents.once('did-finish-load', () => onLoaded(window));
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
