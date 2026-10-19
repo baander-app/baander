@@ -239,6 +239,64 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(storage.require_storage_error("SQLITE_FULL: raw SQL credential=secret"),
                          ["voter SQLite: SQLITE_FULL (database or disk is full)"])
 
+    def test_cluster_cleanup_contains_child_network_and_log_failures(self):
+        terminate_failure = OSError("first voter termination failed")
+        wait_failure = OSError("first voter reap failed")
+        network_failure = OSError("network cleanup failed")
+        log_failure = OSError("first log close failed")
+
+        class Child:
+            def __init__(self, broken=False):
+                self.broken = broken
+                self.terminated = False
+                self.killed = False
+                self.reaped = False
+                self.wait_attempts = 0
+            def poll(self):
+                return None
+            def terminate(self):
+                self.terminated = True
+                if self.broken:
+                    raise terminate_failure
+            def wait(self, timeout):
+                self.wait_attempts += 1
+                if self.broken:
+                    raise wait_failure
+                if not self.killed:
+                    raise subprocess.TimeoutExpired("disposable voter", timeout)
+                self.reaped = True
+                return 0
+            def kill(self):
+                self.killed = True
+
+        class Resource:
+            def __init__(self, failure=None):
+                self.failure = failure
+                self.closed = False
+            def close(self):
+                self.closed = True
+                if self.failure:
+                    raise self.failure
+
+        cluster = Cluster.__new__(Cluster)
+        cluster.processes = [Child(broken=True), Child()]
+        cluster.network = Resource(network_failure)
+        cluster.logs = [Resource(log_failure), Resource()]
+        with self.assertRaises(BaseExceptionGroup) as caught:
+            cluster.close()
+
+        self.assertTrue(all(child.terminated for child in cluster.processes))
+        self.assertEqual(cluster.processes[0].wait_attempts, 1)
+        self.assertTrue(cluster.processes[1].killed)
+        self.assertTrue(cluster.processes[1].reaped)
+        self.assertTrue(cluster.network.closed)
+        self.assertTrue(all(log.closed for log in cluster.logs))
+        voter_failures, failed_network, failed_log = caught.exception.exceptions
+        self.assertIsInstance(voter_failures, BaseExceptionGroup)
+        self.assertEqual(voter_failures.exceptions, (terminate_failure, wait_failure))
+        self.assertIs(failed_network, network_failure)
+        self.assertIs(failed_log, log_failure)
+
     def test_cluster_default_and_override_data_paths(self):
         cluster = Cluster.__new__(Cluster)
         cluster.directory = Path("/fixture")
