@@ -22,8 +22,9 @@ retain requirements or deferred scope, without making every item a next task.
 
 - **Next implementation priority:** select the next concrete bug, unfinished
   feature or named release decision by the rule below. Latest-target
-  [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19) and
+  [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19),
   [encrypted Registry backup automation](#registry-encrypted-backups-2026-10-19)
+  and [desktop renderer security](#desktop-renderer-security-2026-10-19)
   are delivered locally. Actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
@@ -3224,6 +3225,63 @@ interaction gap left open at the shared media-control checkpoint above. Select
 subsequent work by the rule in [Resume here](#resume-here); deferred release
 acceptance retains its existing prerequisites.
 
+### Desktop renderer security (2026-10-19)
+
+The desktop change follows the
+[reviewed plan](docs/plans/2026-10-19-desktop-renderer-security-plan.md) and enforces
+one renderer trust policy for navigation and privileged IPC. Only live,
+app-owned main frames at the exact configured Vite origin or the resolved main and
+configuration HTML files may invoke handlers. Backend URLs remain API destinations;
+they do not grant renderer privileges. Guards attach before loading either startup
+window and deny untrusted navigation, redirects, frames and renderer-created windows.
+
+Every registered configuration, keyring, discovery, deep-link and window handler
+checks its sender before service access. Payload validation precedes configuration,
+CORS, keyring, theme and native-window effects. Credential deletion now supplies the
+username required by the existing operation. Failed configuration saves keep setup
+open. First-run handoff and configured startup share live-main-window registration,
+so titlebar actions and media shortcuts target the current window.
+
+Verification checkpoint:
+
+- **14 focused tests** pass in **300.427 ms** in the frontend CI image built from
+  `docker/runner/Dockerfile`, tagged `baander-runner:desktop-verification`. These
+  regressions cover the concrete trust, IPC and lifecycle fixes.
+- Actual main, preload and renderer TypeScript checks pass in that image. The
+  desktop script checks all three projects directly; frontend CI requires those
+  checks and the focused suite. Narrow desktop compiler corrections make the
+  previously ineffective references-only check usable.
+- The local desktop build passes in **20.35 seconds** after correcting asset paths.
+  Real Electron startup initially exposed a missing WASM-hash artifact and
+  file-based routing that navigated away from the trusted HTML entrypoint. The build now generates
+  all six WASM hashes from the asset source, verified against the bundled bytes.
+  File-based UI uses hash routing while HTTP UI retains browser routing. A clean
+  Vite development startup also passes.
+- The local Xvfb/Electron smoke passes **four launches in 6.50 seconds**: first-run
+  setup and configured restart for both built files and the exact development
+  origin. Each verifies a visible login page, local API requests, reload, denied
+  external navigation/popups and native titlebar IPC. The development origin is
+  served by a local static SPA fixture, not a running Vite process. Xvfb has no
+  window manager: focused fixtures prove maximize state transitions; the native
+  check proves dispatch and a boolean state response. Physical media keys are not
+  exercised, and the user's keyring is untouched.
+- Workflow YAML parsing and whitespace checks pass. Evidence:
+  `var/test-runs/desktop-renderer-security-20261019/` contains `runtime.log`,
+  `ci.log`, `web.log`, `axios.log`, `verification.json` and `review.json`.
+
+Independent code review found two issues: clean development startup needed WASM
+hashes from the asset source, and an unused, unguarded menu IPC listener remained.
+Both are corrected. Runtime investigation also found that file-origin API path
+resolution dropped DPoP headers. The correction has a failing-before/passing-after
+regression; the affected Axios suite passes **12 tests in 875 ms**. Final web and
+worker TypeScript checks and affected-file ESLint pass in the CI image after these
+corrections. No review findings remain unresolved.
+
+Electron version support, CSP redesign, main-window sandbox migration and the
+configuration page's discovery-result HTML interpolation remain outside this
+patch's acceptance scope. React Native and Android remain deferred. No release
+certification follows from the desktop checkpoint.
+
 ### Registry release and growth
 
 The local contracts listed below are implemented and covered. The entries
@@ -3322,8 +3380,12 @@ automatic quorum reduction. This is not the current implementation priority.
 
 ### Secondary clients, native qualification, and release operations
 
-- [ ] Remove shared compilation blockers and require dependent shared/mobile/desktop
-  checks. Tighten Electron navigation/origin and IPC validation and test failures.
+- [x] Require shared TypeScript checks in frontend CI; the existing shared gate
+  remains required. Mobile work remains deferred at the user's request.
+- [x] Enforce desktop renderer trust and IPC validation across both startup paths,
+  with working titlebar actions and live media targets. Focused, static and real
+  Electron checks pass; see
+  [desktop renderer security](#desktop-renderer-security-2026-10-19).
 - [ ] When the user resumes deferred React Native work, reconcile the [React Native styling plan](docs/plans/2026-07-15-001-refactor-rn-styling-pattern-plan.md)
   and [React Native/TV tooling plan](docs/plans/2026-07-15-002-chore-rn-tv-dx-tooling-plan.md)
   against current code after backend/web priorities are satisfied.
