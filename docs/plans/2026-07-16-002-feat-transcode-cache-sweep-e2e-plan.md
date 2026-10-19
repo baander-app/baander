@@ -11,6 +11,15 @@ depth: standard
 
 # Transcode Cache-Sweep Scheduler Job + E2E Reliability
 
+**Scope reconciliation, 2026-10-18:**
+[Shared media control qualification](2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+checks current playback readiness and controls through the paired deployment.
+Its browser checkpoint requires decoded output and an advancing clock; a manifest
+or successful segment response alone does not establish playback. Cache-sweep
+acceptance remains open in `ROADMAP.md`. Cache-sweep TTL, size budget, eviction
+order, active-viewer safety and cold/warm reliability across the historical E2E
+matrix require separate evidence. The original scope remains below.
+
 ## Goal Capsule
 
 Two deliverables that close out the muxed-refactor:

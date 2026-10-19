@@ -793,6 +793,83 @@ the version 4 maximum-one envelope. The latter passed all three phases in
 exhaustion left control alive with no control OOM event. These exhaustion results
 do not qualify maxima two or four.
 
+### Shared media control qualification
+
+To exercise controls while native capacity is occupied, build the current worker
+image and run the dedicated drill:
+
+```bash
+docker buildx build --target worker --load -t baander-worker:test .
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  bash scripts/test-worker-media-control-container.sh
+```
+
+The runner selects ordinary maximum two, the combined web/worker fixture and
+`BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1`. It inherits the operator runner's
+600-second deadline, resource preflight and cleanup. Set `BAANDER_TEST_ARTIFACTS`
+to retain evidence at a chosen path; the default is
+`var/test-runs/media-control-*`. The
+[2026-10-19 checkpoint](../../ROADMAP.md#shared-webworker-media-control-2026-10-19)
+records passing pressure, browser and cleanup evidence for single-intention
+pause/seek/reconnect and reattachment. Latest-target rapid native scrubbing remains
+a separate open interaction contract.
+
+Observation mode builds a disposable fixture derived from the production image.
+Its test-only FFmpeg wrapper records each video encoder launch before executing
+the original native binary with the same PID, start ticks, arguments and streams.
+This is an instrumented runtime test; the immutable production-image contract
+remains a separate gate. Observation defaults to zero and is incompatible with
+`BAANDER_TEST_USE_IMAGE=1`, which forbids rebuilding the worker fixture.
+
+The drill fills three video slots and one audio slot, queues ordinary work and
+applies execution CPU pressure for at least 60 seconds. The audio encoder is held
+after initial output to keep its slot occupied; this does not measure sustained
+audio throughput. Controls exercise running and paused attachment, ticketed socket
+reconnect and replay, stale generation refusal, paused seek, active and pending
+cancellation, and deliberate admission after cancellation. Retired init and media
+requests must fail even while their old files remain present. Subtitle authority
+and readiness-wait races need their separate deterministic coverage.
+
+`qualification.json` records control acknowledgement and heartbeat p99 and maximum,
+seek readiness, cancellation retirement, occupancy, sampling gaps and ordinary
+progress. Both p99 limits are one second and both maximum limits are two seconds;
+seek and cancel request handling also have two-second limits. Seek readiness and
+exact encoder retirement after cancellation each have a 30-second watchdog.
+`media.json` holds the scenario receipts; `native-launches.jsonl` records each job,
+generation, output directory, process identity and live predecessors at launch.
+Process identity includes PID, start ticks, PID namespace and hostname. The ledger
+checks duplicate attempts and overlapping predecessors, and attachment compares the
+launch records before and after each concurrent attachment batch. Periodic process
+counts alone cannot prove those properties. Keep the container inspections, native verification,
+control/execution samples, backlog observations, operator log and cleanup receipts
+with these results, including failed runs.
+
+Run instrumented browser controls through the operator runner's combined fixture:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+BAANDER_TEST_TWO_COMMAND=1 BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1 \
+BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
+  bash scripts/test-worker-operator-container.sh
+```
+
+The separate `scripts/test-two-command-deployment-container.sh` gate uses the
+immutable production worker through `scripts/test-worker-production-container.sh`;
+its image contract forbids observation mode's fixture rebuild. Keep that gate
+separate from this instrumented browser run.
+
+With both observation and the browser hook enabled, `client-controls` exercises
+native pause, seek and resume, an offline refresh failure followed by recovery,
+and reload while paused. It checks the canonical session, job and generation,
+then requires decoded frames and the playback clock to advance from the current
+signed rendition set. Individual playback waits have a 45-second watchdog;
+`client-controls` has a 360-second checkpoint request budget. Inspect
+`playback-timeline.json` and the browser's `result.json` or `failure.json` for
+snapshots, control timings, network failures and media events. This browser run
+covers client behavior separately from the dedicated saturated-control drill.
+Hardware acceleration, ABR switching, cache-sweep policy and measured FLAC DSP CPU
+cost remain separate qualification work.
+
 ### Ordinary worker autoscaling qualification
 
 Build the current worker image as above. The bounded comparison runner creates

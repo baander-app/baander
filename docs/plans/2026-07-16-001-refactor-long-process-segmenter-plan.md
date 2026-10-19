@@ -11,6 +11,14 @@ depth: deep
 
 # Long-lived FFmpeg Segmenter Process
 
+**Scope reconciliation, 2026-10-18:** The web-owned process and CPU-pool topology
+below is historical. The paired control/execution deployment supersedes it.
+[Shared media control qualification](2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+checks the current seek, pause, resume, attachment and native-retirement behavior;
+acceptance depends on current passing evidence in `ROADMAP.md`. It does not close
+this plan's hardware-acceleration, HDR, DASH or ABR requirements. The original
+proposal and its verification contract remain below for context.
+
 ## Goal Capsule
 
 Shift the on-the-fly transcoder from **N independent per-segment FFmpeg invocations** (each re-opening the input, re-seeking, re-initializing the encoder) to **one long-lived FFmpeg process per (job, tier)** that produces video + audio segments continuously via `-f segment -segment_list pipe:1`, emitting segment-available events as FFmpeg completes each fragment.

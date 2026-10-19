@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-18. This is the working delivery record for the remediation,
+Updated: 2026-10-19. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -105,20 +105,15 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Qualify the remaining
-  [shared web/worker media-control contract](#worker-architecture-and-resource-control):
-  leased ownership, ordered revisions, session generations, stale-segment exclusion,
-  cancellation under saturation, seek/pause/resume/reconnect and no duplicate
-  encoders on reattachment. Worker lifecycle and outage qualification is accepted
-  at the checkpoint below. Measured autoscaling and admission profiles are
-  delivered by the [2026-10-18 checkpoint](#measured-ordinary-worker-autoscaling-2026-10-18).
-  Reserved control capacity and validated routes/resource classes retain their
-  [control](#reserved-worker-control-capacity-2026-10-18) and
-  [route](#validated-asynchronous-routes-2026-10-18) checkpoints.
-  The two-command deployment item retains its production and browser checkpoint.
-  Provider live qualification and regional acceptance remain separate work.
-  React Native and Android remain deferred. The local dev database note below
-  stands.
+- **Next.** Continue the local [Registry release and growth](#registry-release-and-growth)
+  gates. The [shared media-control checkpoint](#shared-webworker-media-control-2026-10-19)
+  accepts single-intention pause/seek/reconnect, saturated cancellation and encoder
+  reuse on reattachment. Latest-target rapid native scrubbing remains a separate
+  open interaction contract. Worker lifecycle, measured autoscaling, reserved
+  control capacity and validated asynchronous routes retain their checkpoints
+  below. Provider live qualification, regional acceptance and S3 destination
+  restoration still need their existing external prerequisites. React Native and
+  Android remain deferred. The local dev database note below stands.
 
 
 The backend release-gate package is complete (see the next two sections). Eight
@@ -2832,9 +2827,124 @@ qualification retain their separate open scope.
 - [x] Exercise leases, scheduler occurrences, process retirement, orphan cleanup,
   deployment recovery, and transport outages. Do not inherit live Doctrine
   connections across forks or depend on a running HTTP server to supervise workers.
-- [ ] Qualify shared web/worker media control: leased ownership, ordered revisions,
+- [x] Qualify shared web/worker media control: leased ownership, ordered revisions,
   session generations, stale-segment exclusion, cancellation under saturation,
   seek/pause/resume/reconnect, and no duplicate encoders on client reattachment.
+- [ ] Define and qualify latest-target behavior for rapid native scrubbing.
+  Consecutive seek targets can carry a generation retired by the first accepted
+  seek; stale targets remain fenced. Single-intention pause/seek/reconnect
+  qualification does not establish this interaction contract.
+
+#### Shared web/worker media control (2026-10-19)
+
+Implementation on `plan/shared-media-control-qualification` preserves seek/progress
+fences and retry identities through HTTP and WebSocket position controls.
+Acknowledgements describe command handling, without claiming worker observation
+or mutation after a rejected fence. A paused native seek could wait for a missing
+segment without emitting `seeked`, preventing the seek command itself. The player
+now submits the fenced command on `seeking`; `seeked` completes restoration.
+During seeking, only a rendition refresh for the execution already attached to the
+media element is deferred; a newly ready generation must attach. The
+[reviewed plan](docs/plans/2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+records the qualification scope.
+
+The final CI-image backend run passes **10,062 tests in 946 files / 82,056
+assertions** in **919.656 seconds**, with no failures, errors or skips and verified
+finalization/cleanup. Lane counts (tests / assertions) and lane wall times are ordinary
+**6,430 / 25,808** (**66.7 seconds**), native **724 / 8,173** (**117.0 seconds**),
+and PostgreSQL **1,680 / 23,166** (**698.1 seconds**) and **1,228 / 24,909**
+(**521.7 seconds**). Lane wall times include setup and report collection; PHPUnit
+reports its own test duration separately. Evidence:
+`var/test-runs/media-backend-final-20261019/run.log` and
+`var/test-runs/20261019-174024-880d5c39`, including `verified-absence.json` with
+empty container, network and volume lists. Focused adapter verification also passes
+**163 tests / 4,304 assertions** in **82.751 seconds** (`var/test-runs/20261018-182616-dfede000`).
+
+The production-derived pressure drill passes at three occupied video slots and
+one audio slot, ordinary maximum two and execution CPU pressure. Its **63.062875
+seconds** of pressure (**70.816-second** media phase) yield **162 control
+acknowledgements**, p99 **0.282443541 seconds** / maximum **0.285865401 seconds**.
+The **1,223 heartbeat samples** yield **0.010419372 / 0.018601489 seconds**; both
+meet the **one-second p99 / two-second maximum** budgets. Seek/cancel handling is
+**0.019852651 / 0.029492010 seconds**, within two seconds; seek readiness and exact
+cancelled-encoder retirement are **19.173580421 / 0.241075307 seconds**, each within
+its thirty-second watchdog. The run records **750 full-occupancy / 53
+post-cancellation samples**, **125.377477 execution CPU seconds** and **2,031
+ordinary backlog acknowledgements**.
+
+Four running and four paused reattachments retain one reference and one attempt
+at generation **2**; paused seek advances **2 → 3**. Two old files remain present
+while new init/segment requests return **404**. Five native launches show no
+duplicate attempts or overlapping predecessors. Independent owners, socket
+reconnect/replay, terminal cancellation, later deliberate admission and pending
+cancellation without a launch pass. Evidence and verified cleanup:
+`var/test-runs/media-control-third/{qualification.json,media.json,cleanup.json}`.
+All **20 stack-isolation checks** pass, with no error or cleanup errors
+(`var/test-runs/media-stack-isolation-20261019/results.json`); no elapsed time was
+recorded. The native-HLS browser drill passes all **eight phases** and **eleven client
+controls** with the canonical session/job retained. Paused native seeks take
+**14.516 / 12.580 seconds**, reconnect **1.405 seconds** and paused remount **3.819
+seconds**, each within the 45-second playback watchdog. Browser generations advance
+**3 → 4 → 5**, operator seek reaches paused generation **6** at **30 seconds**, and
+worker recovery reaches paused generation **7** at the same position. The **15
+native launches** have no duplicate generations or overlapping predecessors.
+Initial attachment records four attachments/one session and **679,592 decoded
+bytes**. Paused seek (**12.704-second** phase) rejects the retained initial init/media
+URLs with **404**; recovery (**10.517-second** phase) retains two generation-6 files,
+rejects their init/media URLs with **404**, and decodes **692,610 bytes** from
+generation **7**. Both containment checks retire **seven identities** with no
+survivors. All phases, launch, containment and verified cleanup receipts are under
+`var/test-runs/media-browser-prepared-20261019/`. Shared media control is accepted
+within the single-intention scope above; rapid native scrubbing remains open.
+
+The revised player passes **39 hook tests**, including regressions that failed
+before the seek-dispatch and ready-generation attachment repairs. Final frontend
+commands pass: tests **1.835 seconds** (Vitest reports **1.12 seconds**), typecheck
+**18.648 seconds**, lint **21.568 seconds** (zero errors, seven standing warnings),
+build **1.29 seconds**. Evidence: `var/test-runs/media-player-fix-20261019/red.log`
+and `var/test-runs/media-player-prepared-20261019/`. Composer platform requirements
+(**0.4 seconds**), Deptrac (**5.3 seconds**), container lint (**2.1 seconds**) and
+OpenAPI drift (**2.3 seconds**) pass; PHPStan passes after fixture PHPDoc
+corrections in **58.36 seconds**. Static receipts and verified cleanup:
+`var/test-runs/media-final-static-20261019/results.json` and
+`var/test-runs/media-phpstan-final-20261019/results.json`.
+
+Three final player simplification reviewers covered reuse, quality and efficiency.
+They removed one redundant `seeked` conditional; reuse and efficiency had no
+findings. The final frontend checks above follow that change and the corrective
+attached-execution guard. Earlier simplification of the pressure fixture removed
+unused monitor history. Earlier eight-lens code reviews
+(`media-20261018-184128`, `media-final-20261018-185122`) reported no actionable
+findings in those snapshots. Review `20261019-174338-b9e53067` covers the revised
+player; its rapid-scrubbing finding was adjudicated as a residual interaction risk,
+with no actionable repair established within the fenced, no-client-retry scope.
+Receipts: `var/test-runs/media-player-final-20261019/review/`. Independent validation
+of the later attached-execution correction is clean
+(`var/test-runs/media-player-prepared-20261019/independent-validation.json`).
+Consecutive native
+seek targets can carry a generation retired by the first accepted seek; earlier
+dispatch increases exposure. Latest-target rapid scrubbing remains a distinct
+open item above.
+
+Earlier attempts exposed the adapter regressions, incompatible browser image mode
+and the final-seek failure. Desktop shutdown interrupted the 2026-10-18 backend
+run; it remains failed. Recovery removed only its **nine stopped containers, two
+networks and four volumes**, with cleanup verified in
+`var/test-runs/20261018-184909-d70fe443/recovery-cleanup.json`. Earlier temporary
+frontend and review logs were lost; the final results above use retained evidence.
+On 2026-10-18, all **69 Python runner regressions** passed in **0.757 seconds**,
+and **23 cleanup/final-drill/phase-receipt cases (16 + 2 + 5)** passed. Those harness
+scripts are unchanged; their temporary logs were lost, so these outcomes are
+recorded from the session without retained artifact links.
+
+Held audio proves occupied capacity, without measuring continuous throughput.
+Subtitle authority, readiness-wait revalidation and stale-lease/successor publication
+have deterministic backend coverage; a response opened before retirement may
+finish. The historical segmenter plan's web-owned process/Swoole-table topology is
+superseded by the paired deployment. Cache/sweep, measured FLAC DSP CPU,
+hardware/HDR and DASH/ABR acceptance remain open. Registry release and growth
+remain the next local gates; live-provider, regional and S3 destination acceptance
+retain their existing external prerequisites.
 
 Related detailed media plans remain part of the roadmap until reconciled:
 [long-process segmenter](docs/plans/2026-07-16-001-refactor-long-process-segmenter-plan.md),
