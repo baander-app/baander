@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Real 3/5-voter TLS partitions, quorum loss, acknowledged data and rejoin."""
 import argparse
+import hashlib
 import http.client
 import json
 from pathlib import Path
@@ -151,8 +152,9 @@ def verify(api, acknowledged):
     for identifier, expected in acknowledged.items():
         status, body, _ = api.request("GET", "/api/servers/" + identifier)
         assert status == 200, f"Acknowledged identity unavailable: {identifier} ({status})"
-        assert all(body["data"][key] == value for key, value in expected.items()), identifier
-        assert "credential_digest" not in body["data"] and "apiKey" not in body["data"]
+        assert set(body) == {"data"} and body["data"] == expected, (
+            f"Public snapshot mismatch for {identifier}"
+        )
 
 
 def verify_cross_api_ownership(first, second, cluster, voter):
@@ -214,22 +216,67 @@ def verify_cross_api_ownership(first, second, cluster, voter):
     print("PASS: distinct-owner cross-API claims, capability binding and owner retry", flush=True)
 
 
-def wait_converged(cluster, indices, acknowledged_index):
+def local_row(cluster, voter, identifier):
+    status, result = cluster.request(
+        voter,
+        "/db/query?level=none&associative",
+        [["SELECT public_id, credential_digest, url, name, version, created_ms, "
+          "updated_ms, last_seen_ms, revision FROM registries WHERE public_id=?", identifier]],
+    )
+    context = f"Local diagnostic for voter {voter}, identity {identifier}"
+    assert status == 200, f"{context}: HTTP {status}"
+    assert isinstance(result, dict) and "error" not in result, f"{context}: query failed"
+    statements = result.get("results")
+    assert isinstance(statements, list) and len(statements) == 1, f"{context}: invalid results"
+    statement = statements[0]
+    assert isinstance(statement, dict) and "error" not in statement, f"{context}: statement failed"
+    expected_types = {
+        "public_id": "text", "credential_digest": "text", "url": "text",
+        "name": "text", "version": "text", "created_ms": "integer",
+        "updated_ms": "integer", "last_seen_ms": "integer", "revision": "integer",
+    }
+    assert statement.get("types") == expected_types, f"{context}: invalid column types"
+    rows = statement.get("rows", [])
+    assert isinstance(rows, list) and len(rows) <= 1, f"{context}: invalid row count"
+    if not rows:
+        return None
+    row = rows[0]
+    assert isinstance(row, dict) and set(row) == set(expected_types), f"{context}: invalid row fields"
+    return row
+
+
+def wait_converged(cluster, indices, acknowledged_index, expected_rows=None):
     until = time.monotonic() + 30
+    mismatches = []
     while time.monotonic() < until:
         try:
             states = [cluster.request(index, "/status")[1]["store"] for index in indices]
             leaders = {state["leader"]["node_id"] for state in states}
-            if (
+            applied = (
                 len(leaders) == 1
                 and "" not in leaders
                 and all(int(state["db_applied_index"]) >= acknowledged_index for state in states)
-            ):
-                return int(next(iter(leaders))[5:])
+            )
         except (OSError, KeyError):
-            pass
+            time.sleep(0.05)
+            continue
+        mismatches = []
+        if applied:
+            for voter in indices:
+                for identifier, expected in (expected_rows or {}).items():
+                    row = local_row(cluster, voter, identifier)
+                    if row != expected:
+                        fields = (
+                            sorted(key for key in expected if row.get(key) != expected[key])
+                            if row is not None else ["missing row"]
+                        )
+                        mismatches.append(f"voter {voter}, identity {identifier}: {', '.join(fields)}")
+            if not mismatches:
+                return int(next(iter(leaders))[5:])
         time.sleep(0.05)
-    raise AssertionError("Voters did not rejoin/apply acknowledged state within 30 seconds.")
+    raise AssertionError(
+        "Voters did not rejoin/apply acknowledged state within 30 seconds. " + "; ".join(mismatches)
+    )
 
 
 def main():
@@ -277,9 +324,11 @@ def main():
             verify_cross_api_ownership(pinned, majority_api, cluster, initial_leader)
             acknowledged = {}
 
-            def write(api, identifier):
-                value = registration(identifier)
-                status, body, _ = api.request("POST", "/api/servers/register", value)
+            def write(api, identifier, value=None, enrollment=True):
+                value = registration(identifier) if value is None else value
+                status, body, _ = api.request(
+                    "POST", "/api/servers/register", value, enrollment=enrollment
+                )
                 assert status == 200, f"Expected committed registration: {identifier} ({status})"
                 acknowledged[identifier] = {
                     "publicId": identifier,
@@ -287,11 +336,23 @@ def main():
                     "name": value["name"],
                     "version": value["version"],
                     "revision": body["data"]["revision"],
+                    "updatedAtMs": body["data"]["updatedAtMs"],
+                    "lastHeartbeatMs": body["data"]["lastHeartbeatMs"],
                 }
 
             for number in range(4):
                 write(pinned, f"before-partition-{number}")
             verify(pinned, acknowledged)
+            seed_identifier = "before-partition-0"
+            new_identifier = "during-partition-0"
+            baseline = local_row(cluster, initial_leader, seed_identifier)
+            assert baseline is not None, "Seed row missing before partition."
+            credential_digest = hashlib.sha256(registration(seed_identifier)["apiKey"].encode()).hexdigest()
+            assert baseline["credential_digest"] == credential_digest, "Seed credential digest mismatch."
+            baseline_index = int(
+                cluster.request(initial_leader, "/status")[1]["store"]["db_applied_index"]
+            )
+            wait_converged(cluster, range(args.nodes), baseline_index, {seed_identifier: baseline})
             # Submit once through an existing TLS client during an actual Raft partition.
             # Its outcome is uncertain and is NEVER automatically replayed.
             connection = pinned.connection()
@@ -349,18 +410,76 @@ def main():
                     or "error" in body
                     or any("error" in item for item in body.get("results", []))
                 ), "Minority served an authoritative read."
-            for _ in range(2):
-                status, body, headers = minority_api.request(
-                    "GET", "/api/servers/before-partition-0"
-                )
-                assert status == 503 and headers.get("Retry-After") == "1" and "url" not in body
+            updated_seed = dict(
+                registration(seed_identifier),
+                url="https://updated-seed.baander.app",
+                name="Updated partition seed",
+                version="2.0.0",
+            )
+            write(majority_api, seed_identifier, updated_seed, enrollment=False)
+            assert acknowledged[seed_identifier]["revision"] == baseline["revision"] + 1
             for number in range(4):
                 write(majority_api, f"during-partition-{number}")
+            expected_rows = {
+                identifier: local_row(cluster, new_leader, identifier)
+                for identifier in (seed_identifier, new_identifier)
+            }
+            for identifier, row in expected_rows.items():
+                assert row is not None, f"Acknowledged local row missing: {identifier}"
+                assert row["credential_digest"] == credential_digest, (
+                    f"Acknowledged credential digest mismatch: {identifier}"
+                )
+                for public_field, stored_field in (
+                    ("publicId", "public_id"), ("url", "url"), ("name", "name"),
+                    ("version", "version"), ("revision", "revision"),
+                    ("updatedAtMs", "updated_ms"), ("lastHeartbeatMs", "last_seen_ms"),
+                ):
+                    assert row[stored_field] == acknowledged[identifier][public_field], (
+                        f"Acknowledged row mismatch for {identifier}: {stored_field}"
+                    )
+            current_seed = expected_rows[seed_identifier]
+            assert current_seed["created_ms"] == baseline["created_ms"], "Owner update changed creation time."
+            for field in ("updated_ms", "last_seen_ms"):
+                assert current_seed[field] >= baseline[field], f"Owner update decreased {field}."
             acknowledged_index = int(
                 cluster.request(new_leader, "/status")[1]["store"]["db_applied_index"]
             )
+            wait_converged(cluster, sorted(majority), acknowledged_index, expected_rows)
+            for index in sorted(minority):
+                assert local_row(cluster, index, seed_identifier) == baseline, (
+                    f"Minority voter {index} did not retain the obsolete seed row."
+                )
+                assert local_row(cluster, index, new_identifier) is None, (
+                    f"Minority voter {index} unexpectedly has the new identity."
+                )
+            public_unavailability_errors = {
+                "Authoritative registry unavailable.",
+                "Authoritative database result unavailable.",
+                "Authoritative registry result unavailable.",
+                "Database request budget exhausted.",
+                "Database request deadline exceeded.",
+                "Registry query result unavailable.",
+                "Registry result unavailable.",
+            }
+            # Both lookups must precede failed readiness, which clears initialization.
+            for identifier in (seed_identifier, new_identifier):
+                status, body, headers = minority_api.request("GET", "/api/servers/" + identifier)
+                assert status == 503, f"Stale minority lookup for {identifier} returned {status}."
+                assert headers.get("Retry-After") == "1", identifier
+                assert set(body) == {"error"} and body["error"] in public_unavailability_errors, (
+                    f"Stale minority lookup for {identifier} returned an unexpected public envelope."
+                )
+            status, body, headers = minority_api.request("GET", "/ready")
+            assert status == 503 and headers.get("Retry-After") == "1"
+            assert set(body) == {"error"} and body["error"] in public_unavailability_errors
+            health_status, health_body, _ = minority_api.request("GET", "/health")
+            assert health_status == 200 and health_body == {"data": {"alive": True}}
+            verify(majority_api, acknowledged)
+            verify(pinned, acknowledged)
             cluster.network.heal()
-            healed_leader = wait_converged(cluster, range(args.nodes), acknowledged_index)
+            healed_leader = wait_converged(
+                cluster, range(args.nodes), acknowledged_index, expected_rows
+            )
             minority_api.wait_ready()
             verify(minority_api, acknowledged)
             print(
@@ -416,15 +535,6 @@ def main():
                 cluster.processes[index].wait(timeout=3)
             assert len(stopped) == args.nodes // 2 + 1
             outage_registration = registration("uncertain-quorum-loss")
-            public_unavailability_errors = {
-                "Authoritative registry unavailable.",
-                "Authoritative database result unavailable.",
-                "Authoritative registry result unavailable.",
-                "Database request budget exhausted.",
-                "Database request deadline exceeded.",
-                "Registry query result unavailable.",
-                "Registry result unavailable.",
-            }
             outage_started = time.monotonic()
             for method, target, payload in (
                 ("GET", "/api/servers/before-partition-0", None),
