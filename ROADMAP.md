@@ -6,8 +6,8 @@ Completed code is not proof of production or performance qualification.
 
 External acceptance: deployment access/inventory for `de`, `ca`, `sg`, `au`, and
 `fi`, and the S3 backup configuration are unavailable (user confirmed 2026-10-04).
-Continue local implementation and emulated acceptance; actual regional deployment,
-regional measurements, and backup-destination restore qualification remain pending.
+Actual regional deployment, regional measurements, and backup-destination restore
+qualification remain deferred until those prerequisites are available.
 React Native and Android work is deferred at the user's request (2026-10-05).
 
 ## Resume here
@@ -15,13 +15,48 @@ React Native and Android work is deferred at the user's request (2026-10-05).
 Read [AGENTS.md](AGENTS.md) for working rules and the
 [testing guide](docs-book/part-2-developer-guide/testing.md) for runners. This
 roadmap records scope and acceptance; the linked design documents, current source,
-and CI workflow are the executable detail. Measurements in later historical
-batches describe their own checkpoints; the current gate below takes precedence.
+and CI workflow are the executable detail. This section is the sole current work
+selection and status summary. Dated handoffs, measurements and limitation lists
+below record their own checkpoints; they do not assign new work. Unchecked items
+retain requirements or deferred scope, without making every item a next task.
+
+- **Next implementation priority:** define and repair latest-target behavior for
+  [rapid native scrubbing](#worker-architecture-and-resource-control). Consecutive
+  targets can carry a generation retired by the first accepted seek. This is an
+  existing interaction gap; the single-intention media-control scope is accepted.
+  This documentation cleanup does not implement that repair.
+- **Delivered local scope:** backend/static boundaries, browser credentials, worker
+  lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
+  and shared media control retain their recorded evidence. The latest full backend
+  checkpoint is **10,062 tests / 82,056 assertions**, followed by the focused
+  checks described in [shared media control](#shared-webworker-media-control-2026-10-19).
+  Registry registration, authoritative reads, local failure/recovery, transport TLS,
+  sanitizers and bounded load checks are covered; see the reconciled
+  [Registry status](#registry-release-and-growth).
+- **Deferred release acceptance:** real regional access, S3 destination and backup
+  rehearsal, constrained whole-host measurements, an accepted fixed-runner
+  performance baseline and the 24-hour soak remain prerequisites for release.
+  Their absence does not select more local failure-injection work. React Native
+  and Android remain deferred at the user's request.
+- **Selection rule:** start work for a concrete bug, an unfinished feature or a
+  named release decision that existing evidence cannot answer. Reuse the existing
+  checks first; add a regression only for the specific gap. A historical limitation
+  or an unchecked release requirement alone does not justify broader testing;
+  there is no obligation to exhaustively cover failure combinations.
+  The proposed same-process TLS expansion is abandoned; it was not qualified.
+  There is no standing task to complete “full failure injection” or add further
+  certificate scenarios.
+
+Roadmap reconciliation on 2026-10-19 changes documentation only. Existing source,
+CI and recorded checkpoints establish the statuses below; no product tests were
+added or rerun for this cleanup. Prose-preservation, link and whitespace checks
+verify this delivery.
 
 ### Handoff state on 2026-10-17
 
-Any harness can take over from this section; nothing below depends on a tool that
-only one agent host has.
+Historical handoff: the statements below describe the 2026-10-17 checkout and
+workflow. Use [Resume here](#resume-here) to select current work; later delivery
+checkpoints supersede this handoff where their scope overlaps.
 
 - **Bounded coroutine DNS.** Implementation on `plan/bounded-coroutine-dns`
   moves complete native lookup into bounded helpers and shares caller budgets
@@ -105,17 +140,10 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Continue the remaining local [Registry release and growth](#registry-release-and-growth)
-  gates after the [full-disk checkpoint](#registry-disk-exhaustion-qualification-2026-10-19).
-  The [shared media-control checkpoint](#shared-webworker-media-control-2026-10-19)
-  accepts single-intention pause/seek/reconnect, saturated cancellation and encoder
-  reuse on reattachment. Latest-target rapid native scrubbing remains a separate
-  open interaction contract. Worker lifecycle, measured autoscaling, reserved
-  control capacity and validated asynchronous routes retain their checkpoints
-  below. Provider live qualification, regional acceptance and S3 destination
-  restoration still need their existing external prerequisites. React Native and
-  Android remain deferred. The local dev database note below stands.
-
+- **Priority at this handoff.** Superseded by [Resume here](#resume-here).
+  The subsequent Registry disk, worker and shared media-control deliveries retain
+  their checkpoints below. Latest-target native scrubbing remains open; regional
+  and S3 acceptance require their external prerequisites.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -475,13 +503,18 @@ authorized a separate reset for the 2026-10-17 migration consolidation; that res
 is now complete. Other old histories require their own target-specific approval
 and manual reset. Do not mark the initial migration as executed to bypass refusal.
 
-Other local work can proceed independently: qualify the registry's remaining
-failure, fixed-runner load, resource, and soak gates. Regional hosts and the S3 destination remain external
-blockers. Do not mark deployment or restore acceptance complete from local cluster
-tests. React Native and Android remain deferred; Android's device login posts to a
-pairing endpoint that does not exist and needs a decision when that work resumes.
+Registry release prerequisites are consolidated under
+[Registry release and growth](#registry-release-and-growth); they are not an
+automatic local task queue. Local cluster tests do not establish deployment or S3
+restore acceptance. React Native and Android remain deferred; Android's device
+login posts to a pairing endpoint that does not exist and needs a decision when
+that work resumes.
 
 ## Current quality-gate checkpoint
+
+Historical checkpoint collection. The heading and anchors are retained for links;
+[Resume here](#resume-here) identifies current status and priority. Each result
+qualifies only its recorded tree and scope.
 
 ### Bounded coroutine DNS (2026-10-17)
 
@@ -1432,7 +1465,7 @@ replacement for it. Horizons express dependencies, not promised calendar dates.
 
 | Horizon | Deliverable | Exit condition |
 | --- | --- | --- |
-| Current local work | Remaining backend boundaries, final-image quality gates, browser auth qualification, and registry failure/resource tests | Deptrac reaches zero; full final-image checks and the relevant integrated acceptance pass |
+| Current local work | Latest-target rapid native scrubbing; other work selected by the rule in Resume here | The specific interaction gap is repaired and verified with affected existing checks and a focused regression |
 | Completed foundation | Web-state architecture, render/persistence budgets, optional developer tracing | Local behavior and performance regressions passed; release-wide qualification remains separate |
 | Before application release | Backend/web security, asynchronous recovery, complete contracts and enforceable gates | Fresh install and critical workflows pass real integration tests; deliberately failing checks block publication |
 | Before registry rollout | C++ registry and five-voter deployment qualification | Consistency, constrained capacity, partition/failover, leak and restore gates pass |
@@ -1488,11 +1521,11 @@ Duration formatting also supports hours and zero-pads each field (`00:09`,
 
 ## Follow-up: correctness review and remaining web gates
 
-The full web lint audit on 2026-10-04 reported 134 errors and 14 warnings before
-this follow-up, across the application, tests, and embedded player package.
-Changed-file lint passing does not satisfy this release gate. Resolve the errors
-at their source; do not broaden exclusions or suppressions to obtain a green run.
-After centralizing the image lifecycle, the rerun reports 130 errors and 14 warnings.
+Historical follow-up: the full web lint audit on 2026-10-04 reported 134 errors
+and 14 warnings across the application, tests, and embedded player package. After
+centralizing the image lifecycle, the rerun reported 130 errors and 14 warnings.
+The [next checkpoint](#web-quality-gates-restored) closed this gate with zero
+errors; these counts are retained as evidence of the earlier tree.
 
 - [x] Verify canceled image requests cannot publish stale covers or allocate leaked
   blob URLs; share one loader across album cards and retain unchanged-render budgets.
@@ -1720,9 +1753,10 @@ codec/DSP qualification remains a separate gate.
 
 ## Original remediation programme
 
-These packages remain tracked until their full acceptance criteria are verified.
-Prior commits contain substantial work; audit the current implementation and
-record evidence before marking an entire package complete.
+This is the historical scope of the original programme. Later delivery records
+close much of it; this list is not an active checklist or a request to repeat its
+audits. Open requirements are tracked in the scoped backlog below and selected
+through [Resume here](#resume-here).
 
 1. **Quality gates:** separate unit/browser discovery; correct fixtures and runtime
    requirements; shared typechecks; actual Vite output checks; isolated CI services;
@@ -1864,25 +1898,14 @@ exclusively to rqlite. Keep sockets, timers, buffers, and requests RAII-managed;
 do not introduce detached threads, unbounded queues, or custom JSON/crypto code.
 The database/admin endpoints stay private behind authenticated TLS.
 
-- [x] Implement the C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
-  pinned dependencies, CMake/Ninja, GoogleTest, and bounded async rqlite pools.
-  The PHP registry is replaced; no Symfony serialization, Redis, Sentinel, or
-  Electric is used. Local build, sanitizer, and cluster evidence is recorded above.
-- [ ] Finish release qualification of that implementation on constrained hosts,
-  full failure injection, fixed-runner performance, and the actual regional network.
-- [ ] Verify atomic credential-owned registration, digest-only credentials,
-  idempotent uncertain-commit retries, reserved offline identities, revisioning,
-  parameterized SQL and statement errors, bounded input/rate limits, private TLS
-  database endpoints, and liveness/readiness behavior.
-- [ ] Require explicit linearizable reads and committed writes. Return 503 with
-  Retry-After when quorum cannot provide an authoritative result; never downgrade.
-- [ ] Qualify concurrency, partitions, leader loss, stale replicas, disk/certificate
-  failures, shutdown, sanitizers, fuzzing, backups, and 24-hour soak/leak gates.
-- [ ] Run constrained optimized acceptance on five hosts and actual regional links.
-- [ ] Configure and rehearse encrypted, versioned five-minute S3-compatible backups
-  and isolated restoration (five-minute RPO; rehearsed 30-minute RTO).
-- [ ] Deploy and validate five voters, then upgrade voters one at a time. Preserve
-  volumes and prevent accidental competing-cluster bootstrap after quorum loss.
+The delivered C++20 implementation uses Beast/Asio, OpenSSL, nlohmann/json,
+pinned dependencies, CMake/Ninja, GoogleTest and bounded asynchronous rqlite pools.
+The PHP registry is replaced; Symfony serialization, Redis, Sentinel and Electric
+are absent. Local qualification is recorded above and in the stale-follower and
+disk-exhaustion checkpoints below. The single reconciled
+checklist is [Registry release and growth](#registry-release-and-growth); its
+deferred release prerequisites retain the deployment, backup and resource
+requirements without reopening covered behavior.
 
 Deployment names are configurable: currently `de`, `ca`, `sg`, `au`, `fi`, using
 `<region>.registry.baander.app`. Regions may change. Target three to five online
@@ -1939,10 +1962,11 @@ findings; prose preservation audits and whitespace checks pass.
 
 Evidence: `/tmp/baander-registry-stale-20261019/`, including `qualification.log`,
 `timing.json`, `negative-control.log`, `negative-control.json`, `tool-versions.txt`,
-`tooling-image.txt` and `syntax-check.txt`. Full-disk and further certificate
-injection, constrained hosts, regional networks, S3 destination restoration,
-fixed-runner performance, transitive dependency/license inventory and the 24-hour
-soak remain open.
+`tooling-image.txt` and `syntax-check.txt`. Full-disk qualification was still open
+at this checkpoint and is delivered below. The remaining release prerequisites
+are consolidated under [Registry release and growth](#registry-release-and-growth).
+The historical suggestion of further certificate injection does not assign work;
+existing invalid-TLS coverage remains valid.
 
 ### Registry disk exhaustion qualification (2026-10-19)
 
@@ -2021,13 +2045,20 @@ Evidence: `/tmp/baander-registry-disk-20261019/`, including `release.log`,
 `sanitize.log`, `qualification-results.json`, `tool-versions.txt`,
 `final-storage-tests.log` and `static-checks.log`.
 
-The observed qualification covers bounded voter filesystem exhaustion. SQLite
-`SQLITE_FULL`, power-loss durability, whole-host capacity, further certificate
-injection, constrained snapshots/compaction, regional networks, S3 destination
-restoration, fixed-runner performance, transitive dependency/license inventory and
-the 24-hour soak retain their separate acceptance gates.
+The observed qualification covers bounded voter filesystem exhaustion. It does
+not establish SQLite `SQLITE_FULL` or power-loss durability. Those are evidence
+limits, not additional default tasks. Whole-host capacity, constrained
+snapshots/compaction, regional networks, S3 destination restoration, fixed-runner
+performance, transitive dependency/license inventory and the 24-hour soak retain
+the prerequisites and scope recorded under
+[Registry release and growth](#registry-release-and-growth).
 
 ## Long-horizon acceptance backlog
+
+This section retains delivered scope, deferred features and release prerequisites.
+It is not an ordered work queue. Dated delivery records retain their original
+findings and limits; reconcile them with later records before selecting work.
+Only [Resume here](#resume-here) sets the current priority.
 
 ### Application security and reliability
 
@@ -2159,8 +2190,9 @@ fairness, duplicate JSON key behavior, live HTTP fuzzing, inbound legacy TLS and
 session saturation probes remain explicit limitations. Regional deployment,
 constrained-host soak and S3 backup/restore acceptance remain open. Existing
 container startup guard evidence is historical; this task does not rerun that gate.
-The application model's existing WebSocket proof, rate-limit and outbound-policy
-findings also remain open.
+The application model's WebSocket proof, rate-limit and outbound-policy findings
+were open at that checkpoint; the subsequent WebSocket ticket, atomic rate-limit
+and provider destination deliveries close them within their recorded scope.
 
 ### Application threat-model delivery (2026-10-14)
 
@@ -2459,10 +2491,10 @@ reports exit **0** and `cleanupVerified: true`. Results:
 
 The two-command deployment item is closed by this production/browser result,
 backend full-run evidence plus its focused correction, affected static/frontend
-gates and independent review. Operator and testing guidance describes manifest
-version 2, shared media storage, worker execution and explicit recovery. Later
-route/resource qualification, control capacity, autoscaling, failure/load coverage
-and media saturation items remain open.
+gates and independent review. Operator and testing guidance at this checkpoint
+described manifest version 2, shared media storage, worker execution and explicit
+recovery. Subsequent route, control-capacity, autoscaling, lifecycle and shared
+media-control deliveries below supersede this checkpoint's remaining-work list.
 
 #### Validated asynchronous routes (2026-10-18)
 
@@ -2537,7 +2569,8 @@ Frontend gates and backend runner/isolation self-tests were not repeated: no web
 code, runner protocol, backend isolation fixtures or native-test classification
 changed. Local application databases, baseline services and media remain untouched;
 all verification infrastructure is disposable. Reserved control capacity,
-autoscaling, broader failure/load coverage and media saturation remain open.
+autoscaling and shared media-control scope were open at this checkpoint and are
+delivered below; broader coverage is not a standing follow-up task.
 
 #### Reserved worker control capacity (2026-10-18)
 
@@ -2665,8 +2698,10 @@ fixture PHPStan after the counter-capture correction passed with zero errors in
 **9.01 seconds**, with cleanup verified; evidence:
 `/tmp/reserved-control-static-pressure/results.json`.
 
-Autoscaling, broader capacity/default-profile selection, regional acceptance and
-longer failure/load coverage remain open. Earlier production/browser checkpoints
+Autoscaling was open at this checkpoint and is delivered below with measured
+profiles. Smaller-host/default-profile expansion and regional acceptance remain
+outside that measured envelope; select any further qualification against a named
+release decision. Earlier production/browser checkpoints
 retain their original scope. Baseline services, application databases and media
 remain untouched; all new verification resources are disposable.
 
@@ -2938,8 +2973,9 @@ The new lifecycle CI path uses the current image. Timings and exit statuses:
 All **20 backend stack-isolation checks** pass in **43.373 seconds**. Evidence:
 `var/test-runs/lifecycle-stack-isolation` and
 `/tmp/lifecycle-gate-stack-isolation.log`. The reviewed lifecycle and outage scope
-is accepted; shared web/worker media control, live-provider and regional
-qualification retain their separate open scope.
+is accepted. Shared web/worker media control was open at this checkpoint and is
+delivered below. Live-provider and regional qualification retain their external
+prerequisites.
 
 - [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
@@ -3068,9 +3104,9 @@ Subtitle authority, readiness-wait revalidation and stale-lease/successor public
 have deterministic backend coverage; a response opened before retirement may
 finish. The historical segmenter plan's web-owned process/Swoole-table topology is
 superseded by the paired deployment. Cache/sweep, measured FLAC DSP CPU,
-hardware/HDR and DASH/ABR acceptance remain open. Registry release and growth
-remain the next local gates; live-provider, regional and S3 destination acceptance
-retain their existing external prerequisites.
+hardware/HDR and DASH/ABR acceptance remain open within their existing plans.
+Current work selection is recorded in [Resume here](#resume-here); live-provider,
+regional and S3 destination acceptance retain their external prerequisites.
 
 Related detailed media plans remain part of the roadmap until reconciled:
 [long-process segmenter](docs/plans/2026-07-16-001-refactor-long-process-segmenter-plan.md),
@@ -3081,68 +3117,129 @@ contracts; neither old prose nor the current branch name establishes completion.
 
 ### Registry release and growth
 
-- [ ] Public API retains registration fields `publicId`, `url`, `name`, `version`,
-  `apiKey` and recognizable success envelopes. Enforce HTTPS hostname URLs without
-  embedded credentials; 8 KiB bodies, depth eight, IDs/names 128 characters,
-  versions 64, URLs 2,048. Verify malformed/invalid/forbidden/oversize/throttled/
-  unavailable statuses 400/422/403/413/429/503 respectively.
-- [ ] Use `schema_migrations` checksums and one credential-owned `registries`
-  table. Store only SHA-256 credential digests for random 256-bit credentials;
-  never log/return credentials. Offline after ten minutes never releases ownership.
-- [x] Prove stale rows and false local absence on every minority voter in three-
-  and five-voter partitions; reject both public lookups and verify exact row
-  convergence after healing. See the
-  [stale-follower checkpoint](#stale-follower-verification-2026-10-19).
-- [x] Prove public unavailability and exact acknowledged-row recovery after real
-  filesystem exhaustion across three voter data directories on a bounded tmpfs.
-  See the [full-disk checkpoint](#registry-disk-exhaustion-qualification-2026-10-19)
-  for the observed voter `ENOSPC` layer and remaining storage acceptance.
-- [ ] Complete failure qualification for simultaneous claims, wrong credentials,
-  retry after uncertain commit, 3–2 partitions, total quorum loss, full disks,
-  invalid TLS, graceful shutdown and rejoin without manual data merging. Existing
-  local checkpoints cover several cases; full failure injection remains open.
-- [ ] Every PR: release build with warnings as errors, unit/API and three-node
-  integration tests, static analysis, dependency/license checks, ASan/LSan/UBSan,
-  separate TSan, malformed-input/disconnect/deadline/retry/reconnection/shutdown
-  coverage, and fixed-runner performance smoke tests. Confirmed regression above
-  10% against the accepted baseline blocks release.
-- [ ] Nightly and pre-release: five-node partition/failover, parser fuzzing, isolated
-  backup restoration, and a 24-hour workload soak. After warm-up compare equivalent
-  quiescent windows; fail sustained RSS growth over 1 MiB/hour or 10% of baseline.
-- [ ] Test snapshots, compaction, node catch-up, and backup upload inside the host
-  resource limit. Sanitizer workers may be larger; optimized deployment binaries
-  must still meet the agreed whole-host 512 MiB constraint.
-- [ ] Rehearse loss of any two voters without acknowledged-data loss, leader recovery
-  within 30 seconds, and cluster-wide restore from encrypted/versioned backups.
-  Measure the actual regional topology before rollout, not only emulated latency.
-- [ ] Expand APIs from five toward twenty only after measurements justify it;
-  retain five voters, optionally use non-voting replicas, and route authoritative
-  reads to the leader. Region changes require membership/runbook updates; emergency
-  one/two-host operation never implies unsafe automatic quorum reduction.
+The local contracts listed below are implemented and covered. The entries
+reconcile existing source and recorded runs; checking an entry records that
+evidence, not a new test run. The deferred requirements remain release blockers
+within their stated scope.
+
+- [x] Public API retains registration fields `publicId`, `url`, `name`, `version`,
+  `apiKey` and recognizable success envelopes. HTTPS hostname URLs exclude embedded
+  credentials; bodies are bounded at 8 KiB, depth eight, IDs/names 128 characters,
+  versions 64 and URLs 2,048. Malformed/invalid/forbidden/oversize/throttled/
+  unavailable statuses are 400/422/403/413/429/503. Evidence:
+  [HTTP contract](relay/tests/run_http_contract.py) and
+  [core tests](relay/tests/core_test.cpp).
+- [x] `schema_migrations` checksums and one credential-owned `registries` table
+  preserve ownership, revisions and reserved offline identities. Random 256-bit
+  credentials are stored only as SHA-256 digests and never logged/returned; ten
+  minutes offline does not release ownership. Parameterized SQL and statement
+  errors are covered by [core tests](relay/tests/core_test.cpp),
+  [security tests](relay/tests/security_test.cpp) and the HTTP contract.
+- [x] Authoritative lookups use explicit linearizable reads; registration is
+  acknowledged after commit. Quorum loss returns 503 with `Retry-After: 1`, while
+  liveness remains available. Never downgrade consistency to serve a result.
+  Concurrent claims, wrong-owner refusal, a real
+  acknowledged write with a lost response, owner retry, 3–2 partitions, total
+  quorum loss, leader recovery and rejoin are covered by the recorded HTTP and
+  three/five-voter contracts in [C++ registry](#c-registry).
+- [x] Stale rows and false local absence are proven on every minority voter in
+  three- and five-voter partitions, with public rejection and exact convergence
+  after healing. See [stale-follower verification](#stale-follower-verification-2026-10-19).
+- [x] Real bounded filesystem exhaustion returns public unavailability and recovers
+  exact acknowledged rows. See the
+  [full-disk checkpoint](#registry-disk-exhaustion-qualification-2026-10-19) for
+  voter `ENOSPC` evidence and its storage-layer limits.
+- [x] Authenticated SQL/TLS transport rejects hostname mismatch, untrusted server
+  and client certificates, expired server certificates and legacy TLS, then
+  recovers. The [transport contract](relay/tests/run_transport_contract.py) and
+  HTTP contract also cover connection/deadline recovery and graceful shutdown.
+- [x] CI requires warnings-as-errors release builds, unit/API/three-voter tests,
+  ASan/LSan/UBSan, separate TSan, parser fuzzing, static analysis, direct dependency
+  notices and five-voter production-container qualification before publication.
+  Container checks cover bootstrap refusal, persistent acknowledgements, rolling
+  restart/replacement and shutdown. Local isolated binary restore and bounded
+  optimized load-smoke results are recorded above. Evidence:
+  [native runner](scripts/test-registry.sh),
+  [container contract](relay/tests/run_container_contract.py) and
+  [CI workflow](.forgejo/workflows/ci.yaml).
+
+Remaining release implementation, selected when it advances a named release
+milestone:
+
+- [ ] Implement encrypted, versioned five-minute S3-compatible backup automation.
+  Destination credentials are needed to qualify the resulting upload and restore.
+- [ ] Add fixed-runner baseline comparison and enforce confirmed regressions above
+  10%, once the stable runner and accepted baseline are selected. The bounded
+  optimized load smoke already exists.
+- [ ] Complete the packaged transitive dependency/license inventory. First-party
+  declarations and five pinned direct dependency notices are already checked.
+- [ ] Add scheduled nightly five-voter partition/failover, parser-fuzz and
+  isolated-restore orchestration using the existing runners. Push/PR CI and local
+  five-voter results do not establish a nightly schedule.
+
+Deferred measurements and rehearsals, requiring an agreed environment or access:
+
+- [ ] Qualify the agreed five-host optimized deployment budget, including
+  snapshots, compaction, node catch-up and backup upload. Each whole host remains
+  limited to 1 CPU and 512 MiB, with the full latency, burst, recovery and memory
+  thresholds in [C++ registry](#c-registry). Optimized deployment binaries must
+  meet those limits; sanitizer workers may be larger.
+  Select this work when the target hosts or an explicit equivalent measurement
+  environment and release decision are available.
+- [ ] Select the stable performance runner and record an accepted baseline for
+  regression comparison. Existing bounded load-smoke results do not establish it.
+- [ ] Run the 24-hour workload soak on the intended deployment profile. After
+  warm-up compare equivalent quiescent windows; fail sustained RSS growth over
+  1 MiB/hour or 10% of baseline. The soak requires a reserved run window and
+  recorded profile; short local runs do not complete it.
+- [ ] Qualify encrypted, versioned five-minute S3-compatible backups and rehearse
+  isolated restoration with five-minute RPO and 30-minute RTO. Local fresh-storage
+  binary restore is covered; this rehearsal needs destination access and the
+  backup automation above.
+- [ ] Validate the actual regional five-voter deployment and upgrade voters one at
+  a time while preserving volumes and bootstrap guards. Measure the regional
+  topology and verify two-voter loss without acknowledged-data loss and leader
+  recovery within 30 seconds. Local five-voter failure/rejoin and rolling restart
+  are covered; actual host access and inventory remain unavailable.
+
+Future growth remains conditional: expand APIs from five toward twenty only when
+measurements justify it; retain five voters, optionally use non-voting replicas,
+and route authoritative reads to the leader. Region changes require membership
+and runbook updates. One/two-host emergency operation never permits unsafe
+automatic quorum reduction. This is not the current implementation priority.
 
 ### Secondary clients, native qualification, and release operations
 
 - [ ] Remove shared compilation blockers and require dependent shared/mobile/desktop
   checks. Tighten Electron navigation/origin and IPC validation and test failures.
-- [ ] Reconcile the [React Native styling plan](docs/plans/2026-07-15-001-refactor-rn-styling-pattern-plan.md)
+- [ ] When the user resumes deferred React Native work, reconcile the [React Native styling plan](docs/plans/2026-07-15-001-refactor-rn-styling-pattern-plan.md)
   and [React Native/TV tooling plan](docs/plans/2026-07-15-002-chore-rn-tv-dx-tooling-plan.md)
   against current code after backend/web priorities are satisfied.
 - [ ] Make codec/DSP builds reproducible and run reference vectors before claiming
   native paths release-certified. Track remaining loudness/codec qualification in
   [DSP qualification](packages/dsp/README.md); browser graph tests alone are insufficient.
-- [ ] Verify clean application installs/upgrades on disposable PostgreSQL, restore
-  backups before migration rollout, correct production dependency-copy ordering,
-  environment defaults/startup behavior, and meaningful health/readiness probes.
-- [ ] Align all first-party manifests/documentation to Apache-2.0; retain all vendored
-  third-party notices/licenses and verify dependency-license checks in CI.
+- [x] Qualify fresh application installation, refusal of unknown histories and
+  repeat no-op migration on disposable PostgreSQL. See
+  [migration consolidation](#doctrine-migration-consolidation-2026-10-17).
+  Worker/container startup and health checks retain their recorded scope.
+- [ ] Rehearse application backup restoration before migration rollout and reconcile
+  release-image dependency-copy ordering and environment defaults against existing
+  image checks. These release prerequisites do not reopen covered migration or
+  runtime behavior.
+- [x] Align first-party manifests/documentation to Apache-2.0 while retaining
+  vendored third-party notices. See [license alignment](#first-party-license-alignment)
+  and the Registry direct-license gate above. Packaged transitive-license
+  qualification remains a release prerequisite.
 - [ ] Cut the first production release only after its acceptance evidence is recorded.
   Remove the temporary pre-release AGENTS.md policy only on the user's explicit
   announcement, then establish real compatibility/migration commitments from there.
 
 ### Developer tooling after the first debugger
 
-- [ ] Keep trace records versioned and exportable, with bounded recording and visible
-  gaps/truncation/redaction. Keep state snapshots detached from live references.
+- [x] Keep trace records versioned and exportable, with bounded recording and visible
+  gaps/truncation/redaction, and snapshots detached from live references. Delivered
+  in the [debugger foundation](#completed-foundation-web-stores-and-developer-tooling);
+  preserve these invariants when that feature changes.
 - [ ] Define replay scope explicitly: pure state transitions versus asynchronous
   completion, external input, network effects, native media, and nonserializable
   objects. Record enough provenance for deterministic supported cases.
@@ -3150,13 +3247,17 @@ contracts; neither old prose nor the current branch name establishes completion.
   Never execute stored functions or silently replay external effects from imported traces.
 - [ ] Add deterministic replay/reference tests and a version-upgrade policy when actual
   replay is implemented. A diagnostic timeline is not yet an event-sourced application.
-- [ ] Retain disabled instrumentation and unrelated-render performance gates as the
-  debugger and store APIs evolve; enabled tracing overhead is explicitly permitted.
+- [x] Retain disabled instrumentation and unrelated-render performance gates. Their
+  [foundation checkpoint](#completed-foundation-web-stores-and-developer-tooling)
+  records the existing checks; reuse them when debugger/store APIs change. Enabled
+  tracing overhead is explicitly permitted.
 
 ## Completion and next updates
 
-Before edits, assess symbol impact through source searches, caller inspection
-and the relevant test suites. Before
+[Resume here](#resume-here) selects current work. Historical limits and deferred
+release acceptance do not authorize an expanding test programme. Before edits,
+assess symbol impact through source searches, caller inspection and the relevant
+test suites. Before
 commits, inspect the actual scope with `git status` and `git diff --stat`, including
 unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
