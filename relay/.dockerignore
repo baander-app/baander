@@ -12,3 +12,6 @@
 !docker/Dockerfile
 !docker/rqlite.Dockerfile
 !docker/rqlite-entrypoint.sh
+!docker/backup.Dockerfile
+!backup/
+!backup/registry_backup.py

@@ -1,0 +1,11 @@
+{
+  "rqlite_url": "https://voter-1.registry.baander.app:4001",
+  "curl_config": "/run/secrets/registry-backup/curl.conf",
+  "recipients_file": "/run/secrets/registry-backup/recipients.txt",
+  "rclone_config": "/run/secrets/registry-backup/rclone.conf",
+  "destination": "backup:registry-backups/registry",
+  "spool_dir": "/var/spool/registry-backup",
+  "status_file": "/var/lib/registry-backup/status.json",
+  "attempt_timeout_seconds": 240,
+  "max_ciphertext_bytes": 268435456
+}

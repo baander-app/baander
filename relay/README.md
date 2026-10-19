@@ -6,7 +6,9 @@ data and legacy volumes are left untouched; they are never opened or migrated.
 
 The local implementation includes validation, parameterized rqlite requests, a
 bounded asynchronous mTLS connection pool, and a TLS HTTP server. Regional
-infrastructure, deployment and backup automation remain separate acceptance gates.
+infrastructure and deployment remain separate acceptance gates. The opt-in
+[encrypted backup worker](backup/README.md) stores historical snapshots in
+S3-compatible storage; real-destination recovery qualification remains open.
 
 The [registry threat model](../docs-book/part-2-developer-guide/registry-threat-model.md)
 describes credential ownership, replay limits, parser and transport boundaries, and
@@ -353,6 +355,8 @@ Third-party license notices are retained in `third_party/`.
 | GoogleTest (tests only) | 1.17.0 | `65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c` | BSD-3-Clause |
 | OpenSSL (environment library; isolated CI source build) | 3.5.3 | `c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf` | Apache-2.0 |
 | rqlite (external database/test binary) | 10.5.1 | Linux amd64 release: `f0ebf593b573595022947add67cd22e6cbb02c1d2a1ed8c7da45c94093a49b0d` | MIT |
+| age (backup encryption) | 1.3.2 | Linux amd64 release: `cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10` | BSD-3-Clause |
+| rclone (backup object transfer) | 1.71.2 | Linux amd64 release: `ab9fa5877cee91c64fdfd61a27028a458cf618b39259e5c371dc2ec34a12e415` | MIT |
 
 Authoritative contracts: [rqlite HTTP API](https://rqlite.io/docs/api/api/) and
 [read consistency](https://rqlite.io/docs/api/read-consistency/).

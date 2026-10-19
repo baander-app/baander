@@ -3,24 +3,17 @@
 # Direct dependency notices are checked; this is not a transitive SBOM/license audit.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-if [[ $# != 0 ]]; then
-    echo "Usage: $0" >&2
+pins_only=false
+if [[ $# == 1 && $1 == --pins-notices-only ]]; then
+    pins_only=true
+elif [[ $# != 0 ]]; then
+    echo "Usage: $0 [--pins-notices-only]" >&2
     exit 2
 fi
-export CC=clang-19 CXX=clang++-19
-for command in cmake ninja "$CC" "$CXX" clang-tidy-19 make perl curl python3 sha256sum pkg-config cmp; do
-    command -v "$command" >/dev/null
-done
-python3 -c 'import yaml'
-clang-tidy-19 --version | grep -Eq 'LLVM version 19\.' || {
-    echo 'Registry static qualification requires clang-tidy 19.' >&2
-    exit 2
-}
-work="$(mktemp -d /tmp/baander-registry-static.XXXXXXXX)"
-trap 'rm -rf "$work"' EXIT
 
 # Unknown FetchContent dependencies fail closed instead of silently missing a notice.
 python3 - <<'PY'
+import hashlib
 import pathlib
 import re
 
@@ -65,13 +58,31 @@ for filename, version, digest in [
         'rqlite-v10.5.1-linux-amd64',
         'f0ebf593b573595022947add67cd22e6cbb02c1d2a1ed8c7da45c94093a49b0d',
     ),
+    (
+        'relay/docker/backup.Dockerfile',
+        'https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz',
+        'cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10',
+    ),
+    (
+        'relay/docker/backup.Dockerfile',
+        'https://github.com/rclone/rclone/releases/download/v1.71.2/rclone-v1.71.2-linux-amd64.zip',
+        'ab9fa5877cee91c64fdfd61a27028a458cf618b39259e5c371dc2ec34a12e415',
+    ),
 ]:
     dockerfile = pathlib.Path(filename).read_text()
     if version not in dockerfile or digest not in dockerfile:
         raise SystemExit('Registry packaged dependency pin changed: ' + filename)
-notices = {'boost', 'json', 'googletest', 'openssl', 'rqlite'}
+notices = {'boost', 'json', 'googletest', 'openssl', 'rqlite', 'age', 'rclone'}
 if {p.name.removesuffix('-LICENSE.txt') for p in pathlib.Path('relay/third_party').glob('*-LICENSE.txt')} != notices:
     raise SystemExit('Registry retained-notice inventory changed; review its coverage.')
+# These upstream notice contents are pinned independently of their archives.
+for name, digest in {
+    'age': 'c5d65279d02955c0fc2294ae417c3add650d228f4f5c82bd6d531fc26c89cd96',
+    'rclone': '8cd2e9e750b90a04b7d82dbbca3930c696ae0309d7c10464f90a44f45754cd04',
+}.items():
+    notice = pathlib.Path('relay/third_party/' + name + '-LICENSE.txt')
+    if hashlib.sha256(notice.read_bytes()).hexdigest() != digest:
+        raise SystemExit('Registry packaged dependency notice changed: ' + name)
 sources = [
     *pathlib.Path('relay/cpp').rglob('*.cpp'),
     *pathlib.Path('relay/include').rglob('*.hpp'),
@@ -82,6 +93,21 @@ for source in sources:
         raise SystemExit('Missing first-party Apache-2.0 declaration: ' + str(source))
 print('Reviewed direct dependency pins and first-party license declarations passed.')
 PY
+
+if [[ "$pins_only" == true ]]; then
+    exit 0
+fi
+export CC=clang-19 CXX=clang++-19
+for command in cmake ninja "$CC" "$CXX" clang-tidy-19 make perl curl python3 sha256sum pkg-config cmp; do
+    command -v "$command" >/dev/null
+done
+python3 -c 'import yaml'
+clang-tidy-19 --version | grep -Eq 'LLVM version 19\.' || {
+    echo 'Registry static qualification requires clang-tidy 19.' >&2
+    exit 2
+}
+work="$(mktemp -d /tmp/baander-registry-static.XXXXXXXX)"
+trap 'rm -rf "$work"' EXIT
 
 curl --fail --silent --show-error --location --retry 3 --max-time 180 \
     https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz \
@@ -108,7 +134,7 @@ curl --fail --silent --show-error --location --retry 3 --max-time 180 \
     https://raw.githubusercontent.com/rqlite/rqlite/v10.5.1/LICENSE -o "$work/rqlite-LICENSE"
 echo "eebaac1ed2a0deece5e8ea39c679bd2c8813aa8da3ec95cdda953b95ce349629  $work/rqlite-LICENSE" | sha256sum --check --status
 cmp relay/third_party/rqlite-LICENSE.txt "$work/rqlite-LICENSE"
-echo 'All five reviewed direct dependency notices match upstream.'
+echo 'All seven reviewed direct dependency notices match pinned upstream contents.'
 
 checks='-*,clang-analyzer-*'
 checks+=',bugprone-use-after-move,bugprone-dangling-handle,bugprone-infinite-loop'

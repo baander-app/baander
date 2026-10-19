@@ -1,0 +1,3 @@
+# SPDX-License-Identifier: Apache-2.0
+# Put the public age recipient from your separately stored recovery identity here.
+# Keep the private recovery identity outside the backup container.

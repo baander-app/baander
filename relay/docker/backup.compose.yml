@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+services:
+  registry-backup:
+    profiles: [backup]
+    image: baander/registry-backup:age1.3.2-rclone1.71.2
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: docker/backup.Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 0.5
+    mem_limit: 512m
+    pids_limit: 64
+    stop_grace_period: 15s
+    tmpfs:
+      - /var/spool/registry-backup:rw,noexec,nosuid,nodev,size=272m,uid=10001,gid=10001,mode=0700
+      - /tmp:rw,noexec,nosuid,nodev,size=8m,uid=10001,gid=10001,mode=0700
+    volumes:
+      - "${REGISTRY_BACKUP_CONFIG_DIRECTORY:?Provide backup configuration directory}:/etc/baander-registry-backup:ro"
+      - "${REGISTRY_BACKUP_SECRETS_DIRECTORY:?Provide backup TLS/auth and public recipient directory}:/run/secrets/registry-backup:ro"
+      - backup_status:/var/lib/registry-backup
+    healthcheck:
+      test: [CMD, python3, /usr/local/bin/registry-backup, health, --config, /etc/baander-registry-backup/backup.json]
+      interval: 30s
+      timeout: 5s
+      start_period: 250s
+      retries: 1
+volumes:
+  backup_status:
