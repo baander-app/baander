@@ -287,6 +287,105 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
+  it('orders a pause between native targets and retains its intent until fresh reconciliation', async () => {
+    let generation = 4
+    let position = 30
+    let status = 'running'
+    const snapshot = () => ({ data: {
+      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`,
+      sessionId: 'owned-session', generation, revision: generation, ready: true,
+      position, status, startTime: 12, duration: 180,
+    } })
+    let finishFirst!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    let finishLast!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+      if (path === '/api/stream/sign') return Promise.resolve(snapshot())
+      position = payload.position!
+      if (payload.action === 'pause') status = 'paused'
+      if (payload.action === 'seek') {
+        generation++
+        if (position === 45) return new Promise((resolve) => { finishFirst = resolve })
+        return new Promise((resolve) => { finishLast = resolve })
+      }
+      return Promise.resolve({ data: { data: {} } })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false })
+    vi.mocked(video.play).mockImplementation(async () => { Object.defineProperty(video, 'paused', { value: false }) })
+    vi.mocked(video.pause).mockImplementation(() => { Object.defineProperty(video, 'paused', { value: true }) })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 33
+    await act(async () => video.dispatchEvent(new Event('seeking')))
+    video.currentTime = 43
+    Object.defineProperty(video, 'paused', { value: true })
+    await act(async () => video.dispatchEvent(new Event('pause')))
+    video.currentTime = 53
+    await act(async () => video.dispatchEvent(new Event('seeking')))
+    await act(async () => finishFirst({ data: { data: { acceptedGeneration: 5 } } }))
+    const commands = () => post.mock.calls.filter((call) => call[1].action).map((call) => call[1])
+    expect(commands()).toEqual([
+      { action: 'seek', position: 45, generation: 4 },
+      { action: 'pause', position: 55 },
+      { action: 'seek', position: 65, generation: 5 },
+    ])
+    expect(video.paused).toBe(true)
+    await act(async () => finishLast({ data: { data: { acceptedGeneration: 6 } } }))
+    expect(position).toBe(65)
+    expect(status).toBe('paused')
+    expect(video.paused).toBe(true)
+    unmount()
+  })
+
+  it('retains accepted native seek authority while its fresh reconciliation is pending', async () => {
+    let generation = 4
+    let position = 30
+    const snapshot = () => ({ data: {
+      url: `/manifest?generation=${generation}`, jobId: 'job', renditionSet: `job.${generation}`,
+      sessionId: 'owned-session', generation, revision: generation, ready: true,
+      position, status: 'paused', startTime: 12, duration: 180,
+    } })
+    let finishRefresh!: (value: ReturnType<typeof snapshot>) => void
+    let finishLast!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    let refreshes = 0
+    post.mockImplementation((path: string, payload: { position?: number }) => {
+      if (path === '/api/stream/sign') {
+        refreshes++
+        if (refreshes === 2) return new Promise((resolve) => { finishRefresh = resolve })
+        return Promise.resolve(snapshot())
+      }
+      position = payload.position!
+      generation++
+      if (position === 65) return new Promise((resolve) => { finishLast = resolve })
+      return Promise.resolve({ data: { data: { acceptedGeneration: generation } } })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 33
+    await act(async () => video.dispatchEvent(new Event('seeking')))
+    expect(refreshes).toBe(2)
+    expect(video.src).toContain('generation=4')
+    const committedFirst = snapshot()
+    video.currentTime = 53
+    await act(async () => video.dispatchEvent(new Event('seeking')))
+    await act(async () => finishRefresh(committedFirst))
+    expect(post.mock.calls.filter((call) => call[1].action === 'seek').map((call) => call[1])).toEqual([
+      { action: 'seek', position: 45, generation: 4 },
+      { action: 'seek', position: 65, generation: 5 },
+    ])
+    expect(video.src).toContain('generation=4')
+    await act(async () => finishLast({ data: { data: { acceptedGeneration: 6 } } }))
+    expect(video.src).toContain('generation=6')
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(53)
+    unmount()
+  })
+
   it('keeps explicit seek intent independent of the attached generation', async () => {
     post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
