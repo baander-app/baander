@@ -1,27 +1,22 @@
-import { resolve } from 'node:path';
-import { copyFile } from 'node:fs/promises';
-import type { Plugin } from 'vite';
+import { resolve, dirname } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
+import type { Plugin } from 'vite';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const rootDir = resolve(__dirname, '../../..');
-const electronDir = resolve(__dirname, '..');
+const electronDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * Vite plugin to copy wasm-hashes.json to the main process output
- */
-export function copyWasmHashes(): Plugin {
+export function writeWasmHashes(): Plugin {
   return {
-    name: 'copy-wasm-hashes',
-    writeBundle() {
-      const wasmHashesPath = resolve(electronDir, 'src/main/wasm-hashes.json');
-      const outDir = resolve(electronDir, 'dist/main');
-
-      return copyFile(wasmHashesPath, resolve(outDir, 'wasm-hashes.json'))
-        .then(() => console.log('✓ Copied wasm-hashes.json to main process output'))
-        .catch((err) => console.warn('  ⚠ Skipping wasm-hashes.json (not found)', err));
+    name: 'write-wasm-hashes',
+    async writeBundle() {
+      const modules: string[] = JSON.parse(await readFile(resolve(electronDir, 'src/shared/wasm-modules.json'), 'utf8'));
+      const hashes: Record<string, string> = {};
+      for (const module of modules) {
+        const bytes = await readFile(resolve(electronDir, '../../packages/dsp', module, `${module}.wasm`));
+        hashes[module] = createHash('sha256').update(bytes).digest('hex');
+      }
+      await writeFile(resolve(electronDir, 'dist/main/wasm-hashes.json'), JSON.stringify(hashes, null, 2));
     },
   };
 }

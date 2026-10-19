@@ -7,7 +7,7 @@ vi.mock('@/features/auth/stores/auth-store', () => ({
 }));
 
 vi.mock('@/shared/crypto/dpop-store', () => ({
-  getDpopKeyPair: () => null,
+  getDpopKeyPair: vi.fn(() => null),
   getDpopNonce: () => null,
   setDpopNonce: vi.fn(),
 }));
@@ -18,6 +18,8 @@ vi.mock('@/shared/crypto/dpop-proof', () => ({
 
 import { buildHtu, customInstance, AXIOS_INSTANCE } from '../axios-instance';
 import MockAdapter from 'axios-mock-adapter';
+import { getDpopKeyPair } from '@/shared/crypto/dpop-store';
+import { createDpopProof } from '@/shared/crypto/dpop-proof';
 
 describe('DPoP request URI', () => {
   it.each([
@@ -120,5 +122,42 @@ describe('customInstance', () => {
     expect(result.expires).toBe(3600);
     expect(result).toEqual(body);
     expect(result).not.toHaveProperty('headers');
+  });
+});
+
+
+describe('file-based desktop API requests', () => {
+  it('signs configured API requests while keeping proofs off foreign requests', async () => {
+    const previousBase = AXIOS_INSTANCE.defaults.baseURL;
+    const api = 'https://api.baander.app';
+    const mock = new MockAdapter(AXIOS_INSTANCE);
+    vi.stubGlobal('window', {
+      __BAANDER_API_URL__: api,
+      location: { origin: 'null', href: 'file:///opt/baander/index.html#/login' },
+    });
+    AXIOS_INSTANCE.defaults.baseURL = api;
+    vi.mocked(getDpopKeyPair).mockReturnValue({} as NonNullable<ReturnType<typeof getDpopKeyPair>>);
+    vi.mocked(createDpopProof).mockResolvedValue('signed-proof');
+    mock.onGet('/api/test').reply(config => {
+      expect(config.headers?.DPoP).toBe('signed-proof');
+      return [200, {}];
+    });
+    mock.onGet('https://foreign.baander.app/data').reply(config => {
+      expect(config.headers?.DPoP).toBeUndefined();
+      expect(config.headers?.Authorization).toBeUndefined();
+      return [200, {}];
+    });
+    try {
+      await AXIOS_INSTANCE.get('/api/test');
+      await AXIOS_INSTANCE.get('https://foreign.baander.app/data', {
+        headers: { DPoP: 'must-not-leak', Authorization: 'must-not-leak' },
+      });
+    } finally {
+      mock.restore();
+      AXIOS_INSTANCE.defaults.baseURL = previousBase;
+      vi.mocked(getDpopKeyPair).mockReturnValue(null);
+      vi.mocked(createDpopProof).mockReset();
+      vi.unstubAllGlobals();
+    }
   });
 });

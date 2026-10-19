@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { createMainWindow } from '../windows/main-window';
+import { createMainWindow, getMainWindow } from '../windows/main-window';
 import { createConfigWindow } from '../windows/config-window';
 import { enableCrossOriginIsolation } from '../security/cross-origin-isolation-shim';
 import { mainLog } from '../log';
@@ -122,7 +122,7 @@ export class DeepLinkService {
   private getExistingWindow() {
     const configured = this.getServerUrlSync();
     return configured
-           ? (createMainWindow as any).get?.()
+           ? getMainWindow()
            : (createConfigWindow as any)?.get?.() || null;
   }
 

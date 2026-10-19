@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron';
 import { buildMenu } from './build-menu';
 import type { AppMenuContext } from './types';
 import { MenuActionId } from './ids';
@@ -15,10 +15,7 @@ export function setupApplicationMenu(ctx: AppMenuContext) {
   // Wire menu item actions by id
   wireMenuActions(menu);
 
-  // Basic IPC wiring example for menu actions
-  ipcMain.on('menu:action', (_e, actionId: string) => {
-    handleMenuAction(actionId);
-  });
+
 }
 
 function sendToFocused(channel: string, payload?: any) {

@@ -61,7 +61,7 @@ export function buildHtu(url: string): string {
 
 function isApiRequest(config: AxiosRequestConfig): boolean {
   try {
-    const target = new URL(AXIOS_INSTANCE.getUri(config), window.location.origin);
+    const target = new URL(AXIOS_INSTANCE.getUri(config), window.location.href);
     return target.origin === apiOrigin() && !target.username && !target.password;
   } catch {
     return false;

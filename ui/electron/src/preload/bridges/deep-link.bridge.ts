@@ -10,11 +10,9 @@ export const deepLinkBridge = {
   },
 
   onDeepLinkReceived: (callback: (url: string) => void) => {
-    ipcRenderer.on('baander:deeplink:received', (_event, url) => callback(url));
-  },
-
-  removeDeepLinkListener: (callback: (url: string) => void) => {
-    ipcRenderer.removeListener('baander:deeplink:received', callback);
+    const listener = (_event: Electron.IpcRendererEvent, url: string) => callback(url);
+    ipcRenderer.on('baander:deeplink:received', listener);
+    return () => ipcRenderer.removeListener('baander:deeplink:received', listener);
   },
 } as const;
 

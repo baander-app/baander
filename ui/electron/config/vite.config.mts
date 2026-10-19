@@ -6,7 +6,7 @@ import electron from 'vite-plugin-electron/simple';
 import Info from 'unplugin-info/vite';
 import richSvg from 'vite-plugin-react-rich-svg';
 import { copyAssets } from './vite-plugin-copy-assets';
-import { copyWasmHashes } from './vite-plugin-copy-wasm-hashes';
+import { writeWasmHashes } from './vite-plugin-copy-wasm-hashes';
 
 const mainEntry = resolve(process.cwd(), 'src/main/index.ts');
 const preloadEntry = resolve(process.cwd(), 'src/preload/index.ts');
@@ -87,7 +87,7 @@ export default defineConfig(({mode}) => {
           entry: mainEntry,
           vite: {
             envDir: process.cwd(),
-            plugins: [copyWasmHashes()],
+            plugins: [writeWasmHashes()],
             build: {
               outDir: resolve(process.cwd(), 'dist/main'),
               emptyOutDir: true,

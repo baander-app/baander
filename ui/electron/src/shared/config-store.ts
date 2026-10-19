@@ -8,8 +8,7 @@ type ConfigShape = {
 };
 
 // Safely detect if we're in a renderer process with Electron APIs
-const isElectronRenderer = typeof window !== 'undefined' &&
-  typeof (window as any).BaanderElectron !== 'undefined';
+const isElectronRenderer = typeof (globalThis as any).BaanderElectron !== 'undefined';
 
 // Main process implementation
 // Only initialized in the main process context
@@ -83,7 +82,7 @@ export async function loadConfig(): Promise<ConfigShape> {
   if (isElectronRenderer) {
     // Use the IPC bridge in renderer
     try {
-      const serverUrl = await (window as any).BaanderElectron?.config?.getServerUrl?.();
+      const serverUrl = await (globalThis as any).BaanderElectron?.config?.getServerUrl?.();
       return { serverUrl };
     } catch (err) {
       console.error('Failed to load config via IPC:', err);
@@ -101,7 +100,7 @@ export async function saveConfig(config: ConfigShape): Promise<void> {
     // Use the IPC bridge in renderer
     try {
       if (config.serverUrl !== undefined) {
-        await (window as any).BaanderElectron?.config?.setServerUrl?.(config.serverUrl);
+        await (globalThis as any).BaanderElectron?.config?.setServerUrl?.(config.serverUrl);
       }
     } catch (err) {
       console.error('Failed to save config via IPC:', err);
@@ -116,7 +115,7 @@ export async function getServerUrl(): Promise<string | undefined> {
   if (isElectronRenderer) {
     // Use the IPC bridge in renderer
     try {
-      return await (window as any).BaanderElectron?.config?.getServerUrl?.();
+      return await (globalThis as any).BaanderElectron?.config?.getServerUrl?.();
     } catch (err) {
       console.error('Failed to get server URL via IPC:', err);
       return undefined;
@@ -132,7 +131,7 @@ export async function setServerUrl(url: string | undefined): Promise<void> {
   if (isElectronRenderer) {
     // Use the IPC bridge in renderer
     try {
-      await (window as any).BaanderElectron?.config?.setServerUrl?.(url || '');
+      await (globalThis as any).BaanderElectron?.config?.setServerUrl?.(url || '');
     } catch (err) {
       console.error('Failed to set server URL via IPC:', err);
     }

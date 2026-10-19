@@ -116,35 +116,19 @@ export function createConfigWindow() {
 
   attachLoadGuards(configWindow, 'Config window');
 
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devServerUrl) {
-    // Serve from Vite: /config/index.html
-    configWindow.loadURL(trust.configUrl).catch(err => {
-      mainLog.error('[fatal] Failed to load config URL', err);
-      try {
-        dialog.showMessageBoxSync(configWindow!, {
-          type: 'error',
-          title: 'Config window failed',
-          message: 'Failed to load dev config URL',
-          detail: String(err),
-        });
-      } catch {}
-      app.exit(1);
-    });
-  } else {
-    configWindow.loadURL(trust.configUrl).catch(err => {
-      mainLog.error('[fatal] Failed to load built config HTML', err);
-      try {
-        dialog.showMessageBoxSync(configWindow!, {
-          type: 'error',
-          title: 'Config window failed',
-          message: 'Failed to load built config HTML',
-          detail: String(err),
-        });
-      } catch {}
-      app.exit(1);
-    });
-  }
+  const loadDescription = process.env.VITE_DEV_SERVER_URL ? 'config URL' : 'built config HTML';
+  configWindow.loadURL(trust.configUrl).catch(err => {
+    mainLog.error(`[fatal] Failed to load ${loadDescription}`, err);
+    try {
+      dialog.showMessageBoxSync(configWindow!, {
+        type: 'error',
+        title: 'Config window failed',
+        message: `Failed to load ${loadDescription}`,
+        detail: String(err),
+      });
+    } catch {}
+    app.exit(1);
+  });
 
   configWindow.on('closed', () => (configWindow = null));
   return configWindow;

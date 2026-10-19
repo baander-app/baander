@@ -130,34 +130,19 @@ export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
   window.on('unmaximize', () => window.webContents.send('baander:window:maximized-change', false));
   if (onLoaded) window.webContents.once('did-finish-load', () => onLoaded(window));
 
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devServerUrl) {
-    mainWindow.loadURL(trust.mainUrl).catch(err => {
-      mainLog.error('[fatal] Failed to load dev server URL', err);
-      try {
-        dialog.showMessageBoxSync(mainWindow!, {
-          type: 'error',
-          title: 'Main window failed',
-          message: 'Failed to load dev server URL',
-          detail: String(err),
-        });
-      } catch {}
-      app.exit(1);
-    });
-  } else {
-    mainWindow.loadURL(trust.mainUrl).catch(err => {
-      mainLog.error('[fatal] Failed to load built index.html', err);
-      try {
-        dialog.showMessageBoxSync(mainWindow!, {
-          type: 'error',
-          title: 'Main window failed',
-          message: 'Failed to load built index.html',
-          detail: String(err),
-        });
-      } catch {}
-      app.exit(1);
-    });
-  }
+  const loadDescription = process.env.VITE_DEV_SERVER_URL ? 'dev server URL' : 'built index.html';
+  mainWindow.loadURL(trust.mainUrl).catch(err => {
+    mainLog.error(`[fatal] Failed to load ${loadDescription}`, err);
+    try {
+      dialog.showMessageBoxSync(mainWindow!, {
+        type: 'error',
+        title: 'Main window failed',
+        message: `Failed to load ${loadDescription}`,
+        detail: String(err),
+      });
+    } catch {}
+    app.exit(1);
+  });
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.on('closed', () => (mainWindow = null));
@@ -165,7 +150,6 @@ export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
   return mainWindow;
 }
 
-(createMainWindow as any).get = () => mainWindow;
 
 export function getMainWindow() {
   return mainWindow;

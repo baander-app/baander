@@ -1,21 +1,38 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"],
+    "types": [
+      "vite/client"
+    ],
     "lib": [
       "ES2023",
       "DOM",
       "DOM.Iterable",
       "WebWorker"
     ],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@/app/*": [
+        "../web/src/*"
+      ],
+      "@/*": [
+        "../web/src/*"
+      ],
+      "react": [
+        "../web/node_modules/@types/react"
+      ],
+      "react/*": [
+        "../web/node_modules/@types/react/*"
+      ]
+    },
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/renderer/**/*.ts",
     "src/renderer/**/*.tsx",
-    "src/shared/**/*.ts",
     "typings/**/*.d.ts",
-    "src/preload/types/**/*.d.ts"
+    "src/preload/types/**/*.d.ts",
+    "../web/src/**/*.d.ts"
   ],
   "exclude": [
     "dist",

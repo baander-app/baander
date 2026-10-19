@@ -78,7 +78,7 @@ async function ensureWasmModulesBuilt(): Promise<void> {
  */
 export function copyAssets(): Plugin {
   const packagesDspDir = resolve(rootDir, 'packages/dsp');
-  const publicWorkletsDir = resolve(electronDir, 'public/audio-worklets');
+  const publicWorkletsDir = resolve(rootDir, 'public/audio-worklets');
   const ziggyJsPath = resolve(rootDir, 'resources/app/ziggy.js');
 
   return {

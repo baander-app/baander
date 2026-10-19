@@ -1,4 +1,4 @@
-import wasmModulesJson from './wasm-modules.json' q;
+import wasmModulesJson from './wasm-modules.json';
 
 /**
  * List of WASM DSP modules used in the application

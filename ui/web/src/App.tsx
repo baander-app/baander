@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { routes } from './features/layout/routes';
 import { PreferenceSyncProvider } from './features/settings/hooks/use-preference-bootstrap';
@@ -13,7 +13,8 @@ const queryClient = new QueryClient({
   },
 });
 
-const router = createBrowserRouter(routes);
+const createRouter = window.location.protocol === 'file:' ? createHashRouter : createBrowserRouter;
+const router = createRouter(routes);
 
 function App() {
   return (
