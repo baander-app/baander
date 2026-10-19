@@ -89,9 +89,15 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         const previous = snapshot
         // A later response cannot move an attached job backwards in durable state.
         if (previous?.jobId === data.jobId && (data.generation < previous.generation || data.revision < previous.revision)) return
+        const identity = `${data.jobId}:${data.generation}:${data.renditionSet}`
+        // Let an active native seek finish before replacing its source to add
+        // renditions. Committed execution changes still apply immediately.
+        if (previous?.jobId === data.jobId && previous.generation === data.generation
+          && previous.revision === data.revision && identity !== loadedIdentity
+          && loadedIdentity?.startsWith(`${data.jobId}:${data.generation}:`)
+          && video.seeking && !pendingLoad) return
         appliedRequest = revision
         snapshot = data
-        const identity = `${data.jobId}:${data.generation}:${data.renditionSet}`
         const executionChanged = previous?.jobId !== data.jobId || previous.generation !== data.generation
         if (identity !== loadedIdentity && ((data.status === 'paused' && executionChanged) || reloadCursor !== null || previous?.position !== data.position)) {
           reloadCursor = data.position
@@ -222,12 +228,16 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (Math.abs(video.currentTime - pendingLoad.position) <= 0.05) restorePendingLoad()
         return
       }
-      if (restoredPosition !== null && Math.abs(video.currentTime - restoredPosition) <= 0.05) {
-        restoredPosition = null
-        return
-      }
       restoredPosition = null
-      if (!pendingLoad && snapshot && Math.abs(mediaStart + video.currentTime - snapshot.position) > 0.05) {
+    })
+    video.addEventListener('seeking', () => {
+      if (!active() || !snapshot?.ready || pendingLoad
+        || loadedIdentity !== `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`) return
+      if (restoredPosition !== null && Math.abs(video.currentTime - restoredPosition) <= 0.05) return
+      restoredPosition = null
+      // A paused encoder may not provide the data needed to finish this native seek.
+      // Commit its intent before decoding completes so the new execution can start.
+      if (Math.abs(mediaStart + video.currentTime - snapshot.position) > 0.05) {
         control('seek', mediaStart + video.currentTime, snapshot.generation)
       }
     })

@@ -41,6 +41,9 @@ const mediaResponses = []
 const apiResponses = []
 const playbackControls = []
 const playbackSnapshots = []
+const clientControls = []
+const previousMediaEvents = []
+const networkInterruptions = []
 let savingTimeline = false
 const nativeResponseEvidence = []
 const nativeResponseKeys = new Set()
@@ -105,7 +108,7 @@ function appendBounded(list, value, limit = 300) {
   if (list.length > limit) list.shift()
 }
 function safePlayback(value) {
-  return Object.fromEntries(['jobId', 'ready', 'generation', 'revision', 'status', 'position', 'startTime', 'duration', 'renditionSet'].map(key => [key, value[key]]))
+  return Object.fromEntries(['jobId', 'sessionId', 'ready', 'generation', 'revision', 'status', 'position', 'startTime', 'duration', 'renditionSet'].map(key => [key, value[key]]))
 }
 async function savePlaybackTimeline() {
   if (savingTimeline) return
@@ -113,12 +116,18 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, mediaEvents,
+      playbackSnapshots, playbackControls, clientControls, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
   }
 }
+page.on('requestfailed', request => {
+  const url = new URL(request.url())
+  if (url.pathname === '/api/stream/sign') {
+    appendBounded(networkInterruptions, { at: Date.now(), path: url.pathname })
+  }
+})
 page.on('request', request => {
   const url = new URL(request.url())
   if (request.method() !== 'POST' || !/^\/api\/transcode\/sessions\/[^/]+\/position$/.test(url.pathname)) return
@@ -162,7 +171,7 @@ async function until(check, description, milliseconds = 45000) {
 }
 
 async function mediaState() {
-  assert(video, 'The original attached video must exist')
+  assert(video, 'An attached video must exist')
   return video.evaluate(element => ({
     ...window.__twoCommandMediaState(element),
     connected: element.isConnected, time: element.currentTime, paused: element.paused,
@@ -180,7 +189,50 @@ async function pausedAt(position, minimumGeneration) {
       && Number.isFinite(snapshot.startTime)
       && Math.abs(snapshot.startTime + state.time - position) < 2
       && new URL(state.source).searchParams.get('set') === snapshot.renditionSet
-  }, 'the original player to restore its paused global position')
+  }, 'the attached player to restore its paused global position')
+}
+
+function ownedPlayback() {
+  assert(snapshot?.ready && snapshot.sessionId, 'Playback must have a ready owned session')
+  return { jobId: snapshot.jobId, sessionId: snapshot.sessionId, generation: snapshot.generation }
+}
+
+function samePlayback(owner, generation = owner.generation) {
+  assert.equal(snapshot.jobId, owner.jobId, 'Client controls must retain the owned job')
+  assert.equal(snapshot.sessionId, owner.sessionId, 'Client controls must retain the canonical session')
+  assert.equal(snapshot.generation, generation, 'Only an intentional seek may advance generation')
+}
+
+async function recordClientControl(action, started) {
+  const state = await mediaState()
+  const { source, ...safeState } = state
+  clientControls.push({ action, at: Date.now(), elapsedMs: Date.now() - started,
+    state: { ...safeState, source: source ? new URL(source).pathname : null },
+    playback: safePlayback(snapshot) })
+  await savePlaybackTimeline()
+}
+
+async function resumeAndDecode(owner, action) {
+  const started = Date.now()
+  const before = await mediaState()
+  await video.evaluate(element => element.play())
+  await until(async () => {
+    const state = await mediaState()
+    return state.connected && !state.paused && state.ready >= 2 && state.error === null
+      && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames
+      && snapshot?.ready && snapshot.status === 'running'
+      && new URL(state.source).searchParams.get('set') === snapshot.renditionSet
+  }, `${action} to decode current signed HLS and advance`)
+  samePlayback(owner)
+  await recordClientControl(action, started)
+}
+
+async function pausePlayback(owner, action) {
+  const started = Date.now()
+  await video.evaluate(element => element.pause())
+  await until(async () => (await mediaState()).paused && snapshot?.status === 'paused', 'native pause to commit')
+  samePlayback(owner)
+  await recordClientControl(action, started)
 }
 
 async function checkpoint({ phase, baseUrl, credentials }) {
@@ -206,6 +258,62 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${evidence}/mobile.png` })
     await page.setViewportSize({ width: 1280, height: 800 })
+  } else if (phase === 'client-controls') {
+    const owner = ownedPlayback()
+    await pausePlayback(owner, 'pause')
+    const started = Date.now()
+    // Exercise the browser-native seek event path, not a test-only REST control.
+    const localTarget = credentials.expectedSeekPosition - snapshot.startTime
+    assert(localTarget >= 0, 'The requested seek must be inside the current native timeline')
+    await video.evaluate((element, position) => { element.currentTime = position }, localTarget)
+    await pausedAt(credentials.expectedSeekPosition, owner.generation + 1)
+    samePlayback(owner, owner.generation + 1)
+    await recordClientControl('seek-paused', started)
+    owner.generation = snapshot.generation
+    await resumeAndDecode(owner, 'resume-after-seek')
+    await pausePlayback(owner, 'pause-before-network-interruption')
+
+    const networkStarted = Date.now()
+    const failureCount = networkInterruptions.length
+    try {
+      await context.setOffline(true)
+      await until(() => networkInterruptions.length > failureCount, 'a real stream refresh failure while offline', 10000)
+    } finally {
+      await context.setOffline(false)
+    }
+    const reconnected = Date.now()
+    await until(() => playbackSnapshots.some(item => item.accepted && item.at >= reconnected
+      && item.jobId === owner.jobId && item.sessionId === owner.sessionId && item.status === 'paused'),
+    'a fresh paused signed snapshot after network reconnection')
+    samePlayback(owner)
+    await recordClientControl('network-reconnected-paused', networkStarted)
+    await resumeAndDecode(owner, 'resume-after-network-reconnection')
+    await pausePlayback(owner, 'pause-before-remount')
+    const pausedPosition = snapshot.startTime + (await mediaState()).time
+
+    const remountStarted = Date.now()
+    previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
+    const previousVideo = video
+    snapshot = undefined
+    await page.reload()
+    await page.getByRole('button', { name: 'Play', exact: true }).click()
+    video = await page.locator('video').elementHandle()
+    assert(video, 'Reload must mount a new video element')
+    await previousVideo.dispose()
+    await pausedAt(pausedPosition, owner.generation)
+    samePlayback(owner)
+    await recordClientControl('remounted-paused', remountStarted)
+    await resumeAndDecode(owner, 'resume-after-remount')
+    await pausePlayback(owner, 'final-pause')
+    // Leave a different paused cursor so the following operator seek changes position.
+    const finalSeekStarted = Date.now()
+    const finalPosition = credentials.expectedSeekPosition + 5
+    const finalLocalPosition = finalPosition - snapshot.startTime
+    assert(finalLocalPosition >= 0 && finalPosition < snapshot.duration, 'The final seek must fit the current native timeline')
+    await video.evaluate((element, position) => { element.currentTime = position }, finalLocalPosition)
+    await pausedAt(finalPosition, owner.generation + 1)
+    samePlayback(owner, owner.generation + 1)
+    await recordClientControl('final-seek-paused', finalSeekStarted)
   } else if (phase === 'sought-paused') {
     await pausedAt(credentials.expectedSeekPosition, initialGeneration + 1)
     soughtGeneration = snapshot.generation
@@ -227,13 +335,13 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       return item.status === 200 && job && snapshot.renditionSet.split(',').includes(`${job}.${item.generation}`)
     }), 'Recovered playback must receive media from the current signed rendition set')
   } else if (phase === 'complete') {
-    assert.deepEqual(phases, ['authenticated', 'attached', 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
+    assert.deepEqual(phases, ['authenticated', 'attached', ...(phases.includes('client-controls') ? ['client-controls'] : []), 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
   } else {
     throw new Error(`Unexpected browser checkpoint: ${phase}`)
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, networkInterruptions }, null, 2))
   return { phase, passed: true }
 }
 
@@ -250,7 +358,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, mediaEvents, mediaResponses, apiResponses, nativeResponseEvidence,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })
