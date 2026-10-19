@@ -21,7 +21,10 @@ export function Selection() {
 }
 export function Actions() {
   const select = useSelectionStore(state => state.select)
-  return <button onClick={() => select('album-one', 'album')}>Select album</button>
+  return <>
+    <button onClick={() => select('album-one', 'album')}>Select album</button>
+    <button onClick={() => select('album-two', 'album')}>Select another album</button>
+  </>
 }
 createRoot(document.getElementById('root')!).render(<ThemeProvider theme={resolveTheme('dark', 'violet')}>
   <GlobalStyles />
