@@ -24,6 +24,14 @@ interface PlaybackSnapshot {
   duration: number | null
 }
 
+interface NativeSeekChain {
+  sessionId: string
+  jobId: string
+  attachment: string
+  started: boolean
+  pendingPosition: number | null
+}
+
 export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTimeUpdate, onStateChange, onError }: UseBaanderPlayerOptions) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -58,6 +66,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let progressPosition: number | null = null
     let mediaStart = 0
     let restoredPosition: number | null = null
+    let nativeSeek: NativeSeekChain | null = null
     const active = () => !abort.signal.aborted && videoRef.current === video
     const changeState = (next: string) => {
       if (!active()) return
@@ -90,6 +99,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         // A later response cannot move an attached job backwards in durable state.
         if (previous?.jobId === data.jobId && (data.generation < previous.generation || data.revision < previous.revision)) return
         const identity = `${data.jobId}:${data.generation}:${data.renditionSet}`
+        if (nativeSeek) {
+          // Only this seek's acknowledgement can carry pending intent forward.
+          // Even a refresh started before the seek must leave its source attached.
+          if (nativeSeek.sessionId !== data.sessionId || nativeSeek.jobId !== data.jobId) nativeSeek = null
+          else if (nativeSeek.started) return
+          else if (nativeSeek.attachment !== identity) nativeSeek = null
+        }
         // Let an active native seek finish before replacing its source to add
         // renditions. Committed execution changes still apply immediately.
         if (previous?.jobId === data.jobId && previous.generation === data.generation
@@ -129,7 +145,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       }
     }
 
-    const control = (action: 'seek' | 'pause' | 'resume' | 'progress', globalPosition = mediaStart + video.currentTime, nativeGeneration?: number) => {
+    const control = (action: 'seek' | 'pause' | 'resume' | 'progress', globalPosition = mediaStart + video.currentTime, nativeGeneration?: number, chain?: NativeSeekChain) => {
       const current = snapshot
       const sessionId = current?.sessionId
       if (!sessionId || !current || !active()) return
@@ -145,13 +161,32 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (action === 'progress' && (snapshot?.sessionId !== sessionId
           || snapshot.generation !== current.generation || snapshot.revision !== current.revision
           || snapshot.status !== 'running' || video.paused || video.seeking)) return
-        await AXIOS_INSTANCE.post(`/api/transcode/sessions/${sessionId}/position`, {
-          position, action,
-          ...(action === 'progress' ? { generation: current.generation, revision: current.revision } : {}),
-          ...(nativeGeneration !== undefined ? { generation: nativeGeneration } : {}),
-        }, { signal: abort.signal, timeout: 5000 })
+        if (chain && nativeSeek === chain) chain.started = true
+        let target = position
+        let generation = nativeGeneration
+        try {
+          do {
+            const { data } = await AXIOS_INSTANCE.post<{ data?: { acceptedGeneration?: number } }>(`/api/transcode/sessions/${sessionId}/position`, {
+              position: target, action,
+              ...(action === 'progress' ? { generation: current.generation, revision: current.revision } : {}),
+              ...(generation !== undefined ? { generation } : {}),
+            }, { signal: abort.signal, timeout: 5000 })
+            if (!chain || nativeSeek !== chain || !active()
+              || data.data?.acceptedGeneration === undefined || chain.pendingPosition === null) break
+            target = chain.pendingPosition
+            chain.pendingPosition = null
+            generation = data.data.acceptedGeneration
+          } while (active())
+        } finally {
+          if (chain && nativeSeek === chain) {
+            nativeSeek = null
+            // Discard earlier reads even when they arrive after this chain ends.
+            appliedRequest = requestRevision + 1
+          }
+          if (chain) await refresh()
+        }
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
-        await refresh()
+        if (!chain) await refresh()
       }).catch(fail).finally(() => {
         pendingControls--
         if (statusRevision !== null && statusRevision === localStatusRevision) {
@@ -231,14 +266,22 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       restoredPosition = null
     })
     video.addEventListener('seeking', () => {
-      if (!active() || !snapshot?.ready || pendingLoad
+      if (!active() || !snapshot?.ready || !snapshot.sessionId || pendingLoad
         || loadedIdentity !== `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`) return
       if (restoredPosition !== null && Math.abs(video.currentTime - restoredPosition) <= 0.05) return
       restoredPosition = null
       // A paused encoder may not provide the data needed to finish this native seek.
       // Commit its intent before decoding completes so the new execution can start.
-      if (Math.abs(mediaStart + video.currentTime - snapshot.position) > 0.05) {
-        control('seek', mediaStart + video.currentTime, snapshot.generation)
+      if (nativeSeek || Math.abs(mediaStart + video.currentTime - snapshot.position) > 0.05) {
+        if (nativeSeek) nativeSeek.pendingPosition = mediaStart + video.currentTime
+        else {
+          nativeSeek = {
+            sessionId: snapshot.sessionId, jobId: snapshot.jobId,
+            attachment: `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`,
+            started: false, pendingPosition: null,
+          }
+          control('seek', mediaStart + video.currentTime, snapshot.generation, nativeSeek)
+        }
       }
     })
     const seek = (time: number) => {
@@ -255,6 +298,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     const cleanup = () => {
       if (abort.signal.aborted) return
       window.clearInterval(timer)
+      nativeSeek = null
       abort.abort()
       video.pause()
       video.src = ''
