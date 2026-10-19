@@ -22,9 +22,9 @@ retain requirements or deferred scope, without making every item a next task.
 
 - **Next implementation priority:** select the next concrete bug, unfinished
   feature or named release decision by the rule below. Latest-target
-  [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19) is delivered locally;
-  consecutive native targets settle at the latest target while pause/resume
-  ordering and generation fences remain enforced.
+  [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19) and
+  [encrypted Registry backup automation](#registry-encrypted-backups-2026-10-19)
+  are delivered locally. Actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -33,7 +33,8 @@ retain requirements or deferred scope, without making every item a next task.
   and [rapid native scrubbing](#rapid-native-scrubbing-2026-10-19); it was not rerun
   for the scrubbing fix.
   Registry registration, authoritative reads, local failure/recovery, transport TLS,
-  sanitizers and bounded load checks are covered; see the reconciled
+  sanitizers, bounded load checks and encrypted backup/upload/offline restore
+  through disposable TLS S3 storage are covered; see the reconciled
   [Registry status](#registry-release-and-growth).
 - **Deferred release acceptance:** real regional access, S3 destination and backup
   rehearsal, constrained whole-host measurements, an accepted fixed-runner
@@ -1467,7 +1468,7 @@ replacement for it. Horizons express dependencies, not promised calendar dates.
 
 | Horizon | Deliverable | Exit condition |
 | --- | --- | --- |
-| Current local work | Next concrete bug, unfinished feature or named release decision selected by the rule in Resume here; rapid native scrubbing is delivered | The selected scope is implemented and verified with affected existing checks and any regression needed for its specific gap |
+| Current local work | Next concrete bug, unfinished feature or named release decision selected by the rule in Resume here; rapid native scrubbing and encrypted Registry backup automation are delivered | The selected scope is implemented and verified with affected existing checks and any regression needed for its specific gap |
 | Completed foundation | Web-state architecture, render/persistence budgets, optional developer tracing | Local behavior and performance regressions passed; release-wide qualification remains separate |
 | Before application release | Backend/web security, asynchronous recovery, complete contracts and enforceable gates | Fresh install and critical workflows pass real integration tests; deliberately failing checks block publication |
 | Before registry rollout | C++ registry and five-voter deployment qualification | Consistency, constrained capacity, partition/failover, leak and restore gates pass |
@@ -1926,6 +1927,54 @@ backlog during the burst. Test 200ms inter-node RTT, 25ms jitter, 0.1% loss, <=3
 leader-loss recovery, and no acknowledged registration loss after any two voter
 failures. Failed gates block release, without weakening consistency or increasing
 the agreed host budget.
+
+### Registry encrypted backups (2026-10-19)
+
+The opt-in backup worker captures authenticated rqlite binary snapshots at startup
+and every **300 seconds**, encrypts them with a public age recipient and uploads
+completed ciphertext under unique timestamped S3-compatible object keys. Each
+attempt has a **240-second** default deadline; attempts do not overlap or queue
+missed ticks. Plaintext passes through pipes; only ciphertext is spooled.
+The private recovery identity remains separately held and absent from the worker.
+
+Atomic status retains the last successful capture time, object key and ciphertext
+hash across failed attempts. A separate health invocation checks capture age for
+an external monitor. The non-root, read-only container, opt-in Compose service,
+secret examples and offline recovery procedure are documented in
+[the Registry guide](relay/README.md). Its **512 MiB** container limit does not
+qualify the agreed whole-host deployment budget. Implementation follows the
+[reviewed plan](docs/plans/2026-10-19-registry-encrypted-backups-plan.md).
+
+Verification:
+
+- The final disposable backup contract passes in **22.779 seconds**, including
+  cached image builds and cleanup. All **nine core tests** pass in **0.998 seconds**.
+  The packaged worker creates **two** encrypted objects through authenticated TLS
+  S3 storage and verifies their ciphertext hashes. Offline recovery rejects a
+  wrong identity and tampered ciphertext, then decrypts a stored object and reuses
+  the existing fresh **three-voter** restore contract. Ownership, credential
+  digests, saved revisions, migration checksum, absent post-snapshot sentinel and
+  voter convergence pass. The original binary restore path also passes.
+  Evidence: `var/test-runs/registry-encrypted-backups-20261019/backup-contract-final-result.json`
+  and its retained log.
+- The core tests also pass in the CI image: **nine tests / 1.200 seconds**.
+  Packaged non-root read-only startup, missing-configuration refusal and Compose
+  validation pass. The dependency gate verifies **seven** pinned direct notices.
+  Python parsing for **four files**, shell syntax, workflow YAML and whitespace
+  checks pass.
+- Simplification covered reuse, quality and efficiency at each phase. Two small
+  core reuse/header-decoding changes were applied; the final integration phase
+  required no changes. Its core rerun passes **nine tests / 1.190 seconds**.
+- Independent code review completed **eight** lenses with no findings and a
+  **Ready to merge** verdict. The receipt is retained at
+  `var/test-runs/registry-encrypted-backups-20261019/review.json`. It records
+  nonblocking coverage limits without adding further qualification tasks.
+
+This delivers encrypted, versioned five-minute backup automation and local offline
+recovery. Actual-destination credentials, regional networks, five-minute RPO,
+30-minute RTO, constrained whole-host backup operation and the 24-hour soak retain
+their deferred acceptance requirements. The backend and broad C++ suites were not
+rerun; C++ source is unchanged and the contract reuses the current built images.
 
 ### Stale follower verification (2026-10-19)
 
@@ -3222,17 +3271,20 @@ within their stated scope.
   [native runner](scripts/test-registry.sh),
   [container contract](relay/tests/run_container_contract.py) and
   [CI workflow](.forgejo/workflows/ci.yaml).
+- [x] Implement encrypted, versioned five-minute S3-compatible backup automation
+  with a separately held private recovery identity. The
+  [delivery checkpoint](#registry-encrypted-backups-2026-10-19) records packaged
+  encrypted upload and fresh-voter offline restore through disposable TLS S3
+  storage. Actual-destination and RPO/RTO qualification remain deferred.
 
 Remaining release implementation, selected when it advances a named release
 milestone:
 
-- [ ] Implement encrypted, versioned five-minute S3-compatible backup automation.
-  Destination credentials are needed to qualify the resulting upload and restore.
 - [ ] Add fixed-runner baseline comparison and enforce confirmed regressions above
   10%, once the stable runner and accepted baseline are selected. The bounded
   optimized load smoke already exists.
 - [ ] Complete the packaged transitive dependency/license inventory. First-party
-  declarations and five pinned direct dependency notices are already checked.
+  declarations and seven pinned direct dependency notices are already checked.
 - [ ] Add scheduled nightly five-voter partition/failover, parser-fuzz and
   isolated-restore orchestration using the existing runners. Push/PR CI and local
   five-voter results do not establish a nightly schedule.
@@ -3254,8 +3306,8 @@ Deferred measurements and rehearsals, requiring an agreed environment or access:
   recorded profile; short local runs do not complete it.
 - [ ] Qualify encrypted, versioned five-minute S3-compatible backups and rehearse
   isolated restoration with five-minute RPO and 30-minute RTO. Local fresh-storage
-  binary restore is covered; this rehearsal needs destination access and the
-  backup automation above.
+  binary restore and encrypted upload/offline restore through disposable TLS S3
+  storage are covered; this rehearsal needs actual-destination access.
 - [ ] Validate the actual regional five-voter deployment and upgrade voters one at
   a time while preserving volumes and bootstrap guards. Measure the regional
   topology and verify two-voter loss without acknowledged-data loss and leader

@@ -47,7 +47,9 @@ flowchart LR
     Key --> API
     API -->|Authenticated HTTPS and mTLS| DB[(rqlite HTTP API)]
     DB <-->|Raft mTLS| Peers[(Other voters)]
-    DB --> Backup[Operator backup and restore]
+    DB --> Backup[Backup worker with public recipient]
+    Backup -->|Encrypted historical objects| Store[S3-compatible storage]
+    Store --> Recovery[Offline recovery with private identity]
 ```
 
 The public API exposes registration, lookup, `/health` and `/ready`. It does not
@@ -179,7 +181,7 @@ not, by itself, a demonstrated registry SSRF path. HTTPS syntax also does not pr
 that the destination is public or safe for a consumer to fetch. Consumers need
 their own destination and rendering policy.
 
-Actual registry egress goes to configured rqlite origins. The transport requires
+The API's database egress goes to configured rqlite origins. The transport requires
 HTTPS, explicit CA trust, hostname verification, SNI, a client certificate/key and
 Basic authentication. Optional `connectAddress` changes the connected IP while
 retaining the configured TLS identity. Redirects are rejected, not followed.
@@ -209,6 +211,28 @@ preserves persisted membership on restart and refuses manual peer recovery files
 Its container contracts are separate prior evidence unless rerun in the current
 checkpoint. Quorum loss does not authorize reducing the configured voter set.
 
+### Backup disclosure and recovery
+
+The opt-in [backup worker](../../relay/backup/registry_backup.py) streams snapshots
+into age and spools only ciphertext. It holds a public recipient, database backup
+credentials and S3 upload credentials. The private recovery identity stays outside
+the worker. Snapshot transport verifies TLS and rejects nonbinary responses,
+incomplete transfers and rqlite stream-error trailers before upload.
+
+Every completed capture uses a distinct historical object key. The worker does not
+delete objects or enable bucket-native versioning. A failed attempt preserves the
+last successful capture time; a separate health invocation detects failed or stale
+backups. Operators must also monitor a stopped or missing worker.
+
+The disposable backup contract uses real age and rclone against authenticated TLS
+object storage, then decrypts separately and reuses the existing fresh-cluster
+restore assertions. Wrong identities and altered ciphertext must fail before load.
+Encryption protects confidentiality and ciphertext integrity, but anyone holding
+the public recipient can create ciphertext; it does not authenticate the uploader.
+Destination write permissions, trusted object selection and independently retained
+recovery material remain operator responsibilities. The
+[backup runbook](../../relay/backup/README.md) documents these boundaries.
+
 ## Remaining qualification and operational work
 
 The shared enrollment key gives every verifier minting authority. A compromised
@@ -220,7 +244,7 @@ procedure; no such procedure is qualified here.
 
 Live HTTP fuzzing, parser differentials, session admission saturation and inbound
 legacy TLS probes remain open. Regional deployment, physical failure, constrained
-resource soak, scheduled S3 backup/restore and measured recovery objectives also
-remain open. The local binary restore fixture establishes a narrower backup/load
-contract, not those operational guarantees. Consult the roadmap for the actual
+resource soak, actual S3 destination qualification and measured recovery objectives
+also remain open. Local binary and encrypted-object restore contracts do not
+establish those operational guarantees. Consult the roadmap for the actual
 release, sanitizer, static and container checkpoints and their limitations.

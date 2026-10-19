@@ -75,12 +75,7 @@ def lookup(api, identifier):
     return body["data"]
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--rqlited", required=True)
-    parser.add_argument("--server", required=True)
-    parser.add_argument("--nodes", type=int, choices=(3, 5), default=3)
-    args = parser.parse_args()
+def run_restore_scenario(rqlited, server, nodes=3, snapshot_provider=None):
     with tempfile.TemporaryDirectory(prefix="baander-registry-restore-") as directory:
         root = Path(directory)
         source_dir, restored_dir = root / "source", root / "restored"
@@ -88,9 +83,9 @@ def main():
         restored_dir.mkdir()
         source = restored = source_api = restored_api = None
         try:
-            source = Cluster(source_dir, args.rqlited, args.nodes)
+            source = Cluster(source_dir, rqlited, nodes)
             leader = source.start()
-            source_api = Api(source, args.server, "source-api", list(enumerate(source.http_ports)))
+            source_api = Api(source, server, "source-api", list(enumerate(source.http_ports)))
             values = [registration(f"backup-owner-{number}") for number in range(3)]
             for value in values:
                 status, body, _ = source_api.request("POST", "/api/servers/register", value)
@@ -108,10 +103,13 @@ def main():
                     value["apiKey"].encode()
                 ).hexdigest()
                 assert row["revision"] == public[value["publicId"]]["revision"]
-            status, backup, content_type = binary_request(
-                source, leader, "GET", "/db/backup?fmt=binary"
-            )
-            assert status == 200 and content_type == "application/octet-stream"
+            if snapshot_provider is None:
+                status, backup, content_type = binary_request(
+                    source, leader, "GET", "/db/backup?fmt=binary"
+                )
+                assert status == 200 and content_type == "application/octet-stream"
+            else:
+                backup = snapshot_provider(source, leader, root)
             assert backup.startswith(b"SQLite format 3\x00"), "Backup is not a SQLite database."
             backup_path = root / "backup.sqlite"
             backup_path.write_bytes(backup)
@@ -131,7 +129,7 @@ def main():
 
             # Fresh paths and a fresh CA prevent accidental reuse of source state.
             assert not any(restored_dir.iterdir())
-            restored = Cluster(restored_dir, args.rqlited, args.nodes)
+            restored = Cluster(restored_dir, rqlited, nodes)
             assert (source_dir / "ca.crt").read_bytes() != (restored_dir / "ca.crt").read_bytes()
             leader = restored.start()
             assert query_rows(
@@ -143,7 +141,7 @@ def main():
             assert not any("error" in result for result in response.get("results", [])), response
             wait_rows(restored, rows, migrations)
             restored_api = Api(
-                restored, args.server, "restored-api", list(enumerate(restored.http_ports))
+                restored, server, "restored-api", list(enumerate(restored.http_ports))
             )
             assert restored_api.request("GET", "/ready")[0] == 200
             for identifier, expected in public.items():
@@ -161,12 +159,21 @@ def main():
             updated_rows = query_rows(restored, leader, REGISTRY_QUERY)
             wait_rows(restored, updated_rows, migrations)
             print(
-                f"PASS: local binary backup integrity, fresh {args.nodes}-voter restore, "
+                f"PASS: local binary backup integrity, fresh {nodes}-voter restore, "
                 "snapshot boundary, ownership and voter convergence",
                 flush=True,
             )
         finally:
             close_resources([restored_api, restored, source_api, source])
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--rqlited", required=True)
+    parser.add_argument("--server", required=True)
+    parser.add_argument("--nodes", type=int, choices=(3, 5), default=3)
+    args = parser.parse_args()
+    run_restore_scenario(args.rqlited, args.server, args.nodes)
 
 
 if __name__ == "__main__":

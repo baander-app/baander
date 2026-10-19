@@ -458,6 +458,8 @@ jobs:
                     apt-get install -y --no-install-recommends python3 openssl
             -   name: Build and qualify registry containers
                 run: bash scripts/test-registry-container.sh
+            -   name: Qualify encrypted registry backup and recovery
+                run: bash scripts/test-registry-backup.sh
 
     registry-thread-quality:
         runs-on: docker-cli

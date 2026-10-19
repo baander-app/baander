@@ -254,6 +254,24 @@ of the pinned rqlite 10.5.1 build. It does not qualify scheduled backups, S3 upl
 or download, regional disaster recovery, or RPO/RTO. Those operational gates remain
 pending; the disposable fixture has no production credentials or remote destination.
 
+The encrypted backup gate builds the backup, API and voter images and runs the
+packaged backup entry point against disposable authenticated TLS S3 storage. It
+preserves two historical objects, verifies their hashes, decrypts them offline and
+rejects a wrong identity and altered ciphertext. The recovered snapshot enters
+the same fresh-cluster restore assertions described above. The original binary
+restore scenario also runs because both paths share that helper.
+
+```sh
+bash scripts/test-registry-backup.sh
+bash scripts/test-registry-static.sh --pins-notices-only
+```
+
+The contract container has no external network and uses temporary storage. Its
+small S3 fixture disables multipart uploads because of the fixture server's
+limitation; actual destination compatibility and recovery objectives remain open.
+The [backup runbook](backup/README.md) covers activation, key custody, health and
+manual recovery. This worker adds resource limits beyond the API/voter budget.
+
 ## Server configuration
 
 Run `baander-registry --config /etc/baander-registry/config.json`. The config is
