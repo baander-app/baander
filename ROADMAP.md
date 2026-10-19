@@ -105,8 +105,9 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Continue the local [Registry release and growth](#registry-release-and-growth)
-  gates. The [shared media-control checkpoint](#shared-webworker-media-control-2026-10-19)
+- **Next.** Continue the remaining local [Registry release and growth](#registry-release-and-growth)
+  gates after the [stale-follower checkpoint](#stale-follower-verification-2026-10-19).
+  The [shared media-control checkpoint](#shared-webworker-media-control-2026-10-19)
   accepts single-intention pause/seek/reconnect, saturated cancellation and encoder
   reuse on reattachment. Latest-target rapid native scrubbing remains a separate
   open interaction contract. Worker lifecycle, measured autoscaling, reserved
@@ -1901,6 +1902,48 @@ leader-loss recovery, and no acknowledged registration loss after any two voter
 failures. Failed gates block release, without weakening consistency or increasing
 the agreed host budget.
 
+### Stale follower verification (2026-10-19)
+
+The three- and five-voter partition contracts now prove divergent stored rows
+before checking public discovery. Every isolated minority voter retains an
+existing registration's old row and lacks a new identity after majority commits.
+Both minority lookups return 503 with `Retry-After: 1` and a fixed error envelope
+before a failed readiness probe can clear API initialization. Majority-capable
+APIs return current public results. After healing, every voter's metadata,
+revisions, timestamps and credential digests match the saved acknowledged rows;
+the formerly isolated API becomes ready and returns both current records.
+
+The native release recipe passed in **295.881 seconds** in a disposable Debian
+trixie container with Clang **19.1.7**, pinned static OpenSSL **3.5.3** and rqlite
+**10.5.1**. All **32 CTests** passed in **0.31 seconds**, and all **three cleanup
+regressions** passed in **0.026 seconds**. Authenticated SQL/TLS, public HTTP,
+three-voter partition/crash/quorum-loss, fresh binary restore and bounded load-smoke
+contracts passed. The separate **five-voter contract** passed in **14.327 seconds**,
+including stale-row rejection, two-voter crash/rejoin and three-of-five quorum loss.
+The smoke recorded normal/burst lookup p99 of **14.28/14.23 ms** and sampled API
+peak RSS of **11.55 MiB**; whole-host budgets and fixed-runner regression remain open.
+
+An isolated source copy weakened only public lookup consistency to `none` and
+rebuilt the executable. The three-voter contract then failed at the new stale
+minority lookup assertion: it received HTTP 200 before readiness was probed.
+The expected failure exited **1**; the qualification wrapper accepted that result.
+Production C++ was unchanged. Python syntax and whitespace checks pass, and the
+three-persona simplification review returned no findings. No verified sanitizer
+build was available; this Python/documentation change did not rerun the C++
+sanitizers, analyzer, TSan, fuzz, PHP or UI gates. Two setup failures occurred before
+testing, involving SELinux access to the temporary script and archive ownership
+restoration under dropped capabilities. Both were corrected before these timings.
+The disposable qualification container ran as a nonroot user with capabilities
+dropped and was removed afterwards. Independent plan and code reviews returned no
+findings; prose preservation audits and whitespace checks pass.
+
+Evidence: `/tmp/baander-registry-stale-20261019/`, including `qualification.log`,
+`timing.json`, `negative-control.log`, `negative-control.json`, `tool-versions.txt`,
+`tooling-image.txt` and `syntax-check.txt`. Full-disk and further certificate
+injection, constrained hosts, regional networks, S3 destination restoration,
+fixed-runner performance, transitive dependency/license inventory and the 24-hour
+soak remain open.
+
 ## Long-horizon acceptance backlog
 
 ### Application security and reliability
@@ -2963,9 +3006,14 @@ contracts; neither old prose nor the current branch name establishes completion.
 - [ ] Use `schema_migrations` checksums and one credential-owned `registries`
   table. Store only SHA-256 credential digests for random 256-bit credentials;
   never log/return credentials. Offline after ten minutes never releases ownership.
-- [ ] Test simultaneous claims, wrong credentials, retry after uncertain commit,
-  3–2 partitions, total quorum loss, stale followers, full disks, invalid TLS,
-  graceful shutdown, and convergence after rejoin without manual data merging.
+- [x] Prove stale rows and false local absence on every minority voter in three-
+  and five-voter partitions; reject both public lookups and verify exact row
+  convergence after healing. See the
+  [stale-follower checkpoint](#stale-follower-verification-2026-10-19).
+- [ ] Complete failure qualification for simultaneous claims, wrong credentials,
+  retry after uncertain commit, 3–2 partitions, total quorum loss, full disks,
+  invalid TLS, graceful shutdown and rejoin without manual data merging. Existing
+  local checkpoints cover several cases; full failure injection remains open.
 - [ ] Every PR: release build with warnings as errors, unit/API and three-node
   integration tests, static analysis, dependency/license checks, ASan/LSan/UBSan,
   separate TSan, malformed-input/disconnect/deadline/retry/reconnection/shutdown

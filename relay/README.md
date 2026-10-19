@@ -149,7 +149,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
 The tests check minority 503 responses, majority progress, leader recovery within
 30 seconds, retained acknowledged metadata/revisions, rejoin, abrupt voter crashes
 (one of three or two of five), and durable catch-up after process restart.
-They then stop a majority including the leader (two of three or three of five)
+During each partition, the majority updates an existing registration and creates
+another. Authenticated local diagnostic queries with `level=none` prove that every
+minority voter retains the old row and lacks the new identity. Both public lookups
+must return 503 with `Retry-After: 1` and a fixed error envelope before failed
+readiness can clear API initialization. Majority-capable APIs return the saved
+current public results. After healing, every voter's rows must match the saved
+metadata, revisions, timestamps and credential digests before the formerly isolated
+API becomes ready and returns the current results. These local diagnostic reads
+are confined to the test harness; public lookup remains linearizable.
+
+The tests then stop a majority including the leader (two of three or three of five)
 while the API stays running. Existing and absent lookups, registration and readiness
 must return 503 with `Retry-After: 1` and fixed public errors without credentials or
 metadata; health stays 200. Restarting the persisted voters must restore quorum and
