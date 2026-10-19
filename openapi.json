@@ -19691,6 +19691,11 @@
                                             "description": "Echoed when supplied in the request",
                                             "type": "string",
                                             "format": "uuid"
+                                        },
+                                        "acceptedGeneration": {
+                                            "description": "Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands",
+                                            "type": "integer",
+                                            "minimum": 1
                                         }
                                     },
                                     "type": "object"

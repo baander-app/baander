@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Doctrine;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
@@ -67,10 +68,10 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
         return $this->find($jobId) ?? throw new \LogicException('Admitted runtime disappeared.');
     }
 
-    public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeRuntimeSnapshot
+    public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeControlResult
     {
         $this->validateRequest($requestId);
-        return $this->connection->transactional(function () use ($jobId, $sessionId, $requestId, $status, $audioProfile, $position, $segmentIndex, $seek): TranscodeRuntimeSnapshot {
+        return $this->connection->transactional(function () use ($jobId, $sessionId, $requestId, $status, $audioProfile, $position, $segmentIndex, $seek): TranscodeControlResult {
             $row = $this->locked('transcode_runtime_state', 'job_id', $jobId->toString());
             if ($row === null || $row['session_id'] !== $sessionId->toString()) {
                 throw new \LogicException('Control does not address the current runtime session.');
@@ -80,12 +81,12 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
                 [$sessionId->toString(), $requestId],
             );
             if ($recorded === 0 || in_array($row['outcome'], ['failed', 'cancelled', 'refused'], true)) {
-                return $this->snapshot($row);
+                return new TranscodeControlResult($this->snapshot($row), false);
             }
             $previous = $this->snapshot($row)->desired;
             $desired = new DesiredTranscodeState($audioProfile ?? $previous->audioProfile, $status ?? $previous->status, $position ?? $previous->position, $segmentIndex ?? $previous->segmentIndex, $previous->audioLanguages);
             if ($this->encodeDesired($desired) === $this->encodeDesired($previous)) {
-                return $this->snapshot($row);
+                return new TranscodeControlResult($this->snapshot($row), true);
             }
             $positionChanged = $position !== null && $position !== $previous->position;
             $segmentChanged = $segmentIndex !== null && $segmentIndex !== $previous->segmentIndex;
@@ -100,7 +101,7 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
                 'UPDATE transcode_runtime_state SET desired = CAST(:desired AS jsonb), desired_revision = desired_revision + 1, generation = :generation, outcome = :outcome, output_directory = CASE WHEN generation = :generation THEN output_directory ELSE NULL END, updated_at = clock_timestamp()' . $ownerReset . ' WHERE job_id = :job',
                 ['desired' => $this->encodeDesired($desired), 'generation' => $generation, 'outcome' => $outcome, 'job' => $jobId->toString()],
             );
-            return $this->find($jobId) ?? throw new \LogicException('Controlled runtime disappeared.');
+            return new TranscodeControlResult($this->find($jobId) ?? throw new \LogicException('Controlled runtime disappeared.'), true);
         });
     }
 

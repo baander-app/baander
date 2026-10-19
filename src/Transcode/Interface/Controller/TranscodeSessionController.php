@@ -293,7 +293,7 @@ final class TranscodeSessionController
             new OA\Parameter(name: 'publicId', description: 'Session public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Echoed when supplied in the request')])),
+            new OA\Response(response: '200', description: 'Command processed; fences or replay may leave state unchanged. Read current session state separately for execution progress.', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string', enum: ['ok']), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'requestId', type: 'string', format: 'uuid', description: 'Echoed when supplied in the request'), new OA\Property(property: 'acceptedGeneration', type: 'integer', minimum: 1, description: 'Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands')])),
         ],
     )]
     #[Route('/{publicId}/position', name: 'position', methods: ['POST'])]
@@ -335,7 +335,7 @@ final class TranscodeSessionController
         }
         $position = (float) $position;
 
-        $this->commandBus->dispatch(new UpdateTranscodePositionCommand(
+        $envelope = $this->commandBus->dispatch(new UpdateTranscodePositionCommand(
             sessionId: $sessionId,
             position: $position,
             action: $action,
@@ -345,6 +345,10 @@ final class TranscodeSessionController
         ));
 
         $response = ['status' => 'ok', 'position' => $position];
+        $acceptedGeneration = $envelope->last(HandledStamp::class)?->getResult();
+        if (is_int($acceptedGeneration)) {
+            $response['acceptedGeneration'] = $acceptedGeneration;
+        }
         if ($requestId !== null) {
             $response['requestId'] = $requestId;
         }

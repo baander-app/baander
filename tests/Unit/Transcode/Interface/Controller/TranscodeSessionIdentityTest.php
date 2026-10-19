@@ -9,6 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Query\TranscodeSessionQueryPort;
@@ -21,6 +22,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -126,6 +128,44 @@ final class TranscodeSessionIdentityTest extends TestCase
         $body = json_decode((string) $response->getContent(), true);
         self::assertIsArray($body);
         self::assertSame($session->getPublicId()->toString(), $body['publicId']);
+    }
+
+    #[DataProvider('seekResults')]
+    public function testPositionResponseCarriesOnlyTheHandledSeekGeneration(?int $generation): void
+    {
+        $owner = Uuid::generate();
+        $session = TranscodeSession::create($owner, Uuid::generate(), Uuid::generate(), AudioProfile::streamingStereo());
+        $requestId = Uuid::generate()->toString();
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $sessions = $this->createStub(TranscodeSessionPortInterface::class);
+        $sessions->method('findByPublicId')->willReturn($session);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(
+            static function (UpdateTranscodePositionCommand $command) use ($generation, $requestId): Envelope {
+                self::assertSame($requestId, $command->requestId);
+                self::assertSame(3, $command->expectedGeneration);
+                return new Envelope($command, [new HandledStamp($generation, 'test-handler')]);
+            },
+        );
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $request = new Request(content: json_encode(['position' => 61, 'action' => 'seek', 'generation' => 3, 'requestId' => $requestId], JSON_THROW_ON_ERROR));
+
+        $response = $controller->updatePosition($session->getPublicId()->toString(), $request);
+
+        self::assertSame(200, $response->getStatusCode());
+        $expected = ['status' => 'ok', 'position' => 61, 'requestId' => $requestId];
+        if ($generation !== null) {
+            $expected['acceptedGeneration'] = $generation;
+        }
+        self::assertEquals(['data' => $expected], json_decode((string) $response->getContent(), true));
+    }
+
+    /** @return iterable<string, array{?int}> */
+    public static function seekResults(): iterable
+    {
+        yield 'fresh accepted seek' => [8];
+        yield 'no continuation authority' => [null];
     }
 
     /** @param class-string $contract */

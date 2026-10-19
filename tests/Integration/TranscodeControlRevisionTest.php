@@ -15,13 +15,13 @@ final class TranscodeControlRevisionTest extends TestCase
     public function testSeekKeepsPauseAndReplayCannotReverseCommittedControls(): void
     {
         $initial = $this->admit();
-        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused');
-        $seek = $this->runtime->control($this->jobId, $this->sessionId, 'seek', position: 45.5);
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused')->runtime;
+        $seek = $this->runtime->control($this->jobId, $this->sessionId, 'seek', position: 45.5)->runtime;
         self::assertSame('paused', $seek->desired->status);
         self::assertSame(45.5, $seek->desired->position);
         self::assertSame($initial->generation + 1, $seek->generation);
         self::assertSame($paused->desiredRevision + 1, $seek->desiredRevision);
-        $replayed = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused');
+        $replayed = $this->runtime->control($this->jobId, $this->sessionId, 'pause', status: 'paused')->runtime;
         self::assertSame($seek->desiredRevision, $replayed->desiredRevision);
         self::assertSame(45.5, $replayed->desired->position);
     }
@@ -30,8 +30,8 @@ final class TranscodeControlRevisionTest extends TestCase
     {
         $this->admit();
         $this->runtime->control($this->jobId, $this->sessionId, 'pause-a', status: 'paused');
-        $resumed = $this->runtime->control($this->jobId, $this->sessionId, 'resume-b', status: 'running');
-        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-a', status: 'paused');
+        $resumed = $this->runtime->control($this->jobId, $this->sessionId, 'resume-b', status: 'running')->runtime;
+        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-a', status: 'paused')->runtime;
         self::assertSame('running', $replayed->desired->status);
         self::assertSame($resumed->desiredRevision, $replayed->desiredRevision);
         self::assertSame($resumed->generation, $replayed->generation);
@@ -41,19 +41,34 @@ final class TranscodeControlRevisionTest extends TestCase
     {
         $this->admit();
         $this->runtime->control($this->jobId, $this->sessionId, 'seek-a', position: 10);
-        $latest = $this->runtime->control($this->jobId, $this->sessionId, 'seek-b', position: 60);
-        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'seek-a', position: 10);
+        $accepted = $this->runtime->control($this->jobId, $this->sessionId, 'seek-b', position: 60);
+        self::assertTrue($accepted->accepted);
+        $latest = $accepted->runtime;
+        $result = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'seek-a', position: 10);
+        self::assertFalse($result->accepted);
+        $replayed = $result->runtime;
         self::assertSame(60.0, $replayed->desired->position);
         self::assertSame($latest->desiredRevision, $replayed->desiredRevision);
         self::assertSame($latest->generation, $replayed->generation);
+    }
+
+    public function testFreshSamePositionSeekAcknowledgesTheUnchangedGeneration(): void
+    {
+        $initial = $this->admit();
+        $result = $this->runtime->control($this->jobId, $this->sessionId, 'same-position-seek', position: $initial->desired->position);
+
+        self::assertTrue($result->accepted);
+        self::assertSame($initial->generation, $result->runtime->generation);
+        self::assertSame($initial->desiredRevision, $result->runtime->desiredRevision);
+        self::assertFalse($this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'same-position-seek', position: $initial->desired->position)->accepted);
     }
 
     public function testInitiallyUnchangedControlIsStillRememberedAfterLaterChanges(): void
     {
         $this->admit();
         $this->runtime->control($this->jobId, $this->sessionId, 'resume-a', status: 'running');
-        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-b', status: 'paused');
-        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'resume-a', status: 'running');
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-b', status: 'paused')->runtime;
+        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'resume-a', status: 'running')->runtime;
         self::assertSame('paused', $replayed->desired->status);
         self::assertSame($paused->desiredRevision, $replayed->desiredRevision);
     }
@@ -64,7 +79,7 @@ final class TranscodeControlRevisionTest extends TestCase
         $this->first->beginTransaction();
         $this->runtime->control($this->jobId, $this->sessionId, 'pause-rolled-back', status: 'paused');
         $this->first->rollBack();
-        $retry = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-rolled-back', status: 'paused');
+        $retry = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-rolled-back', status: 'paused')->runtime;
         self::assertSame('paused', $retry->desired->status);
         self::assertSame($initial->desiredRevision + 1, $retry->desiredRevision);
     }
@@ -72,9 +87,9 @@ final class TranscodeControlRevisionTest extends TestCase
     public function testCancelledPendingExecutionCannotBeClaimedOrResumed(): void
     {
         $this->admit();
-        $cancelled = $this->runtime->control($this->jobId, $this->sessionId, 'cancel', status: 'cancelled');
+        $cancelled = $this->runtime->control($this->jobId, $this->sessionId, 'cancel', status: 'cancelled')->runtime;
         self::assertNull($this->runtime->claim($this->jobId, $this->worker()));
-        $resume = $this->runtime->control($this->jobId, $this->sessionId, 'resume', status: 'running');
+        $resume = $this->runtime->control($this->jobId, $this->sessionId, 'resume', status: 'running')->runtime;
         self::assertSame('cancelled', $resume->desired->status);
         self::assertSame($cancelled->desiredRevision, $resume->desiredRevision);
     }
@@ -114,13 +129,13 @@ final class TranscodeControlRevisionTest extends TestCase
         $old = $this->runtime->claim($this->jobId, $this->worker());
         self::assertNotNull($old);
         self::assertTrue($this->runtime->observe($old, 'complete', '/fixture/generation-' . $old->runtime->generation));
-        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-complete', status: 'paused', seek: false);
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-complete', status: 'paused', seek: false)->runtime;
         self::assertSame('complete', $paused->outcome);
         self::assertSame('paused', $paused->desired->status);
         $this->first->executeStatement("UPDATE transcode_runtime_state SET admission_deadline = clock_timestamp() - interval '1 second'");
         $restart = $control === 'seek'
-            ? $this->runtime->control($this->jobId, $this->sessionId, 'seek-complete', position: 42)
-            : $this->runtime->control($this->jobId, $this->sessionId, 'profile-complete', audioProfile: AudioProfile::mobileMono());
+            ? $this->runtime->control($this->jobId, $this->sessionId, 'seek-complete', position: 42)->runtime
+            : $this->runtime->control($this->jobId, $this->sessionId, 'profile-complete', audioProfile: AudioProfile::mobileMono())->runtime;
         self::assertSame('accepted', $restart->outcome);
         self::assertSame($old->runtime->generation + 1, $restart->generation);
         self::assertSame('paused', $restart->desired->status);
@@ -140,17 +155,17 @@ final class TranscodeControlRevisionTest extends TestCase
         self::assertNotNull($claim);
         $directory = '/fixture/generation-' . $claim->runtime->generation;
         self::assertTrue($this->runtime->observe($claim, 'complete', $directory));
-        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-complete', status: 'paused', position: 10, seek: false);
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-complete', status: 'paused', position: 10, seek: false)->runtime;
         self::assertSame('paused', $paused->desired->status);
         self::assertSame('complete', $paused->outcome);
         self::assertSame($directory, $paused->outputDirectory);
         self::assertSame($claim->runtime->generation, $paused->generation);
-        $resumed = $this->runtime->control($this->jobId, $this->sessionId, 'resume-complete', status: 'running', position: 20, seek: false);
+        $resumed = $this->runtime->control($this->jobId, $this->sessionId, 'resume-complete', status: 'running', position: 20, seek: false)->runtime;
         self::assertSame('running', $resumed->desired->status);
         self::assertSame('complete', $resumed->outcome);
         self::assertSame($paused->desiredRevision + 1, $resumed->desiredRevision);
         self::assertSame($claim->runtime->generation, $resumed->generation);
-        $unchanged = $this->runtime->control($this->jobId, $this->sessionId, 'same-profile-complete', audioProfile: AudioProfile::streamingStereo());
+        $unchanged = $this->runtime->control($this->jobId, $this->sessionId, 'same-profile-complete', audioProfile: AudioProfile::streamingStereo())->runtime;
         self::assertSame($resumed->desiredRevision, $unchanged->desiredRevision);
         self::assertSame('complete', $unchanged->outcome);
     }
@@ -161,11 +176,13 @@ final class TranscodeControlRevisionTest extends TestCase
         $claim = $this->runtime->claim($this->jobId, $this->worker());
         self::assertNotNull($claim);
         self::assertTrue($this->runtime->observe($claim, 'complete', '/fixture/generation-' . $claim->runtime->generation));
-        $cancelled = $this->runtime->control($this->jobId, $this->sessionId, 'cancel-complete', status: 'cancelled');
+        $cancelled = $this->runtime->control($this->jobId, $this->sessionId, 'cancel-complete', status: 'cancelled')->runtime;
         self::assertSame('cancelled', $cancelled->outcome);
         self::assertSame('cancelled', $cancelled->desired->status);
         self::assertNull($this->runtime->claim($this->jobId, $this->worker('b')));
-        $ignored = $this->runtime->control($this->jobId, $this->sessionId, 'seek-cancelled-complete', position: 42);
+        $result = $this->runtime->control($this->jobId, $this->sessionId, 'seek-cancelled-complete', position: 42);
+        self::assertFalse($result->accepted);
+        $ignored = $result->runtime;
         self::assertSame($cancelled->desiredRevision, $ignored->desiredRevision);
         self::assertSame('cancelled', $ignored->outcome);
     }

@@ -36,12 +36,12 @@ final readonly class TranscodePlaybackControl
         ?int $expectedGeneration = null,
         ?int $expectedRevision = null,
         bool $missingIsNoop = false,
-    ): void {
-        $this->transaction->run(function () use ($sessionId, $requestId, $status, $audioProfile, $position, $seek, $progress, $expectedGeneration, $expectedRevision, $missingIsNoop): void {
+    ): ?int {
+        return $this->transaction->run(function () use ($sessionId, $requestId, $status, $audioProfile, $position, $seek, $progress, $expectedGeneration, $expectedRevision, $missingIsNoop): ?int {
             $group = $this->lockGroup($sessionId, $missingIsNoop);
             $source = $group[$sessionId->toString()] ?? null;
             if ($source === null) {
-                return;
+                return null;
             }
             $previous = $this->ownership->find($source->getJobId());
             if ($previous === null || !$previous->sessionId->equals($sessionId)
@@ -49,12 +49,13 @@ final readonly class TranscodePlaybackControl
                 || ($progress && ($previous->generation !== $expectedGeneration
                     || $previous->desiredRevision !== $expectedRevision || $previous->desired->status !== 'running'))
             ) {
-                return;
+                return null;
             }
-            $canonical = $this->ownership->control($source->getJobId(), $sessionId, $requestId, $status, $audioProfile, $position, seek: $seek);
+            $result = $this->ownership->control($source->getJobId(), $sessionId, $requestId, $status, $audioProfile, $position, seek: $seek);
+            $canonical = $result->runtime;
             $this->project($source, $previous, $canonical);
             if (in_array($canonical->outcome, ['failed', 'refused'], true)) {
-                return;
+                return null;
             }
             foreach ($group as $sibling) {
                 if ($sibling->getId()->equals($sessionId)) {
@@ -74,8 +75,9 @@ final readonly class TranscodePlaybackControl
                     position: $position !== null ? $canonical->desired->position : null,
                     seek: $seek,
                 );
-                $this->project($sibling, $before, $runtime);
+                $this->project($sibling, $before, $runtime->runtime);
             }
+            return $seek && $result->accepted ? $canonical->generation : null;
         });
     }
 

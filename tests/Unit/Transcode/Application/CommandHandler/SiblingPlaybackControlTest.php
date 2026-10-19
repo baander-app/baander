@@ -18,6 +18,7 @@ use App\Transcode\Application\CommandHandler\UpdateTranscodePositionHandler;
 use App\Transcode\Application\CommandHandler\UpdateTranscodeSessionHandler;
 use App\Transcode\Application\Service\TranscodePlaybackControl;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -95,18 +96,31 @@ final class SiblingPlaybackControlTest extends TestCase
         $this->ownership->method('lockAdmission')->willReturnCallback(function (Uuid $id): void { $this->locks[] = 'video:' . $id; });
         $this->ownership->method('lockSession')->willReturnCallback(function (Uuid $id): void { $this->locks[] = $id->toString(); });
         $this->ownership->method('find')->willReturnCallback(fn (Uuid $id): ?TranscodeRuntimeSnapshot => $this->runtimes[$id->toString()] ?? null);
-        $this->ownership->method('control')->willReturnCallback(function (Uuid $job, Uuid $session, string $request, ?string $status = null, ?AudioProfile $profile = null, ?float $position = null, ?int $segment = null, bool $seek = true): TranscodeRuntimeSnapshot {
+        $this->ownership->method('control')->willReturnCallback(function (Uuid $job, Uuid $session, string $request, ?string $status = null, ?AudioProfile $profile = null, ?float $position = null, ?int $segment = null, bool $seek = true): TranscodeControlResult {
             $this->controls[] = ['session' => $session->toString(), 'request' => $request, 'seek' => $seek];
             $previous = $this->runtimes[$job->toString()];
             if (isset($this->receipts[$session . ':' . $request]) || in_array($previous->outcome, ['failed', 'refused', 'cancelled'], true)) {
-                return $previous;
+                return new TranscodeControlResult($previous, false);
             }
             $this->receipts[$session . ':' . $request] = true;
             $desired = $previous->desired;
-            return $this->runtimes[$job->toString()] = new TranscodeRuntimeSnapshot($job, $session, 'admitted', new DesiredTranscodeState($profile ?? $desired->audioProfile, $desired->status === 'cancelled' ? 'cancelled' : ($status ?? $desired->status), $position ?? $desired->position), 6, 5, 3, $status === 'cancelled' ? 'cancelled' : $previous->outcome, '/generation-3', null, true);
+            $runtime = $this->runtimes[$job->toString()] = new TranscodeRuntimeSnapshot($job, $session, 'admitted', new DesiredTranscodeState($profile ?? $desired->audioProfile, $desired->status === 'cancelled' ? 'cancelled' : ($status ?? $desired->status), $position ?? $desired->position), 6, 5, 3, $status === 'cancelled' ? 'cancelled' : $previous->outcome, '/generation-3', null, true);
+            return new TranscodeControlResult($runtime, true);
         });
         $this->transaction = $this->createStub(TransactionPortInterface::class);
         $this->transaction->method('run')->willReturnCallback(static fn (callable $operation) => $operation());
+    }
+
+    public function testFreshSeekReturnsTheAuthoritativeGenerationAndReplayReturnsNoContinuation(): void
+    {
+        $playback = new TranscodePlaybackControl($this->sessionPort, $this->ownership, $this->transaction, $this->jobPort);
+        $handler = new UpdateTranscodePositionHandler($playback);
+        $request = Uuid::generate()->toString();
+        $command = new UpdateTranscodePositionCommand($this->sessions[0]->getId(), 61.0, 'seek', $request, 3);
+
+        self::assertSame(3, $handler($command));
+        $this->dispatch('pause', Uuid::generate()->toString());
+        self::assertNull($handler($command));
     }
 
     #[DataProvider('actions')]
@@ -145,7 +159,8 @@ final class SiblingPlaybackControlTest extends TestCase
             6, 5, $generation, 'ready', '/generation-' . $generation, null, true,
         );
         $before = $this->runtimes;
-        $this->dispatch('seek', Uuid::generate()->toString(), expectedRevision: 5, expectedGeneration: $expectedGeneration);
+        $result = $this->dispatch('seek', Uuid::generate()->toString(), expectedRevision: 5, expectedGeneration: $expectedGeneration);
+        self::assertSame($accepted ? 3 : null, $result);
 
         if (!$accepted) {
             self::assertSame([], $this->controls);
@@ -221,7 +236,7 @@ final class SiblingPlaybackControlTest extends TestCase
             5, 5, 3, $outcome, null, 'encoder failed',
         );
 
-        $this->dispatch('pause', Uuid::generate()->toString());
+        self::assertNull($this->dispatch('seek', Uuid::generate()->toString()));
 
         self::assertCount(1, $this->controls);
         foreach (array_slice($this->sessions, 0, 3) as $session) {
@@ -326,16 +341,20 @@ final class SiblingPlaybackControlTest extends TestCase
         self::assertSame(SessionState::Cancelled, $source->getSessionState());
     }
 
-    private function dispatch(string $action, string $request, int $expectedRevision = 5, ?int $expectedGeneration = 3): void
+    private function dispatch(string $action, string $request, int $expectedRevision = 5, ?int $expectedGeneration = 3): ?int
     {
         $source = $this->sessions[0]->getId();
         $playback = new TranscodePlaybackControl($this->sessionPort, $this->ownership, $this->transaction, $this->jobPort);
+        if (in_array($action, ['seek', 'progress'], true)) {
+            return (new UpdateTranscodePositionHandler($playback))(new UpdateTranscodePositionCommand($source, 61.0, $action, $request, $expectedGeneration, $expectedRevision));
+        }
         match ($action) {
             'pause' => (new PauseTranscodeSessionHandler($playback))(new PauseTranscodeSessionCommand($source, $request)),
             'resume' => (new ResumeTranscodeSessionHandler($playback))(new ResumeTranscodeSessionCommand($source, $request)),
             'profile' => (new UpdateTranscodeSessionHandler($playback))(new UpdateTranscodeSessionCommand($source, AudioProfile::mobileMono(), $request)),
             'cancel' => (new CancelTranscodeSessionHandler($playback))(new CancelTranscodeSessionCommand($source, $request)),
-            default => (new UpdateTranscodePositionHandler($playback))(new UpdateTranscodePositionCommand($source, 61.0, $action, $request, $expectedGeneration, $expectedRevision)),
+            default => throw new \LogicException('Unknown test action.'),
         };
+        return null;
     }
 }

@@ -6,6 +6,7 @@ namespace App\Transcode\Application\Port;
 
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
@@ -18,7 +19,7 @@ interface TranscodeExecutionOwnershipPort
     /** Lock the current runtime before reading a session for a control mutation. */
     public function lockSession(Uuid $sessionId): void;
     public function admit(Uuid $jobId, Uuid $sessionId, string $requestId, DesiredTranscodeState $desired, int $deadlineSeconds = 5): TranscodeRuntimeSnapshot;
-    public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeRuntimeSnapshot;
+    public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeControlResult;
     public function find(Uuid $jobId): ?TranscodeRuntimeSnapshot;
     /** @return list<TranscodeRuntimeSnapshot> */
     public function pending(int $limit = 100): array;

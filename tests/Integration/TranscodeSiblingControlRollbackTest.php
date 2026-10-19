@@ -7,7 +7,9 @@ namespace App\Tests\Integration;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Transcode\Application\Command\CancelTranscodeSessionCommand;
+use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\CommandHandler\CancelTranscodeSessionHandler;
+use App\Transcode\Application\CommandHandler\UpdateTranscodePositionHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -38,17 +40,18 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
 
     private bool $injectFailure = true;
 
-    /** @return iterable<string, array{int, bool}> */
+    /** @return iterable<string, array{int, bool, bool}> */
     public static function failureBoundaries(): iterable
     {
-        yield 'second tier projection' => [2, false];
-        yield 'third tier projection' => [3, false];
-        yield 'second tier after source encoding completed' => [2, true];
-        yield 'third tier after source encoding completed' => [3, true];
+        yield 'second tier projection' => [2, false, false];
+        yield 'third tier projection' => [3, false, false];
+        yield 'second tier after source encoding completed' => [2, true, false];
+        yield 'third tier after source encoding completed' => [3, true, false];
+        yield 'seek second tier projection' => [2, false, true];
     }
 
     #[DataProvider('failureBoundaries')]
-    public function testLaterTierFailureRollsBackEveryRuntimeProjectionReferenceAndReceipt(int $failOnSave, bool $sourceEncodingComplete): void
+    public function testLaterTierFailureRollsBackEveryRuntimeProjectionReferenceAndReceipt(int $failOnSave, bool $sourceEncodingComplete, bool $seek): void
     {
         CustomTypesRegistrar::register();
         $configuration = ORMSetup::createAttributeMetadataConfig([dirname(__DIR__, 2) . '/src'], isDevMode: true);
@@ -98,7 +101,7 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         $port = $this->createStub(TranscodeSessionPortInterface::class);
         $port->method('findByUuid')->willReturnCallback($sessionService->findByUuid(...));
         $port->method('findActiveByUserAndVideo')->willReturnCallback($sessionService->findActiveByUserAndVideo(...));
-        $port->method('save')->willReturnCallback(function (TranscodeSession $session) use ($sessionService, $tierSessions, $failOnSave, $failure, &$saveCount, $before): void {
+        $port->method('save')->willReturnCallback(function (TranscodeSession $session) use ($sessionService, $tierSessions, $failOnSave, $failure, &$saveCount, $before, $seek): void {
             $sessionService->save($session);
             ++$saveCount;
             if (!$this->injectFailure) {
@@ -112,17 +115,28 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
                 }
             }
             if ($saveCount === $failOnSave) {
-                self::assertSame($failOnSave, (int) $this->first->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE outcome = 'cancelled'"));
-                self::assertSame($failOnSave, (int) $this->first->fetchOne("SELECT count(*) FROM transcode_sessions WHERE state = 'cancelled'"));
-                self::assertSame($failOnSave - 1, (int) $this->first->fetchOne('SELECT count(*) FROM transcode_jobs WHERE reference_count = 0'));
+                if ($seek) {
+                    self::assertSame($failOnSave, (int) $this->first->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE (desired->>'position')::numeric = 42"));
+                } else {
+                    self::assertSame($failOnSave, (int) $this->first->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE outcome = 'cancelled'"));
+                    self::assertSame($failOnSave, (int) $this->first->fetchOne("SELECT count(*) FROM transcode_sessions WHERE state = 'cancelled'"));
+                    self::assertSame($failOnSave - 1, (int) $this->first->fetchOne('SELECT count(*) FROM transcode_jobs WHERE reference_count = 0'));
+                }
                 self::assertSame($before, $this->snapshot($this->second), 'An independent reader must still see the original committed group.');
                 throw $failure;
             }
         });
-        $handler = new CancelTranscodeSessionHandler(new TranscodePlaybackControl($port, $runtime, $transaction, $jobService));
-        $command = new CancelTranscodeSessionCommand($tierSessions[0]->getId(), 'cancel-group');
+        $playback = new TranscodePlaybackControl($port, $runtime, $transaction, $jobService);
+        $requestId = $seek ? 'seek-group' : 'cancel-group';
+        $execute = function () use ($seek, $playback, $tierSessions, $requestId): ?int {
+            if ($seek) {
+                return (new UpdateTranscodePositionHandler($playback))(new UpdateTranscodePositionCommand($tierSessions[0]->getId(), 42.0, 'seek', $requestId, 1));
+            }
+            (new CancelTranscodeSessionHandler($playback))(new CancelTranscodeSessionCommand($tierSessions[0]->getId(), $requestId));
+            return null;
+        };
         try {
-            $handler($command);
+            $execute();
             self::fail('The later sibling failure must propagate out of the transaction.');
         } catch (\RuntimeException $error) {
             self::assertSame($failure, $error);
@@ -132,15 +146,21 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         self::assertFalse($this->first->isTransactionActive());
         self::assertSame(0, $manager->getUnitOfWork()->size(), 'Rollback must discard projections of aborted writes.');
         self::assertSame($before, $this->snapshot($this->second));
-        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_control_receipts WHERE request_id = ?', ['cancel-group']));
+        self::assertSame(0, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_control_receipts WHERE request_id = ?', [$requestId]));
 
         // The exact same command can commit after the fault; no aborted receipt suppresses a tier.
         $this->injectFailure = false;
-        $handler($command);
-        self::assertSame(3, (int) $this->second->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE outcome = 'cancelled'"));
-        self::assertSame(3, (int) $this->second->fetchOne("SELECT count(*) FROM transcode_sessions WHERE state = 'cancelled'"));
-        self::assertSame(3, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_jobs WHERE reference_count = 0'));
-        self::assertSame(3, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_control_receipts WHERE request_id = ?', ['cancel-group']));
+        $generation = $execute();
+        if ($seek) {
+            self::assertSame(2, $generation);
+            self::assertSame($generation, (int) $this->second->fetchOne('SELECT generation FROM transcode_runtime_state WHERE job_id = ?', [$this->jobId->toString()]));
+            self::assertSame(3, (int) $this->second->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE (desired->>'position')::numeric = 42"));
+        } else {
+            self::assertSame(3, (int) $this->second->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE outcome = 'cancelled'"));
+            self::assertSame(3, (int) $this->second->fetchOne("SELECT count(*) FROM transcode_sessions WHERE state = 'cancelled'"));
+            self::assertSame(3, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_jobs WHERE reference_count = 0'));
+        }
+        self::assertSame(3, (int) $this->second->fetchOne('SELECT count(*) FROM transcode_control_receipts WHERE request_id = ?', [$requestId]));
     }
 
     private function assertRowIsLocked(string $table, string $key, string $id): void

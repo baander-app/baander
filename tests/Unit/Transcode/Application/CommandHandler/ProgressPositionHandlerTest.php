@@ -9,6 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\CommandHandler\UpdateTranscodePositionHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -40,7 +41,7 @@ final class ProgressPositionHandlerTest extends TestCase
         $ownership->expects(self::once())->method('lockSession')->with($session->getId());
         $ownership->method('find')->willReturn($runtime);
         $ownership->expects($accepted ? self::once() : self::never())->method('control')
-            ->with($session->getJobId(), $session->getId(), self::anything(), null, null, 61.0, null, false)->willReturn($runtime);
+            ->with($session->getJobId(), $session->getId(), self::anything(), null, null, 61.0, null, false)->willReturn(new TranscodeControlResult($runtime, true));
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation) => $operation());
         $jobs = $this->createStub(TranscodeJobPortInterface::class);

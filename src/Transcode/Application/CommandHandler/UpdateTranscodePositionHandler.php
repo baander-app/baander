@@ -13,9 +13,9 @@ final readonly class UpdateTranscodePositionHandler
     public function __construct(private TranscodePlaybackControl $playback) {}
 
     #[AsMessageHandler]
-    public function __invoke(UpdateTranscodePositionCommand $command): void
+    public function __invoke(UpdateTranscodePositionCommand $command): ?int
     {
-        $this->playback->apply(
+        return $this->playback->apply(
             $command->sessionId,
             $command->requestId,
             status: match ($command->action) { 'pause' => 'paused', 'resume' => 'running', default => null },

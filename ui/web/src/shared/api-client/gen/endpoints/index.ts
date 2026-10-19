@@ -7330,6 +7330,11 @@ export type PostTranscodeSessionPosition200 = {
   position?: number;
   /** Echoed when supplied in the request */
   requestId?: string;
+  /**
+     * Resulting generation of a fresh accepted seek; absent for replayed, stale, terminal or non-seek commands
+     * @minimum 1
+     */
+  acceptedGeneration?: number;
 };
 
 export type GetAccentColorIndex200 = {
