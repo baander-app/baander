@@ -24,7 +24,7 @@
     "dist:mac": "yarn build && electron-builder --mac",
     "dist:all": "yarn build && electron-builder -w -l -m",
     "electron-rebuild": "electron-rebuild -f -w @napi-rs/keyring",
-    "build:wasm": "tsx scripts/build-wasm.ts",
+    "build:wasm": "tsx ../../scripts/build-wasm.ts",
     "test": "node --import tsx --experimental-test-module-mocks --test tests/*.test.ts",
     "test:smoke": "node tests/runtime-smoke.mjs"
   },
