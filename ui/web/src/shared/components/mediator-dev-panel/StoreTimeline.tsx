@@ -1,7 +1,8 @@
-import { memo, useState, useSyncExternalStore } from 'react'
+import { memo, useMemo, useState, useSyncExternalStore } from 'react'
 import styled from 'styled-components'
 import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreTraceEvent } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
+import { reconstructCaptures } from '@/shared/stores/reconstruct-captures'
 
 const Container = styled.div`
   flex: 1;
@@ -60,12 +61,14 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
   const selectedIndex = events.findIndex(event => event.id === selectedId)
   const selectedEvent = events[selectedIndex]
   if (selectedId !== null && selectedIndex === -1) setSelectedId(null)
+  const history = useMemo(() => selectedEvent ? reconstructCaptures(state, selectedEvent.id) : null, [state, selectedEvent])
 
   return <Container>
     <label>Filter store actions<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
     <Button size="sm" onClick={() => recorder.clear()}>Clear timeline</Button>
     <Button size="sm" onClick={() => setExported(recorder.exportTrace())}>Export trace</Button>
     <p>{state.events.length} recorded events · {state.droppedEvents} older events discarded</p>
+    {state.omittedRegistrations > 0 && <p>Omitted registrations: {state.omittedRegistrations} (100 active instance limit).</p>}
     <p>Parent IDs link synchronous calls. Async completions retain their action ID; updates after await are shown separately, without guessed parentage.</p>
     {exported && <label>Trace JSON<textarea readOnly aria-label="Trace JSON" value={exported} rows={8} /></label>}
     <Button size="sm" disabled={selectedIndex <= 0} onClick={() => setSelectedId(events[selectedIndex - 1].id)}>Previous event</Button>
@@ -77,8 +80,25 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
         {selectedEvent.kind === 'update' ? <>
           <Capture label="Before capture" capture={selectedEvent.before} />
           <Capture label="After capture" capture={selectedEvent.after} />
-        </> : <p>This event has no state capture.</p>}
+        </> : selectedEvent.kind === 'register'
+          ? <Capture label="Registration capture" capture={selectedEvent.after} />
+          : <p>This event has no state capture.</p>}
       </> : <p>Select an event to inspect its captured state.</p>}
+    </Inspection>
+    <Inspection aria-label="Historical store captures">
+      <h2>Historical store captures</h2>
+      {!history ? <p>Select an event to inspect recorded stores.</p>
+        : history.status === 'unavailable' ? <p>Historical captures are unavailable.</p>
+          : <>
+            <p>Through event #{selectedEvent.id} · history epoch {state.baseline.epoch}</p>
+            <p>{history.partial ? 'Partial diagnostic captures' : 'Complete diagnostic captures'}; inspection does not restore executable state.</p>
+            {Object.keys(history.stores).length === 0 && <p>No recorded stores at this event.</p>}
+            {Object.entries(history.stores).map(([id, entry]) => <details key={id} open>
+              <summary>{entry.name} #{id}</summary>
+              <p>Captured at event #{entry.sourceEventId}</p>
+              <Capture label="State capture" capture={entry.capture} />
+            </details>)}
+          </>}
     </Inspection>
     {events.length === 0 && <p>No matching store events.</p>}
     {events.map(event => <EventRow key={event.id} $selected={event.id === selectedId}>

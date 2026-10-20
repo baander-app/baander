@@ -83,6 +83,37 @@ describe('store timeline UI', () => {
     expect(screen.queryByRole('button', { name: 'Inspect event #3' })).not.toBeInTheDocument()
     expect(screen.getByText('Select an event to inspect its captured state.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled()
+    expect(screen.getByRole('region', { name: 'Historical store captures' })).toHaveTextContent('Select an event to inspect recorded stores.')
+  })
+
+  it('reconstructs all instances through hidden events and keeps earlier values while live stores advance', () => {
+    const recorder = createStoreDebugger(true)
+    const first = createStore(recorder.instrument('same', () => ({ count: 0 })))
+    const second = createStore(recorder.instrument('same', () => ({ count: 10 })))
+    first.setState({ count: 1 })
+    second.setState({ count: 11 })
+    const selected = recorder.getSnapshot().events.at(-1)!.id
+    render(<StoreTimeline debugger={recorder} />)
+    fireEvent.change(screen.getByLabelText('Filter store actions'), { target: { value: 'update' } })
+    fireEvent.click(screen.getByRole('button', { name: `Inspect event #${selected}` }))
+    const history = screen.getByRole('region', { name: 'Historical store captures' })
+    expect(history).toHaveTextContent('same #1')
+    expect(history).toHaveTextContent('same #2')
+    expect(history).toHaveTextContent('"count": 1')
+    expect(history).toHaveTextContent('"count": 11')
+    act(() => {
+      first.setState({ count: 2 })
+      second.setState({ count: 12 })
+    })
+    const snapshot = recorder.getSnapshot()
+    expect(history).not.toHaveTextContent('"count": 12')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous event' }))
+    expect(history).toHaveTextContent('"count": 10')
+    expect(recorder.getSnapshot()).toBe(snapshot)
+    expect(first.getState().count).toBe(2)
+    expect(second.getState().count).toBe(12)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear timeline' }))
+    expect(history).toHaveTextContent('Select an event to inspect recorded stores.')
   })
 
   it('shows each capture completeness and markers without substituting latest store state', () => {
@@ -112,8 +143,21 @@ describe('store timeline UI', () => {
     expect(inspection.getByText('Capture unavailable.')).toBeInTheDocument()
     expect(inspection.getByText('"[unavailable]"')).toBeInTheDocument()
     expect(inspection.queryByText(/999/)).not.toBeInTheDocument()
+    const history = screen.getByRole('region', { name: 'Historical store captures' })
+    expect(history).toHaveTextContent('Partial diagnostic captures')
+    expect(history).toHaveTextContent('[unavailable]')
+    expect(history).not.toHaveTextContent('999')
     fireEvent.click(screen.getByRole('button', { name: 'Next event' }))
     expect(inspection.getByText('This event has no state capture.')).toBeInTheDocument()
+  })
+
+  it('reports unavailable reconstruction for an unsupported history version', () => {
+    const recorder = createStoreDebugger(true)
+    createStore(recorder.instrument('counter', () => ({ count: 0 })))
+    const snapshot = { ...recorder.getSnapshot(), schemaVersion: 1 } as unknown as StoreDebugSnapshot
+    render(<StoreTimeline debugger={{ ...recorder, getSnapshot: () => snapshot }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #1' }))
+    expect(screen.getByRole('region', { name: 'Historical store captures' })).toHaveTextContent('Historical captures are unavailable.')
   })
 
   it('updates without polling, filters, shows state changes/stacks, exports and clears', () => {

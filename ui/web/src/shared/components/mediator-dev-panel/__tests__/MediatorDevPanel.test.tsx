@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
+import { createStore } from 'zustand/vanilla'
+import { createStoreDebugger, storeDebugger } from '@/shared/stores/debug'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
@@ -150,6 +152,33 @@ describe('HandlerMap', () => {
 })
 
 describe('StoreInspector', () => {
+  it('distinguishes current instances, reports omissions and clears a retired selection', () => {
+    const recorder = createStoreDebugger(true)
+    createStore(recorder.instrument('same', () => ({ count: 1 })))
+    createStore(recorder.instrument('same', () => ({ count: 2 })))
+    for (let index = 2; index < 101; index++) {
+      createStore(recorder.instrument('other', () => ({ count: index })))
+    }
+    const snapshotSpy = vi.spyOn(storeDebugger, 'getSnapshot').mockImplementation(recorder.getSnapshot)
+    const subscribeSpy = vi.spyOn(storeDebugger, 'subscribe').mockImplementation(recorder.subscribe)
+    try {
+      renderWithTheme(<StoreInspector />)
+      expect(screen.getByText('Omitted registrations: 1 (100 active instance limit).')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('combobox', { name: 'Select store' }))
+      expect(screen.getByRole('option', { name: 'same #1', exact: true })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('option', { name: 'same #2', exact: true }))
+      expect(screen.getByText(/"count": 2/)).toBeInTheDocument()
+      act(() => { recorder.unregisterStore(2) })
+      expect(screen.getByText('Select a store to inspect its state.')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('combobox', { name: 'Select store' }))
+      expect(screen.getByRole('option', { name: 'same #1', exact: true })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: 'same #2', exact: true })).not.toBeInTheDocument()
+    } finally {
+      snapshotSpy.mockRestore()
+      subscribeSpy.mockRestore()
+    }
+  })
+
   it('renders store names in a dropdown', () => {
     const stores = {
       player: () => ({ isPlaying: false, volume: 75 }),

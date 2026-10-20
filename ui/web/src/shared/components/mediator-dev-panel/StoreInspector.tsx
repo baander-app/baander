@@ -50,8 +50,9 @@ export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps
   const entries = externalRegistry
     ? Object.keys(externalRegistry).sort().map(name => ({ id: name, label: name }))
     : Object.entries(debug.stores).map(([id, entry]) => ({ id, label: `${entry.name} #${id}` }))
-  const capture = externalRegistry?.[selected]
-    ? captureState(externalRegistry[selected]())
+  if (selected && !entries.some(entry => entry.id === selected)) setSelected('')
+  const capture = externalRegistry
+    ? externalRegistry[selected] ? captureState(externalRegistry[selected]()) : undefined
     : debug.stores[selected]?.capture
   const snapshot = capture?.value
 
@@ -71,9 +72,10 @@ export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps
           </SelectContent>
         </Select>
       </SelectBar>
+      {!externalRegistry && debug.omittedRegistrations > 0 && <p>Omitted registrations: {debug.omittedRegistrations} (100 active instance limit).</p>}
       <Content>
-        {snapshot ? (
-          <><JsonPre>{JSON.stringify(snapshot, null, 2)}</JsonPre>{!capture?.complete && <p>Some values are redacted or unavailable for replay.</p>}</>
+        {capture ? (
+          <><JsonPre>{JSON.stringify(snapshot, null, 2)}</JsonPre>{!capture.complete && <p>Some captured values are redacted or unavailable.</p>}</>
         ) : (
           <EmptyState>Select a store to inspect its state.</EmptyState>
         )}
