@@ -7,6 +7,8 @@ import { MediatorDevPanel } from '@/shared/components/mediator-dev-panel'
 import { useDevPanelStore } from '@/shared/stores/dev-panel-store'
 import { useSelectionStore } from '@/features/catalog/stores/selection-store'
 import { useViewModeStore } from '@/features/catalog/stores/view-mode-store'
+import { createStore } from 'zustand/vanilla'
+import { storeDebugger } from '@/shared/stores/debug'
 
 useDevPanelStore.getState().setVisible(true)
 
@@ -41,6 +43,11 @@ createRoot(document.getElementById('root')!).render(<ThemeProvider theme={resolv
       const { viewMode, setViewMode } = useViewModeStore.getState()
       setViewMode(viewMode === 'list' ? 'grid' : 'list')
     }}>Change view</button>
+    <button onClick={() => {
+      for (let index = 0; index < 97; index++) {
+        createStore(storeDebugger.instrument(`fixture.store.${index}`, () => ({ count: index })))
+      }
+    }}>Register fixture stores</button>
   </main>
   <MediatorDevPanel />
 </ThemeProvider>)

@@ -1,6 +1,7 @@
-import { memo, useMemo, useState, useSyncExternalStore } from 'react'
+import { memo, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import styled from 'styled-components'
-import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreTraceEvent } from '@/shared/stores/debug'
+import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreCaptures, type StoreTraceEvent } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
 import { reconstructCaptures } from '@/shared/stores/reconstruct-captures'
 
@@ -31,6 +32,11 @@ const Inspection = styled.section`
   h2, h3 { font-size: inherit; font-weight: 600; }
 `
 
+const CaptureScroll = styled.div`
+  height: 320px;
+  overflow: auto;
+`
+
 const Capture = memo(function Capture({ label, capture }: { label: string; capture?: StateCapture }) {
   return <>
     <h3>{label}</h3>
@@ -40,6 +46,43 @@ const Capture = memo(function Capture({ label, capture }: { label: string; captu
     </> : <p>Capture unavailable.</p>}
   </>
 })
+
+function HistoricalStores({ stores }: { stores: StoreCaptures }) {
+  const entries = Object.entries(stores)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set())
+  const virtualizer = useVirtualizer({
+    count: entries.length,
+    enabled: entries.length > 50,
+    getScrollElement: () => scrollRef.current,
+    getItemKey: index => entries[index][0],
+    estimateSize: () => 240,
+    overscan: 3,
+  })
+  const renderCapture = ([id, entry]: typeof entries[number]) => <details key={id} open={!closed.has(id)}>
+    <summary onClick={event => {
+      event.preventDefault()
+      setClosed(previous => {
+        const next = new Set(previous)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    }}>{entry.name} #{id}</summary>
+    <p>Captured at event #{entry.sourceEventId}</p>
+    <Capture label="State capture" capture={entry.capture} />
+  </details>
+
+  if (entries.length <= 50) return entries.map(renderCapture)
+  return <CaptureScroll ref={scrollRef} role="region" aria-label="Recorded store instances" tabIndex={0}>
+    <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+      {virtualizer.getVirtualItems().map(row => <div key={row.key} data-index={row.index} ref={virtualizer.measureElement}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${row.start}px)` }}>
+        {renderCapture(entries[row.index])}
+      </div>)}
+    </div>
+  </CaptureScroll>
+}
 
 function EventCapture({ event }: { event: StoreTraceEvent }) {
   if (event.kind === 'update') return <>
@@ -97,11 +140,7 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
             <p>Through event #{selectedId} · history epoch {state.baseline.epoch}</p>
             <p>{history.partial ? 'Partial diagnostic captures' : 'Complete diagnostic captures'}; inspection does not restore executable state.</p>
             {Object.keys(history.stores).length === 0 && <p>No recorded stores at this event.</p>}
-            {Object.entries(history.stores).map(([id, entry]) => <details key={id} open>
-              <summary>{entry.name} #{id}</summary>
-              <p>Captured at event #{entry.sourceEventId}</p>
-              <Capture label="State capture" capture={entry.capture} />
-            </details>)}
+            <HistoricalStores key={selectedId} stores={history.stores} />
           </>}
     </Inspection>
     {events.length === 0 && <p>No matching store events.</p>}
