@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createStore } from 'zustand/vanilla'
 import { render } from '../../../../../tests/test-utils'
 import { createStoreDebugger, type StoreDebugSnapshot } from '@/shared/stores/debug'
@@ -14,6 +14,78 @@ describe('store timeline UI', () => {
     render(<StoreTimeline debugger={recorder} />)
     return { recorder, counter }
   }
+
+  function setupVerification(expectedCount = 1, limit = 200) {
+    const recorder = createStoreDebugger(true, limit)
+    const calculate = vi.fn(() => ({ count: expectedCount }))
+    const counter = createStore(recorder.instrument('counter', (set) => ({
+      count: 0, increment: () => set({ count: 1 }),
+    }), {
+      id: 'counter', version: 1, actions: ['increment'],
+      validateState: () => true, validateArgs: () => true, calculate,
+    }))
+    counter.getState().increment()
+    render(<StoreTimeline debugger={recorder} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
+    return { recorder, counter, calculate }
+  }
+
+  it('verifies only on demand and preserves an older match as live events advance', () => {
+    const { recorder, counter, calculate } = setupVerification()
+    expect(calculate).not.toHaveBeenCalled()
+    const inspection = within(screen.getByRole('region', { name: 'Captured state' }))
+    expect(inspection.getByText('Before capture')).toBeInTheDocument()
+    const snapshot = recorder.getSnapshot()
+    const live = counter.getState()
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Match')
+    expect(recorder.getSnapshot()).toBe(snapshot)
+    expect(counter.getState()).toBe(live)
+    act(() => { counter.setState({ count: 2 }) })
+    expect(screen.getByRole('status')).toHaveTextContent('Match')
+    expect(calculate).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Next event' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next event' }))
+    expect(inspection.getByText('After capture')).toBeInTheDocument()
+  })
+
+  it('shows a mismatch with expected and recorded data and clears it when filtered out', () => {
+    setupVerification(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Mismatch')
+    const verification = within(screen.getByRole('region', { name: 'Action verification' }))
+    expect(verification.getByText(/"count": 2/)).toBeInTheDocument()
+    expect(verification.getByText(/"count": 1/)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Filter store actions'), { target: { value: 'absent' } })
+    fireEvent.change(screen.getByLabelText('Filter store actions'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('explains unavailable events and removes results on retirement and clear', () => {
+    const { recorder } = setupVerification(1, 5)
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Unavailable: Select an action event to verify.')
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    act(() => { recorder.unregisterStore(1) })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Unavailable: The current transition descriptor is unavailable or differs.')
+    fireEvent.click(screen.getByRole('button', { name: 'Clear timeline' }))
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('removes a verification result when its action is evicted', () => {
+    const { counter } = setupVerification(1, 4)
+    fireEvent.click(screen.getByRole('button', { name: 'Verify action' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Match')
+    act(() => { counter.setState({ count: 2 }); counter.setState({ count: 3 }) })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByText('Select an event to inspect its captured state.')).toBeInTheDocument()
+  })
 
   it('selects and steps through retained events without changing live state or recording events', () => {
     const { recorder, counter } = setup()

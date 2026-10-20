@@ -297,7 +297,7 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
       notify()
     },
     exportTrace() {
-      return JSON.stringify({ purpose: 'diagnostic; side-effect replay is not supported',
+      return JSON.stringify({ purpose: 'diagnostic inspection and supported isolated verification; side-effect replay is not supported',
         asyncParentage: 'Synchronous updates are linked; updates after await retain call stacks but are not guessed into a flow.',
         ...snapshot }, null, 2)
     },

@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import styled from 'styled-components'
 import { storeDebugger, type createStoreDebugger, type StateCapture, type StoreCaptures, type StoreTraceEvent } from '@/shared/stores/debug'
 import { Button } from '@/shared/components/ui/button'
+import type { StoreTransitionVerification } from '@/shared/stores/verify-transition'
 import { reconstructCaptures } from '@/shared/stores/reconstruct-captures'
 
 const Container = styled.div`
@@ -89,8 +90,30 @@ function EventCapture({ event }: { event: StoreTraceEvent }) {
     <Capture label="Before capture" capture={event.before} />
     <Capture label="After capture" capture={event.after} />
   </>
+  if (event.kind === 'action' && event.before) return <Capture label="Before capture" capture={event.before} />
+  if (event.kind === 'resolved' && event.after) return <Capture label="After capture" capture={event.after} />
   if (event.kind === 'register') return <Capture label="Registration capture" capture={event.after} />
   return <p>This event has no state capture.</p>
+}
+
+function ActionVerification({ recorder, event }: {
+  recorder: ReturnType<typeof createStoreDebugger>
+  event: StoreTraceEvent
+}) {
+  const [result, setResult] = useState<StoreTransitionVerification | null>(null)
+  return <section aria-label="Action verification">
+    <Button size="sm" onClick={() => setResult(recorder.verifyAction(event.id))}>Verify action</Button>
+    {result && <>
+      <p role="status">{result.status === 'unavailable'
+        ? `Unavailable: ${result.reason}`
+        : result.status === 'match' ? 'Match: the current transition produces the recorded result.'
+          : 'Mismatch: the current transition differs from the recorded result.'}</p>
+      {result.status === 'mismatch' && <>
+        <h3>Expected result</h3><pre>{JSON.stringify(result.expected, null, 2)}</pre>
+        <h3>Recorded result</h3><pre>{JSON.stringify(result.recorded, null, 2)}</pre>
+      </>}
+    </>}
+  </section>
 }
 
 const EventDetails = memo(function EventDetails({ event }: { event: StoreTraceEvent }) {
@@ -130,6 +153,11 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
       {selectedEvent ? <>
         <p>#{selectedEvent.id} {selectedEvent.store} · {selectedEvent.action} · {selectedEvent.kind}</p>
         <EventCapture event={selectedEvent} />
+        <ActionVerification
+          key={`${state.baseline.epoch}:${selectedEvent.instanceId}:${selectedEvent.id}:${Object.hasOwn(state.stores, selectedEvent.instanceId)}`}
+          recorder={recorder}
+          event={selectedEvent}
+        />
       </> : <p>Select an event to inspect its captured state.</p>}
     </Inspection>
     <Inspection aria-label="Historical store captures">

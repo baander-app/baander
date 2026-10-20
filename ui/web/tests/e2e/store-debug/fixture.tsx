@@ -8,6 +8,7 @@ import { useDevPanelStore } from '@/shared/stores/dev-panel-store'
 import { useSelectionStore } from '@/features/catalog/stores/selection-store'
 import { useViewModeStore } from '@/features/catalog/stores/view-mode-store'
 import { createStore } from 'zustand/vanilla'
+import { Button } from '@/shared/components/ui/button'
 import { storeDebugger } from '@/shared/stores/debug'
 
 useDevPanelStore.getState().setVisible(true)
@@ -27,9 +28,11 @@ function ViewMode() {
 }
 export function Actions() {
   const select = useSelectionStore(state => state.select)
+  const clear = useSelectionStore(state => state.clear)
   return <>
     <button onClick={() => select('album-one', 'album')}>Select album</button>
     <button onClick={() => select('album-two', 'album')}>Select another album</button>
+    <Button onClick={() => clear()}>Clear selection</Button>
   </>
 }
 createRoot(document.getElementById('root')!).render(<ThemeProvider theme={resolveTheme('dark', 'violet')}>
