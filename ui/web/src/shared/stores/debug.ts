@@ -1,3 +1,4 @@
+import { foldStoreEvent } from './reconstruct-captures'
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand'
 
 export const STORE_DEBUG_SETTING = 'baander-store-debug'
@@ -16,11 +17,12 @@ function enabledAtStartup(): boolean {
 export type DebugValue = null | boolean | number | string | DebugValue[] | { [key: string]: DebugValue }
 export interface StateCapture { value: DebugValue; complete: boolean }
 export interface StoreTraceEvent {
-  schemaVersion: 1
+  schemaVersion: 2
+  instanceId: number
   id: number
   parentId: number | null
   store: string
-  kind: 'action' | 'update' | 'resolved' | 'rejected'
+  kind: 'register' | 'retire' | 'action' | 'update' | 'resolved' | 'rejected'
   action: string
   timestamp: number
   stack?: string
@@ -29,10 +31,24 @@ export interface StoreTraceEvent {
   after?: StateCapture
   changedKeys?: string[]
 }
+export interface StoreInstanceCapture {
+  name: string
+  capture: StateCapture
+  sourceEventId: number
+}
+export type StoreCaptures = Readonly<Record<string, StoreInstanceCapture>>
+export interface StoreHistoryBaseline {
+  epoch: number
+  boundaryEventId: number | null
+  stores: StoreCaptures
+}
 export interface StoreDebugSnapshot {
+  schemaVersion: 2
   events: readonly StoreTraceEvent[]
-  stores: Readonly<Record<string, StateCapture>>
+  stores: StoreCaptures
+  baseline: StoreHistoryBaseline
   droppedEvents: number
+  omittedRegistrations: number
 }
 
 function freezeCapture<T>(value: T): T {
@@ -97,16 +113,28 @@ export function captureState(value: unknown, sensitive = false): StateCapture {
 
 /** Separate instances make recording deterministic in tests without enabling app tracing. */
 export function createStoreDebugger(enabled: boolean, limit = 200) {
-  let snapshot: StoreDebugSnapshot = Object.freeze({ events: Object.freeze([]), stores: Object.freeze({}), droppedEvents: 0 })
+  let snapshot: StoreDebugSnapshot = freezeCapture({
+    schemaVersion: 2, events: [], stores: {},
+    baseline: { epoch: 1, boundaryEventId: null, stores: {} },
+    droppedEvents: 0, omittedRegistrations: 0,
+  })
   let nextId = 1
+  let nextInstanceId = 1
+  let admissions = 0
   let parentId: number | null = null
+  const retirements = new Map<number, () => void>()
   const listeners = new Set<() => void>()
   const capacity = Math.max(1, Math.min(1000, limit))
   const notify = () => { for (const listener of listeners) { try { listener() } catch { /* Debugging must not break actions. */ } } }
   const append = (event: StoreTraceEvent) => {
     const events = [...snapshot.events, freezeCapture(event)]
     const dropped = Math.max(0, events.length - capacity)
-    snapshot = Object.freeze({ ...snapshot, events: Object.freeze(events.slice(dropped)), droppedEvents: snapshot.droppedEvents + dropped })
+    let baseline = snapshot.baseline
+    for (const evicted of events.slice(0, dropped)) {
+      baseline = { ...baseline, boundaryEventId: evicted.id, stores: foldStoreEvent(baseline.stores, evicted) }
+    }
+    snapshot = freezeCapture({ ...snapshot, stores: foldStoreEvent(snapshot.stores, event), baseline,
+      events: events.slice(dropped), droppedEvents: snapshot.droppedEvents + dropped })
     notify()
   }
   function instrument<T extends object, Mps extends [StoreMutatorIdentifier, unknown][] = [], Mcs extends [StoreMutatorIdentifier, unknown][] = []>(
@@ -115,45 +143,65 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
     // No wrapper, action replacement, subscription, clock, or capture on the disabled path.
     if (!enabled) return creator
     return ((set, get, api) => {
+      if (admissions >= 100) {
+        snapshot = Object.freeze({ ...snapshot, omittedRegistrations: snapshot.omittedRegistrations + 1 })
+        notify()
+        return creator(set, get, api)
+      }
+      admissions++
+      const instanceId = nextInstanceId++
       const sensitive = /auth/i.test(name)
+      const label = name.slice(0, MAX_CAPTURE_KEY_LENGTH)
       const capture = (state: unknown) => captureState(state, sensitive)
-      const wrapSet = (original: typeof set): typeof set => ((...args: unknown[]) => {
-        const beforeState = get()
-        const before = capture(beforeState)
-        const result = Reflect.apply(original, undefined, args)
-        const afterState = get()
-        if (!Object.is(beforeState, afterState)) {
+      let active = false
+      // Zustand notifies in subscription order, so capture before application listeners.
+      const unsubscribe = api.subscribe((afterState, beforeState) => {
+        if (!active) return
+        try {
+          const before = capture(beforeState)
           const after = capture(afterState)
-          const beforeRecord = (beforeState ?? {}) as Record<string, unknown>
-          const afterRecord = (afterState ?? {}) as Record<string, unknown>
-          const changedKeys = [...new Set([...Object.keys(beforeRecord), ...Object.keys(afterRecord)])]
-            .filter(key => key.length <= MAX_CAPTURE_KEY_LENGTH && !Object.is(beforeRecord[key], afterRecord[key]))
-            .slice(0, 60)
-          snapshot = Object.freeze({ ...snapshot, stores: Object.freeze({ ...snapshot.stores, [name]: after }) })
-          append({ schemaVersion: 1, id: nextId++, parentId, store: name, kind: 'update', action: 'setState',
+          let changedKeys: string[] = []
+          try {
+            const beforeRecord = (beforeState ?? {}) as Record<string, unknown>
+            const afterRecord = (afterState ?? {}) as Record<string, unknown>
+            changedKeys = [...new Set([...Object.keys(beforeRecord), ...Object.keys(afterRecord)])]
+              .filter(key => key.length <= MAX_CAPTURE_KEY_LENGTH
+                && !Object.is(Object.getOwnPropertyDescriptor(beforeRecord, key)?.value,
+                  Object.getOwnPropertyDescriptor(afterRecord, key)?.value))
+              .slice(0, 60)
+          } catch { /* An unavailable key list must not hide an unavailable capture. */ }
+          append({ schemaVersion: 2, instanceId, id: nextId++, parentId, store: label, kind: 'update', action: 'setState',
             timestamp: Date.now(), stack: captureStack(), before, after, changedKeys })
-        }
-        return result
-      }) as typeof set
-      const state = creator(wrapSet(set), get, api)
-      api.setState = wrapSet(api.setState as typeof set) as typeof api.setState
+        } catch { /* Recorder failures must not interrupt application subscribers. */ }
+      })
+      let state: T
+      try {
+        state = creator(set, get, api)
+      } catch (error) {
+        unsubscribe()
+        admissions--
+        throw error
+      }
       const actions = new Map<string, { original: unknown; wrapped: (this: unknown, ...args: unknown[]) => unknown }>()
       const wrapActions = (source: T): T => {
         const wrapped = { ...source }
         for (const [key, value] of Object.entries(source as Record<string, unknown>)) {
           if (typeof value !== 'function') continue
-          const label = key.length > MAX_CAPTURE_KEY_LENGTH ? `${key.slice(0, MAX_CAPTURE_KEY_LENGTH - 12)}…[truncated]` : key
+          const actionLabel = key.length > MAX_CAPTURE_KEY_LENGTH ? `${key.slice(0, MAX_CAPTURE_KEY_LENGTH - 12)}…[truncated]` : key
           let action = actions.get(key)
           if (!action || action.original !== value) {
             action = { original: value, wrapped: function (this: unknown, ...args: unknown[]) {
+              if (!active) return Reflect.apply(value, this, args)
               const id = nextId++
               const previous = parentId
-              append({ schemaVersion: 1, id, parentId: previous, store: name, kind: 'action', action: label,
+              append({ schemaVersion: 2, instanceId, id, parentId: previous, store: label, kind: 'action', action: actionLabel,
                 timestamp: Date.now(), stack: captureStack(),
                 args: sensitive ? { value: '[redacted]', complete: false } : captureState(args) })
               parentId = id
-              const settled = (kind: 'resolved' | 'rejected') => append({ schemaVersion: 1, id: nextId++, parentId: id,
-                store: name, kind, action: label, timestamp: Date.now() })
+              const settled = (kind: 'resolved' | 'rejected') => {
+                if (active) append({ schemaVersion: 2, instanceId, id: nextId++, parentId: id,
+                  store: label, kind, action: actionLabel, timestamp: Date.now() })
+              }
               try {
                 const result = Reflect.apply(value, this, args)
                 if (result instanceof Promise) result.then(() => settled('resolved'), () => settled('rejected'))
@@ -180,7 +228,16 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
         }
         return tracedInitial
       }
-      snapshot = Object.freeze({ ...snapshot, stores: Object.freeze({ ...snapshot.stores, [name]: capture(wrapped) }) })
+      active = true
+      retirements.set(instanceId, () => {
+        active = false
+        unsubscribe()
+        admissions--
+        append({ schemaVersion: 2, instanceId, id: nextId++, parentId, store: label,
+          kind: 'retire', action: 'unregisterStore', timestamp: Date.now() })
+      })
+      append({ schemaVersion: 2, instanceId, id: nextId++, parentId, store: label,
+        kind: 'register', action: 'registerStore', timestamp: Date.now(), after: capture(wrapped) })
       return wrapped
     }) as StateCreator<T, Mps, Mcs>
   }
@@ -193,9 +250,19 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
-    clear() { snapshot = Object.freeze({ ...snapshot, events: Object.freeze([]), droppedEvents: 0 }); notify() },
+    unregisterStore(instanceId: number) {
+      const retire = retirements.get(instanceId)
+      if (!retire) return
+      retirements.delete(instanceId)
+      retire()
+    },
+    clear() {
+      snapshot = freezeCapture({ ...snapshot, events: [], droppedEvents: 0,
+        baseline: { epoch: snapshot.baseline.epoch + 1, boundaryEventId: nextId - 1 || null, stores: snapshot.stores } })
+      notify()
+    },
     exportTrace() {
-      return JSON.stringify({ schemaVersion: 1, purpose: 'diagnostic; side-effect replay is not supported',
+      return JSON.stringify({ purpose: 'diagnostic; side-effect replay is not supported',
         asyncParentage: 'Synchronous updates are linked; updates after await retain call stacks but are not guessed into a flow.',
         ...snapshot }, null, 2)
     },

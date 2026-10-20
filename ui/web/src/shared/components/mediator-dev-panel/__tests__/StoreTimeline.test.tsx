@@ -23,26 +23,28 @@ describe('store timeline UI', () => {
     const next = screen.getByRole('button', { name: 'Next event' })
     expect(previous).toBeDisabled()
     expect(next).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
-    expect(inspection.getByText('#2 counter · setState · update')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #3' }))
+    expect(inspection.getByText('#3 counter · setState · update')).toBeInTheDocument()
     expect(inspection.getByText('Before capture')).toBeInTheDocument()
     expect(inspection.getByText(/"count": 0/)).toBeInTheDocument()
     expect(inspection.getByText(/"count": 1/)).toBeInTheDocument()
     expect(inspection.getAllByText('Complete capture')).toHaveLength(2)
     act(() => { counter.getState().increment() })
-    expect(inspection.getByText('#2 counter · setState · update')).toBeInTheDocument()
+    expect(inspection.getByText('#3 counter · setState · update')).toBeInTheDocument()
     expect(inspection.getByText(/"count": 1/)).toBeInTheDocument()
     const snapshot = recorder.getSnapshot()
     const liveState = counter.getState()
     fireEvent.click(previous)
-    expect(inspection.getByText('#1 counter · increment · action')).toBeInTheDocument()
+    expect(inspection.getByText('#2 counter · increment · action')).toBeInTheDocument()
     expect(inspection.getByText('This event has no state capture.')).toBeInTheDocument()
+    fireEvent.click(previous)
     expect(previous).toBeDisabled()
     fireEvent.click(next)
     fireEvent.click(next)
-    expect(inspection.getByText('#3 counter · increment · resolved')).toBeInTheDocument()
+    fireEvent.click(next)
+    expect(inspection.getByText('#4 counter · increment · resolved')).toBeInTheDocument()
     expect(inspection.getByText('This event has no state capture.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #6' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #7' }))
     expect(next).toBeDisabled()
     expect(recorder.getSnapshot()).toBe(snapshot)
     expect(counter.getState()).toBe(liveState)
@@ -58,16 +60,16 @@ describe('store timeline UI', () => {
     const filter = screen.getByLabelText('Filter store actions')
     const inspection = within(screen.getByRole('region', { name: 'Captured state' }))
     fireEvent.change(filter, { target: { value: 'update' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #3' }))
     expect(screen.getByRole('button', { name: 'Previous event' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Next event' }))
-    expect(inspection.getByText('#5 counter · setState · update')).toBeInTheDocument()
+    expect(inspection.getByText('#6 counter · setState · update')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled()
     fireEvent.change(filter, { target: { value: 'resolved' } })
     fireEvent.change(filter, { target: { value: '' } })
     expect(inspection.getByText('Select an event to inspect its captured state.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Inspect event #5' })).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #5' }))
+    expect(screen.getByRole('button', { name: 'Inspect event #6' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #6' }))
     fireEvent.click(screen.getByRole('button', { name: 'Clear timeline' }))
     expect(inspection.getByText('Select an event to inspect its captured state.')).toBeInTheDocument()
     expect(recorder.getSnapshot().events).toHaveLength(0)
@@ -76,24 +78,27 @@ describe('store timeline UI', () => {
   it('removes an evicted selection without selecting a replacement', () => {
     const { counter } = setup(3)
     act(() => { counter.getState().increment() })
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect event #3' }))
     act(() => { counter.getState().increment() })
-    expect(screen.queryByRole('button', { name: 'Inspect event #2' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Inspect event #3' })).not.toBeInTheDocument()
     expect(screen.getByText('Select an event to inspect its captured state.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next event' })).toBeDisabled()
   })
 
   it('shows each capture completeness and markers without substituting latest store state', () => {
     const snapshot: StoreDebugSnapshot = {
+      schemaVersion: 2,
+      baseline: { epoch: 1, boundaryEventId: null, stores: {} },
+      omittedRegistrations: 0,
       events: [
-        { schemaVersion: 1, id: 1, parentId: null, store: 'counter', kind: 'update', action: 'setState', timestamp: 0,
+        { schemaVersion: 2, instanceId: 1, id: 1, parentId: null, store: 'counter', kind: 'update', action: 'setState', timestamp: 0,
           before: { complete: false, value: { password: '[redacted]', nested: '[truncated]' } },
           after: { complete: true, value: { count: 1 } } },
-        { schemaVersion: 1, id: 2, parentId: null, store: 'counter', kind: 'update', action: 'setState', timestamp: 1,
+        { schemaVersion: 2, instanceId: 1, id: 2, parentId: null, store: 'counter', kind: 'update', action: 'setState', timestamp: 1,
           after: { complete: false, value: '[unavailable]' } },
-        { schemaVersion: 1, id: 3, parentId: null, store: 'counter', kind: 'rejected', action: 'fail', timestamp: 2 },
+        { schemaVersion: 2, instanceId: 1, id: 3, parentId: null, store: 'counter', kind: 'rejected', action: 'fail', timestamp: 2 },
       ],
-      stores: { counter: { complete: true, value: { count: 999 } } },
+      stores: { 1: { name: 'counter', capture: { complete: true, value: { count: 999 } }, sourceEventId: 2 } },
       droppedEvents: 0,
     }
     const recorder = { ...createStoreDebugger(true), getSnapshot: () => snapshot }
@@ -113,19 +118,19 @@ describe('store timeline UI', () => {
 
   it('updates without polling, filters, shows state changes/stacks, exports and clears', () => {
     const { recorder, counter } = setup()
-    expect(screen.getByText('No matching store events.')).toBeInTheDocument()
+    expect(screen.getByText(/counter · registerStore · register/)).toBeInTheDocument()
     act(() => { counter.getState().increment() })
     expect(screen.getByText(/counter · increment · action/)).toBeInTheDocument()
     expect(screen.getByText('Changed: count')).toBeInTheDocument()
     expect(screen.getByText('Before')).toBeInTheDocument()
-    expect(screen.getByText('After')).toBeInTheDocument()
+    expect(screen.getAllByText('After')).toHaveLength(2)
     expect(screen.getAllByText('Call stack')).toHaveLength(2)
     fireEvent.change(screen.getByLabelText('Filter store actions'), { target: { value: 'absent' } })
     expect(screen.getByText('No matching store events.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Export trace' }))
     const trace = JSON.parse((screen.getByRole('textbox', { name: 'Trace JSON' }) as HTMLTextAreaElement).value)
-    expect(trace.schemaVersion).toBe(1)
-    expect(trace.events).toHaveLength(3)
+    expect(trace.schemaVersion).toBe(2)
+    expect(trace.events).toHaveLength(4)
     fireEvent.click(screen.getByRole('button', { name: 'Clear timeline' }))
     expect(recorder.getSnapshot().events).toHaveLength(0)
   })

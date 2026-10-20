@@ -47,10 +47,12 @@ const EmptyState = styled.div`
 export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps) {
   const [selected, setSelected] = useState('')
   const debug = useSyncExternalStore(storeDebugger.subscribe, storeDebugger.getSnapshot, storeDebugger.getSnapshot)
-  const storeNames = Object.keys(externalRegistry ?? debug.stores).sort()
+  const entries = externalRegistry
+    ? Object.keys(externalRegistry).sort().map(name => ({ id: name, label: name }))
+    : Object.entries(debug.stores).map(([id, entry]) => ({ id, label: `${entry.name} #${id}` }))
   const capture = externalRegistry?.[selected]
     ? captureState(externalRegistry[selected]())
-    : debug.stores[selected]
+    : debug.stores[selected]?.capture
   const snapshot = capture?.value
 
   return (
@@ -61,9 +63,9 @@ export function StoreInspector({ stores: externalRegistry }: StoreInspectorProps
             <SelectValue placeholder="Select store..." />
           </SelectTrigger>
           <SelectContent>
-            {storeNames.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
+            {entries.map(({ id, label }) => (
+              <SelectItem key={id} value={id}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>
