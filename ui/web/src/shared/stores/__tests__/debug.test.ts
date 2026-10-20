@@ -1,10 +1,100 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createStore, type StateCreator } from 'zustand/vanilla'
 import { persist } from 'zustand/middleware'
-import { createStoreDebugger, captureState } from '../debug'
+import { createStoreDebugger, captureState, type StoreTransitionDescriptor } from '../debug'
 import { createSelectiveJSONStorage } from '../persistence'
 
+const counterTransition: StoreTransitionDescriptor = {
+  id: 'counter',
+  version: 1,
+  actions: ['add', 'noop', 'run'],
+  validateState: value => value !== null && typeof value === 'object' && !Array.isArray(value)
+    && typeof value.count === 'number',
+  validateArgs: (_action, args) => Array.isArray(args) && args.length === 0,
+  calculate: state => state,
+}
+
 describe('store tracing', () => {
+  it('captures trusted synchronous invocation boundaries including no-op actions after clear', () => {
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('counter', set => ({
+      count: 0,
+      add: () => set({ count: 1 }),
+      noop: () => {},
+    }), counterTransition))
+    const action = store.getState().add
+    const initial = store.getInitialState()
+    store.getState().add()
+    expect(recorder.getSnapshot().events.slice(1)).toMatchObject([
+      { kind: 'action', before: { value: { count: 0 }, complete: true }, transition: { id: 'counter', version: 1 } },
+      { kind: 'update' },
+      { kind: 'resolved', after: { value: { count: 1 }, complete: true }, completion: 'synchronous' },
+    ])
+    expect(store.getState().add).toBe(action)
+    expect(store.getInitialState()).toBe(initial)
+    recorder.clear()
+    store.getState().noop()
+    expect(recorder.getSnapshot().events).toMatchObject([
+      { kind: 'action', before: { value: { count: 1 }, complete: true }, transition: { id: 'counter', version: 1 } },
+      { kind: 'resolved', after: { value: { count: 1 }, complete: true }, completion: 'synchronous' },
+    ])
+  })
+
+  it('does not grant trust to aliased originals or differing initial-state actions', () => {
+    const recorder = createStoreDebugger(true)
+    const run = () => {}
+    const aliased = createStore(recorder.instrument('aliased', () => ({ count: 0, run, alias: run }), counterTransition))
+    aliased.getState().run()
+    const store = createStore(recorder.instrument<{ count: number; run: () => void }>('initial', (_set, _get, api) => {
+      api.getInitialState = () => ({ count: 0, run: () => {} })
+      return { count: 0, run: () => {} }
+    }, counterTransition))
+    store.getInitialState().run()
+    expect(recorder.getSnapshot().events.filter(event => event.kind === 'action')
+      .every(event => event.transition === undefined && event.before === undefined)).toBe(true)
+    store.getState().run()
+    expect(recorder.getSnapshot().events.at(-2)).toMatchObject({
+      kind: 'action', transition: { id: 'counter', version: 1 },
+    })
+  })
+
+  it('withholds synchronous success for promises, thenables and thrown actions without changing returns', async () => {
+    const recorder = createStoreDebugger(true)
+    const pending = Promise.resolve(3)
+    const thenable = { then: vi.fn() }
+    const throwingThen = Object.defineProperty({}, 'then', { get() { throw new Error('then unavailable') } })
+    const failure = new Error('action failed')
+    for (const result of [pending, thenable, throwingThen]) {
+      const store = createStore(recorder.instrument('counter', () => ({ count: 0, run: () => result }), counterTransition))
+      expect(store.getState().run()).toBe(result)
+    }
+    const store = createStore(recorder.instrument('counter', () => ({ count: 0, run: () => { throw failure } }), counterTransition))
+    expect(() => store.getState().run()).toThrow(failure)
+    await pending
+    const terminals = recorder.getSnapshot().events.filter(event => event.kind === 'resolved' || event.kind === 'rejected')
+    expect(terminals.length).toBeGreaterThan(0)
+    expect(terminals.every(event => event.completion === undefined && event.after === undefined)).toBe(true)
+    expect(thenable.then).not.toHaveBeenCalled()
+  })
+
+  it('does not trust replaced actions or capture incomplete data as complete', () => {
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('counter', () => ({ count: 0, run: () => {} }), counterTransition))
+    const replacement = () => {}
+    store.setState({ run: replacement })
+    store.getState().run()
+    expect(recorder.getSnapshot().events.filter(event => event.kind === 'action')).toHaveLength(0)
+    recorder.unregisterStore(1)
+    const retired = recorder.getSnapshot()
+    store.getInitialState().run()
+    expect(recorder.getSnapshot()).toBe(retired)
+    const sensitive = createStore(recorder.instrument('auth.counter', () => ({ count: 0, run: () => {} }), counterTransition))
+    sensitive.getState().run()
+    const invocation = recorder.getSnapshot().events.find(event => event.kind === 'action')!
+    expect(invocation.before?.complete).toBe(false)
+    expect(invocation.args?.complete).toBe(false)
+  })
+
   it('records outer mutations before same-store and cross-store subscriber writes', () => {
     const recorder = createStoreDebugger(true)
     const other = createStore(recorder.instrument('other', () => ({ count: 0 })))
@@ -161,7 +251,8 @@ describe('store tracing', () => {
     const recorder = createStoreDebugger(false)
     const action = vi.fn()
     const creator: StateCreator<{ count: number; action: () => void }> = () => ({ count: 0, action })
-    expect(recorder.instrument('counter', creator)).toBe(creator)
+    const descriptor = new Proxy(counterTransition, { get() { throw new Error('descriptor consulted') } })
+    expect(recorder.instrument('counter', creator, descriptor)).toBe(creator)
     const store = createStore(recorder.instrument('counter', creator))
     expect(store.getState().action).toBe(action)
     const listener = vi.fn()

@@ -15,6 +15,14 @@ function enabledAtStartup(): boolean {
 }
 
 export type DebugValue = null | boolean | number | string | DebugValue[] | { [key: string]: DebugValue }
+export interface StoreTransitionDescriptor {
+  readonly id: string
+  readonly version: number
+  readonly actions: readonly string[]
+  validateState(value: DebugValue): boolean
+  validateArgs(action: string, args: DebugValue): boolean
+  calculate(state: DebugValue, action: string, args: DebugValue): DebugValue
+}
 export interface StateCapture { value: DebugValue; complete: boolean }
 export interface StoreTraceEvent {
   schemaVersion: 2
@@ -29,6 +37,8 @@ export interface StoreTraceEvent {
   args?: StateCapture
   before?: StateCapture
   after?: StateCapture
+  transition?: { id: string; version: number }
+  completion?: 'synchronous'
   changedKeys?: string[]
 }
 export interface StoreInstanceCapture {
@@ -122,6 +132,7 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
   let nextInstanceId = 1
   let admissions = 0
   let parentId: number | null = null
+  const transitions = new Map<number, StoreTransitionDescriptor>()
   const retirements = new Map<number, () => void>()
   const listeners = new Set<() => void>()
   const capacity = Math.max(1, Math.min(1000, limit))
@@ -138,7 +149,7 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
     notify()
   }
   function instrument<T extends object, Mps extends [StoreMutatorIdentifier, unknown][] = [], Mcs extends [StoreMutatorIdentifier, unknown][] = []>(
-    name: string, creator: StateCreator<T, Mps, Mcs>,
+    name: string, creator: StateCreator<T, Mps, Mcs>, descriptor?: StoreTransitionDescriptor,
   ): StateCreator<T, Mps, Mcs> {
     // No wrapper, action replacement, subscription, clock, or capture on the disabled path.
     if (!enabled) return creator
@@ -182,6 +193,17 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
         admissions--
         throw error
       }
+      const originalActions = Object.entries(state as Record<string, unknown>)
+        .filter(([, value]) => typeof value === 'function')
+      const trustedActions = new Map<string, unknown>()
+      if (descriptor) {
+        transitions.set(instanceId, descriptor)
+        for (const [key, value] of originalActions) {
+          if (descriptor.actions.includes(key) && originalActions.filter(([, other]) => other === value).length === 1) {
+            trustedActions.set(key, value)
+          }
+        }
+      }
       const actions = new Map<string, { original: unknown; wrapped: (this: unknown, ...args: unknown[]) => unknown }>()
       const wrapActions = (source: T): T => {
         const wrapped = { ...source }
@@ -194,18 +216,28 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
               if (!active) return Reflect.apply(value, this, args)
               const id = nextId++
               const previous = parentId
+              const transition = trustedActions.get(key) === value ? transitions.get(instanceId) : undefined
               append({ schemaVersion: 2, instanceId, id, parentId: previous, store: label, kind: 'action', action: actionLabel,
                 timestamp: Date.now(), stack: captureStack(),
-                args: sensitive ? { value: '[redacted]', complete: false } : captureState(args) })
+                args: sensitive ? { value: '[redacted]', complete: false } : captureState(args),
+                ...(transition ? { transition: { id: transition.id, version: transition.version }, before: capture(get()) } : {}) })
               parentId = id
-              const settled = (kind: 'resolved' | 'rejected') => {
+              const settled = (kind: 'resolved' | 'rejected', synchronous = false) => {
                 if (active) append({ schemaVersion: 2, instanceId, id: nextId++, parentId: id,
-                  store: label, kind, action: actionLabel, timestamp: Date.now() })
+                  store: label, kind, action: actionLabel, timestamp: Date.now(),
+                  ...(transition && synchronous ? { after: capture(get()), completion: 'synchronous' as const } : {}) })
               }
               try {
                 const result = Reflect.apply(value, this, args)
-                if (result instanceof Promise) result.then(() => settled('resolved'), () => settled('rejected'))
-                else settled('resolved')
+                let asynchronous = false
+                try {
+                  asynchronous = result !== null && (typeof result === 'object' || typeof result === 'function')
+                    && typeof result.then === 'function'
+                } catch { asynchronous = true }
+                if (result instanceof Promise) {
+                  try { Promise.prototype.then.call(result, () => settled('resolved'), () => settled('rejected')) }
+                  catch { /* Observing a result must not change the action's return value. */ }
+                } else settled('resolved', !asynchronous)
                 return result
               } catch (error) { settled('rejected'); throw error }
               finally { parentId = previous }
@@ -231,6 +263,7 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
       active = true
       retirements.set(instanceId, () => {
         active = false
+        transitions.delete(instanceId)
         unsubscribe()
         admissions--
         append({ schemaVersion: 2, instanceId, id: nextId++, parentId, store: label,
