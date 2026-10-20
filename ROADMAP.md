@@ -3485,6 +3485,61 @@ Verification checkpoint:
   follow-up review reports no remaining concrete issues. Evidence:
   `var/test-runs/store-capture-reconstruction-20261020/`.
 
+### Registry nightly qualification (2026-10-20)
+
+The [reviewed plan](docs/plans/2026-10-20-registry-nightly-qualification-plan.md)
+adds a dedicated [nightly workflow](.forgejo/workflows/registry-nightly.yaml) using
+one native `fuzz` recipe with five-voter partition/failover and isolated binary
+restore, bounded parser fuzzing and its sanitizer negative control. The workflow
+schedules 02:17 UTC daily and permits manual dispatch, with a 45-minute job bound.
+It retains run-specific diagnostics for 14 days after success or failure.
+
+The [local rerun procedure](relay/README.md#nightly-qualification-and-retained-diagnostics)
+describes voter selection, fresh evidence directories and artifact interpretation.
+The runner records revision, voter count, fuzz limits and exit status beside its
+console output, allowlisted scenario logs and available parser reproducers.
+Generated credentials and database files are excluded from export.
+
+Implementation is committed locally as `2a80bd64`. Verification checkpoint:
+
+- The CI image passes **11 orchestration regressions in 8.816 seconds** and
+  **38 workflow tests / 301 assertions in 1.359 seconds**. Shell syntax and workflow
+  YAML checks pass. The nightly job also runs the orchestration regressions.
+- The frozen-source native recipe exits **0 in 312.34 seconds**. It passes
+  **32 CTest checks in 0.79 seconds**, **four cluster cleanup checks in 0.370
+  seconds** and **14 storage cleanup checks in 0.013 seconds**, plus SQL, TLS and
+  HTTP contracts, five-voter partition/failover and isolated five-voter restore.
+  The parser completes **10,000 fuzz iterations in 44 seconds**; its ASan negative
+  control passes. Retained metadata records five voters and exit status zero.
+- Inspection finds **27 selected diagnostic files**, without generated credentials
+  or database files. No scenario/build children, zombies or temporary directories
+  remain. The disposable verification container was removed; shared services and
+  storage were untouched.
+- Simplification and code review completed. The confirmed interruption-cleanup
+  finding is resolved by containing child-contract temporary storage beneath the
+  recipe's owned directory; its regression failed before the fix and passes after
+  it. An initless probe left an exited child as a zombie, so nightly and documented
+  local containers use `--init`. The strict reaping regression passes.
+- Two earlier native attempts failed and are not qualification passes: a source
+  edit during the first run caused a shell parse failure after its gates, and the
+  second encountered an HTTP port collision. Held voter-port reservations through
+  proxy setup and a deterministic regression resolve the collision; focused review
+  reports no remaining findings.
+
+Evidence is retained under `var/test-runs/registry-nightly-20261020/`, including
+`verification.json`, `native-verified.log`, the `native-verified/` artifact directory,
+review receipts and cleanup inspection. The verified source archive SHA-256 is
+`98f7fa75a2a9095530abba0e8be1d63715710c5d2dd3561e4ca0c93b93f229af`;
+it captures the tested implementation beyond the plan revision recorded in metadata.
+Documentation passes prose-preservation audits, local link/anchor checks and the
+whitespace check.
+
+Hosted schedule activation remains pending a later authorized push and merge to
+the default branch. No hosted nightly run has been observed; local qualification
+cannot establish scheduler execution. Regional deployment, actual-destination
+backup recovery, accepted performance baseline, constrained-host measurements
+and the 24-hour soak retain their existing acceptance prerequisites.
+
 ### Registry release and growth
 
 The local contracts listed below are implemented and covered. The entries
@@ -3549,9 +3604,11 @@ milestone:
 - [ ] Add fixed-runner baseline comparison and enforce confirmed regressions above
   10%, once the stable runner and accepted baseline are selected. The bounded
   optimized load smoke already exists.
-- [ ] Add scheduled nightly five-voter partition/failover, parser-fuzz and
-  isolated-restore orchestration using the existing runners. Push/PR CI and local
-  five-voter results do not establish a nightly schedule.
+- [x] Add scheduled nightly five-voter partition/failover, parser-fuzz and
+  isolated-restore orchestration using the existing runners. The
+  [nightly checkpoint](#registry-nightly-qualification-2026-10-20) records verified
+  local implementation; hosted activation and an observed scheduled run remain
+  pending. Local qualification does not establish hosted scheduler execution.
 
 Deferred measurements and rehearsals, requiring an agreed environment or access:
 

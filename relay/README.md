@@ -70,7 +70,7 @@ reference; the CI job uses its configured registry and owner with
 CI and runs the release recipe:
 
 ```sh
-docker run --rm --platform linux/amd64 --user 0 \
+docker run --rm --init --platform linux/amd64 --user 0 \
   --mount "type=bind,src=$PWD,dst=/workspace,readonly" \
   --workdir /workspace \
   --tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700 \
@@ -271,6 +271,63 @@ small S3 fixture disables multipart uploads because of the fixture server's
 limitation; actual destination compatibility and recovery objectives remain open.
 The [backup runbook](backup/README.md) covers activation, key custody, health and
 manual recovery. This worker adds resource limits beyond the API/voter budget.
+
+### Nightly qualification and retained diagnostics
+
+The [nightly workflow](../.forgejo/workflows/registry-nightly.yaml) runs at 02:17 UTC
+(`17 2 * * *`) and supports manual dispatch through the same job. It runs the
+existing `fuzz` recipe with five voters for both partition/failover and isolated
+binary restore, then the parser fuzzer and its ASan negative control. The job has
+a 45-minute timeout. Forgejo activates schedules from the default branch; this
+local implementation has no observed hosted scheduled run. Activation and observation
+remain pending a later authorized push and merge.
+
+To repeat the nightly recipe inside a runner provisioned as described above,
+install `clang-19` and `libclang-rt-19-dev` along with the native build tools, then
+select a fresh evidence directory:
+
+```sh
+CC=clang-19 CXX=clang++-19 \
+REGISTRY_CLUSTER_NODES=5 \
+REGISTRY_FUZZ_RUNS=10000 REGISTRY_FUZZ_SECONDS=120 \
+REGISTRY_QUALIFICATION_OUTPUT=var/test-runs/registry-nightly/manual-001 \
+bash scripts/test-registry.sh fuzz
+```
+
+`REGISTRY_CLUSTER_NODES` accepts only `3` or `5` and defaults to `3`; it selects
+both cluster and restore voter counts. The fuzzer defaults to 10,000 runs and
+120 seconds through `REGISTRY_FUZZ_RUNS` and `REGISTRY_FUZZ_SECONDS`. These bounds
+apply to the parser invocation; setup, native contracts and the negative control
+are separate phases.
+
+`REGISTRY_QUALIFICATION_OUTPUT` accepts an absolute path or a path relative to the
+repository root. The runner creates the directory if absent and rejects a nonempty
+one. Choose a new path for each rerun. With the read-only checkout mount shown
+above, mount a separate writable evidence directory and set this variable to its
+container path. The relative path in the example requires a writable checkout.
+Without this setting, the recipe retains its existing temporary-output behavior.
+
+The evidence directory contains `metadata.env` with the revision, mode, voter
+count, fuzz limits and exit status, plus `console.log` with setup and gate output.
+Available diagnostics include `openssl-build.log`, `fuzz.log`, `fuzz-negative.log`,
+allowlisted process logs under `cluster/` and `restore/`, and parser reproducers
+under `fuzz-artifacts/`. Generated certificates, credentials and database files
+are excluded. A nonzero exit status fails qualification; use the failed-command
+message and completed-gate messages in `console.log` to locate the failure. A gate
+without its completion message has no passing result.
+
+The workflow uploads available evidence after success or failure as
+`registry-nightly-<run-id>-<attempt>`, retaining it for 14 days. Its source directory
+is `var/test-runs/registry-nightly/<run-id>-<attempt>/`. Temporary processes and
+storage are cleaned on normal exit, gate failure and handled termination. Child
+contracts allocate temporary storage beneath the recipe's own temporary directory,
+so its cleanup also removes storage left by interrupted contracts. The nightly
+container uses `--init` to reap adopted child processes after termination;
+include `--init` in local disposable-container runs as shown above. An initless
+container can retain exited children as zombies even after their processes stop.
+Forced runner loss can prevent final metadata writes or upload and supplies no passing
+qualification result. These local gates leave regional deployment, actual backup
+destination, performance baseline and 24-hour soak acceptance open.
 
 ## Server configuration
 
