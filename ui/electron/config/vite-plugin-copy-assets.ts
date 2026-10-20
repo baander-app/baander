@@ -1,7 +1,6 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { mkdir, copyFile, readFile, access, constants } from 'node:fs/promises';
-import { execSync, spawnSync } from 'node:child_process';
+import { mkdir, copyFile, readFile } from 'node:fs/promises';
 import type { Plugin } from 'vite';
 import { readFileSync } from 'node:fs';
 
@@ -13,67 +12,32 @@ const electronDir = resolve(__dirname, '..');
 const wasmModulesJson = readFileSync(resolve(electronDir, 'src/shared/wasm-modules.json'), 'utf-8');
 const WASM_MODULES = JSON.parse(wasmModulesJson) as readonly ['spectral_features', 'dynamics_meter', 'fft2048', 'loudness_r128', 'partitioned_convolver', 'resampler_hq'];
 
-/**
- * Check if a file exists
- */
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
+const REQUIRED_LOADERS = new Set([
+  'spectral_features', 'dynamics_meter', 'loudness_r128',
+  'partitioned_convolver', 'resampler_hq',
+]);
+const DSP_ASSETS = WASM_MODULES.flatMap(module => [
+  { module, filename: `${module}.wasm` },
+  ...(REQUIRED_LOADERS.has(module) ? [{ module, filename: `${module}.js` }] : []),
+]);
 
-/**
- * Build a single WASM module using make
- */
-async function buildModule(module: string): Promise<void> {
-  const moduleDir = resolve(rootDir, 'packages/dsp', module);
-
-  try {
-    execSync('make', { cwd: moduleDir, stdio: 'pipe' });
-    console.log(`[copy-assets] Built ${module}`);
-  } catch (error) {
-    throw new Error(`Failed to build ${module}: ${error}`);
-  }
-}
-
-/**
- * Ensure all WASM WASM_MODULES are built
- */
-async function ensureWasmModulesBuilt(): Promise<void> {
-  const needsBuild: string[] = [];
-
-  for (const module of WASM_MODULES) {
-    const wasmPath = resolve(rootDir, 'packages/dsp', module, `${module}.wasm`);
-    if (!(await fileExists(wasmPath))) {
-      needsBuild.push(module);
+async function validateDspAssets(): Promise<void> {
+  for (const { module, filename } of DSP_ASSETS) {
+    const path = resolve(rootDir, 'packages/dsp', module, filename);
+    try {
+      await readFile(path);
+    } catch (cause) {
+      throw new Error(
+        `Required DSP asset unavailable: ${path}. Restore the checked-in DSP assets, ` +
+        'or regenerate qualified analysis modules with yarn --cwd ui/electron build:wasm.',
+        { cause },
+      );
     }
   }
-
-  if (needsBuild.length === 0) {
-    return;
-  }
-
-  console.log(`[copy-assets] Building missing WASM WASM_MODULES: ${needsBuild.join(', ')}`);
-
-  // Check if emcc is available
-  try {
-    spawnSync('emcc', ['--version'], { stdio: 'pipe' });
-  } catch {
-    throw new Error('Emscripten (emcc) is not installed. Run: brew install emscripten');
-  }
-
-  for (const module of needsBuild) {
-    await buildModule(module);
-  }
-
-  console.log('[copy-assets] All WASM WASM_MODULES built');
 }
 
 /**
- * Vite plugin to serve WASM WASM_MODULES and audio worklets in dev
+ * Vite plugin to serve WASM modules and audio worklets in dev
  * and copy them to the build output in production
  */
 export function copyAssets(): Plugin {
@@ -86,8 +50,7 @@ export function copyAssets(): Plugin {
 
     // In dev mode, serve the files via middleware
     async configureServer(server) {
-      // Ensure WASM WASM_MODULES are built before starting server
-      await ensureWasmModulesBuilt();
+      await validateDspAssets();
 
       // Add middleware to serve files
       server.middlewares.use(async (req, res, next) => {
@@ -152,8 +115,7 @@ export function copyAssets(): Plugin {
 
     // In production, copy files to build output
     async closeBundle() {
-      // Ensure WASM WASM_MODULES are built before copying
-      await ensureWasmModulesBuilt();
+      await validateDspAssets();
 
       const outDir = resolve(electronDir, 'dist/renderer');
       const dspOutDir = resolve(outDir, 'dsp');
@@ -162,27 +124,22 @@ export function copyAssets(): Plugin {
       await mkdir(dspOutDir, { recursive: true });
       await mkdir(workletsOutDir, { recursive: true });
 
-      // Copy WASM and JS files from packages/dsp
-      for (const module of WASM_MODULES) {
-        const moduleDir = resolve(packagesDspDir, module);
-
+      // Required DSP assets must arrive unchanged in the renderer output.
+      for (const { module, filename } of DSP_ASSETS) {
+        const source = resolve(packagesDspDir, module, filename);
+        const destination = resolve(dspOutDir, filename);
         try {
-          const wasmSrc = resolve(moduleDir, `${module}.wasm`);
-          const wasmDst = resolve(dspOutDir, `${module}.wasm`);
-          await copyFile(wasmSrc, wasmDst);
-          console.log(`✓ Copied ${module}.wasm`);
-        } catch (err) {
-          console.warn(`  ⚠ Skipping ${module}.wasm (not found)`);
+          await copyFile(source, destination);
+          const [sourceBytes, destinationBytes] = await Promise.all([
+            readFile(source), readFile(destination),
+          ]);
+          if (!sourceBytes.equals(destinationBytes)) {
+            throw new Error('Destination bytes differ from source');
+          }
+        } catch (cause) {
+          throw new Error(`Failed to copy required DSP asset ${filename}: ${cause}`, { cause });
         }
-
-        try {
-          const jsSrc = resolve(moduleDir, `${module}.js`);
-          const jsDst = resolve(dspOutDir, `${module}.js`);
-          await copyFile(jsSrc, jsDst);
-          console.log(`✓ Copied ${module}.js`);
-        } catch (err) {
-          // Some WASM_MODULES might not have a .js file, that's okay
-        }
+        console.log(`✓ Copied ${filename}`);
       }
 
       // Copy audio worklets from public/audio-worklets
