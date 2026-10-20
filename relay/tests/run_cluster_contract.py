@@ -7,7 +7,9 @@ import http.client
 import json
 from pathlib import Path
 import signal
+import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from cluster_support import Cluster
@@ -279,12 +281,34 @@ def wait_converged(cluster, indices, acknowledged_index, expected_rows=None):
     )
 
 
+def export_diagnostics(directory, destination):
+    if destination is None:
+        return
+    failed = sys.exception() is not None
+    try:
+        destination = Path(destination)
+        destination.mkdir(parents=True, exist_ok=True)
+        for path in Path(directory).glob("*.log"):
+            shutil.copyfile(path, destination / path.name)
+    except OSError as failure:
+        # Keep the scenario's failure intact if retaining evidence also fails.
+        print(f"Could not retain scenario diagnostics: {failure}", file=sys.stderr)
+        if not failed:
+            raise
+
+
+def handle_termination(signum, _frame):
+    raise SystemExit(128 + signum)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--rqlited", required=True)
     parser.add_argument("--server", required=True)
     parser.add_argument("--nodes", type=int, choices=(3, 5), required=True)
+    parser.add_argument("--diagnostics", type=Path)
     args = parser.parse_args()
+    signal.signal(signal.SIGTERM, handle_termination)
     with tempfile.TemporaryDirectory(prefix=f"baander-registry-{args.nodes}-voters-") as directory:
         cluster = Cluster(directory, args.rqlited, args.nodes)
         apis = []
@@ -579,11 +603,15 @@ def main():
         except Exception:
             for log in cluster.logs:
                 log.flush()
-            for path in Path(directory).glob("*.log"):
-                Path(f"/tmp/registry-cluster-{args.nodes}-{path.name}").write_text(path.read_text())
+            if args.diagnostics is None:
+                for path in Path(directory).glob("*.log"):
+                    Path(f"/tmp/registry-cluster-{args.nodes}-{path.name}").write_text(path.read_text())
             raise
         finally:
-            close_resources([*reversed(apis), observer, cluster])
+            try:
+                close_resources([*reversed(apis), observer, cluster])
+            finally:
+                export_diagnostics(directory, args.diagnostics)
 
 
 if __name__ == "__main__":

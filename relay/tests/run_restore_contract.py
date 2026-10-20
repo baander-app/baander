@@ -7,11 +7,14 @@ import hashlib
 import http.client
 import json
 from pathlib import Path
+import signal
 import sqlite3
 import tempfile
 import time
 from cluster_support import Cluster
-from run_cluster_contract import Api, close_resources, registration
+from run_cluster_contract import (
+    Api, close_resources, export_diagnostics, handle_termination, registration,
+)
 from run_http_contract import LocalHTTPS
 
 
@@ -75,7 +78,7 @@ def lookup(api, identifier):
     return body["data"]
 
 
-def run_restore_scenario(rqlited, server, nodes=3, snapshot_provider=None):
+def run_restore_scenario(rqlited, server, nodes=3, snapshot_provider=None, diagnostics=None):
     with tempfile.TemporaryDirectory(prefix="baander-registry-restore-") as directory:
         root = Path(directory)
         source_dir, restored_dir = root / "source", root / "restored"
@@ -164,7 +167,12 @@ def run_restore_scenario(rqlited, server, nodes=3, snapshot_provider=None):
                 flush=True,
             )
         finally:
-            close_resources([restored_api, restored, source_api, source])
+            try:
+                close_resources([restored_api, restored, source_api, source])
+            finally:
+                if diagnostics is not None:
+                    export_diagnostics(source_dir, Path(diagnostics) / "source")
+                    export_diagnostics(restored_dir, Path(diagnostics) / "restored")
 
 
 def main():
@@ -172,8 +180,10 @@ def main():
     parser.add_argument("--rqlited", required=True)
     parser.add_argument("--server", required=True)
     parser.add_argument("--nodes", type=int, choices=(3, 5), default=3)
+    parser.add_argument("--diagnostics", type=Path)
     args = parser.parse_args()
-    run_restore_scenario(args.rqlited, args.server, args.nodes)
+    signal.signal(signal.SIGTERM, handle_termination)
+    run_restore_scenario(args.rqlited, args.server, args.nodes, diagnostics=args.diagnostics)
 
 
 if __name__ == "__main__":

@@ -13,9 +13,47 @@ import unittest
 from unittest.mock import patch
 
 import run_cluster_contract as contract
+import cluster_support
 
 
 class CleanupTest(unittest.TestCase):
+    def test_voter_ports_stay_reserved_during_proxy_setup(self):
+        cluster = cluster_support.Cluster.__new__(cluster_support.Cluster)
+        start = cluster_support.FaultNetwork.start
+
+        async def start_proxies(network):
+            for number in [*cluster.http_ports, *network.real_ports]:
+                with socket.socket() as competitor:
+                    with self.assertRaises(OSError, msg=f"Unreserved voter port {number}"):
+                        competitor.bind(("127.0.0.1", number))
+            await start(network)
+
+        def spawn(*args, **kwargs):
+            for number in (cluster.http_ports[0], cluster.network.real_ports[0]):
+                with socket.socket() as voter:
+                    voter.bind(("127.0.0.1", number))
+            for number in (cluster.http_ports[1], cluster.network.real_ports[1]):
+                with socket.socket() as competitor:
+                    with self.assertRaises(OSError):
+                        competitor.bind(("127.0.0.1", number))
+            return SimpleNamespace(poll=lambda: 0, wait=lambda **kwargs: 0)
+
+        with tempfile.TemporaryDirectory(prefix="baander-registry-ports-") as directory:
+            try:
+                with patch.object(cluster_support.FaultNetwork, "start", start_proxies):
+                    cluster.__init__(directory, "unused", 2)
+                with patch.object(cluster_support.subprocess, "Popen", side_effect=spawn) as popen:
+                    cluster.start_node(0)
+                    cluster.stop_nodes()
+                    cluster.start_node(0)
+                    self.assertEqual(popen.call_count, 2)
+            finally:
+                if hasattr(cluster, "network"):
+                    cluster.close()
+            for number in [*cluster.http_ports, *cluster.network.real_ports]:
+                with socket.socket() as replacement:
+                    replacement.bind(("127.0.0.1", number))
+
     def test_all_resources_are_attempted_and_cleanup_errors_are_preserved(self):
         calls = []
 

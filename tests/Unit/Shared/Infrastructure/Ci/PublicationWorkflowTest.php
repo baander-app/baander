@@ -78,6 +78,43 @@ final class PublicationWorkflowTest extends TestCase
         );
     }
 
+    public function testNightlyRegistryRunsFiveVoterFuzzAndRetainsDiagnostics(): void
+    {
+        $workflow = $this->workflow('registry-nightly.yaml');
+        self::assertSame(['schedule', 'workflow_dispatch'], array_keys($workflow['on']));
+        self::assertSame([['cron' => '17 2 * * *']], $workflow['on']['schedule']);
+        $job = $workflow['jobs']['qualify'];
+        $existing = $this->workflow('ci.yaml')['jobs']['registry-fuzz-quality'];
+        self::assertSame($existing['runs-on'], $job['runs-on']);
+        self::assertSame($existing['container']['image'], $job['container']['image']);
+        self::assertSame('--init', $job['container']['options']);
+        self::assertSame(45, $job['timeout-minutes']);
+        self::assertSame(
+            $this->step($existing, 'Install parser fuzz toolchain')['run'],
+            $this->step($job, 'Install parser fuzz toolchain')['run'],
+        );
+        self::assertSame('python3 relay/tests/test_qualification_runner.py', $this->step($job, 'Verify qualification orchestration')['run']);
+        $run = $this->step($job, 'Qualify five-voter Registry');
+        self::assertSame('bash scripts/test-registry.sh fuzz', $run['run']);
+        self::assertSame('5', $run['env']['REGISTRY_CLUSTER_NODES']);
+        self::assertSame('10000', $run['env']['REGISTRY_FUZZ_RUNS']);
+        self::assertSame('120', $run['env']['REGISTRY_FUZZ_SECONDS']);
+        self::assertSame($this->step($existing, 'Fuzz registry parser and registration validation')['env']['CXX'], $run['env']['CXX']);
+        self::assertArrayNotHasKey('continue-on-error', $run);
+        self::assertArrayNotHasKey('continue-on-error', $job);
+        self::assertArrayNotHasKey('if', $run);
+        $output = 'var/test-runs/registry-nightly/${{ forgejo.run_id }}-${{ forgejo.run_attempt }}';
+        self::assertSame($output, $run['env']['REGISTRY_QUALIFICATION_OUTPUT']);
+        $upload = $this->step($job, 'Preserve nightly qualification evidence');
+        $existingUpload = $this->step($this->workflow('ci.yaml')['jobs']['registry-container-quality'], 'Preserve packaged Registry inventories');
+        self::assertSame($existingUpload['uses'], $upload['uses']);
+        self::assertSame('always()', $upload['if']);
+        self::assertSame($output, $upload['with']['path']);
+        self::assertSame('registry-nightly-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}', $upload['with']['name']);
+        self::assertSame(14, $upload['with']['retention-days']);
+        self::assertSame('error', $upload['with']['if-no-files-found']);
+    }
+
     #[DataProvider('requiredRegistryModeProvider')]
     public function testRegistryQualificationRejectsMissingStorageBeforeDownloading(string $mode): void
     {
@@ -213,7 +250,7 @@ SH;
         $this->git(['push', 'origin', 'master'], $writer);
         $advancedSha = trim($this->git(['rev-parse', 'HEAD'], $writer));
 
-        foreach (['ci.yaml', 'frontend.yaml', 'dsp-analysis.yaml'] as $file) {
+        foreach (['ci.yaml', 'frontend.yaml', 'dsp-analysis.yaml', 'registry-nightly.yaml'] as $file) {
             foreach ($this->workflow($file)['jobs'] as $jobName => $job) {
                 $checkout = $this->step($job, 'Checkout')['run'];
                 self::assertStringNotContainsString('${{ forgejo.ref }}', $checkout);

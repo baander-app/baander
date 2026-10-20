@@ -1,0 +1,45 @@
+name: Registry nightly qualification
+
+on:
+    schedule:
+        - cron: '17 2 * * *'
+    workflow_dispatch:
+
+jobs:
+    qualify:
+        runs-on: docker-cli
+        timeout-minutes: 45
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+            options: --init
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Install parser fuzz toolchain
+                run: |
+                    apt-get update
+                    apt-get install -y --no-install-recommends python3 openssl clang-19 libclang-rt-19-dev ninja-build
+            -   name: Verify qualification orchestration
+                run: python3 relay/tests/test_qualification_runner.py
+            -   name: Qualify five-voter Registry
+                env:
+                    CC: clang-19
+                    CXX: clang++-19
+                    REGISTRY_CLUSTER_NODES: '5'
+                    REGISTRY_FUZZ_RUNS: '10000'
+                    REGISTRY_FUZZ_SECONDS: '120'
+                    REGISTRY_QUALIFICATION_OUTPUT: var/test-runs/registry-nightly/${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
+                run: bash scripts/test-registry.sh fuzz
+            -   name: Preserve nightly qualification evidence
+                if: always()
+                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+                with:
+                    name: registry-nightly-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
+                    path: var/test-runs/registry-nightly/${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
+                    if-no-files-found: error
+                    retention-days: 14

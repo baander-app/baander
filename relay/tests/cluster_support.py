@@ -10,7 +10,7 @@ import ssl
 import subprocess
 import threading
 import time
-from run_http_contract import LocalHTTPS, port
+from run_http_contract import LocalHTTPS
 from run_transport_contract import certificate
 
 
@@ -21,7 +21,7 @@ class FaultNetwork:
     No process pause or host firewall is used. All keys are disposable test keys.
     """
 
-    def __init__(self, directory, count):
+    def __init__(self, directory, count, real_ports):
         self.directory = directory
         self.count = count
         self.loop = asyncio.new_event_loop()
@@ -32,23 +32,30 @@ class FaultNetwork:
         self.links = set()
         self.tasks = set()
         self.servers = []
-        self.real_ports = [port() for _ in range(count)]
+        self.real_ports = real_ports
         self.ports = []
         self.server_contexts = []
         self.client_contexts = []
-        for index in range(count):
-            key, cert = directory / f"node-{index}.key", directory / f"node-{index}.crt"
-            server = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            server.load_cert_chain(cert, key)
-            server.load_verify_locations(directory / "ca.crt")
-            server.verify_mode = ssl.CERT_REQUIRED
-            client = ssl.create_default_context(cafile=str(directory / "ca.crt"))
-            client.load_cert_chain(cert, key)
-            self.server_contexts.append(server)
-            self.client_contexts.append(client)
-        self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
-        self.thread.start()
-        asyncio.run_coroutine_threadsafe(self.start(), self.loop).result(timeout=5)
+        try:
+            for index in range(count):
+                key, cert = directory / f"node-{index}.key", directory / f"node-{index}.crt"
+                server = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                server.load_cert_chain(cert, key)
+                server.load_verify_locations(directory / "ca.crt")
+                server.verify_mode = ssl.CERT_REQUIRED
+                client = ssl.create_default_context(cafile=str(directory / "ca.crt"))
+                client.load_cert_chain(cert, key)
+                self.server_contexts.append(server)
+                self.client_contexts.append(client)
+            self.thread = threading.Thread(target=self.loop.run_forever, daemon=True)
+            self.thread.start()
+            asyncio.run_coroutine_threadsafe(self.start(), self.loop).result(timeout=5)
+        except BaseException:
+            if hasattr(self, "thread") and self.thread.is_alive():
+                self.close()
+            else:
+                self.loop.close()
+            raise
 
     async def start(self):
         for index in range(self.count):
@@ -261,23 +268,35 @@ class Cluster:
                 check=True,
                 capture_output=True,
             )
-        self.http_ports = [port() for _ in range(count)]
-        (self.directory / "password").write_text("disposable-cluster-secret\n")
-        (self.directory / "auth.json").write_text(
-            json.dumps(
-                [
-                    {
-                        "username": "registry",
-                        "password": "disposable-cluster-secret",
-                        "perms": ["all"],
-                    }
-                ]
+        self.port_reservations = []
+        try:
+            for _ in range(count * 2):
+                reservation = socket.socket()
+                self.port_reservations.append(reservation)
+                reservation.bind(("127.0.0.1", 0))
+            numbers = [reservation.getsockname()[1] for reservation in self.port_reservations]
+            self.http_ports = numbers[:count]
+            real_ports = numbers[count:]
+            (self.directory / "password").write_text("disposable-cluster-secret\n")
+            (self.directory / "auth.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "username": "registry",
+                            "password": "disposable-cluster-secret",
+                            "perms": ["all"],
+                        }
+                    ]
+                )
             )
-        )
-        self.tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
-        self.tls.load_cert_chain(self.client_cert, self.client_key)
-        self.api_tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
-        self.network = FaultNetwork(self.directory, count)
+            self.tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
+            self.tls.load_cert_chain(self.client_cert, self.client_key)
+            self.api_tls = ssl.create_default_context(cafile=str(self.directory / "ca.crt"))
+            self.network = FaultNetwork(self.directory, count, real_ports)
+        except BaseException:
+            for reservation in self.port_reservations:
+                reservation.close()
+            raise
 
     def data_directory(self, index):
         return self.data_root / f"data-{index}"
@@ -328,6 +347,9 @@ class Cluster:
                 "200ms",
             ]
         command.append(str(self.data_directory(index)))
+        # Keep voter addresses occupied until the child can take over their listeners.
+        self.port_reservations[index].close()
+        self.port_reservations[self.count + index].close()
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
         if index < len(self.processes):
             self.processes[index] = process
@@ -413,7 +435,12 @@ class Cluster:
 
     def close(self):
         failures = []
-        for close in [self.stop_nodes, self.network.close, *(log.close for log in self.logs)]:
+        for close in [
+            self.stop_nodes,
+            self.network.close,
+            *(reservation.close for reservation in getattr(self, "port_reservations", [])),
+            *(log.close for log in self.logs),
+        ]:
             try:
                 close()
             except BaseException as failure:

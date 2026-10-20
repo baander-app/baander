@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-set -euo pipefail
+set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 
 mode="${1:-release}"
@@ -8,6 +8,75 @@ if [[ $# -gt 1 || ( "$mode" != release && "$mode" != sanitize && "$mode" != thre
     echo "Usage: $0 [release|sanitize|thread|fuzz]" >&2
     exit 2
 fi
+cluster_nodes="${REGISTRY_CLUSTER_NODES:-3}"
+fuzz_runs="${REGISTRY_FUZZ_RUNS:-10000}"
+fuzz_seconds="${REGISTRY_FUZZ_SECONDS:-120}"
+output="${REGISTRY_QUALIFICATION_OUTPUT:-}"
+cluster_diagnostics=()
+restore_diagnostics=()
+if [[ -n "$output" ]]; then
+    mkdir -p "$output"
+    output="$(cd "$output" && pwd)"
+    if [[ -n "$(ls -A "$output")" ]]; then
+        echo "REGISTRY_QUALIFICATION_OUTPUT must be an empty directory." >&2
+        exit 2
+    fi
+    revision="$(git rev-parse HEAD)"
+    printf 'revision=%s\nmode=%s\ncluster_nodes=%s\nfuzz_runs=%s\nfuzz_seconds=%s\nexit_status=running\n' \
+        "$revision" "$mode" "$cluster_nodes" "$fuzz_runs" "$fuzz_seconds" > "$output/metadata.env"
+    exec 3>&1 4>&2
+    exec > >(tee "$output/console.log") 2>&1
+    console_pid=$!
+    cluster_diagnostics=(--diagnostics "$output/cluster")
+    restore_diagnostics=(--diagnostics "$output/restore")
+fi
+
+finish() {
+    status=$?
+    trap - EXIT
+    if [[ -n "${work:-}" ]]; then
+        cleanup_work "$status" || status=$?
+    fi
+    if [[ -n "$output" ]]; then
+        # Reporting must never replace the qualification's own exit status.
+        exec 1>&3 2>&4 3>&- 4>&-
+        wait "$console_pid" || { [[ "$status" != 0 ]] || status=1; }
+        sed -i "s/^exit_status=.*/exit_status=$status/" "$output/metadata.env" || { [[ "$status" != 0 ]] || status=1; }
+    fi
+    exit "$status"
+}
+trap finish EXIT
+if [[ "$cluster_nodes" != 3 && "$cluster_nodes" != 5 ]]; then
+    echo "REGISTRY_CLUSTER_NODES must be 3 or 5." >&2
+    exit 2
+fi
+
+cleanup_work() {
+    local status="$1"
+    if [[ -n "${work:-}" ]]; then
+        if [[ -n "$output" ]]; then
+            for diagnostic in openssl-build.log fuzz.log fuzz-negative.log; do
+                [[ ! -f "$work/$diagnostic" ]] || cp "$work/$diagnostic" "$output/" || { [[ "$status" != 0 ]] || status=1; }
+            done
+            if [[ -d "$work/artifacts" ]]; then
+                mkdir -p "$output/fuzz-artifacts" || { [[ "$status" != 0 ]] || status=1; }
+                for artifact in "$work/artifacts/"*; do
+                    [[ ! -f "$artifact" ]] || cp "$artifact" "$output/fuzz-artifacts/" || { [[ "$status" != 0 ]] || status=1; }
+                done
+            fi
+        fi
+        rm -rf "$work" || { [[ "$status" != 0 ]] || status=1; }
+    fi
+    return "$status"
+}
+
+run_qualification() {
+    set +m
+    trap 'exit 143' TERM
+    trap 'exit 130' INT
+    trap 'status=$?; printf "FAILED (%s): %s\n" "$status" "$BASH_COMMAND" >&2' ERR
+mkdir "$work/tmp"
+export TMPDIR="$work/tmp"
 export PYTHONDONTWRITEBYTECODE=1
 if [[ "$mode" == release || "$mode" == sanitize ]]; then
     if [[ -z "${REGISTRY_FULL_DISK_ROOT:-}" ]]; then
@@ -31,16 +100,12 @@ if [[ "$mode" == thread || "$mode" == fuzz ]]; then
 fi
 if [[ "$mode" == fuzz ]]; then
     command -v base64 >/dev/null
-    fuzz_runs="${REGISTRY_FUZZ_RUNS:-10000}"
-    fuzz_seconds="${REGISTRY_FUZZ_SECONDS:-120}"
     if [[ ! "$fuzz_runs" =~ ^[1-9][0-9]*$ || ! "$fuzz_seconds" =~ ^[1-9][0-9]*$ ]]; then
         echo "REGISTRY_FUZZ_RUNS and REGISTRY_FUZZ_SECONDS must be positive integers." >&2
         exit 2
     fi
 fi
 
-work="$(mktemp -d /tmp/baander-registry-ci.XXXXXXXX)"
-trap 'rm -rf "$work"' EXIT
 curl --fail --silent --show-error --location --retry 3 --max-time 180 \
     https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz \
     -o "$work/openssl.tar.gz"
@@ -51,7 +116,7 @@ tar -xzf "$work/openssl.tar.gz" -C "$work"
     ./Configure --prefix="$work/openssl" --libdir=lib no-shared no-tests
     make -j2
     make install_sw
-) > "$work/openssl-build.log" 2>&1 || { cat "$work/openssl-build.log" >&2; exit 1; }
+) > "$work/openssl-build.log" 2>&1 || { build_status=$?; cat "$work/openssl-build.log" >&2; exit "$build_status"; }
 
 curl --fail --silent --show-error --location --retry 3 --max-time 180 \
     https://github.com/rqlite/rqlite/releases/download/v10.5.1/rqlite-v10.5.1-linux-amd64.tar.gz \
@@ -85,9 +150,9 @@ python3 relay/tests/run_rqlite_contract.py \
 python3 relay/tests/run_transport_contract.py --fixture "$work/build/registry_transport_fixture"
 python3 relay/tests/run_http_contract.py \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
-python3 relay/tests/run_cluster_contract.py --nodes 3 \
+python3 relay/tests/run_cluster_contract.py --nodes "$cluster_nodes" "${cluster_diagnostics[@]}" \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
-python3 relay/tests/run_restore_contract.py \
+python3 relay/tests/run_restore_contract.py --nodes "$cluster_nodes" "${restore_diagnostics[@]}" \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 if [[ "$mode" == release || "$mode" == sanitize ]]; then
     python3 relay/tests/run_storage_contract.py \
@@ -106,12 +171,13 @@ if [[ "$mode" == fuzz ]]; then
         -runs="$fuzz_runs" -max_total_time="$fuzz_seconds" -seed=1 \
         -max_len=65537 -timeout=10 -rss_limit_mb=1024 \
         -artifact_prefix="$work/artifacts/" > "$work/fuzz.log" 2>&1 || {
+            fuzz_status=$?
             cat "$work/fuzz.log" >&2
             for artifact in "$work/artifacts/"*; do
                 [[ -f "$artifact" ]] || continue
                 echo "Failing input (base64): $(base64 -w0 "$artifact")" >&2
             done
-            exit 1
+            exit "$fuzz_status"
         }
     tail -n 12 "$work/fuzz.log"
     # Negative control proves that the actual compiler/runtime reports memory bugs.
@@ -139,3 +205,27 @@ CPP
     echo "Parser fuzzer ASan negative control passed."
 fi
 echo "Registry $mode qualification passed."
+
+}
+
+# One process group owns all build and scenario descendants. Termination reaches
+# their cleanup handlers before the recipe removes temporary storage.
+work="$(mktemp -d /tmp/baander-registry-ci.XXXXXXXX)"
+set -m
+run_qualification &
+qualification_pid=$!
+set +m
+terminate() {
+    trap '' TERM INT
+    kill -TERM -- "-$qualification_pid" 2>/dev/null || true
+    for ((attempt = 0; attempt < 50; attempt++)); do
+        kill -0 -- "-$qualification_pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    kill -KILL -- "-$qualification_pid" 2>/dev/null || true
+    wait "$qualification_pid" || true
+    exit "$1"
+}
+trap 'terminate 143' TERM
+trap 'terminate 130' INT
+wait "$qualification_pid"
