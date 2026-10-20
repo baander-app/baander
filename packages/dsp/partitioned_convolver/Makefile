@@ -10,7 +10,7 @@ LDFLAGS := \
   -s STRICT=1 \
   -s INITIAL_MEMORY=16777216 \
   -s ALLOW_MEMORY_GROWTH=0 \
-  -s EXPORTED_FUNCTIONS='["_create_convolver","_process","_destroy_convolver"]' \
+  -s EXPORTED_FUNCTIONS='["_create_convolver","_process","_destroy_convolver","_malloc","_free"]' \
   -s DISABLE_EXCEPTION_CATCHING=1 \
   -lc++ -lc++abi
 

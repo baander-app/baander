@@ -57,20 +57,18 @@ void process(void* ctx, const float* in, float* out, int frames) {
         }
       }
 
-      // Add overlap and write
-      float* ov = cv->overlap.data() + c*(L-1);
+      // Combine all pending contributions before emitting this block.
+      const int overlap_offset = c*(L-1);
+      for (int j=0;j<L-1;j++) {
+        temp[j] += cv->overlap[overlap_offset + j];
+      }
       for (int i=0;i<n;i++) {
-        float v = temp[i] + ov[0];
-        y[i*C] = v;
-        // shift overlap for next sample? We'll manage after loop
+        y[i*C] = temp[i];
       }
 
-      // Prepare next overlap: tail n..n+L-2 becomes new overlap
-      // First shift old overlap down by n
-      // Instead of shifting per sample, directly compute new overlap from temp
+      // Retain the complete unconsumed tail, including older contributions.
       for (int j=0;j<L-1;j++) {
-        int idx = n + j;
-        ov[j] = temp[idx];
+        cv->overlap[overlap_offset + j] = temp[n + j];
       }
     }
 
