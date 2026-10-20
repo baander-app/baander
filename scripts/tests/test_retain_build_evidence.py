@@ -96,6 +96,7 @@ class BuildEvidenceTest(unittest.TestCase):
             ("pie", "src/Other.php", "private const PIE_VERSION = '1.5.2';", None),
         ]
         create = r'''$p = new Phar($argv[1]);
+$p->setAlias($argv[5]);
 $p[$argv[2]] = $argv[3];
 $p['vendor/dependency/LICENSE'] = 'dependency terms';
 $p->setStub('<?php file_put_contents(' . var_export($argv[4], true) . ', "executed"); __HALT_COMPILER();');
@@ -106,7 +107,7 @@ $p->setStub('<?php file_put_contents(' . var_export($argv[4], true) . ', "execut
                 marker = self.root / (str(index) + "-executed")
                 source = "<?php\n" + literal + "\nfile_put_contents(" + repr(str(marker)) + ", 'executed');"
                 subprocess.run(["php", "-d", "phar.readonly=0", "-r", create,
-                                str(archive), source_path, source, str(marker)],
+                                str(archive), source_path, source, str(marker), identity + ".phar"],
                                check=True, capture_output=True)
                 output = self.root / (str(index) + "-evidence")
                 self.run_helper("phar", "--output", output, "--id", identity,

@@ -355,8 +355,8 @@ RUN php /usr/local/bin/retain-build-evidence.php phar \
 
 # -----------------------------------------------------------------------------
 # Stage 4: runtime
-# Copies only compiled PHP extension artifacts and runtime library packages.
-# No build tools, no -dev packages. This is the minimal runtime foundation.
+# Adds compiled artifacts and runtime libraries to the common base.
+# Build tools and development libraries installed in base remain in this image.
 # -----------------------------------------------------------------------------
 FROM base AS runtime
 
@@ -370,7 +370,7 @@ ENV APP_HOME=/var/www/html \
     INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER \
     COMPOSER_ALLOW_SUPERUSER=1
 
-# Install ONLY runtime library packages (no -dev packages).
+# Install additional runtime library packages.
 RUN set -xe && \
     DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \

@@ -244,6 +244,11 @@ def observe(root, identity):
                 gap(native_path, 'native component has no upstream notices', key)
             for path in component.get('notices', []):
                 notice(path, key)
+            metadata = component.get('metadata') or {}
+            if metadata.get('own_notices_gap'):
+                gap(native_path, metadata['own_notices_gap'], key)
+            for pattern in metadata.get('unmatched_artifact_patterns', []):
+                gap(pattern, 'native build artifact pattern matched no final files', key)
             if component.get('embedded_dependencies') != 'reviewed':
                 gap(native_path, 'embedded native dependency coverage requires review', key)
     else:
