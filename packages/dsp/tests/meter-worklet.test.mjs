@@ -5,7 +5,7 @@ import vm from 'node:vm'
 import { loadWasm } from './wasm-fixture.mjs'
 
 async function fixture(rate = 48000, fault, options = {}) {
-  const modules = await Promise.all(['loudness_r128', 'dynamics_meter'].map(loadWasm))
+  const modules = await Promise.all(['loudness_r128', 'dynamics_meter'].map(name => loadWasm(name)))
   const messages = [], calls = [[], []], allocations = [[], []], freed = [[], []], initRates = [], oversampling = []
   let count = 0, Processor
   const pending = [], resets = [0, 0]
@@ -89,7 +89,7 @@ for (const rate of [44100, 48000]) test(`meter processes every frame and silence
   assert.equal(reports.length, 4)
   assert.equal(reports.at(-1).isPlaying, false)
   assert.ok(reports.at(-1).rms < 0.001, 'silent frames must release the RMS envelope')
-  const reference = await Promise.all(['loudness_r128', 'dynamics_meter'].map(loadWasm))
+  const reference = await Promise.all(['loudness_r128', 'dynamics_meter'].map(name => loadWasm(name)))
   reference[0].init_loudness(rate, 4)
   reference[1].init_meters(10, 100, rate)
   for (const exp of reference) {

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const packagesDspDir = join(rootDir, 'packages', 'dsp');
 const publicDspDirs = [join(rootDir, 'public/dsp'), join(rootDir, 'ui/electron/public/dsp')];
-const modules = ['fft2048', 'spectral_features', 'dynamics_meter', 'loudness_r128'];
+const modules = ['fft2048', 'spectral_features', 'dynamics_meter', 'loudness_r128', 'partitioned_convolver'];
 
 async function main(): Promise<void> {
   const compiler = process.env.EMCC || 'emcc';
@@ -53,7 +53,7 @@ async function main(): Promise<void> {
         }
       }
     }
-    console.log('DSP analysis artifacts regenerated and synchronized.');
+    console.log('DSP artifacts regenerated and synchronized.');
   } finally {
     await rm(output, { recursive: true, force: true });
   }

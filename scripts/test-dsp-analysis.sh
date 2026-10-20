@@ -17,7 +17,7 @@ fi
 
 work="$(mktemp -d /tmp/baander-dsp-analysis.XXXXXXXX)"
 trap 'rm -rf "$work"' EXIT
-modules=(fft2048 spectral_features dynamics_meter loudness_r128)
+modules=(fft2048 spectral_features dynamics_meter loudness_r128 partitioned_convolver)
 
 for pass in 1 2; do
     output="$work/build-$pass"

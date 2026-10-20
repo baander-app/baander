@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const tsx = fileURLToPath(import.meta.resolve('tsx/cli'));
-const modules = ['fft2048', 'spectral_features', 'dynamics_meter', 'loudness_r128'];
+const modules = ['fft2048', 'spectral_features', 'dynamics_meter', 'loudness_r128', 'partitioned_convolver'];
 const destinations = ['public/dsp', 'ui/electron/public/dsp'];
 
 async function fixture(t: TestContext) {
@@ -22,7 +22,7 @@ async function fixture(t: TestContext) {
     await mkdir(join(root, directory), { recursive: true });
   }
   // Dormant packages exist so accidentally building them cannot mask another failure.
-  for (const name of [...modules, 'partitioned_convolver', 'resampler_hq', 'baander-aac']) {
+  for (const name of [...modules, 'resampler_hq', 'baander-aac']) {
     await mkdir(join(root, 'packages/dsp', name), { recursive: true });
     await writeFile(join(root, 'packages/dsp', name, `${name}.wasm`), `tracked ${name}`);
     for (const destination of destinations) {
@@ -84,7 +84,7 @@ test('rejects a missing selected compiler before publishing or building', async 
   await assert.rejects(readFile(join(f.root, 'build.log')), { code: 'ENOENT' });
 });
 
-test('forces the four analysis builds and publishes identical binaries and required wrappers', async t => {
+test('forces the five DSP builds and publishes identical binaries and required wrappers', async t => {
   const f = await fixture(t);
   const result = f.run({ FRESH_TARGETS: '1' });
   assert.equal(result.status, 0, result.stderr);
@@ -109,7 +109,7 @@ test('forces the four analysis builds and publishes identical binaries and requi
 
 test('does not publish any binary when a later module build fails', async t => {
   const f = await fixture(t);
-  const result = f.run({ FAIL_MODULE: 'loudness_r128' });
+  const result = f.run({ FAIL_MODULE: 'partitioned_convolver' });
   assert.notEqual(result.status, 0);
   await f.unchanged();
 });
