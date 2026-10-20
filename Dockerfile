@@ -582,7 +582,8 @@ USER www-data
 # A separate dump runs the Runtime plugin's autoload hook without post-install
 # auto-scripts, so bin/console still receives vendor/autoload_runtime.php.
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts && \
-    COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction
+    COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction && \
+    rm -rf /home/www-data/.cache/composer
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["php", "bin/console", "app:health:check"]

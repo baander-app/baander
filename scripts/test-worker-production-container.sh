@@ -21,6 +21,10 @@ assert not config.get("Volumes"), "Worker target must not declare host volumes"
 '
 docker "${docker_args[@]}" run --rm --network none --entrypoint /usr/local/bin/php "$image_id" -r '
 require "vendor/autoload.php";
+if (is_dir("/home/www-data/.cache/composer")) {
+    fwrite(STDERR, "Production image contains Composer installation cache.\n");
+    exit(1);
+}
 if (!in_array(ini_get("display_errors"), ["", "0"], true)
     || !in_array(ini_get("display_startup_errors"), ["", "0"], true)) {
     fwrite(STDERR, "Production PHP must not display runtime or startup errors.\n");
