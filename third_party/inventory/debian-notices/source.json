@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "scope": "Six literal missing Debian common-license references only; no package-wide reclassification or redistribution qualification. Original image inventories and raw gaps remain unchanged.",
+  "measured_images": {
+    "production": {
+      "identity": {
+        "image_id": "sha256:33835105243be75c73ed538715404c00620ef7639b395aa3f5f54458d70aca80",
+        "platform": "linux/amd64",
+        "revision": "1066d2035b58441e72b0ccdaf86490b763e2798c",
+        "target": "production"
+      },
+      "inventory_sha256": "af141e9f608e29c3b15ef17f6de6cf9d30c6fc1a2980517cdca14ccacf63c72b",
+      "bundle_path": "var/test-runs/application-inventory-20261020/production"
+    },
+    "worker": {
+      "identity": {
+        "image_id": "sha256:a054b8f0e3dc56e574a20ff9d2949a71f2e1e2927bda0262f960d5067857621b",
+        "platform": "linux/amd64",
+        "revision": "1066d2035b58441e72b0ccdaf86490b763e2798c",
+        "target": "worker"
+      },
+      "inventory_sha256": "fa78769368ab3eaa3ba6b810825e1d9f409f6579061d5b8db124587eb8b9c41d",
+      "bundle_path": "var/test-runs/application-inventory-20261020/worker"
+    }
+  },
+  "licenses": [
+    {
+      "path": "LICENSE.GFDL-1.3",
+      "image_path": "/usr/share/common-licenses/GFDL-1.3",
+      "sha256": "110535522396708cea37c72a802c5e7e81391139f5f7985631c93ef242b206a4",
+      "heading": "\n                GNU Free Documentation License\n                 Version 1.3, 3 November 2008\n"
+    },
+    {
+      "path": "LICENSE.GPL-2",
+      "image_path": "/usr/share/common-licenses/GPL-2",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "heading": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 2, June 1991\n\n Copyright (C) 1989, 1991 Free Software Foundation, Inc.,"
+    },
+    {
+      "path": "LICENSE.GPL-3",
+      "image_path": "/usr/share/common-licenses/GPL-3",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "heading": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>"
+    }
+  ],
+  "references": [
+    {
+      "component": "deb:gzip:amd64",
+      "package": "gzip",
+      "version": "1.12-1",
+      "source_package": "gzip",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/gzip/copyright",
+      "copyright_sha256": "1ca5dd5098fe2e1c0f0d05196f5b3da8b414a807702e6ca8b536eb5fd3059130",
+      "source_excerpt": {
+        "start_line": 42,
+        "end_line": 50,
+        "text": "License: GFDL-1.3+-no-invariant\n Permission is granted to copy, distribute and/or modify this document\n under the terms of the GNU Free Documentation License, Version 1.3 or\n any later version published by the Free Software Foundation; with no\n Invariant Sections, with no Front-Cover Texts, and with no Back-Cover\n Texts.\n .\n On Debian GNU/Linux systems, the complete text of the GNU Free Documentation\n License can be found in `/usr/share/common-licenses/GFDL-3'."
+      },
+      "scope_stanza": {
+        "start_line": 15,
+        "end_line": 18,
+        "text": "Files: doc/* NEWS README\nCopyright: 1999-2022 Free Software Foundation, Inc. http://fsf.org/\n           1992-1993 Jean-loup Gailly\nLicense: GFDL-1.3+-no-invariant"
+      },
+      "scope_explanation": "GFDL stanza applies to doc/* NEWS README; default package stanza is GPL-3+.",
+      "missing_reference": "/usr/share/common-licenses/GFDL-3",
+      "source_version": "1.12-1",
+      "license_path": "LICENSE.GFDL-1.3",
+      "status": "resolved-reference"
+    },
+    {
+      "component": "deb:libpango-1.0-0:amd64",
+      "package": "libpango-1.0-0",
+      "version": "1.50.12+ds-1",
+      "source_package": "pango1.0",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/libpango-1.0-0/copyright",
+      "copyright_sha256": "3a29d0e487eae553ec47f260be1570a0d96e4f28c21f29ef58a14cd3d53147ff",
+      "source_excerpt": {
+        "start_line": 210,
+        "end_line": 222,
+        "text": "License: GPL-2+\n SPDX license expression \"GPL-2.0-or-later\":\n https://spdx.org/licenses/GPL-2.0-or-later.html\n .\n This license identifier refers to the choice to use code under\n GPL-2.0-or-later (i.e., GPL-2.0 or some later version), as distinguished\n from use of code under GPL-2.0-only. The license notice (as seen in the\n Standard License Header field below) states which of these applies the\n code in the file. The example in the exhibit to the license shows the\n license notice for the \"or later\" approach.\n .\n On Debian systems, the complete text of the GNU General Public License\n version 2 can be found in \"/usr/share/common-licenses/GPL-2.0\"."
+      },
+      "scope_stanza": {
+        "start_line": 8,
+        "end_line": 40,
+        "text": "Files: *\nCopyright: 1999-2019  Red Hat\n           1999-2006  Red Hat Software\n           2021       Red Hat, Inc.\n           2005-2007  Imendio AB\n           2007       Novell, Inc\n           2001       Sun Microsystems\n           2000       SuSE Linux Ltd\n           2005       Amit Aronovitch\n           2012       Emmanuele Bassi\n           2008       J\u00fcrg Billeter\n           2001       Hans Breuer\n           2002-2020  Matthias Clasen\n           2001, 2002, 2006 Behdad Esfahbod\n           2016       Chun-wei Fan\n           2001       Alexander Larsson\n           2012       Ryan Lortie\n           2003       Noah Levitt\n           2000-2002  Tor Lillqvist\n           2000, 2005 Keith Packard\n           2010, 2012 Kristian Rietveld\n           2021       GNOME Foundation\n           2021       Jordi Mas i Hern\u00e0ndez\n           2021       Benjamin Otte\n                      Owen Taylor\n                      Abigail Brady\n                      Sivaraj Doddannan\n                      Karl Koehler\n                      Havoc Pennington\n                      Roozbeh Pournader\n                      Changwoo Ryu\n                      Chookij Vanatham\nLicense: LGPL-2+ and LGPL-2.1+"
+      },
+      "scope_explanation": "GPL-2+ appears in a standalone license-definition stanza; default Files * stanza is LGPL-2+ and LGPL-2.1+. This resolves the reference without asserting package-wide GPL coverage.",
+      "missing_reference": "/usr/share/common-licenses/GPL-2.0",
+      "source_version": "1.50.12+ds-1",
+      "license_path": "LICENSE.GPL-2",
+      "status": "resolved-reference"
+    },
+    {
+      "component": "deb:libpangocairo-1.0-0:amd64",
+      "package": "libpangocairo-1.0-0",
+      "version": "1.50.12+ds-1",
+      "source_package": "pango1.0",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/libpangocairo-1.0-0/copyright",
+      "copyright_sha256": "3a29d0e487eae553ec47f260be1570a0d96e4f28c21f29ef58a14cd3d53147ff",
+      "source_excerpt": {
+        "start_line": 210,
+        "end_line": 222,
+        "text": "License: GPL-2+\n SPDX license expression \"GPL-2.0-or-later\":\n https://spdx.org/licenses/GPL-2.0-or-later.html\n .\n This license identifier refers to the choice to use code under\n GPL-2.0-or-later (i.e., GPL-2.0 or some later version), as distinguished\n from use of code under GPL-2.0-only. The license notice (as seen in the\n Standard License Header field below) states which of these applies the\n code in the file. The example in the exhibit to the license shows the\n license notice for the \"or later\" approach.\n .\n On Debian systems, the complete text of the GNU General Public License\n version 2 can be found in \"/usr/share/common-licenses/GPL-2.0\"."
+      },
+      "scope_stanza": {
+        "start_line": 8,
+        "end_line": 40,
+        "text": "Files: *\nCopyright: 1999-2019  Red Hat\n           1999-2006  Red Hat Software\n           2021       Red Hat, Inc.\n           2005-2007  Imendio AB\n           2007       Novell, Inc\n           2001       Sun Microsystems\n           2000       SuSE Linux Ltd\n           2005       Amit Aronovitch\n           2012       Emmanuele Bassi\n           2008       J\u00fcrg Billeter\n           2001       Hans Breuer\n           2002-2020  Matthias Clasen\n           2001, 2002, 2006 Behdad Esfahbod\n           2016       Chun-wei Fan\n           2001       Alexander Larsson\n           2012       Ryan Lortie\n           2003       Noah Levitt\n           2000-2002  Tor Lillqvist\n           2000, 2005 Keith Packard\n           2010, 2012 Kristian Rietveld\n           2021       GNOME Foundation\n           2021       Jordi Mas i Hern\u00e0ndez\n           2021       Benjamin Otte\n                      Owen Taylor\n                      Abigail Brady\n                      Sivaraj Doddannan\n                      Karl Koehler\n                      Havoc Pennington\n                      Roozbeh Pournader\n                      Changwoo Ryu\n                      Chookij Vanatham\nLicense: LGPL-2+ and LGPL-2.1+"
+      },
+      "scope_explanation": "GPL-2+ appears in a standalone license-definition stanza; default Files * stanza is LGPL-2+ and LGPL-2.1+. This resolves the reference without asserting package-wide GPL coverage.",
+      "missing_reference": "/usr/share/common-licenses/GPL-2.0",
+      "source_version": "1.50.12+ds-1",
+      "license_path": "LICENSE.GPL-2",
+      "status": "resolved-reference"
+    },
+    {
+      "component": "deb:libpangoft2-1.0-0:amd64",
+      "package": "libpangoft2-1.0-0",
+      "version": "1.50.12+ds-1",
+      "source_package": "pango1.0",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/libpangoft2-1.0-0/copyright",
+      "copyright_sha256": "3a29d0e487eae553ec47f260be1570a0d96e4f28c21f29ef58a14cd3d53147ff",
+      "source_excerpt": {
+        "start_line": 210,
+        "end_line": 222,
+        "text": "License: GPL-2+\n SPDX license expression \"GPL-2.0-or-later\":\n https://spdx.org/licenses/GPL-2.0-or-later.html\n .\n This license identifier refers to the choice to use code under\n GPL-2.0-or-later (i.e., GPL-2.0 or some later version), as distinguished\n from use of code under GPL-2.0-only. The license notice (as seen in the\n Standard License Header field below) states which of these applies the\n code in the file. The example in the exhibit to the license shows the\n license notice for the \"or later\" approach.\n .\n On Debian systems, the complete text of the GNU General Public License\n version 2 can be found in \"/usr/share/common-licenses/GPL-2.0\"."
+      },
+      "scope_stanza": {
+        "start_line": 8,
+        "end_line": 40,
+        "text": "Files: *\nCopyright: 1999-2019  Red Hat\n           1999-2006  Red Hat Software\n           2021       Red Hat, Inc.\n           2005-2007  Imendio AB\n           2007       Novell, Inc\n           2001       Sun Microsystems\n           2000       SuSE Linux Ltd\n           2005       Amit Aronovitch\n           2012       Emmanuele Bassi\n           2008       J\u00fcrg Billeter\n           2001       Hans Breuer\n           2002-2020  Matthias Clasen\n           2001, 2002, 2006 Behdad Esfahbod\n           2016       Chun-wei Fan\n           2001       Alexander Larsson\n           2012       Ryan Lortie\n           2003       Noah Levitt\n           2000-2002  Tor Lillqvist\n           2000, 2005 Keith Packard\n           2010, 2012 Kristian Rietveld\n           2021       GNOME Foundation\n           2021       Jordi Mas i Hern\u00e0ndez\n           2021       Benjamin Otte\n                      Owen Taylor\n                      Abigail Brady\n                      Sivaraj Doddannan\n                      Karl Koehler\n                      Havoc Pennington\n                      Roozbeh Pournader\n                      Changwoo Ryu\n                      Chookij Vanatham\nLicense: LGPL-2+ and LGPL-2.1+"
+      },
+      "scope_explanation": "GPL-2+ appears in a standalone license-definition stanza; default Files * stanza is LGPL-2+ and LGPL-2.1+. This resolves the reference without asserting package-wide GPL coverage.",
+      "missing_reference": "/usr/share/common-licenses/GPL-2.0",
+      "source_version": "1.50.12+ds-1",
+      "license_path": "LICENSE.GPL-2",
+      "status": "resolved-reference"
+    },
+    {
+      "component": "deb:libdecor-0-0:amd64",
+      "package": "libdecor-0-0",
+      "version": "0.1.1-2",
+      "source_package": "libdecor-0",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/libdecor-0-0/copyright",
+      "copyright_sha256": "c8b0394900f44bcb9e07a48fa878d3629957d84ba19a992ddfcec6d96e639899",
+      "source_excerpt": {
+        "start_line": 45,
+        "end_line": 57,
+        "text": "License: GPL-3.0+\n SPDX license expression \"GPL-3.0-or-later\":\n https://spdx.org/licenses/GPL-3.0-or-later.html\n .\n This license identifier refers to the choice to use code under\n GPL-3.0-or-later (i.e., GPL-3.0 or some later version), as distinguished\n from use of code under GPL-3.0-only. The license notice (as seen in the\n Standard License Header field below) states which of these applies the\n code in the file. The example in the exhibit to the license shows the\n license notice for the \"or later\" approach.\n .\n On Debian systems, the complete text of the GNU General Public License\n version 3 can be found in \"/usr/share/common-licenses/GPL-3.0\"."
+      },
+      "scope_stanza": {
+        "start_line": 22,
+        "end_line": 24,
+        "text": "Files:     debian/tests/run-with-display\nCopyright: 2021 Marco Trevisan\nLicense:   GPL-3.0+"
+      },
+      "scope_explanation": "GPL-3.0+ Files stanza covers debian/tests/run-with-display; default/library stanzas are Expat.",
+      "missing_reference": "/usr/share/common-licenses/GPL-3.0",
+      "source_version": "0.1.1-2",
+      "license_path": "LICENSE.GPL-3",
+      "status": "resolved-reference"
+    },
+    {
+      "component": "deb:libdecor-0-plugin-1-cairo:amd64",
+      "package": "libdecor-0-plugin-1-cairo",
+      "version": "0.1.1-2",
+      "source_package": "libdecor-0",
+      "architecture": "amd64",
+      "copyright_path": "/usr/share/doc/libdecor-0-plugin-1-cairo/copyright",
+      "copyright_sha256": "c8b0394900f44bcb9e07a48fa878d3629957d84ba19a992ddfcec6d96e639899",
+      "source_excerpt": {
+        "start_line": 45,
+        "end_line": 57,
+        "text": "License: GPL-3.0+\n SPDX license expression \"GPL-3.0-or-later\":\n https://spdx.org/licenses/GPL-3.0-or-later.html\n .\n This license identifier refers to the choice to use code under\n GPL-3.0-or-later (i.e., GPL-3.0 or some later version), as distinguished\n from use of code under GPL-3.0-only. The license notice (as seen in the\n Standard License Header field below) states which of these applies the\n code in the file. The example in the exhibit to the license shows the\n license notice for the \"or later\" approach.\n .\n On Debian systems, the complete text of the GNU General Public License\n version 3 can be found in \"/usr/share/common-licenses/GPL-3.0\"."
+      },
+      "scope_stanza": {
+        "start_line": 22,
+        "end_line": 24,
+        "text": "Files:     debian/tests/run-with-display\nCopyright: 2021 Marco Trevisan\nLicense:   GPL-3.0+"
+      },
+      "scope_explanation": "GPL-3.0+ Files stanza covers debian/tests/run-with-display; default/library stanzas are Expat.",
+      "missing_reference": "/usr/share/common-licenses/GPL-3.0",
+      "source_version": "0.1.1-2",
+      "license_path": "LICENSE.GPL-3",
+      "status": "resolved-reference"
+    }
+  ],
+  "redistribution_review": "not-qualified"
+}
