@@ -1935,6 +1935,72 @@ leader-loss recovery, and no acknowledged registration loss after any two voter
 failures. Failed gates block release, without weakening consistency or increasing
 the agreed host budget.
 
+### Registry packaged dependency inventory (2026-10-20)
+
+The packaged transitive dependency/license inventory is delivered for the Linux
+amd64 API, voter and backup images under the
+[reviewed plan](docs/plans/2026-10-20-registry-packaged-inventory-plan.md). Independent
+review identified two qualification gaps; both are corrected and verified.
+
+Each image carries `/usr/share/registry-inventory/` with actual Debian package
+versions, executable digests, runtime component identities and retained notices.
+API compiler/linker evidence covers pinned headers and static OpenSSL; Go build
+information covers toolchains, modules and separately identified embedded native
+or vendored code. GoogleTest, build tools and temporary source trees are outside
+the runtime inventory. Independent final-image verification exports the bundle
+and an immutable local image receipt before tag cleanup. CI retains those artifacts
+for 14 days; local runners accept `REGISTRY_INVENTORY_OUTPUT` and otherwise use
+`var/test-runs/registry-inventory/<run-id>/`.
+
+The upstream rqlite and rclone release binaries report modified source trees.
+Their images now build the same pinned versions from exact clean commits with
+checksum-verified Go SDKs and unchanged dependencies; age and age-keygen retain
+the pinned release binaries. Debian package versions remain floating and are
+recorded per image. The inventory records component and license evidence without
+claiming legal approval, redistribution compliance or reproducible OS package sets.
+
+Verification checkpoint:
+
+- All **19 inventory tests** pass in the CI image in **0.147 seconds**, covering
+  missing and altered evidence, native payloads and executable settings. The full
+  Registry static gate passes with **371 resolved records**, while retaining the
+  seven direct dependency notice checks. Publication workflow checks pass
+  **37 tests / 274 assertions** in **1.335 seconds** of PHP execution
+  (**10.9 seconds** including coordination).
+- Independent final-image verification passes for all three images. The final
+  bundles contain the following records and retained notice documents:
+
+  | Image | Debian packages | Component records | Debian notice documents | Unique associated upstream notice paths |
+  | --- | --- | --- | --- | --- |
+  | API | 106 | 25 | 119 | 37 |
+  | rqlite | 88 | 97 | 101 | 144 |
+  | Backup | 122 | 254 | 136 | 363 |
+
+  Component records include explicitly marked supplementary source notices whose
+  incorporation depends on compiled packages; these counts do not represent
+  distinct compiled payloads.
+- The five existing API/voter container contracts pass in **141.32 seconds**.
+  All **nine backup tests** pass in **0.994 seconds**; the existing encrypted TLS
+  S3 and fresh-voter restore contracts pass in **44.13 seconds**, including final
+  rebuild and independent inventory verification of all three images. Runtime
+  executable hashes match the prior qualification for every image, so the
+  five-voter result remains applicable. Verification uses disposable local
+  services and storage.
+- A pre-review check found omitted CGO runtime settings. The existing regression
+  was extended, failed before the correction and passed afterward. The first
+  backup inventory generation rejected two unrecognized Python copyright
+  documents. Exact-hash resolutions now cover their seven packages; generation
+  and independent verification pass with the same rejection checks.
+- Simplification and independent code review completed. Review found that
+  additional static archives and unresolved Debian license declarations could
+  pass qualification. The guards now reject both cases, with two focused
+  regression methods added and all three rebuilt images verified. Both justified
+  findings are resolved; no findings remain. Review receipt:
+  `/tmp/compound-engineering-1000/ce-code-review/20261020-181949-1b424b23/review.json`.
+- Evidence: `var/test-runs/registry-packaged-inventory-20261020/`, including
+  `backup-reviewed.log`. The final three-image bundles and receipts are under
+  `var/test-runs/registry-inventory/baander-registry-backup-1792513588-135202/`.
+
 ### Registry encrypted backups (2026-10-19)
 
 The opt-in backup worker captures authenticated rqlite binary snapshots at startup
@@ -3472,14 +3538,17 @@ within their stated scope.
   encrypted upload and fresh-voter offline restore through disposable TLS S3
   storage. Actual-destination and RPO/RTO qualification remain deferred.
 
+- [x] Complete the packaged transitive dependency/license inventory for all three
+  Linux amd64 Registry images, retaining first-party declarations and seven pinned
+  direct dependency notice checks. See the
+  [inventory checkpoint](#registry-packaged-dependency-inventory-2026-10-20).
+
 Remaining release implementation, selected when it advances a named release
 milestone:
 
 - [ ] Add fixed-runner baseline comparison and enforce confirmed regressions above
   10%, once the stable runner and accepted baseline are selected. The bounded
   optimized load smoke already exists.
-- [ ] Complete the packaged transitive dependency/license inventory. First-party
-  declarations and seven pinned direct dependency notices are already checked.
 - [ ] Add scheduled nightly five-voter partition/failover, parser-fuzz and
   isolated-restore orchestration using the existing runners. Push/PR CI and local
   five-voter results do not establish a nightly schedule.

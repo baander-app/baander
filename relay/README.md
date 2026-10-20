@@ -362,9 +362,10 @@ to registry/cluster peers; actual host exposure is a deployment acceptance check
 
 ## Dependencies and licenses
 
-First-party C++ sources and tests are Apache-2.0. The retained PHP application's
-historical manifest is separate and will be removed with that implementation.
-Third-party license notices are retained in `third_party/`.
+First-party C++ sources and tests are Apache-2.0. Direct third-party notices and
+reviewed transitive license resolutions are retained in `third_party/`. The table
+records the existing direct dependency pins; the packaged inventory below records
+the components actually shipped in each image.
 
 | Dependency | Version | Archive SHA-256 | License |
 | --- | --- | --- | --- |
@@ -379,6 +380,57 @@ Third-party license notices are retained in `third_party/`.
 Authoritative contracts: [rqlite HTTP API](https://rqlite.io/docs/api/api/) and
 [read consistency](https://rqlite.io/docs/api/read-consistency/).
 
+## Packaged dependency inventory
+
+The API, voter and backup images contain `/usr/share/registry-inventory/`. Its
+`inventory.json` records installed Debian packages, executable SHA-256 digests,
+component identities, versions or immutable source identities, license expressions
+and paths to retained notices. Debian records come from the final package database
+and copyright files, including their resolved symlink targets. The bundle retains
+those notices and the reviewed source resolutions used to identify them.
+
+The API inventory includes compiler dependency observations, pinned header source
+hashes and static OpenSSL linker evidence. Go executable records cover `rqlited`,
+`rclone`, `age` and `age-keygen`: build information identifies the toolchain and
+module graph, with separate records for embedded native and vendored components
+such as SQLite. Source archive URLs, digests and collected license files accompany
+the reviewed resolutions. Records marked `supplementary-source-notice` retain
+source-archive notices whose incorporation depends on the compiled packages; a
+component-record count is therefore not a count of distinct compiled payloads.
+GoogleTest remains a test dependency; build tools and temporary source trees are
+outside the runtime inventory.
+
+The upstream rqlite and rclone release binaries report modified source trees.
+Their images therefore build the same pinned versions from clean commits
+`8b6cc4cb14a78b81ac725ec3c7cd281e1c646422` and
+`84a85367111c84061c959e01e0c320618e492dc6`, respectively, using checksum-verified
+Go SDKs. Dependencies remain unchanged. `age` and `age-keygen` still come from the
+checksum-verified age release archive listed above.
+
+Both container runners independently verify the final image filesystem against
+its bundle and the repository's reviewed resolutions before removing their unique
+image tags. Missing or mismatched components, source evidence and notices fail
+qualification. The verifier exports the bundle with a `receipt.json` containing
+the immutable local image ID, inventory digest and executable digests. A local
+image ID identifies the image checked; it is not a registry publication digest.
+
+Set `REGISTRY_INVENTORY_OUTPUT` to choose the evidence directory. The default is
+`var/test-runs/registry-inventory/<run-id>/`; each image's evidence is stored under
+`<kind>/<image-id>/`. CI uses `var/test-runs/registry-inventory/` and retains the
+uploaded artifact for 14 days. To verify an existing local image and retain its
+evidence:
+
+```sh
+python3 relay/tools/verify_packaged_image.py \
+  --image baander/registry:0.1.0 --kind api \
+  --output var/test-runs/registry-inventory/manual
+```
+
+Use `--kind rqlite` or `--kind backup` for the other images. This inventory records
+packaged components and their license evidence; it does not make a legal approval
+or redistribution-compliance determination. Actual Debian versions are recorded
+per image because repository package versions can change between builds.
+
 ## Container packaging and private inventory
 
 The mandatory container gate builds unique image tags and runs the disposable
@@ -390,16 +442,17 @@ bash scripts/test-registry-container.sh
 
 The image build context is allowlisted: local data, keys, operator configuration
 and PHP files are excluded. The API image builds C++20 Release code with static
-OpenSSL 3.5.3 and the CMake dependency checksums above. The voter image verifies
-the rqlite 10.5.1 Linux amd64 archive. Both use the immutable official Debian base
+OpenSSL 3.5.3 and the CMake dependency checksums above. The voter image uses
+a clean build of the rqlite 10.5.1 source commit. Both use the immutable official
+Debian base
 `sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251`.
 The verified amd64 child is
 `sha256:f3034a6ec3c1205360777c4aae76234998866ad18806ae62b63a3f84ccad782b`.
 Only Linux amd64 is qualified here. Debian security packages are installed from
 its package repository; these builds do not claim byte-for-byte reproducibility
 of the operating-system package set. Dependency updates require new verified pins
-and qualification. First-party code is Apache-2.0; runtime images retain dependency
-license notices. The operating-system package licenses remain separate obligations.
+and qualification. First-party code is Apache-2.0; each runtime image retains its
+packaged dependency inventory and license evidence.
 
 ```sh
 docker build --platform linux/amd64 -f relay/docker/Dockerfile \
