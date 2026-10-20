@@ -62,9 +62,33 @@
         "sha256": "4dc332dfcacd9c836992386f6b46b6cf0c1128c78fc4db9bfa8b5a959612f9f1",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/api/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/e5a33a4cabe9486c71c240af6afc586d19c8e64a/LICENSE",
+          "reference": "e5a33a4cabe9486c71c240af6afc586d19c8e64a",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/api/commits/6f8d237ce2c304ca85f31970f788e7f074d147be",
+        "split_root_tree": "6fee46a8c324c591867640d92ddaeb52b7e38a22",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "e5a33a4cabe9486c71c240af6afc586d19c8e64a",
+          "subtree_path": "src/API",
+          "subtree_sha": "6fee46a8c324c591867640d92ddaeb52b7e38a22",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/e5a33a4cabe9486c71c240af6afc586d19c8e64a?recursive=1",
+          "tree_response_sha256": "82d12728ed794fe40ea694b5f57eaf1ad9e976f3efcb8ac821127980cfcfeba0",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     },
     {
       "package": "open-telemetry/context",
@@ -79,9 +103,33 @@
         "sha256": "ba989c43152135e20063aa14d350d5a0248670af87d4bb28c44341c962669d95",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/context/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/ac49b46ffe3b264834808ae48e64e10cdef92bf1/LICENSE",
+          "reference": "ac49b46ffe3b264834808ae48e64e10cdef92bf1",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/context/commits/3c414b246e0dabb7d6145404e6a5e4536ca18d07",
+        "split_root_tree": "9328a9508c9114948bf499bea51de8ce33d2cde0",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "ac49b46ffe3b264834808ae48e64e10cdef92bf1",
+          "subtree_path": "src/Context",
+          "subtree_sha": "9328a9508c9114948bf499bea51de8ce33d2cde0",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/ac49b46ffe3b264834808ae48e64e10cdef92bf1?recursive=1",
+          "tree_response_sha256": "4ecd4e2212177cfc8aa75baa3c58867fd375e810a12584844645a54f64190ced",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     },
     {
       "package": "open-telemetry/exporter-otlp",
@@ -96,9 +144,33 @@
         "sha256": "8aec5fa938a5cd3f5a6f00d82a63f4a79db3e95a2eeaa1857ac552567a79ad75",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/exporter-otlp/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/26a2a4ed076a3e7b4c51204ecac52a38ac17f25e/LICENSE",
+          "reference": "26a2a4ed076a3e7b4c51204ecac52a38ac17f25e",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/exporter-otlp/commits/283a0d66522f2adc6d8d7debfd7686be91c282be",
+        "split_root_tree": "513c58a573f7e2735f03b2cf05cde17f9da4766d",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "26a2a4ed076a3e7b4c51204ecac52a38ac17f25e",
+          "subtree_path": "src/Contrib/Otlp",
+          "subtree_sha": "513c58a573f7e2735f03b2cf05cde17f9da4766d",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/26a2a4ed076a3e7b4c51204ecac52a38ac17f25e?recursive=1",
+          "tree_response_sha256": "b06fc3c10b99d516df14bdc121e6ab245bd67ac12ce58f43d7e8f30366763b35",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     },
     {
       "package": "open-telemetry/gen-otlp-protobuf",
@@ -113,9 +185,33 @@
         "sha256": "97f948f975aef1e4e4c36126e9badb0e2f93ac9d215e332a471c8b085da64c2d",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/gen-otlp-protobuf/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/ac49b46ffe3b264834808ae48e64e10cdef92bf1/LICENSE",
+          "reference": "ac49b46ffe3b264834808ae48e64e10cdef92bf1",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/gen-otlp-protobuf/commits/a229cf161d42001d64c8f21e8f678581fe1c66b9",
+        "split_root_tree": "e74ba212012fe0427ebcf0f77b7e4fbb469dcf38",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "ac49b46ffe3b264834808ae48e64e10cdef92bf1",
+          "subtree_path": "proto/otel",
+          "subtree_sha": "e74ba212012fe0427ebcf0f77b7e4fbb469dcf38",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/ac49b46ffe3b264834808ae48e64e10cdef92bf1?recursive=1",
+          "tree_response_sha256": "4ecd4e2212177cfc8aa75baa3c58867fd375e810a12584844645a54f64190ced",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     },
     {
       "package": "open-telemetry/sdk",
@@ -130,9 +226,33 @@
         "sha256": "6850685037ce0e6df3072963a9067cfc2f6834c5f7fd07aeb8cb6c04bb9783b9",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/sdk/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/2a3aa614ed75e27d22e2336f250316b572524ebd/LICENSE",
+          "reference": "2a3aa614ed75e27d22e2336f250316b572524ebd",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/sdk/commits/6e3d0ce93e76555dd5e2f1d19443ff45b990e410",
+        "split_root_tree": "3ab2438b30c718f8da768a0c36c8a651a02f7568",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "2a3aa614ed75e27d22e2336f250316b572524ebd",
+          "subtree_path": "src/SDK",
+          "subtree_sha": "3ab2438b30c718f8da768a0c36c8a651a02f7568",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/2a3aa614ed75e27d22e2336f250316b572524ebd?recursive=1",
+          "tree_response_sha256": "257fa86d188dc7fd20fce2f74802efb74190224e2f184b672509bea047ebb38e",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     },
     {
       "package": "open-telemetry/sem-conv",
@@ -147,9 +267,33 @@
         "sha256": "309ec495520c0f308fa1cca29cded54e8352420a7f1a58aeba01a8a53dd836ac",
         "truncated": false
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+      "notices": [
+        {
+          "path": "open-telemetry/sem-conv/LICENSE",
+          "url": "https://raw.githubusercontent.com/open-telemetry/opentelemetry-php/695724168681238d1e811a60fec1939bb4a3179e/LICENSE",
+          "reference": "695724168681238d1e811a60fec1939bb4a3179e",
+          "git_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "status": "recovered",
+      "source_correspondence": {
+        "method": "identical-git-trees",
+        "split_commit_url": "https://api.github.com/repos/opentelemetry-php/sem-conv/commits/e613bc640a407def4991b8a936a9b27edd9a3240",
+        "split_root_tree": "e31102f3e761554feb2756c2200d4dc47675f31a",
+        "monorepo": {
+          "url": "https://github.com/open-telemetry/opentelemetry-php.git",
+          "reference": "695724168681238d1e811a60fec1939bb4a3179e",
+          "subtree_path": "src/SemConv",
+          "subtree_sha": "e31102f3e761554feb2756c2200d4dc47675f31a",
+          "tree_query_url": "https://api.github.com/repos/open-telemetry/opentelemetry-php/git/trees/695724168681238d1e811a60fec1939bb4a3179e?recursive=1",
+          "tree_response_sha256": "304736f3d53f7567d9f47797574fd4e2ccc70ba4ad695a26eb99da12cf4c2ca3",
+          "truncated": false
+        },
+        "notice_paths": [
+          "LICENSE"
+        ]
+      }
     }
   ]
 }
