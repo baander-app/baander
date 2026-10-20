@@ -15,6 +15,27 @@ const counterTransition: StoreTransitionDescriptor = {
 }
 
 describe('store tracing', () => {
+  it('verifies without changing live state or history and releases retired transitions', () => {
+    const recorder = createStoreDebugger(true)
+    const store = createStore(recorder.instrument('counter', () => ({ count: 0, noop: () => {} }), counterTransition))
+    store.getState().noop()
+    const actionId = recorder.getSnapshot().events.find(event => event.kind === 'action')!.id
+    const state = store.getState()
+    const snapshot = recorder.getSnapshot()
+    const listener = vi.fn()
+    const unsubscribeStore = store.subscribe(listener)
+    const unsubscribeRecorder = recorder.subscribe(listener)
+    expect(recorder.verifyAction(actionId).status).toBe('match')
+    expect(recorder.verifyAction(actionId).status).toBe('match')
+    expect(store.getState()).toBe(state)
+    expect(recorder.getSnapshot()).toBe(snapshot)
+    expect(listener).not.toHaveBeenCalled()
+    unsubscribeStore()
+    unsubscribeRecorder()
+    recorder.unregisterStore(1)
+    expect(recorder.verifyAction(actionId).status).toBe('unavailable')
+  })
+
   it('captures trusted synchronous invocation boundaries including no-op actions after clear', () => {
     const recorder = createStoreDebugger(true)
     const store = createStore(recorder.instrument('counter', set => ({

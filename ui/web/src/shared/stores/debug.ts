@@ -1,4 +1,5 @@
 import { foldStoreEvent } from './reconstruct-captures'
+import { verifyTransition } from './verify-transition'
 import type { StateCreator, StoreMutatorIdentifier } from 'zustand'
 
 export const STORE_DEBUG_SETTING = 'baander-store-debug'
@@ -278,6 +279,7 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
     enabled,
     instrument,
     getSnapshot: () => snapshot,
+    verifyAction: (actionId: number) => verifyTransition(snapshot, actionId, instanceId => transitions.get(instanceId)),
     subscribe(listener: () => void) {
       if (!enabled) return () => {}
       listeners.add(listener)
