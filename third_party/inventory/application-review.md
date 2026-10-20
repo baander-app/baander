@@ -67,7 +67,7 @@ these raw observations.
 
 ## Recovered notices
 
-Three supplemental notices are included in the source tree and image:
+Three supplemental notices were included in the measured source tree and images:
 
 - [PIE 1.5.2](pie-1.5.2/LICENSE.md), with its pinned
   [upstream source record](pie-1.5.2/source.json).
@@ -76,21 +76,50 @@ Three supplemental notices are included in the source tree and image:
   retrieved at the installed source revisions recorded in the
   [Composer notice source record](composer-notices/source.json).
 
-The collector retains these notices and source records. Its raw observations
+The collector retained these notices and source records. Its raw observations
 still report their absence from the original PHAR or installed package directory;
 the supplemental files provide that notice evidence for the reviewed versions.
 They do not establish coverage for other versions or embedded dependencies.
+
+### OpenTelemetry supplemental evidence
+
+The source tree now also retains licenses for the six OpenTelemetry packages
+listed in the [Composer notice source record](composer-notices/source.json).
+For each installed split-repository revision, its root Git tree exactly matches a
+subtree in a pinned `open-telemetry/opentelemetry-php` monorepo revision. The record
+names both tree identities, the monorepo revision and subtree path, and the upstream
+license URL, Git blob and SHA-256. This proves content correspondence without
+claiming a unique original split commit in the monorepo.
+
+All six corresponding package manifests declare Apache-2.0. Each complete
+monorepo tree contains the same root `LICENSE` and no separately named `NOTICE`.
+The six retained license files preserve those upstream bytes. This resolves
+their supplemental top-level license evidence; embedded dependency obligations
+remain outside this check.
+
+On 2026-10-20, direct checks verified the six subtree mappings and all eight
+recovered Composer packages' notice hashes and installed source references.
+A disposable Docker context export using the repository's `.dockerignore`
+preserved all nine notice/provenance paths. The existing collector then generated
+and verified a fixture bundle retaining every path byte-for-byte, with its
+`not-qualified` outcome unchanged. These checks took 0.70 seconds; logs and upstream
+responses are under `var/test-runs/application-package-notices-20261020/`.
+No product code or tests changed, and no product suites were rerun.
+
+This follow-up did not rebuild or collect the application images. The image IDs,
+counts and raw observations above still describe the earlier snapshot; the six
+new licenses are supplemental source evidence, not measured contents of those
+images.
 
 ## Remaining redistribution work
 
 The remaining gate concerns these observed contents:
 
-- **Package notices:** the installed revisions of OpenTelemetry `api`, `context`,
-  `exporter-otlp`, `gen-otlp-protobuf`, `sdk`, and `sem-conv` contain no
-  license/notice-named files in their complete upstream split-repository trees.
-  Retain authoritative notices or establish the corresponding source and notices
-  in the upstream monorepo. The local `tsduck/php` package also declares
-  BSD-2-Clause without a corresponding retained top-level notice.
+- **Package notices:** the local `tsduck/php` package declares BSD-2-Clause without
+  a retained top-level notice, copyright attribution or established upstream
+  source. Its package tree is unchanged from the initial repository commit.
+  The Composer notice record pins that tree and manifest; repository ownership
+  and the native TSDuck license do not establish the PHP bindings' notice.
 - **Debian evidence:** some retained copyright files have no machine-readable
   license declaration. Six references name absent common-license paths:
   `GFDL-3`, `GPL-2.0`, or `GPL-3.0`. Review the copyright text and resolve those

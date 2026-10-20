@@ -78,6 +78,9 @@ when checking that deployment decision.
   The separate Registry inventory is outside this remainder.
   Checkpoint, 2026-10-20: 96 tooling tests passed; both image inventories,
   production worker smoke, Docker context and applicable syntax checks passed.
+  Supplemental evidence now resolves six OpenTelemetry package licenses through
+  exact upstream tree matches. Notice hashes, Docker context inclusion and
+  collector retention passed; historical image measurements remain unchanged.
 - **Selected native media path:** when a release explicitly includes an active
   codec/DSP path, resolve its remaining reproducibility and reference-vector
   acceptance before claiming certification. Use the
