@@ -23,6 +23,7 @@ on:
             - 'public/audio-worklets/wasm-spectrum.js'
             - 'ui/web/src/features/player/services/audio-processor.ts'
             - 'scripts/test-dsp-analysis.sh'
+            - 'scripts/build-wasm.ts'
             - '.forgejo/workflows/dsp-analysis.yaml'
     pull_request:
         types: [opened, synchronize, reopened]
@@ -46,6 +47,7 @@ on:
             - 'public/audio-worklets/wasm-spectrum.js'
             - 'ui/web/src/features/player/services/audio-processor.ts'
             - 'scripts/test-dsp-analysis.sh'
+            - 'scripts/build-wasm.ts'
             - '.forgejo/workflows/dsp-analysis.yaml'
 
 jobs:

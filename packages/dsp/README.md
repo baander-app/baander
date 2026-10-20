@@ -14,20 +14,34 @@ exact threshold queries, tree balancing, and explicit exhaustion/reset behavior.
 The production pool remains fixed at 262144 distinct energies; the harness
 does not change the deployed ABI or memory limit.
 
-After an intentional source change, regenerate the affected artifacts before
-running the gate:
+After an intentional source change, regenerate the four qualified analysis modules
+from the repository root, then run the gate:
 
 ```sh
-for module in fft2048 spectral_features dynamics_meter loudness_r128; do
-    make -B -C "packages/dsp/$module"
-    cp "packages/dsp/$module/$module.wasm" "public/dsp/$module.wasm"
-    cp "packages/dsp/$module/$module.wasm" "ui/electron/public/dsp/$module.wasm"
-done
-cp packages/dsp/fft2048/wasm-spectrum.js public/audio-worklets/wasm-spectrum.js
-cp packages/dsp/dynamics_meter/dynamics_meter.js public/dsp/dynamics_meter.js
-cp packages/dsp/dynamics_meter/dynamics_meter.js ui/electron/public/dsp/dynamics_meter.js
+yarn --cwd ui/electron build:wasm
 bash scripts/test-dsp-analysis.sh
 ```
+
+Regeneration requires Emscripten 6.0.3. Set `EMCC` to select a compiler outside
+`PATH`; the regeneration command and qualification gate both respect it. The
+command rejects a missing or different compiler before changing tracked artifacts.
+It forces fresh builds of `fft2048`, `spectral_features`, `dynamics_meter`, and
+`loudness_r128` into temporary output paths. Once all builds succeed and their
+outputs are readable, it publishes identical WASM bytes to each source package,
+`public/dsp/`, and `ui/electron/public/dsp/`. It also synchronizes the dynamics
+loader into both public directories and the FFT worklet into
+`public/audio-worklets/`. Build, publication, and copied-byte verification errors
+fail the command. Rerun regeneration to repair an interrupted publication.
+
+Ordinary Electron development and packaging consume checked-in assets without a
+compiler. They require all six modules in `ui/electron/src/shared/wasm-modules.json`:
+`fft2048`, `spectral_features`, `dynamics_meter`, `loudness_r128`,
+`partitioned_convolver`, and `resampler_hq`. Each module requires its JavaScript
+loader except standalone `fft2048`. Missing required files fail with a diagnostic
+that names the file and directs developers to restoration or explicit regeneration.
+The regeneration command covers only the four qualified analysis modules; restore
+missing convolver or resampler artifacts from the repository. Packaging fails if a
+required DSP copy fails or its destination bytes differ from the source.
 
 The reference suite can also inspect existing web-served artifacts directly:
 

@@ -30,8 +30,10 @@ retain requirements or deferred scope, without making every item a next task.
   is also delivered locally.
   [Store timeline navigation](#store-timeline-navigation-2026-10-19) and
   [historical store capture reconstruction](#store-capture-reconstruction-2026-10-20)
-  are delivered locally. Live replay and full asynchronous provenance remain open;
-  actual-destination backup acceptance remains deferred.
+  are delivered locally. The selected [DSP artifact build
+  fix](#dsp-artifact-build-contract-2026-10-20) is also delivered locally. Live
+  replay and full asynchronous provenance remain open; actual-destination backup
+  acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -3652,6 +3654,9 @@ automatic quorum reduction. This is not the current implementation priority.
 - [ ] When the user resumes deferred React Native work, reconcile the [React Native styling plan](docs/plans/2026-07-15-001-refactor-rn-styling-pattern-plan.md)
   and [React Native/TV tooling plan](docs/plans/2026-07-15-002-chore-rn-tv-dx-tooling-plan.md)
   against current code after backend/web priorities are satisfied.
+- [x] Pin explicit regeneration of the four qualified DSP analysis modules and
+  make ordinary Electron asset consumption compiler-free, with required-file and
+  copy verification. See the [artifact build checkpoint](#dsp-artifact-build-contract-2026-10-20).
 - [ ] Make codec/DSP builds reproducible and run reference vectors before claiming
   native paths release-certified. Track remaining loudness/codec qualification in
   [DSP qualification](packages/dsp/README.md); browser graph tests alone are insufficient.
@@ -4083,3 +4088,48 @@ Verification checkpoint:
 - Implementation and documentation were committed as `78165f61` on
   `plan/consolidate-doctrine-migrations`. After verification, the user authorized
   merging into `master` and pushing to both remotes on 2026-10-17.
+
+## DSP artifact build contract (2026-10-20)
+
+The [reviewed plan](docs/plans/2026-10-20-dsp-artifact-build-contract-plan.md)
+provides explicit regeneration through `yarn --cwd ui/electron build:wasm`.
+The command checks Emscripten 6.0.3, respects `EMCC`, and forces temporary builds
+of `fft2048`, `spectral_features`, `dynamics_meter`, and `loudness_r128` before
+publishing. It synchronizes all three tracked WASM copies, the dynamics loader,
+and the web FFT worklet; failed builds, missing output, failed publication or
+copied-byte mismatches return failure.
+
+Ordinary Electron development and packaging consume checked-in files without
+compiling. All six manifest WASM modules and the five supplied loaders are
+required; `fft2048` is standalone WASM. Missing required assets direct developers
+to restore checked-in files or explicitly regenerate the qualified analysis
+modules. Required DSP copy failures and byte mismatches fail packaging. Both
+existing frontend and DSP CI workflows include the root regeneration script in
+their push and pull-request filters.
+
+Verification checkpoint:
+
+- The regeneration checks pass **8 tests in 2.213 seconds**. Actual pinned
+  regeneration completes in **3.11 seconds**, leaving tracked artifact bytes and
+  modes unchanged.
+- The existing DSP gate passes **132 tests per build**, across two independent
+  builds (**264 executions**) in **12.93 seconds**, with zero failures. The
+  reproducibility checks retain their tracked-copy and wrapper/worklet comparisons.
+- The complete Electron CI suite passes **59 tests**, with **59 passed and zero
+  skipped**, in **2.2446 seconds** of test-process time (**2.58 seconds** including
+  coordination). Main, preload, and renderer TypeScript checks pass in **17.60
+  seconds**; a separate tooling check covers the regeneration script, asset plugin
+  and new tests.
+- A real production Vite build passes in **2.33 seconds** with
+  `EMCC=/no-compiler-needed`, copying six WASM modules and five loaders. All
+  **11 output files** match their source bytes. No temporary DSP build directories
+  remain. Simplification and code review found no actionable issues. Evidence,
+  including `verification.json`: `var/test-runs/dsp-artifact-build-20261020/`.
+- Both workflow push and pull-request filters include `scripts/build-wasm.ts`.
+  Documentation command, module inventory and local-link checks, prose-preservation
+  audits and whitespace checks pass. Existing qualification limitations remain
+  unchanged.
+
+This checkpoint delivers artifact build tooling. Convolver and resampler quality,
+native codec compliance, remaining loudness qualification, and overall native-path
+release certification remain open under [DSP qualification](packages/dsp/README.md).
