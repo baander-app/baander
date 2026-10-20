@@ -1,0 +1,9 @@
+759653
+github.com/jcmturner/dnsutils/v2 v2.0.0 h1:lltnkeZGL0wILNvrNiVCR6Ro5PGU/SeBvVO/8c/iPbo=
+github.com/jcmturner/dnsutils/v2 v2.0.0/go.mod h1:b0TnjGOvI/n42bZa+hmXL+kFJZsFT7G4t3HTlQ184QM=
+
+go.sum database tree
+69509668
+cWb/X2KF2dnRUkRQF1+tzHHkfFGBMXg8WPSFhSD+Kq8=
+
+— sum.golang.org Az3grqDXltyaDLruoy/rfxsQxuKMN3KUlnEOr1UCSaE1pe/qq9MZcvp0Tgx8rrvVA3GMJIv3ug8sjZ/XJMF4zywC9AE=

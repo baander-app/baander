@@ -1,0 +1,9 @@
+62927390
+github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1 h1:cFHmwLxZPvtoAlo79MboURL2+7b0TMHycnrcf5VZNXk=
+github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1/go.mod h1:/uA+2Qj4jd5qBWagVC1AyzzDFXVK997E7U04w7Kw0wI=
+
+go.sum database tree
+69523388
+oHHjAKTZXrL4tafZFLYc5K+D1siOAtz4+N6qmX/qM2M=
+
+— sum.golang.org Az3grgQHEz0Mdqzi4Y9fl5Pp/Zxi4WT55v1wXIb2LtR2j7gdeZ3HOlezvsGOkOB3AE+nuzWPoHIgJ4PP+C15svDxpwQ=

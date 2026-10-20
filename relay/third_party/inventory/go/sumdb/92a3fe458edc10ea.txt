@@ -1,0 +1,9 @@
+10018907
+github.com/hashicorp/go-uuid v1.0.3 h1:2gKiV6YVmrJ1i2CKKa9obLvRieoRGviZFL26PcT/Co8=
+github.com/hashicorp/go-uuid v1.0.3/go.mod h1:6SBZvOh/SIDV7/2o3Jml5SYk/TvGqwFJ/bN7x4byOro=
+
+go.sum database tree
+69520904
+5et/CRNPkxx1iD3sgNNrLTv+2JNa+kRHl9Jpd7inhA4=
+
+— sum.golang.org Az3grssXA8wONCh+xWCUTlcuIl5qKdEiKk8qku4xT6GCtDj9BkOjY2Gh4FqAXh96tr20gJjEmQ/NeETuHx7UdJvXfA8=

@@ -1,0 +1,9 @@
+15965114
+github.com/jcmturner/gokrb5/v8 v8.4.4 h1:x1Sv4HaTpepFkXbt2IkL29DXRf8sOfZXo8eRKh687T8=
+github.com/jcmturner/gokrb5/v8 v8.4.4/go.mod h1:1btQEpgT6k+unzCwX1KdWMEwPPkkgBtP+F6aCACiMrs=
+
+go.sum database tree
+69518363
+932gGzm2UM59NcQyTh1S8hHbyfbuSERSNEqNjKhvCFg=
+
+— sum.golang.org Az3grpx+1UgXXQaMnEpaFofKdsTQej4SFW0vnk3jcr4N8zvQV0hl+uqqDuryEPxxRFfUuB4yjs27Ub00fX8H9q/A5Qo=

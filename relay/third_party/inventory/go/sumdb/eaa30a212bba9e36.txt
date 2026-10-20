@@ -1,0 +1,9 @@
+32914986
+github.com/andybalholm/cascadia v1.3.3 h1:AG2YHrzJIm4BZ19iwJ/DAua6Btl3IwJX+VI4kktS1LM=
+github.com/andybalholm/cascadia v1.3.3/go.mod h1:xNd9bqTn98Ln4DwST8/nG+H0yuB8Hmgu1YHNnWw0GeA=
+
+go.sum database tree
+69522834
+fXHLVLdALeKzlu9gMIDLKx4lo/fce3VV90xRfxdq46E=
+
+— sum.golang.org Az3grhD7jx4HMAxx1E9sD2H9902Ta9+3QqQvzij2t6D89z5Ge6SQ4vuD2PMjSUIKro0PjlqTPZq9/9TmmaxaqD7j4Qc=

@@ -1,0 +1,9 @@
+41535761
+github.com/lanrat/extsort v1.4.0 h1:jysS/Tjnp7mBwJ6NG8SY+XYFi8HF3LujGbqY9jOWjco=
+github.com/lanrat/extsort v1.4.0/go.mod h1:hceP6kxKPKebjN1RVrDBXMXXECbaI41Y94tt6MDazc4=
+
+go.sum database tree
+69523337
+5jB0a3eHk+BGdz2RO+Mx9UgoSqb+gOMWXomTPyOY1Xw=
+
+— sum.golang.org Az3grijJyNEWwO//DfghNmyKZPdHin01M7ehkUuzQRdgb3Sw3ltet+qMsf5IA7lmbZF7WykxUcGmEhWu4e1lS+JBgwI=

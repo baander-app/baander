@@ -1,0 +1,9 @@
+3266
+github.com/ryszard/goskiplist v0.0.0-20150312221310-2dfbae5fcf46 h1:GHRpF1pTW19a8tTFrMLUcfWwyC0pnifVo2ClaLq+hP8=
+github.com/ryszard/goskiplist v0.0.0-20150312221310-2dfbae5fcf46/go.mod h1:uAQ5PCi+MFsC7HjREoAz1BU+Mq60+05gifQSsHSDG/8=
+
+go.sum database tree
+69523463
+87GYyZeqRhKf93OXg65mX8luXB52bl+WaC3IETR4Tdg=
+
+— sum.golang.org Az3grlEFQDWTTPnskoNp613FzV8AxMSZNW6oEI15s6XLT0CEhKTGNccVLPOYp0PWqRIpUvik3YRhaDCf0b0M75v4TwM=

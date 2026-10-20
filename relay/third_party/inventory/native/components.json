@@ -1,0 +1,86 @@
+[
+  {
+    "id": "boost",
+    "family": "api",
+    "name": "Boost",
+    "version": "1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "license": "BSL-1.0",
+    "notices": [
+      {
+        "path": "native/licenses/boost/LICENSE_1_0.txt",
+        "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+      }
+    ],
+    "scope": "runtime",
+    "source_scope": "pinned source archive; final incorporation is established by compiler dependencies and linker evidence"
+  },
+  {
+    "id": "json",
+    "family": "api",
+    "name": "JSON for Modern C++",
+    "version": "3.12.0",
+    "source": {
+      "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+      "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+    },
+    "license": "MIT",
+    "notices": [
+      {
+        "path": "native/licenses/json/LICENSE.MIT",
+        "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603"
+      }
+    ],
+    "scope": "runtime",
+    "source_scope": "pinned source archive; final incorporation is established by compiler dependencies and linker evidence"
+  },
+  {
+    "id": "openssl",
+    "family": "api",
+    "name": "OpenSSL",
+    "version": "3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "license": "Apache-2.0",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      },
+      {
+        "path": "native/licenses/openssl/AUTHORS.md",
+        "sha256": "b9f638dfc06b59c2d3b808186c3b30f713805a5db390f5b77b1703ac58acb83e"
+      },
+      {
+        "path": "native/licenses/openssl/SOURCE-NOTICES.txt",
+        "sha256": "ef61dbdf215b71c289f2fffdd662ae862bd33eff4cb65d150889345215030f8e"
+      }
+    ],
+    "scope": "runtime",
+    "source_scope": "pinned source archive; final incorporation is established by compiler dependencies and linker evidence"
+  },
+  {
+    "id": "googletest",
+    "family": "api",
+    "name": "GoogleTest",
+    "version": "1.17.0",
+    "source": {
+      "url": "https://codeload.github.com/google/googletest/tar.gz/refs/tags/v1.17.0",
+      "sha256": "65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c"
+    },
+    "license": "BSD-3-Clause",
+    "notices": [
+      {
+        "path": "native/licenses/googletest/LICENSE",
+        "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138"
+      }
+    ],
+    "scope": "build-test",
+    "source_scope": "pinned source archive; final incorporation is established by compiler dependencies and linker evidence"
+  }
+]

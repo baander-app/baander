@@ -1,0 +1,9 @@
+25870777
+github.com/koofr/go-httpclient v0.0.0-20240520111329-e20f8f203988 h1:CjEMN21Xkr9+zwPmZPaJJw+apzVbjGL5uK/6g9Q2jGU=
+github.com/koofr/go-httpclient v0.0.0-20240520111329-e20f8f203988/go.mod h1:/agobYum3uo/8V6yPVnq+R82pyVGCeuWW5arT4Txn8A=
+
+go.sum database tree
+69516901
+I4PyQyNJvLD3Q6HutrDaFhKagPPJIKxD253DgfwHAv4=
+
+— sum.golang.org Az3grnhBsEz6fP4lvyMpXbBny/zbo0VAYHxbmElrNwwbctGIOxEOtLyvKOIChhsw5gUj+QMsWsObZ0gxjAvh0JJzGAg=

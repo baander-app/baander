@@ -1,0 +1,9 @@
+19513161
+github.com/henrybear327/go-proton-api v1.0.0 h1:zYi/IbjLwFAW7ltCeqXneUGJey0TN//Xo851a/BgLXw=
+github.com/henrybear327/go-proton-api v1.0.0/go.mod h1:w63MZuzufKcIZ93pwRgiOtxMXYafI8H74D77AxytOBc=
+
+go.sum database tree
+69523428
+qiB9NEflTOQWJUYVfX9VenFU4IYEDzLAFFfVkDrnTZY=
+
+— sum.golang.org Az3grkBOzQNFJLt0Hri9kdh4km1jzKvQzneF4wYmZqxAJwtH+vnQWW2nVWbhM7kVFrYhlvD0T8Pqh50AJqCtCealQAw=

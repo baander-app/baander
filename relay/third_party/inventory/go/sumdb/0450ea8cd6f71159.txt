@@ -1,0 +1,9 @@
+33778163
+github.com/emersion/go-message v0.18.2 h1:rl55SQdjd9oJcIoQNhubD2Acs1E6IzlZISRTK7x/Lpg=
+github.com/emersion/go-message v0.18.2/go.mod h1:XpJyL70LwRvq2a8rVbHXikPgKj8+aI0kGdHlg16ibYA=
+
+go.sum database tree
+69517009
+SEF2X0iUiogIVJ3xwd21zgw1OL+86O3oTvJ12YK4ET8=
+
+— sum.golang.org Az3grm5QtvBrTauhF/+I+O01nLEkSpQS0+RLg7ijwVT8EfY/kmViAacCJDEfL7fuD46tAmZEYh5pD+V6qLCobtdLUAk=

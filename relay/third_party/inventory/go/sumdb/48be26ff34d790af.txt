@@ -1,0 +1,9 @@
+38513846
+golang.org/x/time v0.12.0 h1:ScB/8o8olJvc+CQPWrK3fPZNfh7qgwCrY0zJmoEQLSE=
+golang.org/x/time v0.12.0/go.mod h1:CDIdPxbZBQxdj6cxyCIdrNogrJKMJ7pr37NYpMcMDSg=
+
+go.sum database tree
+69523005
+LDi2gjhA7LoUO5lZve3e7qGXf00QZCyro3L9WPFfQPw=
+
+— sum.golang.org Az3grnNOadFsExq/1j6NfEvvqcnTKumvl872ZioyBdhUnzYjRhUpog6owp/5iSAk6MCMZTrWvT2IIPxi5mu3g6s7AAc=

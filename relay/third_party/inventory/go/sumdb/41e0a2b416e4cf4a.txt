@@ -1,0 +1,9 @@
+11825900
+github.com/minio/xxml v0.0.3 h1:ZIpPQpfyG5uZQnqqC0LZuWtPk/WT8G/qkxvO6jb7zMU=
+github.com/minio/xxml v0.0.3/go.mod h1:wcXErosl6IezQIMEWSK/LYC2VS7LJ1dAkgvuyIN3aH4=
+
+go.sum database tree
+69516926
+A2s4j6h0RwlMJToMML/sJRK089mTEhvEjlJxlrtn8dY=
+
+— sum.golang.org Az3grmFhaQh3fOoXAQejBdRtuNWH77wn5oNqc7/Sy/HtD1Upd+UrHtOXcQ4fl7pQTia+jgadMajxhVhfwtrXTpP0fwk=

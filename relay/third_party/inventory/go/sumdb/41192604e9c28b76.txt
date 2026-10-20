@@ -1,0 +1,9 @@
+15247559
+github.com/coreos/go-semver v0.3.1 h1:yi21YpKnrx1gt5R+la8n5WgS0kCrsPp33dmEyHReZr4=
+github.com/coreos/go-semver v0.3.1/go.mod h1:irMmmIw/7yzSRPWryHsK7EYSg09caPQL03VsM8rvUec=
+
+go.sum database tree
+69514719
+nUZUSwW3Cgr2SK8tz1xDcPGDWRty+kuiu3f/pM6wNGc=
+
+— sum.golang.org Az3grg4ZZUwOpWCaaQ79DV8BxCu/oa4Jh5yp2nhJU9imkmcE2ANr0/QUwbWJnH4xA3a23Dop6SJ1myeeymI6YTDt2Q4=

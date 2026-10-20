@@ -1,0 +1,9 @@
+9983734
+gopkg.in/validator.v2 v2.0.1 h1:xF0KWyGWXm/LM2G1TrEjqOu4pa6coO9AlWSf3msVfDY=
+gopkg.in/validator.v2 v2.0.1/go.mod h1:lIUZBlB3Im4s/eYp39Ry/wkR02yOPhZ9IwIRBjuPuG8=
+
+go.sum database tree
+69514021
+DEJj0060a5NoPGdNOlgJfZJ3V6xhRJCJeU8cqnbdcrE=
+
+— sum.golang.org Az3grgHKd/Nr5OI+CwNLsM6gPqa1lnTz9MrOrzZjj65855R2uf2MjS0O+hmxu/P2eHRSFWzoqLlpDbLRIF3kmEP+2w0=

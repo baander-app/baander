@@ -1,0 +1,9 @@
+35440655
+cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIiLpZnkHRbnc=
+cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
+
+go.sum database tree
+69517481
+jknHyphGpgQf217iVtL1YM9JRSGEvyinEhNutO/9kGM=
+
+— sum.golang.org Az3groHsAmGd7V/tw+uLnKEz8d9sD+rSoIac3vN3D9hokrLvYKtrwTIwWdB6H3CrIEeZcoN5CKFcUpAMo6ROP+HekQw=

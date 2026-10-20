@@ -1,0 +1,9 @@
+38363650
+github.com/ncw/swift/v2 v2.0.4 h1:hHWVFxn5/YaTWAASmn4qyq2p6OyP/Hm3vMLzkjEqR7w=
+github.com/ncw/swift/v2 v2.0.4/go.mod h1:cbAO76/ZwcFrFlHdXPjaqWZ9R7Hdar7HpjRXBfbjigk=
+
+go.sum database tree
+69523485
+mV9rfm2XtREvSf2ZM9/PHe4xMqshUKF2wrh6bIJG3U8=
+
+— sum.golang.org Az3grh1uzyg3InUKy4Dxlt8j7XMn5jBaoDtjs3QnngNKb30VQ9qmP0JIy2P+q/FTbvaFUG9ijuXU938WQve30ESQvA4=

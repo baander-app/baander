@@ -1,0 +1,9 @@
+36887358
+golang.org/x/oauth2 v0.30.0 h1:dnDm7JmhM45NNpd8FDDeLhK6FwqbOf4MLCM9zb1BOHI=
+golang.org/x/oauth2 v0.30.0/go.mod h1:B++QgG3ZKulg6sRPGD/mqlHQs5rB3Ml9erfeDY7xKlU=
+
+go.sum database tree
+69509660
+FSCXfnLD67g1lDz52Y1wwD8LckizmSrYPuI5HreF9nI=
+
+— sum.golang.org Az3grrRn8CKXUZ8Bfz6LrJ08FofF1nwCnnnOAscPI92QlR3ts4aOk0H0Nq4uAC9ckHSgSi/HbHeob+DRo5Ur0Vhq0QY=

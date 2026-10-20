@@ -1,0 +1,9 @@
+29077946
+storj.io/uplink v1.13.1 h1:C8RdW/upALoCyuF16Lod9XGCXEdbJAS+ABQy9JO/0pA=
+storj.io/uplink v1.13.1/go.mod h1:x0MQr4UfFsQBwgVWZAtEsLpuwAn6dg7G0Mpne1r516E=
+
+go.sum database tree
+69523511
+Us6UALw97jvDHpZRHn/xT5QmmOVDD7fgSH0gcGC3SdE=
+
+— sum.golang.org Az3grmzXedG3n20naNuJKGOwKd0HnqoeoyDcy0a6egSjW5o1S0e6QIEgWQOekeykXWTaoKiWmIBeZpxbDCWoMYyC4g4=

@@ -1,0 +1,9 @@
+54871273
+github.com/mattn/go-colorable v0.1.15 h1:+u9SLTRGnXv73cEsnsmoZBom+dMU88B2M0aDcWy0/jY=
+github.com/mattn/go-colorable v0.1.15/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
+
+go.sum database tree
+69515222
+FqD45PSOTKkaLL4lKjFKAvnUaO/kMLbWuSjXPUB8Y7w=
+
+— sum.golang.org Az3grorGvx9oOgcwcD5w2fkYdeEtpsB1NvCmUv+7wMrPNqzn8F+DZu1kp+VSAKdhOnsJjGYRlz+vafPluBLNKeADRQ8=

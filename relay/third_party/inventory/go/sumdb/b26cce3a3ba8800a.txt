@@ -1,0 +1,9 @@
+57870378
+go.opentelemetry.io/proto/otlp v1.11.0 h1:5rrYs0Ykyj50sdU/JU0x8etU+LubXWb+gED6TbEdMIk=
+go.opentelemetry.io/proto/otlp v1.11.0/go.mod h1:SmVizdCOAm3XBtG1g1NnOdhW6jtddT72hLMhv8VwA8E=
+
+go.sum database tree
+69518131
+IylGGh+cMNvNq1tVUW8hFFiok5SEqpqtD+8RC49tMRg=
+
+— sum.golang.org Az3grsBMrZSqfiZXi3Mo5g4UUxiEQJZ2oEcjNilP0Ab8UhAkSw1H13N9KRFgai154Mawev+jSC8WiIzruMlTjsifVQo=

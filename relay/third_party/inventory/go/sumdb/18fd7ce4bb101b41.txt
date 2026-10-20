@@ -1,0 +1,9 @@
+624
+github.com/kr/fs v0.1.0 h1:Jskdu9ieNAYnjxsi0LbQp1ulIKZV1LAFgK1tWhpZgl8=
+github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
+
+go.sum database tree
+69515105
+udlMAVo5u0eMJFJ+1qTsnMH5AWwrJtyiEN5JhJi9qTI=
+
+— sum.golang.org Az3grp4dZWxttdyzTw0lvMB1nne9xeGv7QVDYQFpyCMGGtTHJ4oEaIPlxEDORWKJK92QjP5QF7z5mtG8lsj8aMXdjAY=

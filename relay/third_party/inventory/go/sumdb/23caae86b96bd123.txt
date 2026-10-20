@@ -1,0 +1,9 @@
+16089296
+github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
+github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
+
+go.sum database tree
+69513382
+Y1lmDKq5woWFQwt4I0Uqc8p0sk6/K1tmPdN/eOR9E4U=
+
+— sum.golang.org Az3grsIsfS0GD9AuE5cg3alj3v+PpPz2I7DAm/YseOSRHBDSWuxZ0Q968egbSwyF8I2V2f9ruwZCnVHUt1r3QpfViAM=

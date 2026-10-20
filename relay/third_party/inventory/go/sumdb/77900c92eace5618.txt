@@ -1,0 +1,9 @@
+307070
+github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
+github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
+
+go.sum database tree
+69512296
+fMkBiK7zfxTO5okag5CM2SdQ55tOPvbdCEu7ckHlEIA=
+
+— sum.golang.org Az3grnrYplY2dNd7lTYp2WKw9cGpEitmQHjhwToP0QS4Et7SSck/2563RmRFFkpu3Q1NSG1OUW0vvxlfOsqCHqwnTwM=

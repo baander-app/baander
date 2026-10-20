@@ -1,0 +1,9 @@
+14687016
+github.com/go-playground/locales v0.14.1 h1:EWaQ/wswjilfKLTECiXz7Rh+3BjFhfDFKv/oXslEjJA=
+github.com/go-playground/locales v0.14.1/go.mod h1:hxrqLVvrK65+Rwrd5Fc6F2O76J/NuW9t0sjnWqG1slY=
+
+go.sum database tree
+69515193
+EYxH+ADG/QV9SkYSv6N5f9oFHuSGdSnf9YXGP9jLSl4=
+
+— sum.golang.org Az3grsBOAUaAxJ0qTQLHHY7xoghyRjrT5k1sa+7bTxiMLeWAWvHxWxVl1zcH6VOaxiQLSP+Ajw/iPz/AKUFSIWM0Zw4=

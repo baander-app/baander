@@ -1,0 +1,9 @@
+41419601
+github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 h1:9iefClla7iYpfYWdzPCRDozdmndjTm8DXdpCzPajMgA=
+github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2/go.mod h1:XtLgD3ZD34DAaVIIAyG3objl5DynM3CQ/vMcbBNJZGI=
+
+go.sum database tree
+69522691
+XGGEaQk7Y2K1WwX+/UMcsoFGVu8ug4UYbIAVEq2Ux4k=
+
+— sum.golang.org Az3grsECCIK1BeD10R1mGA7qr6qiVVxkBVzIGx8fEd8vo/YdRww4qNK8JIOnCSeOPztYEFtcUanfdtYWLp7WQL/0wgw=

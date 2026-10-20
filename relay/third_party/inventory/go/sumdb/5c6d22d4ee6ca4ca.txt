@@ -1,0 +1,9 @@
+3184
+github.com/abbot/go-http-auth v0.4.0 h1:QjmvZ5gSC7jm3Zg54DqWE/T5m1t2AfDu6QlXJT0EVT0=
+github.com/abbot/go-http-auth v0.4.0/go.mod h1:Cz6ARTIzApMJDzh5bRMSUou6UMSp0IEXg9km/ci7TJM=
+
+go.sum database tree
+69511729
+ipDhDOjTm76aANQY/X5HjyEruLEqTmx3Wy9L/6MUlts=
+
+— sum.golang.org Az3grrGK1hrYsRzCMoEvAx7VtMx/I8u10mwagVQ6K6MxJUTugEzhTr33KCuMXemIWfdfLkmCK9K/KIwfhvy4PCMyEQQ=

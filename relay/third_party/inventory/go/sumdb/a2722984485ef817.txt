@@ -1,0 +1,9 @@
+16595551
+github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f h1:tCbYj7/299ekTTXpdwKYF8eBlsYsDVoggDAuAjoK66k=
+github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f/go.mod h1:gcr0kNtGBqin9zDW9GOHcVntrwnjrK+qdJ06mWYBybw=
+
+go.sum database tree
+69512957
+NVt3EO/wIEoeR3Yj5dZMg7QALABF6hOJsGX88Xuc3+0=
+
+— sum.golang.org Az3grrtQq2+1cmkq9IvUyrOyxfwvw3Y7nlneRFdaR7dCalbHw0wPjz5TWWbffrdEYZ+I7/j0Ggc7n5Sx3ZuMXzwzVAM=

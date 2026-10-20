@@ -1,0 +1,9 @@
+23629660
+github.com/gdamore/encoding v1.0.1 h1:YzKZckdBL6jVt2Gc+5p82qhrGiqMdG/eNs6Wy0u3Uhw=
+github.com/gdamore/encoding v1.0.1/go.mod h1:0Z0cMFinngz9kS1QfMjCP8TY7em3bZYeeklsSDPivEo=
+
+go.sum database tree
+69523091
+9XbxRA3qS/keNaxs6rRTTq48ShEw9C+MKxdcJdqegGQ=
+
+— sum.golang.org Az3grvbLSzq6psrFn57oyO2nEBZXZHjx4qAnFHmaTmunuLGO6tOspLfS7GwYIvR6ruWkTZdK5j+zN8HhVBljSnHZaQo=

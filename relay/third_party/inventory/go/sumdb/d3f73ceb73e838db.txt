@@ -1,0 +1,9 @@
+20841624
+github.com/jtolio/noiseconn v0.0.0-20231127013910-f6d9ecbf1de7 h1:JcltaO1HXM5S2KYOYcKgAV7slU0xPy1OcvrVgn98sRQ=
+github.com/jtolio/noiseconn v0.0.0-20231127013910-f6d9ecbf1de7/go.mod h1:MEkhEPFwP3yudWO0lj6vfYpLIB+3eIcuIW+e0AZzUQk=
+
+go.sum database tree
+69515852
+5VUXGZM+8gvMjre+hWPAgP1UDG4BMvPIQSWI5nZ0L/4=
+
+— sum.golang.org Az3gruGvEYjE8+ICIBP+qWxsfEyhCsafW611kjBU3gCG0GqQSVaHtmQwoFeTV7F0fQ+PQr6D1QYU1Is8fT3u0J39xQw=

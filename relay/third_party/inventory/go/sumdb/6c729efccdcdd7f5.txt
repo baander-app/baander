@@ -1,0 +1,9 @@
+50225291
+filippo.io/edwards25519 v1.2.0 h1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=
+filippo.io/edwards25519 v1.2.0/go.mod h1:xzAOLCNug/yB62zG1bQ8uziwrIqIuxhctzJT18Q77mc=
+
+go.sum database tree
+69516117
+dhbNi2dpWHoZRt4n0Zdz2dcgdUZAxj//Rb/zPJydL9I=
+
+— sum.golang.org Az3gromL0GV9b/Fjx4WZ4kwGm/NksLLaduK3lDzgk71xwdBzPy8G4Zdf4LQi09EO0h2Gs+bxItv5XPAqO1vfM/70egc=

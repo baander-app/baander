@@ -1,0 +1,10 @@
+Package: fixture-lib
+Status: install ok installed
+Version: 1.2.3-1
+Architecture: amd64
+Source: fixture-source (1.2.3)
+
+Package: removed-lib
+Status: deinstall ok config-files
+Version: 0.9
+Architecture: amd64

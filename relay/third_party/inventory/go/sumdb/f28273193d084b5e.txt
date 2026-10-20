@@ -1,0 +1,9 @@
+63236933
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.7 h1:omtMzSxsMhRDJzG/1bzT4dLA+jybY/nQLwEuoxt52yI=
+github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.7/go.mod h1:oTPLfqQ08mCCN1qIkuZUsu0x6Iv/N7YEDax5qhCwN+o=
+
+go.sum database tree
+69523338
+xo4kPTBsLYObxG8cB3mKGl0oWsAwBRXOFWVFLxGKuXA=
+
+— sum.golang.org Az3grkUrymD6J8OhTVUdMtFYk6qpYswPcfPOWhAOKqCcI0O65k0I2b9gHDUFIHSuaAxj/3p4aK4SGFwih43mix81ggE=

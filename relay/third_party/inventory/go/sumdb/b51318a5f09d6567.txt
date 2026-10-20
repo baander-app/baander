@@ -1,0 +1,9 @@
+59529548
+golang.org/x/crypto v0.55.0 h1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=
+golang.org/x/crypto v0.55.0/go.mod h1:uq0V9dE/fzQuJtbnL+2EhWOE63vo164FY8xqEnV9xis=
+
+go.sum database tree
+69522188
+NN7qcpmnSZ4+pS7OZSly0eyRFXyCQ0O86K8C7o049vU=
+
+— sum.golang.org Az3groSekWf+yTOv1rTabjFiyR2iKxjvpbH3m80OYKev2l88G5T4Gt1yK2yHG2EZDmZv+3FbjSalejBUIP+v9kG9kAM=

@@ -1,0 +1,702 @@
+[
+  {
+    "id": "boost-beast-zlib",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "zlib code incorporated into Boost.Beast",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/beast/zlib/detail/inflate_stream.ipp",
+      "boost/beast/zlib/detail/deflate_stream.ipp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Zlib",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/beast/zlib/detail/inflate_stream.ipp",
+        "sha256": "390e33e2c266e767ad3c5c5f324cc9806ed3e885a0aa06c7b3b7fee963aa91e0"
+      },
+      {
+        "path": "native/licenses/boost/boost/beast/zlib/detail/deflate_stream.ipp",
+        "sha256": "5124c7c32f4ee76ccae3ed6a36e3e46e8b138f186d39f25f1f12348bcae136b7"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Relevant header is observed by the compiler; emitted code depends on used Beast compression functions."
+  },
+  {
+    "id": "boost-beast-base64",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Rene Nyffenegger base64",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/beast/core/detail/base64.ipp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Zlib",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/beast/core/detail/base64.ipp",
+        "sha256": "1796c3b80949635def389850640615eba5e7dd052ea487ea24940ab59d35ca56"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Relevant header is observed by the compiler; emitted code depends on used base64 functions."
+  },
+  {
+    "id": "boost-beast-chacha",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Orson Peters ChaCha",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/beast/core/detail/chacha.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Zlib",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/beast/core/detail/chacha.hpp",
+        "sha256": "b55322b54b655ac36d06dac70d64cc32e740d315d4187a3f5adc958b4e86a6da"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Relevant header is observed by the compiler; emitted code depends on template instantiation."
+  },
+  {
+    "id": "boost-asio-unix-endpoint",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Daniel Casimiro Unix endpoint",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/asio/local/basic_endpoint.hpp",
+      "boost/asio/local/detail/endpoint.hpp",
+      "boost/asio/local/detail/impl/endpoint.ipp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-Daniel-Casimiro-Public-Domain",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/asio/local/basic_endpoint.hpp",
+        "sha256": "d0118cd4fb5fe68e3deb610de933f6fa926df7a30148225de6b59a737e3f23f7"
+      },
+      {
+        "path": "native/licenses/boost/boost/asio/local/detail/endpoint.hpp",
+        "sha256": "d29e8692e21ba94ed85bdb2b1120a0a925f8f48aa745a79e53d55f293cc96a99"
+      },
+      {
+        "path": "native/licenses/boost/boost/asio/local/detail/impl/endpoint.ipp",
+        "sha256": "9fabf99502777a72090b0bec8f9d6456ad728a3b5800ef3fb79730155d58df5c"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Relevant header is observed by the compiler; emitted code depends on use of Unix endpoints."
+  },
+  {
+    "id": "boost-intrusive-tree",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Julienne Walker and The EC Team tree algorithm",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/intrusive/rbtree_algorithms.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-Walker-EC-Public-Domain",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/intrusive/rbtree_algorithms.hpp",
+        "sha256": "e6e0de8f4d67bf9db21df2b76687eef297cadcec704fadd46993372edf299afa"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Relevant header is observed by the compiler; emitted code depends on template instantiation."
+  },
+  {
+    "id": "boost-beast-sha1",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "SHA-1 adaptation from vog/sha1",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/beast/core/detail/sha1.hpp",
+      "boost/beast/core/detail/sha1.ipp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "BSL-1.0",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/beast/core/detail/sha1.hpp",
+        "sha256": "475728867fbec8ee198e1f0c662d41d598cf281dad8a9b38089cb371cfbfe307"
+      },
+      {
+        "path": "native/licenses/boost/boost/beast/core/detail/sha1.ipp",
+        "sha256": "916cf1e071558be99862c048e1db08b29994a1e73ad1b046ad6ab10827af8917"
+      },
+      {
+        "path": "native/licenses/boost/LICENSE_1_0.txt",
+        "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Beast explicitly distributes its adaptation under BSL-1.0; emitted code depends on use of SHA-1 functions."
+  },
+  {
+    "id": "boost-container-hash-mx3",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Jon Maiga mx3 hash mixing adaptation",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/container_hash/detail/hash_mix.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "BSL-1.0",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/container_hash/detail/hash_mix.hpp",
+        "sha256": "806139b076c7fc8069974cf7d064212e89a2403d7d9a2fcf54df18d278d3170e"
+      },
+      {
+        "path": "native/licenses/boost/LICENSE_1_0.txt",
+        "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Boost explicitly distributes its adaptation under BSL-1.0; emitted code depends on template instantiation."
+  },
+  {
+    "id": "boost-string-view",
+    "family": "api",
+    "parent": "boost",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "LLVM StringRef and N3422 string view adaptation",
+    "version": "as bundled in Boost 1.88.0",
+    "source": {
+      "url": "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2",
+      "sha256": "46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b"
+    },
+    "source_path": [
+      "boost/utility/string_view.hpp",
+      "boost/utility/string_view_fwd.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "BSL-1.0",
+    "notices": [
+      {
+        "path": "native/licenses/boost/boost/utility/string_view.hpp",
+        "sha256": "d30beafc37fbc837d0b7a81e8b19dffb03badc79407e53c29f6b466ee7810b44"
+      },
+      {
+        "path": "native/licenses/boost/boost/utility/string_view_fwd.hpp",
+        "sha256": "d2d573b90d1c9af9679016397b577bcd83ea383b01b5f3df9fddc9027ed7e214"
+      },
+      {
+        "path": "native/licenses/boost/LICENSE_1_0.txt",
+        "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Boost explicitly distributes its adaptation under BSL-1.0; emitted code depends on template instantiation."
+  },
+  {
+    "id": "json-hedley",
+    "family": "api",
+    "parent": "json",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Hedley",
+    "version": "15",
+    "source": {
+      "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+      "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+    },
+    "source_path": [
+      "include/nlohmann/thirdparty/hedley/hedley.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "MIT",
+    "notices": [
+      {
+        "path": "native/licenses/json/include/nlohmann/thirdparty/hedley/hedley.hpp",
+        "sha256": "1547b367895f8be9f8283ae21f583182db572ad990236220002b632a15238712"
+      },
+      {
+        "path": "native/licenses/json/LICENSE.MIT",
+        "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Header macros used by JSON for Modern C++."
+  },
+  {
+    "id": "json-grisu2",
+    "family": "api",
+    "parent": "json",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Florian Loitsch Grisu2",
+    "version": "as bundled in JSON for Modern C++ 3.12.0",
+    "source": {
+      "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+      "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+    },
+    "source_path": [
+      "include/nlohmann/detail/conversions/to_chars.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "MIT",
+    "notices": [
+      {
+        "path": "native/licenses/json/include/nlohmann/detail/conversions/to_chars.hpp",
+        "sha256": "20b9bc4469ee490bc626d8dbcdee060a494292473df4bdbcecfe2f2145ed562d"
+      },
+      {
+        "path": "native/licenses/json/LICENSE.MIT",
+        "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Floating-point serialization implementation."
+  },
+  {
+    "id": "json-utf8-dfa",
+    "family": "api",
+    "parent": "json",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Björn Hoehrmann UTF-8 DFA",
+    "version": "as bundled in JSON for Modern C++ 3.12.0",
+    "source": {
+      "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+      "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+    },
+    "source_path": [
+      "include/nlohmann/detail/output/serializer.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "MIT",
+    "notices": [
+      {
+        "path": "native/licenses/json/include/nlohmann/detail/output/serializer.hpp",
+        "sha256": "4c079acb8f6936c4f787fd5706a52c77a1751dd34787a821705845698ec8540e"
+      },
+      {
+        "path": "native/licenses/json/LICENSE.MIT",
+        "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "UTF-8 serialization validation implementation."
+  },
+  {
+    "id": "json-abseil-integer-sequence",
+    "family": "api",
+    "parent": "json",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Abseil integer_sequence",
+    "version": "10cb35e459f5ecca5b2ff107635da0bfa41011b4",
+    "source": {
+      "url": "https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz",
+      "sha256": "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa"
+    },
+    "source_path": [
+      "include/nlohmann/detail/meta/cpp_future.hpp"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0",
+    "notices": [
+      {
+        "path": "native/licenses/json/include/nlohmann/detail/meta/cpp_future.hpp",
+        "sha256": "71e606c586174ff875f5996a00bc6e84a49e0919eafd6fb38c7cb928dfdf5795"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "source-only",
+    "condition": "Excluded by JSON_HAS_CPP_14 in the registry C++20 build; retained as source-archive evidence only.",
+    "incorporated": false
+  },
+  {
+    "id": "openssl-siphash",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "SipHash reference implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/siphash/siphash.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "CC0-1.0",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/siphash/siphash.c",
+        "sha256": "81429486f9ff136cbcbd25ae1c086945a22c7c8eeddbc48443c24b7ab414d371"
+      },
+      {
+        "path": "native/licenses/openssl/CC0-1.0.txt",
+        "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion.",
+    "license_text_source": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.26.0/text/CC0-1.0.txt",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    }
+  },
+  {
+    "id": "openssl-rijndael",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Rijndael reference implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/aes/aes_core.c",
+      "crypto/aes/aes_x86core.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-Rijndael-Public-Domain",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/aes/aes_core.c",
+        "sha256": "d4015f2fc3f53e644b3d770063c3755572f91e8a36b937819eb439e06a8ce0db"
+      },
+      {
+        "path": "native/licenses/openssl/crypto/aes/aes_x86core.c",
+        "sha256": "a6d9f9632ff048b02a6e22132b2ad8dcc30c6a6eaf12d344944a9e0612d944ec"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-aria",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "NSRI ARIA reference implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/aria/aria.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-ARIA-Public-Domain",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/aria/aria.c",
+        "sha256": "6e62515e67910aea2f04b64c643aa2545732f9dd7bf0abf87d8accf8c2c1fb88"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-chacha-supercop",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "SUPERCOP ChaCha",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/chacha/chacha_enc.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-SUPERCOP-Public-Domain",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/chacha/chacha_enc.c",
+        "sha256": "08874ccd7036ca13062b51741c4ba1417826a7c4c6e5778af5e20a86d1b281ca"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-seed",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "KISA SEED",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/seed/seed.c",
+      "crypto/seed/seed_local.h"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-KISA-SEED",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/seed/seed.c",
+        "sha256": "2b0909c6e8f3f1c348f447b759e1ea500f555db5de63a3d5a8c28ffcd232d5b8"
+      },
+      {
+        "path": "native/licenses/openssl/crypto/seed/seed_local.h",
+        "sha256": "a7f0d1699042ca94e64221d43abfb70b94abd1d992b9a1e101af0a7a2b3ecdbe"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-bio-powell",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Patrick Powell formatting implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/bio/bio_print.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "LicenseRef-Patrick-Powell",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/bio/bio_print.c",
+        "sha256": "cdcff413696b0cb07a7d710fe9f3568e02005037c27a4f2c4cd4bacc10b66036"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-lpdir",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Richard Levitte LPdir",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/LPdir_unix.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0 OR BSD-2-Clause",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/LPdir_unix.c",
+        "sha256": "a63d8af424e50744b7804634a79eafb389a8d5a5488c5df42343b661c0027370"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-proxy-certificates",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "KTH proxy certificate extensions",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/x509/v3_pci.c",
+      "crypto/x509/v3_pcia.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0 OR BSD-3-Clause",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/x509/v3_pci.c",
+        "sha256": "621182026f498566c44d15630ef85948acda34890c601e6a44afdd55098266e7"
+      },
+      {
+        "path": "native/licenses/openssl/crypto/x509/v3_pcia.c",
+        "sha256": "89c9915e8e65700504bbf1d5cad187bc7723dafbd2f018fe03a10d04ba5711c6"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-blake2",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Samuel Neves BLAKE2 implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "providers/implementations/digests/blake2b_prov.c",
+      "providers/implementations/digests/blake2s_prov.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/providers/implementations/digests/blake2b_prov.c",
+        "sha256": "10bf65ebaf71eec075966a95799d4350733b9f6e0ff5c4d2c08448f9ee0139a2"
+      },
+      {
+        "path": "native/licenses/openssl/providers/implementations/digests/blake2s_prov.c",
+        "sha256": "72fb44ea296baa5dc9d8eec7f3ee90ee112ae7cc33545a4921fe3b3c58c5c792"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-camellia",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "NTT Camellia implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "crypto/camellia/camellia.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/crypto/camellia/camellia.c",
+        "sha256": "f24d35eeac86fd0f212efb45c8d1ba0cbff9c09c69a900b2d487d62cb3978c7c"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  },
+  {
+    "id": "openssl-dtls-srtp",
+    "family": "api",
+    "parent": "openssl",
+    "association_role": "supplementary-source-notice",
+    "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
+    "name": "Eric Rescorla DTLS-SRTP implementation",
+    "version": "as bundled in OpenSSL 3.5.3",
+    "source": {
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
+      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+    },
+    "source_path": [
+      "ssl/d1_srtp.c"
+    ],
+    "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
+    "license": "Apache-2.0",
+    "notices": [
+      {
+        "path": "native/licenses/openssl/ssl/d1_srtp.c",
+        "sha256": "0428c8a95e331243d973128056dd1da5223216dd497607202f1133d92b303f04"
+      },
+      {
+        "path": "native/licenses/openssl/LICENSE.txt",
+        "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+      }
+    ],
+    "scope": "runtime",
+    "condition": "Included only if the final linker map selects the corresponding OpenSSL archive member; the source archive and broad retained notices alone do not establish inclusion."
+  }
+]

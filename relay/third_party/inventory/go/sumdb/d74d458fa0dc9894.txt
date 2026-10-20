@@ -1,0 +1,9 @@
+3038296
+github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
+github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
+
+go.sum database tree
+69517015
+7U5J/4R6xQxgY31FiEEg6uZ2j5HZVJkNyxZY0gmR7Co=
+
+— sum.golang.org Az3grjZv+6/cvga1ZslD0fWHB4U6ZAdkhoeUNeFD1Cx+D8ZX+vz9nqFFKkmtbgTnhzSCjI1oLdoUjhJ0HTVkoIdQzwY=

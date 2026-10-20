@@ -1,0 +1,9 @@
+34646830
+github.com/spf13/cobra v1.9.1 h1:CXSaggrXdbHK9CF+8ywj8Amf7PBRmPCOJugH954Nnlo=
+github.com/spf13/cobra v1.9.1/go.mod h1:nDyEzZ8ogv936Cinf6g1RU9MRY64Ir93oCnqb9wxYW0=
+
+go.sum database tree
+69518975
+QLRpUYuYwRPgTmEtdFtUT3wka43v9uVbmeylHPuZYQ0=
+
+— sum.golang.org Az3grlVgsn36dYTcZQwmn9PK4L31viwCqWBF+55Xzp6Ih1E6eqbkXSdcQ7Hzyj3xRk75W9vf8QIjsZi+mOg3U9pfVQk=

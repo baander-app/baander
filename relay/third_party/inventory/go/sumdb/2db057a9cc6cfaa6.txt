@@ -1,0 +1,9 @@
+41915449
+github.com/Files-com/files-sdk-go/v3 v3.2.218 h1:tIvcbHXNY/bq+Sno6vajOJOxhe5XbU59Fa1ohOybK+s=
+github.com/Files-com/files-sdk-go/v3 v3.2.218/go.mod h1:E0BaGQbcMUcql+AfubCR/iasWKBxX5UZPivnQGC2z0M=
+
+go.sum database tree
+69523091
+9XbxRA3qS/keNaxs6rRTTq48ShEw9C+MKxdcJdqegGQ=
+
+— sum.golang.org Az3grvbLSzq6psrFn57oyO2nEBZXZHjx4qAnFHmaTmunuLGO6tOspLfS7GwYIvR6ruWkTZdK5j+zN8HhVBljSnHZaQo=

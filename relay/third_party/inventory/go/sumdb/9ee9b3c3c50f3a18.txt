@@ -1,0 +1,9 @@
+15469675
+gopkg.in/natefinch/lumberjack.v2 v2.2.1 h1:bBRl1b0OH9s/DuPhuXpNl+VtCaJXFZ5/uEFST95x9zc=
+gopkg.in/natefinch/lumberjack.v2 v2.2.1/go.mod h1:YD8tP3GAjkrDg1eZH7EGmyESg/lsYskCTPBJVb9jqSc=
+
+go.sum database tree
+69518297
+k7gZ5dAfc1f3YCl69Sxx9wREUUiHwL+Th5vYbnldKTI=
+
+— sum.golang.org Az3grkZJ4ECMx9k5KwQJZRQmSA5lztf2i4jyVdyNmVwXwJ7TAglmy9fzXr/xbi8Vj48sd3f1OH8FeNWjk/3yFK4QhgE=

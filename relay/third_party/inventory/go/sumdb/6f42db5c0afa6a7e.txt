@@ -1,0 +1,9 @@
+63236775
+github.com/aws/aws-sdk-go-v2/credentials v1.20.5 h1:wklUVvHMc9xTQ3rcp49/ISpiMnhbCicJcA6n6S8m7J8=
+github.com/aws/aws-sdk-go-v2/credentials v1.20.5/go.mod h1:fyEdrn6ccLFOkoK84j5bQyGTxp9zPt5l2XMhxf4DVZs=
+
+go.sum database tree
+69523091
+9XbxRA3qS/keNaxs6rRTTq48ShEw9C+MKxdcJdqegGQ=
+
+— sum.golang.org Az3grvbLSzq6psrFn57oyO2nEBZXZHjx4qAnFHmaTmunuLGO6tOspLfS7GwYIvR6ruWkTZdK5j+zN8HhVBljSnHZaQo=

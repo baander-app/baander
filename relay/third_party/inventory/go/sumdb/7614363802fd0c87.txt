@@ -1,0 +1,9 @@
+8759253
+github.com/peterh/liner v1.2.2 h1:aJ4AOodmL+JxOZZEL2u9iJf8omNRpqHc/EbrK+3mAXw=
+github.com/peterh/liner v1.2.2/go.mod h1:xFwJyiKIXJZUKItq5dGHZSTBRAuG/CpeNpWLyiNRNwI=
+
+go.sum database tree
+69522659
+ebyNZcZHHok1vZ3OodaAkkAFeYCEHLrHZkMCuQ4OGOY=
+
+— sum.golang.org Az3grv5qo17ywgYU1DX1jWGggp4BinKF2YVRPMmA8s5uz3ojIN6r1JmK1n7rphMBKoQZqEd2y8IdyZvnQhMwufIKWAE=

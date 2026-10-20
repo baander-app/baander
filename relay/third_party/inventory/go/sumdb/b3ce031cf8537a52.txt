@@ -1,0 +1,9 @@
+39434725
+github.com/pkg/xattr v0.4.12 h1:rRTkSyFNTRElv6pkA3zpjHpQ90p/OdHQC1GmGh1aTjM=
+github.com/pkg/xattr v0.4.12/go.mod h1:di8WF84zAKk8jzR1UBTEWh9AUlIZZ7M/JNt8e9B6ktU=
+
+go.sum database tree
+69518537
+Q3rtLhB46dg+pIiWy6RJRN/fUfywf5YrkHverNWNHYU=
+
+— sum.golang.org Az3grpVaijf5ZU7D4vhHXGd//35niYpDHkbjRh3YIp+X15t2nK6TxunnEsyC9HDQ5pJEsDNoGgLAL3BANrAVQCvWIwE=

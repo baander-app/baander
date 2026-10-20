@@ -15,3 +15,5 @@
 !docker/backup.Dockerfile
 !backup/
 !backup/registry_backup.py
+!tools/
+!tools/packaged_inventory.py

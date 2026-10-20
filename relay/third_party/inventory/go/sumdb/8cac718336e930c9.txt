@@ -1,0 +1,9 @@
+729493
+github.com/putdotio/go-putio/putio v0.0.0-20200123120452-16d982cac2b8 h1:Y258uzXU/potCYnQd1r6wlAnoMB68BiCkCcCnKx1SH8=
+github.com/putdotio/go-putio/putio v0.0.0-20200123120452-16d982cac2b8/go.mod h1:bSJjRokAHHOhA+XFxplld8w2R/dXLH7Z3BZ532vhFwU=
+
+go.sum database tree
+69516972
+OUmLlB+n06OdcsPKM0xyY5DYyWrj60lI8vwnlU5dHxw=
+
+— sum.golang.org Az3gru+3icSh9CIZ7lO+G3cmrLYkfBuTfP3cX79EHhr9h0HQxZmtZtozskfHAPNvckOAhIHtesgslU+ELInr1AnSiQc=

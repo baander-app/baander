@@ -1,0 +1,9 @@
+35265457
+github.com/googleapis/enterprise-certificate-proxy v0.3.6 h1:GW/XbdyBFQ8Qe+YAmFU9uHLo7OnF5tL52HFAgMmyrf4=
+github.com/googleapis/enterprise-certificate-proxy v0.3.6/go.mod h1:MkHOF77EYAE7qfSuSS9PU6g4Nt4e11cnsDUowfwewLA=
+
+go.sum database tree
+69521262
+IIKv+7QO87HRuDDMM+nWijhjgufTOWam/bIv2wbEVtw=
+
+— sum.golang.org Az3grruaIDmmIVGKMicQQx5QMTMMNtP67tOQ1PrdBX5MEfuxvmor3Yk+ZWBpxs5jc6A9GxLMsicW27gvYj10WWAkRgk=

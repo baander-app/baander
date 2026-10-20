@@ -1,0 +1,9 @@
+61866205
+github.com/klauspost/compress v1.20.0 h1:a3C1ke2ohxFymNlb2HWAHjDeKCI90scRskErZkR0ezA=
+github.com/klauspost/compress v1.20.0/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
+
+go.sum database tree
+69512781
+nffC/ZK3NpSvgT5j7NqfbM8F8jUZSA+yX29hNBJLENo=
+
+— sum.golang.org Az3grta263bI9Gh36uD+BRpEIWYjXlNNWL6NmO7MXrlvgAmeFXGYUz+nzLRy+tPsx66SbmwOkLkNDzlV6tF43yd0PgM=

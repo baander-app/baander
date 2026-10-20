@@ -1,0 +1,9 @@
+16174482
+github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd h1:nzE1YQBdx1bq9IlZinHa+HVffy+NmVRoKr+wHN8fpLE=
+github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd/go.mod h1:C8yoIfvESpM3GD07OCHU7fqI7lhwyZ2Td1rbNbTAhnc=
+
+go.sum database tree
+69516958
+MaDsTHajBhrDuMvUh1NRlN4XANpXfSXjc97ZAAGGUns=
+
+— sum.golang.org Az3gru4alBJ7SxDdUhVw9EbcVTV71rrxBaKuhKDxa058T8oLLHL19vXCcndWyCIBcxIfbs3AO/8Wf0NWVzW/Xxz/FwU=

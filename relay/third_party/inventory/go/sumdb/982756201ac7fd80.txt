@@ -1,0 +1,9 @@
+38540132
+github.com/geoffgarside/ber v1.2.0 h1:/loowoRcs/MWLYmGX9QtIAbA+V/FrnVLsMMPhwiRm64=
+github.com/geoffgarside/ber v1.2.0/go.mod h1:jVPKeCbj6MvQZhwLYsGwaGI52oUorHoHKNecGT85ZCc=
+
+go.sum database tree
+69513314
+2bLMgaqVImy9uuTEMxaNt57LlRqM2GO5al0Io+yhAjI=
+
+— sum.golang.org Az3grqjDZeykHpgiMD2OHA38uAThhSeIJhCYzfCgjUpUguYZ7ge9+M1y4agpJzrcUOU1UMEE5ahbC/6Q4F9XWBZH2wc=

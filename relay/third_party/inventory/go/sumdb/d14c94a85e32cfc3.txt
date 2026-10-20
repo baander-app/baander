@@ -1,0 +1,9 @@
+63456930
+github.com/hashicorp/serf v0.11.0 h1:8PbIr0pQOHs5hpBAkbX0teVLckuLvG3qIZm7hZJO0gc=
+github.com/hashicorp/serf v0.11.0/go.mod h1:k7zXXBvdNnDT5F1xrC0uMJB/0FWf6erElwZNQq/SsBA=
+
+go.sum database tree
+69511191
+w5rDdkSCK3o9o9Cd2DAwINCKWSCZ5ovYTBe+NWa7GWk=
+
+— sum.golang.org Az3grtZO5Y0IR8nn60Sfji/Eo/74pTpg9U/94kNgv6q+t2J7dm+OWfhv4d9Tgm+2qkJeRYJIcOC1n6k+1EIms3rTFw0=

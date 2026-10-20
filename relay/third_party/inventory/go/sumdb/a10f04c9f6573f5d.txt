@@ -1,0 +1,9 @@
+6909088
+github.com/aalpar/deheap v0.0.0-20210914013432-0cc84d79dec3 h1:hhdWprfSpFbN7lz3W1gM40vOgvSh1WCSMxYD6gGB4Hs=
+github.com/aalpar/deheap v0.0.0-20210914013432-0cc84d79dec3/go.mod h1:XaUnRxSCYgL3kkgX0QHIV0D+znljPIDImxlv2kbGv0Y=
+
+go.sum database tree
+69523388
+oHHjAKTZXrL4tafZFLYc5K+D1siOAtz4+N6qmX/qM2M=
+
+— sum.golang.org Az3grgQHEz0Mdqzi4Y9fl5Pp/Zxi4WT55v1wXIb2LtR2j7gdeZ3HOlezvsGOkOB3AE+nuzWPoHIgJ4PP+C15svDxpwQ=

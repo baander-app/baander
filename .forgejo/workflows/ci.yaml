@@ -442,6 +442,8 @@ jobs:
     registry-container-quality:
         runs-on: docker-cli
         timeout-minutes: 30
+        env:
+            REGISTRY_INVENTORY_OUTPUT: var/test-runs/registry-inventory
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
@@ -460,6 +462,14 @@ jobs:
                 run: bash scripts/test-registry-container.sh
             -   name: Qualify encrypted registry backup and recovery
                 run: bash scripts/test-registry-backup.sh
+            -   name: Preserve packaged Registry inventories
+                if: always()
+                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+                with:
+                    name: registry-packaged-inventory
+                    path: var/test-runs/registry-inventory/
+                    if-no-files-found: error
+                    retention-days: 14
 
     registry-thread-quality:
         runs-on: docker-cli

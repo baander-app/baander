@@ -1,0 +1,9 @@
+38394950
+github.com/anacrolix/generics v0.0.3 h1:wMkQgQzq0obSy1tMkxDu7Ife7PsegOBWHDRaSW31EnM=
+github.com/anacrolix/generics v0.0.3/go.mod h1:MN3ve08Z3zSV/rTuX/ouI4lNdlfTxgdafQJiLzyNRB8=
+
+go.sum database tree
+69523397
+7MyNosWENXFSrVvFAj9XP2g4mocoEdRoyMkv5bTwNd8=
+
+— sum.golang.org Az3grlcy8mNgTvNUm2bqPk2S12jynDLKPvtmqfl8VntyrKR5xzjB6o/X0cZXcHgoGrod+XzxE/4kG0LodHvaw/RbZwc=

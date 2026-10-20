@@ -1,0 +1,9 @@
+17753432
+github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
+github.com/sirupsen/logrus v1.9.3/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
+
+go.sum database tree
+69510860
+VNAw5zR8xBmljyjDrqdHtof7rfjsWkhih37rsMqYk6U=
+
+— sum.golang.org Az3grmAfUylQhzTJB0qNnCOieZpcSmLig8xVQoL+32qBjhLgv3D25j9AQ0pmzxvDx5geExIH1H7Y8xKsHXphERE9gww=

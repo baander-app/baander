@@ -1,0 +1,9 @@
+14298963
+github.com/koofr/go-koofrclient v0.0.0-20221207135200-cbd7fc9ad6a6 h1:FHVoZMOVRA+6/y4yRlbiR3WvsrOcKBd/f64H7YiWR2U=
+github.com/koofr/go-koofrclient v0.0.0-20221207135200-cbd7fc9ad6a6/go.mod h1:MRAz4Gsxd+OzrZ0owwrUHc0zLESL+1Y5syqK/sJxK2A=
+
+go.sum database tree
+69516958
+MaDsTHajBhrDuMvUh1NRlN4XANpXfSXjc97ZAAGGUns=
+
+— sum.golang.org Az3gru4alBJ7SxDdUhVw9EbcVTV71rrxBaKuhKDxa058T8oLLHL19vXCcndWyCIBcxIfbs3AO/8Wf0NWVzW/Xxz/FwU=

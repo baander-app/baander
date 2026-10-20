@@ -1,0 +1,9 @@
+35756398
+github.com/pkg/sftp v1.13.9 h1:4NGkvGudBL7GteO3m6qnaQ4pC0Kvf0onSVc9gR3EWBw=
+github.com/pkg/sftp v1.13.9/go.mod h1:OBN7bVXdstkFFN/gdnHPUb5TE8eb8G1Rp9wCItqjkkA=
+
+go.sum database tree
+69523091
+9XbxRA3qS/keNaxs6rRTTq48ShEw9C+MKxdcJdqegGQ=
+
+— sum.golang.org Az3grvbLSzq6psrFn57oyO2nEBZXZHjx4qAnFHmaTmunuLGO6tOspLfS7GwYIvR6ruWkTZdK5j+zN8HhVBljSnHZaQo=

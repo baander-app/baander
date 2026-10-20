@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-for command in docker timeout; do
+for command in docker timeout python3; do
     command -v "$command" >/dev/null
 done
 docker buildx version >/dev/null
@@ -15,6 +15,7 @@ database_image="$run_id:database"
 contract_image="$run_id:contract"
 container="$run_id-contract"
 work="$(mktemp -d /tmp/baander-registry-backup.XXXXXXXX)"
+inventory_output="${REGISTRY_INVENTORY_OUTPUT:-var/test-runs/registry-inventory/$run_id}"
 cleanup() {
     docker rm -f "$container" >/dev/null 2>&1 || true
     docker image rm "$contract_image" "$backup_image" "$api_image" "$database_image" >/dev/null 2>&1 || true
@@ -30,6 +31,10 @@ docker buildx build --platform linux/amd64 --load \
     -f relay/docker/Dockerfile -t "$api_image" relay
 docker buildx build --platform linux/amd64 --load \
     -f relay/docker/rqlite.Dockerfile -t "$database_image" relay
+export PYTHONDONTWRITEBYTECODE=1
+python3 relay/tools/verify_packaged_image.py --image "$backup_image" --kind backup --output "$inventory_output"
+python3 relay/tools/verify_packaged_image.py --image "$api_image" --kind api --output "$inventory_output"
+python3 relay/tools/verify_packaged_image.py --image "$database_image" --kind rqlite --output "$inventory_output"
 
 # Copy through the build context so this works with a remote Docker daemon too.
 mkdir "$work/tests" "$work/backup"

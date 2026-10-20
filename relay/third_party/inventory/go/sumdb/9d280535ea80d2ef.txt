@@ -1,0 +1,9 @@
+38839025
+github.com/hanwen/go-fuse/v2 v2.8.0 h1:wV8rG7rmCz8XHSOwBZhG5YcVqcYjkzivjmbaMafPlAs=
+github.com/hanwen/go-fuse/v2 v2.8.0/go.mod h1:yE6D2PqWwm3CbYRxFXV9xUd8Md5d6NG0WBs5spCswmI=
+
+go.sum database tree
+69523409
+qBGHWg83z5VWxdzXgcFLfVDA8sPf7IrYOaT3EbLPsHU=
+
+— sum.golang.org Az3grod3WBB3hm7mpOlpzhin6tnLB6IRddSDai8DbE4Ai5iW7HN5MBYzRzAZC5cxI6kqBnC21x0AAl32bd3hf+Du/wM=

@@ -1,0 +1,9 @@
+5793452
+github.com/rfjakob/eme v1.1.2 h1:SxziR8msSOElPayZNFfQw4Tjx/Sbaeeh3eRvrHVMUs4=
+github.com/rfjakob/eme v1.1.2/go.mod h1:cVvpasglm/G3ngEfcfT/Wt0GwhkuO32pf/poW6Nyk1k=
+
+go.sum database tree
+69523463
+87GYyZeqRhKf93OXg65mX8luXB52bl+WaC3IETR4Tdg=
+
+— sum.golang.org Az3grlEFQDWTTPnskoNp613FzV8AxMSZNW6oEI15s6XLT0CEhKTGNccVLPOYp0PWqRIpUvik3YRhaDCf0b0M75v4TwM=

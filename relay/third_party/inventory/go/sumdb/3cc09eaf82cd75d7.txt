@@ -1,0 +1,9 @@
+16731537
+go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
+go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
+
+go.sum database tree
+69521325
+t48OVFNbW96j7YQU4wMr6L7MLzt/CasA1sVMZCJhDyQ=
+
+— sum.golang.org Az3grrxGLzkMqqTxJclW/tvXRQalXsqUMHvxlvS/dYUQ/EUMPb63v4IPlhK2m3RW0IcmnEMKfP9QSmJ+xvnCBhq3kAY=

@@ -1,0 +1,9 @@
+13742
+github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
+github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+
+go.sum database tree
+69519466
+iKfcR6rilln38zsfLvjQDf0OovbVSJp2tbczQJT720I=
+
+— sum.golang.org Az3grpygGpT+knCy7PHrSC0yg/NAcXcQTbNYSn/Jr1HGEcChxIzynbBasjhVDfGbwFaHaNQuJRmFEykoCqU5EfyiIAk=

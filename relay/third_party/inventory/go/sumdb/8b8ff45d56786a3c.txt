@@ -1,0 +1,9 @@
+45319374
+github.com/rclone/rclone v1.71.2 h1:3Jk5xNPFrZhVABRuN/OPvApuZQddpE2tkhYMuEn1Ud4=
+github.com/rclone/rclone v1.71.2/go.mod h1:dCK9FzPDlpkbQJ9M7MmWsmv3X5nibfWe+ogJXu6gSgM=
+
+go.sum database tree
+69523511
+Us6UALw97jvDHpZRHn/xT5QmmOVDD7fgSH0gcGC3SdE=
+
+— sum.golang.org Az3grmzXedG3n20naNuJKGOwKd0HnqoeoyDcy0a6egSjW5o1S0e6QIEgWQOekeykXWTaoKiWmIBeZpxbDCWoMYyC4g4=

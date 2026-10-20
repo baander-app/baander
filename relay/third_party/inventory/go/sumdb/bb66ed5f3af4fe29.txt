@@ -1,0 +1,9 @@
+32080885
+github.com/relvacode/iso8601 v1.6.0 h1:eFXUhMJN3Gz8Rcq82f9DTMW0svjtAVuIEULglM7QHTU=
+github.com/relvacode/iso8601 v1.6.0/go.mod h1:FlNp+jz+TXpyRqgmM7tnzHHzBnz776kmAH2h3sZCn0I=
+
+go.sum database tree
+69523219
+o/R7aXbehdVdlKc7Vr/E0aWrASeJhv0bvEB8xh2554c=
+
+— sum.golang.org Az3grl5cbHCVgIVMeaR0OpcB8t1pNr+rWLbv7Ol+6uVHTxmXmbKqXNDSFwhPt/Dht+uX3wkvu6bV8SFi0l/li3FzUws=

@@ -1,0 +1,9 @@
+41951161
+github.com/oracle/oci-go-sdk/v65 v65.98.0 h1:ZKsy97KezSiYSN1Fml4hcwjpO+wq01rjBkPqIiUejVc=
+github.com/oracle/oci-go-sdk/v65 v65.98.0/go.mod h1:RGiXfpDDmRRlLtqlStTzeBjjdUNXyqm3KXKyLCm3A/Q=
+
+go.sum database tree
+69522990
+8pt7A2xXiMuzPYBZXnVF8bBPw3ePThQXxGJLTeaNdss=
+
+— sum.golang.org Az3grtVqeI0UWVVlf4SmBYnIG+NKKkDL3F6leA2W1lOYcjN6mFKnavgFC8nQDNu7b5TsaErwC3hIXZOvIFy8TgFK3g4=

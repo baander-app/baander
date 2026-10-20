@@ -1,0 +1,9 @@
+44031578
+github.com/hashicorp/go-msgpack/v2 v2.1.5 h1:Ue879bPnutj/hXfmUk6s/jtIK90XxgiUIcXRl656T44=
+github.com/hashicorp/go-msgpack/v2 v2.1.5/go.mod h1:bjCsRXpZ7NsJdk45PoCQnzRGDaK8TKm5ZnDI/9y3J4M=
+
+go.sum database tree
+69511827
+sD2x6SDFS99uzRfjWizb2FviDkmSSadZBsf+jEI1T4Y=
+
+— sum.golang.org Az3gril4rasVffmu34ZfITTg8sKWVTUk2Ok5HDe0o0BaooTm2w6rKOfUXZocoYNRMGzMoD8Rd/mNxsjQfpQRaw9hFAQ=

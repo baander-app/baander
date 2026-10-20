@@ -1,0 +1,9 @@
+2656130
+github.com/buengese/sgzip v0.1.1 h1:ry+T8l1mlmiWEsDrH/YHZnCVWD2S3im1KLsyO+8ZmTU=
+github.com/buengese/sgzip v0.1.1/go.mod h1:i5ZiXGF3fhV7gL1xaRRL1nDnmpNj0X061FQzOS8VMas=
+
+go.sum database tree
+69516871
+wfif+GLaOFQ0YjvjnxaGNiaaxlG+5ldCB1Erpi0YqAY=
+
+— sum.golang.org Az3grinCmb3m+OAq+Ccw8+vgxXKY5UHl3Yxus7TQ0+/EFTJwhl1PnjxDQUZTPSqzmenNA/2/khWD8IR1gsfnge8BygQ=

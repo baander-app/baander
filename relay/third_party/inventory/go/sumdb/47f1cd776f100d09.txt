@@ -1,0 +1,9 @@
+36488071
+github.com/gabriel-vasile/mimetype v1.4.9 h1:5k+WDwEsD9eTLL8Tz3L0VnmVh9QxGjRmjBvAG7U/oYY=
+github.com/gabriel-vasile/mimetype v1.4.9/go.mod h1:WnSQhFKJuBlRyLiKohA/2DtIlPFAbguNaG7QCHcyGok=
+
+go.sum database tree
+69513991
+fNZtOabX8y5+IiQ/lnQx4Kh5XPGmg5VYF+yJgBhWduA=
+
+— sum.golang.org Az3grr6QjgD+NYBVuBeCXqL/Po0WVFahgwtDeSGEDvwTEodwTKw8ChD3tJTIXLJv802md7O65XHp5IKpqZCqZsgKXwg=

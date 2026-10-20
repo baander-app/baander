@@ -1,0 +1,9 @@
+41690331
+cloud.google.com/go/compute/metadata v0.8.0 h1:HxMRIbao8w17ZX6wBnjhcDkW6lTFpgcaobyVfZWqRLA=
+cloud.google.com/go/compute/metadata v0.8.0/go.mod h1:sYOGTp851OV9bOFJ9CH7elVvyzopvWQFNNghtDQ/Biw=
+
+go.sum database tree
+69523046
+f6hFmZRnGS0tP/qBdl73wBVvql1nzzismLbuav7bmuM=
+
+— sum.golang.org Az3grhAO+GkeEk5NGyibC9BZ7SdoCkKjhMTsuheXJMJfHV8GdcqH2JWE+zNtRHdgccnEnUEXsZZuSi2/e1TfGoFJIAM=

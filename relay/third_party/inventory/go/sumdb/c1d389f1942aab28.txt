@@ -1,0 +1,9 @@
+41643852
+github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.11.0 h1:MhRfI58HblXzCtWEZCO0feHs8LweePB3s90r7WaR1KU=
+github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.11.0/go.mod h1:okZ+ZURbArNdlJ+ptXoyHNuOETzOl1Oww19rm8I2WLA=
+
+go.sum database tree
+69523337
+5jB0a3eHk+BGdz2RO+Mx9UgoSqb+gOMWXomTPyOY1Xw=
+
+— sum.golang.org Az3grijJyNEWwO//DfghNmyKZPdHin01M7ehkUuzQRdgb3Sw3ltet+qMsf5IA7lmbZF7WykxUcGmEhWu4e1lS+JBgwI=

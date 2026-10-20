@@ -1,0 +1,9 @@
+19513094
+github.com/henrybear327/Proton-API-Bridge v1.0.0 h1:gjKAaWfKu++77WsZTHg6FUyPC5W0LTKWQciUm8PMZb0=
+github.com/henrybear327/Proton-API-Bridge v1.0.0/go.mod h1:gunH16hf6U74W2b9CGDaWRadiLICsoJ6KRkSt53zLts=
+
+go.sum database tree
+69523409
+qBGHWg83z5VWxdzXgcFLfVDA8sPf7IrYOaT3EbLPsHU=
+
+— sum.golang.org Az3grod3WBB3hm7mpOlpzhin6tnLB6IRddSDai8DbE4Ai5iW7HN5MBYzRzAZC5cxI6kqBnC21x0AAl32bd3hf+Du/wM=

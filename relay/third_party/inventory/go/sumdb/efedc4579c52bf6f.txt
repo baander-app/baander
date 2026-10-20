@@ -1,0 +1,9 @@
+28514767
+github.com/mattn/go-runewidth v0.0.16 h1:E5ScNMtiwvlvB5paMFdw9p4kSQzbXFikJ5SQO6TULQc=
+github.com/mattn/go-runewidth v0.0.16/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
+
+go.sum database tree
+69517576
+adfKq2p73vMHqGEPcTtq3vaBCJjKP9IoBK7JXuigyn4=
+
+— sum.golang.org Az3gruKF4rLeT8OCee0ZDVoInQDDL6GO5VgwkWNNG5zN3CxNfCdwHz2P2gBqWxPrb/dJvphP3KTxzzslJAnLcMLr/AE=

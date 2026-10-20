@@ -1,0 +1,9 @@
+36321885
+github.com/PuerkitoBio/goquery v1.10.3 h1:pFYcNSqHxBD06Fpj/KsbStFRsgRATgnf3LeXiUkhzPo=
+github.com/PuerkitoBio/goquery v1.10.3/go.mod h1:tMUX0zDMHXYlAQk6p35XxQMqMweEKB7iK7iLNd4RH4Y=
+
+go.sum database tree
+69511368
+GdemfAjvsI5sYyh72LQsFXu/QF8U0ziF9GYTpqdOBKM=
+
+— sum.golang.org Az3grqqIgaXNN1CiSKsd7Q5FMgW6lwVJAZHcPpnRGJDJr77JYqyzgoSP9OmPyC1xjX1ETP4Ig9jTcttkkqpys9OedAE=

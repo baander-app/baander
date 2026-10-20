@@ -1,0 +1,9 @@
+38266
+github.com/pengsrc/go-shared v0.2.1-0.20190131101655-1999055a4a14 h1:XeOYlK9W1uCmhjJSsY78Mcuh7MVkNjTzmHx1yBzizSU=
+github.com/pengsrc/go-shared v0.2.1-0.20190131101655-1999055a4a14/go.mod h1:jVblp62SafmidSkvWrXyxAme3gaTfEtWwRPGz5cpvHg=
+
+go.sum database tree
+69516972
+OUmLlB+n06OdcsPKM0xyY5DYyWrj60lI8vwnlU5dHxw=
+
+— sum.golang.org Az3gru+3icSh9CIZ7lO+G3cmrLYkfBuTfP3cX79EHhr9h0HQxZmtZtozskfHAPNvckOAhIHtesgslU+ELInr1AnSiQc=

@@ -1,0 +1,9 @@
+44260269
+filippo.io/nistec v0.0.4 h1:F14ZHT5htWlMnQVPndX9ro9arf56cBhQxq4LnDI491s=
+filippo.io/nistec v0.0.4/go.mod h1:PK/lw8I1gQT4hUML4QGaqljwdDaFcMyFKSXN7kjrtKI=
+
+go.sum database tree
+69517311
+BZ8KpBhxZbycjMSbkwfgH0VtDIBct2dZ55cX93gZbJ0=
+
+— sum.golang.org Az3grt9CPYOESUBrIf2vHmpdw9xfN7WPpKDXR8jxfYuXd9XNAOExP5L1gNxbwcsuccbo+znk7gXr082WS1zHS4Ao3Ag=

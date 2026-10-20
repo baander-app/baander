@@ -1,0 +1,9 @@
+7162175
+github.com/ProtonMail/bcrypt v0.0.0-20211005172633-e235017c1baf h1:yc9daCCYUefEs69zUkSzubzjBbL+cmOXgnmt9Fyd9ug=
+github.com/ProtonMail/bcrypt v0.0.0-20211005172633-e235017c1baf/go.mod h1:o0ESU9p83twszAU8LBeJKFAAMX14tISa0yk4Oo5TOqo=
+
+go.sum database tree
+69516871
+wfif+GLaOFQ0YjvjnxaGNiaaxlG+5ldCB1Erpi0YqAY=
+
+— sum.golang.org Az3grinCmb3m+OAq+Ccw8+vgxXKY5UHl3Yxus7TQ0+/EFTJwhl1PnjxDQUZTPSqzmenNA/2/khWD8IR1gsfnge8BygQ=

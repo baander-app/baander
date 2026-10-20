@@ -1,0 +1,9 @@
+62707205
+github.com/aws/aws-sdk-go-v2/service/signin v1.10.0 h1:ZD5qFpWcaOKdTuhBi431pIDkCgrMkMlMT6jlpSPoIRI=
+github.com/aws/aws-sdk-go-v2/service/signin v1.10.0/go.mod h1:8Nuuf+tR346PjJ3MvZPh9pekbLiLQFWJhzMXfwy7alA=
+
+go.sum database tree
+69511925
+k8lKDgT3o9fupEwsOF+ikyuJRqTUtD+bmKhB6zBWquU=
+
+— sum.golang.org Az3grg5MELUZ8d+QCKORYCdMa71BR1F0apgEKMgBwOyhJmrkcgq2w4W7LVhAP9W5oH9wl7bi4k+7N+uesyTD5KqS4w8=

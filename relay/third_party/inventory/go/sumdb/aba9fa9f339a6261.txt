@@ -1,0 +1,9 @@
+5807708
+github.com/hashicorp/go-immutable-radix v1.3.1 h1:DKHmCUm2hRBK510BaiZlwvpD40f8bJFeZnpfm2KLowc=
+github.com/hashicorp/go-immutable-radix v1.3.1/go.mod h1:0y9vanUI8NX6FsYoO3zeMjhV/C5i9g4Q3DwcSNZ4P60=
+
+go.sum database tree
+69515055
+erLkSnvyqTE6qJM1eiDHyE8id2yNHvE3gySK6OEqiBI=
+
+— sum.golang.org Az3griv2TPwDIuxbP1LJVUEviEUNPxv94LVGOcjz7Vs+Yf16jp5vUQP36cGQXW3X5PyEiavKouQeeDHj52H0FnlRUQg=

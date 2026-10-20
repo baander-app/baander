@@ -1,0 +1,9 @@
+44145914
+github.com/t3rm1n4l/go-mega v0.0.0-20250926104142-ccb8d3498e6c h1:BLopNCyqewbE8+BtlIp/Juzu8AJGxz0gHdGADnsblVc=
+github.com/t3rm1n4l/go-mega v0.0.0-20250926104142-ccb8d3498e6c/go.mod h1:ykucQyiE9Q2qx1wLlEtZkkNn1IURib/2O+Mvd25i1Fo=
+
+go.sum database tree
+69523330
+WmWFYsz/Fri6LiAwmgNkbULc8SeJAfZYRaCAPpP78Pg=
+
+— sum.golang.org Az3grrSwZLLWhIqGh5QM6QcDymzXVHjxqKK8sTBjJ7G2uL/3+8E9u5FHPpNYhEKvVB3vC6ZYyQRgiIw5Bm+/KHue0wU=

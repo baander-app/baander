@@ -1,0 +1,9 @@
+33270445
+github.com/google/s2a-go v0.1.9 h1:LGD7gtMgezd8a/Xak7mEWL0PjoTQFvpRudN895yqKW0=
+github.com/google/s2a-go v0.1.9/go.mod h1:YA0Ei2ZQL3acow2O62kdp9UlnvMmU7kA6Eutn0dXayM=
+
+go.sum database tree
+69510017
+tDmz1LLTAlFUNYIJWTFKha3QPabrwyQSIKVoeg0+mi8=
+
+— sum.golang.org Az3grswXBY/Hj1tlL3KGapaLm+0YKAFvzYfl4O/gKNmtt0OK78XDHqHwe0HUJdEnpYcOh+ruyXkGkBq+kOOXFnTptwU=

@@ -1,0 +1,9 @@
+27810107
+github.com/gorilla/schema v1.4.1 h1:jUg5hUjCSDZpNGLuXQOgIWGdlgrIdYvgQ0wZtdK1M3E=
+github.com/gorilla/schema v1.4.1/go.mod h1:Dg5SSm5PV60mhF2NFaTV1xuYYj8tV8NOPRo4FggUMnM=
+
+go.sum database tree
+69516993
+8bLK5DQbv0eBDPrk8B8hF6khNjXTcRN85KOf/irp+ms=
+
+— sum.golang.org Az3grj9ClK+rtqMlc/EqFJVgCzadYxT3CasTfwICCrU6QLVMpucJ3+iE6zauFu6mTTjlNx5iE2x3oLeb/kl7+EclfQA=

@@ -8,3 +8,8 @@
 
 /.github export-ignore
 CHANGELOG.md export-ignore
+
+# Upstream notice bytes are hashed as retained source evidence.
+relay/third_party/inventory/*/licenses/** -text -whitespace
+relay/third_party/inventory/go/*.buildinfo.txt -text -whitespace
+relay/third_party/inventory/native/licenses/openssl/AUTHORS.md conflict-marker-size=32

@@ -1,0 +1,9 @@
+781919
+github.com/yunify/qingstor-sdk-go/v3 v3.2.0 h1:9sB2WZMgjwSUNZhrgvaNGazVltoFUUfuS9f0uCWtTr8=
+github.com/yunify/qingstor-sdk-go/v3 v3.2.0/go.mod h1:KciFNuMu6F4WLk9nGwwK69sCGKLCdd9f97ac/wfumS4=
+
+go.sum database tree
+69517009
+SEF2X0iUiogIVJ3xwd21zgw1OL+86O3oTvJ12YK4ET8=
+
+— sum.golang.org Az3grm5QtvBrTauhF/+I+O01nLEkSpQS0+RLg7ijwVT8EfY/kmViAacCJDEfL7fuD46tAmZEYh5pD+V6qLCobtdLUAk=

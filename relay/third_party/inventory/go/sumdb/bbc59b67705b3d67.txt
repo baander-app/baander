@@ -1,0 +1,9 @@
+37709911
+github.com/ProtonMail/go-crypto v1.3.0 h1:ILq8+Sf5If5DCpHQp4PbZdS1J7HDFRXz/+xKBiRGFrw=
+github.com/ProtonMail/go-crypto v1.3.0/go.mod h1:9whxjD8Rbs29b4XWbB8irEcE8KHMqaR2e7GWU1R+/PE=
+
+go.sum database tree
+69515941
+AoshTbmjsg2gy4JQd+xQ0JXmB68H4I7R/MY9GHyrF3o=
+
+— sum.golang.org Az3groKHOp1Smef2bv9sueMHCQFldoROgUV3LL3Ysk3I0g84lL9UuSyE2KAeP+e6HpTRXQf3NhPKcuWzKREiw6hmdA4=

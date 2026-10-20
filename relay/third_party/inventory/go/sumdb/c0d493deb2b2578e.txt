@@ -1,0 +1,9 @@
+40514599
+github.com/klauspost/cpuid/v2 v2.3.0 h1:S4CRMLnYUhGeDFDqkGriYKdfoFlDnMtqTiI/sFzhA9Y=
+github.com/klauspost/cpuid/v2 v2.3.0/go.mod h1:hqwkgyIinND0mEev00jJYCxPNVRVXFQeu1XKlok6oO0=
+
+go.sum database tree
+69517816
+5hmUf4BREo9q13KSm7dg6GbnYWqyL7r5n2nX3VkJIUM=
+
+— sum.golang.org Az3grvZWMaTGvdB0LgadIk+yzRjWoryB+hSRo3407/sbgjLH8gSOCvmIs3yqumfaYomZJbm8m9TmSKGZtu+cDm6oOAw=

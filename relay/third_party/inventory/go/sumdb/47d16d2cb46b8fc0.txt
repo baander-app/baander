@@ -1,0 +1,9 @@
+1725640
+github.com/jzelinskie/whirlpool v0.0.0-20201016144138-0675e54bb004 h1:G+9t9cEtnC9jFiTxyptEKuNIAbiN5ZCQzX2a74lj3xg=
+github.com/jzelinskie/whirlpool v0.0.0-20201016144138-0675e54bb004/go.mod h1:KmHnJWQrgEvbuy0vcvj00gtMqbvNn1L+3YUZLK/B92c=
+
+go.sum database tree
+69516516
+07HXUg0M2JJpfPHd3Bv6oVaotIgmqyPabE1dgMHf9SI=
+
+— sum.golang.org Az3grnPWiAhff7wbBJHA4gX97Xbl9DBums9D+yLMMIN4nY27+l4TnrOisoUpA3LQl6Eu3HEjdbD/90xsEe/P0FkAXg8=

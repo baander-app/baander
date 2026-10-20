@@ -1,0 +1,9 @@
+41904853
+github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.8.3 h1:3ZKmesYBaFX33czDl6mbrcHb6jeheg6LqjJhQdefhsY=
+github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.8.3/go.mod h1:7ryVb78GLCnjq7cw45N6oUb9REl7/vNUwjvIqC5UgdY=
+
+go.sum database tree
+69523219
+o/R7aXbehdVdlKc7Vr/E0aWrASeJhv0bvEB8xh2554c=
+
+— sum.golang.org Az3grl5cbHCVgIVMeaR0OpcB8t1pNr+rWLbv7Ol+6uVHTxmXmbKqXNDSFwhPt/Dht+uX3wkvu6bV8SFi0l/li3FzUws=

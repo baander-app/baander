@@ -1,0 +1,9 @@
+39029171
+github.com/hashicorp/go-retryablehttp v0.7.8 h1:ylXZWnqa7Lhqpk0L1P1LzDtGcCR0rPVUrx/c8Unxc48=
+github.com/hashicorp/go-retryablehttp v0.7.8/go.mod h1:rjiScheydd+CxvumBsIrFKlx3iS0jrZ7LvzFGFmuKbw=
+
+go.sum database tree
+69514392
+woP15a0SckwJxFjwaamYQMkLCFIFxBgT9QKMqpwqJ7k=
+
+— sum.golang.org Az3grjegqt/CJISfbH2w6us+LWJ990BDOH/Mx87HttJUPHYqh3Afrn88Na5qGmjreMomy/LH2vCj04Fwt9ErdzPnwgM=

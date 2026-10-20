@@ -1,0 +1,9 @@
+34853375
+github.com/cloudsoda/sddl v0.0.0-20250224235906-926454e91efc h1:0xCWmFKBmarCqqqLeM7jFBSw/Or81UEElFqO8MY+GDs=
+github.com/cloudsoda/sddl v0.0.0-20250224235906-926454e91efc/go.mod h1:uvR42Hb/t52HQd7x5/ZLzZEK8oihrFpgnodIJ1vte2E=
+
+go.sum database tree
+69511833
+Q8zP109ZAvzsFTglW/ygyir7ge1MsHHDfGgohjPwgn4=
+
+— sum.golang.org Az3grqxfFxJrIq1Piw4gIZK9pEUEw6dg7QIzRrDanDbh0Wudi5dXdrsx/+yCmhjyFB/n0OfjeJTBZy6u0nQn+aYhEA8=

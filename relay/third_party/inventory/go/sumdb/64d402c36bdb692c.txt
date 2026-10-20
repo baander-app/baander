@@ -1,0 +1,9 @@
+34378683
+github.com/rqlite/rqlite-disco-clients v0.0.0-20250205044118-8ada2b350099 h1:5cqkVLdl6sGJSY3kiF2dqaA3bD+8OS5FUdZqO0BxXLU=
+github.com/rqlite/rqlite-disco-clients v0.0.0-20250205044118-8ada2b350099/go.mod h1:6SVI8KegsW9Fyu2UQ+uvw0JI5CAILRYRyiQ/OFSJPrs=
+
+go.sum database tree
+69523428
+qiB9NEflTOQWJUYVfX9VenFU4IYEDzLAFFfVkDrnTZY=
+
+— sum.golang.org Az3grkBOzQNFJLt0Hri9kdh4km1jzKvQzneF4wYmZqxAJwtH+vnQWW2nVWbhM7kVFrYhlvD0T8Pqh50AJqCtCealQAw=

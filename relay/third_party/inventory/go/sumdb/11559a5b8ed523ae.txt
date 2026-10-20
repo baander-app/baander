@@ -1,0 +1,9 @@
+7841667
+github.com/unknwon/goconfig v1.0.0 h1:rS7O+CmUdli1T+oDm7fYj1MwqNWtEJfNj+FqcUHML8U=
+github.com/unknwon/goconfig v1.0.0/go.mod h1:qu2ZQ/wcC/if2u32263HTVC39PeOQRSmidQk3DuDFQ8=
+
+go.sum database tree
+69515852
+5VUXGZM+8gvMjre+hWPAgP1UDG4BMvPIQSWI5nZ0L/4=
+
+— sum.golang.org Az3gruGvEYjE8+ICIBP+qWxsfEyhCsafW611kjBU3gCG0GqQSVaHtmQwoFeTV7F0fQ+PQr6D1QYU1Is8fT3u0J39xQw=

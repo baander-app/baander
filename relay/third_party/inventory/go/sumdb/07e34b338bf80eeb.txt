@@ -1,0 +1,9 @@
+41904655
+github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.3 h1:GicIdnekoJsjq9wqnvyi2elW6CGMSYKhdozE7/Svh78=
+github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.3/go.mod h1:R7BIi6WNC5mc1kfRM7XM/VHC3uRWkjc396sfabq4iOo=
+
+go.sum database tree
+69523279
+dQir2KZj89HEX+6pX9cWvalym/MisjtT4CSveahaEDQ=
+
+— sum.golang.org Az3gruT7wpph7TefesjXvui7+bHP9JNCm3iACUPRWifoWPfMuyYLjw0SBXNYQwODFxYCmIjA6YtLyzOqSvMmqCVGrQw=

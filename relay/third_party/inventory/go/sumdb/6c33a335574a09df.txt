@@ -1,0 +1,9 @@
+41957434
+google.golang.org/api v0.247.0 h1:tSd/e0QrUlLsrwMKmkbQhYVa109qIintOls2Wh6bngc=
+google.golang.org/api v0.247.0/go.mod h1:r1qZOPmxXffXg6xS5uhx16Fa/UFY8QU/K4bfKrnvovM=
+
+go.sum database tree
+69522990
+8pt7A2xXiMuzPYBZXnVF8bBPw3ePThQXxGJLTeaNdss=
+
+— sum.golang.org Az3grtVqeI0UWVVlf4SmBYnIG+NKKkDL3F6leA2W1lOYcjN6mFKnavgFC8nQDNu7b5TsaErwC3hIXZOvIFy8TgFK3g4=

@@ -1,0 +1,9 @@
+50473124
+github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372 h1:2V0y6mzmPj7vQKad76nTL7sZ/lFLj5VKvNjpa6IRxYE=
+github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372/go.mod h1:ib9zVtNgRKiGuoMyUqqL5aNpk+r+++YlyiVIkclVqPg=
+
+go.sum database tree
+69523397
+7MyNosWENXFSrVvFAj9XP2g4mocoEdRoyMkv5bTwNd8=
+
+— sum.golang.org Az3grlcy8mNgTvNUm2bqPk2S12jynDLKPvtmqfl8VntyrKR5xzjB6o/X0cZXcHgoGrod+XzxE/4kG0LodHvaw/RbZwc=

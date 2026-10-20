@@ -1,0 +1,9 @@
+568908
+github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8 h1:GKTyiRCL6zVf5wWaqKnf+7Qs6GbEPfd4iMOitWzXJx8=
+github.com/bradfitz/iter v0.0.0-20191230175014-e8f45d346db8/go.mod h1:spo1JLcs67NmW1aVLEgtA8Yy1elc+X8y5SRW1sFW4Og=
+
+go.sum database tree
+69518577
+PFIKGPObA11rJdheXJjdy13kZOJF0j6H3KE4PVZkDFk=
+
+— sum.golang.org Az3grhsV1Hb5AGjfoJBN4WZ9zXsduckcKG6EoUZwqIcPPXRIyBsrUwD31Q/Vk5nXR9CTc7O4mX13nKCziaYKDQdrLwQ=

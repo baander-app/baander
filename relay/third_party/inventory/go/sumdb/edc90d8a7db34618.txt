@@ -1,0 +1,9 @@
+33439324
+github.com/rclone/gofakes3 v0.0.4 h1:LswpC49VY/UJ1zucoL5ktnOEX6lq3qK7e1aFIAfqCbk=
+github.com/rclone/gofakes3 v0.0.4/go.mod h1:j/UoS+2/Mr7xAlfKhyVC58YyFQmh9uoQA5YZQXQUqmg=
+
+go.sum database tree
+69523494
+lvSjWdDhWoCFTsOnXjn5Lnh0HGZiPvucUN6ODowiLyE=
+
+— sum.golang.org Az3grimhc8Z0TNeC9JUxSClxgFxRljBuk8Bos/xauLxwRt5+DvtQHzWTEK6teNIVGP7LCjecw3K7Yc6KZQCcHdVTvAw=

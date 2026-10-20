@@ -1,0 +1,9 @@
+18512190
+github.com/colinmarc/hdfs/v2 v2.4.0 h1:v6R8oBx/Wu9fHpdPoJJjpGSUxo8NhHIwrwsfhFvU9W0=
+github.com/colinmarc/hdfs/v2 v2.4.0/go.mod h1:0NAO+/3knbMx6+5pCv+Hcbaz4xn/Zzbn9+WIib2rKVI=
+
+go.sum database tree
+69516442
+O3IU4tTQOIBHMbRt0rwoHh9DTS0rPz6s9mnAII2b/i8=
+
+— sum.golang.org Az3grlq72FpGOn6rdUON/RUu7i01cyWJ8YpMwYlUkqLAaV/Z8EPQ9X//pYBtWbkCFaIO3d7KjJAgRCh/lk8kv6V4jgo=

@@ -1,0 +1,9 @@
+8402985
+github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
+github.com/go-logr/stdr v1.2.2/go.mod h1:mMo/vtBO5dYbehREoey6XUKy/eSumjCCveDpRre4VKE=
+
+go.sum database tree
+69514458
+BrwDPbilgeU3WZcLEUeLEygVM6GgfgivSPFSTU2DZjg=
+
+— sum.golang.org Az3grmYlYSD55vEROGhN6IItrBEz9ymBgipQApflAooTp8S33plEzTlHQs+V/N0J3xn1+zFKiur0B/zSmAd63WUDHgk=

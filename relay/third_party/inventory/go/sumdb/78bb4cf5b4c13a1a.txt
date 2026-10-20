@@ -1,0 +1,9 @@
+10032614
+github.com/cronokirby/saferith v0.33.0 h1:TgoQlfsD4LIwx71+ChfRcIpjkw+RPOapDEVxa+LhwLo=
+github.com/cronokirby/saferith v0.33.0/go.mod h1:QKJhjoqUtBsXCAVEjw38mFqoi7DebT7kthcD7UzbnoA=
+
+go.sum database tree
+69516197
+xJsMZHdZG/SZoz647kks/T3qIXyZOvCyZYPpDtjbw5Q=
+
+— sum.golang.org Az3gri6rcWKnc+0qMjw5miY9fjNwPrxHXyUoGu1a3P5hsWl+WoU7RFGYfiG/t7/ZhwF0PEd+Mt6JS6B3aZiJJlrrQQk=

@@ -1,0 +1,9 @@
+39310083
+go.etcd.io/bbolt v1.4.2 h1:IrUHp260R8c+zYx/Tm8QZr04CX+qWS5PGfPdevhdm1I=
+go.etcd.io/bbolt v1.4.2/go.mod h1:Is8rSHO/b4f3XigBC0lL0+4FwAQv3HXEEIgFMuKHceM=
+
+go.sum database tree
+69519152
+VC7mt3YSgfSEhTGxN6DojrpIOPxJreRft2XCU25W+hU=
+
+— sum.golang.org Az3grm6jlZz3HByHa7BpYpdK5P1S9zMQMQJv4k2p1a0D+84bacwZBY2ikjVzw9yXlwX8vQ4isHoIdtjHx7JhdCGDQQE=

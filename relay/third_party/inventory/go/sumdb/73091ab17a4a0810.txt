@@ -1,0 +1,9 @@
+22477818
+github.com/flynn/noise v1.1.0 h1:KjPQoQCEFdZDiP03phOvGi11+SVVhBG2wOWAorLsstg=
+github.com/flynn/noise v1.1.0/go.mod h1:xbMo+0i6+IGbYdJhF31t2eR1BIU0CYc12+BNAKwUTag=
+
+go.sum database tree
+69516972
+OUmLlB+n06OdcsPKM0xyY5DYyWrj60lI8vwnlU5dHxw=
+
+— sum.golang.org Az3gru+3icSh9CIZ7lO+G3cmrLYkfBuTfP3cX79EHhr9h0HQxZmtZtozskfHAPNvckOAhIHtesgslU+ELInr1AnSiQc=

@@ -1,0 +1,9 @@
+10738965
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+
+go.sum database tree
+69513284
+ubygsV5NXx60AEivISUJg5ZwE0jF62y6ztIs0Jl07YU=
+
+— sum.golang.org Az3grv1st5axhHuYTmvhNqQZSw/rYRB7qnkKuem54Q0sZEhRubrkHhYsy9B90OpxoKIFAON/mQm+pTDELiA3JbV5vwA=

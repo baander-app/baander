@@ -1,0 +1,9 @@
+2691964
+github.com/hashicorp/go-cleanhttp v0.5.2 h1:035FKYIWjmULyFRBKPs8TBQoi0x6d9G4xc9neXJWAZQ=
+github.com/hashicorp/go-cleanhttp v0.5.2/go.mod h1:kO/YDlP8L1346E6Sodw+PrpBSV4/SoxCXGY6BqNFT48=
+
+go.sum database tree
+69510846
+QqxmNg6YESAtcV3U7z4GxmpOx3E7klUWIq73dWus1to=
+
+— sum.golang.org Az3grvMa0mFQvzncio1gs8pBs4zhvxXf6YAxnwRwui5W3h0FBx5lzM+MZoPQiZ+KZWj1mpk31Jcy922LfhvSxW56DAA=

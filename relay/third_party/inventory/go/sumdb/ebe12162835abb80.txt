@@ -1,0 +1,9 @@
+1806949
+github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
+github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
+
+go.sum database tree
+69522091
+5W/vrUr6oK9W14h2TpEQxdWXZ8GHjlKml87JsSe2BqQ=
+
+— sum.golang.org Az3grhAynCU+hOMosvU7pSjyq/LWM+HG7rYhEfeZHf1hLj/CdrfTfYzwKQhNP5G5DR9Htio0YQp/G6GP/kq3psXBfAs=

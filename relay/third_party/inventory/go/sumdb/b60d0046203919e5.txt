@@ -1,0 +1,9 @@
+41185776
+sigs.k8s.io/yaml v1.6.0 h1:G8fkbMSAFqgEFgh4b1wmtzDnioxFCUgTZhlbj5P9QYs=
+sigs.k8s.io/yaml v1.6.0/go.mod h1:796bPqUfzR/0jLAl6XjHl3Ck7MiyVv8dbTdyT3/pMf4=
+
+go.sum database tree
+69519713
+xNNfugLECfpj5IJ0Mc68/LixFtgZBnhCsxuV47PZL3w=
+
+— sum.golang.org Az3groa6yPv2IgwFaj6QA3N3cDNQ4HsagyzxQ8sI2py50iRmxfcGf40EcC6iAO3thDWL2AhRxZQ3XJ/leeKzsIwAlgI=

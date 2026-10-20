@@ -1,0 +1,9 @@
+30938296
+github.com/zeebo/errs v1.4.0 h1:XNdoD/RRMKP7HD0UhJnIzUy74ISdGGxURlYG8HSWSfM=
+github.com/zeebo/errs v1.4.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
+
+go.sum database tree
+69512402
+JPM5OnrZE+UG7pZ8ZjACF2/CZZCgLsokOF3H583l+cI=
+
+— sum.golang.org Az3grgqrY7ll6ujE3PojSuq8z3ux51sl75SXnXdWxFhoYnOkkRV9Hl9AW6HCXStdWOZffDzQIFQQ3pXAPXnasSl9fgk=

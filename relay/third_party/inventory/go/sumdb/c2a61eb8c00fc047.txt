@@ -1,0 +1,9 @@
+4348601
+github.com/calebcase/tmpfile v1.0.3 h1:BZrOWZ79gJqQ3XbAQlihYZf/YCV0H4KPIdM5K5oMpJo=
+github.com/calebcase/tmpfile v1.0.3/go.mod h1:UAUc01aHeC+pudPagY/lWvt2qS9ZO5Zzof6/tIUzqeI=
+
+go.sum database tree
+69516426
+xmzncOcGb/74c9Kk3+xFGHkUv0/mf2U53PUFK9toG0Q=
+
+— sum.golang.org Az3griwVPyHYi897XEH1MfXqm0K6wd6d2ysF1M8qRrPTEjjMzoXwjNK6SEZheCjRYYu/6nCaS4+/IQLQdbNg8CIkAg8=

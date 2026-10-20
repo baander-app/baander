@@ -1,0 +1,9 @@
+1826950
+github.com/jcmturner/rpc/v2 v2.0.3 h1:7FXXj8Ti1IaVFpSAziCZWNzbNuZmnvw/i6CqLNdWfZY=
+github.com/jcmturner/rpc/v2 v2.0.3/go.mod h1:VUJYCIDm3PVOEHw8sgt091/20OJjskO/YJki3ELg/Hc=
+
+go.sum database tree
+69509582
+k32grnjCnKSJZ9sngnu1TLet9PHUwXkQ8yx8OCu8O54=
+
+— sum.golang.org Az3grmQdE61fl74NDuEahpv2mfVDfPWSUoxwrHT7u8paIG8WwwavbHJCYStayxFvRbLJ8aUvZNkAs+domQHI6ADZCg8=

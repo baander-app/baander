@@ -1,0 +1,9 @@
+53060845
+go.uber.org/zap v1.28.0 h1:IZzaP1Fv73/T/pBMLk4VutPl36uNC+OSUh3JLG3FIjo=
+go.uber.org/zap v1.28.0/go.mod h1:rDLpOi171uODNm/mxFcuYWxDsqWSAVkFdX4XojSKg/Q=
+
+go.sum database tree
+69521458
+fHjduvNLCDk6DqpPqgpXSn0ccB6B5da2Yaf15MddLw8=
+
+— sum.golang.org Az3grgttxRNkhsGv2oDvID67OI7hAOceQiJf2qaNppmWlO5cfV8YKaq0xyID57xPuTcVTdjxJUcfUQQ09WTzCIwoWgo=

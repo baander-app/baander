@@ -1,0 +1,9 @@
+383
+github.com/patrickmn/go-cache v2.1.0+incompatible h1:HRMgzkcYKYpi3C8ajMPV8OFXaaRUnok+kx1WdO15EQc=
+github.com/patrickmn/go-cache v2.1.0+incompatible/go.mod h1:3Qf8kWWT7OJRJbdiICTKqZju1ZixQ/KpMGzzAfe6+WQ=
+
+go.sum database tree
+69514603
+1rXui9+W/sIwifK+YT3uKurueXMpOPSxeBTY/v2NCWY=
+
+— sum.golang.org Az3grqUpFXBX0VTPl2Lza78UpIZgUZRCq6P1s3Eb22F1ypZwW3gJyMysn1lRPGO/a1pXRyiQcZNq8Ja/sfqggoD9CwM=

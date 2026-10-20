@@ -1,0 +1,9 @@
+17743752
+goftp.io/server/v2 v2.0.1 h1:H+9UbCX2N206ePDSVNCjBftOKOgil6kQ5RAQNx5hJwE=
+goftp.io/server/v2 v2.0.1/go.mod h1:7+H/EIq7tXdfo1Muu5p+l3oQ6rYkDZ8lY7IM5d5kVdQ=
+
+go.sum database tree
+69512195
+dQ7d1zv2TJ6irr9VA8e3NBtDJ04BYGJD87nzGjgpCO4=
+
+— sum.golang.org Az3grr3bWb/q188lGtOnIYP9xpFB6nKSSNaAOMj8hq4rrx4YyRUdGNwLsip5q+CThU3JN9QT4DxyIYpDyacW2TWFIQE=

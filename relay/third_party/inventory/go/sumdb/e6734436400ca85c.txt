@@ -1,0 +1,9 @@
+22522902
+github.com/leodido/go-urn v1.4.0 h1:WT9HwE9SGECu3lg4d/dIA+jxlljEa1/ffXKmRjqdmIQ=
+github.com/leodido/go-urn v1.4.0/go.mod h1:bvxc+MVxLKB4z00jd1z+Dvzr47oO32F/QSNjSBOlFxI=
+
+go.sum database tree
+69515231
+OvrRjGT3lLqL4W3N6qm28NiN/NRoOqlJK0+tfxqESFs=
+
+— sum.golang.org Az3grtnko9p2Bm2SZZ5w5J8rhcHmjUfFmorUOyLYeMyLD6Z6+bhKshcu6keunE0VQnEy6Xtb8WSHboHeTfldAbNKhg8=

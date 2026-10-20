@@ -1,0 +1,9 @@
+17826755
+github.com/hashicorp/go-metrics v0.5.1 h1:rfPwUqFU6uZXNvGl4hzjY8LEBsqFVU4si1H9/Hqck/U=
+github.com/hashicorp/go-metrics v0.5.1/go.mod h1:KEjodfebIOuBYSAe/bHTm+HChmKSxAOXPBieMLYozDE=
+
+go.sum database tree
+69523444
+LZThpYLajx+SE3CXHI7bHKPTb7BO9TjPdYY32DlvNVM=
+
+— sum.golang.org Az3grvQEIabRiuk/wJquLLx7GS3KR0YO3v7E54iMWwvSuVkUDqIeIh6puyF3d+iECr87M5AlqALwuYFTt2kL34pcHAk=

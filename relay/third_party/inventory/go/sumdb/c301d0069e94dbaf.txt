@@ -1,0 +1,9 @@
+41409897
+github.com/golang-jwt/jwt/v5 v5.3.0 h1:pv4AsKCKKZuqlgs5sUmn4x8UlGa0kEVt/puTpKx9vvo=
+github.com/golang-jwt/jwt/v5 v5.3.0/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
+
+go.sum database tree
+69514392
+woP15a0SckwJxFjwaamYQMkLCFIFxBgT9QKMqpwqJ7k=
+
+— sum.golang.org Az3grjegqt/CJISfbH2w6us+LWJ990BDOH/Mx87HttJUPHYqh3Afrn88Na5qGmjreMomy/LH2vCj04Fwt9ErdzPnwgM=

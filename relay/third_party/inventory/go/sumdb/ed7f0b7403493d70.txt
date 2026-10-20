@@ -1,0 +1,9 @@
+60846345
+go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0 h1:v4KkRLVvE1cWqTJDfZZkTCG+Z4aolsa6RVos0FX7vqE=
+go.opentelemetry.io/contrib/instrumentation/runtime v0.71.0/go.mod h1:g/xbuPC0XbgwMdKuyF5sKOUUEsorSkN6APydyFP/H9E=
+
+go.sum database tree
+69523511
+Us6UALw97jvDHpZRHn/xT5QmmOVDD7fgSH0gcGC3SdE=
+
+— sum.golang.org Az3grmzXedG3n20naNuJKGOwKd0HnqoeoyDcy0a6egSjW5o1S0e6QIEgWQOekeykXWTaoKiWmIBeZpxbDCWoMYyC4g4=

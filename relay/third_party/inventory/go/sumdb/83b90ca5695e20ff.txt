@@ -1,0 +1,9 @@
+9566501
+moul.io/http2curl/v2 v2.3.0 h1:9r3JfDzWPcbIklMOs2TnIFzDYvfAZvjeavG6EzP7jYs=
+moul.io/http2curl/v2 v2.3.0/go.mod h1:RW4hyBjTWSYDOxapodpNEtX0g5Eb16sxklBqmd2RHcE=
+
+go.sum database tree
+69516901
+I4PyQyNJvLD3Q6HutrDaFhKagPPJIKxD253DgfwHAv4=
+
+— sum.golang.org Az3grnhBsEz6fP4lvyMpXbBny/zbo0VAYHxbmElrNwwbctGIOxEOtLyvKOIChhsw5gUj+QMsWsObZ0gxjAvh0JJzGAg=

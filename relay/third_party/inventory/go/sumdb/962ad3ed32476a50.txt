@@ -1,0 +1,9 @@
+528773
+github.com/hashicorp/go-rootcerts v1.0.2 h1:jzhAVGtqPKbwpyCPELlgNWhE1znq+qwJtW5Oi2viEzc=
+github.com/hashicorp/go-rootcerts v1.0.2/go.mod h1:pqUvnprVnM5bf7AOirdbb01K4ccR319Vf4pU3K5EGc8=
+
+go.sum database tree
+69522665
+4OTucYxW39PLSnoPdoQJIDQREAw/PZYUXpi1NkixrQE=
+
+— sum.golang.org Az3grl1eN3YiH229v0FTk64lwcagn8ZZxGVNv7FGKmQo1mha2NXJ7Yg8gYdACJIRgabnkwkcZtLgzblc160vsQTpKAg=

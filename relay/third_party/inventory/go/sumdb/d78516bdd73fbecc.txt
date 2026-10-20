@@ -1,0 +1,9 @@
+22347003
+github.com/bradenaw/juniper v0.15.3 h1:RHIAMEDTpvmzV1wg1jMAHGOoI2oJUSPx3lxRldXnFGo=
+github.com/bradenaw/juniper v0.15.3/go.mod h1:UX4FX57kVSaDp4TPqvSjkAAewmRFAfXf27BOs5z9dq8=
+
+go.sum database tree
+69516663
+WYL2cnIkyn6ICvru/I9hp1yzuKNW58UUDGLd0cXobc8=
+
+— sum.golang.org Az3grnjVU3yPbyBY1066MgksgWkFnMPsjyBF+sF5qVdNilGx3jDPf4L6SIy3qAUYihcMjFbUy8Jo+s7M0Uyb2mIKOAQ=

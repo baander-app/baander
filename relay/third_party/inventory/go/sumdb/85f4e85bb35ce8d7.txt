@@ -1,0 +1,9 @@
+41154524
+github.com/Azure/azure-sdk-for-go/sdk/storage/azfile v1.5.2 h1:l3SabZmNuXCMCbQUIeR4W6/N4j8SeH/lwX+a6leZhHo=
+github.com/Azure/azure-sdk-for-go/sdk/storage/azfile v1.5.2/go.mod h1:k+mEZ4f1pVqZTRqtSDW2AhZ/3wT5qLpsUA75C/k7dtE=
+
+go.sum database tree
+69523338
+xo4kPTBsLYObxG8cB3mKGl0oWsAwBRXOFWVFLxGKuXA=
+
+— sum.golang.org Az3grkUrymD6J8OhTVUdMtFYk6qpYswPcfPOWhAOKqCcI0O65k0I2b9gHDUFIHSuaAxj/3p4aK4SGFwih43mix81ggE=

@@ -1,0 +1,9 @@
+759705
+github.com/jcmturner/aescts/v2 v2.0.0 h1:9YKLH6ey7H4eDBXW8khjYslgyqG2xZikXP0EQFKrle8=
+github.com/jcmturner/aescts/v2 v2.0.0/go.mod h1:AiaICIRyfYg35RUkr8yESTqvSy7csK90qZ5xfvvsoNs=
+
+go.sum database tree
+69510623
+vRBsi7kxuSFu6X8UPybUstGwMhHYCz7vIp1Hng5ewn8=
+
+— sum.golang.org Az3grqUXqZO3mV1JGH+evzgXd+AZL9hrXLmZfwxlrrKjmUCvh864U2zWr/w/+5ksvf5zL8Yct3BanIF3bp/lB7f1fQM=

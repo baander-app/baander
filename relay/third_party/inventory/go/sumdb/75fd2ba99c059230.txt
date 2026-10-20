@@ -1,0 +1,9 @@
+57725636
+github.com/go-logr/logr v1.4.4 h1:tG4xh9yMsRCAiodLVTxyrkzSZ9+o0L1Kg/+cPVcbP/8=
+github.com/go-logr/logr v1.4.4/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
+
+go.sum database tree
+69513747
+OiDe0B5A/lGh6/SBxCSu+8d4WgKu5l7Jy+SScjVLVhk=
+
+— sum.golang.org Az3grum1aHgKh29OZsMRt98XNDKERVYxYpUoESKlOXGhX116/TRSEmz4+p64orgfJuXUdooEXJ2PqdqV9D4H12xuxwI=

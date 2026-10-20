@@ -1,0 +1,9 @@
+62707098
+github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 h1:bON1rJf67TSTDCKg816AAIE4xSTtoo9tl0XRkO72R+I=
+github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3/go.mod h1:c5BBpjJcQXpfeq9iASyVKA3T6vX6B6LEXY4mL/gklDY=
+
+go.sum database tree
+69511939
+xnrfP+B13cvhbyb0hxJKSfcwhvnIF54OG38l05LFh8s=
+
+— sum.golang.org Az3grkHBOjPsu+R0fpeYhYnvFeeDmvwLeuzRFzya1E/BQ3eEQWxs7qWL3z/0sLjXBRBi9XyFCPQnJbCuKgGeGde2aQU=

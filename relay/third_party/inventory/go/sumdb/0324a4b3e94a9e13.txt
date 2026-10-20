@@ -1,0 +1,9 @@
+20693000
+storj.io/infectious v0.0.2 h1:rGIdDC/6gNYAStsxsZU79D/MqFjNyJc1tsyyj9sTl7Q=
+storj.io/infectious v0.0.2/go.mod h1:QEjKKww28Sjl1x8iDsjBpOM4r1Yp8RsowNcItsZJ1Vs=
+
+go.sum database tree
+69516871
+wfif+GLaOFQ0YjvjnxaGNiaaxlG+5ldCB1Erpi0YqAY=
+
+— sum.golang.org Az3grinCmb3m+OAq+Ccw8+vgxXKY5UHl3Yxus7TQ0+/EFTJwhl1PnjxDQUZTPSqzmenNA/2/khWD8IR1gsfnge8BygQ=

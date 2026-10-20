@@ -1,0 +1,9 @@
+41330345
+github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 h1:6+lZi2JeGKtCraAj1rpoZfKqnQ9SptseRZioejfUOLM=
+github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0/go.mod h1:eb3gfbVIxIoGgJsi9pGne19dhCBpK6opTYpQqAmdy44=
+
+go.sum database tree
+69523494
+lvSjWdDhWoCFTsOnXjn5Lnh0HGZiPvucUN6ODowiLyE=
+
+— sum.golang.org Az3grimhc8Z0TNeC9JUxSClxgFxRljBuk8Bos/xauLxwRt5+DvtQHzWTEK6teNIVGP7LCjecw3K7Yc6KZQCcHdVTvAw=

@@ -1,0 +1,9 @@
+34950541
+github.com/cloudsoda/go-smb2 v0.0.0-20250228001242-d4c70e6251cc h1:t8YjNUCt1DimB4HCIXBztwWMhgxr5yG5/YaRl9Afdfg=
+github.com/cloudsoda/go-smb2 v0.0.0-20250228001242-d4c70e6251cc/go.mod h1:CgWpFCFWzzEA5hVkhAc6DZZzGd3czx+BblvOzjmg6KA=
+
+go.sum database tree
+69518566
+nw4Q6b41WQzwweT21BZzkMiBoqDMZmWp2+sT27hVtDQ=
+
+— sum.golang.org Az3grrPNxF7KybQUG+QLsLTg+dgdHg1nYmt7+c6EwaD1/IMOG593gtnvbS8ZxnXTqfIPPN2cRcKWB9yvYyIYwCra7QE=

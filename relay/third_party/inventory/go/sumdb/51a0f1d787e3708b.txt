@@ -1,0 +1,9 @@
+3266080
+github.com/hashicorp/go-multierror v1.1.1 h1:H5DkEtf6CXdFp0N0Em5UCwQpXMWke8IA0+lD48awMYo=
+github.com/hashicorp/go-multierror v1.1.1/go.mod h1:iw975J/qwKPdAO1clOe2L8331t/9/fmwbPZ6JB6eMoM=
+
+go.sum database tree
+69519900
+VBn8cELKBnpCfEiPYdZQaKPnmKyimILbkbhSbQNWKUU=
+
+— sum.golang.org Az3grlLb9/oXoeRsnYZdJUeA5+LsuqIGhIYsdxHXQyGd0x7Z3EaUY8FlBhAxGwBlUiFTPbSCLt4NLeCajhv6nggDQQ8=

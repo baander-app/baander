@@ -1,0 +1,26 @@
+[
+  {
+    "name": "rqlite",
+    "source": {
+      "url": "https://codeload.github.com/rqlite/rqlite/tar.gz/8b6cc4cb14a78b81ac725ec3c7cd281e1c646422",
+      "sha256": "88a51c52c9398e43ad179af0835c62d7ff2d9ffc4ff9cfe29630e51ecf617398",
+      "commit": "8b6cc4cb14a78b81ac725ec3c7cd281e1c646422"
+    },
+    "git_commit": "8b6cc4cb14a78b81ac725ec3c7cd281e1c646422",
+    "tracked_regular_files_compared": 486,
+    "mismatches": [],
+    "git_status": ""
+  },
+  {
+    "name": "rclone",
+    "source": {
+      "url": "https://codeload.github.com/rclone/rclone/tar.gz/84a85367111c84061c959e01e0c320618e492dc6",
+      "sha256": "9f2bdefc2e15049e5ecea6b5f5c477460461281256a512c8b151a2753d6e2e9b",
+      "commit": "84a85367111c84061c959e01e0c320618e492dc6"
+    },
+    "git_commit": "84a85367111c84061c959e01e0c320618e492dc6",
+    "tracked_regular_files_compared": 2341,
+    "mismatches": [],
+    "git_status": ""
+  }
+]

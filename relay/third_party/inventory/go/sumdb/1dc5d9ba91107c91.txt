@@ -1,0 +1,9 @@
+28386468
+github.com/moby/sys/mountinfo v0.7.2 h1:1shs6aH5s4o5H2zQLn796ADW1wMrIwHsyJ2v9KouLrg=
+github.com/moby/sys/mountinfo v0.7.2/go.mod h1:1YOa8w8Ih7uW0wALDUgT1dTTSBrZ+HiBLGws92L2RU4=
+
+go.sum database tree
+69516581
+KDBMP/OACZOAgE+Wh5f/wTK6ow1tYIjJoUtWmWAMy30=
+
+— sum.golang.org Az3grsPrETQpLrJKSO/Ir3ky1Sx33jkVoySSDn2T5fNxf/kO41vvqGF/javJRQDZTIJMXMUrg4sOg0nyGzAxB9pYOg0=

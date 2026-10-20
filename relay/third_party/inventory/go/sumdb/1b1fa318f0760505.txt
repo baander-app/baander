@@ -1,0 +1,9 @@
+14080531
+github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 h1:mFRzDkZVAjdal+s7s0MwaRv9igoPqLRdzOLzw/8Xvq8=
+github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358/go.mod h1:chxPXzSsl7ZWRAuOIE23GDNzjWuZquvFlgA8xmpunjU=
+
+go.sum database tree
+69511599
+aj8Q/ia92LNFV6TkOJ1M2xX2+IpeYG1c1w2i0OATn9I=
+
+— sum.golang.org Az3grhQJ7ZnJK8w/0xnI7e/4C9nid1K1gaaBG6hpd/AWtbXAHXhSFecIhoGxbRmV+yjHnPS0o5KYE443mdLO1hNVMgA=

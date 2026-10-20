@@ -1,0 +1,67 @@
+[
+  {
+    "path": "/usr/local/bin/rqlited",
+    "sha256": "0afe4ab2119e90874a1183138ef0d6a71294c321148b9e0eda2f727c87769eb6",
+    "source": {
+      "url": "https://codeload.github.com/rqlite/rqlite/tar.gz/8b6cc4cb14a78b81ac725ec3c7cd281e1c646422",
+      "sha256": "88a51c52c9398e43ad179af0835c62d7ff2d9ffc4ff9cfe29630e51ecf617398",
+      "commit": "8b6cc4cb14a78b81ac725ec3c7cd281e1c646422"
+    },
+    "build_settings": {
+      "-buildmode": "exe",
+      "-compiler": "gc",
+      "-trimpath": "true",
+      "DefaultGODEBUG": "tracebacklabels=0,x509sslcertoverrideplatform=0",
+      "CGO_ENABLED": "1",
+      "GOARCH": "amd64",
+      "GOOS": "linux",
+      "GOAMD64": "v1",
+      "vcs": "git",
+      "vcs.revision": "8b6cc4cb14a78b81ac725ec3c7cd281e1c646422",
+      "vcs.time": "2026-10-02T14:52:00Z",
+      "vcs.modified": "false"
+    },
+    "compiler": "gcc (SUSE Linux) 16.2.1 20260929",
+    "module_graph_matches_downloaded_artifact_except_clean_main_version": true,
+    "sdk": {
+      "url": "https://go.dev/dl/go1.27.1.linux-amd64.tar.gz",
+      "sha256": "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445",
+      "official_checksum_verified": true
+    },
+    "source_tree_clean_after_build": true,
+    "smoke_test": "rqlited -version reports v10.5.1, Go1.27.1 and SQLite3.53.4"
+  },
+  {
+    "path": "/usr/local/bin/rclone",
+    "sha256": "e98b1c0f7ea131884a090dbdf24a4b424e2bb991f78a68f3240fcac9c0844554",
+    "source": {
+      "url": "https://codeload.github.com/rclone/rclone/tar.gz/84a85367111c84061c959e01e0c320618e492dc6",
+      "sha256": "9f2bdefc2e15049e5ecea6b5f5c477460461281256a512c8b151a2753d6e2e9b",
+      "commit": "84a85367111c84061c959e01e0c320618e492dc6"
+    },
+    "build_settings": {
+      "-buildmode": "exe",
+      "-compiler": "gc",
+      "-tags": "cmount",
+      "-trimpath": "true",
+      "DefaultGODEBUG": "containermaxprocs=0,decoratemappings=0,tlssha1=1,updatemaxprocs=0,x509sha256skid=0",
+      "CGO_ENABLED": "0",
+      "GOARCH": "amd64",
+      "GOOS": "linux",
+      "GOAMD64": "v1",
+      "vcs": "git",
+      "vcs.revision": "84a85367111c84061c959e01e0c320618e492dc6",
+      "vcs.time": "2025-10-20T12:02:17Z",
+      "vcs.modified": "false"
+    },
+    "compiler": "Go compiler; CGO_ENABLED=0",
+    "module_graph_matches_downloaded_artifact_except_clean_main_version": true,
+    "sdk": {
+      "url": "https://go.dev/dl/go1.25.3.linux-amd64.tar.gz",
+      "sha256": "0335f314b6e7bfe08c3d0cfaa7c19db961b7b99fb20be62b0a826c992ad14e0f",
+      "official_checksum_verified": true
+    },
+    "source_tree_clean_after_build": true,
+    "smoke_test": "rclone version reports v1.71.2, Go1.25.3 and static linking"
+  }
+]

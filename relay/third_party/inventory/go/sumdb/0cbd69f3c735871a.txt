@@ -1,0 +1,9 @@
+23395798
+github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
+github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
+
+go.sum database tree
+69519726
+sqjAA82rp6Iaxb7tU74s5vVLsnQNO5iA6rw9a3pXizg=
+
+— sum.golang.org Az3grhMgbGah/+8SQFo6BA75d/ETRx/ULpy0UiyBZM4AZrBU3rEGMXjx1LV0N8d1hxpsFLDs7BjQIQNurCQEkjNDKQ0=

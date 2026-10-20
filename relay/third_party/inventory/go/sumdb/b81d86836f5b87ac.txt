@@ -1,0 +1,9 @@
+41885541
+github.com/cloudinary/cloudinary-go/v2 v2.12.0 h1:uveBJeNpJztKDwFW/B+Wuklq584hQmQXlo+hGTSOGZ8=
+github.com/cloudinary/cloudinary-go/v2 v2.12.0/go.mod h1:ireC4gqVetsjVhYlwjUJwKTbZuWjEIynbR9zQTlqsvo=
+
+go.sum database tree
+69523494
+lvSjWdDhWoCFTsOnXjn5Lnh0HGZiPvucUN6ODowiLyE=
+
+— sum.golang.org Az3grimhc8Z0TNeC9JUxSClxgFxRljBuk8Bos/xauLxwRt5+DvtQHzWTEK6teNIVGP7LCjecw3K7Yc6KZQCcHdVTvAw=

@@ -1,0 +1,9 @@
+22647345
+github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
+
+go.sum database tree
+69518334
+AREO8BNay/0sluI2oDq4MZs2GN6B024bb2Bezv1ONb4=
+
+— sum.golang.org Az3grqADE+ElGJ/rxYc6hrzlXLT7Sur4qLNVFndXox7jA6K8TH5n/JQfEjU41ylfkw+y8PlCI5ArgbnlhtAR/ZJWsQI=

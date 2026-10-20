@@ -1,0 +1,9 @@
+43594843
+go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
+go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
+
+go.sum database tree
+69509772
+jUL35XvyYmCgu3vryiYy2AOAgyDKtp4zHH/bK+mlZqg=
+
+— sum.golang.org Az3groVxj964iVwziTj7WTqEaBumyeZbPL3AogvCNcJI1a9YC32+n6yyI/n+69hV3PLPhQMPfpRZLcVb2/S42KzFXQ0=

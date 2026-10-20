@@ -1,0 +1,9 @@
+43220451
+golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
+
+go.sum database tree
+69510969
+jGr9WhGHwTDv6g7vpE5IDlSccS5/OPilgCwqx+Kkz5w=
+
+— sum.golang.org Az3grgk2Mgz6jY6yMhnXnI1hDG13o1+5IFSV0DcDha/yrTN791AllxoAOSHDEyCwNWrqARc8tJZfVFQffS/FIjRgJgw=

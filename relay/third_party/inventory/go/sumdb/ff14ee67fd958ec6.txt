@@ -1,0 +1,9 @@
+16828
+github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
+github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+
+go.sum database tree
+69516966
+qNvjnKataHWh1T0YcY9rkvDrWi3O5zf0wktYItfmDuo=
+
+— sum.golang.org Az3grvWbK4EyDnIGrUmwjlfIyr3t69xaTWx2LnzpFg/zCI3/VbrOsD95/2SXNr7mnsZ/mqWPw4LObPzAfkgaj9mKQAM=

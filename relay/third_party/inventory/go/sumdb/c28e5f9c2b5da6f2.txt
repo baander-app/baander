@@ -1,0 +1,9 @@
+13994349
+github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
+github.com/xanzy/ssh-agent v0.3.3/go.mod h1:6dzNDKs0J9rVPHPhaGCukekBHKqfl+L3KghI1Bc68Uw=
+
+go.sum database tree
+69522977
+G90yoEHrLAsrVTaPoHInaVjbZM6gxt9QLSzlhMS2/A0=
+
+— sum.golang.org Az3grgvvJmT4ZaHKAmNE4uTK0nb+VR0neijKxirtVveZDnGUx3v7UcUOqZ0axblto3Y4U8kT9Xaanogd5U82MRsBtQc=

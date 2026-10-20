@@ -1,0 +1,9 @@
+36334495
+github.com/panjf2000/ants/v2 v2.11.3 h1:AfI0ngBoXJmYOpDh9m516vjqoUu2sLrIVgppI9TZVpg=
+github.com/panjf2000/ants/v2 v2.11.3/go.mod h1:8u92CYMUc6gyvTIw8Ru7Mt7+/ESnJahz5EVtqfrilek=
+
+go.sum database tree
+69523463
+87GYyZeqRhKf93OXg65mX8luXB52bl+WaC3IETR4Tdg=
+
+— sum.golang.org Az3grlEFQDWTTPnskoNp613FzV8AxMSZNW6oEI15s6XLT0CEhKTGNccVLPOYp0PWqRIpUvik3YRhaDCf0b0M75v4TwM=

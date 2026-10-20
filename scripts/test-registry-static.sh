@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Direct dependency notices are checked; this is not a transitive SBOM/license audit.
+# Direct pins and retained packaged evidence are checked independently.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 pins_only=false
@@ -55,8 +55,8 @@ for filename, version, digest in [
     ),
     (
         'relay/docker/rqlite.Dockerfile',
-        'rqlite-v10.5.1-linux-amd64',
-        'f0ebf593b573595022947add67cd22e6cbb02c1d2a1ed8c7da45c94093a49b0d',
+        '8b6cc4cb14a78b81ac725ec3c7cd281e1c646422',
+        '88a51c52c9398e43ad179af0835c62d7ff2d9ffc4ff9cfe29630e51ecf617398',
     ),
     (
         'relay/docker/backup.Dockerfile',
@@ -65,13 +65,25 @@ for filename, version, digest in [
     ),
     (
         'relay/docker/backup.Dockerfile',
-        'https://github.com/rclone/rclone/releases/download/v1.71.2/rclone-v1.71.2-linux-amd64.zip',
-        'ab9fa5877cee91c64fdfd61a27028a458cf618b39259e5c371dc2ec34a12e415',
+        '84a85367111c84061c959e01e0c320618e492dc6',
+        '9f2bdefc2e15049e5ecea6b5f5c477460461281256a512c8b151a2753d6e2e9b',
     ),
 ]:
     dockerfile = pathlib.Path(filename).read_text()
-    if version not in dockerfile or digest not in dockerfile:
+    evidence = dockerfile
+    if version in {'8b6cc4cb14a78b81ac725ec3c7cd281e1c646422', '84a85367111c84061c959e01e0c320618e492dc6'}:
+        # Source-built executables pin the checkout commit; its corresponding
+        # immutable archive digest is retained in the reviewed source evidence.
+        evidence += pathlib.Path('relay/third_party/inventory/go/components.json').read_text()
+    if version not in dockerfile or digest not in evidence:
         raise SystemExit('Registry packaged dependency pin changed: ' + filename)
+for filename, sdk, digest in [
+    ('relay/docker/rqlite.Dockerfile', 'go1.27.1.linux-amd64.tar.gz', '63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445'),
+    ('relay/docker/backup.Dockerfile', 'go1.25.3.linux-amd64.tar.gz', '0335f314b6e7bfe08c3d0cfaa7c19db961b7b99fb20be62b0a826c992ad14e0f'),
+]:
+    dockerfile = pathlib.Path(filename).read_text()
+    if sdk not in dockerfile or digest not in dockerfile:
+        raise SystemExit('Registry packaged Go toolchain pin changed: ' + filename)
 notices = {'boost', 'json', 'googletest', 'openssl', 'rqlite', 'age', 'rclone'}
 if {p.name.removesuffix('-LICENSE.txt') for p in pathlib.Path('relay/third_party').glob('*-LICENSE.txt')} != notices:
     raise SystemExit('Registry retained-notice inventory changed; review its coverage.')
@@ -93,6 +105,9 @@ for source in sources:
         raise SystemExit('Missing first-party Apache-2.0 declaration: ' + str(source))
 print('Reviewed direct dependency pins and first-party license declarations passed.')
 PY
+
+python3 -m unittest discover -s relay/tests -p test_packaged_inventory.py
+python3 relay/tools/packaged_inventory.py check-resolutions --resolutions relay/third_party/inventory
 
 if [[ "$pins_only" == true ]]; then
     exit 0

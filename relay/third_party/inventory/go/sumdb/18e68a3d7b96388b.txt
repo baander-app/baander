@@ -1,0 +1,9 @@
+29958450
+github.com/jlaffaye/ftp v0.2.1-0.20240918233326-1b970516f5d3 h1:ZxO6Qr2GOXPdcW80Mcn3nemvilMPvpWqxrNfK2ZnNNs=
+github.com/jlaffaye/ftp v0.2.1-0.20240918233326-1b970516f5d3/go.mod h1:dvLUr/8Fs9a2OBrEnCC5duphbkz/k/mSy5OkXg3PAgI=
+
+go.sum database tree
+69523177
++bcCKTtfFdunmgEWorM2MP094jYfPqx35m93YeYUxQI=
+
+— sum.golang.org Az3grny8z8WvoiTb7OxT9kP1KqWcKf7SBdpLImelMRkyLQkkmLVR3jTtpuE2ebp0vqI2pT5A3MpuDDGJKVI+Pfo3TwY=

@@ -1,0 +1,9 @@
+41912539
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250811230008-5f3141c8851a h1:tPE/Kp+x9dMSwUm/uM0JKK0IfdiJkwAbSMSeZBXXJXc=
+google.golang.org/genproto/googleapis/rpc v0.0.0-20250811230008-5f3141c8851a/go.mod h1:gw1tLEfykwDz2ET4a12jcXt4couGAm7IwsVaTy0Sflo=
+
+go.sum database tree
+69511367
+QtMkYoenxs8DqfYwMqhLfie+u24xtB56yvebj3ev9y0=
+
+— sum.golang.org Az3grki4EUJfWSmY/8CGHFANS8Frj+ALpM0NZyIee7omahPqC0GyFrkVnjMlCFKL9axIjHi1C/ZksygqeZVGrdOPMgY=

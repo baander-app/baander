@@ -1,0 +1,9 @@
+63832966
+github.com/aws/smithy-go v1.28.2 h1:myhcykQcatTul2B/zITjDk203G7t0awUAs1hVry5Bvg=
+github.com/aws/smithy-go v1.28.2/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
+
+go.sum database tree
+69523129
+Ard+KzjDKaEJ4KbU4n+GNDdRULqnMuf4yV8l3cVaEJ0=
+
+— sum.golang.org Az3grmMgL+Ffyd1HJEsuheUEIt5d6IIyBEMg7KJu5slEL0HvrilH+ZVMEYrUI/XpggwYXPfXVUdfE8c5d7DoLkJgqA8=

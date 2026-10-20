@@ -1,0 +1,9 @@
+25452970
+github.com/sony/gobreaker v1.0.0 h1:feX5fGGXSl3dYd4aHZItw+FpHLvvoaqkawKjVNiFMNQ=
+github.com/sony/gobreaker v1.0.0/go.mod h1:ZKptC7FHNvhBz7dN2LGjPVBz2sZJmc0/PkyDJOjmxWY=
+
+go.sum database tree
+69511447
+NB79iifcmClstTclYT7G79H1cNwvacZAldbk9UkqepA=
+
+— sum.golang.org Az3grmG4qwpAXnmBnaMya9OdyDNI9xPx0QjNBYIeMJNd/sF6SIAtzlzXS6AIgdYssn0pSBRMl63ETyb0+24GWDFc3gU=

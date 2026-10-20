@@ -1,0 +1,9 @@
+440508
+github.com/lpar/date v1.0.0 h1:bq/zVqFTUmsxvd/CylidY4Udqpr9BOFrParoP6p0x/I=
+github.com/lpar/date v1.0.0/go.mod h1:KjYe0dDyMQTgpqcUz4LEIeM5VZwhggjVx/V2dtc8NSo=
+
+go.sum database tree
+69518633
+EKZr0O0nNlgR73Vi/KSWNDXHn6/uDh81V/d/hyaRSwY=
+
+— sum.golang.org Az3grnDJmimf7LWB/S4HlEOLjxr8KNc0/39wSWLVUahL8fQ4BeCMIJhuJ4OnOZTm0bO0KI+Dyep2ZQel7MtRcaHj6AA=

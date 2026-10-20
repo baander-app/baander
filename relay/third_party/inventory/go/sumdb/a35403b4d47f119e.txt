@@ -1,0 +1,9 @@
+11602394
+github.com/jcmturner/gofork v1.7.6 h1:QH0l3hzAU1tfT3rZCnW5zXl+orbkNMMRGJfdJjHVETg=
+github.com/jcmturner/gofork v1.7.6/go.mod h1:1622LH6i/EZqLloHfE7IeZ0uEJwMSUyQ/nDd82IeqRo=
+
+go.sum database tree
+69521134
+MAgF6b0YxUeNk/GEoqn1qd54FuC+uzJQO87oylv1XyI=
+
+— sum.golang.org Az3grpRmfKK3Zr5WYMTPOVPzRerFiRVWBhbBpdSbT2+DCOgTXc1zP7O1rA7U6FXwwVTimgYWx+uD/RHDLhKqc67eHwQ=

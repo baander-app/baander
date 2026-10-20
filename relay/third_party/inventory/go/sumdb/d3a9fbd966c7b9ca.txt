@@ -1,0 +1,9 @@
+41692555
+cloud.google.com/go/auth v0.16.4 h1:fXOAIQmkApVvcIn7Pc2+5J8QTMVbUGLscnSVNl11su8=
+cloud.google.com/go/auth v0.16.4/go.mod h1:j10ncYwjX/g3cdX7GpEzsdM+d+ZNsXAbb6qXA7p1Y5M=
+
+go.sum database tree
+69523023
+khQTZkw84SC8PaWhP6GOOINWDYm3ad8ROAg8qaC9EQ8=
+
+— sum.golang.org Az3gruJ1ZYvLKePjGM9NxlYVnieCvJB5l1OusEQZ+DSOnY42PmuBTatI7B16mgfm+apYdE1qI0Nw0PneDwVbqAjWwgw=

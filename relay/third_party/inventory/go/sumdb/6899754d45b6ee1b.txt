@@ -1,0 +1,9 @@
+35795698
+github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2 h1:oygO0locgZJe7PpYPXT5A29ZkwJaPqcva7BVeemZOZs=
+github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2/go.mod h1:wP83P5OoQ5p6ip3ScPr0BAq0BvuPAvacpEuSzyouqAI=
+
+go.sum database tree
+69512750
+LFo2fNhAsmx1ywi+4xXKPn2yIBY1SObCy/Am5AxMk3w=
+
+— sum.golang.org Az3gro+CiRDJZWRdP6qN18Jr6YAlWrTrv3+63zuU1xtCAX4Xd1p3gLTkiZf5yuk5C5ZQfc4DtwiWoeZoYIQrpr3+8gw=

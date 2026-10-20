@@ -1,0 +1,9 @@
+15243770
+bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5 h1:A0NsYy4lDBZAC6QiYeJ4N+XuHIKBpyhAVRMHRQZKTeQ=
+bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5/go.mod h1:gG3RZAMXCa/OTes6rr9EwusmR1OH1tDDy+cg9c5YliY=
+
+go.sum database tree
+69517031
+l64t58mG5ZdJJecOixzoEIhedreHwoU3p3waV2GsPw4=
+
+— sum.golang.org Az3gruge4X8CClNw5n4WuhkEfDKe+yKb6n90FiHKWcm+0rWGjhqMWfZsbV5p4RRq/nw34Qt2UHKIAJm20z2YaYHlGgM=

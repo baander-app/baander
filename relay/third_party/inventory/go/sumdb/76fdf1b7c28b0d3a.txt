@@ -1,0 +1,9 @@
+13815753
+github.com/coreos/go-systemd/v22 v22.5.0 h1:RrqgGjYQKalulkV8NGVIfkXQf6YYmOyiJKk8iXXhfZs=
+github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
+
+go.sum database tree
+69522380
+LZ+BrSfj5dgIp7Rux0j6xciwD7qPeSswAxpPJLrntvc=
+
+— sum.golang.org Az3grj5TLw2nrFmEP3+0V7VczsSpDX6ohD5DCs3YuzF6oqSbLue0Cf67rOMqokc3EVCOzOTu1okaELaUuVuZIEPkIgQ=

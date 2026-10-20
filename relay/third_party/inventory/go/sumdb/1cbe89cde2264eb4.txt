@@ -1,0 +1,9 @@
+58828367
+github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePCEX9iuS+cneUwncnw=
+github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
+
+go.sum database tree
+69512061
+EZL1J4Ms6Gdsq7Jx9DJCILhw22PiAYqqZTuvLy95LHc=
+
+— sum.golang.org Az3grsaQlXRPylthAzzYvBy94E+j0jWEZHDNgMCBwYtMPZotfMxcPjtsQ2fcpXCZ9f16YrdNSAF1ESeUszy84zZVrAY=

@@ -1,0 +1,9 @@
+28621081
+github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 h1:ilQV1hzziu+LLM3zUTJ0trRztfwgjqKnBWNtSRkbmwM=
+github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78/go.mod h1:aL8wCCfTfSfmXjznFBSZNN13rSJjlIOI1fUNAtF7rmI=
+
+go.sum database tree
+69509839
+GNOfc81KYg1XoooVgdp6fs1klOXp4OxdxV2zke4Tx5g=
+
+— sum.golang.org Az3grovi+OQFrNOobEjHNVE4YjVHguvMthcdBdn2sDu2lTpxXSkpmZQj8EYfpNKm4RDzgCQOn0wXlfsD/7/LnAV98Qw=

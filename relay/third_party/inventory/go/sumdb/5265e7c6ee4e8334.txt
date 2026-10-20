@@ -1,0 +1,9 @@
+16599298
+github.com/ProtonMail/go-srp v0.0.7 h1:Sos3Qk+th4tQR64vsxGIxYpN3rdnG9Wf9K4ZloC1JrI=
+github.com/ProtonMail/go-srp v0.0.7/go.mod h1:giCp+7qRnMIcCvI6V6U3S1lDDXDQYx2ewJ6F/9wdlJk=
+
+go.sum database tree
+69516663
+WYL2cnIkyn6ICvru/I9hp1yzuKNW58UUDGLd0cXobc8=
+
+— sum.golang.org Az3grnjVU3yPbyBY1066MgksgWkFnMPsjyBF+sF5qVdNilGx3jDPf4L6SIy3qAUYihcMjFbUy8Jo+s7M0Uyb2mIKOAQ=

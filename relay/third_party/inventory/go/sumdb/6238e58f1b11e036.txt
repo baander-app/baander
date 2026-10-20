@@ -1,0 +1,9 @@
+24883214
+github.com/hashicorp/go-hclog v1.6.3 h1:Qr2kF+eVWjTiYmU7Y31tYlP1h0q/X3Nl3tPGdaB11/k=
+github.com/hashicorp/go-hclog v1.6.3/go.mod h1:W4Qnvbt70Wk/zYJryRzDRU/4r0kIg0PVHBcfoyhpF5M=
+
+go.sum database tree
+69516741
+hotGpeb3StJ/YIC0Sjp0+n0nsTNLFlb22AS/sqpxmN8=
+
+— sum.golang.org Az3grvk4h96LbO7cDrfRSJPbpYhBpo1rpknji+zKZZn1WSo50iVdqlsV9ZPzLPzn+5nASbaZ+eQWLikZ34g5PAWXgww=

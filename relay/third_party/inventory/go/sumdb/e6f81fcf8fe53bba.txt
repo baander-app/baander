@@ -1,0 +1,9 @@
+41086055
+google.golang.org/grpc v1.74.2 h1:WoosgB65DlWVC9FqI82dGsZhWFNBSLjQ84bjROOpMu4=
+google.golang.org/grpc v1.74.2/go.mod h1:CtQ+BGjaAIXHs/5YS3i473GqwBBa1zGQNevxdeBEXrM=
+
+go.sum database tree
+69522934
+0HOX6WmadQ9hjh7Zkm0bRxY6u/1nsLADoosjScaTRPc=
+
+— sum.golang.org Az3grrk4Qu0/HjPIrrMvgxtiMx/wMzm67AGrwu6r4D6PTWAUfF2/er/7zz72NZyY4p8UMzCjceHwqPikmoRlxbSFygs=

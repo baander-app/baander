@@ -1,0 +1,9 @@
+48904759
+github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPEgAXnvj1Ro=
+github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
+
+go.sum database tree
+69517658
+WSo2Srh+aA9Qw7xz8gn+q2lH4XnsT2UxJrZArosl6nI=
+
+— sum.golang.org Az3grkqzVLIo4g26Cz6Cbf6ICeR1cHqoDVltZ4DckKy44VfOR5B9o4ffrjjKeAfeFqf2eaZV+EfimBgDT2xGK5g/OwE=
