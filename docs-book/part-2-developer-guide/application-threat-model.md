@@ -6,13 +6,14 @@ application and records where the current tests establish a boundary. It also
 covers a signed-in user attempting to read another user's data, a stolen token,
 a malicious outbound destination, and unavailable infrastructure.
 
-The evidence applies to the checkout and runtime recorded in
-[ROADMAP.md](../../ROADMAP.md), not to an independently assessed deployment.
+The evidence applies to the checkout and runtime recorded by each verification
+run, not to an independently assessed deployment. The [testing guide](testing.md)
+documents the runners and their artifact locations.
 The separate [registry threat model](registry-threat-model.md) covers the C++
 service's credential ownership, replay, parsing, TLS and quorum boundaries. The
 application checkpoint below does not qualify those boundaries. Regional deployment
-qualification and deferred mobile work remain separate work. The combined
-model/regression checkpoint and remaining findings are recorded in the roadmap.
+qualification and deferred mobile work remain separate work. Remaining findings
+and coverage limits are described below.
 A scanner canary establishes scanner operation, not resistance to hostile requests.
 
 ## Assets and actors
@@ -90,7 +91,7 @@ PostgreSQL, Redis and the loopback Swoole management API remain deployment dutie
 
 Test names below are repository paths relative to `tests/` unless a different root
 is given. Existing tests are evidence of intended controls; the current execution
-counts and failures are recorded separately in the roadmap.
+counts and failures belong to the corresponding run artifacts.
 
 | Threat and prerequisite | Impact | Implemented control and supporting evidence | Coverage limit or unresolved finding |
 | --- | --- | --- | --- |
@@ -187,8 +188,8 @@ exhaustive taint analysis of logging or external observability.
    in-flight bounded Redis call can finish after that deadline. Transport errors,
    uncertain writes and corrupt state are not retried as fresh consumption. The 19 names, budgets, identity keys,
    media exemptions and development bypass are unchanged. The full backend suites,
-   focused concurrency/outage checks and production runtime drills pass; the roadmap
-   records their counts and limits. The rewritten
+   focused concurrency/outage checks and production runtime drills have recorded
+   passing runs; those artifacts retain their counts and limits. The rewritten
    `Unit/Shared/Infrastructure/RateLimiter/RateLimiterFailureSemanticsTest.php`
    targets failed storage, conflict refetch, uncertain writes and the retry deadline.
    The effective configuration contributes to the subject digest, so a configuration
@@ -209,7 +210,8 @@ exhaustive taint analysis of logging or external observability.
    adapters. Bounded helper execution removes native DNS from the coroutine
    worker and includes lookup in the caller's request budget. The dedicated
    network-isolated DNS drill and native lifecycle tests cover complete answers,
-   stalled lookups, cancellation and cleanup; current results are in the roadmap.
+   stalled lookups, cancellation and cleanup; execution results belong to the
+   corresponding run artifacts.
    Per-process helper capacity, cleanup/scheduling tolerance, overall provider
    retries and approved-provider compromise remain limits. Webhooks,
    operator-configured lyrics, mail, tracing

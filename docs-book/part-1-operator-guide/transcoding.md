@@ -91,6 +91,15 @@ old event without changing the generation, revision or desired position. Explici
 seek requests remain new user intent. Progress separately requires both the
 current generation and revision; it cannot overwrite a later explicit seek.
 
+When native seek gestures arrive while a seek is still in flight, the player
+retains the latest queued target and keeps pause and resume commands in order.
+Each following native seek uses only the generation returned by its preceding
+freshly accepted seek. Stale, replayed, terminal or otherwise unproven responses
+cannot continue that chain. Same-session polling leaves the attachment in place
+until the chain settles. Replacing the source, session or player component
+invalidates pending intent; generation checks and the latest pause/resume intent
+still apply.
+
 A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
 
 Signing returns the current job, generation, revision, readiness, position and desired status. Once ready, it also returns `startTime` and source `duration`. A generation may begin at a nonzero source position. The player adds `startTime` to the media element's local clock for progress and subtracts it when restoring a source position. After a generation change it obtains the current signed manifest and restores position and paused state.

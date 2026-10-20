@@ -326,8 +326,9 @@ container uses `--init` to reap adopted child processes after termination;
 include `--init` in local disposable-container runs as shown above. An initless
 container can retain exited children as zombies even after their processes stop.
 Forced runner loss can prevent final metadata writes or upload and supplies no passing
-qualification result. These local gates leave regional deployment, actual backup
-destination, performance baseline and 24-hour soak acceptance open.
+qualification result. These local gates leave the [release acceptance](#release-acceptance)
+for regional deployment, actual backup destination, performance baseline and
+24-hour soak open.
 
 ## Server configuration
 
@@ -488,6 +489,55 @@ packaged components and their license evidence; it does not make a legal approva
 or redistribution-compliance determination. Actual Debian versions are recorded
 per image because repository package versions can change between builds.
 
+## Release acceptance
+
+The five-host optimized deployment must meet the whole-host budget, including
+snapshots, compaction, node catch-up and backup upload. Each whole host gets
+1 CPU and 512 MiB; total used memory must stay at or below 448 MiB, API peak RSS
+at or below 64 MiB, and normal busiest-host CPU at or below 70%. Run the load
+generator outside these budgets. Sanitizer workers may be larger.
+
+The acceptance workload is 100 servers with 60-second staggered heartbeats and
+20 lookups/s, with fivefold bursts for five minutes. Normal p95/p99 must be
+<=1s/2s; burst p99 must be <=3s. Require no swap, OOM or unbounded backlog during
+the burst. Test 200ms inter-node RTT, 25ms jitter, 0.1% loss, <=30s leader-loss
+recovery, and no acknowledged registration loss after any two voter failures.
+Failed gates block release without weakening consistency or increasing the agreed
+host budget. A five-voter cluster requires three voters for authoritative
+operations; one or two surviving voters must fail closed. Emergency operation
+never permits unsafe automatic quorum reduction.
+
+The optimized release recipe already runs a bounded three-voter, three-API load
+smoke: 100 registrations, 20 lookups/s and 100/60 heartbeats/s for ten seconds,
+then fivefold rates for ten seconds. It fails on request errors, backlog, missed
+pacing, normal p95/p99 above one/two seconds, burst p99 above three seconds, or
+sampled API RSS above 64 MiB. This smoke does not establish the five-host resource,
+regional-network or five-minute burst acceptance. Select a stable performance
+runner and record an accepted baseline before adding fixed-runner comparison
+that enforces confirmed regressions above 10%; existing smoke results do not
+establish that baseline.
+
+The 24-hour workload soak requires the intended deployment profile, a reserved
+run window and a recorded profile. After warm-up, compare equivalent quiescent
+windows and fail sustained RSS growth over 1 MiB/hour or 10% of baseline. Short
+local runs do not complete this gate.
+
+Regional acceptance requires the actual five-voter deployment, measured topology
+and voter upgrades one at a time while preserving volumes and bootstrap guards.
+Verify two-voter loss without acknowledged-data loss and leader recovery within
+30 seconds. Local five-voter failure/rejoin and rolling restart are covered;
+actual host access remains unavailable. Whole-host measurements require the
+target hosts or an explicit equivalent measurement environment and a release
+decision.
+
+Backup acceptance requires encrypted, versioned five-minute S3-compatible backups
+and an isolated restoration rehearsal with five-minute RPO and 30-minute RTO
+against the actual destination. Local binary restore and encrypted upload/offline
+restore through disposable TLS S3 storage are covered; actual-destination access
+remains unavailable. The [backup runbook](backup/README.md) covers activation,
+key custody and recovery; its [freshness check](backup/README.md#check-progress-and-failures)
+does not establish the RPO. Qualify whole-host capacity with backups enabled.
+
 ## Container packaging and private inventory
 
 The mandatory container gate builds unique image tags and runs the disposable
@@ -607,9 +657,9 @@ No startup path deletes state or silently repairs/reinitializes a volume. Inspec
 membership after provisioning and upgrade one voter at a time while quorum remains.
 
 API and voter limits total one CPU and 448 MiB per host (96 MiB API, 352 MiB voter).
-These are containment limits, not measured acceptance evidence: whole-host RSS/CPU,
-regional latency, physical failure, operational backups and disaster recovery,
-and soak gates remain pending.
+These are containment limits, not measured [release acceptance](#release-acceptance)
+evidence: whole-host RSS/CPU, regional latency, physical failure, operational
+backups and disaster recovery, and soak gates remain pending.
 The old `relay_data` volume and local SQLite files are deliberately unreferenced;
 they are not opened, converted or reset. Never use `docker compose down -v` on an
 operator inventory, and never reuse that legacy volume as native rqlite storage.

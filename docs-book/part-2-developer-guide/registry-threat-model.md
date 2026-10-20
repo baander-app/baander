@@ -7,10 +7,11 @@ persistence and do not call this service; their boundaries belong to the
 [application threat model](application-threat-model.md).
 
 This model describes source controls and the cases exercised by the local native
-contracts. Execution results and toolchain limitations belong to
-[ROADMAP.md](../../ROADMAP.md). Test descriptions below do not claim a current
-passing run. Container startup qualification is prior evidence unless that
-container gate is explicitly rerun; local native tests do not renew it or qualify
+contracts. The [Registry guide](../../relay/README.md) describes the runners,
+artifact locations and release acceptance limits. Execution results apply to the
+checkout and toolchain recorded by each run; test descriptions below do not claim
+a current passing run. Container startup qualification is prior evidence unless
+that container gate is explicitly rerun; local native tests do not renew it or qualify
 a regional deployment.
 
 ## Assets and actors
@@ -146,8 +147,8 @@ before DOM parsing, after the size check, while preserving valid escaped Unicode
 such as `\u0000`. Native regressions in `relay/tests/transport_test.cpp` cover
 trailing and interior NULs, hidden suffix bytes, an escaped-NUL positive control
 and size-limit precedence. The malformed-owner HTTP case checks wire rejection;
-execution status for these regressions belongs to the roadmap. The same
-parser reads database responses, so malformed upstream bytes must fail closed
+execution status comes from the corresponding native and HTTP contract runs.
+The same parser reads database responses, so malformed upstream bytes must fail closed
 rather than becoming a successful authoritative result.
 
 JSON object duplicate keys are not rejected explicitly. The current nlohmann
@@ -246,5 +247,6 @@ Live HTTP fuzzing, parser differentials, session admission saturation and inboun
 legacy TLS probes remain open. Regional deployment, physical failure, constrained
 resource soak, actual S3 destination qualification and measured recovery objectives
 also remain open. Local binary and encrypted-object restore contracts do not
-establish those operational guarantees. Consult the roadmap for the actual
-release, sanitizer, static and container checkpoints and their limitations.
+establish those operational guarantees. Use the
+[release acceptance requirements](../../relay/README.md#release-acceptance) for
+deployment decisions and the corresponding run artifacts for execution evidence.

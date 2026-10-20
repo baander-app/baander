@@ -155,6 +155,23 @@ state. Reconstruction does not restore a running application or replay network o
 media effects. Schema v1 has no compatibility conversion, and trace import is not
 supported.
 
+The timeline can verify one retained `catalog.selection` `select` or `clear`
+action, including a successful no-op. It calculates the expected result with the
+current pure transition shared by the live store, using detached captured data
+and a trusted descriptor held by the recorder. Verification requires complete
+starting-state, argument, update and terminal captures, matching transition
+identity/version, and an unambiguous successful synchronous invocation. Nested,
+foreign or unattributed updates and broken invocation boundaries make verification
+unavailable. Results are match, mismatch or unavailable with a reason; a no-op
+remains an explicit recorded action even when it emits no update.
+
+Verification leaves live stores and recorder history unchanged and runs no live
+effects. It supports neither async replay nor trace import. Schema-version-2
+records without the optional invocation provenance remain inspectable but are
+unavailable for verification. See the
+[transition verifier](../../ui/web/src/shared/stores/verify-transition.ts) for the
+admission checks.
+
 Unit tests verify creator/action identity when tracing is disabled, no-op subscriber
 and persistence behavior, secret redaction, immutable snapshots, and event ordering.
 They also cover instance registration and retirement, nested subscriber mutations,
@@ -523,8 +540,8 @@ regression suite does not.
 
 Full coverage qualification matched 9,098 selected/completed test identities,
 44,191 executable lines and 35,385 covered lines between the sequential reference
-and ParaTest. Timings and subsequent verification are recorded in the
-[roadmap](../../ROADMAP.md#parallel-backend-verification).
+and ParaTest. Use the run comparison command above to inspect timings and
+identity or coverage differences in retained artifacts.
 
 ### Validated asynchronous workloads
 
@@ -752,8 +769,8 @@ outbox and scheduler, without OAuth certification. Forgejo now includes blocking
 context-exclusion, production-worker build and production-lifecycle steps. Their
 configuration does not establish a passing Forgejo run. The recorded immutable-image
 lifecycle and combined Chromium playback/recovery gates passed before the paired
-deployment change; exact image, phase, containment and cleanup evidence is recorded in the
-[worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control).
+deployment change. Retain image identity, phase, containment and cleanup evidence
+with the runner's artifacts before claiming a result for a newer deployment.
 Native Swoole is pinned to Composer's required 6.2.0. PIE installation failures
 fail the image build.
 
@@ -794,10 +811,10 @@ recorded gate before the paired deployment change passed authenticated playback,
 paused seek,
 web restart, worker containment and recovery, and final completion. It also proves
 both stale-generation probes leave paused state unchanged, checks fourteen
-contained process identities with no survivors and verifies cleanup. The
-[worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control)
-records the exact local result. Autoscaling, saturation and regional qualification
-remain separate gates.
+contained process identities with no survivors and verifies cleanup. Ordinary
+[autoscaling](#ordinary-worker-autoscaling-qualification) and saturated
+[media controls](#shared-media-control-qualification) have dedicated gates below;
+regional qualification remains separate.
 
 The reserved-control pressure drill runs separately from the full backend suite:
 
@@ -815,9 +832,7 @@ the manifest; its host preflight requires four CPUs and 15 GiB, including the
 web/dependency ceilings and headroom described above. Inspect its resource and progress
 receipts before claiming pressure qualification. Separate OOM, PID exhaustion,
 peer-loss and containment results from ordinary backend correctness results.
-The [roadmap](../../ROADMAP.md#worker-architecture-and-resource-control) records
-verified CPU, memory and PID outcomes for both the earlier explicit profile and
-the version 4 maximum-one envelope. The latter passed all three phases in
+The recorded version 4 maximum-one run passed all three phases in
 281.436 seconds, with verified cleanup and joint retirement. Execution OOM/PID
 exhaustion left control alive with no control OOM event. These exhaustion results
 do not qualify maxima two or four.
@@ -837,11 +852,14 @@ The runner selects ordinary maximum two, the combined web/worker fixture and
 `BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1`. It inherits the operator runner's
 600-second deadline, resource preflight and cleanup. Set `BAANDER_TEST_ARTIFACTS`
 to retain evidence at a chosen path; the default is
-`var/test-runs/media-control-*`. The
-[2026-10-19 checkpoint](../../ROADMAP.md#shared-webworker-media-control-2026-10-19)
-records passing pressure, browser and cleanup evidence for single-intention
-pause/seek/reconnect and reattachment. Latest-target rapid native scrubbing remains
-a separate open interaction contract.
+`var/test-runs/media-control-*`. Recorded pressure, browser and cleanup evidence
+covers single-intention pause/seek/reconnect and reattachment. Rapid native
+scrubbing also retains the latest queued target across an in-flight seek, with
+pause/resume ordering and generation authority preserved; see
+[Playback controls and generations](../part-1-operator-guide/transcoding.md#playback-controls-and-generations).
+That interaction contract has focused backend and player-hook regressions; the
+recorded single-intention drill does not establish browser pressure coverage of
+rapid scrubbing.
 
 Observation mode builds a disposable fixture derived from the production image.
 Its test-only FFmpeg wrapper records each video encoder launch before executing
@@ -998,9 +1016,10 @@ failed attempts remain failed evidence. The fresh production-image contract,
 maximum-two production media drill, real worker-command lifecycle and all twenty
 backend isolation checks pass. The version 4 reserved-control CPU/memory/PID drill
 also passes at maximum one; its exhaustion results do not qualify maxima two or
-four. Final independent review reconciliation is in progress. The [roadmap](../../ROADMAP.md#worker-architecture-and-resource-control) records exact
-acceptance scope. This ordinary gate does not replace backend, native, retry,
-media, lease-loss or joint-retirement gates.
+four. Final independent review is complete with no remaining blockers for the
+recorded hardware, placement and workload. Smaller-host, live-provider, regional
+and longer failure/load qualification remain separate. This ordinary gate does
+not replace backend, native, retry, media, lease-loss or joint-retirement gates.
 
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also

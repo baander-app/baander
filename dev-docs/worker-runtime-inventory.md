@@ -12,8 +12,12 @@ routing, ownership, deployment and completion descriptions.
 
 [WorkerSupervisorRunner](../src/Shared/Infrastructure/Worker/WorkerSupervisorRunner.php)
 defines the unit roles. Each consumer has a deployment/boot/launch-qualified
-identity. Scheduler polling records immutable
-occurrences and publishes their IDs to the dedicated receiver. The relay handles
+identity. Ordinary admission scales within the fixed pair: every configured
+ordinary consumer remains resident and reserved, including while parked. The
+scheduler consumer and media slots have separate reservations.
+
+Scheduler polling records immutable occurrences and publishes their IDs to the
+dedicated receiver. The relay handles
 committed outbox events and notification delivery intents. Neither role requires
 a running web server.
 
@@ -128,7 +132,7 @@ owners as null and fencing old active/complete output for re-encoding.
 ### Admitted deployment recipe
 
 The host-only [deployment controller](../bin/worker-deployment.php) admits immutable
-version 3 recipes for a fixed control/execution pair. Named local Docker volumes
+version 4 recipes for a fixed control/execution pair. Named local Docker volumes
 provide read-only sources and writable derived storage at identical web/worker
 paths. Set `MEDIA_STORAGE_PATH` inside a source volume, for example
 `/media/library`; `CONVERT_STORAGE_PATH` belongs inside a derived volume. Derived
@@ -142,22 +146,20 @@ The controller verifies volume names, mountpoints and
 access modes. Bind mounts, devices, extra mounts and Docker authority in either
 unit are refused.
 
-Control requires at least 2624 MiB and 128 PID slots. Execution requires at least
-4160 MiB plus scheduled console memory and 256 PID slots. Scheduled console
-execution is disabled at zero or reserves at least 320 MiB in execution. Separate
-Docker memory/CPU/PID ceilings and nonempty disjoint CPU sets reserve control
-capacity from execution pressure. The example profile assigns control CPU `[0]`
-and execution CPUs `[1, 2]`, with 4480 MiB execution memory when console is enabled;
-these are explicit operator choices, not universal defaults or measured capacity.
-The PHP kernel heap ceiling is 256 MiB. Control reserves 384 MiB for management
-and 1600 MiB for five media PHP processes at 320 MiB each. Execution reserves
-3520 MiB for management/native execution, including 3136 MiB for native work.
-Three video jobs and one audio rendition remain the fixed media admission limits.
-Threads count toward each unit's PID ceiling. The paired operator fixture
-requires four host CPUs and 13 GiB; its combined web/media and control-capacity
-variants require 15 GiB to include the 2048 MiB web ceiling. These host thresholds
-include 4352 MiB for PostgreSQL/Redis and 1024 MiB of headroom; they are admission
-limits for the fixture, not measured universal capacity defaults.
+Control requires at least 2944 MiB and 129 PID slots, including the independent
+autoscaler's 320 MiB reservation. With maximum ordinary concurrency `max`,
+execution requires at least `4160 + 320 * (max - 1)` MiB plus scheduled console
+memory, and `256 + max - 1` PID slots. Scheduled console execution is disabled
+at zero or reserves at least 320 MiB in execution. Separate Docker memory/CPU/PID
+ceilings and nonempty disjoint CPU sets reserve control capacity from execution
+pressure. All ordinary consumers remain fully reserved when parked. Three video
+jobs and one audio rendition retain independent admission limits; threads count
+toward each unit's PID ceiling. These are admission reservations, not measured
+universal capacity defaults. See the
+[operator recipe](../docs-book/part-1-operator-guide/commands/README.md#worker-deployment)
+for profile fields and the
+[qualification guide](../docs-book/part-2-developer-guide/testing.md#ordinary-worker-autoscaling-qualification)
+for measured profiles and host budgets.
 
 Control alone acquires and renews the lease. Execution observes committed
 authority and cannot take it over. Matching peer boot/epoch evidence and a ready
@@ -190,9 +192,9 @@ That checkpoint does not qualify the paired deployment.
 
 ### Verification boundary
 
-[ROADMAP.md](../ROADMAP.md#worker-architecture-and-resource-control) records the
-static, frontend, runtime and production/browser checkpoints. The
-following full-run and browser results predate the paired deployment change. The full
+The [testing guide](../docs-book/part-2-developer-guide/testing.md#running-tests)
+describes the runtime runners and their artifact records. The following full-run
+and browser results predate the paired deployment change. The full
 backend run completed with one obsolete index-test expectation; its corrected
 file passes a focused rerun. This is full-run evidence plus a focused correction,
 not an uninterrupted passing full-suite rerun.
@@ -210,10 +212,12 @@ native HLS without a media library or feature override.
 The two-command deployment checkpoint above retains its recorded scope.
 The reserved control/execution boundary is implemented. The dedicated drill has
 passed monitored CPU, memory and PID phases on the declared fixture profile.
-The [reserved-control checkpoint](../ROADMAP.md#reserved-worker-control-capacity-2026-10-18)
-records the exact profile and evidence. Autoscaling, broader measured capacity
-and failure/load coverage remain open. Route validation is described in
-the current routing section; its verification checkpoints belong in the roadmap.
+The [testing guide](../docs-book/part-2-developer-guide/testing.md#running-tests)
+records the maximum-one exhaustion profile and its limits. Ordinary
+[autoscaling qualification](../docs-book/part-2-developer-guide/testing.md#ordinary-worker-autoscaling-qualification)
+covers the fixed pair at resident maxima one, two and four. Broader measured
+capacity and failure/load coverage remain separate. Route validation is described
+in the current routing section above.
 
 ## Historical inventory and incremental evidence
 
