@@ -32,9 +32,10 @@ retain requirements or deferred scope, without making every item a next task.
   [historical store capture reconstruction](#store-capture-reconstruction-2026-10-20)
   and [isolated store verification](#isolated-store-verification-2026-10-20)
   are delivered locally. The selected [DSP artifact build
-  fix](#dsp-artifact-build-contract-2026-10-20) is also delivered locally. Live
-  replay and full asynchronous provenance remain open; actual-destination backup
-  acceptance remains deferred.
+  fix](#dsp-artifact-build-contract-2026-10-20) and
+  [convolver block continuity](#convolver-block-continuity-2026-10-20) are also
+  delivered locally. Live replay and full asynchronous provenance remain open;
+  actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -3705,9 +3706,10 @@ automatic quorum reduction. This is not the current implementation priority.
 - [ ] When the user resumes deferred React Native work, reconcile the [React Native styling plan](docs/plans/2026-07-15-001-refactor-rn-styling-pattern-plan.md)
   and [React Native/TV tooling plan](docs/plans/2026-07-15-002-chore-rn-tv-dx-tooling-plan.md)
   against current code after backend/web priorities are satisfied.
-- [x] Pin explicit regeneration of the four qualified DSP analysis modules and
-  make ordinary Electron asset consumption compiler-free, with required-file and
-  copy verification. See the [artifact build checkpoint](#dsp-artifact-build-contract-2026-10-20).
+- [x] Pin explicit regeneration of the five qualified DSP modules and make
+  ordinary Electron asset consumption compiler-free, with required-file and copy
+  verification. See the [artifact build checkpoint](#dsp-artifact-build-contract-2026-10-20)
+  and the [convolver extension](#convolver-block-continuity-2026-10-20).
 - [ ] Make codec/DSP builds reproducible and run reference vectors before claiming
   native paths release-certified. Track remaining loudness/codec qualification in
   [DSP qualification](packages/dsp/README.md); browser graph tests alone are insufficient.
@@ -4190,3 +4192,61 @@ Verification checkpoint:
 This checkpoint delivers artifact build tooling. Convolver and resampler quality,
 native codec compliance, remaining loudness qualification, and overall native-path
 release certification remain open under [DSP qualification](packages/dsp/README.md).
+
+## Convolver block continuity (2026-10-20)
+
+The [reviewed plan](docs/plans/2026-10-20-convolver-block-continuity-plan.md)
+repairs pending-tail handling in the shipped `partitioned_convolver`. Each channel
+adds its previous tail to the current convolution by sample position before
+emitting output and retaining the complete remaining tail. Contributions survive
+internal blocks and successive processing calls, including calls shorter than the
+impulse response. A one-tap response applies its gain without overlap access.
+The existing create/process/destroy interface and JavaScript loader contract remain
+usable; additive allocation exports give the reference tests owned WASM buffers.
+
+Explicit regeneration and the existing two-build DSP gate now cover five modules,
+including `partitioned_convolver`. Regeneration publishes its corrected binary to
+the source package, `public/dsp/`, and `ui/electron/public/dsp/`. Both push and
+pull-request filters in the DSP workflow include the convolver source directory
+and its two public binary paths. The
+[DSP guide](packages/dsp/README.md) records current coverage and restoration
+instructions; the earlier four-module checkpoint above retains its historical
+counts and scope.
+
+Verification checkpoint:
+
+- Before the implementation repair, the compiled-module regression run reported
+  **16 tests: 4 passed and 12 failed in 100.540 ms**. The short vector returned
+  `17` where causal convolution requires `16`; longer responses also lost pending
+  tail contributions. One-tap tests passed in that run, so they do not establish
+  a demonstrated pre-fix crash. Corrected focused tests pass **16/16 in 84.243 ms**
+  in the CI image (**15.266 seconds** including cold SDK/build coordination).
+  Vectors use independent direct convolution with absolute sample tolerance
+  `2e-6` and cover complete tails, whole-stream/single-frame/uneven calls, one-tap
+  gain, and independent stereo histories.
+- Pinned regeneration completes in **5.366 seconds**. Only the three convolver
+  binaries change, each from **20,045 to 20,547 bytes**. The final DSP gate passes
+  **148 tests per build**, across two independent builds (**296 executions**), in
+  **15.301 seconds**, with zero failures. Both builds are reproducible and all
+  three tracked copies match, including the corrected convolver.
+- The complete Electron CI suite passes **59/59 tests in 2,473.377 ms** of test
+  execution (**4.061 seconds** including coordination). Main, preload, and renderer
+  TypeScript checks pass in **18.421 seconds**. Tooling TypeScript checks and shell
+  syntax checks pass in **2.335 seconds**. The existing JavaScript loader loads the
+  shipped convolver and retains its memory/create/process/destroy contract in a
+  **0.687-second** smoke check. Electron has no configured lint gate.
+- Phase-boundary simplification completed across three lenses with no findings.
+  Final code review completed with four local reviewers and no findings.
+  Documentation inventory, local links, prose-preservation audits, and whitespace
+  checks pass. Evidence and command logs: `var/test-runs/convolver-continuity-20261020/`.
+  Backend and unrelated web checks were not rerun for this DSP and artifact
+  tooling boundary.
+
+This delivery establishes convolution streaming correctness for the bounded
+reference vectors. The module still uses direct time-domain convolution without
+real-time allocation or performance qualification. No active player wiring was
+found, so this checkpoint makes no audible playback change claim. Resampler
+quality, codec compliance, remaining loudness qualification, player integration,
+and overall native-path release certification remain open under
+[DSP qualification](packages/dsp/README.md); the broader release item remains
+unchecked.

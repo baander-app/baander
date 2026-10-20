@@ -1,20 +1,20 @@
-# DSP analysis qualification
+# DSP qualification
 
 Run `bash scripts/test-dsp-analysis.sh` from the repository with Emscripten
-6.0.3 and Node.js on `PATH`. The gate builds `fft2048`, `spectral_features`, `dynamics_meter`, and
-`loudness_r128` twice in temporary directories, runs analytical reference vectors against each
-build, compares the binaries, and checks that the source-package, web-served,
-and Electron public WASM artifacts match. It also checks that the web-served FFT
-worklet and dynamics loader match their source-package copies. It leaves tracked files unchanged
-and fails on a missing compiler, different compiler version, failed vector,
-or stale artifact.
+6.0.3 and Node.js on `PATH`. The gate builds `fft2048`, `spectral_features`,
+`dynamics_meter`, `loudness_r128`, and `partitioned_convolver` twice in temporary
+directories, runs analytical reference vectors against each build, compares the
+binaries, and checks that the source-package, web-served, and Electron public WASM
+artifacts match. It also checks that the web-served FFT worklet and dynamics loader
+match their source-package copies. It leaves tracked files unchanged and fails on
+a missing compiler, different compiler version, failed vector, or stale artifact.
 
 The gate also builds an unshipped small-capacity gating harness. Its tests check
 exact threshold queries, tree balancing, and explicit exhaustion/reset behavior.
 The production pool remains fixed at 262144 distinct energies; the harness
 does not change the deployed ABI or memory limit.
 
-After an intentional source change, regenerate the four qualified analysis modules
+After an intentional source change, regenerate the five qualified DSP modules
 from the repository root, then run the gate:
 
 ```sh
@@ -25,10 +25,10 @@ bash scripts/test-dsp-analysis.sh
 Regeneration requires Emscripten 6.0.3. Set `EMCC` to select a compiler outside
 `PATH`; the regeneration command and qualification gate both respect it. The
 command rejects a missing or different compiler before changing tracked artifacts.
-It forces fresh builds of `fft2048`, `spectral_features`, `dynamics_meter`, and
-`loudness_r128` into temporary output paths. Once all builds succeed and their
-outputs are readable, it publishes identical WASM bytes to each source package,
-`public/dsp/`, and `ui/electron/public/dsp/`. It also synchronizes the dynamics
+It forces fresh builds of `fft2048`, `spectral_features`, `dynamics_meter`,
+`loudness_r128`, and `partitioned_convolver` into temporary output paths. Once all
+builds succeed and their outputs are readable, it publishes identical WASM bytes
+to each source package, `public/dsp/`, and `ui/electron/public/dsp/`. It also synchronizes the dynamics
 loader into both public directories and the FFT worklet into
 `public/audio-worklets/`. Build, publication, and copied-byte verification errors
 fail the command. Rerun regeneration to repair an interrupted publication.
@@ -39,9 +39,10 @@ compiler. They require all six modules in `ui/electron/src/shared/wasm-modules.j
 `partitioned_convolver`, and `resampler_hq`. Each module requires its JavaScript
 loader except standalone `fft2048`. Missing required files fail with a diagnostic
 that names the file and directs developers to restoration or explicit regeneration.
-The regeneration command covers only the four qualified analysis modules; restore
-missing convolver or resampler artifacts from the repository. Packaging fails if a
-required DSP copy fails or its destination bytes differ from the source.
+The regeneration command covers the five qualified DSP modules. Restore missing
+resampler artifacts and JavaScript loaders other than the synchronized dynamics
+loader from the repository. Packaging fails if a required DSP copy fails or its
+destination bytes differ from the source.
 
 The reference suite can also inspect existing web-served artifacts directly:
 
@@ -67,8 +68,15 @@ cover EBU cases 15–19, intersample overshoot, and streaming filter history.
 Player programme resets cover source loads, handoffs, and repeats, with
 queued-report isolation. Crossfades measure the output mix; see the
 [loudness module](loudness_r128/README.md) for the remaining limitations.
-This gate does not establish resampling or
-convolution quality, native AAC codec compliance, or audible playback quality.
+Convolver vectors compare the compiled module with independent causal convolution
+using an absolute sample tolerance of `2e-6`. They cover pending tails across
+internal blocks and whole-stream, single-frame, and uneven calls, including
+zero-input tail draining, one-tap gain, asymmetric stereo, and a silent channel.
+The module retains direct time-domain convolution; its real-time allocation and
+performance behavior is unqualified. No active player wiring was found, so these
+vectors establish module streaming correctness without claiming an audible player
+change. This gate does not establish resampling quality, native AAC codec
+compliance, audible playback quality, or overall native-path release certification.
 
 
 The web loader shares compiled WASM modules, while each getter call creates an
