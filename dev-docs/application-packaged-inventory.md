@@ -8,7 +8,7 @@ component coverage can be compared from observations.
 
 ## Build and collect locally
 
-Use a clean checkout of the committed source, Docker with Buildx, Bash, Python 3,
+Use a clean checkout of the committed source, Docker with Buildx, Bash, Python 3.11 or later,
 and enough temporary disk space for an exported image and its extracted filesystem.
 Run these commands from the repository root:
 

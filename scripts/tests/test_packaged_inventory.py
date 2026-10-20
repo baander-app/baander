@@ -44,6 +44,52 @@ class InventoryTest(unittest.TestCase):
         self.assertEqual(['acme/runtime'], [p['name'] for p in result['composer']])
         self.assertEqual('installed-composer', next(f['group'] for f in result['files'] if f['path'].endswith('runtime/LICENSE')))
 
+    def test_composer_metapackage_is_metadata_only_installed_membership(self):
+        package = {'name': 'upscale/ext-swoole', 'type': 'metapackage', 'version': 'v6.2.0',
+                   'install-path': None, 'license': ['Apache-2.0']}
+        self.put('/var/www/html/vendor/composer/installed.json', json.dumps({'packages': [package]}))
+        result = self.generate()
+        component = result['composer'][0]
+        self.assertEqual('upscale/ext-swoole', component['name'])
+        self.assertEqual('metapackage', component['type'])
+        self.assertIsNone(component['install_path'])
+        self.assertFalse(any(component['id'] in f['owners'] for f in result['files']))
+        self.assertFalse(any(g.get('component') == component['id'] for g in result['review_gaps']))
+        inv.verify(self.root, self.bundle / 'inventory.json', 'abc')
+
+    def test_composer_regular_package_requires_installation_path(self):
+        for path in (None, ''):
+            with self.subTest(path=path):
+                package = {'name': 'acme/runtime', 'type': 'library', 'version': '1',
+                           'install-path': path, 'license': ['MIT']}
+                self.put('/var/www/html/vendor/composer/installed.json', json.dumps({'packages': [package]}))
+                with self.assertRaisesRegex(inv.InventoryError, 'installation path.*acme/runtime'):
+                    self.generate()
+        package.pop('install-path')
+        self.put('/var/www/html/vendor/composer/installed.json', json.dumps({'packages': [package]}))
+        with self.assertRaisesRegex(inv.InventoryError, 'installation path.*acme/runtime'):
+            self.generate()
+
+    def test_composer_path_repository_owns_physical_source_and_notice(self):
+        package = {'name': 'swoole-bundle/swoole-bundle', 'type': 'library', 'version': '1',
+                   'install-path': '../swoole-bundle/swoole-bundle', 'license': ['MIT']}
+        self.put('/var/www/html/vendor/composer/installed.json', json.dumps({'packages': [package]}))
+        self.put('/var/www/html/packages/swoole-bundle/LICENSE', 'local package notice')
+        self.put('/var/www/html/packages/swoole-bundle/src/Bundle.php', '<?php // source')
+        link = self.root / 'var/www/html/vendor/swoole-bundle/swoole-bundle'
+        link.parent.mkdir(parents=True)
+        link.symlink_to('../../packages/swoole-bundle/')
+        result = self.generate()
+        self.assertEqual('/var/www/html/vendor/swoole-bundle/swoole-bundle', result['composer'][0]['install_path'])
+        for path in ('/var/www/html/packages/swoole-bundle/src/Bundle.php',
+                     '/var/www/html/vendor/swoole-bundle/swoole-bundle'):
+            entry = next(f for f in result['files'] if f['path'] == path)
+            self.assertEqual('installed-composer', entry['group'])
+            self.assertEqual(['composer:swoole-bundle/swoole-bundle'], entry['owners'])
+        self.assertTrue(any(e['path'] == '/var/www/html/packages/swoole-bundle/LICENSE' for e in result['evidence']))
+        self.assertFalse(any(g.get('component') == 'composer:swoole-bundle/swoole-bundle' for g in result['review_gaps']))
+        inv.verify(self.root, self.bundle / 'inventory.json', 'abc')
+
     def test_debian_absolute_copyright_alias(self):
         path = self.root / 'usr/share/doc/libc/copyright'
         path.unlink()
@@ -145,6 +191,27 @@ class InventoryTest(unittest.TestCase):
             stream.addfile(item)
         with self.assertRaisesRegex(inv.InventoryError, 'unsafe archive path'):
             inv.extract(archive, pathlib.Path(self.temp.name) / 'exported')
+
+    def test_native_merged_usr_alias_preserves_ownership_and_other_gaps(self):
+        (self.root / 'bin').symlink_to('/usr/bin')
+        self.put('/usr/bin/pie', b'#!/usr/bin/env php\npie fixture')
+        self.put('/usr/bin/unknown', b'\x7fELFunknown')
+        self.put('/usr/share/baander-build-evidence/notices/pie/LICENSE', 'PIE notice')
+        self.put('/usr/share/baander-build-evidence/components.json', json.dumps({
+            'schema': 'baander-native-build-evidence/v1', 'components': [{
+                'id': 'pie', 'name': 'PIE', 'version': '1',
+                'source': {'url': 'https://baander.app/pie'},
+                'artifacts': [{'path': '/bin/pie', 'sha256': inv.file_hash(self.root / 'usr/bin/pie')}],
+                'notices': ['/usr/share/baander-build-evidence/notices/pie/LICENSE']
+            }]}))
+        result = self.generate()
+        pie = next(f for f in result['files'] if f['path'] == '/usr/bin/pie')
+        self.assertEqual('native-build', pie['group'])
+        self.assertEqual(['pie'], pie['owners'])
+        self.assertFalse(any(g['path'] == '/usr/bin/pie' for g in result['review_gaps']))
+        self.assertTrue(any(g['path'] == '/usr/bin/unknown' for g in result['review_gaps']))
+        self.assertTrue(any(g.get('component') == 'pie' and 'embedded' in g['reason'] for g in result['review_gaps']))
+        inv.verify(self.root, self.bundle / 'inventory.json', 'abc')
 
     def test_native_output_hash_bound_to_provenance(self):
         self.put('/usr/local/bin/native', b'\x7fELFnative')

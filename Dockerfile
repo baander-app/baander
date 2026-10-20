@@ -149,7 +149,7 @@ RUN set -xe && \
         --version "${LIBURING_VERSION}" --source-dir "liburing-liburing-${LIBURING_VERSION}" \
         --source-url "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" \
         --source-archive "liburing-${LIBURING_VERSION}.tar.gz" \
-        --artifact '/usr/local/lib/liburing*' --artifact '/usr/lib/liburing*' && \
+        --artifact '/usr/lib/liburing*' && \
     rm -rf "liburing-liburing-${LIBURING_VERSION}" && rm -f "liburing-${LIBURING_VERSION}.tar.gz"
 
 # Install PECL extensions.
@@ -205,6 +205,7 @@ RUN set -xe && \
         --version "${PHP_VERSION}" --source-dir /usr/src/php \
         --source-url "${PHP_URL}" --source-archive /usr/src/php.tar.xz \
         --artifact '/usr/local/bin/php*' \
+        --artifact /usr/local/lib/libphp.so \
         --artifact '/usr/local/lib/php/extensions/*/exif.so' \
         --artifact '/usr/local/lib/php/extensions/*/ffi.so' \
         --artifact '/usr/local/lib/php/extensions/*/gd.so' \

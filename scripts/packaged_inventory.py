@@ -34,7 +34,7 @@ def file_hash(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def root_file(root, name):
+def root_path(root, name):
     """Resolve image symlinks inside the export, including absolute Debian aliases."""
     pending = list(pathlib.PurePosixPath('/' + str(name).lstrip('/')).parts[1:])
     parts = []
@@ -59,7 +59,11 @@ def root_file(root, name):
             pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
         else:
             parts.append(part)
-    result = root.joinpath(*parts)
+    return root.joinpath(*parts)
+
+
+def root_file(root, name):
+    result = root_path(root, name)
     if not result.is_file():
         raise MissingImageFileError('missing image file: ' + str(name))
     return result
@@ -196,21 +200,31 @@ def observe(root, identity):
     composer_roots = []
     for package in installed:
         name = package['name']
-        install_path = package.get('install-path', '../' + name)
-        full = os.path.normpath(APP + '/vendor/composer/' + install_path)
-        if not full.startswith(APP + '/'):
-            raise InventoryError('Composer installation path escapes application: ' + name)
+        package_type = package.get('type')
+        full = None
         component = 'composer:' + name
-        composer_roots.append((full, component))
-        record = {'id': component, 'name': name, 'version': package.get('version'),
+        if package_type != 'metapackage':
+            install_path = package.get('install-path')
+            if not isinstance(install_path, str) or not install_path:
+                raise InventoryError('missing Composer installation path: ' + name)
+            full = os.path.normpath(APP + '/vendor/composer/' + install_path)
+            if not full.startswith(APP + '/'):
+                raise InventoryError('Composer installation path escapes application: ' + name)
+            composer_roots.append((full, component))
+        record = {'id': component, 'name': name, 'type': package_type, 'version': package.get('version'),
                   'source': package.get('source'), 'dist': package.get('dist'),
                   'declared_license': package.get('license'), 'install_path': full}
         composer.append(record)
         if not record['declared_license'] or not all(known(value) for value in record['declared_license']):
             gap(installed_path, 'missing declared Composer license', component)
+        if package_type == 'metapackage':
+            continue
         found = []
-        directory = root / full.lstrip('/')
-        if directory.is_dir() and not directory.is_symlink():
+        directory = root_path(root, full)
+        if directory.is_dir():
+            physical_prefix = '/' + str(directory.relative_to(root))
+            if physical_prefix != full:
+                composer_roots.append((physical_prefix, component))
             found = ['/' + str(p.relative_to(root)) for p in directory.iterdir() if notice_name(p.name) and (p.is_file() or p.is_symlink())]
         if not found:
             gap(full, 'installed Composer package has no retained top-level notice', component)
@@ -303,6 +317,8 @@ def observe(root, identity):
                 evidence_paths.add(path)
             if kind == 'notice':
                 evidence_paths.add(path)
+            if path.startswith(APP + '/third_party/inventory/') and name == 'source.json' and entry.get('sha256'):
+                evidence_paths.add(path)
             if group in ('unresolved', 'copied-repository') and kind in ('native', 'wasm', 'archive', 'tool-or-script'):
                 gap(path, 'unresolved ownership or embedded dependency evidence for ' + kind)
             if group == 'copied-repository' and name in ('composer.json', 'package.json') and entry.get('sha256'):
@@ -319,23 +335,29 @@ def observe(root, identity):
                 gap(path, 'copied manifest describes source requirements; installed or generated contents require review')
             if group == 'unresolved' and kind == 'file':
                 gap(path, 'unowned filesystem material requires classification')
-    # Debian's merged-/usr symlinks can give ownership lists an alias path.
-    # Resolve owner aliases against the actual census rather than treating them as new binaries.
-    by_resolved = {}
-    for path, assigned in owners.items():
-        try:
-            resolved = root_file(root, path)
-        except MissingImageFileError:
-            continue
-        by_resolved.setdefault(str(resolved), set()).update(assigned)
+    # Merged-/usr symlinks can give Debian and native artifact owners alias paths.
+    # Preserve existing assignments and Debian precedence when resolving unowned files.
+    by_resolved = {'debian': {}, 'native-build': {}}
+    for group, ownership in (('debian', owners), ('native-build', native_owners)):
+        for path, assigned in ownership.items():
+            try:
+                resolved = root_file(root, path)
+            except MissingImageFileError:
+                continue
+            by_resolved[group].setdefault(str(resolved), set()).update(assigned)
     resolved_aliases = set()
     for entry in files:
         if entry['group'] == 'unresolved' and entry.get('sha256'):
-            assigned = by_resolved.get(str(root_file(root, entry['path'])))
-            if assigned:
-                entry.update(group='debian', owners=sorted(assigned))
-                resolved_aliases.add(entry['path'])
-    gaps = [g for g in gaps if g['path'] not in resolved_aliases]
+            resolved = str(root_file(root, entry['path']))
+            for group in ('debian', 'native-build'):
+                assigned = by_resolved[group].get(resolved)
+                if assigned:
+                    entry.update(group=group, owners=sorted(assigned))
+                    resolved_aliases.add(entry['path'])
+                    break
+    gaps = [g for g in gaps if not (g['path'] in resolved_aliases and
+            (g['reason'].startswith('unresolved ownership or embedded dependency evidence for ') or
+             g['reason'] == 'unowned filesystem material requires classification'))]
     return {'schema': SCHEMA, 'identity': identity, 'debian': packages,
             'composer': sorted(composer, key=lambda p: p['name']), 'native': native,
             'files': sorted(files, key=lambda p: p['path']),

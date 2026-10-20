@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "packages": [
+    {
+      "package": "cweagans/composer-patches",
+      "version": "2.0.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/cweagans/composer-patches.git",
+        "reference": "bfa6018a5f864653d9ed899b902ea72f858a2cf7"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/cweagans/composer-patches/git/trees/bfa6018a5f864653d9ed899b902ea72f858a2cf7?recursive=1",
+        "sha256": "5310b4c0753d42c1d5e7b35cf4bf2e1f68419a02ca8ddde63399d3bed5b1e463",
+        "truncated": false
+      },
+      "notices": [
+        {
+          "path": "cweagans/composer-patches/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/cweagans/composer-patches/bfa6018a5f864653d9ed899b902ea72f858a2cf7/LICENSE.md",
+          "reference": "bfa6018a5f864653d9ed899b902ea72f858a2cf7",
+          "git_blob_sha": "2be383aa948ec6d021eb02a3900721db5814cea0",
+          "sha256": "040d22aeb7d79a1cdc20fe63ff720c1f1324be653a4363c9ac4b260dcc4063ae"
+        }
+      ],
+      "status": "recovered"
+    },
+    {
+      "package": "hidehalo/nanoid-php",
+      "version": "2.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/hidehalo/nanoid-php.git",
+        "reference": "3aa4f874d36e2368a57b2ad4c9ca1abe13514e66"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/hidehalo/nanoid-php/git/trees/3aa4f874d36e2368a57b2ad4c9ca1abe13514e66?recursive=1",
+        "sha256": "a12ba414f29bdd672a54ca518b3b81ea63e6e28dba569ecc427051187fec7abc",
+        "truncated": false
+      },
+      "notices": [
+        {
+          "path": "hidehalo/nanoid-php/LICENSE.md",
+          "url": "https://raw.githubusercontent.com/hidehalo/nanoid-php/3aa4f874d36e2368a57b2ad4c9ca1abe13514e66/LICENSE.md",
+          "reference": "3aa4f874d36e2368a57b2ad4c9ca1abe13514e66",
+          "git_blob_sha": "d159c42e3b93fa7bc9a76ab5df8e717ad7c1cd0e",
+          "sha256": "87365ea351fbe418bfb9351384561c114e4549aa0a0cfbae54fc29ea38f75eee"
+        }
+      ],
+      "status": "recovered"
+    },
+    {
+      "package": "open-telemetry/api",
+      "version": "1.9.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/api.git",
+        "reference": "6f8d237ce2c304ca85f31970f788e7f074d147be"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/api/git/trees/6f8d237ce2c304ca85f31970f788e7f074d147be?recursive=1",
+        "sha256": "4dc332dfcacd9c836992386f6b46b6cf0c1128c78fc4db9bfa8b5a959612f9f1",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    },
+    {
+      "package": "open-telemetry/context",
+      "version": "1.5.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/context.git",
+        "reference": "3c414b246e0dabb7d6145404e6a5e4536ca18d07"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/context/git/trees/3c414b246e0dabb7d6145404e6a5e4536ca18d07?recursive=1",
+        "sha256": "ba989c43152135e20063aa14d350d5a0248670af87d4bb28c44341c962669d95",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    },
+    {
+      "package": "open-telemetry/exporter-otlp",
+      "version": "1.4.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/exporter-otlp.git",
+        "reference": "283a0d66522f2adc6d8d7debfd7686be91c282be"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/exporter-otlp/git/trees/283a0d66522f2adc6d8d7debfd7686be91c282be?recursive=1",
+        "sha256": "8aec5fa938a5cd3f5a6f00d82a63f4a79db3e95a2eeaa1857ac552567a79ad75",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    },
+    {
+      "package": "open-telemetry/gen-otlp-protobuf",
+      "version": "1.9.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/gen-otlp-protobuf.git",
+        "reference": "a229cf161d42001d64c8f21e8f678581fe1c66b9"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/gen-otlp-protobuf/git/trees/a229cf161d42001d64c8f21e8f678581fe1c66b9?recursive=1",
+        "sha256": "97f948f975aef1e4e4c36126e9badb0e2f93ac9d215e332a471c8b085da64c2d",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    },
+    {
+      "package": "open-telemetry/sdk",
+      "version": "1.14.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/sdk.git",
+        "reference": "6e3d0ce93e76555dd5e2f1d19443ff45b990e410"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/sdk/git/trees/6e3d0ce93e76555dd5e2f1d19443ff45b990e410?recursive=1",
+        "sha256": "6850685037ce0e6df3072963a9067cfc2f6834c5f7fd07aeb8cb6c04bb9783b9",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    },
+    {
+      "package": "open-telemetry/sem-conv",
+      "version": "1.38.0",
+      "installed_source": {
+        "type": "git",
+        "url": "https://github.com/opentelemetry-php/sem-conv.git",
+        "reference": "e613bc640a407def4991b8a936a9b27edd9a3240"
+      },
+      "source_tree": {
+        "url": "https://api.github.com/repos/opentelemetry-php/sem-conv/git/trees/e613bc640a407def4991b8a936a9b27edd9a3240?recursive=1",
+        "sha256": "309ec495520c0f308fa1cca29cded54e8352420a7f1a58aeba01a8a53dd836ac",
+        "truncated": false
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The complete source tree at the installed revision contains no license, licence, copying, copyright or notice filename. No source correspondence to another repository revision has been established."
+    }
+  ]
+}
