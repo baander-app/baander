@@ -76,11 +76,10 @@ when checking that deployment decision.
   [collection procedure](dev-docs/application-packaged-inventory.md) for each new
   artifact. Preserve the boundaries in [THIRD_PARTY.md](THIRD_PARTY.md).
   The separate Registry inventory is outside this remainder.
-  Checkpoint, 2026-10-20: 96 tooling tests passed; both image inventories,
-  production worker smoke, Docker context and applicable syntax checks passed.
-  Supplemental evidence now resolves six OpenTelemetry package licenses through
-  exact upstream tree matches. Notice hashes, Docker context inclusion and
-  collector retention passed; historical image measurements remain unchanged.
+  Checkpoint, 2026-10-20: supplemental evidence resolves six OpenTelemetry
+  license notices and six Debian common-license references. Source identity,
+  exact-byte, Docker context and collector retention checks passed. Historical
+  image measurements and their verification remain in the review record.
 - **Selected native media path:** when a release explicitly includes an active
   codec/DSP path, resolve its remaining reproducibility and reference-vector
   acceptance before claiming certification. Use the

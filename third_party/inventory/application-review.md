@@ -111,6 +111,37 @@ counts and raw observations above still describe the earlier snapshot; the six
 new licenses are supplemental source evidence, not measured contents of those
 images.
 
+### Debian common-license references
+
+The [Debian reference record](debian-notices/source.json) resolves six missing
+paths using the explicit version text in the retained copyright files. Both
+measured image bundles already contain the corresponding complete license bodies
+under these names:
+
+| Referring packages | Missing name | Retained name |
+|---|---|---|
+| gzip | `GFDL-3` | `GFDL-1.3` |
+| libpango-1.0-0, libpangocairo-1.0-0, libpangoft2-1.0-0 | `GPL-2.0` | `GPL-2` |
+| libdecor-0-0, libdecor-0-plugin-1-cairo | `GPL-3.0` | `GPL-3` |
+
+All paths are under `/usr/share/common-licenses/`. The record preserves each
+package version, copyright excerpt and hash, license path and hash, and both
+image identities. Three unchanged license bodies are retained alongside it.
+The correspondence follows the grants, including their “or later” terms, rather
+than filename similarity. The gzip GFDL grant covers `doc/* NEWS README` with no
+invariant sections or cover texts. The libdecor GPL grant covers
+`debian/tests/run-with-display`. Pango's reference occurs in a license-definition
+stanza; it does not classify the Pango binaries as GPL.
+
+On 2026-10-20, checks matched all six scoped references and three complete bodies
+against both image bundles. A disposable Docker context export preserved all four
+new files, and fixture collection and verification retained their exact bytes.
+These checks took 1.02 seconds; logs are under
+`var/test-runs/debian-license-references-20261020/`. No application code or tests
+changed, and no product suites or application image builds ran.
+The six raw missing-reference observations remain historical evidence; these
+supplemental source records do not change image measurements or qualify a release.
+
 ## Remaining redistribution work
 
 The remaining gate concerns these observed contents:
@@ -120,10 +151,10 @@ The remaining gate concerns these observed contents:
   source. Its package tree is unchanged from the initial repository commit.
   The Composer notice record pins that tree and manifest; repository ownership
   and the native TSDuck license do not establish the PHP bindings' notice.
-- **Debian evidence:** some retained copyright files have no machine-readable
-  license declaration. Six references name absent common-license paths:
-  `GFDL-3`, `GPL-2.0`, or `GPL-3.0`. Review the copyright text and resolve those
-  references; do not infer a different license from a similar filename.
+- **Debian evidence:** 149 retained copyright files have no machine-readable
+  license declaration. Their text still needs review; resolving the six
+  common-license references above does not settle those declarations or
+  package-wide redistribution obligations.
 - **Embedded dependencies:** PHP, liburing, eight PECL extensions, Swoole, TSDuck,
   Composer, and PIE have retained source/tool evidence and bound output hashes.
   Their embedded dependency and distribution obligations remain unreviewed.
