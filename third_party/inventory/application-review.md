@@ -1,6 +1,6 @@
 # Application image inventory review
 
-This review covers the root Dockerfile's `production` and `worker` targets on
+The initial inventory covers the root Dockerfile's `production` and `worker` targets on
 Linux amd64, built from commit `1066d203`. It records packaged contents and
 licensing evidence on 2026-10-20; redistribution qualification remains open.
 
@@ -142,6 +142,61 @@ changed, and no product suites or application image builds ran.
 The six raw missing-reference observations remain historical evidence; these
 supplemental source records do not change image measurements or qualify a release.
 
+## Runtime images without Composer install caches
+
+On 2026-10-20, both targets were rebuilt from committed source
+`8130c214fe0ba715d7bcfb0b2295c1e84f84e94d`, using an extracted directory context
+with `.dockerignore` applied. The production dependency step now deletes
+`/home/www-data/.cache/composer` after autoloader generation in the same layer.
+The worker inherits that result. These are the new image identities:
+
+```text
+production sha256:f9c7b1819f597224670076ed07f2417b0fc6f286cf5799db6988f73162c4116f
+worker     sha256:dc2e24871e4084c6e134c30d906d8dc9d13f533744757e640a1c0e4118010398
+```
+
+Both inventory generation and verification passed. Their observed contents are
+identical, including 636 Debian packages, 152 Composer entries, 14 native/tool
+components, 80 native-owned entries and 12 copied manifests. Installed package
+records and native artifact hashes also match the initial inventory exactly.
+
+| Observation, per image | Initial inventory | New inventory |
+|---|---:|---:|
+| Files and symlinks | 52,278 | 52,117 |
+| Raw review observations | 5,501 | 5,328 |
+| Retained evidence paths | 2,053 | 2,063 |
+| Unique retained evidence blobs | 1,405 | 1,406 |
+
+The removed cache contained 173 files totalling 15,057,283 bytes, including 148
+downloaded archives. No cache path or associated review observation remains.
+The comparison also accounts for 12 added notice/review files and five changed
+repository files, all matching the committed source bytes. Five additional file
+differences are confined to `vendor/upscale/swoole-reflection/.git`: index
+checkout timestamps and device/inode fields, plus timestamps in four reflogs.
+All 13 tracked index entries and their object IDs match; these metadata changes
+do not indicate dependency source drift.
+
+The existing worker image runner rejected the retained old image with the new
+cache-absence assertion. The rebuilt worker passed that assertion, platform and
+restricted file-I/O checks, and the isolated startup, outbox, scheduler and
+deployment-retirement smoke in 37.54 seconds. Production and worker builds took
+21.30 and 1.88 seconds; inventory collection and verification took 52.81 and
+53.20 seconds. Shell syntax and `git diff --check` passed. No new test suite or
+broad application suite ran.
+
+Full bundles, build and verification logs, `comparison.json`, and the five-file
+Git metadata proof are under `var/test-runs/production-composer-cache-20261020/`.
+The inventory SHA-256 values are:
+
+```text
+production d03269b4d74d2af64c5ebc165f2ebe57a8471cea7e1a71c6ecbaf9326463ba2a
+worker     6885cab08815ebde4fa622de16ab8fea548f54a5fcbd9e46ca8041cc5d95a20a
+```
+
+The earlier machine-readable review record remains historical evidence. This
+documentation follows the new measured source snapshot; both new inventories
+still report `not-qualified`.
+
 ## Remaining redistribution work
 
 The remaining gate concerns these observed contents:
@@ -164,9 +219,10 @@ The remaining gate concerns these observed contents:
   JavaScript manifests are source requirements, not proof of installed npm
   dependencies. This inventory does not select new DSP algorithm qualification.
 - **Unclassified inherited files:** distinguish generated OS metadata and caches
-  from distributed dependency material. Observations include dpkg state files,
-  generated MIME data, Python bytecode, PHP/PEAR files, and Composer download
-  archives. A raw gap count is not a count of missing licenses.
+  from distributed dependency material. Remaining observations include dpkg state
+  files, generated MIME data, Python bytecode and PHP/PEAR files. The new images
+  exclude Composer's install cache. A raw gap count is not a count of missing
+  licenses.
 
 The machine-readable bundle names each path and component requiring review.
 Its `not-qualified` outcome remains unchanged after a successful integrity check.
