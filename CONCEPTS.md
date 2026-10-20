@@ -207,3 +207,19 @@ pool; native tests run one fresh process per file without networking. Each
 functional/integration lane owns a disposable Compose project with separate
 PostgreSQL, Redis and application containers. Together, the lane manifests must
 contain every discovered test file exactly once.
+
+## Store debugging
+
+### Recorder instance
+
+One successfully created store admitted by the enabled store debugger. Its
+recorder-local ID distinguishes it from stores with the same display name and is
+not reused after retirement or a history clear. Explicit retirement stops recording
+that instance.
+
+### History baseline
+
+The immutable diagnostic captures immediately before the store debugger's retained
+event window. Eviction folds discarded events into this baseline; clearing starts a
+new epoch from current recorded captures. Reconstruction applies retained events to
+the baseline through the selected event.

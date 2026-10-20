@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-19. This is the working delivery record for the remediation,
+Updated: 2026-10-20. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -28,9 +28,10 @@ retain requirements or deferred scope, without making every item a next task.
   are delivered locally. The
   [desktop discovery rendering fix](#desktop-discovery-rendering-2026-10-19)
   is also delivered locally.
-  [Store timeline navigation](#store-timeline-navigation-2026-10-19) and inspection
-  of selected captured state are delivered locally. General reconstruction and
-  replay remain open; actual-destination backup acceptance remains deferred.
+  [Store timeline navigation](#store-timeline-navigation-2026-10-19) and
+  [historical store capture reconstruction](#store-capture-reconstruction-2026-10-20)
+  are delivered locally. Live replay and full asynchronous provenance remain open;
+  actual-destination backup acceptance remains deferred.
 - **Delivered local scope:** backend/static boundaries, browser credentials, worker
   lifecycle, asynchronous routes, reserved control capacity, measured autoscaling
   and shared media control retain their recorded evidence. The historical full
@@ -3366,6 +3367,58 @@ Verification checkpoint:
   release-image build or runtime test was performed for this reconciliation.
   Application backup restoration remains deferred.
 
+### Store capture reconstruction (2026-10-20)
+
+The timeline now reconstructs historical diagnostic captures across recorded store
+instances, following the
+[reviewed plan](docs/plans/2026-10-19-store-capture-reconstruction-plan.md).
+Schema2 records successful registrations, updates and explicit retirements by
+recorder instance ID. Duplicate display names remain distinct. Nested subscriber
+mutations retain their actual event order; construction-time intermediate states
+are outside the recorded history.
+
+An immutable baseline advances as events are evicted. Clearing starts a new epoch
+from current recorded captures. Historical inspection folds the full retained
+history through the selected event, including events hidden by a filter, without
+borrowing newer live values or invoking actions and effects. The Inspector shows
+current instances. Explicit retirement stops observation and releases one of the
+100 active-instance slots. Omitted registrations increase a visible cumulative
+count that persists across clearing and retirement and makes reconstruction
+partial. Incomplete captures retain their diagnostic markers. Collections over 50
+instances are virtualized, with keyboard scrolling and preserved collapse state.
+
+This delivers captured-state reconstruction. Complete captures remain sanitized
+diagnostic values; they do not restore a running application. Live replay and
+full asynchronous provenance remain deferred. Schema v1 has no compatibility
+conversion, and trace import is unsupported. This local delivery adds no external
+release acceptance.
+
+Verification checkpoint:
+
+- After the review fix, the full web suite passes **2,120 tests in 187 files in
+  32.99 seconds**, including 16 new recorder, reconstruction and UI regressions.
+  It runs in `baander-runner:desktop-verification`, built from
+  `docker/runner/Dockerfile`, image
+  `sha256:01d0abb656471d7325ed6027474729c3f72ce42133718dca4d7f6edff8e1c1f4`.
+- Final web and worker TypeScript checks pass. Full ESLint reports zero errors
+  and eight warnings: seven existing warnings and a React Compiler
+  incompatible-library warning for the historical list's `useVirtualizer` call.
+  The compiler skips automatic memoization of that component. The production
+  build passes in **710 ms**, with existing chunk warnings.
+- The extended Chromium debugger case passes **1/1 in 5.5 seconds** through the
+  disposable local `debug.baander.app` HTTPS fixture. It checks keyboard navigation,
+  unchanged live stores, 100 recorded instances with bounded mounting, scrolling to
+  the end, preserved collapse state, and no horizontal overflow in the narrow
+  virtualized view.
+  Earlier **1280×900** and **390×844** screenshots of three stores were inspected
+  without document or capture overflow; those screenshots precede virtualization.
+  The existing Playwright workflow is used because the `agent-browser` CLI is
+  unavailable.
+- Independent code review found one justified P2 standards issue: historical
+  collections over 50 instances needed virtualization. The fix is applied;
+  follow-up review reports no remaining concrete issues. Evidence:
+  `var/test-runs/store-capture-reconstruction-20261020/`.
+
 ### Registry release and growth
 
 The local contracts listed below are implemented and covered. The entries
@@ -3509,9 +3562,12 @@ automatic quorum reduction. This is not the current implementation priority.
 - [x] Add timeline navigation and read-only inspection of the selected update's
   own captured before and after values. See
   [store timeline navigation](#store-timeline-navigation-2026-10-19).
-- [ ] Define general multi-store historical reconstruction before live replay.
-  Selected-event inspection does not reconstruct other stores or fill gaps from
-  newer captures. Never execute stored functions or silently replay external
+- [x] Reconstruct historical captures across admitted store instances from a
+  schema2 baseline and retained events. See
+  [store capture reconstruction](#store-capture-reconstruction-2026-10-20).
+  Incomplete captures and omitted registrations remain visible; reconstruction
+  does not restore live application state. Live replay and full asynchronous
+  provenance remain deferred. Never execute stored functions or silently replay external
   effects from imported traces.
 - [ ] Add deterministic replay/reference tests and a version-upgrade policy when actual
   replay is implemented. A diagnostic timeline is not yet an event-sourced application.

@@ -122,14 +122,43 @@ opt-in through `baander-store-debug` in local storage and is disabled in product
 builds. Disabling also reloads, removing tracing wrappers instead of keeping a
 conditional branch on every action. Enabling recording incurs snapshot/stack costs.
 
-The timeline links synchronous nested calls, shows changed fields and before/after
-state, and exports schema-version-1 JSON. Async completions link to their originating
-action; updates after an `await` retain their call stacks without inferred parentage.
-History is bounded and reports discarded events. Redacted/truncated/native values
-make captures incomplete; exports are diagnostic and do not yet support replay.
+The timeline exports schema-version-2 JSON with ordered events, recorder instance
+IDs, current captures and a history baseline. Each admitted store records a
+registration capture after successful creation; construction-time intermediate
+states are outside the recorded history. Duplicate display names have distinct instance IDs. Explicit
+`unregisterStore(instanceId)` retirement releases observation and removes that
+instance from later historical points and the current Inspector. Retirement does
+not happen automatically when a component unmounts.
+
+Select a retained event to inspect **Historical store captures** for every recorded
+instance present at that point. Reconstruction folds the full retained history
+through the selected event, even when the timeline filter hides intervening events. It uses
+the baseline and recorded captures, without reading newer live state, changing
+stores or running effects. Update before/after captures still belong to the selected
+event. Clearing or evicting that event removes selection. Collections over 50
+instances use a keyboard-accessible virtualized scroll region; rows keep their
+expanded or collapsed state while scrolling.
+
+Evicted events advance the baseline to the start of the retained window. Clearing
+the timeline starts a new baseline epoch from current recorded captures; instance
+and event IDs are not reused. At most 100 active instances are admitted. Omitted
+registrations remain uninstrumented and increase the visible cumulative omission
+count, which persists across clearing and retirement. A nonzero count marks
+reconstruction as partial even when each displayed capture is complete. Retiring
+an admitted instance frees a slot for a later registration.
+
+Synchronous nested calls retain parent links. Async completions link to their
+originating action; updates after an `await` retain their call stacks without
+inferred parentage. Redacted, truncated and native values make captures incomplete.
+Even complete captures are sanitized diagnostic values, not executable application
+state. Reconstruction does not restore a running application or replay network or
+media effects. Schema v1 has no compatibility conversion, and trace import is not
+supported.
 
 Unit tests verify creator/action identity when tracing is disabled, no-op subscriber
 and persistence behavior, secret redaction, immutable snapshots, and event ordering.
+They also cover instance registration and retirement, nested subscriber mutations,
+baseline eviction and clear, admission omissions, and reconstruction without effects.
 Player/session tests additionally cover clock isolation and sync under continuous
 playback. Performance assertions use counts rather than timing-sensitive thresholds.
 
