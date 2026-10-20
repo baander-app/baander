@@ -136,14 +136,21 @@ RUN set -xe && \
 
 # Compile liburing from source.
 # --mount=type=cache preserves the build directory across rebuilds.
+COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
 RUN set -xe && \
     wget https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz && \
     tar zxf liburing-${LIBURING_VERSION}.tar.gz && \
     cd liburing-liburing-${LIBURING_VERSION} && \
     ./configure && \
     make -j$(nproc) install && \
-    cd .. \
-    rm -rf liburing-${LIBURING_VERSION} && rm -f liburing-${LIBURING_VERSION}.tar.gz
+    cd .. && \
+    php /usr/local/bin/retain-build-evidence.php collect \
+        --output /tmp/build-evidence-php --id liburing --name liburing \
+        --version "${LIBURING_VERSION}" --source-dir "liburing-liburing-${LIBURING_VERSION}" \
+        --source-url "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" \
+        --source-archive "liburing-${LIBURING_VERSION}.tar.gz" \
+        --artifact '/usr/local/lib/liburing*' --artifact '/usr/lib/liburing*' && \
+    rm -rf "liburing-liburing-${LIBURING_VERSION}" && rm -f "liburing-${LIBURING_VERSION}.tar.gz"
 
 # Install PECL extensions.
 # --mount=type=cache,target=/tmp/pecl persists downloaded source across rebuilds.
@@ -182,7 +189,36 @@ RUN --mount=type=cache,target=/tmp/pecl \
     # uv
     && pecl bundle -d /tmp/pecl uv \
     && docker-php-ext-configure /tmp/pecl/uv \
-    && docker-php-ext-install -j$(nproc) /tmp/pecl/uv
+    && docker-php-ext-install -j$(nproc) /tmp/pecl/uv \
+    && for extension in imagick igbinary redis mailparse inotify excimer yaml uv; do \
+        php /usr/local/bin/retain-build-evidence.php collect \
+            --output /tmp/build-evidence-php --id "pecl-${extension}" --name "${extension}" \
+            --source-dir "/tmp/pecl/${extension}" --package-xml "/tmp/pecl/${extension}/package.xml" \
+            --source-url "https://pecl.php.net/package/${extension}" \
+            --artifact "/usr/local/lib/php/extensions/*/${extension}.so"; \
+    done
+
+RUN set -xe && \
+    docker-php-source extract && \
+    php /usr/local/bin/retain-build-evidence.php collect \
+        --output /tmp/build-evidence-php --id php --name PHP \
+        --version "${PHP_VERSION}" --source-dir /usr/src/php \
+        --source-url "${PHP_URL}" --source-archive /usr/src/php.tar.xz \
+        --artifact '/usr/local/bin/php*' \
+        --artifact '/usr/local/lib/php/extensions/*/exif.so' \
+        --artifact '/usr/local/lib/php/extensions/*/ffi.so' \
+        --artifact '/usr/local/lib/php/extensions/*/gd.so' \
+        --artifact '/usr/local/lib/php/extensions/*/gettext.so' \
+        --artifact '/usr/local/lib/php/extensions/*/intl.so' \
+        --artifact '/usr/local/lib/php/extensions/*/pcntl.so' \
+        --artifact '/usr/local/lib/php/extensions/*/pdo_pgsql.so' \
+        --artifact '/usr/local/lib/php/extensions/*/pgsql.so' \
+        --artifact '/usr/local/lib/php/extensions/*/sockets.so' \
+        --artifact '/usr/local/lib/php/extensions/*/zip.so' \
+        --artifact '/usr/local/lib/php/extensions/*/shmop.so' \
+        --artifact '/usr/local/lib/php/extensions/*/sysvmsg.so' \
+        --artifact '/usr/local/lib/php/extensions/*/sodium.so' && \
+    docker-php-source delete
 
 # Install Composer from official image
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -205,8 +241,8 @@ RUN set -xe && \
     cd liburing-liburing-${LIBURING_VERSION} && \
     ./configure && \
     make -j$(nproc) install && \
-    cd .. \
-    rm -rf liburing-${LIBURING_VERSION} && rm -f liburing-${LIBURING_VERSION}.tar.gz
+    cd .. && \
+    rm -rf "liburing-liburing-${LIBURING_VERSION}" && rm -f "liburing-${LIBURING_VERSION}.tar.gz"
 
 # Install sockets extension (required by Swoole's --enable-sockets)
 RUN set -xe && \
@@ -217,8 +253,18 @@ RUN set -xe && \
 # Keep the async thread file backend: io_uring requires syscalls denied by the
 # deployment container's default seccomp profile and has no runtime fallback.
 # --mount=type=cache persists pie's download and build cache.
+COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
 RUN --mount=type=cache,target=/root/.cache/pie \
     set -xe && \
+    export PIE_WORKING_DIRECTORY=/tmp/pie-evidence && \
+    pie download swoole/swoole:6.2.0 && \
+    for source in /tmp/pie-evidence/php*/vendor/swoole/swoole; do \
+        php /usr/local/bin/retain-build-evidence.php collect \
+            --output /tmp/build-evidence-swoole --id swoole --name Swoole \
+            --source-dir "$source" --package-xml "$source/package.xml" \
+            --source-url https://github.com/swoole/swoole-src \
+            --artifact '/usr/local/lib/php/extensions/*/swoole.so'; \
+    done && \
     pie install swoole/swoole:6.2.0 \
         --enable-swoole-thread \
         --enable-sockets \
@@ -248,6 +294,20 @@ RUN set -xe && \
     make -j$(nproc) NOTEST=true -C src install-tools && \
     ldconfig
 
+COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
+RUN set -e; \
+    set --; \
+    for source in /tmp/tsduck-src/src/tstools/ts*.cpp; do \
+        tool="/usr/bin/$(basename "$source" .cpp)"; \
+        if [ -f "$tool" ]; then set -- "$@" --artifact "$tool"; fi; \
+    done; \
+    php /usr/local/bin/retain-build-evidence.php collect \
+    --output /tmp/build-evidence-tsduck --id tsduck --name TSDuck \
+    --version "${TSDUCK_VERSION}" --source-dir /tmp/tsduck-src \
+    --source-url https://github.com/tsduck/tsduck.git \
+    --source-revision "$(git -C /tmp/tsduck-src rev-parse HEAD)" \
+    --artifact '/usr/lib/libtsduck*' --artifact '/usr/lib/libtscore*' "$@"
+
 # -----------------------------------------------------------------------------
 # Stage 3: builder
 # Merges compiled artifacts from all parallel builder stages.
@@ -275,6 +335,23 @@ COPY --from=builder-php /usr/bin/composer /usr/bin/composer
 
 # Update linker cache for copied libraries
 RUN ldconfig
+
+FROM builder AS application-evidence
+
+COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
+COPY --from=builder-php /tmp/build-evidence-php /tmp/build-evidence-php
+COPY --from=builder-swoole /tmp/build-evidence-swoole /tmp/build-evidence-swoole
+COPY --from=builder-tsduck /tmp/build-evidence-tsduck /tmp/build-evidence-tsduck
+RUN php /usr/local/bin/retain-build-evidence.php phar \
+        --output /tmp/build-evidence-tools --id composer --name Composer \
+        --archive /usr/bin/composer --artifact /usr/bin/composer && \
+    php /usr/local/bin/retain-build-evidence.php phar \
+        --output /tmp/build-evidence-tools --id pie --name PIE \
+        --archive /bin/pie --artifact /bin/pie && \
+    php /usr/local/bin/retain-build-evidence.php finalize \
+        --output /usr/share/baander-build-evidence \
+        --input /tmp/build-evidence-php --input /tmp/build-evidence-swoole \
+        --input /tmp/build-evidence-tsduck --input /tmp/build-evidence-tools
 
 # -----------------------------------------------------------------------------
 # Stage 4: runtime
@@ -468,6 +545,9 @@ CMD ["/usr/local/bin/start-web.sh"]
 # -----------------------------------------------------------------------------
 FROM runtime AS production
 
+ARG BAANDER_SOURCE_REVISION
+LABEL org.opencontainers.image.revision="${BAANDER_SOURCE_REVISION}"
+
 ENV APP_ENV=prod APP_DEBUG=0
 
 # Switch to root to install the Composer executable.
@@ -475,6 +555,7 @@ USER root
 
 # Copy Composer from builder (already installed there)
 COPY --from=builder /usr/bin/composer /usr/bin/composer
+COPY --from=application-evidence /usr/share/baander-build-evidence /usr/share/baander-build-evidence
 
 # Path repositories, patches and application classes must exist before Composer
 # resolves local packages and generates the optimized application autoloader.
