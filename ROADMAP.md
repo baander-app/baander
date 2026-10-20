@@ -28,8 +28,9 @@ retain requirements or deferred scope, without making every item a next task.
   are delivered locally. The
   [desktop discovery rendering fix](#desktop-discovery-rendering-2026-10-19)
   is also delivered locally.
-  [Store timeline navigation](#store-timeline-navigation-2026-10-19) and
+  [Store timeline navigation](#store-timeline-navigation-2026-10-19),
   [historical store capture reconstruction](#store-capture-reconstruction-2026-10-20)
+  and [isolated store verification](#isolated-store-verification-2026-10-20)
   are delivered locally. The selected [DSP artifact build
   fix](#dsp-artifact-build-contract-2026-10-20) is also delivered locally. Live
   replay and full asynchronous provenance remain open; actual-destination backup
@@ -3487,6 +3488,56 @@ Verification checkpoint:
   follow-up review reports no remaining concrete issues. Evidence:
   `var/test-runs/store-capture-reconstruction-20261020/`.
 
+### Isolated store verification (2026-10-20)
+
+The store timeline verifies a retained `catalog.selection` `select` or `clear`
+action against the pure transition shared with the live store, following the
+[reviewed plan](docs/plans/2026-10-20-isolated-store-verification-plan.md).
+Complete synchronous invocation captures produce match or mismatch; unsupported,
+incomplete or ambiguous evidence produces unavailable with a reason. Successful
+no-op actions are supported.
+
+Verification uses detached captured data and a trusted descriptor held by the
+recorder. It leaves live stores and recorder history unchanged. Schema2 gains
+optional invocation provenance; earlier schema2 records remain inspectable and are
+unavailable for verification when that evidence is missing. Async actions, effects,
+trace import, multi-action workflows and live restoration remain deferred.
+
+Verification checkpoint:
+
+- The final `yarn --cwd ui/web test` run passes **2,173 tests in 188 files in
+  29.90 seconds** in
+  `baander-runner:desktop-verification`, image
+  `sha256:01d0abb656471d7325ed6027474729c3f72ce42133718dca4d7f6edff8e1c1f4`.
+  An earlier typecheck identified three test-fixture annotation issues; those are
+  corrected in this final run. Focused unit checkpoints passed **30**, **69** and
+  **22** tests; the overlapping post-review selection, recorder and verifier run
+  passes **72 tests in 3 files in 891 ms**.
+- `yarn --cwd ui/web build`, including web and worker TypeScript checks, passes in
+  **19.55 seconds**; Vite reports **726 ms**. Changed-file ESLint has zero errors
+  and the existing React Compiler warning for `useVirtualizer`. The files changed
+  to resolve review findings pass lint without warnings. Existing build chunk
+  warnings remain.
+- `yarn --cwd ui/web test:store-debug` passes **1/1 in 3.9 seconds** on the host,
+  using the disposable loopback HTTPS fixture. The CI image's browser
+  attempt stopped before executing the case because `libglib-2.0.so.0` is absent.
+  The passing workflow verifies selection and clear actions, keyboard activation,
+  unchanged live state and event history, and result removal on selection or
+  history changes.
+- `agent-browser` inspection at **1280×900** and **390×844** confirms a match for
+  an older selection while live selection remains `album-two` and the event count
+  stays at **11**. Both layouts have no horizontal overflow. Screenshots were
+  inspected before the recorder review fixes; the subsequent browser rerun covers
+  those fixes. The disposable browser and fixture server were stopped.
+- Three simplification reviews found no changes to apply. Independent code review
+  found two defects: action-result classification read a `then` accessor, and
+  capture could turn malformed numeric IDs into accepted strings. Both
+  failures were reproduced in existing tests before correction. The recorder now
+  avoids those accessor reads and marks non-finite captures incomplete. Follow-up
+  inspection closes both findings and confirms coverage of the second update
+  boundary in a chain. Prose audits and whitespace checks pass. Evidence:
+  `var/test-runs/isolated-store-verification-20261020/`.
+
 ### Registry nightly qualification (2026-10-20)
 
 The [reviewed plan](docs/plans/2026-10-20-registry-nightly-qualification-plan.md)
@@ -3687,9 +3738,13 @@ automatic quorum reduction. This is not the current implementation priority.
   gaps/truncation/redaction, and snapshots detached from live references. Delivered
   in the [debugger foundation](#completed-foundation-web-stores-and-developer-tooling);
   preserve these invariants when that feature changes.
-- [ ] Define replay scope explicitly: pure state transitions versus asynchronous
-  completion, external input, network effects, native media, and nonserializable
-  objects. Record enough provenance for deterministic supported cases.
+- [x] Define the initial replay scope as isolated verification of
+  `catalog.selection` `select` and `clear`, using complete synchronous invocation
+  captures and the current registered pure transition. See
+  [isolated store verification](#isolated-store-verification-2026-10-20).
+- [ ] Define asynchronous completion and external-input provenance before extending
+  verification to network effects, native media, nonserializable objects or
+  multi-action workflows. Trace import and live restoration remain deferred.
 - [x] Add timeline navigation and read-only inspection of the selected update's
   own captured before and after values. See
   [store timeline navigation](#store-timeline-navigation-2026-10-19).
@@ -3702,6 +3757,8 @@ automatic quorum reduction. This is not the current implementation priority.
   effects from imported traces.
 - [ ] Add deterministic replay/reference tests and a version-upgrade policy when actual
   replay is implemented. A diagnostic timeline is not yet an event-sourced application.
+  The isolated verifier has focused comparison tests and an explicit transition-version
+  gate; this does not define a compatibility policy for broader replay.
 - [x] Retain disabled instrumentation and unrelated-render performance gates. Their
   [foundation checkpoint](#completed-foundation-web-stores-and-developer-tooling)
   records the existing checks; reuse them when debugger/store APIs change. Enabled

@@ -223,3 +223,10 @@ The immutable diagnostic captures immediately before the store debugger's retain
 event window. Eviction folds discarded events into this baseline; clearing starts a
 new epoch from current recorded captures. Reconstruction applies retained events to
 the baseline through the selected event.
+
+### Isolated store verification
+
+A comparison of one recorded synchronous action with the current registered pure
+transition, calculated from detached captured data. It reports match, mismatch or
+unavailable and leaves live application state and recorder history unchanged. Its
+initial scope is the catalog selection store's `select` and `clear` actions.
