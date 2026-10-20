@@ -294,6 +294,20 @@
           "LICENSE"
         ]
       }
+    },
+    {
+      "package": "tsduck/php",
+      "declared_license": "BSD-2-Clause",
+      "local_source": {
+        "path": "packages/tsduck-php-ffi",
+        "repository_reference": "8121bcc45717e0ebc8a160b25eb90561afef7b3a",
+        "git_tree_sha": "b32d561a07db30233388fec45c4688adb19625ad",
+        "initial_repository_reference": "1268df23cc255fe414d33940dd303228189343e6",
+        "manifest_sha256": "54f2c4bcb91ee0b66518ecb36e2fbeb1375d0be3d55787c87db56741e00f9531"
+      },
+      "notices": [],
+      "status": "unresolved",
+      "gap": "The package declares BSD-2-Clause but contains no retained license/notice file, copyright attribution or established upstream source. Its package tree is unchanged from the initial repository commit. Repository ownership and the native TSDuck license do not establish the PHP bindings notice."
     }
   ]
 }
