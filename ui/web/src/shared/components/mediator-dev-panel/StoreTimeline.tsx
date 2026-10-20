@@ -31,7 +31,7 @@ const Inspection = styled.section`
   h2, h3 { font-size: inherit; font-weight: 600; }
 `
 
-function Capture({ label, capture }: { label: string; capture?: StateCapture }) {
+const Capture = memo(function Capture({ label, capture }: { label: string; capture?: StateCapture }) {
   return <>
     <h3>{label}</h3>
     {capture ? <>
@@ -39,6 +39,15 @@ function Capture({ label, capture }: { label: string; capture?: StateCapture }) 
       <pre>{JSON.stringify(capture.value, null, 2)}</pre>
     </> : <p>Capture unavailable.</p>}
   </>
+})
+
+function EventCapture({ event }: { event: StoreTraceEvent }) {
+  if (event.kind === 'update') return <>
+    <Capture label="Before capture" capture={event.before} />
+    <Capture label="After capture" capture={event.after} />
+  </>
+  if (event.kind === 'register') return <Capture label="Registration capture" capture={event.after} />
+  return <p>This event has no state capture.</p>
 }
 
 const EventDetails = memo(function EventDetails({ event }: { event: StoreTraceEvent }) {
@@ -61,7 +70,7 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
   const selectedIndex = events.findIndex(event => event.id === selectedId)
   const selectedEvent = events[selectedIndex]
   if (selectedId !== null && selectedIndex === -1) setSelectedId(null)
-  const history = useMemo(() => selectedEvent ? reconstructCaptures(state, selectedEvent.id) : null, [state, selectedEvent])
+  const history = useMemo(() => selectedId === null ? null : reconstructCaptures(state, selectedId), [state, selectedId])
 
   return <Container>
     <label>Filter store actions<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
@@ -77,12 +86,7 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
       <h2>Captured state</h2>
       {selectedEvent ? <>
         <p>#{selectedEvent.id} {selectedEvent.store} · {selectedEvent.action} · {selectedEvent.kind}</p>
-        {selectedEvent.kind === 'update' ? <>
-          <Capture label="Before capture" capture={selectedEvent.before} />
-          <Capture label="After capture" capture={selectedEvent.after} />
-        </> : selectedEvent.kind === 'register'
-          ? <Capture label="Registration capture" capture={selectedEvent.after} />
-          : <p>This event has no state capture.</p>}
+        <EventCapture event={selectedEvent} />
       </> : <p>Select an event to inspect its captured state.</p>}
     </Inspection>
     <Inspection aria-label="Historical store captures">
@@ -90,7 +94,7 @@ export function StoreTimeline({ debugger: recorder = storeDebugger }: { debugger
       {!history ? <p>Select an event to inspect recorded stores.</p>
         : history.status === 'unavailable' ? <p>Historical captures are unavailable.</p>
           : <>
-            <p>Through event #{selectedEvent.id} · history epoch {state.baseline.epoch}</p>
+            <p>Through event #{selectedId} · history epoch {state.baseline.epoch}</p>
             <p>{history.partial ? 'Partial diagnostic captures' : 'Complete diagnostic captures'}; inspection does not restore executable state.</p>
             {Object.keys(history.stores).length === 0 && <p>No recorded stores at this event.</p>}
             {Object.entries(history.stores).map(([id, entry]) => <details key={id} open>

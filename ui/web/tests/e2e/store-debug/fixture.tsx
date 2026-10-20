@@ -19,6 +19,10 @@ export function Selection() {
   const selected = useSelectionStore(state => state.selectedId)
   return <p>Selection: <output data-testid="selection">{selected ?? 'none'}</output></p>
 }
+function ViewMode() {
+  const mode = useViewModeStore(state => state.viewMode)
+  return <p>View: <output data-testid="view-mode">{mode}</output></p>
+}
 export function Actions() {
   const select = useSelectionStore(state => state.select)
   return <>
@@ -30,9 +34,13 @@ createRoot(document.getElementById('root')!).render(<ThemeProvider theme={resolv
   <GlobalStyles />
   <main><h1>Store debugger fixture</h1>
     <Profiler id="selection" onRender={recordRender}><Selection /></Profiler>
+    <ViewMode />
     <Profiler id="action" onRender={recordRender}><Actions /></Profiler>
     <p>Selection renders: <output data-testid="selection-renders" /> · Action renders: <output data-testid="action-renders" /></p>
-    <button onClick={() => useViewModeStore.getState().setViewMode('list')}>Change view</button>
+    <button onClick={() => {
+      const { viewMode, setViewMode } = useViewModeStore.getState()
+      setViewMode(viewMode === 'list' ? 'grid' : 'list')
+    }}>Change view</button>
   </main>
   <MediatorDevPanel />
 </ThemeProvider>)
