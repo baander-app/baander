@@ -12,7 +12,7 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-No implementation task is selected by this cleanup. Historical unchecked items,
+No further implementation task is selected here. Historical unchecked items,
 old plan limitations and incomplete experiments do not authorize work. The retained
 [plans](docs/plans/) supply design context; reconcile them with current callers and
 behavior before proposing a change. This applies to older cache/sweep, segmenter,
@@ -69,10 +69,15 @@ when checking that deployment decision.
 - **Recovery:** rehearse application backup restoration before migration rollout.
   Follow the [upgrade guide](docs-book/part-1-operator-guide/upgrading.md); this
   prerequisite does not reopen covered fresh-install or migration behavior.
-- **Redistribution:** complete the application's packaged transitive dependency
-  inventory and redistribution review, retaining the boundaries in
-  [THIRD_PARTY.md](THIRD_PARTY.md). The Registry image inventory is delivered and
-  is not part of this remainder.
+- **Redistribution:** resolve the application's observed notice, provenance and
+  embedded-dependency gaps before qualifying a release image. The
+  [application review record](third_party/inventory/application-review.md) retains
+  the inventory evidence and verification checkpoint; follow the
+  [collection procedure](dev-docs/application-packaged-inventory.md) for each new
+  artifact. Preserve the boundaries in [THIRD_PARTY.md](THIRD_PARTY.md).
+  The separate Registry inventory is outside this remainder.
+  Checkpoint, 2026-10-20: 96 tooling tests passed; both image inventories,
+  production worker smoke, Docker context and applicable syntax checks passed.
 - **Selected native media path:** when a release explicitly includes an active
   codec/DSP path, resolve its remaining reproducibility and reference-vector
   acceptance before claiming certification. Use the
@@ -89,11 +94,3 @@ when checking that deployment decision.
 React Native and Android remain deferred at the user's request (2026-10-05).
 Resume their feature, API and tooling reconciliation only when the user resumes
 that work. Historical mobile failures do not select a task or a new CI lane.
-
-## Documentation checkpoint
-
-2026-10-20: removed completed delivery narratives and speculative backlog paths;
-retained unresolved release acceptance and linked enduring contracts in their
-existing guides. Verification: prose-preservation audit with intentional historical
-deletions reviewed, local link and anchor checks, and `git diff --check`. No product
-suites or static application gates were rerun for this documentation change.

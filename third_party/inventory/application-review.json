@@ -1,0 +1,149 @@
+{
+  "counts": {
+    "composer": 152,
+    "copied_manifests": 12,
+    "debian": 636,
+    "evidence": 2053,
+    "files": 52278,
+    "native": 14,
+    "review_gaps": 5501
+  },
+  "date": "2026-10-20",
+  "filesystem_groups": {
+    "build-evidence": 141,
+    "copied-repository": 6172,
+    "debian": 30604,
+    "installed-composer": 10080,
+    "native-build": 80,
+    "unresolved": 5201
+  },
+  "identical_observations": [
+    "debian",
+    "composer",
+    "native",
+    "files",
+    "evidence",
+    "review_gaps",
+    "copied_manifests"
+  ],
+  "images": {
+    "production": {
+      "checksums_sha256": "c144e238c9e8f09cd52adea281d543e31d1d21577b7522f85059cbb292844c29",
+      "image_id": "sha256:33835105243be75c73ed538715404c00620ef7639b395aa3f5f54458d70aca80",
+      "inventory_sha256": "af141e9f608e29c3b15ef17f6de6cf9d30c6fc1a2980517cdca14ccacf63c72b",
+      "platform": "linux/amd64",
+      "revision": "1066d2035b58441e72b0ccdaf86490b763e2798c",
+      "target": "production"
+    },
+    "worker": {
+      "checksums_sha256": "5bdc7178009944bdb5227f7d120e563580e67be887dbf4a2df1c8595ac23ecd2",
+      "image_id": "sha256:a054b8f0e3dc56e574a20ff9d2949a71f2e1e2927bda0262f960d5067857621b",
+      "inventory_sha256": "fa78769368ab3eaa3ba6b810825e1d9f409f6579061d5b8db124587eb8b9c41d",
+      "platform": "linux/amd64",
+      "revision": "1066d2035b58441e72b0ccdaf86490b763e2798c",
+      "target": "worker"
+    }
+  },
+  "native_components": [
+    {
+      "artifacts": 1,
+      "id": "composer",
+      "notices": 31,
+      "version": "2.10.3"
+    },
+    {
+      "artifacts": 8,
+      "id": "liburing",
+      "notices": 4,
+      "version": "2.13"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-excimer",
+      "notices": 1,
+      "version": "1.2.6"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-igbinary",
+      "notices": 1,
+      "version": "3.2.17RC1"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-imagick",
+      "notices": 1,
+      "version": "3.8.1"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-inotify",
+      "notices": 1,
+      "version": "3.0.1"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-mailparse",
+      "notices": 1,
+      "version": "3.2.0"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-redis",
+      "notices": 2,
+      "version": "6.3.0"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-uv",
+      "notices": 1,
+      "version": "0.3.1"
+    },
+    {
+      "artifacts": 1,
+      "id": "pecl-yaml",
+      "notices": 1,
+      "version": "2.3.0"
+    },
+    {
+      "artifacts": 19,
+      "id": "php",
+      "notices": 16,
+      "version": "8.5.2"
+    },
+    {
+      "artifacts": 1,
+      "id": "pie",
+      "notices": 36,
+      "version": "1.5.2"
+    },
+    {
+      "artifacts": 1,
+      "id": "swoole",
+      "notices": 10,
+      "version": "6.2.0"
+    },
+    {
+      "artifacts": 42,
+      "id": "tsduck",
+      "notices": 2,
+      "version": "v3.43-4549"
+    }
+  ],
+  "redistribution_review": "not-qualified",
+  "review_gap_reasons": {
+    "Debian copyright has no machine-readable license declaration": 149,
+    "No top-level notice for the tool itself found in the archive; embedded dependency notices do not establish tool notice coverage.": 1,
+    "copied manifest describes source requirements; installed or generated contents require review": 21,
+    "embedded native dependency coverage requires review": 14,
+    "installed Composer package has no retained top-level notice": 9,
+    "missing license or copyright evidence": 6,
+    "unowned filesystem material requires classification": 4706,
+    "unresolved ownership or embedded dependency evidence for archive": 152,
+    "unresolved ownership or embedded dependency evidence for tool-or-script": 425,
+    "unresolved ownership or embedded dependency evidence for wasm": 18
+  },
+  "schema": "baander-application-image-review/v1",
+  "unique_evidence_blobs": 1405,
+  "unowned_elf_files": 0
+}
