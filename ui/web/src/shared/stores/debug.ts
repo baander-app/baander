@@ -78,7 +78,11 @@ export function captureState(value: unknown, sensitive = false): StateCapture {
   function visit(input: unknown, depth: number): DebugValue {
     if (--budget < 0 || depth > 6) { complete = false; return '[truncated]' }
     if (input === null || typeof input === 'boolean') return input
-    if (typeof input === 'number') return Number.isFinite(input) ? input : String(input)
+    if (typeof input === 'number') {
+      if (Number.isFinite(input)) return input
+      complete = false
+      return String(input)
+    }
     if (typeof input === 'string') {
       if (input.length > 512) { complete = false; return `${input.slice(0, 512)}…` }
       return input
@@ -230,11 +234,8 @@ export function createStoreDebugger(enabled: boolean, limit = 200) {
               }
               try {
                 const result = Reflect.apply(value, this, args)
-                let asynchronous = false
-                try {
-                  asynchronous = result !== null && (typeof result === 'object' || typeof result === 'function')
-                    && typeof result.then === 'function'
-                } catch { asynchronous = true }
+                // Objects and functions may be thenables; do not execute their accessors to find out.
+                const asynchronous = result !== null && (typeof result === 'object' || typeof result === 'function')
                 if (result instanceof Promise) {
                   try { Promise.prototype.then.call(result, () => settled('resolved'), () => settled('rejected')) }
                   catch { /* Observing a result must not change the action's return value. */ }

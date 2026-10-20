@@ -65,6 +65,9 @@ describe('useSelectionStore', () => {
         { value: { selectedId: null, selectedType: null }, complete: true },
       ])
       expect(events.filter(event => event.kind === 'update')).toHaveLength(2)
+      tracedStore.getState().select(Infinity as unknown as string, 'album')
+      const malformedAction = storeDebugger.getSnapshot().events.findLast(event => event.kind === 'action')!
+      expect(storeDebugger.verifyAction(malformedAction.id).status).toBe('unavailable')
     } finally {
       if (previous === null) localStorage.removeItem('baander-store-debug')
       else localStorage.setItem('baander-store-debug', previous)

@@ -53,6 +53,21 @@ describe('isolated transition verification', () => {
     expect(verifyTransition(snapshot, 1, lookup)).toMatchObject({ status: 'mismatch', expected: selected, recorded: empty })
   })
 
+  it('checks every boundary in an invocation with multiple updates', () => {
+    const snapshot = history()
+    snapshot.events = [
+      snapshot.events[0],
+      event('update', 2, { before: captureState(empty), after: captureState(empty) }),
+      { ...snapshot.events[1], id: 3 },
+      { ...snapshot.events[2], id: 4 },
+    ]
+    expect(verifyTransition(snapshot, 1, lookup).status).toBe('match')
+    snapshot.events[2].before = captureState(selected)
+    expect(verifyTransition(snapshot, 1, lookup)).toMatchObject({
+      status: 'unavailable', reason: expect.stringContaining('chain'),
+    })
+  })
+
   it.each(['clear', 'select'] as const)('verifies a successful %s with no update', action => {
     const snapshot = history()
     const value = action === 'clear' ? empty : selected
@@ -121,7 +136,7 @@ describe('isolated transition verification', () => {
       expect(Object.isFrozen(values)).toBe(true)
       return selected
     })
-    const descriptor = { ...selectionTransition, calculate }
+    const descriptor: StoreTransitionDescriptor = { ...selectionTransition, calculate }
     expect(verifyTransition(snapshot, 1, () => descriptor).status).toBe('match')
     expect(calculate).toHaveBeenCalledOnce()
     descriptor.calculate = () => { throw new Error('calculator failed') }

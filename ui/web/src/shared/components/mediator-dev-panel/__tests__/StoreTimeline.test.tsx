@@ -18,7 +18,7 @@ describe('store timeline UI', () => {
   function setupVerification(expectedCount = 1, limit = 200) {
     const recorder = createStoreDebugger(true, limit)
     const calculate = vi.fn(() => ({ count: expectedCount }))
-    const counter = createStore(recorder.instrument('counter', (set) => ({
+    const counter = createStore(recorder.instrument<{ count: number; increment: () => void }>('counter', (set) => ({
       count: 0, increment: () => set({ count: 1 }),
     }), {
       id: 'counter', version: 1, actions: ['increment'],

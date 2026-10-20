@@ -38,7 +38,7 @@ describe('store tracing', () => {
 
   it('captures trusted synchronous invocation boundaries including no-op actions after clear', () => {
     const recorder = createStoreDebugger(true)
-    const store = createStore(recorder.instrument('counter', set => ({
+    const store = createStore(recorder.instrument<{ count: number; add: () => void; noop: () => void }>('counter', set => ({
       count: 0,
       add: () => set({ count: 1 }),
       noop: () => {},
@@ -83,7 +83,8 @@ describe('store tracing', () => {
     const recorder = createStoreDebugger(true)
     const pending = Promise.resolve(3)
     const thenable = { then: vi.fn() }
-    const throwingThen = Object.defineProperty({}, 'then', { get() { throw new Error('then unavailable') } })
+    const readThen = vi.fn(() => { throw new Error('then unavailable') })
+    const throwingThen = Object.defineProperty({}, 'then', { get: readThen })
     const failure = new Error('action failed')
     for (const result of [pending, thenable, throwingThen]) {
       const store = createStore(recorder.instrument('counter', () => ({ count: 0, run: () => result }), counterTransition))
@@ -96,6 +97,7 @@ describe('store tracing', () => {
     expect(terminals.length).toBeGreaterThan(0)
     expect(terminals.every(event => event.completion === undefined && event.after === undefined)).toBe(true)
     expect(thenable.then).not.toHaveBeenCalled()
+    expect(readThen).not.toHaveBeenCalled()
   })
 
   it('does not trust replaced actions or capture incomplete data as complete', () => {
