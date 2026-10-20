@@ -1,0 +1,9 @@
+{
+  "component": "PIE",
+  "version": "1.5.2",
+  "source_revision": "2ac12a548bdfb8617a04ca0f7a2fc35d14fb1c47",
+  "source_url": "https://github.com/php/pie/blob/2ac12a548bdfb8617a04ca0f7a2fc35d14fb1c47/LICENSE.md",
+  "notice": "LICENSE.md",
+  "notice_sha256": "e13d5dfea8575e46ea65e5e52028f57d671cc38a717b9b2b50c1b17de4a12fe9",
+  "scope": "Supplemental upstream notice for PIE 1.5.2 only; it does not qualify other versions or embedded dependencies."
+}

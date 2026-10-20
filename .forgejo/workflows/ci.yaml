@@ -71,8 +71,16 @@ jobs:
             -   name: Build production worker image
                 run: |
                     docker buildx build --target worker --load \
+                      --build-arg BAANDER_SOURCE_REVISION="${{ forgejo.sha }}" \
                       -t "${CI_IMAGE}-worker" \
                       --cache-from=type=local,src=/tmp/buildkit-cache .
+
+            -   name: Collect and verify worker packaged inventory
+                run: |
+                    bash scripts/collect-packaged-inventory.sh \
+                      --image "${CI_IMAGE}-worker" --target worker \
+                      --revision "${{ forgejo.sha }}" \
+                      --output var/test-runs/application-inventory-worker
 
             -   name: Production worker lifecycle and dependencies
                 run: |
@@ -110,6 +118,8 @@ jobs:
             -   name: Backend runner regressions
                 run: |
                     python3 -m unittest discover -s scripts/tests
+                    docker run --rm --network none --entrypoint python3 "$CI_IMAGE" \
+                      -m unittest discover -s scripts/tests -p test_retain_build_evidence.py
                     bash scripts/test-worker-operator-cleanup.sh
 
             -   name: Backend stack isolation
@@ -534,20 +544,38 @@ jobs:
             -   name: Login to Container Registry
                 run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
 
-            -   name: Build and push production image
-                if: forgejo.ref == 'refs/heads/master'
+            -   name: Build production image
                 run: |
                     docker buildx build \
                       --target production \
-                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ forgejo.sha }} \
-                      --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
-                      --push \
+                      --build-arg BAANDER_SOURCE_REVISION="${{ forgejo.sha }}" \
+                      --tag "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" \
+                      --tag "$REGISTRY/$IMAGE_NAME:latest" \
+                      --load \
                       .
 
-            -   name: Build production image (PR verification)
-                if: forgejo.ref != 'refs/heads/master'
+            -   name: Collect and verify production packaged inventory
                 run: |
-                    docker build \
-                      --target production \
-                      -t baander-production \
-                      .
+                    bash scripts/collect-packaged-inventory.sh \
+                      --image "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" --target production \
+                      --revision "${{ forgejo.sha }}" \
+                      --output var/test-runs/application-inventory-production
+
+            -   name: Push verified production image
+                if: forgejo.ref == 'refs/heads/master'
+                run: |
+                    OUTPUT=var/test-runs/application-inventory-production
+                    docker push "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" > "$OUTPUT/push-revision.log" 2>&1
+                    cat "$OUTPUT/push-revision.log"
+                    docker image inspect "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" > "$OUTPUT/published-image-inspect.json"
+                    docker push "$REGISTRY/$IMAGE_NAME:latest" > "$OUTPUT/push-latest.log" 2>&1
+                    cat "$OUTPUT/push-latest.log"
+
+            -   name: Preserve production packaged inventory
+                if: always()
+                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+                with:
+                    name: application-packaged-inventory-production
+                    path: var/test-runs/application-inventory-production/
+                    if-no-files-found: ignore
+                    retention-days: 14
