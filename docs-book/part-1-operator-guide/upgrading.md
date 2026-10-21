@@ -49,6 +49,23 @@ Check the commit log for notable changes between your current version and the on
 git log --oneline <current-tag>..HEAD
 ```
 
+## Queued Messages and Retry Data
+
+Before upgrading an instance with older queued messages:
+
+1. Stop producers and preserve queued and retrying Redis work while retiring the
+   old worker deployment through the [deployment controller](commands/README.md#worker-deployment).
+2. Resolve or export failed messages, and back up the Redis streams and job
+   history before changing code.
+3. Upgrade producers and workers together, following the worker retirement and
+   fresh-boot procedure above.
+
+Queued commands and stored job retry data use the `baander.message` JSON format,
+version 1. PHP-serialized envelopes and legacy `__class` job payloads are rejected;
+archived legacy jobs cannot be retried through the new codec. Do not remove
+pending messages to make an upgrade pass. See [CQRS and Messaging](../part-2-developer-guide/cqrs-and-messaging.md#message-contract-and-retries)
+for the contract and retry behavior.
+
 ## Database Migrations
 
 `make migrate` runs all pending migrations on both the main database and the test database. Always run it after pulling new code, even if you do not expect schema changes -- migrations may contain data transformations or index additions that are not obvious from the file list alone.
@@ -110,7 +127,7 @@ specific target and a separate manual operation outside Doctrine migrations.
    then run them again and verify there is no pending work. For the configured
    main database alone, use `make migrate-no-test` on both runs.
 5. **Restore service state.** Restart the services recorded in step 2 and complete
-   the [initial setup](getting-started.md#initial-setup) required by the empty
+   the [initial setup](getting-started.md#5-initialize-the-main-database-and-authentication) required by the empty
    application database.
 
 ## When to Rebuild Docker Images

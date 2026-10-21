@@ -21,7 +21,31 @@ make exec cmd="php bin/console app:outbox:consume --once"
 
 Without `--once`, the command repeats a pass every second until the time limit passes, it receives `SIGTERM` or `SIGINT`, or its memory use reaches 256 MiB. A signal lets the current pass finish before the command exits.
 
-A failure in one queue does not stop the other: the error is logged and the failed records stay eligible for a later pass. A lost acknowledgement can repeat a handoff, so an email, push or webhook delivery is not guaranteed to happen exactly once.
+Live domain events are captured in the outbox. Replay uses a private dispatcher
+for notification and admin-alert listeners; session and transcode listeners stay
+on the live dispatcher. Each event's receipt, notifications and channel delivery
+intents commit in one transaction. Replaying the same outbox ID skips an already
+committed receipt.
+
+Committed delivery intents use the versioned JSON message contract and are handed
+to Redis `async`. A lost acknowledgement can repeat a handoff, so an email, push
+or webhook delivery is not guaranteed to happen exactly once.
+
+A failure in one queue does not stop the other: the error is logged. Events and
+delivery intents use leased claims and retry backoff, reaching dead-letter state
+after five failed attempts. Records awaiting a retry stay eligible for a later
+pass once their delay has elapsed.
+
+The [health endpoints](../monitoring.md#what-is-checked) check the Redis consumer;
+they do not yet check this relay. The worker deployment owns its lifecycle; see
+[Worker deployment](README.md#worker-deployment) for drain and recovery procedures.
+
+The producer runtime drill verifies that operator user creation, user registration
+and email verification commit domain writes and event capture in one transaction.
+Other event producers still need their transaction boundaries reviewed. See
+[CQRS and Messaging](../../part-2-developer-guide/cqrs-and-messaging.md#durable-event-replay)
+and [Testing](../../part-2-developer-guide/testing.md) for the mechanism and runtime
+coverage.
 
 ## Exit codes
 

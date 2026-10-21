@@ -9,7 +9,7 @@ Documentation for Baander, a self-hosted media library server for music, movies,
 
 ## Quick Links
 
-- [Getting Started](part-1-operator-guide/getting-started.md) — up and running in under 10 minutes
+- [Getting Started](part-1-operator-guide/getting-started.md) — source installation, worker deployment and your first library
 - [Configuration](part-1-operator-guide/configuration.md) — all environment variables
 - [CLI Reference](part-1-operator-guide/commands/README.md) — every Baander console command, by area
 

@@ -1,6 +1,6 @@
 # CQRS and Messaging
 
-Baander uses Symfony Messenger to implement the Command Query Responsibility Segregation (CQRS) pattern. Commands represent writes (create, update, delete), queries represent reads, and they are handled asynchronously through a message bus.
+Baander uses Symfony Messenger to implement the Command Query Responsibility Segregation (CQRS) pattern. Commands represent writes (create, update, delete), and queries represent reads. Messenger routes selected background commands to a transport; commands without a transport route run in the calling process.
 
 ## How It Works
 
@@ -9,7 +9,7 @@ Baander uses Symfony Messenger to implement the Command Query Responsibility Seg
 3. The handler executes business logic using domain models and repositories
 4. The handler returns a result or dispatches domain events
 
-In production, commands are processed asynchronously by a worker process consuming from Redis. In development and tests, commands are processed synchronously by default.
+The routed background commands use Redis outside tests. Tests replace the ordinary transports with in-memory transports; an unrouted command still runs inline.
 
 ## Writing a Command
 
@@ -126,17 +126,46 @@ A long-running handler lets an operator cancel its job. It calls `JobCancellatio
 
 ## Async Processing
 
-In production, the Messenger transport is Redis (`MESSENGER_TRANSPORT_DSN`). Workers consume commands from the Redis queue:
+The admitted worker deployment owns the Redis `async` (`MESSENGER_TRANSPORT_DSN`)
+and `scheduler` consumers, outbox relay, scheduler and media execution. The web container runs `app:serve`
+without task workers or a CPU pool. Follow [Worker deployment](../part-1-operator-guide/commands/README.md#worker-deployment)
+for manifests, shared named volumes and the immutable boot lifecycle. Consumer
+names include the deployment and boot identity. A child failure, lease loss or
+termination signal drains the deployment; replacement requires explicit host
+recovery. Automatic worker restart and a second child supervisor are unsupported.
 
-```
-php bin/console messenger:consume async
-```
+### Message contract and retries
 
-Workers are managed by supervisord inside the Docker container. If a command fails, it is retried according to the Messenger retry configuration.
+Queued commands and stored job retry data use the `baander.message` JSON format,
+version 1. The codec registers supported message types and fields explicitly;
+Redis payloads do not depend on Symfony object serialization. Retry metadata keeps
+completed handler names, so a retry skips handlers that already succeeded.
+Consumers still need idempotency for external effects.
 
 A message that exhausts its retries goes to the `failed` transport. That transport is a PostgreSQL table, `failed_messages`, created by a migration rather than by Messenger (`auto_setup: false`) and excluded from Doctrine schema comparison. Its receiver is listable, so `messenger:failed:show`, `messenger:failed:retry` and `messenger:failed:remove` work by message ID, and the admin endpoints in [Monitoring](../part-1-operator-guide/monitoring.md#failed-messages) use the same receiver. Tests use this table too; the other transports are in-memory.
 
-In tests, commands are processed synchronously by default — no worker process is needed. This makes unit and functional tests deterministic.
+Tests use in-memory ordinary transports. See [Testing](testing.md) for the disposable-service delivery, retry and runtime drills.
+
+## Durable Event Replay
+
+Live domain events enter the outbox. Its relay dispatches them through a private
+notification dispatcher, where notification and admin-alert listeners run. Session
+and transcode listeners stay on the live dispatcher. An event's receipt,
+notification records and channel delivery intents commit in one transaction;
+replaying the same outbox ID skips an already committed receipt.
+
+Committed email, push and webhook intents use the versioned JSON codec and are
+handed to Redis `async`. A lost acknowledgement can repeat that handoff, so the
+receipt does not guarantee exactly-once external delivery. Both event replay and
+intent handoff use leased claims, retry backoff and dead-letter state after five
+failed attempts. See [app:outbox:consume](../part-1-operator-guide/commands/app-outbox-consume.md)
+for relay operation and its monitoring limit.
+
+Operator user creation, user registration and email verification commit their
+domain writes and event capture in one transaction. The producer runtime drill
+verifies those three auth producers; other event producers still need their
+transaction boundaries reviewed. See [Testing](testing.md) for the outbox and
+producer drills and the limits of their coverage.
 
 ## See Also
 

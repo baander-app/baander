@@ -1,165 +1,37 @@
 # Bånder
 
-Self-hosted media library server for music, movies, and video. Organizes your collection, enriches it with metadata from external sources, and streams it anywhere.
+## What Bånder is
 
-## Features
+Bånder is a self-hosted server for organizing and playing a personal media collection.
+It keeps your music and movies in a library you can browse through a web interface.
 
-**Media management** — Catalog and browse music, movies, and videos with structured metadata. Automatic library scanning detects new files via inotify.
+## What you can do
 
-**Metadata enrichment** — Pulls metadata from Discogs, Last.fm, Spotify, MusicBrainz, and TasteDive to fill in artist info, album art, genres, and more.
+- Browse your collection by artist, album, song or movie.
+- Enrich your library with metadata and artwork from external providers, with
+  credentials configured for the services you use.
+- Search your catalog and organize songs into playlists.
+- Play music in the web player and stream video, with transcoding for supported
+  playback formats.
 
-**Search** — Full-text search powered by PGroonga with cursor-based pagination.
+## Getting started
 
-**Streaming** — Media streaming through an Nginx reverse proxy.
+Follow the **[installation guide](docs-book/part-1-operator-guide/getting-started.md)**
+for configuration, storage, account setup and your first library.
 
-**Authentication** — OAuth 2.0 authorization server with passkey (WebAuthn) login and TOTP two-factor authentication.
+The current setup builds from source and uses a development-oriented Docker Compose
+stack. Background processing requires a separate worker deployment; starting
+Compose alone does not provide a complete instance. The installation guide includes
+host requirements and links to the worker deployment procedure.
 
-**Notifications** — Web push notifications and webhook delivery for events like new library additions.
+## For developers
 
-**Audio analysis** — FFmpeg measures track loudness with its loudnorm filter so transcodes can be normalized to a target level. Baander does not extract audio features such as energy or danceability.
-
-## Project Structure
-
-The codebase follows Domain-Driven Design with bounded contexts. Each context is organized into four layers:
-
-```
-src/<Context>/
-├── Domain/              # Business rules, entities, value objects
-├── Application/         # Use cases, command/query handlers
-├── Infrastructure/      # Database, external services, adapters
-└── Interface/           # API controllers, request/response handling
-```
-
-| Context | Responsibility |
-|---------|---------------|
-| Auth | OAuth 2.0 server, passkeys, TOTP |
-| Catalog | Artists, albums, songs, movies, videos, genres |
-| Library | Media library management and file scanning |
-| Media | File handling, streaming, image storage |
-| Metadata | External API enrichment |
-| Playlist | Playlist management |
-| Recommendation | Music recommendations |
-| Activity | Listen history tracking |
-| Notification | Notifications and preferences |
-| Filesystem | File operations, MIME detection, inotify watching |
-| Lyrics | Lyrics handling |
-| Shared | Cross-cutting: domain models, caching, logging, API utilities |
-
-## Tech Stack
-
-- PHP 8.5+ with Symfony 8.0
-- Swoole (async runtime with hot module replacement)
-- PostgreSQL 18 with PGroonga full-text search
-- Redis (caching, message queue)
-- Doctrine ORM 3.6
-- Nginx reverse proxy
-- FFmpeg for transcoding and loudness measurement
-
-## Setup
-
-Requires Docker and Docker Compose.
-
-```bash
-cp .env.example .env
-make build
-make start
-make composer-install
-make migrate
-```
-
-The initial migration creates the current schema on an empty database. Existing
-databases with older migration histories require a separately approved manual
-reset; see [Database migrations](docs-book/part-1-operator-guide/upgrading.md#database-migrations).
-
-Then visit `http://localhost`.
-
-## Message delivery and upgrades
-
-Queued commands and job retry data use the `baander.message` JSON format, version 1.
-The codec lists supported message types and fields explicitly. Redis delivery uses
-this contract; message payloads do not depend on Symfony object serialization.
-Retry metadata retains completed handler names so a retry skips handlers that
-already succeeded. External delivery still requires consumer idempotency.
-
-The web container runs `app:serve`. A separate admitted `app:worker` deployment
-owns the `async`/`scheduler` consumer, outbox relay, scheduler and media execution.
-It runs without a live HTTP server; web starts no task workers or CPU pool.
-Follow [Worker deployment](docs-book/part-1-operator-guide/commands/README.md#worker-deployment)
-for the version 2 manifest, shared named volumes and immutable boot lifecycle.
-The Redis consumer name includes its deployment and boot identity. The consumer
-writes its heartbeat to a Redis key, which the web container reads. An idle consumer renews it about
-every 10 seconds and a consumer handling a job every 30 seconds; the worker reads
-unhealthy when its heartbeat is older than 45 seconds while idle or 90 seconds
-while busy. `/health` and `app:health:check` list the worker and the memory
-check, but `/ready`, the `/health` status code and the command's exit status leave
-both out, so a worker outage or a web server worker near its memory limit does not
-make the web container unready or unhealthy. The web server alerts administrators
-instead. `/live` remains process liveness.
-
-The Messenger health details report `lastDeliveryQueueAgeSeconds` and
-`lastDeliveryAt`. These describe the last dequeued message, not the oldest waiting
-message. Worker child failure, lease loss or a termination signal drains the
-whole deployment. Give its container more than the 35-second drain deadline before
-forced teardown. Replacement requires explicit host recovery; automatic worker
-restart and a second child supervisor are unsupported. Restarting web leaves
-background ownership with the worker.
-
-The worker supervisor runs `app:outbox:consume` as its relay child. Live domain
-events enter the outbox; notification and admin-alert listeners run on its private replay
-dispatcher. Each event's receipt, notifications, and channel delivery intents
-commit together. Replaying the same outbox ID skips an already committed receipt.
-Session and transcode listeners remain on the live dispatcher.
-
-Committed channel intents use the versioned JSON codec and are handed to Redis
-`async`. A lost acknowledgement can repeat that handoff; this does not guarantee
-exactly-once email, push, or webhook delivery. Intents use leased claims, retry
-backoff, and dead-letter state after five failed handoffs. Run
-`php bin/console app:outbox:consume --once` to process one batch of each queue.
-The existing health endpoints check the Redis consumer; they do not yet check
-the outbox worker. Operator user creation, user registration, and email
-verification now commit their domain writes and event capture in one transaction.
-Other event producers still need transaction boundaries reviewed.
-
-Before upgrading an instance that has older queued messages, stop producers and
-preserve queued and retrying Redis work while retiring the old worker deployment.
-Resolve or export failed messages and back up the Redis streams and job history. Upgrade producers and
-workers together. PHP-serialized envelopes and legacy `__class` job payloads are
-rejected; archived legacy jobs cannot be retried through the new codec. Do not
-remove pending messages to make an upgrade pass.
-
-Run the strict unit suite with `bash scripts/test-unit-container.sh`. Run real
-Redis delivery, retry, failure-stream, and PostgreSQL lease tests with
-`bash scripts/test-messaging-container.sh`. Both scripts require installed Composer
-dependencies and Docker. The messaging script creates disposable services on its
-own network; it does not use the application's database or Redis instance.
-
-The consumer recovery drill is `bash scripts/test-worker-runtime-container.sh`.
-It runs the application's actual consumer command under a historical Supervisor
-fixture against disposable PostgreSQL and Redis services and verifies job
-completion. It then kills the consumer in the middle of a job and checks that its
-heartbeat reads unhealthy once the 90-second busy window has passed. The fixture
-turns automatic restart off, because a replacement would renew the heartbeat
-first, so the drill restarts the consumer with `supervisorctl`. It checks that the
-replacement completes the unacknowledged job and that a stopped worker no longer
-reads healthy. CI runs the drill against the image it just built.
-
-Run `bash scripts/test-outbox-runtime-container.sh` for the production outbox
-drill. It uses real ORM repositories, PostgreSQL, and Redis to check live capture,
-notification creation, committed delivery intents, and replay after a lost event
-acknowledgement. It does not send email, push, or webhooks to external services.
-
-Run `bash scripts/test-producer-runtime-container.sh` to check the production
-transaction boundary for operator user creation, registration, and email
-verification. The drill rejects outbox writes in disposable PostgreSQL, checks
-rollback through a second connection, and retries through the same message bus.
-It covers registration tokens and notification preferences, verification token
-retention on failure, and recovery after an ORM flush closes the entity manager.
-This runtime drill covers the three auth producers. CI requires both production
-outbox and producer drills to pass.
+Start with the [developer guide](docs-book/part-2-developer-guide/README.md),
+[development environment](docs-book/part-2-developer-guide/development-environment.md)
+and [contribution instructions](docs-book/part-2-developer-guide/contributing.md).
 
 ## License
 
-Baander's first-party code is licensed under [Apache-2.0](LICENSE.md).
+Baander's first-party code is licensed under [Apache-2.0](LICENSE.md), with
+[package-specific exceptions and third-party notices](THIRD_PARTY.md).
 Copyright (C) 2025–2026 Martin Juul Christiansen and contributors.
-Third-party components retain their own licenses and notices; see
-[third-party licensing](THIRD_PARTY.md).

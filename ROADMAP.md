@@ -103,3 +103,33 @@ when checking that deployment decision.
 React Native and Android remain deferred at the user's request (2026-10-05).
 Resume their feature, API and tooling reconciliation only when the user resumes
 that work. Historical mobile failures do not select a task or a new CI lane.
+
+## Source-installation documentation
+
+Checkpoint, 2026-10-21: the README introduces browsing, metadata, search, playlists
+and playback, links the source-installation path and developer resources, and
+retains package licensing exceptions. The getting-started guide now orders
+configuration, shared storage, dependency startup, one-off Composer installation,
+main-only migrations, OAuth/admin setup, frontend build and separate version-4
+worker deployment. Messaging contracts, retry/replay limits, heartbeat metrics and
+upgrade precautions live in the existing developer/operator guides. The testing
+guide already covers the removed README runner descriptions and remains unchanged.
+
+Disposable bootstrap verification used a fresh local clone, private generated
+credentials, unique image/network/volume names and isolated port mappings. Compose
+configuration validation passed. The image build failed at `Dockerfile:497`: the
+dev target's `pecl bundle -d /tmp/pecl xdebug` reported `unable to unpack xdebug`.
+No services started; no existing application database, Redis or media was reused
+or reset. The host PHP 8.5 installation also lacks the worker controller's required
+`posix` extension. Frontend loading, administrator login, worker startup and a
+sample-library scan remain unverified through this procedure. Fix the build and
+provide the host prerequisite before repeating those checks; deployment code was
+not changed by this documentation work.
+
+Documentation verification: 86 local links and heading anchors resolved; command
+signatures and configuration order were checked against source. Preservation audits
+covered all eight edited documents and the new plan; removals and structural changes
+match the requested rewrite and relocation. Whitespace checks passed. Independent
+plan and final documentation reviews found no defects. No application test suite
+was run for this documentation-only change; the runtime build failure above is a
+verification limit, not a passing bootstrap.

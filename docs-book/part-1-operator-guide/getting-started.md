@@ -1,130 +1,282 @@
 # Getting Started
 
-Baander is a self-hosted media library server for music, movies, and video. Think of it as your own private Spotify or Netflix — it organizes your collection, enriches it with metadata from external sources like Discogs and MusicBrainz, transcodes video for smooth streaming, and serves it to any device through a modern web interface.
+This guide prepares a new Bånder instance from source, creates an administrator and
+scans a first library. The current Compose stack is development-oriented: it mounts
+the checkout into the web container and uses a local TLS certificate. Background
+processing needs a separate worker deployment.
+
+The latest disposable bootstrap stopped during the dev image's Xdebug build;
+frontend loading, login, worker startup and scanning remain unverified through this
+procedure. See the [bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation)
+for the failure and remaining checks.
 
 ## Prerequisites
 
-- **Docker** and **Docker Compose** — Baander runs entirely in containers
-- **Git** — to clone the repository
-- **FFmpeg** — bundled in the app container image (installed via apt); no separate build step
-- A directory with your media files (music, movies, or video) accessible from the Docker host
+- Git, Docker with Compose and Buildx, and OpenSSL for generating secrets.
+- A Linux Docker host with cgroup v2, a local Docker Unix socket and enough CPU and
+  memory for web, PostgreSQL, Redis and the worker pair. The worker guide's example
+  reserves 2944 MiB for control and 4800 MiB for execution; admission also requires
+  1 GiB of host memory beyond those ceilings and disjoint CPU sets.
+- Host PHP 8.5 with `posix` and `pdo_pgsql` for the worker controller. Composer
+  dependencies are installed into the checkout below. The controller runs on the
+  trusted host; the application containers receive no Docker socket.
+- Media files that you can copy into a shared named Docker volume. Worker admission
+  does not accept host-directory bind mounts for media.
+
+FFmpeg, Node and Corepack are supplied by the app image. The web frontend selects
+its Yarn version from the repository's `packageManager` field.
+
+Read [Worker deployment](commands/README.md#worker-deployment) before provisioning
+storage or choosing host resources. Its version-4 procedure is authoritative for
+the worker manifest, credentials, volume ownership and admission checks.
 
 ## Installation
+
+Run the following steps from the repository root. Use a fresh checkout and fresh
+instance resources. For an existing installation, follow [Upgrading](upgrading.md)
+instead; do not replace its database or media volumes.
+
+### 1. Prepare configuration and the browser address
+
+Clone the repository from its Git remote, then enter the checkout:
 
 ```bash
 git clone <repository-url> baander
 cd baander
-
 cp .env.example .env
-make build
-make start
 ```
 
-After the containers start, set a Redis password in `.env`:
+Keep `.env` free of deployment secrets: the production and worker image builds copy
+it into the image. In `.env`, set the media paths and the executables supplied by the
+image's Debian packages:
 
 ```env
-REDIS_PASSWORD=a_secure_password
+MEDIA_STORAGE_PATH=/media/library
+CONVERT_STORAGE_PATH=/storage/conversions
+FFMPEG_PATH=/usr/bin/ffmpeg
+FFPROBE_PATH=/usr/bin/ffprobe
 ```
 
-Then restart: `make restart`.
-
-## Initial Setup
-
-After the containers are running, complete these steps in order.
-
-### 1. Install PHP dependencies
-
-```bash
-make composer-install
-```
-
-### 2. Run database migrations
-
-```bash
-make migrate
-```
-
-This initializes both the main and test databases with `Version20261017000000`,
-then applies the forward migrations through `Version20261018130000`. The initial
-migration creates the 80-table schema and two daily schedules: OAuth code purging
-at 03:30 UTC and recommendation generation at 04:00 UTC. The forward migrations
-add playlist persistence versions, video/audio execution authority, durable
-control receipts, playback-owner scoping and paired worker deployment journals. Running migrations again leaves no
-pending work.
-
-Each target must be empty before the initial migration; preinstalled extensions
-and an empty Doctrine migration metadata table are allowed. Existing user objects,
-even an empty table, cause initialization to stop before application schema changes.
-A database already initialized with `Version20261017000000` applies the forward
-migrations normally, preserving its data.
-
-For the main database alone, use `make migrate-no-test`. For an existing database
-with an older migration history, follow the [manual reset procedure](upgrading.md#manual-reset-of-an-existing-database).
-
-The web container runs `app:serve`; it handles requests, streams files and keeps
-client connections. Background work requires a separately admitted `app:worker`
-control and execution pair. After migrations, follow [Worker deployment](commands/README.md#worker-deployment)
-to build the worker image, provision shared named media volumes and a private IPC
-volume owned by that image's runtime UID/GID with mode `0700`, select disjoint
-control/execution CPU sets, and create/start the deployment. The development Compose file starts only web and dependencies;
-`make start` alone does not start consumers, scheduling or media encoding.
-
-### 3. Create an admin user
-
-```bash
-echo "your-password" | make exec cmd="php bin/console app:user:create admin@baander.app Admin --password --role admin --force"
-```
-
-The admin role needs confirmation; `--force` gives it when the password comes from a pipe. See the [User Management](user-management.md) page and the [CLI Reference](commands/app-user-create.md) for details.
-
-### 4. Configure ports (if needed)
-
-By default Baander listens on port 80 (HTTP) and 443 (HTTPS). If those ports are already in use on your machine, set custom ports in `.env` before starting:
+Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
+the secret placeholders with independently generated values from `openssl rand -hex 32`.
+Use the same database password in `DB_PASSWORD` and `DATABASE_URL`, and the same
+Redis password in all three Redis settings:
 
 ```env
+APP_SECRET=<chosen-random-secret>
+STREAM_URL_HMAC_SECRET=<another-random-secret>
+DB_USERNAME=baander
+DB_PASSWORD=<chosen-database-password>
+DB_DATABASE=baander
+DATABASE_URL="postgresql://baander:<chosen-database-password>@database:5432/baander?serverVersion=18&charset=utf8"
+REDIS_PASSWORD=<chosen-redis-password>
+REDIS_URL=redis://default:<chosen-redis-password>@redis:6379
+MESSENGER_TRANSPORT_DSN=redis://default:<chosen-redis-password>@redis:6379/messages
+SERVER_NAME=baander.test
+APP_DOMAIN=baander.test
+APP_URL=https://baander.test:8443
+DEFAULT_URI=https://baander.test:8443
 WEB_PORT_HTTP=8080
-WEB_PORT_SSL=8443
+WEB_PORT_TLS=8443
+AUTH_SPA_CLIENT_ID=baander_dev_spa_00001
 ```
 
-Then start with `make start` and visit `http://localhost:8080`.
+Symfony loads `.env`, `.env.local`, `.env.dev`, then `.env.dev.local` in this
+configuration; existing process environment variables take precedence. The tracked
+`.env.dev` contains a development `APP_SECRET`, so putting your secret only in `.env`
+or `.env.local` does not override it. `.env.dev.local` is excluded from Git and Docker
+build contexts. Set the complete connection URLs there so they use the same chosen
+credentials as the services.
 
-### 5. Set up the OAuth client
+Compose has its own environment loading. Use this shell function for every Compose
+command below so it reads the private settings explicitly:
 
 ```bash
-make exec cmd="php bin/console app:auth:setup-clients"
+export HOST_UID="$(id -u)"
+export HOST_GID="$(id -g)"
+
+dc() {
+    docker compose --env-file .env.dev.local -f docker-compose.yml "$@"
+}
 ```
 
-The command prints one environment variable. Make sure your `.env` file contains it:
+Run it in the same shell as the remaining commands. Remove conflicting exported
+variables before using it; shell values override Compose's environment file. The
+Makefile shortcuts do not load this additional file.
 
-```env
-AUTH_SPA_CLIENT_ID=<printed-id>
-```
+Resolve `baander.test` to the Docker host in your local DNS or hosts file. The bundled
+development certificate covers `baander.test`, its subdomains and `127.0.0.1`.
+Trust that certificate in your development browser, or configure a certificate
+trusted by your clients before using the instance. Changing `SERVER_NAME` alone does
+not change the certificate. See [Security](security.md) for deployment hardening.
 
-### 6. Create a media library
+### 2. Prepare the network and shared storage
+
+The Compose file expects an external network:
 
 ```bash
-make exec cmd="php bin/console app:library:create \"My Music\" /path/to/your/music"
+docker network create baander-backtier
 ```
 
-Replace `/path/to/your/music` with the absolute path inside both web and worker, for example `/media/library/music` below `MEDIA_STORAGE_PATH=/media/library` in a shared source volume. Use identical paths in both roles; worker reads sources and writes derived media through the admitted volumes. Keep web access needed for authorized file deletion. See [Worker deployment](commands/README.md#worker-deployment) for the storage declarations.
+If that name already exists, inspect it before choosing it for this instance. The
+Compose file also has fixed container names and published database and Redis ports.
+Choose non-conflicting names and ports before starting another instance on the same
+host; a Compose project name alone does not isolate these settings.
 
-### 7. Scan your library
+Provision the named media volumes using the local driver without driver options:
 
 ```bash
-make exec cmd="php bin/console app:library:scan my-music"
+docker volume create baander-source
+docker volume create baander-conversions
+docker volume create baander-storage
+docker volume create baander-transcode-state
 ```
 
-Replace `my-music` with the slug of the library you created. The scan discovers media files, extracts metadata, and populates the database.
+In your checkout's `docker-compose.yml`, replace the personal `/home/martin/...`
+bind mounts in `app.volumes` with these shared mounts. Keep the checkout and PHP
+configuration mounts:
 
-### 8. Open Baander
+```yaml
+services:
+    app:
+        volumes:
+            - ./:/var/www/html:cached
+            - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
+            - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
+            - baander-source:/media:ro
+            - baander-conversions:/storage/conversions
+            - baander-storage:/var/www/html/storage
+            - baander-transcode-state:/var/www/html/var/transcode_state
+volumes:
+    baander-source:
+        external: true
+    baander-conversions:
+        external: true
+    baander-storage:
+        external: true
+    baander-transcode-state:
+        external: true
+```
 
-Visit `http://localhost` (or whichever port you configured) in your browser. Log in with the admin account you created.
+Merge these entries into the existing services and volumes; retain the database
+volume declaration. Copy the media you want to scan into `library/music` inside
+`baander-source`. Keep originals intact. Web and workers must see the same paths;
+set `MEDIA_STORAGE_PATH=/media/library` in both roles. Source media is read-only
+in workers. The web mount above is also read-only; authorized deletion of media
+files through web requires writable access there.
 
-After logging in you'll see the main dashboard with your media library. From there you can browse albums, artists, movies, and videos. The sidebar provides navigation to playlists, search, and settings. Audio plays inline in a persistent player bar at the bottom of the screen; video opens in a built-in player with quality selection.
+Prepare the derived volumes for the runtime UID/GID of the images you build, so
+web and workers can write them. Follow the worker guide for ownership checks and
+its separate private IPC volume; never mount that IPC volume into web.
+
+### 3. Build images and start dependencies
+
+```bash
+dc config --quiet
+dc build
+dc up -d --wait database redis
+dc exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'
+```
+
+The Redis check must print `PONG`. Redis receives its password on its first startup.
+The app and nginx are still
+stopped. If a build or dependency fails, inspect its error before continuing.
+
+### 4. Install PHP dependencies
+
+A new checkout has no `vendor/` directory, so use a one-off container rather than
+executing a command in a running web container:
+
+```bash
+dc run --rm --no-deps app composer install --no-interaction --no-progress --no-scripts
+dc run --rm --no-deps app composer dump-autoload --optimize --no-interaction
+```
+
+The separate dump runs the Symfony Runtime autoload hook, generating
+`vendor/autoload_runtime.php`. Do not add `--no-scripts` to that second command.
+The first command defers cache and asset scripts until configuration is ready.
+
+### 5. Initialize the main database and authentication
+
+```bash
+dc run --rm --no-deps app php bin/console doctrine:migrations:migrate --no-interaction
+dc run --rm --no-deps app php bin/console app:oauth:generate-keys --no-interaction
+dc run --rm --no-deps app php bin/console app:auth:setup-clients
+```
+
+The migration command initializes only the configured main database and retains the
+initial migration's empty-database guard. See [Database migrations](upgrading.md#database-migrations)
+for existing histories and the separately approved reset procedure.
+
+Key generation is for this new instance. Keep its private key private; use the
+[security guide](security.md) for later key rotation. Confirm that
+`AUTH_SPA_CLIENT_ID` in `.env.dev.local` matches the ID printed by client setup.
+
+Create an administrator interactively:
+
+```bash
+dc run --rm --no-deps app php bin/console app:user:create admin@baander.app Admin --role admin
+```
+
+Choose a password at the hidden prompt and confirm the administrator role. See
+[User management](user-management.md) and [app:user:create](commands/app-user-create.md)
+for password rules and scripted creation.
+
+### 6. Install and build the web frontend
+
+Use the image's Node/Corepack tooling from the frontend directory. Corepack selects
+the pinned Yarn version, currently 4.14.1:
+
+```bash
+dc run --rm --no-deps -w /var/www/html/ui/web app corepack yarn install --immutable
+dc run --rm --no-deps -w /var/www/html/ui/web app corepack yarn build
+```
+
+The build type-checks the frontend and writes its assets into `public/`, where the
+web application loads them.
+
+### 7. Start web and deploy workers
+
+```bash
+dc up -d app nginx
+```
+
+Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
+image, prepare its private IPC volume and credentials, and create and start the
+version-4 deployment from the host. Use the network and media volumes prepared above;
+the host and worker database URLs must reach the same migrated database. Supply the
+same application secret and Redis credentials through the worker credentials file.
+Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`.
+
+The admitted worker pair owns background consumption, scheduling, outbox relay and
+media execution. Compose starts none of these. Check worker logs and operational
+health as described in that guide; controller `status` reports
+`readiness: "not_checked"` and is not a readiness test.
+
+### 8. Create and scan a library
+
+Once media is present at `/media/library/music`, create a music library with its
+required media type and an explicit slug:
+
+```bash
+dc exec app php bin/console app:library:create "My Music" /media/library/music music --slug my-music
+dc exec app php bin/console app:library:scan my-music
+```
+
+The console scan runs in that process and records its work in the job monitor.
+An administrator can browse the new library; grant other users access separately.
+See [Library management](library-management.md) for library access and scanning.
+
+### 9. Open Bånder
+
+Open **https://baander.test:8443** and log in with the administrator account you
+created. Use the explicit HTTPS address: the development HTTP redirect does not
+preserve a custom TLS port. If you choose another port, change `WEB_PORT_TLS`,
+`APP_URL` and `DEFAULT_URI` together.
 
 ## What's Next
 
-- [Configuration](configuration.md) — customize environment variables, ports, and integrations
-- [Security](security.md) — harden your installation and set up secret rotation
-- [External APIs](external-apis.md) — enable metadata enrichment from Discogs, Last.fm, and MusicBrainz
-- [CLI Reference](commands/README.md) — all available console commands
+- [Configuration](configuration.md) — environment variables and integrations
+- [External APIs](external-apis.md) — metadata provider credentials
+- [Monitoring](monitoring.md) — health and background jobs
+- [CLI Reference](commands/README.md) — console commands and worker deployment

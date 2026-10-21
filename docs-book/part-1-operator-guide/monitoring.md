@@ -49,6 +49,18 @@ The health check verifies five components:
 | Swoole | Whether the Swoole extension is loaded and the worker process is running |
 | Memory | The real memory use of each HTTP worker of the web server against PHP's `memory_limit`, which the production image sets to [512M](configuration.md#php-memory-limit). Each worker reports every 5 seconds, and the check reads the worker using the most. Unhealthy at 90 percent of the limit, about 461 MiB at 512M; not available when the limit is `-1`. |
 
+The admitted worker deployment writes consumer heartbeats to Redis, where the
+web container reads them. An idle consumer renews about every 10 seconds; while
+handling a job, it renews every 30 seconds through the keepalive alarm. Messenger
+health details include `lastDeliveryQueueAgeSeconds` and `lastDeliveryAt`: these
+describe the last dequeued message, not the oldest message still waiting.
+
+These health checks cover the Redis consumer, but do not yet check the outbox
+relay. See [app:outbox:consume](commands/app-outbox-consume.md) for relay behavior
+and [Worker deployment](commands/README.md#worker-deployment) for ownership,
+drain and explicit recovery procedures. Restarting web leaves background work
+with the worker deployment.
+
 The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts). A planned stop or restart of the web server sends no alert: once the server drains, its checks stop. An outage of a checked component while the server is not draining still alerts.
 
 While Redis is unreachable, requests that require rate-limit or DPoP state answer
