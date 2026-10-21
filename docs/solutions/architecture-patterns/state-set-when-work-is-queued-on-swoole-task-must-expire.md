@@ -39,11 +39,34 @@ The library scan claim now does both (migration `migrations/Version2026100820000
 
 - `libraries.claim_id`, `claim_expires_at` and `claim_kind` hold the claim (renamed from `scan_claim_*` on 2026-10-10, when deletes with files began to hold the library too). A check constraint ties `scan_status = 'scanning'` to a `scan` claim; a `delete` claim leaves the scan status alone.
 - The lease is 15 minutes (`LibraryScanClaims::DEFAULT_LEASE_SECONDS = 900`), measured on the database clock: `claim_expires_at = clock_timestamp() + make_interval(secs => :lease)` (`LibraryRepository`'s claim and renew statements).
-- `MusicScanner` and `MovieScanner` call `LibraryScanLease::renew()` at each directory, file hash and publish. `renew()` writes to the database at most once a minute (`RENEWAL_INTERVAL_SECONDS = 60`), so frequent calls are cheap.
+- `MusicScanner` and `MovieScanner` call `LibraryScanLease::renew()` while traversing directories and hashing files. `renew()` writes to the database at most once a minute (`RENEWAL_INTERVAL_SECONDS = 60`), so frequent calls are cheap. Each directory write and each missing-path batch also calls the unthrottled `guardWrite()` inside its transaction, as described below.
 - One `UPDATE` takes the claim when it is free, already this holder's, or lapsed (`LibraryRepository.php:166`). Of two concurrent takeovers, exactly one updates a row.
 - The claim ID travels in `ScanLibraryCommand`. When the scan starts, `ScanLibraryHandler` calls `acquire($library, $claimId)`. A retried job therefore re-claims the free library under its old ID, and stops with a conflict if a newer scan holds a live claim.
 - A lapsed claim reads as `failed` (`LibraryRepository::discoveryStatus`, `LibraryRepository.php:291`), so the UI stops showing a scan that no one is running.
-- `app:library:scan --release` refuses a live claim unless `--force` is given. A forced release fences the old scan: it stops at its next renewal.
+- `app:library:scan --release` refuses a live claim unless `--force` is given. A forced release waits for an already guarded scan write to finish. Once release completes, the old scan stops at its next heartbeat or write check and cannot commit another batch.
+
+## Guard writes inside their transaction
+
+The 2026-10-21 repair closes a gap in heartbeat-only fencing. For up to sixty
+seconds after a renewal, an old scan could trust cached success even after an
+operator released its claim and a successor restored missing media. Its late
+cleanup could then mark those restored sources unavailable. Rejecting the old
+scan at completion did not undo the committed writes.
+
+`LibraryScanLease::guardWrite()` renews the matching library ID, claim ID and
+`scan` kind through `renewScanClaimForWrite()`. The repository requires an active
+transaction. Its row update holds release and takeover attempts until that
+transaction ends. If release or replacement committed first, the guard finds no
+matching claim and throws before index, availability or outbox writes begin.
+An expired claim may still renew when no other holder replaced it, preserving the
+existing lease policy.
+
+Both scanners guard each directory transaction and each missing-path batch of at
+most 1000 paths. Index updates and directory outbox capture share the guarded
+connection. Hashing and traversal stay outside these transactions; no lock spans
+the whole scan. Callers that deliberately omit a lease, including worker-free
+movie provisioning, retain their claim-free behavior. The historical routing
+references elsewhere in this note describe the original claim repair.
 
 ## Why This Matters
 

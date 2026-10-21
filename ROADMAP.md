@@ -419,3 +419,41 @@ nine code-review lenses found no defects. Prose preservation audits retained the
 historical entries, code blocks and tables; all 27 local links and anchors resolved,
 and whitespace checks passed. The runners removed their containers and networks;
 existing application services, databases and media were untouched.
+
+## Scan ownership at the write boundary
+
+Checkpoint, 2026-10-21: music and movie scanners now check their claim inside each
+short directory or missing-path transaction. The check bypasses the heartbeat's
+60-second throttle and holds the library row until commit or rollback. A scan
+whose claim was released or replaced cannot overwrite a successor's index,
+ingestion intent or availability observations. This closes the case where an old
+empty snapshot could mark restored tracks unavailable and block their playback.
+
+Release and takeover wait for an already guarded batch to finish. An ordinary
+takeover then respects the renewed lease; a forced release prevents the old scan's
+next batch. Missing paths remain bounded to 1000 per transaction. Traversal and
+hashing stay outside these transactions. The existing 15-minute lease,
+expired-but-unreplaced renewal, cancellation, completion checks and claim-free
+movie provisioning retain their behavior. No schema or transport changed.
+
+Verification in the CI image passed 477 distinct tests with 2,484 assertions:
+368 Library unit tests, 54 compatibility tests and 55 claim/publication integration
+tests. Sixteen frozen-clock release/replacement cases failed before the repair.
+Twenty-four new two-connection scanner cases verify stale-owner rejection,
+successor availability, release waiting through commit and rollback, and ordinary
+takeover refusal after renewal. The database tests drive actual directory index
+and outbox writes and missing-path updates; separate checks enforce the repository
+transaction requirement and preserve claim-kind, expiry and timestamp semantics.
+Compatibility checks cover missing-source recovery, explicit deletion, ingestion,
+cancellation, relay behavior and scan-to-streaming responses.
+
+Targeted PHPStan passed for every changed PHP file. Full Deptrac reported zero
+violations, warnings and errors, with 484 existing skipped violations. Tests used
+isolated services and temporary media and played no audio. Existing application
+databases, Redis and media storage were not reused or reset.
+
+Simplification reviews completed at both implementation boundaries; no code change
+was needed. Final correctness and independent adversarial review found no
+actionable defects. Prose preservation checks retained historical entries, fenced
+code and tables; all 17 local links and anchors resolved, and whitespace checks
+passed. The runners removed their containers and networks.
