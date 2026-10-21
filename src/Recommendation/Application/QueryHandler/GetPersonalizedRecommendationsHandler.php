@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Recommendation\Application\QueryHandler;
 
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Recommendation\Application\Query\GetPersonalizedRecommendationsQuery;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * @phpstan-type RecommendedSong array{public_id: string, title: string, album_id: string, track: int|null, disc: int|null, year: int|null, length: float|null}
+ * @phpstan-type RecommendedSong array{public_id: string, title: string, album_id: string, track: int|null, disc: int|null, year: int|null, length: float|null, available: bool}
  */
 final class GetPersonalizedRecommendationsHandler
 {
@@ -26,6 +27,7 @@ final class GetPersonalizedRecommendationsHandler
         private readonly RecommendationRepositoryInterface $recommendationRepository,
         private readonly SongRepositoryInterface $songRepository,
         private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
+        private readonly SongAvailabilityPortInterface $availability,
     ) {
     }
 
@@ -72,8 +74,8 @@ final class GetPersonalizedRecommendationsHandler
             array_map(fn ($id) => new \App\Shared\Domain\Model\Uuid($id), $itemIds)
         );
 
-        // Build enriched response
-        $result = [];
+        $visibleSongs = [];
+        $albumPublicIds = [];
         foreach ($topItems as $targetId => $data) {
             $song = $songs[$targetId] ?? null;
             if ($song === null) {
@@ -82,6 +84,19 @@ final class GetPersonalizedRecommendationsHandler
 
             $albumPublicId = $this->identities->publicEntityId('album', $song->getAlbumId()->toString(), $query->getUserId(), $query->administrator);
             if ($albumPublicId === null || $this->identities->publicEntityId('song', $targetId, $query->getUserId(), $query->administrator) === null) { continue; }
+
+            $visibleSongs[$targetId] = $song;
+            $albumPublicIds[$targetId] = $albumPublicId;
+        }
+        $availability = $visibleSongs === [] ? [] : $this->availability->forSongs(array_values($visibleSongs));
+
+        // Build enriched response only for songs visible to this listener.
+        $result = [];
+        foreach ($topItems as $targetId => $data) {
+            $song = $visibleSongs[$targetId] ?? null;
+            if ($song === null) {
+                continue;
+            }
 
             // Get top contributing strategy for one-line explanation
             arsort($data['strategies']);
@@ -94,7 +109,7 @@ final class GetPersonalizedRecommendationsHandler
                 'total_score' => round($data['total_score'], 3),
                 'explanation' => self::STRATEGY_LABELS[$topStrategy] ?? 'Recommended for you',
                 'strategies' => $data['strategies'],
-                'song' => $this->songToArray($song, $albumPublicId),
+                'song' => $this->songToArray($song, $albumPublicIds[$targetId], $availability[$song->getId()->toString()] ?? false),
             ];
         }
 
@@ -102,10 +117,11 @@ final class GetPersonalizedRecommendationsHandler
     }
 
     /** @return RecommendedSong */
-    private function songToArray(\App\Catalog\Domain\Model\Song $song, string $albumPublicId): array
+    private function songToArray(\App\Catalog\Domain\Model\Song $song, string $albumPublicId, bool $available): array
     {
         return [
             'public_id' => $song->getPublicId()->toString(),
+            'available' => $available,
             'title' => $song->getTitle(),
             'album_id' => $albumPublicId,
             'track' => $song->getTrack(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\Command\Song\UpdateSongCommand;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -46,6 +47,7 @@ final class SongController
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly CursorCodec $cursorCodec,
         private readonly MessageBusInterface $bus,
+        private readonly SongAvailabilityPortInterface $availability,
     ) {
     }
 
@@ -99,7 +101,7 @@ final class SongController
         $artistNames = $this->songService->getVisibleArtistNamesForSongs($songIds, $scope);
         $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
 
-        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles)));
+        return $this->cursorPaginatedResponse(CursorPaginatedResponse::fromPage($page, SongResource::collectionWithMeta($songs, $artistNames, $albumTitles, $this->availability->forSongs($songs))));
     }
 
     /**
@@ -138,7 +140,7 @@ final class SongController
         $artistNames = $this->songService->getVisibleArtistNamesForSongs([$song->getId()], $scope);
         $albumTitles = $this->songService->getVisibleAlbumTitlesByIds([$song->getAlbumId()], $scope);
 
-        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles));
+        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song])));
     }
 
     /**
@@ -188,7 +190,7 @@ final class SongController
         $artistNames = $this->songService->getArtistNamesForSongs([$song->getId()]);
         $albumTitles = $this->songService->getAlbumTitlesByIds([$song->getAlbumId()]);
 
-        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles));
+        return $this->successResponse(SongResource::fromWithMeta($song, $artistNames, $albumTitles, $this->availability->forSongs([$song])));
     }
 
     /**

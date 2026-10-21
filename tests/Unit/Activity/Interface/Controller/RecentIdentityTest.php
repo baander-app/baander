@@ -30,6 +30,8 @@ final class RecentIdentityTest extends TestCase
             $this->createStub(ImagePortInterface::class),
             $this->createStub(MoviePortInterface::class),
             $this->users(),
+            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class),
         );
         $controller = new UserRecentController($security, $activities, $enrichment);
 

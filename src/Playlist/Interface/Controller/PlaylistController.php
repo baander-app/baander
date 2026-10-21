@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Controller;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
@@ -70,6 +71,7 @@ final class PlaylistController
         private readonly LibraryReadScopeProviderInterface $libraryScopes,
         private readonly PlaylistCollaboratorResolverInterface $collaborators,
         private readonly PlaylistSongVisibilityInterface $songLookup,
+        private readonly SongAvailabilityPortInterface $availability,
     ) {
     }
 
@@ -182,10 +184,11 @@ final class PlaylistController
                         new OA\Property(property: 'songCount', type: 'integer', minimum: 0, description: 'Number of accessible songs returned in the songs array', example: 25),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'revision', description: 'Revision of the snapshot used to return songs', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
-                        new OA\Property(property: 'songs', type: 'array', items: new OA\Items(properties: [
+                        new OA\Property(property: 'songs', type: 'array', items: new OA\Items(required: ['available'], properties: [
                             new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                             new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
                             new OA\Property(property: 'position', type: 'integer', description: 'Stored playlist position', example: 0),
+                            new OA\Property(property: 'available', type: 'boolean', description: 'Whether the latest scan or ingestion observation marked the source available'),
                             new OA\Property(property: 'title', type: 'string'),
                             new OA\Property(property: 'artistName', type: 'string', nullable: true),
                             new OA\Property(property: 'albumName', type: 'string', nullable: true),
@@ -240,13 +243,14 @@ final class PlaylistController
         );
         $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
 
+        $availability = $this->availability->forSongs(array_values($songMap));
         $songs = [];
         foreach ($playlist->getSongs() as $playlistSong) {
             $song = $songMap[$playlistSong->getSongId()->toString()] ?? null;
             if ($song === null) {
                 continue;
             }
-            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles);
+            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability);
             unset($data['path']);
             $songs[] = array_merge(['position' => $playlistSong->getPosition()], $data);
         }

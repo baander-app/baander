@@ -607,6 +607,8 @@ services:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\AlbumPortInterface:
         alias: App\Catalog\Infrastructure\AlbumService
+    App\Catalog\Application\Port\SongAvailabilityPortInterface:
+        alias: App\Catalog\Infrastructure\SongAvailability
     App\Catalog\Application\Port\SongPortInterface:
         alias: App\Catalog\Infrastructure\SongService
     App\Catalog\Application\Port\SongLookupInterface:
@@ -632,6 +634,8 @@ services:
     App\Library\Application\Port\LibraryMediaFileResolverInterface:
         alias: App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver
 
+    App\Library\Application\Port\LibraryFileAvailabilityInterface:
+        alias: App\Library\Infrastructure\LibraryFileAvailability
     App\Library\Application\Port\LibraryMediaFilesInterface:
         alias: App\Library\Infrastructure\Filesystem\LibraryMediaFiles
 

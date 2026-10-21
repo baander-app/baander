@@ -10,9 +10,11 @@ use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'SongResource',
+    required: ['available'],
     properties: [
         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
+        new OA\Property(property: 'available', type: 'boolean', description: 'Whether the latest scan or ingestion observation marked the source available'),
         new OA\Property(property: 'title', type: 'string', description: 'Song title'),
         new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Primary artist name'),
         new OA\Property(property: 'albumName', type: 'string', nullable: true, description: 'Album title'),
@@ -37,9 +39,10 @@ final class SongResource extends AbstractResource
     /**
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
+     * @param array<string, bool> $availability songUuid => observed source availability
      * @return array<string, mixed>
      */
-    public static function fromWithMeta(Song $song, array $artistNames = [], array $albumTitles = []): array
+    public static function fromWithMeta(Song $song, array $artistNames = [], array $albumTitles = [], array $availability = []): array
     {
         $songUuid = $song->getId()->toString();
         $albumUuid = $song->getAlbumId()->toString();
@@ -47,6 +50,7 @@ final class SongResource extends AbstractResource
         return [
             'publicId' => $song->getPublicId()->toString(),
             'albumId' => ($song->getAlbumPublicId() ?? throw new \LogicException('Song projection requires the album public identifier.'))->toString(),
+            'available' => $availability[$songUuid] ?? false,
             'title' => $song->getTitle(),
             'artistName' => $artistNames[$songUuid] ?? null,
             'albumName' => $albumTitles[$albumUuid] ?? null,
@@ -66,13 +70,14 @@ final class SongResource extends AbstractResource
      * @param iterable<Song> $songs
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
+     * @param array<string, bool> $availability songUuid => observed source availability
      * @return list<array<string, mixed>>
      */
-    public static function collectionWithMeta(iterable $songs, array $artistNames, array $albumTitles): array
+    public static function collectionWithMeta(iterable $songs, array $artistNames, array $albumTitles, array $availability = []): array
     {
         $result = [];
         foreach ($songs as $song) {
-            $result[] = self::fromWithMeta($song, $artistNames, $albumTitles);
+            $result[] = self::fromWithMeta($song, $artistNames, $albumTitles, $availability);
         }
 
         return $result;

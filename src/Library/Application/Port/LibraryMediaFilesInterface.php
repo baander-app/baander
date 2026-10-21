@@ -61,15 +61,14 @@ interface LibraryMediaFilesInterface
 
     /**
      * The paths at which no file exists now, or a symlink points to nothing, in request order,
-     * after deleting their file index rows. An import drops these paths, so a file deleted since
-     * the scan found it becomes no song or video; without its index row, a file that comes back
-     * at the path unchanged reads as new to the next incremental scan, which imports it.
+     * after marking their retained file-index rows unavailable. An import skips these paths;
+     * a file that returns unchanged is published again by the next incremental scan.
      *
      * @param list<string> $paths absolute paths, as the scanner stored them
      *
      * @return list<string>
      */
-    public function forgetMissing(Uuid $libraryId, array $paths): array;
+    public function markMissingUnavailable(Uuid $libraryId, array $paths): array;
 
     /**
      * Claims the library for a delete with files, with a lease that deleteFiles() renews. A claim

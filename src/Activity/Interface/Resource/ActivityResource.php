@@ -13,10 +13,12 @@ use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'ActivityResource',
+    required: ['songAvailable'],
     properties: [
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'User public ID'),
         new OA\Property(property: 'activityType', type: 'string', description: 'Type of activity'),
+        new OA\Property(property: 'songAvailable', type: 'boolean', description: 'Whether the latest scan or ingestion observation marked the song source available'),
         new OA\Property(property: 'songId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Song public ID'),
         new OA\Property(property: 'albumId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Album public ID'),
         new OA\Property(property: 'artistId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Artist public ID'),
@@ -42,6 +44,7 @@ final class ActivityResource extends AbstractResource
             'userId' => $view->userId->toString(),
             'activityType' => $source->getActivityType(),
             'songId' => $view->songId?->toString(),
+            'songAvailable' => false,
             'albumId' => $view->albumId?->toString(),
             'artistId' => $view->artistId?->toString(),
             'movieId' => $view->movieId?->toString(),
@@ -59,6 +62,7 @@ final class ActivityResource extends AbstractResource
      * @param array<string, Album> $albums keyed by album public ID
      * @param array<string, Image> $images keyed by image public ID
      * @param array<string, array<int, array{name: string, role: string|null}>> $albumArtists keyed by album public ID
+     * @param array<string, bool> $availability keyed by song UUID
      * @return array<string, mixed>
      */
     public static function fromWithDetails(
@@ -68,6 +72,7 @@ final class ActivityResource extends AbstractResource
         array $images,
         array $albumArtists,
         string $baseUrl = '',
+        array $availability = [],
     ): array {
         $data = self::from($view);
         $activity = $view->model;
@@ -77,6 +82,7 @@ final class ActivityResource extends AbstractResource
 
         // Song info
         if ($song !== null) {
+            $data['songAvailable'] = $availability[$song->getId()->toString()] ?? false;
             $data['songTitle'] = $song->getTitle();
             $data['songPublicId'] = $song->getPublicId()->toString();
         } else {

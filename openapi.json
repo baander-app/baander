@@ -12270,6 +12270,9 @@
                                                 "songs": {
                                                     "type": "array",
                                                     "items": {
+                                                        "required": [
+                                                            "available"
+                                                        ],
                                                         "properties": {
                                                             "publicId": {
                                                                 "type": "string",
@@ -12288,6 +12291,10 @@
                                                                 "description": "Stored playlist position",
                                                                 "type": "integer",
                                                                 "example": 0
+                                                            },
+                                                            "available": {
+                                                                "description": "Whether the latest scan or ingestion observation marked the source available",
+                                                                "type": "boolean"
                                                             },
                                                             "title": {
                                                                 "type": "string"
@@ -14804,6 +14811,46 @@
                                                         "additionalProperties": true
                                                     },
                                                     "song": {
+                                                        "required": [
+                                                            "public_id",
+                                                            "title",
+                                                            "album_id",
+                                                            "track",
+                                                            "disc",
+                                                            "year",
+                                                            "length",
+                                                            "available"
+                                                        ],
+                                                        "properties": {
+                                                            "public_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "album_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "track": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "disc": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "year": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "length": {
+                                                                "type": "number",
+                                                                "nullable": true
+                                                            },
+                                                            "available": {
+                                                                "type": "boolean"
+                                                            }
+                                                        },
                                                         "type": "object"
                                                     }
                                                 },
@@ -23496,6 +23543,7 @@
                     "publicId",
                     "userId",
                     "activityType",
+                    "songAvailable",
                     "playCount",
                     "love",
                     "createdAt"
@@ -23518,6 +23566,10 @@
                     "activityType": {
                         "description": "Type of activity",
                         "type": "string"
+                    },
+                    "songAvailable": {
+                        "description": "Whether the latest scan or ingestion observation marked the song source available",
+                        "type": "boolean"
                     },
                     "songId": {
                         "description": "Song public ID",
@@ -23613,6 +23665,7 @@
                 "required": [
                     "publicId",
                     "activityType",
+                    "songAvailable",
                     "playCount"
                 ],
                 "properties": {
@@ -23626,6 +23679,10 @@
                     "activityType": {
                         "description": "Type of activity",
                         "type": "string"
+                    },
+                    "songAvailable": {
+                        "description": "Whether the latest scan or ingestion observation marked the song source available",
+                        "type": "boolean"
                     },
                     "songTitle": {
                         "description": "Song title",
@@ -24711,6 +24768,7 @@
                 "required": [
                     "publicId",
                     "albumId",
+                    "available",
                     "title",
                     "explicit",
                     "lockedFields",
@@ -24730,6 +24788,10 @@
                         "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "maxLength": 21,
                         "minLength": 21
+                    },
+                    "available": {
+                        "description": "Whether the latest scan or ingestion observation marked the source available",
+                        "type": "boolean"
                     },
                     "title": {
                         "description": "Song title",

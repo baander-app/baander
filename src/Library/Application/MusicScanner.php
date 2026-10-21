@@ -57,10 +57,11 @@ final class MusicScanner
             'rescan' => $rescan,
         ]);
 
-        // Load existing index for diff (empty on rescan = process all files)
+        // Full rescans still reconcile every previously indexed path.
+        $indexedPaths = $this->fileIndexRepository->findIndexedPathsByLibrary($library->getId());
         $indexMap = $rescan
             ? []
-            : $this->fileIndexRepository->findIndexPathMapByLibrary($library->getId());
+            : $this->fileIndexRepository->findAvailableIndexPathMapByLibrary($library->getId());
 
         // Group files by parent directory (album grouping)
         $filesByDirectory = [];
@@ -77,6 +78,7 @@ final class MusicScanner
 
             $discoveredFiles = [];
             foreach ($files as $file) {
+                $seenPaths[$file->getAbsolutePath()] = true;
                 $hash = hash_file('xxh3', $file->getAbsolutePath());
                 $lease?->renew();
                 if ($hash === false) {
@@ -84,8 +86,6 @@ final class MusicScanner
                     $filesSkipped++;
                     continue;
                 }
-                $seenPaths[$file->getAbsolutePath()] = true;
-
                 // Check if file is new or changed
                 $existingHash = $indexMap[$file->getAbsolutePath()] ?? null;
                 if ($existingHash !== null && $existingHash === $hash && !$rescan) {
@@ -129,12 +129,13 @@ final class MusicScanner
             $filesProcessed += count($discoveredFiles);
         }
 
-        // Remove stale entries (files no longer on disk)
-        foreach (array_keys($indexMap) as $indexedPath) {
-            if (!isset($seenPaths[$indexedPath])) {
-                $lease?->renew();
-                $this->fileIndexRepository->removeByPath($library->getId(), $indexedPath);
-            }
+        // A complete scan records absence without discarding the previous observations.
+        $this->cancellation->check();
+        $missingPaths = array_values(array_filter($indexedPaths, static fn (string $path): bool => !isset($seenPaths[$path])));
+        foreach (array_chunk($missingPaths, 1000) as $paths) {
+            $this->cancellation->check();
+            $lease?->renew();
+            $this->fileIndexRepository->markUnavailableByPaths($library->getId(), $paths);
         }
 
         $this->logger->info('Library scan completed', [

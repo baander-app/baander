@@ -44,7 +44,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         $mediaFiles->expects($this->exactly(2))->method('isHeldByDelete')
             ->with($message->libraryId)
             ->willReturnOnConsecutiveCalls(true, false);
-        $mediaFiles->method('forgetMissing')->willReturn([]);
+        $mediaFiles->method('markMissingUnavailable')->willReturn([]);
         $events = [];
         $requeueStamps = [];
         $songs = $this->createMock(SongPortInterface::class);
@@ -84,7 +84,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/02 Two.mp3', 'hash-two'),
         );
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('forgetMissing')->willReturn(['/music/Album/01 One.mp3', '/music/Album/02 Two.mp3']);
+        $mediaFiles->method('markMissingUnavailable')->willReturn(['/music/Album/01 One.mp3', '/music/Album/02 Two.mp3']);
         $albums = $this->createMock(AlbumPortInterface::class);
         $albums->expects($this->never())->method('findByTitleAndLibrary');
         $albums->expects($this->never())->method('persist');
@@ -103,7 +103,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/02 Here.mp3', 'hash-here'),
         );
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('forgetMissing')->willReturnCallback(
+        $mediaFiles->method('markMissingUnavailable')->willReturnCallback(
             static fn (Uuid $libraryId, array $paths): array => array_values(array_intersect($paths, ['/music/Album/01 Gone.mp3'])),
         );
         $read = [];
@@ -131,7 +131,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie'),
         ]);
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('forgetMissing')->willReturn(['/movies/Gone Movie/movie.mkv']);
+        $mediaFiles->method('markMissingUnavailable')->willReturn(['/movies/Gone Movie/movie.mkv']);
         $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects($this->never())->method('persist');
         $videos = $this->createMock(VideoRepositoryInterface::class);
@@ -142,10 +142,10 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
 
     /**
      * The scan indexed the files before it queued their import. An import that finds a file gone
-     * has the index forget it, so that the next incremental scan reads the file as new when it
-     * comes back unchanged (LibraryMediaFilesTest checks that scan) instead of skipping it as known.
+     * marks its retained index row unavailable, so that the next incremental scan publishes it
+     * when it comes back unchanged instead of skipping it as an available source.
      */
-    public function testAnImportHasTheIndexForgetItsMissingFilesForMusicAndMovies(): void
+    public function testAnImportMarksMissingIndexedFilesUnavailableForMusicAndMovies(): void
     {
         $messages = [
             $this->music($this->file('/music/Album/01 Gone.mp3', 'hash-gone'), $this->file('/music/Album/02 Here.mp3', 'hash-here')),
@@ -157,7 +157,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         foreach ($messages as $message) {
             $paths = array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $message->files);
             $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
-            $mediaFiles->expects($this->once())->method('forgetMissing')
+            $mediaFiles->expects($this->once())->method('markMissingUnavailable')
                 ->with($message->libraryId, $paths)
                 ->willReturn([$paths[0]]);
 
@@ -179,7 +179,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         $message = $this->music(...$files);
         $transaction = new PassThroughTransaction();
         $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('forgetMissing')->willReturn([]);
+        $mediaFiles->method('markMissingUnavailable')->willReturn([]);
         // Free when the import starts and at its first write; claimed before its second.
         $mediaFiles->expects($this->once())->method('isHeldByDelete')->willReturn(false);
         $mediaFiles->expects($this->exactly(2))->method('isHeldByDeleteForImport')

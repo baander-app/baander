@@ -87,7 +87,7 @@ final class MusicScannerTest extends TestCase
         $this->directoryScanner->method('scan')
             ->willReturn([]);
 
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn([]);
 
         $scanner = $this->createScanner();
@@ -112,7 +112,7 @@ final class MusicScannerTest extends TestCase
         $this->directoryScanner->method('scan')
             ->willReturn($files);
 
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn([]);
 
         $scanner = $this->createScanner();
@@ -134,7 +134,7 @@ final class MusicScannerTest extends TestCase
             ->willReturn([$file]);
 
         // File already indexed with same hash
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn([$file->getAbsolutePath() => $hash]);
 
         $scanner = $this->createScanner();
@@ -156,7 +156,7 @@ final class MusicScannerTest extends TestCase
             ->willReturn([$file]);
 
         // File indexed with different hash
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn([$file->getAbsolutePath() => 'old_hash']);
 
         $scanner = $this->createScanner();
@@ -180,7 +180,7 @@ final class MusicScannerTest extends TestCase
 
         // Rescan: index map should not be loaded
         $this->fileIndexRepository->expects($this->never())
-            ->method('findIndexPathMapByLibrary');
+            ->method('findAvailableIndexPathMapByLibrary');
 
         $scanner = $this->createScanner();
         $result = $scanner->scan($library, rescan: true);
@@ -208,7 +208,7 @@ final class MusicScannerTest extends TestCase
         $this->directoryScanner->method('scan')
             ->willReturn([$coverFile, $audioFile]);
 
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn([]);
 
         $scanner = $this->createScanner();
@@ -231,15 +231,15 @@ final class MusicScannerTest extends TestCase
         ]);
         $indexed = [];
         $removed = [];
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')
             ->willReturn(["{$this->tmpDir}/Gone/track01.mp3" => 'old_hash']);
         $this->fileIndexRepository->method('upsert')
             ->willReturnCallback(function (Uuid $libraryId, string $path) use (&$indexed): void {
                 $indexed[] = $path;
             });
-        $this->fileIndexRepository->method('removeByPath')
-            ->willReturnCallback(function (Uuid $libraryId, string $path) use (&$removed): void {
-                $removed[] = $path;
+        $this->fileIndexRepository->method('markUnavailableByPaths')
+            ->willReturnCallback(function (Uuid $libraryId, array $paths) use (&$removed): void {
+                array_push($removed, ...$paths);
             });
         $published = [];
         // The job is cancelled while the scan hashes its second directory.
@@ -271,7 +271,7 @@ final class MusicScannerTest extends TestCase
         $library = $this->createLibrary();
         $this->directoryScanner->method('scan')->willReturn([$this->createAudioFile('Album1', 'track01.mp3')]);
         $this->fileIndexRepository = $this->createMock(LibraryFileIndexRepositoryInterface::class);
-        $this->fileIndexRepository->method('findIndexPathMapByLibrary')->willReturn([]);
+        $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')->willReturn([]);
         $this->fileIndexRepository->expects($this->never())->method('upsert');
 
         $this->expectExceptionMessage('transport down');

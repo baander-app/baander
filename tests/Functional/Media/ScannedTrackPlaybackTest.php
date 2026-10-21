@@ -10,6 +10,7 @@ use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Library\Domain\Model\Library;
+use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
@@ -109,8 +110,81 @@ final class ScannedTrackPlaybackTest extends TestCase
         self::assertSame(sprintf('bytes 100-199/%d', strlen($original)), $range->getHeader('Content-Range'));
         self::assertSame(substr($original, 100, 100), $range->getContent());
 
+        $songId = $song->getId()->toString();
+        $publicId = $song->getPublicId()->toString();
+        $songs = $container->get(SongRepositoryInterface::class);
+        $index = $container->get(LibraryFileIndexRepositoryInterface::class);
+        $song->lockField('title');
+        $song->updateMetadata(comment: 'Keep my notes');
+        $songs->save($song);
+        $songUri = '/api/songs/' . $publicId;
+        $this->client->request('GET', $songUri, [], [], $headers);
+        self::assertTrue(json_decode($this->client->getInternalResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['available']);
+
+        // A temporarily absent root retains its index and original catalog identity.
+        $hidden = $this->libraryDirectory . '-unmounted';
+        self::assertTrue(rename($this->libraryDirectory, $hidden));
+        try {
+            clearstatcache(true);
+            self::assertSame(Command::SUCCESS, $scan->execute(['library' => $slug->toString()]));
+            self::assertSame([$source], $index->findIndexedPathsByLibrary($library->getId()));
+            $this->client->request('GET', $songUri, [], [], $headers);
+            $missing = json_decode($this->client->getInternalResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+            self::assertFalse($missing['available']);
+            self::assertSame($publicId, $missing['publicId']);
+            self::assertCount(1, $songs->findByAlbum($song->getAlbumId()));
+        } finally {
+            self::assertTrue(rename($hidden, $this->libraryDirectory));
+            clearstatcache(true);
+        }
+
+        $transport->reset();
+        self::assertSame(Command::SUCCESS, $scan->execute(['library' => $slug->toString()]));
+        $this->deliverDiscovered($transport);
+        $this->client->request('GET', $songUri, [], [], $headers);
+        self::assertTrue(json_decode($this->client->getInternalResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['available']);
+
+        // Both incremental and forced scans repair a physical rename without replacing the song.
+        foreach ([false, true] as $rescan) {
+            $renamed = $this->libraryDirectory . ($rescan ? '/second-rename.flac' : '/first-rename.flac');
+            self::assertTrue(rename($source, $renamed));
+            clearstatcache(true);
+            $transport->reset();
+            $arguments = ['library' => $slug->toString()];
+            if ($rescan) {
+                $arguments['--rescan'] = true;
+            }
+            self::assertSame(Command::SUCCESS, $scan->execute($arguments), $scan->getDisplay());
+            $this->deliverDiscovered($transport);
+            $repaired = $songs->findFreshByUuid($song->getId());
+            self::assertNotNull($repaired);
+            self::assertSame($songId, $repaired->getId()->toString());
+            self::assertSame($publicId, $repaired->getPublicId()->toString());
+            self::assertSame($renamed, $repaired->getPath());
+            self::assertSame('Keep my notes', $repaired->getComment());
+            self::assertTrue($repaired->isFieldLocked('title'));
+            self::assertCount(1, $songs->findByAlbum($song->getAlbumId()));
+            self::assertSame([$source => false, $renamed => true], $index->findAvailabilityByPaths($library->getId(), [$source, $renamed]));
+            $this->client->request('GET', $uri, [], [], $headers);
+            self::assertSame(200, $this->client->getInternalResponse()->getStatusCode());
+            self::assertSame($original, $this->client->getInternalResponse()->getContent());
+            $this->client->request('GET', $uri, [], [], $headers + ['HTTP_RANGE' => 'bytes=100-199']);
+            self::assertSame(206, $this->client->getInternalResponse()->getStatusCode());
+            self::assertSame(substr($original, 100, 100), $this->client->getInternalResponse()->getContent());
+            $source = $renamed;
+        }
+
         $container->get(LibraryAccessPortInterface::class)->revoke($listener->getId(), $library->getId());
         $this->client->request('GET', $uri, [], [], $headers + ['HTTP_RANGE' => 'bytes=100-199']);
         self::assertSame(403, $this->client->getInternalResponse()->getStatusCode());
+    }
+    private function deliverDiscovered(InMemoryTransport $transport): void
+    {
+        $messages = array_values(array_filter(
+            $transport->getSent(),
+            static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,
+        ));
+        self::assertCount(1, $messages);
+        self::getContainer()->get(FilesDiscoveredHandler::class)($messages[0]->getMessage());
     }
 }

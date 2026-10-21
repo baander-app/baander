@@ -141,7 +141,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $songs->method('getVisibleAlbumTitlesByIds')->willReturn([]);
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
-        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class));
+        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class), $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class));
 
         $response = $controller->show($playlist->getPublicId()->toString());
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
@@ -149,6 +149,56 @@ final class PlaylistSongIdentityTest extends TestCase
         self::assertSame($revision, $data['revision']);
         self::assertSame([], $data['songs']);
         self::assertSame(0, $data['songCount']);
+    }
+
+    public function testDetailKeepsUnavailableSongsInOrderAndProjectsOnlyVisibleSongs(): void
+    {
+        $albumId = new Uuid();
+        $albumPublicId = new PublicId();
+        $visible = [];
+        foreach (['Available', 'Unavailable'] as $title) {
+            $song = \App\Catalog\Domain\Model\Song::create($albumId, $title, '/music/' . $title . '.flac', 1, 'audio/flac');
+            $visible[] = \App\Catalog\Domain\Model\Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(
+                get_object_vars($song->getState()), ['albumPublicId' => $albumPublicId],
+            )));
+        }
+        $playlist = Playlist::create('Mixed availability', new Uuid());
+        $playlist->addSong($visible[0]->getId(), 0);
+        $playlist->addSong(new Uuid(), 1);
+        $playlist->addSong($visible[1]->getId(), 2);
+        $view = new \App\Playlist\Domain\ReadModel\PlaylistReadView(
+            $playlist->getId(), $playlist->getPublicId(), new PublicId(), [], 'Mixed availability', null,
+            false, false, false, [], $playlist->getCreatedAt(), $playlist->getUpdatedAt(), 3,
+        );
+        $playlists = $this->createStub(PlaylistPortInterface::class);
+        $playlists->method('findByPublicId')->willReturn($playlist);
+        $playlists->method('findRead')->willReturn($view);
+        $security = $this->createStub(Security::class);
+        $security->method('isGranted')->willReturn(true);
+        $songs = $this->createStub(SongPortInterface::class);
+        $songs->method('findVisibleByUuids')->willReturn([
+            $visible[0]->getId()->toString() => $visible[0],
+            $visible[1]->getId()->toString() => $visible[1],
+        ]);
+        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability->expects(self::once())->method('forSongs')->with($visible)->willReturn([
+            $visible[0]->getId()->toString() => true,
+            $visible[1]->getId()->toString() => false,
+        ]);
+        $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(LibraryReadScope::unrestricted());
+        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class), $availability);
+
+        $response = $controller->show($playlist->getPublicId()->toString());
+
+        self::assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertSame([true, false], array_column($data['songs'], 'available'));
+        self::assertSame([0, 2], array_column($data['songs'], 'position'));
+        self::assertSame(2, $data['songCount']);
+        foreach ($data['songs'] as $song) {
+            self::assertArrayNotHasKey('path', $song);
+        }
     }
 
     private function controller(Playlist $playlist, PlaylistSongVisibilityInterface $lookup, MessageBusInterface $bus): PlaylistController
@@ -163,7 +213,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $playlists->expects(self::never())->method('save');
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
-        $controller = new PlaylistController($security, $playlists, $this->createStub(SongPortInterface::class), $bus, $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $lookup);
+        $controller = new PlaylistController($security, $playlists, $this->createStub(SongPortInterface::class), $bus, $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $lookup, $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class));
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);

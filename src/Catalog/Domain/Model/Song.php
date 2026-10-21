@@ -134,6 +134,16 @@ final class Song
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    public function updateSourcePath(string $path): void
+    {
+        if (trim($path) === '') {
+            throw new InvalidArgumentException('Song path cannot be empty.');
+        }
+
+        $this->state->path = $path;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
     /**
      * Update audio file metadata (bitrate, sample rate, etc.).
      */

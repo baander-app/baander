@@ -62,7 +62,7 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
         return $this->libraries->liveClaimKindForImport($libraryId) === LibraryClaimKind::Delete;
     }
 
-    public function forgetMissing(Uuid $libraryId, array $paths): array
+    public function markMissingUnavailable(Uuid $libraryId, array $paths): array
     {
         // PHP caches file status; a file deleted since an earlier check must count.
         $missing = array_values(array_filter($paths, static function (string $path): bool {
@@ -71,10 +71,9 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
             return !file_exists($path);
         }));
 
-        // The scan indexed these paths when it found the files. Left in the index, a file that
-        // comes back unchanged would read as known to every incremental scan and never be imported.
+        // Unavailable paths are republished if a later scan finds them unchanged.
         if ($missing !== []) {
-            $this->fileIndex->removeByPaths($libraryId, $missing);
+            $this->fileIndex->markUnavailableByPaths($libraryId, $missing);
         }
 
         return $missing;

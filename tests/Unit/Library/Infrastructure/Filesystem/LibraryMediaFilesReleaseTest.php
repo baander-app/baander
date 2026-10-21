@@ -51,7 +51,7 @@ final class LibraryMediaFilesReleaseTest extends TestCase
         $this->files($libraries, $logger)->release($claim);
     }
 
-    public function testForgetMissingRemovesTheIndexRowsOfTheMissingPathsOnly(): void
+    public function testMissingPathsAreMarkedUnavailableWithoutRemovingIndexRows(): void
     {
         $base = sys_get_temp_dir() . '/baander-forget-missing-' . bin2hex(random_bytes(6));
         self::assertTrue(mkdir($base));
@@ -62,12 +62,12 @@ final class LibraryMediaFilesReleaseTest extends TestCase
 
         try {
             $index = $this->createMock(LibraryFileIndexRepositoryInterface::class);
-            $index->expects($this->once())->method('removeByPaths')->with($libraryId, [$gone]);
-            self::assertSame([$gone], $this->files(index: $index)->forgetMissing($libraryId, [$present, $gone]));
+            $index->expects($this->once())->method('markUnavailableByPaths')->with($libraryId, [$gone]);
+            self::assertSame([$gone], $this->files(index: $index)->markMissingUnavailable($libraryId, [$present, $gone]));
 
             $untouched = $this->createMock(LibraryFileIndexRepositoryInterface::class);
-            $untouched->expects($this->never())->method('removeByPaths');
-            self::assertSame([], $this->files(index: $untouched)->forgetMissing($libraryId, [$present]));
+            $untouched->expects($this->never())->method('markUnavailableByPaths');
+            self::assertSame([], $this->files(index: $untouched)->markMissingUnavailable($libraryId, [$present]));
         } finally {
             unlink($present);
             rmdir($base);

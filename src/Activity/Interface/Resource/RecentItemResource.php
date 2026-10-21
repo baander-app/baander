@@ -13,9 +13,11 @@ use OpenApi\Attributes as OA;
  */
 #[OA\Schema(
     schema: 'RecentItemResource',
+    required: ['songAvailable'],
     properties: [
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'activityType', type: 'string', description: 'Type of activity'),
+        new OA\Property(property: 'songAvailable', type: 'boolean', description: 'Whether the latest scan or ingestion observation marked the song source available'),
         new OA\Property(property: 'songTitle', type: 'string', nullable: true, description: 'Song title'),
         new OA\Property(property: 'songPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Song public identifier'),
         new OA\Property(property: 'albumTitle', type: 'string', nullable: true, description: 'Album title'),
@@ -38,6 +40,7 @@ final class RecentItemResource extends AbstractResource
             'publicId' => $source['publicId'],
             'activityType' => $source['activityType'],
             'songTitle' => $source['songTitle'] ?? null,
+            'songAvailable' => $source['songAvailable'] ?? false,
             'songPublicId' => $source['songPublicId'] ?? null,
             'albumTitle' => $source['albumTitle'] ?? null,
             'albumPublicId' => $source['albumPublicId'] ?? null,

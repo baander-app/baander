@@ -15,7 +15,9 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\DBAL\Schema\Schema;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
 
 final class LibraryFileIndexPersistenceTest extends TestCase
@@ -72,7 +74,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         $repository = new LibraryFileIndexRepository($this->manager);
 
         $repository->upsert($library->getId(), '/media/u15/a.flac', 'first', 1, 'flac', 10);
-        self::assertSame(['/media/u15/a.flac' => 'first'], $repository->findIndexPathMapByLibrary($library->getId()));
+        self::assertSame(['/media/u15/a.flac' => 'first'], $repository->findAvailableIndexPathMapByLibrary($library->getId()));
 
         $repository->upsert($library->getId(), '/media/u15/a.flac', 'second', 2, 'flac', 20);
         self::assertSame(1, $this->countIndexRows($library->getId()));
@@ -125,6 +127,153 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         $this->expectException(ForeignKeyConstraintViolationException::class);
 
         $this->index(null, '/media/u15/orphan.flac');
+    }
+
+    public function testMissingObservationsRetainTheEntireIndexRowAndOnlyAffectTheOwningLibrary(): void
+    {
+        $library = $this->createLibrary();
+        $other = $this->createLibrary();
+        $path = '/media/u15/a.flac';
+        $this->index($library, $path);
+        $this->index($other, $path);
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $read = static fn (): array|false => $connection->fetchAssociative(
+            'SELECT id, library_id, path, hash, size, extension, modified_at, discovered_at FROM library_file_index WHERE library_id = ?',
+            [$library->getId()->toString()],
+        );
+        $original = $read();
+
+        $repository->markUnavailableByPaths($library->getId(), [$path, $path, '/media/u15/unknown.flac']);
+        $repository->markUnavailableByPaths($library->getId(), [$path]);
+
+        self::assertSame($original, $read());
+        self::assertSame([$path], $repository->findIndexedPathsByLibrary($library->getId()));
+        self::assertSame([], $repository->findAvailableIndexPathMapByLibrary($library->getId()));
+        self::assertSame([$path => false], $repository->findAvailabilityByPaths($library->getId(), [$path]));
+        self::assertSame([$path => true], $repository->findAvailabilityByPaths($other->getId(), [$path]));
+        $this->manager->clear();
+        $entity = $this->manager->getRepository(LibraryFileIndexEntity::class)->findOneBy(['libraryId' => $library->getId()]);
+        self::assertInstanceOf(LibraryFileIndexEntity::class, $entity);
+        self::assertFalse($entity->isAvailable());
+    }
+
+    public function testAnUpsertRestoresAvailabilityWithoutReplacingTheIndexIdentity(): void
+    {
+        $library = $this->createLibrary();
+        $path = '/media/u15/returned.flac';
+        $this->index($library, $path);
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $id = $connection->fetchOne('SELECT id FROM library_file_index WHERE library_id = ?', [$library->getId()->toString()]);
+        $repository->markUnavailableByPaths($library->getId(), [$path]);
+
+        $repository->upsert($library->getId(), $path, 'returned', 50, 'flac', 20);
+
+        self::assertSame($id, $connection->fetchOne('SELECT id FROM library_file_index WHERE library_id = ?', [$library->getId()->toString()]));
+        self::assertSame([$path => true], $repository->findAvailabilityByPaths($library->getId(), [$path]));
+        self::assertSame([$path => 'returned'], $repository->findAvailableIndexPathMapByLibrary($library->getId()));
+        $this->manager->clear();
+        $entity = $this->manager->find(LibraryFileIndexEntity::class, Uuid::fromString($id));
+        self::assertInstanceOf(LibraryFileIndexEntity::class, $entity);
+        self::assertTrue($entity->isAvailable());
+    }
+
+    public function testBatchAvailabilityIncludesUnknownPathsAndSeparatesLibraries(): void
+    {
+        $library = $this->createLibrary();
+        $other = $this->createLibrary();
+        $present = '/media/u15/present.flac';
+        $missing = '/media/u15/missing.flac';
+        $unknown = '/media/u15/unknown.flac';
+        $this->index($library, $present, $missing);
+        $this->index($other, $unknown);
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $repository->markUnavailableByPaths($library->getId(), [$missing]);
+
+        self::assertSame(
+            [$present => true, $missing => false, $unknown => false],
+            $repository->findAvailabilityByPaths($library->getId(), [$present, $missing, $unknown, $present]),
+        );
+        self::assertSame([], $repository->findAvailabilityByPaths($library->getId(), []));
+        $repository->markUnavailableByPaths($library->getId(), []);
+        self::assertSame(2, $this->countIndexRows($library->getId()));
+    }
+
+    public function testAvailabilityAndExplicitRemovalParticipateInTheCallersTransaction(): void
+    {
+        $library = $this->createLibrary();
+        $path = '/media/u15/a.flac';
+        $this->index($library, $path);
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $connection->createSavepoint('before_missing_observation');
+        $repository->markUnavailableByPaths($library->getId(), [$path]);
+        self::assertSame([$path => false], $repository->findAvailabilityByPaths($library->getId(), [$path]));
+
+        $connection->rollbackSavepoint('before_missing_observation');
+
+        self::assertSame([$path => true], $repository->findAvailabilityByPaths($library->getId(), [$path]));
+        $connection->createSavepoint('before_explicit_removal');
+        $repository->removeByPaths($library->getId(), [$path]);
+        self::assertSame([], $repository->findIndexedPathsByLibrary($library->getId()));
+
+        $connection->rollbackSavepoint('before_explicit_removal');
+
+        self::assertSame([$path], $repository->findIndexedPathsByLibrary($library->getId()));
+        self::assertSame([$path => true], $repository->findAvailabilityByPaths($library->getId(), [$path]));
+    }
+
+    public function testAvailabilityDefaultsToTrueForPreviouslyIndexedFiles(): void
+    {
+        $column = $this->manager->getConnection()->createSchemaManager()->introspectTable('library_file_index')->getColumn('available');
+        self::assertTrue($column->getNotnull());
+        self::assertSame(true, $column->getDefault());
+    }
+
+    public function testAvailabilityMigrationRetainsExistingRowsAndMarksThemAvailable(): void
+    {
+        $library = $this->createLibrary();
+        $path = '/media/u15/before-migration.flac';
+        $this->index($library, $path);
+        $connection = $this->manager->getConnection();
+        $connection->executeStatement('ALTER TABLE library_file_index DROP COLUMN available');
+        $read = static fn (): array|false => $connection->fetchAssociative(
+            'SELECT * FROM library_file_index WHERE library_id = ?',
+            [$library->getId()->toString()],
+        );
+        $before = $read();
+        self::assertIsArray($before);
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261021120000.php';
+        $migration = new \DoctrineMigrations\Version20261021120000($connection, new NullLogger());
+        $migration->up(new Schema());
+        foreach ($migration->getSql() as $query) {
+            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+        }
+
+        self::assertSame($before + ['available' => true], $read());
+        $this->assertSchemaComparisonIsClean(['library_file_index']);
+    }
+
+    public function testAvailabilityReadsAndUpdatesSpanMoreThanOneStatementBatch(): void
+    {
+        $library = $this->createLibrary();
+        $connection = $this->manager->getConnection();
+        $connection->executeStatement(
+            "INSERT INTO library_file_index (id, library_id, path, hash, size, extension, modified_at, discovered_at)
+             SELECT gen_random_uuid(), :library_id, '/media/u15/batch-' || n || '.flac', 'hash', 1, 'flac', 0, now()
+             FROM generate_series(1, 1001) AS n",
+            ['library_id' => $library->getId()->toString()],
+        );
+        $paths = array_map(static fn (int $number): string => '/media/u15/batch-' . $number . '.flac', range(1, 1001));
+        $repository = new LibraryFileIndexRepository($this->manager);
+        self::assertSame(array_fill_keys($paths, true), $repository->findAvailabilityByPaths($library->getId(), $paths));
+
+        $repository->markUnavailableByPaths($library->getId(), [...$paths, $paths[0]]);
+
+        self::assertSame(array_fill_keys($paths, false), $repository->findAvailabilityByPaths($library->getId(), $paths));
+        self::assertSame(1001, $this->countIndexRows($library->getId()));
+        self::assertCount(1001, $repository->findIndexedPathsByLibrary($library->getId()));
     }
 
     public function testTheUniquePathIndexAloneCoversLibraryLookups(): void

@@ -40,6 +40,9 @@ class LibraryFileIndexEntity
 
         #[ORM\Column(type: 'datetime_immutable')]
         private \DateTimeImmutable $discoveredAt,
+
+        #[ORM\Column(type: 'boolean', options: ['default' => true])]
+        private bool $available = true,
     ) {
     }
 
@@ -51,6 +54,7 @@ class LibraryFileIndexEntity
     public function getExtension(): string { return $this->extension; }
     public function getModifiedAt(): int { return $this->modifiedAt; }
     public function getDiscoveredAt(): \DateTimeImmutable { return $this->discoveredAt; }
+    public function isAvailable(): bool { return $this->available; }
 
     public function setHash(string $hash): void { $this->hash = $hash; }
     public function setSize(int $size): void { $this->size = $size; }

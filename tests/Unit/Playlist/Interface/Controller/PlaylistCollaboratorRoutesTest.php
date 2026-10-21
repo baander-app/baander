@@ -67,6 +67,7 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
             $this->createStub(LibraryReadScopeProviderInterface::class),
             $this->users,
             $this->createStub(PlaylistSongVisibilityInterface::class),
+            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
         );
     }
 

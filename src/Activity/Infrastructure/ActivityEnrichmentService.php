@@ -11,6 +11,8 @@ use App\Activity\Interface\Resource\ActivityResource;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 
 /**
@@ -24,6 +26,8 @@ final class ActivityEnrichmentService
         private readonly ImagePortInterface $imageService,
         private readonly MoviePortInterface $movieService,
         private readonly ActivityIdentityProjectionPortInterface $identities,
+        private readonly SongAvailabilityPortInterface $availability,
+        private readonly LibraryReadScopeProviderInterface $libraryScopes,
     ) {
     }
 
@@ -107,6 +111,16 @@ final class ActivityEnrichmentService
             }
         }
 
+        $scope = $this->libraryScopes->current();
+        $readableSongs = [];
+        foreach ($songs as $song) {
+            $album = $albums[$song->getAlbumId()->toString()] ?? null;
+            if ($album !== null && $scope->allows($album->getLibraryId())) {
+                $readableSongs[] = $song;
+            }
+        }
+        $availability = $readableSongs === [] ? [] : $this->availability->forSongs($readableSongs);
+
         // Build enriched response
         $enriched = array_map(
             fn(MediaActivity $activity) => ActivityResource::fromWithDetails(
@@ -123,6 +137,7 @@ final class ActivityEnrichmentService
                 $images,
                 $albumArtists,
                 $baseUrl,
+                $availability,
             ),
             $activities,
         );

@@ -369,7 +369,7 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not ask whether a delete holds the library.');
             }
 
-            public function forgetMissing(Uuid $libraryId, array $paths): array
+            public function markMissingUnavailable(Uuid $libraryId, array $paths): array
             {
                 throw new \LogicException('A delete does not look for missing paths.');
             }

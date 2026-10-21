@@ -20,6 +20,28 @@ final class SongTest extends TestCase
         $this->albumId = Uuid::v4();
     }
 
+    public function testSourcePathChangesPreserveTheSongState(): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/music/Album/old.flac', 100, 'audio/flac', hash: 'hash');
+        $song->lockField('title');
+        $before = clone $song->getState();
+
+        $song->updateSourcePath('/music/Album/new.flac');
+
+        self::assertSame('/music/Album/new.flac', $song->getPath());
+        $after = clone $song->getState();
+        $after->path = $before->path;
+        $after->updatedAt = $before->updatedAt;
+        self::assertEquals($before, $after);
+    }
+
+    public function testSourcePathCannotBeEmpty(): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/music/Album/old.flac', 100, 'audio/flac');
+        $this->expectException(InvalidArgumentException::class);
+        $song->updateSourcePath('   ');
+    }
+
     public function testCreateWithRequiredFields(): void
     {
         $song = Song::create($this->albumId, 'Yesterday', '/music/beatles/yesterday.mp3', 4096, 'audio/mpeg');

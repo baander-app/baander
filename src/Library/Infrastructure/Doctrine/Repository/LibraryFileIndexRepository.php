@@ -16,7 +16,7 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInterface
 {
-    /** Paths per DELETE, well below PostgreSQL's 65535 bind parameters. */
+    /** Paths per statement, well below PostgreSQL's 65535 bind parameters. */
     private const int PATHS_PER_STATEMENT = 1000;
 
     public function __construct(
@@ -24,21 +24,59 @@ final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInte
     ) {
     }
 
-    public function findIndexPathMapByLibrary(Uuid $libraryId): array
+    public function findAvailableIndexPathMapByLibrary(Uuid $libraryId): array
     {
         return $this->entityManager->getConnection()->executeQuery(
-            'SELECT path, hash FROM library_file_index WHERE library_id = :libraryId',
+            'SELECT path, hash FROM library_file_index WHERE library_id = :libraryId AND available = true',
             ['libraryId' => $libraryId->toString()],
         )->fetchAllKeyValue();
+    }
+
+    public function findIndexedPathsByLibrary(Uuid $libraryId): array
+    {
+        return $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT path FROM library_file_index WHERE library_id = :library_id',
+            ['library_id' => $libraryId->toString()],
+        );
+    }
+
+    public function findAvailabilityByPaths(Uuid $libraryId, array $paths): array
+    {
+        $availability = array_fill_keys($paths, false);
+        $connection = $this->entityManager->getConnection();
+        foreach (array_chunk(array_keys($availability), self::PATHS_PER_STATEMENT) as $chunk) {
+            $rows = $connection->executeQuery(
+                'SELECT path, available FROM library_file_index WHERE library_id = :library_id AND path IN (:paths)',
+                ['library_id' => $libraryId->toString(), 'paths' => $chunk],
+                ['paths' => ArrayParameterType::STRING],
+            )->fetchAllKeyValue();
+            foreach ($rows as $path => $available) {
+                $availability[$path] = (bool) $connection->convertToPHPValue($available, 'boolean');
+            }
+        }
+
+        return $availability;
+    }
+
+    public function markUnavailableByPaths(Uuid $libraryId, array $paths): void
+    {
+        $connection = $this->entityManager->getConnection();
+        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
+            $connection->executeStatement(
+                'UPDATE library_file_index SET available = false WHERE library_id = :library_id AND path IN (:paths) AND available = true',
+                ['library_id' => $libraryId->toString(), 'paths' => $chunk],
+                ['paths' => ArrayParameterType::STRING],
+            );
+        }
     }
 
     public function upsert(Uuid $libraryId, string $path, string $hash, int $size, string $extension, int $modifiedAt): void
     {
         $this->entityManager->getConnection()->executeStatement(
-            'INSERT INTO library_file_index (id, library_id, path, hash, size, extension, modified_at, discovered_at)
-             VALUES (:id, :library_id, :path, :hash, :size, :extension, :modified_at, now())
+            'INSERT INTO library_file_index (id, library_id, path, hash, size, extension, modified_at, discovered_at, available)
+             VALUES (:id, :library_id, :path, :hash, :size, :extension, :modified_at, now(), true)
              ON CONFLICT (library_id, path) DO UPDATE
-             SET hash = EXCLUDED.hash, size = EXCLUDED.size, modified_at = EXCLUDED.modified_at, discovered_at = EXCLUDED.discovered_at',
+             SET hash = EXCLUDED.hash, size = EXCLUDED.size, modified_at = EXCLUDED.modified_at, discovered_at = EXCLUDED.discovered_at, available = true',
             [
                 'id' => (new Uuid())->toString(),
                 'library_id' => $libraryId->toString(),

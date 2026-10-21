@@ -90,6 +90,35 @@ final class LibraryMediaFilesTest extends TestCase
         $this->harnessTearDown();
     }
 
+    public function testMissingRootRetainsItsIndexedFilesAndQueuesThemWhenItReturns(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue(rename($this->base . '/library', $this->base . '/unmounted'));
+
+        self::assertSame(0, $this->scanner->scan($library)->filesDiscovered);
+        self::assertSame([$first => false, $second => false], $this->fileIndex->findAvailabilityByPaths($library->getId(), [$first, $second]));
+        self::assertSame([$first, $second], $this->indexedPaths($library));
+
+        self::assertTrue(rename($this->base . '/unmounted', $this->base . '/library'));
+        self::assertSame(2, $this->scanner->scan($library)->filesProcessed);
+        self::assertSame([$first => true, $second => true], $this->fileIndex->findAvailabilityByPaths($library->getId(), [$first, $second]));
+    }
+
+    public function testEmptySubtreeRetainsItsIndexedFilesDuringAFullRescan(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue(rename($this->album, $this->base . '/unmounted-album'));
+        self::assertTrue(mkdir($this->album));
+
+        self::assertSame(0, $this->scanner->scan($library, rescan: true)->filesDiscovered);
+        self::assertSame([$first, $second], $this->indexedPaths($library));
+
+        self::assertTrue(rmdir($this->album));
+        self::assertTrue(rename($this->base . '/unmounted-album', $this->album));
+        self::assertSame(2, $this->scanner->scan($library)->filesProcessed);
+        self::assertSame([$first => true, $second => true], $this->fileIndex->findAvailabilityByPaths($library->getId(), [$first, $second]));
+    }
+
     public function testDeletesAFileInsideTheRootAndItsIndexRowAndLeavesTheScanStatusAlone(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
@@ -213,21 +242,21 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertFalse($this->files->isHeldByDelete(new Uuid()));
     }
 
-    public function testForgetMissingNamesTheFilesThatAreGoneInRequestOrderAndDeletesOnlyTheirIndexRows(): void
+    public function testMissingImportRetainsIndexRowsAndNamesMissingFilesInRequestOrder(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
         $dangling = $this->album . '/03.flac';
         self::assertTrue(symlink($this->base . '/elsewhere/deleted.flac', $dangling));
         self::assertTrue(unlink($first));
 
-        self::assertSame([$dangling, $first], $this->files->forgetMissing($library->getId(), [$dangling, $second, $first]));
-        self::assertSame([$second], $this->indexedPaths($library));
+        self::assertSame([$dangling, $first], $this->files->markMissingUnavailable($library->getId(), [$dangling, $second, $first]));
+        self::assertSame([$first, $second], $this->indexedPaths($library));
     }
 
     /**
      * The scan indexes a file as it queues its import. When the import finds the file gone, as on
-     * storage unmounted in between, it has the index forget the file; once the file is back
-     * unchanged, the next incremental scan reads it as new and queues it again instead of
+     * storage unmounted in between, it marks the file unavailable; once the file is back
+     * unchanged, the next incremental scan queues it again instead of
      * skipping it as known.
      */
     public function testAFileAnImportFoundMissingIsQueuedAgainByTheNextScanWhenItComesBack(): void
@@ -235,7 +264,7 @@ final class LibraryMediaFilesTest extends TestCase
         [$library, $first, $second] = $this->scannedAlbum();
         self::assertTrue(rename($first, $this->base . '/elsewhere/01.flac'));
 
-        self::assertSame([$first], $this->files->forgetMissing($library->getId(), [$first, $second]));
+        self::assertSame([$first], $this->files->markMissingUnavailable($library->getId(), [$first, $second]));
         self::assertTrue(rename($this->base . '/elsewhere/01.flac', $first));
 
         $published = [];
@@ -476,7 +505,7 @@ final class LibraryMediaFilesTest extends TestCase
     /** @return list<string> */
     private function indexedPaths(Library $library): array
     {
-        $paths = array_keys($this->fileIndex->findIndexPathMapByLibrary($library->getId()));
+        $paths = $this->fileIndex->findIndexedPathsByLibrary($library->getId());
         sort($paths);
 
         return $paths;

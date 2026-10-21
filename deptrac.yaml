@@ -31,9 +31,9 @@ deptrac:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Album Sync Request Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
@@ -193,6 +193,11 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\Port\\(SongLookupInterface|SongLyricSignature)$'
 
+    - name: 'Catalog Song Availability Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
+
     - name: 'Catalog Application'
       collectors:
         - type: bool
@@ -200,6 +205,8 @@ deptrac:
             - type: classLike
               value: '^App\\Catalog\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\(SongLookupInterface|SongLyricSignature)$'
 
@@ -289,6 +296,11 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Application\\Port\\LibraryMediaFile[A-Za-z]*$'
 
+    - name: 'Library File Availability Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Port\\LibraryFileAvailabilityInterface$'
+
     - name: 'Library Application'
       collectors:
         - type: bool
@@ -296,6 +308,8 @@ deptrac:
             - type: classLike
               value: '^App\\Library\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryFileAvailabilityInterface$'
             - type: classLike
               value: '^App\\Library\\Application\\Port\\LibraryReadScopeProviderInterface$'
             - type: classLike
@@ -970,6 +984,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Activity Infrastructure':
+      - 'Library Read Scope Contract'
+      - 'Catalog Song Availability Contract'
       - 'Shared Application'
       - 'Activity Domain'
       - 'Activity Application'
@@ -1036,6 +1052,9 @@ deptrac:
       - 'Shared Interface'
 
     # --- Catalog ---
+    'Catalog Song Availability Contract':
+      - 'Shared Domain'
+      - 'Catalog Domain'
     'Catalog Song Lookup Contract':
       - 'Shared Domain'
     'Catalog Domain':
@@ -1054,6 +1073,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Catalog Song Availability Contract'
+      - 'Library File Availability Contract'
       - 'Auth Identity Contract'
       - 'Catalog Song Lookup Contract'
       - 'Library Content Stats Contract'
@@ -1069,6 +1090,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog Song Availability Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Resources'
       - 'Catalog Application'
@@ -1092,6 +1114,8 @@ deptrac:
       - 'Shared Domain'
 
     # --- Library ---
+    'Library File Availability Contract':
+      - 'Shared Domain'
     'Library Read Scope Contract':
       - 'Shared Domain'
     'Library Content Stats Contract':
@@ -1117,6 +1141,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Library File Availability Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
       - 'Library Content Stats Contract'
@@ -1296,6 +1321,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Playlist Interface':
+      - 'Catalog Song Availability Contract'
       - 'Library Read Scope Contract'
       - 'Playlist Resources'
       - 'Auth Identity Contract'
@@ -1308,6 +1334,7 @@ deptrac:
     'Recommendation Domain':
       - 'Shared Domain'
     'Recommendation Application':
+      - 'Catalog Song Availability Contract'
       - 'Scheduler Schedulable Contract'
       - 'Recommendation Domain'
       - 'Shared Domain'

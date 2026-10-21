@@ -20,6 +20,7 @@ use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
+use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -142,7 +143,7 @@ final class FilesDiscoveredHandler
 
             foreach ($written as $song) {
                 $committedPaths[$song['song']->getPath()] = true;
-                if ($song['song']->getLyrics() === null) {
+                if (!isset($song['previousPath']) && $song['song']->getLyrics() === null) {
                     $songsAwaitingLyrics[] = $song['song']->getId();
                 }
             }
@@ -164,15 +165,29 @@ final class FilesDiscoveredHandler
 
     /**
      * The song a file becomes, with the artist and genres to link it to; null when a song
-     * already has the file's hash or the file has no metadata. Writes nothing.
+     * already has the file's hash without an eligible source rename, or the file has no metadata.
+     * Writes nothing.
      *
-     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}|null
+     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}|null
      */
     private function readSong(Album $album, DiscoveredFile $file): ?array
     {
-        // Dedup by hash
-        if ($this->songService->findByHash($file->hash) !== null) {
-            return null;
+        $existing = $this->songService->findByHash($file->hash);
+        if ($existing !== null) {
+            if (!$existing->getAlbumId()->equals($album->getId())
+                || $existing->getPath() === $file->absolutePath
+                || dirname($existing->getPath()) !== dirname($file->absolutePath)) {
+                return null;
+            }
+
+            return [
+                'file' => $file,
+                'song' => $existing,
+                'artist' => null,
+                'genres' => [],
+                'previousPath' => $existing->getPath(),
+                'expectedAlbum' => $album->getId(),
+            ];
         }
 
         $metadata = $this->metadataReader->readMetadata($file->absolutePath);
@@ -219,10 +234,10 @@ final class FilesDiscoveredHandler
      * library. A song that fails is added to $failures and the others are written; a failed
      * statement fails the transaction and with it the message.
      *
-     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}> $songs
+     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}> $songs
      * @param list<array{path: string, error: string}>                                            $failures
      *
-     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}>|null
+     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>, previousPath?: string, expectedAlbum?: Uuid}>|null
      *         the songs the transaction committed; null when a delete holds the library and nothing was written
      */
     private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
@@ -236,7 +251,15 @@ final class FilesDiscoveredHandler
             $written = [];
             foreach ($songs as $song) {
                 try {
-                    $this->writeSong($song['song'], $song['artist'], $song['genres']);
+                    if (isset($song['previousPath'], $song['expectedAlbum'])) {
+                        $fresh = $this->reconcileSource($libraryId, $song['song']->getId(), $song['expectedAlbum'], $song['previousPath'], $song['file']);
+                        if ($fresh === null) {
+                            continue;
+                        }
+                        $song['song'] = $fresh;
+                    } else {
+                        $this->writeSong($song['song'], $song['artist'], $song['genres']);
+                    }
                     $written[] = $song;
                 } catch (\Throwable $e) {
                     $songFailures[] = $this->fileFailed($song['file'], $e);
@@ -251,6 +274,36 @@ final class FilesDiscoveredHandler
         array_push($failures, ...$songFailures);
 
         return $written;
+    }
+
+    private function reconcileSource(Uuid $libraryId, Uuid $songId, Uuid $albumId, string $previousPath, DiscoveredFile $file): ?Song
+    {
+        $song = $this->songService->findFreshByUuid($songId);
+        if ($song === null
+            || !$song->getAlbumId()->equals($albumId)
+            || $song->getHash() !== $file->hash
+            || $song->getPath() !== $previousPath) {
+            return null;
+        }
+
+        $inspection = $this->mediaFiles->inspect($libraryId, [$previousPath, $file->absolutePath]);
+        if (!$inspection->rootAvailable) {
+            return null;
+        }
+
+        $verdicts = [];
+        foreach ($inspection->files as $check) {
+            $verdicts[$check->path] = $check->verdict;
+        }
+        if (($verdicts[$previousPath] ?? null) !== LibraryMediaFileVerdict::Missing
+            || !in_array($verdicts[$file->absolutePath] ?? null, [LibraryMediaFileVerdict::Deletable, LibraryMediaFileVerdict::DirectoryNotWritable], true)) {
+            return null;
+        }
+
+        $song->updateSourcePath($file->absolutePath);
+        $this->songService->persist($song);
+
+        return $song;
     }
 
     /** @param list<string> $genres */
@@ -435,15 +488,15 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * The message's files that still exist. The others also lose their file index rows, so the
-     * next incremental scan imports a file that comes back at its path.
+     * The message's files that still exist. The others retain their file index rows as
+     * unavailable, so the next incremental scan imports a file that comes back at its path.
      *
      * @return list<DiscoveredFile>
      */
     private function presentFiles(FilesDiscovered $message): array
     {
         $files = array_values($message->files);
-        $missing = $this->mediaFiles->forgetMissing(
+        $missing = $this->mediaFiles->markMissingUnavailable(
             $message->libraryId,
             array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files),
         );

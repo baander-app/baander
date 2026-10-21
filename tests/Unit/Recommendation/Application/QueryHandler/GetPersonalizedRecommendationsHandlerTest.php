@@ -53,7 +53,9 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
 
         $identities = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
         $identities->method('publicEntityId')->willReturn('publicReference1234567');
-        $handler = new GetPersonalizedRecommendationsHandler($recommendationRepository, $songRepository, $identities);
+        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability->expects(self::once())->method('forSongs')->with([$song])->willReturn([$targetId => false]);
+        $handler = new GetPersonalizedRecommendationsHandler($recommendationRepository, $songRepository, $identities, $availability);
 
         $query = new GetPersonalizedRecommendationsQuery($userId, 12, 'song');
         $result = $handler($query);
@@ -66,5 +68,24 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
         // Highest-scoring strategy ('content' = 0.6) drives the explanation.
         $this->assertSame('Similar sound and mood', $result[0]['explanation']);
         $this->assertSame('Test Song', $result[0]['song']['title']);
+        self::assertFalse($result[0]['song']['available']);
+    }
+    public function testHiddenRecommendationIsExcludedBeforeAvailabilityLookup(): void
+    {
+        $userId = new Uuid();
+        $song = Song::create(new Uuid(), 'Hidden song', '/music/hidden.flac', 1, 'audio/flac');
+        $recommendations = $this->createStub(RecommendationRepositoryInterface::class);
+        $recommendations->method('findForUser')->willReturn([
+            Recommendation::create('song', (new Uuid())->toString(), 'song', $song->getId()->toString(), 1.0, $userId, 'content'),
+        ]);
+        $songs = $this->createStub(SongRepositoryInterface::class);
+        $songs->method('findByUuids')->willReturn([$song->getId()->toString() => $song]);
+        $identities = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
+        $identities->method('publicEntityId')->willReturn(null);
+        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability->expects(self::never())->method('forSongs');
+        $handler = new GetPersonalizedRecommendationsHandler($recommendations, $songs, $identities, $availability);
+
+        self::assertSame([], $handler(new GetPersonalizedRecommendationsQuery($userId, 12, 'song')));
     }
 }

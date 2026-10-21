@@ -50,12 +50,16 @@ final class ActivityControllerSecurityTest extends TestCase
         $this->moviePort = $this->createStub(MoviePortInterface::class);
         $this->imagePort = $this->createStub(ImagePortInterface::class);
 
+        $libraryScopes = $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class);
+        $libraryScopes->method('current')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::none());
         $enrichmentService = new ActivityEnrichmentService(
             songService: $this->songPort,
             albumService: $this->albumPort,
             imageService: $this->imagePort,
             movieService: $this->moviePort,
             identities: $this->users(),
+            availability: $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            libraryScopes: $libraryScopes,
         );
 
         $this->controller = new ActivityController(

@@ -33,6 +33,20 @@ final class PublicIdentityProjectionTest extends TestCase
         self::assertNotContains($song->getAlbumId()->toString(), $data);
     }
 
+    public function testSongAvailabilityIsExplicitAndMissingObservationIsUnavailable(): void
+    {
+        $song = Song::create(new Uuid(), 'Song', '/music/song.flac', 1, 'audio/flac');
+        $song = Song::reconstitute(new SongState(...array_replace(
+            get_object_vars($song->getState()), ['albumPublicId' => new PublicId()],
+        )));
+        $key = $song->getId()->toString();
+
+        self::assertFalse(SongResource::from($song)['available']);
+        self::assertTrue(SongResource::fromWithMeta($song, availability: [$key => true])['available']);
+        self::assertFalse(SongResource::fromWithMeta($song, availability: [$key => false])['available']);
+        self::assertSame([true], array_column(SongResource::collectionWithMeta([$song], [], [], [$key => true]), 'available'));
+    }
+
     public function testMissingAlbumProjectionCannotFallBackToUuid(): void
     {
         $song = Song::create(new Uuid(), 'Song', '/music/song.flac', 1, 'audio/flac');

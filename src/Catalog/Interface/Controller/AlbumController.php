@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
 use App\Catalog\Application\Command\Album\UpdateAlbumCommand;
 use App\Catalog\Application\Port\AlbumPortInterface;
@@ -53,6 +54,7 @@ final class AlbumController
         private readonly AlbumDuplicatePortInterface $duplicatePort,
         private readonly AlbumMergePortInterface $mergePort,
         private readonly MessageBusInterface $bus,
+        private readonly SongAvailabilityPortInterface $availability,
     )
     {
     }
@@ -200,7 +202,7 @@ final class AlbumController
 
         $songs = [];
         if ($result !== null) {
-            $songs = SongResource::collection($result[1]);
+            $songs = SongResource::collectionWithMeta($result[1], [], [], $this->availability->forSongs($result[1]));
         }
 
         $coverImage = null;

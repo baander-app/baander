@@ -20,7 +20,16 @@ use PHPUnit\Framework\TestCase;
 
 final class ActivityEnrichmentPublicIdentityTest extends TestCase
 {
-    public function testEveryRelationshipUsesItsResolvedPublicIdentity(): void
+    /** @return iterable<string, array{?bool}> */
+    public static function observations(): iterable
+    {
+        yield 'available source' => [true];
+        yield 'unavailable source' => [false];
+        yield 'unindexed source' => [null];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('observations')]
+    public function testEveryRelationshipUsesItsResolvedPublicIdentity(?bool $observed): void
     {
         $userId = new Uuid();
         $userPublicId = new PublicId();
@@ -40,7 +49,11 @@ final class ActivityEnrichmentPublicIdentityTest extends TestCase
         $identities = $this->createMock(ActivityIdentityProjectionPortInterface::class);
         $identities->expects($this->once())->method('userPublicId')->with($userId)->willReturn($userPublicId);
         $identities->expects($this->once())->method('artistPublicId')->with($artistId)->willReturn($artistPublicId);
-        $service = new ActivityEnrichmentService($songs, $albums, $this->createStub(ImagePortInterface::class), $movies, $identities);
+        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability->expects(self::once())->method('forSongs')->with([$song])->willReturn($observed === null ? [] : [$song->getId()->toString() => $observed]);
+        $scopes = $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::unrestricted());
+        $service = new ActivityEnrichmentService($songs, $albums, $this->createStub(ImagePortInterface::class), $movies, $identities, $availability, $scopes);
 
         [$output] = $service->enrich([$activity], 'https://baander.app');
 
@@ -50,11 +63,51 @@ final class ActivityEnrichmentPublicIdentityTest extends TestCase
         self::assertSame($artistPublicId->toString(), $output['artistId']);
         self::assertSame($movie->getPublicId()->toString(), $output['movieId']);
         self::assertSame('Song', $output['songTitle']);
+        self::assertSame($observed ?? false, $output['songAvailable']);
         self::assertSame('Movie', $output['movieTitle']);
         self::assertNull($output['coverImage']);
         $json = json_encode($output, JSON_THROW_ON_ERROR);
         foreach ([$activity->getId(), $userId, $song->getId(), $album->getId(), $artistId, $movie->getId()] as $id) {
             self::assertStringNotContainsString($id->toString(), $json);
         }
+    }
+    public function testHistoricalSongsOutsideCurrentLibraryScopeDoNotReachAvailabilityLookup(): void
+    {
+        $allowedLibrary = new Uuid();
+        $allowedAlbum = Album::create($allowedLibrary, 'Allowed album', 'studio');
+        $revokedAlbum = Album::create(new Uuid(), 'Revoked album', 'studio');
+        $allowedSong = Song::create($allowedAlbum->getId(), 'Allowed song', '/media/allowed.flac', 1, 'audio/flac');
+        $revokedSong = Song::create($revokedAlbum->getId(), 'Historical song', '/media/revoked.flac', 1, 'audio/flac');
+        $userId = new Uuid();
+        $activities = [
+            MediaActivity::create($userId, 'play', $allowedSong->getId(), $allowedAlbum->getId()),
+            MediaActivity::create($userId, 'play', $revokedSong->getId(), $revokedAlbum->getId()),
+        ];
+        $songs = $this->createMock(SongPortInterface::class);
+        $songs->expects(self::once())->method('findByUuids')->willReturn([
+            $allowedSong->getId()->toString() => $allowedSong,
+            $revokedSong->getId()->toString() => $revokedSong,
+        ]);
+        $albums = $this->createMock(AlbumPortInterface::class);
+        $albums->expects(self::once())->method('findByUuids')->willReturn([
+            $allowedAlbum->getId()->toString() => $allowedAlbum,
+            $revokedAlbum->getId()->toString() => $revokedAlbum,
+        ]);
+        $identities = $this->createStub(ActivityIdentityProjectionPortInterface::class);
+        $identities->method('userPublicId')->willReturn(new PublicId());
+        $scopes = $this->createMock(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class);
+        $scopes->expects(self::once())->method('current')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::restricted([$allowedLibrary]));
+        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability->expects(self::once())->method('forSongs')->with([$allowedSong])->willReturn([
+            $allowedSong->getId()->toString() => true,
+        ]);
+        $service = new ActivityEnrichmentService($songs, $albums, $this->createStub(ImagePortInterface::class), $this->createStub(MoviePortInterface::class), $identities, $availability, $scopes);
+
+        $output = $service->enrich($activities, 'https://baander.app');
+
+        self::assertTrue($output[0]['songAvailable']);
+        self::assertFalse($output[1]['songAvailable']);
+        self::assertSame($revokedSong->getPublicId()->toString(), $output[1]['songPublicId']);
+        self::assertSame('Historical song', $output[1]['songTitle']);
     }
 }

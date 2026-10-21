@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Console;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Command\Song\UpdateSongCommand;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Interface\Resource\SongResource;
@@ -29,6 +30,7 @@ final class SongUpdateCommand extends Command
     public function __construct(
         private readonly AdminCommandSupport $support,
         private readonly SongPortInterface $songs,
+        private readonly SongAvailabilityPortInterface $availability,
     ) {
         parent::__construct();
     }
@@ -75,6 +77,7 @@ final class SongUpdateCommand extends Command
             $song,
             $this->songs->getArtistNamesForSongs([$song->getId()]),
             $this->songs->getAlbumTitlesByIds([$song->getAlbumId()]),
+            $this->availability->forSongs([$song]),
         );
 
         if (AdminCommandSupport::wantsJson($input)) {
