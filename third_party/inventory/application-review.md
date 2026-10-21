@@ -227,6 +227,64 @@ historical image identities and raw gap counts remain intact; the fixture's
 `not-qualified` outcome also remains unchanged. Full application suites were not
 rerun for this notice-only change.
 
+## Runtime images without unused documentation UI assets
+
+On 2026-10-21, both targets were rebuilt from committed source
+`decaea95f4cc582f8f75ccfb27798473e7d2d998`, using an extracted directory context
+with `.dockerignore` applied. The production Composer step now removes
+`vendor/nelmio/api-doc-bundle/public` in the installation layer. The worker
+inherits that result; development installation remains unchanged. Baander exposes
+JSON documentation and JSON/YAML export, with no route using these browser UI
+resources.
+
+```text
+production sha256:c69eeedaa9b8ed30df082810e3ef97586ea350d390d873aa23b5acb75ec988d6
+worker     sha256:7532f1ee27383aad521978d27783ed6196d6291d3d786b12362985d02517a386
+```
+
+Both inventories passed collection and verification. Each omits exactly 14 files
+totalling 11,515,432 bytes compared with the cache-free images above. This is a
+filesystem measurement, not a compressed image download-size claim. Nelmio's PHP
+files and LICENSE are unchanged, as are all installed package records and native
+artifact hashes: 636 Debian packages, 152 Composer entries, 14 native/tool
+components and 80 native-owned entries.
+
+The images also contain the local PHP binding notice added in the preceding
+source checkpoint. Each inventory now records 52,104 files, 2,064 evidence paths
+and 1,407 unique evidence blobs. Its 5,327 raw observations exclude the resolved
+binding notice gap. The comparison accounts for six changed repository files,
+all matching the committed source, and five regenerated Git metadata files in
+`vendor/upscale/swoole-reflection/.git`. The latter differ only in index stat
+fields and reflog timestamps; tracked entries and object IDs match. No unexplained
+filesystem difference remains.
+
+Real JSON and YAML command exports from the retained and replacement workers were
+byte-identical across 245 API paths. The actual configured `/api/doc.json`
+controller returned the same specification. The probe obtains the route through
+`debug:router` and invokes its controller directly; it does not exercise HTTP
+authentication. Both probes used disposable containers and an isolated Redis
+network, taking 10.44 and 10.53 seconds. All probe resources were removed.
+
+Production and worker builds took 21.28 and 1.85 seconds; inventory collection
+and verification took 53.87 and 51.06 seconds. The added assertion in the existing
+worker runner rejected the retained image specifically for its UI assets.
+The replacement passed that assertion, platform and file-I/O checks, and the
+isolated startup, outbox, scheduler and retirement smoke in 36.71 seconds. Shell
+syntax and `git diff --check` passed. No new test suite or broad application suite
+was needed for this packaging change.
+
+Full bundles, logs, output comparisons and Git metadata proof are under
+`var/test-runs/production-doc-ui-assets-20261021/`. The inventory SHA-256 values are:
+
+```text
+production 0891e3215de562cf0eedcceeba1d15f4307223d29f661cd756bbf4a5dde3b1df
+worker     2ebc9ca595531753b19a533b23f8791382084c50ed24f3a48a884d9397b5364d
+```
+
+Historical inventories remain intact, and both new bundles still report
+`not-qualified`. Removing these unused resources does not settle the remaining
+redistribution obligations.
+
 ## Remaining redistribution work
 
 The remaining gate concerns these observed contents:

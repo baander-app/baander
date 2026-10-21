@@ -76,11 +76,12 @@ when checking that deployment decision.
   [collection procedure](dev-docs/application-packaged-inventory.md) for each new
   artifact. Preserve the boundaries in [THIRD_PARTY.md](THIRD_PARTY.md).
   The separate Registry inventory is outside this remainder.
-  Checkpoint, 2026-10-21: the author-confirmed local PHP binding now carries its
-  BSD-2-Clause notice. Exact-byte Docker context and collector fixture checks
-  passed in 1.22 seconds; no new tests or full application suites were needed.
-  The review record retains this source resolution, prior image measurements
-  and remaining gaps. Release qualification remains open.
+  Checkpoint, 2026-10-21: production and worker images omit 14 unused
+  documentation UI files (11,515,432 bytes). Both inventories passed, and real
+  JSON/YAML exports and the configured JSON controller stayed byte-identical
+  across 245 API paths. The existing isolated worker smoke passed in 36.71 seconds;
+  shell syntax and whitespace checks passed. The review record retains measurements,
+  notice resolutions and remaining gaps. Release qualification remains open.
 - **Selected native media path:** when a release explicitly includes an active
   codec/DSP path, resolve its remaining reproducibility and reference-vector
   acceptance before claiming certification. Use the
