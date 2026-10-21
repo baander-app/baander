@@ -18,6 +18,11 @@ old plan limitations and incomplete experiments do not authorize work. The retai
 behavior before proposing a change. This applies to older cache/sweep, segmenter,
 FLAC/DSP and secondary-client plans as well as developer tooling.
 
+Plan cleanup, 2026-10-21: removed 33 completed plans and retained six with
+unfinished or partly superseded commitments. Completed plans remain in Git
+history. Reference, link and whitespace checks passed; no application files
+changed or application suites ran.
+
 Use the existing checks for the selected change; add a regression for a specific
 uncovered failure. Broader replay, asynchronous trace provenance, hypothetical API
 growth and qualification of unused native algorithms have no active roadmap task.

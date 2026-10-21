@@ -12,7 +12,7 @@ depth: standard
 # Transcode Cache-Sweep Scheduler Job + E2E Reliability
 
 **Scope reconciliation, 2026-10-18:**
-[Shared media control qualification](2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+[Shared media control qualification](../../docs-book/part-2-developer-guide/testing.md#shared-media-control-qualification)
 checks current playback readiness and controls through the paired deployment.
 Its browser checkpoint requires decoded output and an advancing clock; a manifest
 or successful segment response alone does not establish playback. Cache-sweep

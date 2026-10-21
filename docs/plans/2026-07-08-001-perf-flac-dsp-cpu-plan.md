@@ -12,7 +12,7 @@ product_contract_source: ce-brainstorm
 # FLAC DSP CPU Optimization - Plan
 
 **Scope reconciliation, 2026-10-18:**
-[Shared media control qualification](2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+[Shared media control qualification](../../docs-book/part-2-developer-guide/testing.md#shared-media-control-qualification)
 uses an MP3 rendition of a FLAC source to occupy native worker capacity. That server-side
 fixture does not measure client DSP cost or meet this plan's sustained under-1%
 target on a Ryzen 7 5800X. The before/after hardware profile and audio-quality

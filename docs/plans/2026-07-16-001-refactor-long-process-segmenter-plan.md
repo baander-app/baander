@@ -13,7 +13,7 @@ depth: deep
 
 **Scope reconciliation, 2026-10-18:** The web-owned process and CPU-pool topology
 below is historical. The paired control/execution deployment supersedes it.
-[Shared media control qualification](2026-10-18-1822-test-shared-media-control-qualification-plan.md)
+[Shared media control qualification](../../docs-book/part-2-developer-guide/testing.md#shared-media-control-qualification)
 checks the current seek, pause, resume, attachment and native-retirement behavior;
 acceptance depends on current passing evidence in `ROADMAP.md`. It does not close
 this plan's hardware-acceleration, HDR, DASH or ABR requirements. The original
