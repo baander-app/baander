@@ -140,6 +140,7 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
   const buildTracks = useCallback((): Track[] => {
     return songs.map((s: Record<string, unknown>) => ({
       publicId: String(s.publicId ?? ''),
+      available: s.available === true,
       title: String(s.title ?? ''),
       artistName: s.artistName ? String(s.artistName) : undefined,
       albumName: albumTitle,
@@ -150,12 +151,13 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
 
   const handlePlayTrack = useCallback(
     (index: number) => {
+      if (songs[index]?.available !== true) return
       const tracks = buildTracks()
       if (tracks[index]) {
-        playTrack(tracks[index], tracks)
+        playTrack(tracks[index], tracks.filter((track) => track.available === true))
       }
     },
-    [buildTracks, playTrack],
+    [buildTracks, playTrack, songs],
   )
 
   if (songs.length === 0) {
@@ -190,6 +192,7 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
               key={publicId}
               song={{
                 publicId,
+                available: song.available === true,
                 title,
                 artistName,
                 albumName: albumTitle,
@@ -219,6 +222,7 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
                         e.stopPropagation()
                         handlePlayTrack(virtualRow.index)
                       }}
+                      disabled={song.available !== true}
                       aria-label={`Play ${title}`}
                     >
                       <Play size={10} fill="currentColor" />
@@ -229,7 +233,7 @@ export function AlbumTrackList({ songs, albumTitle, albumPublicId }: AlbumTrackL
                 </TrackNumber>
 
                 {/* Title */}
-                <TrackTitle>{title}</TrackTitle>
+                <TrackTitle>{title}{song.available === false && <span> · Unavailable</span>}</TrackTitle>
 
                 {/* Artist (for compilations) */}
                 <TrackArtist>{artistName}</TrackArtist>

@@ -145,7 +145,7 @@ export const VirtualSongRow = memo(function VirtualSongRow({
         transform: `translateY(${translateY}px)`,
       }}
       onClick={() => onClick(song, index)}
-      onDoubleClick={() => onPlay(index)}
+      onDoubleClick={() => { if (song.available === true) onPlay(index) }}
     >
       {/* Index / play-on-hover / playing indicator */}
       <IndexCell>
@@ -163,6 +163,7 @@ export const VirtualSongRow = memo(function VirtualSongRow({
               e.stopPropagation()
               onPlay(index)
             }}
+            disabled={song.available !== true}
             aria-label={`Play ${song.title}`}
           >
             <Play size={10} fill="currentColor" />
@@ -178,7 +179,7 @@ export const VirtualSongRow = memo(function VirtualSongRow({
       )}
 
       {/* Title */}
-      <TitleCell>{song.title}</TitleCell>
+      <TitleCell>{song.title}{song.available === false && <span> · Unavailable</span>}</TitleCell>
 
       {/* Artist */}
       <MutedCell>{song.artistName}</MutedCell>
@@ -195,6 +196,7 @@ export const VirtualSongRow = memo(function VirtualSongRow({
 }, (prev, next) => {
   // Custom equality: compare by publicId (stable UUID) + display-affecting props
   if (prev.song.publicId !== next.song.publicId) return false
+  if (prev.song.available !== next.song.available) return false
   if (prev.isPlaying !== next.isPlaying) return false
   if (prev.isFocused !== next.isFocused) return false
   if (prev.index !== next.index) return false

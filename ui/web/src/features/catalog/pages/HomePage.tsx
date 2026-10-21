@@ -255,6 +255,7 @@ function RecentlyPlayedCard({ item }: { item: RecentItem }) {
     if (item.songPublicId && item.songTitle) {
       playTrack({
         publicId: item.songPublicId,
+        available: item.songAvailable,
         title: item.songTitle,
         artistName: item.artistName ?? undefined,
         albumPublicId: item.albumPublicId ?? undefined,
@@ -279,7 +280,7 @@ function RecentlyPlayedCard({ item }: { item: RecentItem }) {
         )}
       </CoverImageArea>
       <CardInfo>
-        <CardTitle>{item.songTitle ?? 'Unknown'}</CardTitle>
+        <CardTitle>{item.songTitle ?? 'Unknown'}{item.songAvailable === false && <span> · Unavailable</span>}</CardTitle>
         {item.artistName && <CardSubtitle>{item.artistName}</CardSubtitle>}
       </CardInfo>
     </CoverCard>

@@ -1,5 +1,6 @@
 export interface ActivityEntry {
   publicId: string
+  songAvailable?: boolean
   userId: string
   activityType: string
   songId: string | null

@@ -223,8 +223,9 @@ interface AlbumDetailsPanelProps {
 }
 
 function buildTracks(songs: AlbumSong[], albumTitle: string): Track[] {
-  return songs.map((s) => ({
+  return songs.filter((s) => s.available === true).map((s) => ({
     publicId: String(s.publicId ?? ''),
+    available: s.available === true,
     title: String(s.title ?? ''),
     artistName: s.artistName ? String(s.artistName) : undefined,
     albumName: albumTitle,
@@ -254,20 +255,22 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
   const handlePlay = useCallback(() => {
     if (songs.length === 0) return
     const tracks = buildTracks(songs, album?.title ?? '')
-    playTrack(tracks[0], tracks)
+    if (tracks.length > 0) playTrack(tracks[0], tracks)
   }, [songs, album, playTrack])
 
   const handleShuffle = useCallback(() => {
     if (songs.length === 0) return
     const tracks = [...buildTracks(songs, album?.title ?? '')].sort(() => Math.random() - 0.5)
-    playTrack(tracks[0], tracks)
+    if (tracks.length > 0) playTrack(tracks[0], tracks)
   }, [songs, album, playTrack])
 
   const handlePlayTrack = useCallback(
     (song: AlbumSong) => {
+      if (song.available !== true) return
       const tracks = buildTracks(songs, album?.title ?? '')
       const track: Track = {
         publicId: String(song.publicId ?? ''),
+        available: song.available,
         title: String(song.title ?? ''),
         artistName: song.artistName ? String(song.artistName) : undefined,
         albumName: album?.title,
@@ -336,11 +339,11 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
         </div>
         {songs.length > 0 && (
           <ActionRow>
-            <Button size="sm" onClick={handlePlay}>
+            <Button size="sm" onClick={handlePlay} disabled={!songs.some((song) => song.available === true)}>
               <Play size={14} fill="currentColor" />
               Play
             </Button>
-            <Button variant="outline" size="sm" onClick={handleShuffle}>
+            <Button variant="outline" size="sm" onClick={handleShuffle} disabled={!songs.some((song) => song.available === true)}>
               <Shuffle size={14} />
             </Button>
           </ActionRow>
@@ -373,7 +376,7 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
             >
               <TrackIndex>{index + 1}</TrackIndex>
               <TrackName>
-                <TrackNameText>{song.title ?? 'Unknown'}</TrackNameText>
+                <TrackNameText>{song.title ?? 'Unknown'}{song.available === false && <span> · Unavailable</span>}</TrackNameText>
               </TrackName>
               <TrackDuration>
                 {typeof (song.length ?? song.duration) === 'number' ? formatDuration((song.length ?? song.duration) as number) : '\u2014'}

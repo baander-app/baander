@@ -182,6 +182,7 @@ export function ColumnBrowserView() {
           if (song) {
             const tracks: Track[] = songs.map((s) => ({
               publicId: s.publicId,
+              available: s.available === true,
               title: s.title,
               artistName: s.artistName,
               albumName: s.albumName,

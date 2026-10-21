@@ -4,6 +4,7 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 
 const mockTrack: Track = {
   publicId: 'song_1',
+  available: true,
   title: 'Test Song',
   artistName: 'Test Artist',
   albumName: 'Test Album',
@@ -13,6 +14,7 @@ const mockTrack: Track = {
 
 const mockTrack2: Track = {
   publicId: 'song_2',
+  available: true,
   title: 'Test Song 2',
   artistName: 'Test Artist 2',
   duration: 180,

@@ -117,7 +117,7 @@ beforeEach(() => {
   vi.stubGlobal('WebSocket', FakeWebSocket)
   useAuthStore.setState({ accessToken: 'token-at-connect', isAuthenticated: true })
   usePlayerStore.setState(usePlayerStore.getInitialState(), true)
-  usePlayerStore.getState().restoreQueue([{ publicId: 'first', title: 'First' }], 0, 0)
+  usePlayerStore.getState().restoreQueue([{ publicId: 'first', available: true, title: 'First' }], 0, 0)
   usePlayerStore.getState().setDuration(300)
   updateTime(45)
 })

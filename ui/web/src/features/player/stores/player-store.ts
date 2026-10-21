@@ -32,7 +32,7 @@ export const usePlayerStore = create<PlayerState>()(withStoreDebug('player', per
   partialize: persistedPlayerState,
   merge: (persisted, current) => {
     const saved = persisted as Partial<PersistedPlayerState> | undefined
-    const queue = Array.isArray(saved?.queue) ? saved.queue : current.queue
+    const queue = Array.isArray(saved?.queue) ? saved.queue.map((track) => ({ ...track, available: undefined })) : current.queue
     const index = saved?.currentIndex
     const currentIndex = queue.length === 0 ? -1 : index !== undefined && Number.isInteger(index)
       ? Math.max(0, Math.min(queue.length - 1, index)) : 0

@@ -116,6 +116,7 @@ const Spacer = styled.span`
 export interface ListSongData {
   publicId: string;
   title: string;
+  available?: boolean;
   artistName?: string;
   albumName?: string;
   year?: number;
@@ -190,10 +191,11 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && song.available === true) {
         e.preventDefault();
         const tracks: Track[] = allSongs.map((s) => ({
           publicId: s.publicId,
+          available: s.available === true,
           title: s.title,
           artistName: s.artistName,
           albumName: s.albumName,
@@ -204,6 +206,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
         playTrack(
           tracks[idx] ?? {
             publicId: song.publicId,
+            available: song.available,
             title: song.title,
             artistName: song.artistName,
             albumName: song.albumName,
@@ -237,7 +240,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
       case 'title':
         return (
           <TitleCell key={colId} $isPlaying={isPlaying} style={{width}}>
-            {song.title}
+            {song.title}{song.available === false && <span> · Unavailable</span>}
           </TitleCell>
         );
       case 'artist':
@@ -297,6 +300,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
     <SongContextMenu
       song={{
         publicId: song.publicId,
+        available: song.available,
         title: song.title,
         artistName: song.artistName,
         albumName: song.albumName,

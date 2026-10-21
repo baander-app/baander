@@ -1,3 +1,4 @@
+import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import styled from 'styled-components'
 import { Link } from 'react-router-dom';
 import { ImageOff } from 'lucide-react';
@@ -185,6 +186,7 @@ export function SearchResults({query}: { query: string }) {
   const {data: artistsData} = useGetArtistIndex({q: query, limit: 20});
   const {data: songsData} = useGetSongIndex({q: query, limit: 20});
   const playTrack = usePlayerStore((s) => s.playTrack);
+  const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem);
 
   const albums = asAlbums(albumsData);
   const artists = asArtists(artistsData);
@@ -193,15 +195,20 @@ export function SearchResults({query}: { query: string }) {
   const hasResults = albums.length > 0 || artists.length > 0 || songs.length > 0;
 
   const handlePlaySong = (_song: SongSummary, songList: SongSummary[], index: number) => {
+    if (_song.available !== true) {
+      setSelectedItem({ type: 'song', publicId: _song.publicId });
+      return;
+    }
     const tracks: Track[] = songList.map((s) => ({
       publicId: s.publicId,
+      available: s.available === true,
       title: s.title,
       artistName: s.artistName ?? undefined,
       albumName: s.albumName ?? undefined,
       albumPublicId: s.albumId,
       duration: s.length ?? undefined,
     }));
-    playTrack(tracks[index], tracks);
+    playTrack(tracks[index], tracks.filter((track) => track.available === true));
   };
 
   if (!query) {
@@ -273,6 +280,7 @@ export function SearchResults({query}: { query: string }) {
                 key={song.publicId}
                 song={{
                   publicId: song.publicId,
+                  available: song.available,
                   title: song.title,
                   artistName: song.artistName ?? undefined,
                   albumName: song.albumName ?? undefined,
@@ -284,7 +292,7 @@ export function SearchResults({query}: { query: string }) {
                   onClick={() => handlePlaySong(song, songs, index)}
                 >
                   <SongInfo>
-                    <SongTitle>{song.title}</SongTitle>
+                    <SongTitle>{song.title}{song.available === false && <span> · Unavailable</span>}</SongTitle>
                     <SongArtist>{song.artistName}</SongArtist>
                   </SongInfo>
                   <SongDuration>

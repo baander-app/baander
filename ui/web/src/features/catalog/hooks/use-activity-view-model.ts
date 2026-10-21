@@ -51,6 +51,7 @@ export function useActivityViewModel({
       for (const entry of page.data ?? []) {
         byPublicId.set(entry.publicId, {
           publicId: entry.publicId,
+          songAvailable: entry.songAvailable === true,
           userId: entry.userId,
           activityType: entry.activityType,
           songId: entry.songId ?? null,

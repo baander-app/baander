@@ -48,12 +48,12 @@ export function AlbumContextMenu({ album, tracks, children }: AlbumContextMenuPr
   }
 
   const handlePlayAll = async () => {
-    const fetched = await handleFetchTracks()
+    const fetched = (await handleFetchTracks()).filter((track) => track.available === true)
     if (fetched.length > 0) playTrack(fetched[0], fetched)
   }
 
   const handleShuffleAll = async () => {
-    const fetched = await handleFetchTracks()
+    const fetched = (await handleFetchTracks()).filter((track) => track.available === true)
     if (fetched.length > 0) {
       const shuffled = [...fetched].sort(() => Math.random() - 0.5)
       playTrack(shuffled[0], shuffled)

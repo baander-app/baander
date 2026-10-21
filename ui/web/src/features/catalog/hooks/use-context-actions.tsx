@@ -6,6 +6,7 @@ import { AddToPlaylistDialog } from '@/features/playlist/components/AddToPlaylis
 export interface SongContextMenuData {
   publicId: string
   title: string
+  available?: boolean
   artistName?: string
   albumName?: string
   duration?: number
@@ -36,8 +37,10 @@ export function useContextActions() {
 
   const playSong = useCallback(
     (song: SongContextMenuData, queue?: Track[]) => {
+      if (song.available !== true) return
       const track: Track = {
         publicId: song.publicId,
+        available: song.available,
         title: song.title,
         artistName: song.artistName,
         albumName: song.albumName,

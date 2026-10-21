@@ -116,6 +116,7 @@ export function requestSelectedTrackPlayback(
   sourceMode: 'replace' | 'preserve' | 'reload' = 'replace',
   format?: TranscodeFormat,
 ) {
+  if (track.available !== true) return
   const generation = ++playbackSelectionGeneration
   cancelPlaybackRecovery()
   const el = get().audioElement

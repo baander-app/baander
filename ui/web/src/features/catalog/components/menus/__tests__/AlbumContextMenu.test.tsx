@@ -76,7 +76,7 @@ describe('AlbumContextMenu', () => {
     artistPublicId: 'artist-1',
   }
 
-  function renderMenu(tracks?: { publicId: string; title: string }[]) {
+  function renderMenu(tracks?: { publicId: string; title: string; available: boolean }[]) {
     return render(
       <AlbumContextMenu album={album} tracks={tracks}>
         <div data-testid="trigger">Album Card</div>
@@ -116,8 +116,8 @@ describe('AlbumContextMenu', () => {
   it('calls playTrack when Play All is clicked', async () => {
     const user = userEvent.setup()
     const tracks = [
-      { publicId: 'song-1', title: 'Track 1' },
-      { publicId: 'song-2', title: 'Track 2' },
+      { publicId: 'song-1', available: true, title: 'Track 1' },
+      { publicId: 'song-2', available: true, title: 'Track 2' },
     ]
     renderMenu(tracks)
 
@@ -132,7 +132,7 @@ describe('AlbumContextMenu', () => {
 
   it('calls insertAfterCurrent when Play Next is clicked', async () => {
     const user = userEvent.setup()
-    const tracks = [{ publicId: 'song-1', title: 'Track 1' }]
+    const tracks = [{ publicId: 'song-1', available: true, title: 'Track 1' }]
     renderMenu(tracks)
 
     await user.pointer({ keys: '[MouseRight]', target: screen.getByTestId('trigger') })
@@ -145,11 +145,12 @@ describe('AlbumContextMenu', () => {
     'fetches songs through the generated client for %s',
     async (action) => {
       const songs = [
-        { publicId: 'song-1', title: 'Track 1', artistName: 'Artist 1', length: 180 },
-        { publicId: 'song-2', title: 'Track 2', artistName: null, length: null },
+        { publicId: 'song-1', available: true, title: 'Track 1', artistName: 'Artist 1', length: 180 },
+        { publicId: 'song-2', available: true, title: 'Track 2', artistName: null, length: null },
       ]
       const expectedTracks = songs.map((song) => ({
         publicId: song.publicId,
+        available: song.available,
         title: song.title,
         artistName: song.artistName ?? undefined,
         duration: song.length ?? undefined,

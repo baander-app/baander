@@ -124,7 +124,7 @@ import { usePlayerStore, type Track, type PlayerState } from '@/features/player/
 // --- Helpers ----------------------------------------------------------------
 
 function track(publicId: string): Track {
-  return { publicId, title: publicId, artistName: 'A' }
+  return { publicId, available: true, title: publicId, artistName: 'A' }
 }
 
 function resetStore(overrides: Partial<PlayerState> = {}) {
@@ -239,6 +239,7 @@ describe('useAudioPlayback', () => {
     expect(retired.src).toBe('')
     expect(result.current.current).toBe(active)
     expect(usePlayerStore.getState().audioElement).toBe(active)
+    usePlayerStore.setState({ currentTrack: track('t0') })
     active.src = '/api/stream/track?id=t0'
     act(() => { active.dispatchEvent(new Event('loadstart')) })
     expect(audioService.connectDualAudioElements).toHaveBeenCalledWith(active, capturedAudioElements[3])

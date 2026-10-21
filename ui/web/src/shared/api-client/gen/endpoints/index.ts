@@ -1010,6 +1010,8 @@ export interface ActivityResource {
   userId: string;
   /** Type of activity */
   activityType: string;
+  /** Whether the latest scan or ingestion observation marked the song source available */
+  songAvailable: boolean;
   /**
      * Song public ID
      * @minLength 21
@@ -1100,6 +1102,8 @@ export interface RecentItemResource {
   publicId: string;
   /** Type of activity */
   activityType: string;
+  /** Whether the latest scan or ingestion observation marked the song source available */
+  songAvailable: boolean;
   /**
      * Song title
      * @nullable
@@ -1680,6 +1684,8 @@ export interface SongResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId: string;
+  /** Whether the latest scan or ingestion observation marked the source available */
+  available: boolean;
   /** Song title */
   title: string;
   /**
@@ -5510,6 +5516,8 @@ export type GetPlaylistShow200DataSongsItem = {
   albumId?: string;
   /** Stored playlist position */
   position?: number;
+  /** Whether the latest scan or ingestion observation marked the source available */
+  available: boolean;
   title?: string;
   /** @nullable */
   artistName?: string | null;
@@ -6085,7 +6093,20 @@ limit?: number;
 
 export type GetRecommendationForYou200DataItemStrategies = { [key: string]: unknown };
 
-export type GetRecommendationForYou200DataItemSong = { [key: string]: unknown };
+export type GetRecommendationForYou200DataItemSong = {
+  public_id: string;
+  title: string;
+  album_id: string;
+  /** @nullable */
+  track: number | null;
+  /** @nullable */
+  disc: number | null;
+  /** @nullable */
+  year: number | null;
+  /** @nullable */
+  length: number | null;
+  available: boolean;
+};
 
 export type GetRecommendationForYou200DataItem = {
   target_id?: string;

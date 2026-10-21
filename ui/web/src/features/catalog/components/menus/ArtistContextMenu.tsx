@@ -36,8 +36,9 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
       const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
       if (items.length === 0) return
 
-      const tracks: Track[] = items.map((s) => ({
+      const tracks: Track[] = items.filter((s) => s.available === true).map((s) => ({
         publicId: String(s.publicId ?? ''),
+        available: s.available === true,
         title: String(s.title ?? ''),
         artistName: artist.name,
         albumName: s.albumName ? String(s.albumName) : undefined,
@@ -46,7 +47,7 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
       }))
 
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playTrack(shuffled[0], shuffled)
+      if (shuffled.length > 0) playTrack(shuffled[0], shuffled)
     } catch {
       // Silently fail — no user-facing error needed for context menu action
     }
@@ -61,8 +62,9 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
       const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
       if (items.length === 0) return
 
-      const tracks: Track[] = items.map((s) => ({
+      const tracks: Track[] = items.filter((s) => s.available === true).map((s) => ({
         publicId: String(s.publicId ?? ''),
+        available: s.available === true,
         title: String(s.title ?? ''),
         artistName: artist.name,
         albumName: s.albumName ? String(s.albumName) : undefined,
@@ -70,7 +72,7 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
         duration: typeof s.length === 'number' ? s.length : undefined,
       }))
 
-      playTrack(tracks[0], tracks)
+      if (tracks.length > 0) playTrack(tracks[0], tracks)
     } catch {
       // Silently fail — no user-facing error needed for context menu action
     }

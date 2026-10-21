@@ -13,6 +13,16 @@ import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('Session')
 
+async function getSessionQueueSongs(publicIds: string[]): Promise<Record<string, unknown>[]> {
+  const ids = [...new Set(publicIds)]
+  const batches: string[][] = []
+  for (let offset = 0; offset < ids.length; offset += 100) batches.push(ids.slice(offset, offset + 100))
+  const responses = await Promise.all(batches.map((batch) => AXIOS_INSTANCE.get<{ data: Record<string, unknown>[] }>('/api/songs/', {
+    params: { publicIds: batch.join(','), limit: batch.length },
+  })))
+  return responses.flatMap((response) => response.data.data ?? [])
+}
+
 export interface SessionData {
   publicId: string
   userId: string
@@ -117,10 +127,7 @@ export function useSession() {
     // This device is active — hydrate server queue into player store if empty
     const localQueue = usePlayerStore.getState().queue
     if (devicePublicId !== null && session.activeDeviceId === devicePublicId && localQueue.length === 0 && session.queue.length > 0) {
-      AXIOS_INSTANCE.get('/api/songs/', {
-        params: { publicIds: session.queue.join(','), limit: session.queue.length }
-      }).then(res => {
-        const songs = res.data?.data ?? []
+      getSessionQueueSongs(session.queue).then(songs => {
         const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
         const tracks: Track[] = session.queue
           .filter(Boolean)
@@ -129,6 +136,7 @@ export function useSession() {
             if (!s) return null
             return {
               publicId: s.publicId as string,
+              available: s.available === true,
               title: s.title as string,
               artistName: (s.artistName as string) ?? undefined,
               albumName: (s.albumName as string) ?? undefined,
@@ -186,10 +194,7 @@ export function useSession() {
           // refetched session is used without forcing a socket reconnect.
           const session = queryClient.getQueryData(SESSION_KEY) as SessionData | undefined
           if (session && session.queue.length > 0) {
-            AXIOS_INSTANCE.get('/api/songs/', {
-              params: { publicIds: session.queue.join(','), limit: session.queue.length }
-            }).then(res => {
-              const songs = res.data?.data ?? []
+            getSessionQueueSongs(session.queue).then(songs => {
               const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
               const tracks: Track[] = session.queue
                 .filter(Boolean)
@@ -198,6 +203,7 @@ export function useSession() {
                   if (!s) return null
                   return {
                     publicId: s.publicId as string,
+                    available: s.available === true,
                     title: s.title as string,
                     artistName: (s.artistName as string) ?? undefined,
                     albumName: (s.albumName as string) ?? undefined,
@@ -257,11 +263,7 @@ export function useSession() {
       if (data.queue.length > 0) {
         // Hydrate server queue (publicIds) into Track[] via batch lookup
         try {
-          const res = await AXIOS_INSTANCE.get('/api/songs/', {
-            params: { publicIds: data.queue.join(','), limit: data.queue.length }
-          })
-          // CursorPaginatedResponse envelope: { data: [...songs], meta: {...} }
-          const songs = res.data?.data ?? []
+          const songs = await getSessionQueueSongs(data.queue)
           const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
           const tracks: Track[] = data.queue
             .filter(Boolean)
@@ -270,6 +272,7 @@ export function useSession() {
               if (!s) return null
               return {
                 publicId: s.publicId as string,
+                available: s.available === true,
                 title: s.title as string,
                 artistName: (s.artistName as string) ?? undefined,
                 albumName: (s.albumName as string) ?? undefined,

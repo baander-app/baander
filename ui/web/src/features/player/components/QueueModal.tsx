@@ -213,8 +213,8 @@ function QueueItem({
           index + 1
         )}
       </IndexCell>
-      <TrackButton onClick={onSelect}>
-        <TrackName $isCurrent={isCurrent}>{track.title}</TrackName>
+      <TrackButton disabled={track.available === false} onClick={onSelect}>
+        <TrackName $isCurrent={isCurrent}>{track.title}{track.available === false && <span> · Unavailable</span>}</TrackName>
         <ArtistName>{track.artistName}</ArtistName>
       </TrackButton>
       <RemoveButton

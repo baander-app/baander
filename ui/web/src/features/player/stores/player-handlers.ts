@@ -12,16 +12,13 @@ import { RADIO_ACTIONS } from '@/features/radio/radio-actions'
 import { CATALOG_ACTIONS } from '@/features/catalog/catalog-actions'
 import type { CatalogPlayTrackPayload } from '@/features/catalog/catalog-actions'
 
-function pausePlayerIfPlaying() {
-  const state = usePlayerStore.getState()
-  if (state.isPlaying) {
-    state.setIsPlaying(false)
-  }
+function pausePlayer() {
+  usePlayerStore.getState().setIsPlaying(false)
 }
 
 export function registerPlayerHandlers() {
   mediator.on(PLAYER_ACTIONS.PAUSE, function playerPauseHandler() {
-    pausePlayerIfPlaying()
+    pausePlayer()
   })
 
   mediator.on(PLAYER_ACTIONS.PLAY, function playerPlayHandler(payload: unknown) {
@@ -47,7 +44,7 @@ export function registerPlayerHandlers() {
   })
 
   mediator.on(RADIO_ACTIONS.STARTED, function playerPauseForRadioHandler() {
-    pausePlayerIfPlaying()
+    pausePlayer()
   })
 
   mediator.on(CATALOG_ACTIONS.PLAY_TRACK, function playerCatalogPlayTrackHandler(payload: unknown) {

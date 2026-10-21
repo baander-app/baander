@@ -13,7 +13,7 @@ beforeEach(() => {
 })
 afterEach(() => { vi.restoreAllMocks() })
 
-const tracks = [{ publicId: 'first', title: 'First' }, { publicId: 'second', title: 'Second' }]
+const tracks = [{ publicId: 'first', available: true, title: 'First' }, { publicId: 'second', available: true, title: 'Second' }]
 
 it('clock ticks notify only clock consumers, without player notifications, serialization, or persistence writes', () => {
   usePlayerStore.getState().setVolume(60)
@@ -84,7 +84,7 @@ it('persists only durable changes and restores a coherent selected track without
     shuffle: false, repeat: 'off', crossfadeEnabled: false, crossfadeDuration: 5 })
   usePlayerStore.setState({ currentTrack: null })
   await usePlayerStore.persist.rehydrate()
-  expect(usePlayerStore.getState().currentTrack).toEqual(tracks[1])
+  expect(usePlayerStore.getState().currentTrack).toEqual({ ...tracks[1], available: undefined })
   expect(usePlayerStore.getState().audioElement).toBeNull()
 })
 

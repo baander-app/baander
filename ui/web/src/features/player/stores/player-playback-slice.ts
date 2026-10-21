@@ -1,3 +1,4 @@
+import { hydrateQueueAvailability } from './player-availability'
 import type { PlayerPlaybackState, PlayerPlaybackActions, PlayerSliceContext } from './player-types'
 import { getCurrentTime, updateTime } from './player-time-tracker'
 import {
@@ -69,11 +70,20 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
       beginPlaybackRecovery(recoveryHost, element, currentTrack, cause, onServerUp, recordPlay)
     },
     setIsPlaying: (playing) => {
-      if (playing === get().isPlaying) return
+      if (playing === get().isPlaying) {
+        if (!playing) invalidatePlaybackSelection()
+        return
+      }
+      if (playing && get().currentTrack?.available !== true) {
+        if (get().currentTrack?.available === undefined && get().currentTrack) {
+          hydrateQueueAvailability({ get, commit }, () => get().setIsPlaying(true))
+        }
+        return
+      }
       if (playing ? resumePlaybackRecovery() : pausePlaybackRecovery()) return
       if (!playing) invalidatePlaybackSelection()
       const { audioElement, currentTrack } = get()
-      if (playing && audioElement && !audioElement.src && currentTrack) {
+      if (playing && audioElement && (!audioElement.src || audioElement.getAttribute?.('src') === '') && currentTrack) {
         audioElement.src = buildStreamUrl(currentTrack.publicId)
         audioElement.currentTime = getCurrentTime()
       }

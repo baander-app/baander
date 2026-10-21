@@ -135,7 +135,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
   const { src: coverSrc } = useImageBlob(coverUrl)
 
   const handlePlay = useCallback(() => {
-    if (!song) return
+    if (!song || song.available !== true) return
     const primaryArtist = album?.artists
       ?.filter((a) => a.role === null || a.role === 'artist')
       .map((a) => a.name)
@@ -143,6 +143,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
       .join(', ')
     const track: Track = {
       publicId: song.publicId ?? publicId,
+      available: song.available,
       title: song.title ?? 'Unknown',
       artistName: primaryArtist || undefined,
       albumName: album?.title,
@@ -218,6 +219,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
         </CoverArea>
         <div>
           <SongTitle>{song.title ?? 'Unknown'}</SongTitle>
+          {song.available === false && <p>Unavailable</p>}
           {artistNames && artistNames.length > 0 && (
             <ArtistText>{artistNames.join(', ')}</ArtistText>
           )}
@@ -225,7 +227,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
             <AlbumText>{album.title}</AlbumText>
           )}
         </div>
-        <Button size="sm" onClick={handlePlay}>
+        <Button size="sm" onClick={handlePlay} disabled={song.available !== true}>
           <Play size={14} fill="currentColor" />
           Play
         </Button>

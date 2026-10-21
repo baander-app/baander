@@ -17,6 +17,7 @@ export function songResourcesToTracks(
 ): Track[] {
   return songs.map((s) => ({
     publicId: s.publicId,
+    available: s.available === true,
     title: s.title,
     artistName: s.artistName ?? undefined,
     albumName: albumTitle,
@@ -41,8 +42,8 @@ export function usePlayAlbum() {
           logger.warn('No songs found for album', albumPublicId)
           return
         }
-        const tracks = songResourcesToTracks(songs, albumTitle, albumPublicId)
-        playTrack(tracks[0], tracks)
+        const tracks = songResourcesToTracks(songs, albumTitle, albumPublicId).filter((track) => track.available === true)
+        if (tracks.length > 0) playTrack(tracks[0], tracks)
       } catch (err) {
         logger.warn('Failed to fetch album tracks:', err)
       }

@@ -16,6 +16,7 @@ function parseSong(raw: Record<string, unknown>, index: number): ListSongData {
   return {
     publicId: String(raw.publicId ?? ''),
     title: String(raw.title ?? ''),
+    available: raw.available === true,
     artistName: typeof raw.artistName === 'string' ? raw.artistName : undefined,
     albumName: typeof raw.albumName === 'string' ? raw.albumName : undefined,
     year: typeof raw.year === 'number' ? raw.year : undefined,

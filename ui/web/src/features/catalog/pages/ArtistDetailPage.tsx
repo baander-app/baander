@@ -151,8 +151,9 @@ export function ArtistDetailPage() {
     })
     const body = res.data as Record<string, unknown>
     const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
-    return items.map((s) => ({
+    return items.filter((s) => s.available === true).map((s) => ({
       publicId: String(s.publicId ?? ''),
+      available: s.available === true,
       title: String(s.title ?? ''),
       artistName: artistName || undefined,
       albumName: s.albumName ? String(s.albumName) : undefined,
@@ -175,7 +176,7 @@ export function ArtistDetailPage() {
       const tracks = await fetchArtistSongs()
       if (tracks.length === 0) return
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playTrack(shuffled[0], shuffled)
+      if (shuffled.length > 0) playTrack(shuffled[0], shuffled)
     } catch {
       // Silently fail
     }

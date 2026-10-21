@@ -14,6 +14,7 @@ vi.mock('../menus/SongContextMenu', () => ({
 const baseSong: ListSongData = {
   publicId: 'song-1',
   title: 'Test Song',
+  available: true,
   artistName: 'Test Artist',
   albumName: 'Test Album',
   year: 2024,
@@ -72,6 +73,18 @@ describe('ListRow', () => {
     const playerState = usePlayerStore.getState()
     expect(playerState.currentTrack?.publicId).toBe('song-1')
     expect(playerState.queue).toHaveLength(2)
+  })
+
+  it('keeps an unavailable song visible and selectable while Enter cannot play it', () => {
+    usePlayerStore.getState().clearQueue()
+    const missing = { ...baseSong, available: false }
+    render(<ListRow song={missing} allSongs={[missing]} style={defaultStyle} />)
+
+    expect(screen.getByText('· Unavailable')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('row'))
+    expect(useSelectionStore.getState().selectedId).toBe(missing.publicId)
+    fireEvent.keyDown(screen.getByRole('row'), { key: 'Enter' })
+    expect(usePlayerStore.getState().currentTrack).toBeNull()
   })
 
   it('applies selected styling when selected', () => {

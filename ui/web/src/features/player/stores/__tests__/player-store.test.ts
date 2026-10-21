@@ -22,7 +22,7 @@ vi.mock('sonner', () => ({
 // --- Helpers ---------------------------------------------------------------
 
 function track(publicId: string, title?: string): Track {
-  return { publicId, title: title ?? publicId, artistName: 'A', albumName: 'Alb' }
+  return { publicId, available: true, title: title ?? publicId, artistName: 'A', albumName: 'Alb' }
 }
 
 function tracks(...ids: string[]): Track[] {
@@ -82,6 +82,67 @@ describe('player-store', () => {
   beforeEach(() => {
     vi.mocked(audioService.getProcessor).mockReturnValue(null)
     resetStore()
+  })
+
+  describe('catalogue availability', () => {
+    it('blocks missing and unconfirmed tracks without changing playback', () => {
+      const queue = seedQueue()
+      const before = usePlayerStore.getState()
+      for (const available of [false, undefined]) {
+        const missing = { ...track('missing'), available }
+        before.playTrack(missing)
+        before.addToQueue(missing)
+        before.insertAfterCurrent([missing])
+      }
+      expect(usePlayerStore.getState()).toBe(before)
+      expect(usePlayerStore.getState().queue).toEqual(queue)
+    })
+
+    it('refreshes an existing queue row with the selected current observation', () => {
+      const oldTrack = { ...track('song'), available: false }
+      usePlayerStore.getState().restoreQueue([oldTrack], 0, 0)
+      const fresh = { ...oldTrack, available: true, title: 'Fresh title' }
+      usePlayerStore.getState().playTrack(fresh)
+      expect(usePlayerStore.getState().queue).toEqual([fresh])
+      expect(usePlayerStore.getState().queue[0]).toBe(usePlayerStore.getState().currentTrack)
+      usePlayerStore.getState().setRepeat('all')
+      usePlayerStore.getState().playNext()
+      expect(usePlayerStore.getState().currentTrack).toBe(fresh)
+    })
+
+    it('removes the playing song and pauses when all remaining songs are unavailable', () => {
+      const queue = [track('playing'), { ...track('missing'), available: false }]
+      usePlayerStore.getState().restoreQueue(queue, 0, 0)
+      usePlayerStore.getState().setIsPlaying(true)
+      usePlayerStore.getState().removeFromQueue(0)
+      expect(usePlayerStore.getState().queue).toEqual([queue[1]])
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
+      expect(usePlayerStore.getState().currentIndex).toBe(0)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+    })
+
+    it('skips an unavailable adjacent song after removing the playing song', () => {
+      const queue = [track('playing'), { ...track('missing'), available: false }, track('next')]
+      usePlayerStore.getState().restoreQueue(queue, 0, 0)
+      usePlayerStore.getState().setIsPlaying(true)
+      usePlayerStore.getState().removeFromQueue(0)
+      expect(usePlayerStore.getState().queue).toEqual(queue.slice(1))
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[2])
+      expect(usePlayerStore.getState().currentIndex).toBe(1)
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
+
+    it('filters a mixed queue and preserves the requested song by public ID', () => {
+      const songs = [
+        { ...track('missing'), available: false },
+        track('first'),
+        track('selected'),
+      ]
+      usePlayerStore.getState().playTrackFromList(songs, 2)
+      expect(usePlayerStore.getState().queue.map((song) => song.publicId)).toEqual(['first', 'selected'])
+      expect(usePlayerStore.getState().currentTrack?.publicId).toBe('selected')
+      expect(usePlayerStore.getState().currentIndex).toBe(1)
+    })
   })
 
   describe('adoptPreloadedNext', () => {

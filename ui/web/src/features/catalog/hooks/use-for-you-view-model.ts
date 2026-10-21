@@ -4,6 +4,7 @@ import { useGetRecommendationForYou } from '@/shared/api-client/gen/endpoints'
 export interface ForYouSong {
   publicId: string
   title: string
+  available: boolean
   /** Internal UUID — NOT a public ID. Cannot be used for album navigation or cover art. */
   albumInternalId: string
   duration: number | null
@@ -23,6 +24,7 @@ export function useForYouViewModel(limit = 12) {
       if (typeof song?.public_id !== 'string' || !song.public_id) return []
       return [{
         publicId: song.public_id,
+        available: song.available === true,
         title: typeof song.title === 'string' ? song.title : 'Unknown',
         albumInternalId: typeof song.album_id === 'string' ? song.album_id : '',
         duration: typeof song.length === 'number' ? song.length : null,

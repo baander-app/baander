@@ -1,4 +1,6 @@
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { usePlayerStore } from '@/features/player/stores/player-store'
+import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -81,6 +83,7 @@ function renderPage() {
 
 describe('PlaylistDetailPage sharing controls', () => {
   beforeEach(() => {
+    usePlayerStore.getState().clearQueue()
     served = playlist()
     mockRequest.mockReset()
     serve()
@@ -89,6 +92,22 @@ describe('PlaylistDetailPage sharing controls', () => {
   afterEach(() => {
     cleanup()
     useAuthStore.setState(initialAuthState, true)
+  })
+
+  it('retains unavailable metadata and selects the correct available song after queue filtering', async () => {
+    served = playlist({ songs: [
+      { publicId: 'missing', title: 'Missing song', available: false },
+      { publicId: 'present', title: 'Present song', available: true },
+    ] })
+    signInAs(STRANGER)
+    renderPage()
+    expect(await screen.findByText('· Unavailable')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Missing song'))
+    expect(usePlayerStore.getState().currentTrack).toBeNull()
+    expect(useContextPanelStore.getState().selectedItem).toEqual({ type: 'song', publicId: 'missing' })
+    fireEvent.click(screen.getByText('Present song'))
+    expect(usePlayerStore.getState().currentTrack?.publicId).toBe('present')
+    expect(usePlayerStore.getState().queue.map((song) => song.publicId)).toEqual(['present'])
   })
 
   it('offers the owner the share dialog and no leave action', async () => {

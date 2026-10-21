@@ -103,8 +103,8 @@ export const QueueRow = memo(function QueueRow({
         )}
       </IndexCell>
 
-      <TitleButton onClick={() => onPlay(track)}>
-        <TrackTitle $isCurrent={isCurrent}>{track.title}</TrackTitle>
+      <TitleButton disabled={track.available === false} onClick={() => onPlay(track)}>
+        <TrackTitle $isCurrent={isCurrent}>{track.title}{track.available === false && <span> · Unavailable</span>}</TrackTitle>
         <TrackArtist>{track.artistName}</TrackArtist>
       </TitleButton>
 

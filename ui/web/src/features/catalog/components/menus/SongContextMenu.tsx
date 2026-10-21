@@ -43,6 +43,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
 
   const track: Track = {
     publicId: song.publicId,
+    available: song.available,
     title: song.title,
     artistName: song.artistName,
     albumName: song.albumName,
@@ -62,14 +63,14 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
       <ContextMenu>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent>
-          <ContextMenuItem onClick={() => actions.playSong(song)}>
+          <ContextMenuItem disabled={song.available !== true} onClick={() => actions.playSong(song)}>
             Play
             {playPauseKeys && (
               <ContextMenuShortcut>{playPauseKeys.join('')}</ContextMenuShortcut>
             )}
           </ContextMenuItem>
-          <ContextMenuItem onClick={handlePlayNext}>Play Next</ContextMenuItem>
-          <ContextMenuItem onClick={handlePlayLast}>Play Last</ContextMenuItem>
+          <ContextMenuItem disabled={song.available !== true} onClick={handlePlayNext}>Play Next</ContextMenuItem>
+          <ContextMenuItem disabled={song.available !== true} onClick={handlePlayLast}>Play Last</ContextMenuItem>
 
           <ContextMenuSeparator />
 
@@ -112,9 +113,10 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
             </ContextMenuSubContent>
           </ContextMenuSub>
 
-          <ContextMenuItem onClick={() => {
+          <ContextMenuItem disabled={song.available !== true} onClick={() => {
             const track = {
               publicId: song.publicId,
+              available: song.available,
               title: song.title,
               artistName: song.artistName,
               albumName: song.albumName,

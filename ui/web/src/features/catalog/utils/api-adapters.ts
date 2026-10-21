@@ -8,6 +8,7 @@ import type { MovieSummary, MovieDetail, MovieVideo } from '../types'
 
 export interface RecentItem {
   songTitle: string | null
+  songAvailable: boolean
   songPublicId: string | null
   albumPublicId: string | null
   albumTitle: string | null
@@ -19,6 +20,7 @@ function asRecentItem(raw: unknown): RecentItem {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
     songTitle: asStringOrNull(item.songTitle),
+    songAvailable: item.songAvailable === true,
     songPublicId: asStringOrNull(item.songPublicId),
     albumPublicId: asStringOrNull(item.albumPublicId),
     albumTitle: asStringOrNull(item.albumTitle),
@@ -135,6 +137,7 @@ function asSong(raw: unknown): SongSummary {
     albumId: asString(item.albumId),
     title: asString(item.title),
     path: asString(item.path),
+    available: item.available === true,
     length: asNumber(item.length ?? item.duration) ?? null,
     track: asNumber(item.track) ?? null,
     disc: asNumber(item.disc) ?? null,

@@ -3,6 +3,7 @@ import type { SongEntry } from '@/features/catalog/types'
 export interface Track {
   publicId: string
   title: string
+  available?: boolean
   artistName?: string
   albumName?: string
   albumPublicId?: string

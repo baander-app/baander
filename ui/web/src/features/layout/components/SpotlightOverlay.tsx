@@ -4,6 +4,7 @@ import { useGetAlbumIndex, useGetArtistIndex, useGetSongIndex } from '@/shared/a
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -26,6 +27,7 @@ interface ArtistSearchItem {
   name?: string
 }
 interface SongSearchItem {
+  available: boolean
   publicId?: string
   title?: string
   artistName?: string
@@ -100,19 +102,25 @@ export function SpotlightOverlay() {
   }, [setSelectedItem])
 
   const handlePlaySong = useCallback((_song: SongSearchItem, songList: SongSearchItem[], index: number) => {
+    if (_song.available !== true) {
+      setSelectedItem({ type: 'song', publicId: asString(_song.publicId) })
+      return
+    }
     const tracks: Track[] = songList.map((s) => ({
       publicId: asString(s.publicId),
+      available: s.available,
       title: asString(s.title),
       artistName: asString(s.artistName),
       albumName: asString(s.albumName),
       duration: typeof s.length === 'number' ? s.length : s.duration,
     }))
-    playTrack(tracks[index], tracks)
+    playTrack(tracks[index], tracks.filter((track) => track.available === true))
     setOpen(false)
-  }, [playTrack])
+  }, [playTrack, setSelectedItem])
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
+      <Command>
       <CommandInput
         placeholder="Search albums, artists, songs..."
         value={query}
@@ -175,13 +183,14 @@ export function SpotlightOverlay() {
                 onSelect={() => handlePlaySong(song, songs, i)}
               >
                 <MusicIcon />
-                <ItemLabel>{asString(song.title)}</ItemLabel>
+                <ItemLabel>{asString(song.title)}{song.available === false && <span> · Unavailable</span>}</ItemLabel>
                 <ItemMeta>{asString(song.artistName)}</ItemMeta>
               </CommandItem>
             ))}
           </CommandGroup>
         )}
       </CommandList>
+      </Command>
     </CommandDialog>
   )
 }

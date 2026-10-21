@@ -20,7 +20,7 @@ function renderPlayers() {
 
 describe('playback recovery status', () => {
   beforeEach(() => {
-    usePlayerStore.setState({ isPlaying: true, duration: 200, audioElement: null, playbackRecovery: 'none' })
+    usePlayerStore.setState({ currentTrack: { publicId: 'song-1', title: 'Song', available: true }, isPlaying: true, duration: 200, audioElement: null, playbackRecovery: 'none' })
     updateTime(42)
   })
 

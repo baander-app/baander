@@ -141,6 +141,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
       return {
         publicId: String(s.publicId ?? ''),
         title: String(s.title ?? ''),
+        available: s.available === true,
         artistName: String(s.artistName ?? albumInfo?.artistName ?? ''),
         albumName: String(s.albumName ?? albumInfo?.title ?? ''),
         albumPublicId: String(s.albumId ?? albumInfo?.publicId ?? ''),

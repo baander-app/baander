@@ -42,7 +42,7 @@ beforeEach(() => {
   buses.connected = false
   buses.instances = []
   usePlayerStore.setState(usePlayerStore.getInitialState(), true)
-  usePlayerStore.getState().restoreQueue([{ publicId: 'first', title: 'First' }], 0, 0)
+  usePlayerStore.getState().restoreQueue([{ publicId: 'first', available: true, title: 'First' }], 0, 0)
   vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : session } }))
 })
 afterEach(() => {

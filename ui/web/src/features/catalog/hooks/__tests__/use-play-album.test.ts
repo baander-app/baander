@@ -35,8 +35,8 @@ describe('usePlayAlbum with the generated API client', () => {
         publicId: 'album-1',
         title: 'Album',
         songs: [
-          { publicId: 'song-1', title: 'First', artistName: 'Artist', length: 180 },
-          { publicId: 'song-2', title: 'Second', artistName: null, length: null },
+          { available: true, publicId: 'song-1', title: 'First', artistName: 'Artist', length: 180 },
+          { available: true, publicId: 'song-2', title: 'Second', artistName: null, length: null },
         ],
       },
     })
@@ -45,11 +45,33 @@ describe('usePlayAlbum with the generated API client', () => {
     await act(() => result.current.playAlbum('album-1', 'Album'))
 
     const tracks = [
-      { publicId: 'song-1', title: 'First', artistName: 'Artist', duration: 180, albumName: 'Album', albumPublicId: 'album-1' },
-      { publicId: 'song-2', title: 'Second', artistName: undefined, duration: undefined, albumName: 'Album', albumPublicId: 'album-1' },
+      { available: true, publicId: 'song-1', title: 'First', artistName: 'Artist', duration: 180, albumName: 'Album', albumPublicId: 'album-1' },
+      { available: true, publicId: 'song-2', title: 'Second', artistName: undefined, duration: undefined, albumName: 'Album', albumPublicId: 'album-1' },
     ]
     expect(playTrack).toHaveBeenCalledWith(tracks[0], tracks)
     expect(api.history.get).toHaveLength(1)
+  })
+
+  it('skips an unavailable first song and leaves all unavailable albums unplayed', async () => {
+    api.onGet('/api/albums/mixed').reply(200, {
+      data: { songs: [
+        { publicId: 'missing', title: 'Missing', available: false },
+        { publicId: 'present', title: 'Present', available: true },
+      ] },
+    })
+    api.onGet('/api/albums/missing').reply(200, {
+      data: { songs: [{ publicId: 'missing', title: 'Missing', available: false }] },
+    })
+    const { result } = renderHook(() => usePlayAlbum())
+
+    await act(() => result.current.playAlbum('mixed', 'Mixed'))
+    expect(playTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ publicId: 'present', available: true }),
+      [expect.objectContaining({ publicId: 'present', available: true })],
+    )
+    playTrack.mockClear()
+    await act(() => result.current.playAlbum('missing', 'Missing'))
+    expect(playTrack).not.toHaveBeenCalled()
   })
 
   it.each([

@@ -1,3 +1,4 @@
+import { hydrateQueueAvailability } from './player-availability'
 import type { PlayerQueueState, PlayerQueueActions, PlayerSliceContext, Track } from './player-types'
 import { activityService } from '../services/activity-service'
 import { getCurrentTime, updateTime } from './player-time-tracker'
@@ -7,6 +8,7 @@ import { buildStreamUrl, invalidatePlaybackSelection, requestSelectedTrackPlayba
 export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): PlayerQueueState & PlayerQueueActions {
   const shuffleForQueue = (queue: Track[], index: number) => get().shuffle ? generateShuffleBag(queue.length, index) : []
   const selectTrack = (track: Track, index: number, queue = get().queue) => {
+    if (track.available !== true) return
     const shuffleBag = queue === get().queue ? get().shuffleBag : shuffleForQueue(queue, index)
     commit({ queue, currentIndex: index, currentTrack: track, isPlaying: true, duration: 0, shuffleBag })
     updateTime(0)
@@ -15,6 +17,18 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
   return {
     queue: [], currentIndex: -1, currentTrack: null, shuffleBag: [],
     playTrack: (track, queue) => {
+      if (track.available !== true) {
+        if (track.available === undefined && get().queue.some((item) => item.publicId === track.publicId)) {
+          hydrateQueueAvailability({ get, commit }, () => {
+            const hydrated = get().queue.find((item) => item.publicId === track.publicId)
+            if (hydrated?.available === true) get().playTrack(hydrated)
+          })
+        }
+        return
+      }
+      if (queue?.some((item) => item.available !== true)) {
+        queue = queue.filter((item) => item.available === true)
+      }
       const state = get()
       if (queue) {
         const found = queue.findIndex(item => item.publicId === track.publicId)
@@ -24,24 +38,29 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
         return
       }
       const found = state.queue.findIndex(item => item.publicId === track.publicId)
-      selectTrack(track, found >= 0 ? found : state.queue.length,
-        found >= 0 ? state.queue : [...state.queue, track])
+      const selectedQueue = found < 0 ? [...state.queue, track]
+        : state.queue[found] === track ? state.queue
+        : state.queue.map((item, index) => index === found ? track : item)
+      selectTrack(track, found >= 0 ? found : state.queue.length, selectedQueue)
     },
     playTrackFromList: (songs, position) => {
       if (!Number.isInteger(position) || !songs[position]) return
+      if (songs[position].available !== true) return
       const tracks: Track[] = songs.map(song => ({
-        publicId: song.publicId, title: song.title, artistName: song.artistName,
+        publicId: song.publicId, available: song.available, title: song.title, artistName: song.artistName,
         albumName: song.albumName, albumPublicId: song.albumPublicId, duration: song.duration,
       }))
       get().playTrack(tracks[position], tracks)
     },
     addToQueue: (track) => {
+      if (track.available !== true) return
       const state = get()
       if (state.queue.some(item => item.publicId === track.publicId)) return
       const queue = [...state.queue, track]
       commit({ queue, shuffleBag: shuffleForQueue(queue, state.currentIndex) })
     },
     insertAfterCurrent: (tracks) => {
+      tracks = tracks.filter((track) => track.available === true)
       if (tracks.length === 0) return
       const state = get()
       const insertion = state.currentIndex < 0 ? state.queue.length : state.currentIndex + 1
@@ -74,8 +93,13 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
         updateTime(0)
         return
       }
-      const index = state.currentIndex > 0 ? state.currentIndex - 1 : state.queue.length - 1
-      selectTrack(state.queue[index], index)
+      for (let offset = 1; offset <= state.queue.length; offset++) {
+        const index = (state.currentIndex - offset + state.queue.length) % state.queue.length
+        if (state.queue[index].available === true) {
+          selectTrack(state.queue[index], index)
+          return
+        }
+      }
     },
     adoptPreloadedNext: (element, expectedCurrentId, expectedNextId) => {
       const state = get()
@@ -100,10 +124,23 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
         : index === state.currentIndex ? Math.min(index, queue.length - 1) : state.currentIndex
       const currentTrack = currentIndex >= 0 ? queue[currentIndex] : null
       if (index === state.currentIndex && currentTrack) {
-        if (state.isPlaying) { selectTrack(currentTrack, currentIndex, queue); return }
+        if (state.isPlaying) {
+          const following = queue.findIndex((track, position) => position >= currentIndex && track.available === true)
+          const availableIndex = following >= 0 ? following : queue.findIndex((track) => track.available === true)
+          if (availableIndex >= 0) {
+            selectTrack(queue[availableIndex], availableIndex, queue)
+            return
+          }
+        }
         invalidatePlaybackSelection()
-        if (state.audioElement) { state.audioElement.pause(); state.audioElement.src = buildStreamUrl(currentTrack.publicId) }
+        if (state.audioElement) {
+          state.audioElement.pause()
+          state.audioElement.src = currentTrack.available === true ? buildStreamUrl(currentTrack.publicId) : ''
+        }
+        commit({ queue, currentIndex, currentTrack, isPlaying: false, duration: 0,
+          shuffleBag: shuffleForQueue(queue, currentIndex) })
         updateTime(0)
+        return
       }
       commit({ queue, currentIndex, currentTrack, shuffleBag: shuffleForQueue(queue, currentIndex) })
     },
@@ -124,7 +161,7 @@ export function createPlayerQueueSlice({ get, commit }: PlayerSliceContext): Pla
       const currentTrack = queue[currentIndex] ?? null
       const time = Number.isFinite(position) ? Math.max(0, position) : 0
       if (state.audioElement) {
-        state.audioElement.src = currentTrack ? buildStreamUrl(currentTrack.publicId) : ''
+        state.audioElement.src = currentTrack?.available === true ? buildStreamUrl(currentTrack.publicId) : ''
         if (currentTrack) state.audioElement.currentTime = time
       }
       commit({ queue, currentIndex, currentTrack, isPlaying: false,

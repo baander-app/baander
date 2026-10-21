@@ -25,8 +25,9 @@ export function usePlayArtist() {
           return
         }
 
-        const tracks: Track[] = items.map((s) => ({
+        const tracks: Track[] = items.filter((s) => s.available === true).map((s) => ({
           publicId: String(s.publicId ?? ''),
+          available: s.available === true,
           title: String(s.title ?? ''),
           artistName: artistName,
           albumName: s.albumName ? String(s.albumName) : undefined,
@@ -34,7 +35,7 @@ export function usePlayArtist() {
           duration: typeof s.length === 'number' ? s.length : undefined,
         }))
 
-        playTrack(tracks[0], tracks)
+        if (tracks.length > 0) playTrack(tracks[0], tracks)
       } catch (err) {
         logger.warn('Failed to fetch artist songs:', err)
       }

@@ -102,6 +102,7 @@ export function ActivityItem({ entry }: ActivityItemProps) {
       e.preventDefault()
       const track: Track = {
         publicId: entry.songId,
+        available: entry.songAvailable === true,
         title: entry.songTitle ?? '',
         artistName: entry.artistName ?? undefined,
         albumName: entry.albumName ?? undefined,
@@ -115,6 +116,7 @@ export function ActivityItem({ entry }: ActivityItemProps) {
     <SongContextMenu
       song={{
         publicId: entry.songId ?? entry.publicId,
+        available: entry.songAvailable === true,
         title,
         artistName: entry.artistName ?? undefined,
         albumName: entry.albumName ?? undefined,
@@ -135,7 +137,7 @@ export function ActivityItem({ entry }: ActivityItemProps) {
 
         {/* Song info */}
         <SongInfo>
-          <SongTitle>{title}</SongTitle>
+          <SongTitle>{title}{entry.songAvailable === false && <span> · Unavailable</span>}</SongTitle>
           <MetaRow>
             {entry.artistName && (
               <MetaText>{entry.artistName}</MetaText>

@@ -77,6 +77,7 @@ describe('SongContextMenu', () => {
   const song = {
     publicId: 'song-1',
     title: 'Test Song',
+    available: true,
     artistName: 'Test Artist',
     albumName: 'Test Album',
     duration: 180,
@@ -91,6 +92,18 @@ describe('SongContextMenu', () => {
       </SongContextMenu>,
     )
   }
+
+  it('disables playback for unavailable media while keeping playlist and info actions', async () => {
+    const user = userEvent.setup()
+    render(<SongContextMenu song={{ ...song, available: false }}><div>Missing song</div></SongContextMenu>)
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByText('Missing song') })
+
+    for (const label of ['Play', 'Play Next', 'Play Last', 'Add to Queue']) {
+      expect(screen.getByRole('menuitem', { name: new RegExp(`^${label}(?:$|Space)`) })).toHaveAttribute('data-disabled')
+    }
+    expect(screen.getByRole('menuitem', { name: 'Add to Playlist' })).not.toHaveAttribute('data-disabled')
+    expect(screen.getByRole('menuitem', { name: /^Get Info/ })).not.toHaveAttribute('data-disabled')
+  })
 
   it('renders children as the trigger', () => {
     renderMenu()

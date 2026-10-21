@@ -76,6 +76,7 @@ export function ForYouCard({ song }: ForYouCardProps) {
       onClick={() => {
         playTrack({
           publicId: song.publicId,
+          available: song.available,
           title: song.title,
           duration: song.duration ?? undefined,
         })
@@ -91,7 +92,7 @@ export function ForYouCard({ song }: ForYouCardProps) {
       </CoverImageArea>
       <CardInfo>
         <CardTitle>{song.title}</CardTitle>
-        <CardSubtitle>{song.explanation}</CardSubtitle>
+        <CardSubtitle>{song.available ? song.explanation : 'Unavailable'}</CardSubtitle>
       </CardInfo>
     </CoverCard>
   )

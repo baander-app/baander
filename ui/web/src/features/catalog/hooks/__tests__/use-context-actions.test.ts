@@ -36,6 +36,7 @@ describe('useContextActions', () => {
   const sampleSong: SongContextMenuData = {
     publicId: 'song-1',
     title: 'Test Song',
+    available: true,
     artistName: 'Test Artist',
     albumName: 'Test Album',
     duration: 180,
@@ -50,6 +51,7 @@ describe('useContextActions', () => {
       {
         publicId: 'song-1',
         title: 'Test Song',
+        available: true,
         artistName: 'Test Artist',
         albumName: 'Test Album',
         duration: 180,
@@ -61,8 +63,8 @@ describe('useContextActions', () => {
   it('playSong passes queue when provided', () => {
     const { result } = renderHook(() => useContextActions())
     const queue = [
-      { publicId: 'song-1', title: 'A' },
-      { publicId: 'song-2', title: 'B' },
+      { publicId: 'song-1', available: true, title: 'A' },
+      { publicId: 'song-2', available: true, title: 'B' },
     ]
     act(() => {
       result.current.playSong(sampleSong, queue)
@@ -75,7 +77,7 @@ describe('useContextActions', () => {
 
   it('playNext calls insertAfterCurrent', () => {
     const { result } = renderHook(() => useContextActions())
-    const tracks = [{ publicId: 'song-1', title: 'A' }]
+    const tracks = [{ publicId: 'song-1', available: true, title: 'A' }]
     act(() => {
       result.current.playNext(tracks)
     })
@@ -84,7 +86,7 @@ describe('useContextActions', () => {
 
   it('playLast calls addToQueue', () => {
     const { result } = renderHook(() => useContextActions())
-    const track = { publicId: 'song-1', title: 'A' }
+    const track = { publicId: 'song-1', available: true, title: 'A' }
     act(() => {
       result.current.playLast(track)
     })

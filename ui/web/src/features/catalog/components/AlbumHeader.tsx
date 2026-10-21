@@ -80,8 +80,9 @@ interface AlbumHeaderProps {
 }
 
 function buildTracks(songs: Record<string, unknown>[], albumTitle: string, albumPublicId?: string): Track[] {
-  return songs.map((s) => ({
+  return songs.filter((s) => s.available === true).map((s) => ({
     publicId: String(s.publicId ?? ''),
+    available: s.available === true,
     title: String(s.title ?? ''),
     artistName: s.artistName ? String(s.artistName) : undefined,
     albumName: albumTitle,
@@ -108,13 +109,13 @@ export function AlbumHeader({
   const handlePlayAll = () => {
     if (songs.length === 0) return
     const tracks = buildTracks(songs, albumTitle, albumPublicId)
-    playTrack(tracks[0], tracks)
+    if (tracks.length > 0) playTrack(tracks[0], tracks)
   }
 
   const handleShuffle = () => {
     if (songs.length === 0) return
     const tracks = [...buildTracks(songs, albumTitle, albumPublicId)].sort(() => Math.random() - 0.5)
-    playTrack(tracks[0], tracks)
+    if (tracks.length > 0) playTrack(tracks[0], tracks)
   }
 
   return (
@@ -150,12 +151,12 @@ export function AlbumHeader({
           {metadataOpen ? 'Hide Info' : 'Info'}
         </Button>
 
-        <Button size="xs" onClick={handlePlayAll} disabled={songs.length === 0}>
+        <Button size="xs" onClick={handlePlayAll} disabled={!songs.some((song) => song.available === true)}>
           <Play size={12} fill="currentColor" />
           Play
         </Button>
 
-        <Button variant="outline" size="xs" onClick={handleShuffle} disabled={songs.length === 0}>
+        <Button variant="outline" size="xs" onClick={handleShuffle} disabled={!songs.some((song) => song.available === true)}>
           <Shuffle size={12} />
         </Button>
         </HeaderBar>

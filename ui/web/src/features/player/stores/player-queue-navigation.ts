@@ -31,14 +31,9 @@ export function resolveNextIndex(
   shuffleBag: number[],
 ): number | null {
   if (queue.length === 0) return null
-  if (shuffle) {
-    const bagIdx = shuffleBag.indexOf(currentIndex)
-    const nextBagIdx = bagIdx + 1
-    if (nextBagIdx < shuffleBag.length) return shuffleBag[nextBagIdx]
-    if (repeat === 'all') return shuffleBag[0]
-    return null
-  }
-  if (currentIndex < queue.length - 1) return currentIndex + 1
-  if (repeat === 'all') return 0
-  return null
+  const order = shuffle ? shuffleBag : queue.map((_, index) => index)
+  const position = order.indexOf(currentIndex)
+  const following = order.slice(position + 1)
+  const candidates = repeat === 'all' ? [...following, ...order.slice(0, position + 1)] : following
+  return candidates.find((index) => queue[index]?.available === true) ?? null
 }

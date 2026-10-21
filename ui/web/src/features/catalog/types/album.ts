@@ -2,6 +2,7 @@
 export interface SongEntry {
   publicId: string
   title: string
+  available?: boolean
   artistName?: string
   albumName?: string
   albumPublicId?: string
@@ -45,6 +46,7 @@ export interface SongSummary {
   publicId: string
   albumId: string
   title: string
+  available?: boolean
   path: string
   length: number | null
   track: number | null

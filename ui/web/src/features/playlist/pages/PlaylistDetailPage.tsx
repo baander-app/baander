@@ -1,3 +1,4 @@
+import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
@@ -156,6 +157,7 @@ export function PlaylistDetailPage() {
     { query: { enabled: !!publicId } }
   )
   const playTrack = usePlayerStore((s) => s.playTrack)
+  const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem)
   const viewerPublicId = useAuthStore((s) => s.user?.publicId)
   const leave = useDeletePlaylistRemoveCollaborator({
     mutation: {
@@ -175,9 +177,10 @@ export function PlaylistDetailPage() {
 
   const tracks: Track[] = useMemo(() =>
     songs
-      .filter((s): s is GetPlaylistShow200DataSongsItem & { publicId: string } => !!s.publicId)
+      .filter((s): s is GetPlaylistShow200DataSongsItem & { publicId: string } => !!s.publicId && s.available === true)
       .map((s) => ({
         publicId: s.publicId,
+        available: s.available === true,
         title: s.title ?? 'Unknown',
         artistName: s.artistName ?? undefined,
         albumName: s.albumName ?? undefined,
@@ -251,11 +254,15 @@ export function PlaylistDetailPage() {
         {songs.map((song, i) => (
           <SongItem
             key={`${song.publicId}-${i}`}
-            onClick={() => playTrack(tracks[i], tracks)}
+            onClick={() => {
+              if (song.publicId) setSelectedItem({ type: 'song', publicId: song.publicId })
+              const selected = tracks.find((track) => track.publicId === song.publicId)
+              if (selected) playTrack(selected, tracks)
+            }}
           >
             <SongPosition>{song.position ?? i + 1}</SongPosition>
             <SongInfo>
-              <SongTitle>{song.title || song.publicId}</SongTitle>
+              <SongTitle>{song.title || song.publicId}{song.available === false && <span> · Unavailable</span>}</SongTitle>
               <SongArtist>{song.artistName ?? 'Unknown artist'}</SongArtist>
             </SongInfo>
             {song.length != null && (
