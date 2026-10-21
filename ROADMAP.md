@@ -133,3 +133,20 @@ match the requested rewrite and relocation. Whitespace checks passed. Independen
 plan and final documentation reviews found no defects. No application test suite
 was run for this documentation-only change; the runtime build failure above is a
 verification limit, not a passing bootstrap.
+
+## Expanded project introduction
+
+Checkpoint, 2026-10-21: expanded the README into a project overview covering library
+scanning, browsing and search, metadata and lyrics, music and movie playback,
+playlists, account access, instance components and development. Descriptions were
+checked against the current web routes, feature implementations and owning guides.
+The README retains source-build and separate-worker requirements, package license
+exceptions and the earlier bootstrap verification limits. This follow-up changes
+no application behavior or installation commands; no application suites or runtime
+walkthrough were run again.
+
+Verification: independent plan and final documentation reviews returned no
+findings. All 31 local links and heading anchors across the changed documents
+resolved. Prose preservation audits and whitespace checks passed; the added
+headings and capability descriptions are intentional expansion, and the existing
+licensing qualifications remain intact.
