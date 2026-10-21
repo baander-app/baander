@@ -8,8 +8,7 @@ declare(strict_types=1);
  * import lock the test process holds.
  *
  * Arguments: schema, application name, library ID, and optionally the claim kind (`scan`, the
- * default, or `delete`). Prints the outcome as JSON: whether it claimed the library and, when it
- * did not, the kind of claim that holds it.
+ * default, `delete`, or `release`). Prints the claim attempt or forced release outcome as JSON.
  */
 
 use App\Shared\Domain\Model\Uuid;
@@ -29,6 +28,11 @@ $connection = LibraryScanClaimRace::connect($schema, $application);
 $connection->executeStatement("SET lock_timeout = '10s'");
 
 $libraries = LibraryScanClaimRace::repository(LibraryScanClaimRace::entityManager($connection));
+if ($kind === 'release') {
+    $release = $libraries->releaseClaim(Uuid::fromString($libraryId), evenIfLive: true);
+    echo json_encode(['released' => $release->released?->value], JSON_THROW_ON_ERROR);
+    exit(0);
+}
 $attempt = match ($kind) {
     'scan' => $libraries->claimScan(Uuid::fromString($libraryId), new Uuid(), 900),
     'delete' => $libraries->claimDelete(Uuid::fromString($libraryId), new Uuid(), 900),

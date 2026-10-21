@@ -9,6 +9,8 @@ use App\Kernel;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\MovieScanner;
+use App\Library\Application\Exception\LibraryScanClaimLostException;
+use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Application\MusicScanner;
 use App\Library\Domain\Event\LibraryDirectoryIndexed;
 use App\Library\Domain\Model\Library;
@@ -28,6 +30,8 @@ use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Library\LibraryScanClaimRace;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Closure;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
@@ -39,6 +43,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
@@ -317,6 +322,167 @@ final class LibraryDirectoryPublicationTest extends TestCase
         self::assertNotNull($this->observer->fetchOne("SELECT relayed_at FROM domain_event_outbox WHERE event_name = 'library.directory_indexed'"));
     }
 
+
+    /** @return iterable<string, array{LibraryType, bool, string}> */
+    public static function lostOwners(): iterable
+    {
+        foreach ([LibraryType::Music, LibraryType::Movie] as $type) {
+            foreach ([false, true] as $missing) {
+                foreach (['release', 'scan', 'delete'] as $replacement) {
+                    yield $type->value . ($missing ? ' missing ' : ' directory ') . $replacement => [$type, $missing, $replacement];
+                }
+            }
+        }
+    }
+
+    #[DataProvider('lostOwners')]
+    public function testOwnershipLostBeforeWriteLeavesSuccessorObservationsUntouched(LibraryType $type, bool $missing, string $replacement): void
+    {
+        $library = $this->library($type);
+        $path = $this->file($type);
+        if ($missing) {
+            $this->scanner($type)->scan($library);
+            self::assertTrue(unlink($path));
+        }
+        $libraries = new LibraryRepository($this->manager, new NativeClock());
+        $lease = $this->lease($libraries, $library);
+        $successor = new Uuid();
+        $changed = false;
+        $transaction = $this->synchronizedTransaction(before: function () use ($library, $type, $missing, $replacement, $successor, &$changed): void {
+            self::assertFalse($changed);
+            $changed = true;
+            $other = LibraryScanClaimRace::repository(LibraryScanClaimRace::entityManager($this->observer));
+            self::assertNotNull($other->releaseClaim($library->getId(), evenIfLive: true)->released);
+            if ($replacement === 'scan') {
+                self::assertTrue($other->claimScan($library->getId(), $successor, 900)->claimed);
+            } elseif ($replacement === 'delete') {
+                self::assertTrue($other->claimDelete($library->getId(), $successor, 900)->claimed);
+            }
+            if ($missing) {
+                // The old scan already took its empty snapshot. A later observation restores this path.
+                $this->file($type);
+                $this->scanner($type)->scan($library, rescan: true, publishDirectory: $this->capture($library));
+            }
+        });
+        try {
+            $this->scanner($type, $transaction)->scan($library, lease: $lease, publishDirectory: $this->capture($library));
+            self::fail('The released holder must fail before writing.');
+        } catch (LibraryScanClaimLostException) {
+            self::assertTrue($changed);
+        }
+        $lease->fail();
+        self::assertSame($replacement === 'release' ? null : $successor->toString(), $this->observer->fetchOne('SELECT claim_id FROM libraries'));
+        self::assertSame($missing ? 1 : 0, $this->rowCount($this->observer, 'library_file_index'));
+        self::assertSame($missing ? 1 : 0, $this->rowCount($this->observer, 'domain_event_outbox'));
+        if ($missing) {
+            self::assertSame($path, $this->observer->fetchOne('SELECT path FROM library_file_index WHERE available = true'));
+        }
+    }
+
+    /** @return iterable<string, array{LibraryType, bool, bool, string}> */
+    public static function guardedWrites(): iterable
+    {
+        foreach ([LibraryType::Music, LibraryType::Movie] as $type) {
+            foreach ([false, true] as $missing) {
+                yield $type->value . ($missing ? ' missing commit' : ' directory commit') => [$type, $missing, false, 'release'];
+                yield $type->value . ($missing ? ' missing rollback' : ' directory rollback') => [$type, $missing, true, 'release'];
+                yield $type->value . ($missing ? ' missing takeover' : ' directory takeover') => [$type, $missing, false, $missing ? 'delete' : 'scan'];
+            }
+        }
+    }
+
+    #[DataProvider('guardedWrites')]
+    public function testGuardedScannerTransactionHoldsClaimUntilItEnds(LibraryType $type, bool $missing, bool $rollback, string $contender): void
+    {
+        $library = $this->library($type);
+        $path = $this->file($type);
+        if ($missing) {
+            $this->scanner($type)->scan($library);
+            self::assertTrue(unlink($path));
+        }
+        $libraries = new LibraryRepository($this->manager, new NativeClock());
+        $lease = $this->lease($libraries, $library);
+        if ($contender !== 'release') {
+            $this->observer->executeStatement("UPDATE libraries SET claim_expires_at = clock_timestamp() - interval '1 second'");
+        }
+        $child = null;
+        $outcome = [];
+        $transaction = $this->synchronizedTransaction(after: function () use ($library, $missing, $rollback, $contender, &$child): void {
+            self::assertTrue($this->writer->isTransactionActive());
+            self::assertSame($missing ? 1 : 0, $this->rowCount($this->observer, 'library_file_index'));
+            self::assertSame(0, $this->rowCount($this->observer, 'domain_event_outbox'));
+            if ($missing) {
+                self::assertTrue($this->observer->fetchOne('SELECT available FROM library_file_index'));
+                self::assertFalse($this->writer->fetchOne('SELECT available FROM library_file_index'));
+            }
+            $child = LibraryScanClaimRace::start($this->schema, $library->getId()->toString(), $contender);
+            LibraryScanClaimRace::awaitLockWait($this->observer, $child);
+            if ($rollback) {
+                throw new \RuntimeException('Roll back guarded write.');
+            }
+        });
+        try {
+            $this->scanner($type, $transaction)->scan($library, lease: $lease, publishDirectory: $this->capture($library));
+            self::assertFalse($rollback);
+        } catch (\RuntimeException $error) {
+            self::assertTrue($rollback);
+            self::assertSame('Roll back guarded write.', $error->getMessage());
+        } finally {
+            if ($child !== null) {
+                $outcome = LibraryScanClaimRace::finish($child);
+            }
+        }
+        self::assertNotNull($child);
+        self::assertSame($contender === 'release' ? ['released' => 'scan'] : ['claimed' => false, 'holder' => 'scan'], $outcome);
+        self::assertSame($missing || !$rollback ? 1 : 0, $this->rowCount($this->observer, 'library_file_index'));
+        self::assertSame(!$missing && !$rollback ? 1 : 0, $this->rowCount($this->observer, 'domain_event_outbox'));
+        if ($missing) {
+            self::assertSame($rollback, $this->observer->fetchOne('SELECT available FROM library_file_index'));
+        }
+        if ($contender === 'release') {
+            $successor = new Uuid();
+            self::assertTrue($libraries->claimScan($library->getId(), $successor, 900)->claimed);
+            $this->writer->beginTransaction();
+            try {
+                $lease->guardWrite();
+                self::fail('A released holder cannot guard another write.');
+            } catch (LibraryScanClaimLostException) {
+                self::assertSame($successor->toString(), $this->observer->fetchOne('SELECT claim_id FROM libraries'));
+            } finally {
+                $this->writer->rollBack();
+            }
+            $lease->fail();
+            self::assertSame($successor->toString(), $this->observer->fetchOne('SELECT claim_id FROM libraries'));
+        }
+    }
+
+    private function lease(LibraryRepository $libraries, Library $library): LibraryScanLease
+    {
+        $claim = new Uuid();
+        self::assertTrue($libraries->claimScan($library->getId(), $claim, 900)->claimed);
+        return new LibraryScanLease($libraries, new MockClock('2026-10-21T12:00:00+00:00'), $library, $claim, 900, 60);
+    }
+
+    private function synchronizedTransaction(?Closure $before = null, ?Closure $after = null): TransactionPortInterface
+    {
+        $inner = $this->kernel->getContainer()->get('test.service_container')->get(TransactionPortInterface::class);
+        return new class($inner, $before, $after) implements TransactionPortInterface {
+            public function __construct(private TransactionPortInterface $inner, private ?Closure $before, private ?Closure $after)
+            {
+            }
+
+            public function run(callable $operation): mixed
+            {
+                ($this->before ?? static function (): void {})();
+                return $this->inner->run(function () use ($operation): mixed {
+                    $result = $operation();
+                    ($this->after ?? static function (): void {})();
+                    return $result;
+                });
+            }
+        };
+    }
+
     private function library(LibraryType $type): Library
     {
         $library = Library::create('Directory publication', new LibrarySlug('directory-publication'), new LibraryPath($this->root), $type, FilesystemType::Local);
@@ -341,10 +507,10 @@ final class LibraryDirectoryPublicationTest extends TestCase
         return $path;
     }
 
-    private function scanner(LibraryType $type): MusicScanner|MovieScanner
+    private function scanner(LibraryType $type, ?TransactionPortInterface $transaction = null): MusicScanner|MovieScanner
     {
         $container = $this->kernel->getContainer()->get('test.service_container');
-        $arguments = [new DirectoryScanner(), $this->index, new NullLogger(), $this->createStub(JobCancellationCheckpointInterface::class), $container->get(TransactionPortInterface::class)];
+        $arguments = [new DirectoryScanner(), $this->index, new NullLogger(), $this->createStub(JobCancellationCheckpointInterface::class), $transaction ?? $container->get(TransactionPortInterface::class)];
         return $type === LibraryType::Music ? new MusicScanner(...$arguments) : new MovieScanner(...$arguments);
     }
 

@@ -79,6 +79,39 @@ final class LibraryScanClaimTest extends TestCase
         $this->kernel?->shutdown();
     }
 
+
+    public function testWriteGuardRequiresTheWriteTransaction(): void
+    {
+        $claim = new Uuid();
+        self::assertTrue($this->libraries->claimScan($this->library->getId(), $claim, self::LEASE)->claimed);
+        $this->expectException(\LogicException::class);
+        $this->libraries->renewScanClaimForWrite($this->library->getId(), $claim, self::LEASE);
+    }
+
+    public function testWriteGuardMatchesLibraryAndScanOwnerWithoutAnExpiryCutoff(): void
+    {
+        $this->completeAScan();
+        $claim = new Uuid();
+        self::assertTrue($this->libraries->claimScan($this->library->getId(), $claim, self::LEASE)->claimed);
+        $this->lapse();
+        $before = $this->observer->fetchAssociative('SELECT updated_at, scan_status, last_scan FROM libraries');
+        $this->writer->beginTransaction();
+        self::assertFalse($this->libraries->renewScanClaimForWrite(new Uuid(), $claim, self::LEASE));
+        self::assertFalse($this->libraries->renewScanClaimForWrite($this->library->getId(), new Uuid(), self::LEASE));
+        self::assertTrue($this->libraries->renewScanClaimForWrite($this->library->getId(), $claim, self::LEASE));
+        $this->writer->commit();
+        self::assertSame($before, $this->observer->fetchAssociative('SELECT updated_at, scan_status, last_scan FROM libraries'));
+        self::assertTrue($this->observer->fetchOne('SELECT claim_expires_at > clock_timestamp() FROM libraries'));
+        self::assertNotNull($this->libraries->releaseClaim($this->library->getId(), evenIfLive: true)->released);
+        $delete = new Uuid();
+        self::assertTrue($this->libraries->claimDelete($this->library->getId(), $delete, self::LEASE)->claimed);
+        $this->writer->beginTransaction();
+        self::assertFalse($this->libraries->renewScanClaimForWrite($this->library->getId(), $delete, self::LEASE));
+        self::assertFalse($this->libraries->renewScanClaimForWrite($this->library->getId(), $claim, self::LEASE));
+        $this->writer->commit();
+        self::assertSame($delete->toString(), $this->row()['claim_id']);
+    }
+
     public function testOfTwoConcurrentClaimsExactlyOneSucceeds(): void
     {
         self::assertNull($this->row()['scan_status'], 'A library that never scanned has no status.');
@@ -483,63 +516,21 @@ final class LibraryScanClaimTest extends TestCase
     /** @return array{process: resource, output: resource, application: string} */
     private function startChild(string $kind = 'scan'): array
     {
-        $application = 'library_claim_' . bin2hex(random_bytes(6));
-        $output = tmpfile();
-        self::assertIsResource($output);
-        $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Library/library-scan-claim.php', $this->schema, $application, $this->library->getId()->toString(), $kind],
-            [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
-            $pipes,
-        );
-        self::assertIsResource($process);
-
-        return ['process' => $process, 'output' => $output, 'application' => $application];
+        return LibraryScanClaimRace::start($this->schema, $this->library->getId()->toString(), $kind);
     }
 
     /** @param array{process: resource, output: resource, application: string} $child */
     private function awaitLockWait(array $child): void
     {
-        $deadline = microtime(true) + 5;
-        while (true) {
-            $this->observer->executeQuery('SELECT pg_stat_clear_snapshot()')->free();
-            $waiting = $this->observer->fetchOne(
-                "SELECT 1 FROM pg_stat_activity WHERE application_name = ? AND wait_event_type = 'Lock'",
-                [$child['application']],
-            );
-            if ($waiting !== false) {
-                return;
-            }
-            if (microtime(true) > $deadline || !proc_get_status($child['process'])['running']) {
-                rewind($child['output']);
-                self::fail('The second claim must wait on the library row lock: ' . stream_get_contents($child['output']));
-            }
-            usleep(1000);
-        }
+        LibraryScanClaimRace::awaitLockWait($this->observer, $child);
     }
 
     /**
      * @param array{process: resource, output: resource, application: string} $child
-     *
      * @return array<string, mixed>
      */
     private function finish(array $child): array
     {
-        $deadline = microtime(true) + 10;
-        while (proc_get_status($child['process'])['running']) {
-            if (microtime(true) > $deadline) {
-                proc_terminate($child['process'], 9);
-                self::fail('The second claim did not finish after the first ended.');
-            }
-            usleep(1000);
-        }
-        rewind($child['output']);
-        $result = (string) stream_get_contents($child['output']);
-        fclose($child['output']);
-        self::assertSame(0, proc_close($child['process']), $result);
-
-        $decoded = json_decode($result, true, flags: JSON_THROW_ON_ERROR);
-        self::assertIsArray($decoded);
-
-        return $decoded;
+        return LibraryScanClaimRace::finish($child);
     }
 }
