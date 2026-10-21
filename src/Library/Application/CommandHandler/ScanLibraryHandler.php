@@ -10,14 +10,15 @@ use App\Library\Application\Exception\LibraryNotFoundException;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\LibraryDiscovery;
-use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Message\DiscoveredFile;
+use App\Library\Domain\Event\LibraryDirectoryIndexed;
 use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Throwable;
 
 /** Runs a library scan under the claim its sender took, publishing each discovered directory. */
@@ -27,7 +28,7 @@ final class ScanLibraryHandler
         private readonly LibraryRepositoryInterface $libraryRepository,
         private readonly LibraryScanClaims $claims,
         private readonly LibraryDiscovery $discovery,
-        private readonly MessageBusInterface $messageBus,
+        private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -44,16 +45,20 @@ final class ScanLibraryHandler
         $library = $this->library($command, $claimId);
         $lease = $this->claims->acquire($library, $claimId);
 
-        // Emit FilesDiscovered per directory via Messenger
-        $queued = 0;
-        $result = $this->discovery->discover($library, $command->isRescan(), $lease, function (string $directory, array $files) use ($library, &$queued): void {
-            $this->messageBus->dispatch(new FilesDiscovered(
-                libraryId: $library->getId(),
+        $result = $this->discovery->discover($library, $command->isRescan(), $lease, function (string $directory, array $files) use ($library): void {
+            $this->eventDispatcher->dispatch(new LibraryDirectoryIndexed(
+                libraryId: $library->getId()->toString(),
                 libraryType: $library->getType()->value,
                 directory: $directory,
-                files: $files,
+                files: array_map(static fn (DiscoveredFile $file): array => [
+                    'absolute_path' => $file->absolutePath,
+                    'relative_path' => $file->relativePath,
+                    'extension' => $file->extension,
+                    'size' => $file->size,
+                    'modified_at' => $file->modifiedAt,
+                    'hash' => $file->hash,
+                ], $files),
             ));
-            $queued++;
         });
 
         return new LibraryScanSummary(
@@ -63,7 +68,7 @@ final class ScanLibraryHandler
             filesDiscovered: $result->filesDiscovered,
             filesProcessed: $result->filesProcessed,
             filesSkipped: $result->filesSkipped,
-            directoriesQueued: $queued,
+            directoriesQueued: count($result->directories),
         );
     }
 

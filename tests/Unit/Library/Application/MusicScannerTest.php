@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Application;
 
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
@@ -52,6 +53,7 @@ final class MusicScannerTest extends TestCase
             fileIndexRepository: $this->fileIndexRepository,
             logger: $this->logger,
             cancellation: $cancellation,
+            transaction: new PassThroughTransaction(),
         );
     }
 
@@ -266,18 +268,18 @@ final class MusicScannerTest extends TestCase
         self::assertSame([], $removed, 'A stopped scan has not seen every file, so it removes no index entry.');
     }
 
-    public function testADirectoryWhosePublicationFailsStaysUnindexed(): void
+    public function testADirectoryCaptureFailurePropagatesForRollback(): void
     {
         $library = $this->createLibrary();
         $this->directoryScanner->method('scan')->willReturn([$this->createAudioFile('Album1', 'track01.mp3')]);
         $this->fileIndexRepository = $this->createMock(LibraryFileIndexRepositoryInterface::class);
         $this->fileIndexRepository->method('findAvailableIndexPathMapByLibrary')->willReturn([]);
-        $this->fileIndexRepository->expects($this->never())->method('upsert');
+        $this->fileIndexRepository->expects($this->once())->method('upsert');
 
-        $this->expectExceptionMessage('transport down');
+        $this->expectExceptionMessage('capture failed');
 
         $this->createScanner()->scan($library, publishDirectory: static function (): void {
-            throw new \RuntimeException('transport down');
+            throw new \RuntimeException('capture failed');
         });
     }
 }

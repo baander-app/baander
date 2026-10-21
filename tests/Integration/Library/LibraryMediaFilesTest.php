@@ -79,6 +79,16 @@ final class LibraryMediaFilesTest extends TestCase
                 {
                 }
             },
+            new class($this->manager->getConnection()) implements \App\Shared\Application\Port\TransactionPortInterface {
+                public function __construct(private readonly \Doctrine\DBAL\Connection $connection)
+                {
+                }
+
+                public function run(callable $operation): mixed
+                {
+                    return $this->connection->transactional($operation);
+                }
+            },
         );
     }
 
@@ -279,6 +289,40 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertSame([$first], $published, 'Only the returning file is new; its unchanged neighbour is still known.');
         self::assertSame(1, $scan->filesProcessed);
         self::assertSame([$first, $second], $this->indexedPaths($library));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('publicationIndexStates')]
+    public function testAnImmediateMissingObservationSurvivesDirectoryPublication(bool $previouslyIndexed): void
+    {
+        [$library, $first] = $this->scannedAlbum();
+        if ($previouslyIndexed) {
+            $this->fileIndex->markUnavailableByPaths($library->getId(), [$first]);
+        } else {
+            $this->fileIndex->removeByPath($library->getId(), $first);
+        }
+
+        $this->scanner->scan($library, publishDirectory: function () use ($library, $first): void {
+            self::assertTrue(rename($first, $this->base . '/elsewhere/01.flac'));
+            self::assertSame([$first], $this->files->markMissingUnavailable($library->getId(), [$first]));
+            self::assertTrue(rename($this->base . '/elsewhere/01.flac', $first));
+        });
+
+        self::assertSame([$first => false], $this->fileIndex->findAvailabilityByPaths($library->getId(), [$first]));
+        $published = [];
+        $result = $this->scanner->scan($library, publishDirectory: static function (string $directory, array $files) use (&$published): void {
+            foreach ($files as $file) {
+                $published[] = $file->absolutePath;
+            }
+        });
+        self::assertSame([$first], $published);
+        self::assertSame(1, $result->filesProcessed);
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function publicationIndexStates(): iterable
+    {
+        yield 'new source' => [false];
+        yield 'previously unavailable source' => [true];
     }
 
     public function testADirectoryTheServerCannotWriteRefusesTheRequestAsAConflict(): void

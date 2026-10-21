@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Application;
 
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\LibraryDiscovery;
@@ -115,7 +116,7 @@ final class LibraryProvisionerTest extends TestCase
     {
         $fileIndex = $this->createStub(LibraryFileIndexRepositoryInterface::class);
         $logger = new NullLogger();
-        $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint());
+        $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint(), new PassThroughTransaction());
         $events = $this->createStub(EventDispatcherInterface::class);
         $events->method('dispatch')->willReturnArgument(0);
 
@@ -128,7 +129,7 @@ final class LibraryProvisionerTest extends TestCase
                 }
             }),
             new LibraryScanClaims(new LibraryLookup($libraries), $libraries, new MockClock()),
-            new LibraryDiscovery(new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint()), $movieScanner, $events, $logger),
+            new LibraryDiscovery(new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint(), new PassThroughTransaction()), $movieScanner, $events, $logger),
             $movieScanner,
         );
     }

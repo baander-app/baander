@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Application;
 
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\Service\LibraryScanLease;
@@ -52,7 +53,7 @@ final class ScannerAvailabilityTest extends TestCase
         $directory = $this->createStub(DirectoryScannerPortInterface::class);
         $directory->method('scan')->willReturn([]);
 
-        $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint()))->scan($library, $rescan);
+        $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), new PassThroughTransaction()))->scan($library, $rescan);
 
         self::assertSame(0, $result->filesProcessed);
     }
@@ -68,7 +69,7 @@ final class ScannerAvailabilityTest extends TestCase
         $directory->method('scan')->willReturn([]);
 
         $this->expectException(JobCancelledException::class);
-        (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(0)))->scan($this->library($type), $rescan);
+        (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(0), new PassThroughTransaction()))->scan($this->library($type), $rescan);
     }
 
     /** @param class-string<MusicScanner|MovieScanner> $scannerClass */
@@ -81,12 +82,12 @@ final class ScannerAvailabilityTest extends TestCase
         $directory->method('scan')->willThrowException(new RuntimeException('Directory cannot be read'));
 
         $this->expectExceptionMessage('Directory cannot be read');
-        (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint()))->scan($this->library($type), $rescan);
+        (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), new PassThroughTransaction()))->scan($this->library($type), $rescan);
     }
 
     /** @param class-string<MusicScanner|MovieScanner> $scannerClass */
     #[DataProvider('scanners')]
-    public function testReturningUnchangedFilesArePublishedBeforeRestoringAvailability(string $scannerClass, LibraryType $type, string $extension, bool $rescan): void
+    public function testReturningUnchangedFilesAreIndexedBeforeDurableCapture(string $scannerClass, LibraryType $type, string $extension, bool $rescan): void
     {
         $path = tempnam(sys_get_temp_dir(), 'baander-return-');
         self::assertIsString($path);
@@ -97,14 +98,14 @@ final class ScannerAvailabilityTest extends TestCase
             $index->method('findAvailableIndexPathMapByLibrary')->willReturn([]);
             $events = new \ArrayObject();
             $index->expects(self::once())->method('upsert')->willReturnCallback(static function () use ($events): void {
-                self::assertSame(['published'], $events->getArrayCopy());
+                $events->append('indexed');
             });
             $index->expects(self::never())->method('markUnavailableByPaths');
             $directory = $this->createStub(DirectoryScannerPortInterface::class);
             $directory->method('scan')->willReturn([new MediaFile($path, basename($path), $extension, 15, time())]);
 
-            $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint()))->scan(
-                $this->library($type), $rescan, static function () use ($events): void { $events->append('published'); },
+            $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), new PassThroughTransaction()))->scan(
+                $this->library($type), $rescan, static function () use ($events): void { self::assertSame(['indexed'], $events->getArrayCopy()); },
             );
             self::assertSame(1, $result->filesProcessed);
         } finally {
@@ -123,12 +124,12 @@ final class ScannerAvailabilityTest extends TestCase
             $index = $this->createMock(LibraryFileIndexRepositoryInterface::class);
             $index->method('findIndexedPathsByLibrary')->willReturn(['/media/gone.' . $extension]);
             $index->expects(self::never())->method('markUnavailableByPaths');
-            $index->expects(self::never())->method('upsert');
+            $index->expects(self::once())->method('upsert');
             $directory = $this->createStub(DirectoryScannerPortInterface::class);
             $directory->method('scan')->willReturn([new MediaFile($path, basename($path), $extension, 5, time())]);
-            $this->expectExceptionMessage('Queue unavailable');
-            (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint()))->scan(
-                $this->library($type), $rescan, static function (): void { throw new RuntimeException('Queue unavailable'); },
+            $this->expectExceptionMessage('Capture failed');
+            (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), new PassThroughTransaction()))->scan(
+                $this->library($type), $rescan, static function (): void { throw new RuntimeException('Capture failed'); },
             );
         } finally {
             unlink($path);
@@ -150,7 +151,7 @@ final class ScannerAvailabilityTest extends TestCase
         $directory->method('scan')->willReturn([new MediaFile($path, basename($path), $extension, 5, time())]);
         set_error_handler(static fn (): bool => true);
         try {
-            $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint()))->scan($library, $rescan);
+            $result = (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), new PassThroughTransaction()))->scan($library, $rescan);
             self::assertSame(1, $result->filesSkipped);
         } finally {
             restore_error_handler();
@@ -177,7 +178,7 @@ final class ScannerAvailabilityTest extends TestCase
         $lease = new LibraryScanLease($libraries, $clock, $library, new Uuid(), 900, 60);
 
         $this->expectException(LibraryScanClaimLostException::class);
-        (new $scannerClass($directory, $index, new NullLogger(), $cancellation))->scan($library, $rescan, lease: $lease);
+        (new $scannerClass($directory, $index, new NullLogger(), $cancellation, new PassThroughTransaction()))->scan($library, $rescan, lease: $lease);
     }
 
     private function library(LibraryType $type): Library

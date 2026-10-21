@@ -1379,6 +1379,10 @@ services:
     App\Shared\Domain\Event\Outbox\RelayOutboxHandler: ~
     App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface:
         alias: App\Shared\Infrastructure\Event\OutboxEventDispatcher
+    App\Library\Infrastructure\Messaging\LibraryDirectoryOutboxEventDispatcher:
+        decorates: App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface
+        arguments:
+            $inner: '@App\Library\Infrastructure\Messaging\LibraryDirectoryOutboxEventDispatcher.inner'
     App\Shared\Infrastructure\Event\OutboxEventDispatcher:
         arguments:
             $dispatcher: '@App\Shared\Infrastructure\Event\NotificationReplayDispatcher'

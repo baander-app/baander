@@ -20,8 +20,8 @@ use Throwable;
 /**
  * Runs one library scan under its claim: file-index maintenance through the scanners, which
  * renew the claim as they go, and the completion event. Callers decide what happens to each
- * discovered directory; the scanners publish each directory as they finish it, before the scan
- * ends its claim as completed, so a publication failure marks the scan failed. A scan whose job
+ * discovered directory; the scanners commit each directory and its durable event capture before the scan
+ * ends its claim as completed, so a capture failure marks the scan failed. A scan whose job
  * is cancelled stops before its next directory and is marked failed too, which ends its claim;
  * the directories it published stay published. A scan that lost its claim stops without
  * touching the claim that replaced it.

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Application\CommandHandler;
 
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\CommandHandler\ScanLibraryHandler;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\LibraryDiscovery;
-use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Domain\Event\LibraryDirectoryIndexed;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
@@ -33,8 +34,6 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /** A scan runs under its sender's claim, renews it as it goes, and ends it with the outcome. */
 final class ScanLibraryHandlerTest extends TestCase
@@ -100,10 +99,10 @@ final class ScanLibraryHandlerTest extends TestCase
         $claim = $this->claims()->claim('movies');
 
         try {
-            ($this->handler(publish: static fn () => throw new \RuntimeException('transport down')))(new ScanLibraryCommand(new LibrarySlug('movies'), claimId: $claim->claimId));
+            ($this->handler(publish: static fn () => throw new \RuntimeException('capture failed')))(new ScanLibraryCommand(new LibrarySlug('movies'), claimId: $claim->claimId));
             self::fail('The publication failure must propagate.');
         } catch (\RuntimeException $error) {
-            self::assertSame('transport down', $error->getMessage());
+            self::assertSame('capture failed', $error->getMessage());
         }
 
         self::assertSame(['claimed movies', 'claimed movies', 'failed movies'], $this->libraries->log);
@@ -237,23 +236,20 @@ final class ScanLibraryHandlerTest extends TestCase
         return new LibraryScanClaims(new LibraryLookup($this->libraries), $this->libraries, $this->clock);
     }
 
-    /** @param (Closure(FilesDiscovered): void)|null $publish runs as each directory is published */
+    /** @param (Closure(LibraryDirectoryIndexed): void)|null $publish runs as each directory is published */
     private function handler(?Closure $publish = null, CancelAtCheckpoint $cancellation = new CancelAtCheckpoint()): ScanLibraryHandler
     {
-        $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(function (object $message) use ($publish): Envelope {
-            self::assertInstanceOf(FilesDiscovered::class, $message);
-            if ($publish !== null) {
-                $publish($message);
-            }
-            $this->libraries->log[] = 'published ' . $message->directory;
-
-            return new Envelope($message);
-        });
         $events = $this->createStub(EventDispatcherInterface::class);
-        $events->method('dispatch')->willReturnCallback(function (object $event): object {
-            self::assertInstanceOf(LibraryScanCompleted::class, $event);
-            $this->libraries->log[] = 'event completed';
+        $events->method('dispatch')->willReturnCallback(function (object $event) use ($publish): object {
+            if ($event instanceof LibraryDirectoryIndexed) {
+                if ($publish !== null) {
+                    $publish($event);
+                }
+                $this->libraries->log[] = 'published ' . $event->directory;
+            } else {
+                self::assertInstanceOf(LibraryScanCompleted::class, $event);
+                $this->libraries->log[] = 'event completed';
+            }
 
             return $event;
         });
@@ -270,12 +266,12 @@ final class ScanLibraryHandlerTest extends TestCase
             $this->libraries,
             $this->claims(),
             new LibraryDiscovery(
-                new MusicScanner($directoryScanner, $fileIndex, $logger, $cancellation),
-                new MovieScanner($directoryScanner, $fileIndex, $logger, $cancellation),
+                new MusicScanner($directoryScanner, $fileIndex, $logger, $cancellation, new PassThroughTransaction()),
+                new MovieScanner($directoryScanner, $fileIndex, $logger, $cancellation, new PassThroughTransaction()),
                 $events,
                 $logger,
             ),
-            $bus,
+            $events,
             $logger,
         );
     }
