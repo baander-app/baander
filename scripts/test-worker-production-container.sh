@@ -21,6 +21,10 @@ assert not config.get("Volumes"), "Worker target must not declare host volumes"
 '
 docker "${docker_args[@]}" run --rm --network none --entrypoint /usr/local/bin/php "$image_id" -r '
 require "vendor/autoload.php";
+if (is_dir("vendor/nelmio/api-doc-bundle/public")) {
+    fwrite(STDERR, "Production image contains unused API documentation UI assets.\n");
+    exit(1);
+}
 if (is_dir("/home/www-data/.cache/composer")) {
     fwrite(STDERR, "Production image contains Composer installation cache.\n");
     exit(1);
