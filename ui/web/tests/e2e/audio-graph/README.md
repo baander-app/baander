@@ -1,5 +1,10 @@
 # Native audio graph regression
 
+> **Audio warning:** The live playback tests can produce audible tones through
+> speakers or headphones. Lower or mute system output before running them; tests
+> may change player volume. Headless mode does not guarantee silent output.
+> Offline rendering cases do not play sound.
+
 Run from `ui/web`:
 
 ```sh

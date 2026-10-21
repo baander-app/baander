@@ -117,6 +117,17 @@ public, then pins an approved address while preserving TLS hostname verification
 It has no LAN exception. Webhooks and operator-configured lyrics retain separate
 policies.
 
+## Media availability
+
+### Available source
+
+A library file whose latest successful discovery recorded it as present. A completed
+scan or queued import that finds the file missing marks its retained index record
+unavailable. A later scan restores availability and queues the returning file even
+when its content is unchanged. This observation does not diagnose a failed mount
+or guarantee that the file is still reachable at playback time. A catalog track
+without an index observation is unavailable until a scan confirms its source.
+
 ## Media execution
 
 ### Transcode execution generation

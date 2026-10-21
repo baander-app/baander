@@ -280,3 +280,101 @@ findings. All 31 local links and heading anchors across the changed documents
 resolved. Prose preservation audits and whitespace checks passed; the added
 headings and capability descriptions are intentional expansion, and the existing
 licensing qualifications remain intact.
+
+## Missing media and renamed tracks
+
+Checkpoint, 2026-10-21: scans retain file-index records when an individual source,
+an entire library root or a mounted subtree disappears. Music and movie discovery
+mark missing sources unavailable; returning unchanged files are queued again,
+including files that disappeared before their first import. Explicit deletion
+keeps its existing behavior. Failed traversal, cancellation, publication failure
+and a lost scan claim do not mark unvisited paths unavailable.
+
+Music responses expose observed availability through batched Library and Catalog
+ports. Catalog lists, albums, playlists, search, recommendations and recent activity
+retain unavailable songs with a label and disabled playback actions. Bulk playback
+skips them, and mixed queues preserve the selected available song. Restored queues
+keep their order, selection and playback position while refreshing availability
+before resume. Radio playback remains separate.
+
+Ingestion repairs a content-matched rename within the same album and parent
+directory when the old source is missing and the new source is inside the available
+library root. It updates the freshly read song inside the guarded transaction,
+retaining IDs, metadata and relationships without new-song enrichment requests.
+Cross-directory and cross-album moves remain outside this repair. Availability is
+an observation, not a diagnosis of a failed mount or a live filesystem guarantee;
+tracks without an index observation remain unavailable until scanned.
+
+The new regression checks failed against the previous code: a missing root and
+missing-before-import source lost index rows, a full rescan did not republish
+unchanged returning files, and eligible renamed tracks retained their old paths.
+The repaired scan-to-playback regression covers disappearance, restoration, two
+physical renames, preserved metadata and IDs, original bytes, byte ranges and
+access revocation. A real Spotlight component test also exposed its missing
+command-menu provider; a local wrapper now lets that playback surface open.
+
+Backend verification passed in the CI image: 940 tests with 5,004 assertions,
+including 34 functional/integration tests with 363 assertions. The isolated
+PostgreSQL runs applied seven migrations, checked the new column against ORM
+mapping, preserved existing index data, and covered restoration, library isolation,
+bounded batches, explicit deletion and rollback. Targeted PHPStan passed. Full
+Deptrac reported zero violations, warnings and errors with 484 existing skipped
+violations. OpenAPI export and client generation include song, playlist,
+recommendation, activity and recent-item availability.
+
+Review verification passed another 97 focused backend tests with 700 assertions:
+76 Activity tests and 21 fresh-install/migration tests. Activity availability now
+respects the viewer's current library access while retaining historical metadata.
+The revoked-library regression failed before the filter was added. Migration
+history assertions include the new version, and downgrade refusal retains the
+existing diagnostic convention. Final PHPStan and full Deptrac checks passed.
+
+The complete web suite passed: 190 files and 2,194 tests. Main and worker TypeScript
+checks and ESLint passed, with zero lint errors and eight existing warnings.
+Regression coverage includes unavailable playback controls, mixed-queue selection,
+restored availability refresh, stale responses, large queues, radio handoff,
+removing a playing queue entry, and a real DOM audio element's empty source URL.
+
+Playback test documentation and runner startup messages now warn that tests can
+produce audible tones or media, advise lowering or muting system output, and note
+that tests may change player volume. Playwright discovery printed the warning for
+both the audio-graph runner (54 listed tests) and the general browser runner (389
+listed tests); these checks used `--list` and played no audio. The two-command
+browser checkpoint's warning passed shell syntax checks. Remaining manual browser
+verification used Chromium's `--mute-audio` output suppression after the user's
+request; decoding and playback-clock checks remain distinct from listening tests.
+
+A fresh isolated instance at `https://availability.baander.app:18445` passed
+immutable frontend dependency installation, production build, administrator login,
+worker admission and ingestion of two generated FLAC tracks. Hiding one file and
+then the whole library root retained song and index IDs, metadata and counts.
+The web app showed unavailable rows and disabled playback controls. A saved mixed
+queue retained its order, current selection and preferences without starting a
+stream for the missing selection; mixed-album bulk playback chose the available
+track. Restoring the source and rescanning restored the exact baseline catalog and
+index snapshot. Reloading that saved queue and pressing Play refreshed availability
+and started the original selected track.
+
+Incremental and forced scans repaired two subsequent physical renames while
+preserving the song identity. Earlier path records remained unavailable and the
+latest path was available. With browser output muted, both renamed sources decoded
+and advanced without a media error; the second reached its 12-second end.
+Authenticated range requests returned 206 and the requested 128-byte slices.
+
+The browser used explicit loopback routing and a disposable self-signed certificate.
+A named checkout volume accommodated the Docker daemon, and the supported trusted
+controller container supplied the host PHP extensions. Internal application
+networks kept external metadata providers outside this verification. Existing
+databases, Redis instances and media storage were not reused or reset. Cleanup
+verified worker retirement and removal of the run's five service containers,
+seven volumes, two networks and two derived images, plus its browser session,
+credentials and OAuth keys. Sanitized evidence remains available locally.
+
+Documentation preservation checks retained historical roadmap text, code blocks
+and tables; all 17 local link destinations resolved. Added concepts, behavior
+sections, sound warnings and measured checkpoints account for the audit deltas.
+Whitespace checks passed.
+Independent simplification reviews and 11 final code-review lenses completed.
+The three confirmed review findings—restored audio source handling, activity
+availability after access revocation, and migration-history assertions—were fixed
+and verified; no actionable findings remain.

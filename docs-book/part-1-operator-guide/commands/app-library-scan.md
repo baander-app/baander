@@ -1,6 +1,6 @@
 # app:library:scan
 
-Scan a media library, or every library, for new, changed, or removed files. The command is the counterpart of the admin panel's scan buttons (`POST /api/libraries/{id}/scan` and `POST /api/libraries/scan-all` in the API) and follows the same rule: a library that is already scanning, or that a delete with files holds, is not scanned.
+Scan a media library, or every library, for new, changed, returning, or missing files. The command is the counterpart of the admin panel's scan buttons (`POST /api/libraries/{id}/scan` and `POST /api/libraries/scan-all` in the API) and follows the same rule: a library that is already scanning, or that a delete with files holds, is not scanned.
 
 ## Quick start
 
@@ -49,6 +49,28 @@ A scan that fails ends its claim and marks the scan `failed`, so the next scan c
 A scan works one directory at a time: it reads every file of the directory to tell new and changed files from known ones, then queues the directory for ingestion. Cancelling the scan's job in the job monitor, or with [app:monitor:job:cancel](app-monitor-job-cancel.md), stops the scan before its next directory. The job ID appears in the job monitor while the scan runs. The command prints `The scan of "<library>" was cancelled: Job "<jobId>" has been cancelled.`, the job's status becomes `cancelled`, and the library's scan becomes `failed`, which ends its claim. Directories queued before the scan stopped are still ingested, and the next scan picks up the rest.
 
 With `--all`, a cancelled scan stops only its own library: the command goes on with the next one and exits with code 1 at the end.
+
+### Missing and returning files
+
+A completed scan retains catalog entries and file-index records when sources are
+missing, including when every file under a library root or mounted subtree has
+disappeared. It marks those sources unavailable. Music remains visible with an
+“Unavailable” label, and the web player skips it during bulk playback and disables
+individual playback actions. Explicit catalog deletion remains separate.
+
+Availability records the last discovery or ingestion observation. It cannot tell
+whether a mount failed or a file was permanently removed, and it is not a live
+filesystem check. Tracks without a file-index observation remain unavailable until
+a scan confirms their source. A failed or cancelled scan does not mark unvisited
+paths unavailable; directories already queued may still be ingested.
+
+Restore the storage and run another scan. Unchanged returning files are queued
+again, including files that disappeared before their first queued import. Both
+ordinary scans and `--rescan` reconcile missing paths. Ingestion also repairs a
+renamed music file when its content hash matches an existing song in the same
+album and directory, its old path is missing, and its new path remains inside the
+available library root. The song keeps its identity, metadata and playlist links.
+Cross-directory and cross-album moves are outside this repair.
 
 ### The claim lease
 

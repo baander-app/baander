@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
+console.warn('WARNING: Playback tests can produce audible tones or media through your speakers/headphones. Lower or mute system output before running; tests may change player volume.')
+
 export default defineConfig({
   testDir: '.',
   timeout: 45_000,

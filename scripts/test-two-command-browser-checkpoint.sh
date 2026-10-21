@@ -33,6 +33,7 @@ if [ "$phase" = cleanup ]; then
     exit 0
 fi
 if [ "$phase" = authenticated ]; then
+    printf '%s\n' 'WARNING: Playback tests can produce audible tones or media through your speakers/headphones. Lower or mute system output before running; tests may change player volume.' >&2
     test ! -e "$container_file"
     container="baander-two-command-browser-$(date +%s)-$$"
     printf '%s\n' "$container" > "$container_file"
