@@ -76,10 +76,11 @@ server {
     # --- Shared proxy headers (inherited by all location blocks) ---
 
     proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Port "";
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header Http_Host $http_host;
     proxy_set_header Scheme $scheme;
@@ -166,10 +167,11 @@ server {
         }
 
         # Explicit proxy headers (override proxy_pass defaults)
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port "";
 
         # Override Connection for WebSocket/SSE upgrade support
         proxy_set_header Upgrade $http_upgrade;
@@ -191,10 +193,11 @@ server {
         }
 
         # Explicit proxy headers (override proxy_pass defaults)
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port "";
 
         # Override Connection for WebSocket/SSE upgrade support
         proxy_set_header Upgrade $http_upgrade;

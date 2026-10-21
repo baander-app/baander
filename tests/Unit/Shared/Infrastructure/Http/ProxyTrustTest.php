@@ -120,26 +120,29 @@ final class ProxyTrustTest extends TestCase
     }
 
     #[DataProvider('trustedUrlCases')]
-    public function testSignedProofUsesUrlFromTrustedPeerOnly(bool $trusted): void
+    public function testSignedProofUsesUrlFromTrustedPeerOnly(bool $trusted, string $forwardedHost, ?string $forwardedPort, string $externalOrigin): void
     {
         (new SetRequestRuntimeConfiguration())->boot(['trustedProxies' => $trusted ? ['192.0.2.10'] : []]);
-        $request = Request::create('http://internal.baander.app/api/auth/me?ignored=yes', server: [
+        $server = [
             'REMOTE_ADDR' => '192.0.2.10',
-            'HTTP_X_FORWARDED_HOST' => 'api.baander.app',
+            'HTTP_X_FORWARDED_HOST' => $forwardedHost,
             'HTTP_X_FORWARDED_PROTO' => 'https',
-            'HTTP_X_FORWARDED_PORT' => '443',
-        ]);
+        ];
+        if ($forwardedPort !== null) {
+            $server['HTTP_X_FORWARDED_PORT'] = $forwardedPort;
+        }
+        $request = Request::create('http://internal.baander.app/api/auth/me?ignored=yes', server: $server);
         $proof = new SignedDpopProof();
         $cache = $this->createMock(DpopJtiCacheInterface::class);
         $cache->expects($trusted ? $this->once() : $this->never())->method('isReplay')->willReturn(false);
         $result = (new DpopProofValidator($cache))->validate(
-            $proof->create('GET', 'https://api.baander.app/api/auth/me', 'disposable-access-token'),
+            $proof->create('GET', $externalOrigin . '/api/auth/me', 'disposable-access-token'),
             $request,
             'disposable-access-token',
             $proof->thumbprint(),
         );
         self::assertSame($trusted, $result->isValid());
-        self::assertSame($trusted ? 'https://api.baander.app' : 'http://internal.baander.app', $request->getSchemeAndHttpHost());
+        self::assertSame($trusted ? $externalOrigin : 'http://internal.baander.app', $request->getSchemeAndHttpHost());
     }
 
     public function testChangingSpoofedAddressCannotResetTheApiBudget(): void
@@ -176,10 +179,14 @@ final class ProxyTrustTest extends TestCase
         }
     }
 
-    /** @return iterable<string, array{bool}> */
+    /** @return iterable<string, array{bool, string, ?string, string}> */
     public static function trustedUrlCases(): iterable
     {
-        yield 'direct client cannot choose proof URL' => [false];
-        yield 'configured proxy supplies external URL' => [true];
+        foreach ([false, true] as $trusted) {
+            $peer = $trusted ? 'trusted proxy' : 'untrusted peer';
+            yield $peer . ' with explicit forwarded port' => [$trusted, 'api.baander.app', '443', 'https://api.baander.app'];
+            yield $peer . ' with default HTTPS authority' => [$trusted, 'api.baander.app', null, 'https://api.baander.app'];
+            yield $peer . ' with custom HTTPS authority' => [$trusted, 'api.baander.app:18443', null, 'https://api.baander.app:18443'];
+        }
     }
 }

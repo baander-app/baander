@@ -13,10 +13,10 @@ on your server.
 ## Explore and organize your collection
 
 A library connects a named collection to a directory of media files. Scanning it
-finds files, reads their tags and technical information, and adds them to the
-catalog. You can keep collections in separate libraries and rescan them as files
-change. Continuous filesystem watching is available through a separately started
-watcher.
+finds files and queues them for ingestion. Workers read their tags and technical
+information and add them to the catalog. You can keep collections in separate
+libraries and rescan them as files change. Continuous filesystem watching is
+available through a separately started watcher.
 
 In the web app, move between artist pages, albums, track lists and genres, or search
 for artists, albums and songs directly. Album covers can be extracted from embedded
@@ -124,13 +124,14 @@ development-oriented Docker Compose stack. Starting Compose alone does not provi
 a complete instance: background processing requires the separately admitted worker
 pair described in [Worker deployment](docs-book/part-1-operator-guide/commands/README.md#worker-deployment).
 
-The dev image's Xdebug build failure is fixed. The source-installation walkthrough
-has not yet verified frontend loading, login, worker startup or scanning end to
-end; the verification host still needs PHP's `posix` extension. The
-[roadmap checkpoint](ROADMAP.md#source-installation-documentation) records the
-repair and remaining checks. Other media categories have incomplete
-browser workflows; they should not be assumed to offer the same coverage as music
-and movies.
+A disposable source-installation check verified frontend loading, administrator
+login, worker startup and a sample music scan through ingestion and browser
+catalog display. Sample music playback failed with HTTP 500 because streaming
+rejected an absolute media path; playback remains blocked in that installation.
+The [roadmap checkpoint](ROADMAP.md#source-installation-documentation)
+records the evidence, environment adaptations and verification limits. Other media
+categories have incomplete browser workflows; they should not be assumed to offer
+the same coverage as music and movies.
 
 ## For developers
 

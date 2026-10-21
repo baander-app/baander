@@ -5,11 +5,12 @@ scans a first library. The current Compose stack is development-oriented: it mou
 the checkout into the web container and uses a local TLS certificate. Background
 processing needs a separate worker deployment.
 
-The dev image's Xdebug build failure is fixed. Frontend loading, login, worker
-startup and scanning remain unverified through this procedure; the verification
-host still needs PHP's `posix` extension. See the
-[bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation) for the
-repair and remaining checks.
+A disposable installation verified frontend loading, administrator login, worker
+startup and a sample music scan through ingestion and browser catalog display.
+Sample music playback failed with HTTP 500 because streaming rejected an absolute
+media path; this procedure does not yet establish working playback. See the
+[bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation) for
+evidence, environment adaptations and verification limits.
 
 ## Prerequisites
 
@@ -242,6 +243,33 @@ web application loads them.
 dc up -d app nginx
 ```
 
+Nginx terminates HTTPS and forwards requests to the app over HTTP. Configure the
+app to trust that proxy's actual source address so generated API URLs retain HTTPS
+and the published TLS port. Inspect nginx on the network prepared above:
+
+```bash
+docker inspect --format '{{(index .NetworkSettings.Networks "baander-backtier").IPAddress}}' "$(dc ps -q nginx)"
+```
+
+If you chose another network name, substitute it in the inspection command. Add
+the returned address to `.env.dev.local` as a single `TRUSTED_PROXIES` setting:
+
+```env
+TRUSTED_PROXIES=<nginx-source-ip>
+```
+
+Then restart the app to load it:
+
+```bash
+dc restart app
+```
+
+Trust only the actual proxy address; do not trust the entire Docker network.
+Both HTTP layers default to no proxy trust, which is appropriate for direct client
+access. If nginx is recreated, inspect its address again, update the setting and
+restart app. See [Configuration](configuration.md#rate-limiting) for the shared
+proxy trust setting.
+
 Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
 version-4 deployment from the host. Use the network and media volumes prepared above;
@@ -264,9 +292,13 @@ dc exec app php bin/console app:library:create "My Music" /media/library/music m
 dc exec app php bin/console app:library:scan my-music
 ```
 
-The console scan runs in that process and records its work in the job monitor.
-An administrator can browse the new library; grant other users access separately.
-See [Library management](library-management.md) for library access and scanning.
+The console scan discovers files in that process, records its work in the job
+monitor and queues directories for ingestion. Workers must finish ingestion before
+the media appears in the catalog; a completed scan alone does not establish that
+background processing works. Check worker health and ingestion progress using
+[Monitoring](monitoring.md), then browse the library as the administrator. Grant
+other users access separately. See [Library management](library-management.md) for
+library access and scanning.
 
 ### 9. Open Bånder
 

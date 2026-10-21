@@ -161,6 +161,59 @@ bootstrap failure above remains recorded; frontend loading, administrator login,
 worker startup and a sample-library scan are still unverified through that
 procedure, and the verification host still needs PHP's `posix` extension.
 
+Bootstrap checkpoint, 2026-10-21: repeated the installation from `d35c74e5` with
+fresh credentials, services, storage and ports. Pinned Yarn 4.14.1 rejected the
+lockfile's metadata version 10; changing only that metadata to 9 made immutable
+installation pass without changing dependency resolution. Frontend type-checking
+and the production asset build passed.
+
+Browser login exposed two proxy configuration errors. The guide omitted explicit
+proxy trust, so the application generated an HTTP API origin behind nginx TLS.
+The development nginx template also discarded the published port through `$host`.
+The template now preserves `$http_host` and clears incoming `X-Forwarded-Port` in
+all three forwarding blocks. The guide configures only nginx's actual address in
+`TRUSTED_PROXIES` and requires updating it after nginx recreation. Default proxy
+trust remains empty.
+
+Verification passed: dev, nginx, PostgreSQL and worker image builds; Composer
+installation and runtime autoloader generation; authenticated Redis `PONG`; six
+main-database migrations with 494 SQL queries; initial OAuth keys, first-party
+client and administrator creation. In a real browser, the frontend loaded over
+HTTPS on port 18443, the administrator logged in, and authenticated catalog API
+requests returned 200. The generated API origin matched the browser origin.
+A three-second synthetic FLAC scan discovered one file. The admitted worker pair
+acknowledged its ingestion, creating one song and one album; the administrator's
+Songs page displayed Bootstrap Tone from Bootstrap Sample. The separate production
+worker harness also passed admission, outbox/scheduler activity and retirement.
+
+Regression evidence: the new nginx check failed against the old template because
+it lost the public port and forwarded a spoofed port header. With the fix, all six
+origin cases passed across ordinary, WebSocket and streaming routes, alongside the
+existing log checks for all three nginx configurations. Proxy trust and DPoP tests
+passed in the CI image: 19 tests, 39 assertions. Three simplification reviews
+found no changes needed. Independent final review returned no findings. Shell
+syntax, prose preservation audits, 34 local links/anchors and whitespace checks
+passed. Worker recovery reached the retired state; successful resource inventories
+confirmed removal of every run-owned container, network and volume. Disposable
+build images and private diagnostic logs remain available for investigation.
+
+Verification adaptations: the Docker daemon could not bind the tool's checkout,
+so the disposable source was copied to a named volume. The existing supported
+trusted controller container supplied PHP extensions missing from the tool host;
+this does not verify the literal host-PHP procedure. Browser automation accepted
+the isolated self-signed certificate. Workers and application services used an
+internal network, so external metadata providers were not exercised. No existing
+application database, Redis or media storage was reused or reset.
+
+Remaining playback defect: an additional browser play attempt returned HTTP 500
+for both the original FLAC and the Opus fallback. Ingestion stored the absolute
+path `/media/library/music/bootstrap-tone.flac`; streaming passed it to
+`LocalFilesystem::resolve()`, which rejects absolute paths. Catalog visibility is
+verified, but this sample's playback is not working. Repair the path contract and
+repeat the browser playback check before treating a scanned music library as
+playback-qualified; do not weaken the filesystem boundary to accept arbitrary
+absolute paths.
+
 ## Expanded project introduction
 
 Checkpoint, 2026-10-21: expanded the README into a project overview covering library

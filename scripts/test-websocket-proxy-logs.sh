@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check the tracked nginx configurations against a refused loopback upstream.
+# Check nginx proxy logging and development HTTPS origin forwarding.
 # Build the fixture using the production nginx base:
 # docker build -f docker/nginx/Dockerfile.test -t baander-websocket-proxy-test:local docker/nginx
 set -euo pipefail
@@ -139,5 +139,72 @@ assert '?' not in access, 'A query string reached the access log'
 print(f'PASS: {variant}: nginx -t, four query forms return upstream 502 with safe logs; ordinary-route diagnostics retained')
 PY
 done
+
+# Echo the headers that reach the app through the actual development template.
+cat >/tmp/ws-proxy/echo-upstream.py <<'PY'
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import json
+
+
+class EchoHeaders(BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps({'path': self.path, 'headers': dict(self.headers)}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *_args):
+        pass
+
+
+server = ThreadingHTTPServer(('127.0.0.1', 9501), EchoHeaders)
+Path('/tmp/ws-proxy/echo-ready').touch()
+server.serve_forever()
+PY
+python3 /tmp/ws-proxy/echo-upstream.py >/tmp/ws-proxy/echo.log 2>&1 &
+echo_pid=$!
+trap 'kill "$echo_pid" 2>/dev/null || true' EXIT
+attempts=0
+while [ ! -e /tmp/ws-proxy/echo-ready ]; do
+    attempts=$((attempts + 1))
+    [ "$attempts" -le 50 ] || { cat /tmp/ws-proxy/echo.log >&2; echo 'Echo upstream did not start' >&2; exit 1; }
+    sleep 0.1
+done
+cp /tmp/ws-proxy/template.conf /tmp/ws-proxy/selected.conf
+nginx -t -c /tmp/ws-proxy/nginx.conf >/tmp/ws-proxy/validation.log 2>&1 || {
+    cat /tmp/ws-proxy/validation.log >&2
+    exit 1
+}
+nginx -c /tmp/ws-proxy/nginx.conf
+for authority in proxy.baander.app:18443 proxy.baander.app; do
+    for route in / /api/ws /api/stream/track; do
+        curl --silent --show-error --fail --max-time 5 --noproxy '*' \
+            --resolve proxy.baander.app:443:127.0.0.1 \
+            --cacert /etc/nginx/certificates/cert.pem \
+            -H "Host: $authority" \
+            -H 'X-Forwarded-Host: attacker.baander.app:9443' \
+            -H 'X-Forwarded-Proto: http' -H 'X-Forwarded-Port: 9443' \
+            -o /tmp/ws-proxy/echo-response.json "https://proxy.baander.app$route"
+        python3 - "$authority" "$route" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+authority, route = sys.argv[1:]
+response = json.loads(Path('/tmp/ws-proxy/echo-response.json').read_text())
+headers = {name.lower(): value for name, value in response['headers'].items()}
+assert response['path'] == route, response
+for name in ('host', 'x-forwarded-host'):
+    assert headers.get(name) == authority, f'{route}: {name} lost public authority: {headers}'
+assert headers.get('x-forwarded-proto') == 'https', f'{route}: spoofed scheme reached app: {headers}'
+assert 'x-forwarded-port' not in headers, f'{route}: spoofed port reached app: {headers}'
+print(f'PASS: template: {route} preserves HTTPS authority {authority} and replaces spoofed origin headers')
+PY
+    done
+done
+nginx -c /tmp/ws-proxy/nginx.conf -s quit
 SHELL
 echo "Proxy log qualification completed in $((SECONDS - started_at)) seconds."
