@@ -378,3 +378,44 @@ Independent simplification reviews and 11 final code-review lenses completed.
 The three confirmed review findings—restored audio source handling, activity
 availability after access revocation, and migration-history assertions—were fixed
 and verified; no actionable findings remain.
+
+## Directory publication and missing-file observations
+
+Checkpoint, 2026-10-21: music and movie scanners now commit each directory's
+file-index updates with a `LibraryDirectoryIndexed` outbox event. The relay sends
+the existing `FilesDiscovered` message only after that commit. This closes the
+race in which a fast import marked a source missing before the scanner inserted
+or restored its index row, leaving an unchanged returning source permanently
+skipped by incremental scans.
+
+Traversal and hashing remain outside the directory transaction. Index or event
+capture failure rolls back that directory; previously committed directories remain
+accepted. Scan cancellation, lease renewal and missing-path reconciliation retain
+their existing behavior. The summary's directory count now means durable
+acceptance. Redis send failures use the existing outbox retry and dead-letter
+policy, and a lost acknowledgement can still produce duplicate delivery. After
+exhausted retries, an operator must repair the cause and use `--rescan` to queue
+unchanged indexed files again. Other events keep their notification replay path.
+This change adds no schema, transport or worker process, and does not complete
+the audit of all event producers.
+
+Verification in the CI image passed 549 tests with 4,199 assertions across the
+focused Library selection and the expanded Catalog, relay, scan-claim, command,
+workload-wiring and scan-to-streaming checks. The original interleaving failed for
+both new and previously indexed sources before the repair. Eleven new integration
+cases use two PostgreSQL connections and the migrated schema to verify commit
+visibility, partial-write rollback, prior-directory progress, failed handoff retry,
+and duplicate delivery after lost acknowledgement. Music recovery imports real
+generated FLAC files; movie recovery exercises discovery, relay and the missing
+source branch without claiming full video playback coverage. These tests play no
+audio and use only disposable services and media. The relay tests control the
+transport boundary; they do not simulate an outage of a live Redis server.
+
+PHPStan passed for every changed PHP file. Full Deptrac reported zero violations,
+warnings and errors, with 484 existing skipped violations. The final callback
+typing adjustment also passed the 21 media-file integration tests with 258
+assertions already included in the totals above. Three simplification reviews and
+nine code-review lenses found no defects. Prose preservation audits retained the
+historical entries, code blocks and tables; all 27 local links and anchors resolved,
+and whitespace checks passed. The runners removed their containers and networks;
+existing application services, databases and media were untouched.

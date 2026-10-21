@@ -119,6 +119,13 @@ policies.
 
 ## Media availability
 
+### Accepted directory
+
+A discovered directory whose file-index updates and ingestion intent committed
+together. The scan summary counts these directories as queued. Acceptance does
+not mean the asynchronous transport has received the message or catalog ingestion
+has finished; the outbox relay owns that handoff and its bounded retries.
+
 ### Available source
 
 A library file whose latest successful discovery recorded it as present. A completed

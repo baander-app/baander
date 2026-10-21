@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Console;
 
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Application\Port\LibraryPortInterface;
@@ -81,6 +83,7 @@ final class LibraryScanCommandTest extends KernelTestCase
             'The scan stored its file index.',
         );
 
+        $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $async = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);
         $discovered = array_values(array_filter(
@@ -150,6 +153,7 @@ final class LibraryScanCommandTest extends KernelTestCase
         // The claim is gone: the scan is marked failed, and a new scan may start.
         self::assertSame('failed', $libraries->findBySlug(new LibrarySlug($slug))?->getDiscoveryStatus());
 
+        $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $async = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);
         self::assertSame([], array_values(array_filter(

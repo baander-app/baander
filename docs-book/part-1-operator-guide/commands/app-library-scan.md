@@ -50,6 +50,22 @@ A scan works one directory at a time: it reads every file of the directory to te
 
 With `--all`, a cancelled scan stops only its own library: the command goes on with the next one and exits with code 1 at the end.
 
+### Queued directories and delivery failures
+
+The directory count means that each directory's index updates and ingestion intent
+committed together. The worker's outbox relay then sends the directory for
+ingestion; it can do this while the scan continues. A failed index write or intent
+capture rolls back that directory and fails the scan. Earlier committed
+directories remain pending or delivered.
+
+A Redis send failure leaves the committed intent for the relay to retry. It does
+not undo the directory's index or fail a scan that already accepted it. After five
+failed relay attempts, the intent is dead-lettered. See
+[app:outbox:consume](app-outbox-consume.md) for relay operation and diagnostics.
+Once the underlying failure is fixed, run `app:library:scan my-music --rescan`
+to queue the indexed files again. An ordinary incremental scan skips unchanged
+available files, including those whose earlier intent exhausted its retries.
+
 ### Missing and returning files
 
 A completed scan retains catalog entries and file-index records when sources are

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Media;
 
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Library\Application\Message\FilesDiscovered;
@@ -74,6 +76,7 @@ final class ScannedTrackPlaybackTest extends TestCase
         $transport->reset();
         $scan = new CommandTester((new Application(self::$kernel))->find('app:library:scan'));
         self::assertSame(Command::SUCCESS, $scan->execute(['library' => $slug->toString()]), $scan->getDisplay());
+        $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $discovered = array_values(array_filter(
             $transport->getSent(),
             static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,
@@ -180,6 +183,7 @@ final class ScannedTrackPlaybackTest extends TestCase
     }
     private function deliverDiscovered(InMemoryTransport $transport): void
     {
+        self::getContainer()->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $messages = array_values(array_filter(
             $transport->getSent(),
             static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,

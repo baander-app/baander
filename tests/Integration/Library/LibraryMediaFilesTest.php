@@ -86,7 +86,7 @@ final class LibraryMediaFilesTest extends TestCase
 
                 public function run(callable $operation): mixed
                 {
-                    return $this->connection->transactional($operation);
+                    return $this->connection->transactional(static fn (): mixed => $operation());
                 }
             },
         );

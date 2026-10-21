@@ -14,7 +14,7 @@ final readonly class LibraryScanSummary
         public int $filesDiscovered,
         public int $filesProcessed,
         public int $filesSkipped,
-        /** Directories handed to the ingestion queue as FilesDiscovered messages. */
+        /** Directory intents committed with their index updates, awaiting asynchronous ingestion. */
         public int $directoriesQueued,
     ) {
     }

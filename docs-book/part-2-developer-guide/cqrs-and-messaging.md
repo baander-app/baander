@@ -148,9 +148,11 @@ Tests use in-memory ordinary transports. See [Testing](testing.md) for the dispo
 
 ## Durable Event Replay
 
-Live domain events enter the outbox. Its relay dispatches them through a private
+Live domain events enter the outbox. For `LibraryDirectoryIndexed`, a Library
+dispatcher converts the committed event into the existing `FilesDiscovered`
+message and sends it to `async`. Other events continue through the private
 notification dispatcher, where notification and admin-alert listeners run. Session
-and transcode listeners stay on the live dispatcher. An event's receipt,
+and transcode listeners stay on the live dispatcher. A notification event's receipt,
 notification records and channel delivery intents commit in one transaction;
 replaying the same outbox ID skips an already committed receipt.
 
@@ -166,6 +168,22 @@ domain writes and event capture in one transaction. The producer runtime drill
 verifies those three auth producers; other event producers still need their
 transaction boundaries reviewed. See [Testing](testing.md) for the outbox and
 producer drills and the limits of their coverage.
+
+Library scans commit each directory's file-index updates and
+`LibraryDirectoryIndexed` capture in one transaction. Traversal and hashing stay
+outside it. The relay cannot read the intent until the index is committed, so an
+import's missing-file observation cannot be overwritten by the scanner's later
+index write. A capture failure rolls back that directory; earlier committed
+directories survive a later failure or cancellation.
+
+Directory relay uses the existing leased retries and five-attempt dead-letter
+policy. It does not use the notification receipt: Redis may accept a message even
+when the relay loses its acknowledgement, so duplicate imports remain possible.
+The scan's `directoriesQueued` count reports durable acceptance, not completed
+transport delivery or catalog ingestion. After a dead-lettered handoff, repair the
+cause and use the existing [rescan option](../part-1-operator-guide/commands/app-library-scan.md#queued-directories-and-delivery-failures)
+to queue unchanged indexed files again. This producer boundary does not establish
+a complete audit of all event producers.
 
 ## See Also
 
