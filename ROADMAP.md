@@ -134,6 +134,33 @@ plan and final documentation reviews found no defects. No application test suite
 was run for this documentation-only change; the runtime build failure above is a
 verification limit, not a passing bootstrap.
 
+Repair checkpoint, 2026-10-21: the dev image now bundles the explicit archive for
+`XDEBUG_VERSION`. PEAR 1.10.16's REST client passed an HTTP chunk-size marker into
+its XML parser, so package lookup failed before unpacking. The archive URL bypasses
+that lookup and fixes the previously ignored version selection. The existing
+extension installation, startup controls and INI paths remain unchanged.
+The new `scripts/test-dev-xdebug-container.sh` checks the installed version,
+normal startup disabling Xdebug, actual coverage collection and both `www-data`
+debug aliases. CI runs it immediately after building the CI image.
+
+Verification: real dev builds passed for default Xdebug 3.5.0 and override 3.5.3.
+A forced dev-stage rebuild (`--no-cache-filter dev`) restored 3.5.0 with the cache
+populated by 3.5.3; its runtime checks passed. The actual CI target also built and
+passed all four container scenarios. The final smoke script additionally checks
+that `debug-on` activates both debug and develop modes; all four scenarios passed
+on each of the three resulting image tags (12 checks). Docker context checks
+passed with 34 host artifacts excluded and 24 source, asset and license markers
+preserved. Shell syntax, workflow YAML parsing and whitespace checks passed.
+Three simplification reviews found no changes needed. Independent code review's
+mode-assertion suggestion was applied. Prose preservation audits retain the
+historical checkpoint and account for the new repair evidence. No application
+services started, and no database, Redis or media storage was reused or reset.
+
+The README and getting-started guide now report the repaired build. The historical
+bootstrap failure above remains recorded; frontend loading, administrator login,
+worker startup and a sample-library scan are still unverified through that
+procedure, and the verification host still needs PHP's `posix` extension.
+
 ## Expanded project introduction
 
 Checkpoint, 2026-10-21: expanded the README into a project overview covering library

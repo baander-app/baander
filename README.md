@@ -124,12 +124,13 @@ development-oriented Docker Compose stack. Starting Compose alone does not provi
 a complete instance: background processing requires the separately admitted worker
 pair described in [Worker deployment](docs-book/part-1-operator-guide/commands/README.md#worker-deployment).
 
-The latest documented bootstrap attempt stopped during the dev image's Xdebug
-build, so that walkthrough has not yet verified frontend loading, login, worker
-startup or scanning end to end. The [roadmap checkpoint](ROADMAP.md#source-installation-documentation)
-records this limitation and the remaining host prerequisite. Other media categories
-have incomplete browser workflows; they should not be assumed to offer the same
-coverage as music and movies.
+The dev image's Xdebug build failure is fixed. The source-installation walkthrough
+has not yet verified frontend loading, login, worker startup or scanning end to
+end; the verification host still needs PHP's `posix` extension. The
+[roadmap checkpoint](ROADMAP.md#source-installation-documentation) records the
+repair and remaining checks. Other media categories have incomplete
+browser workflows; they should not be assumed to offer the same coverage as music
+and movies.
 
 ## For developers
 

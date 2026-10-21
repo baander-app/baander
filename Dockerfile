@@ -492,11 +492,11 @@ USER root
 # Copy Composer from builder
 COPY --from=builder /usr/bin/composer /usr/bin/composer
 
-# Install Xdebug.
+# Install the requested archive directly, bypassing PECL REST metadata lookup.
 # --mount=type=cache persists PECL download/build across rebuilds.
 RUN --mount=type=cache,target=/tmp/pecl \
     set -xe && \
-    pecl bundle -d /tmp/pecl xdebug \
+    pecl bundle -d /tmp/pecl "https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz" \
     && docker-php-ext-configure /tmp/pecl/xdebug \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/xdebug
 

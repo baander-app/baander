@@ -5,10 +5,11 @@ scans a first library. The current Compose stack is development-oriented: it mou
 the checkout into the web container and uses a local TLS certificate. Background
 processing needs a separate worker deployment.
 
-The latest disposable bootstrap stopped during the dev image's Xdebug build;
-frontend loading, login, worker startup and scanning remain unverified through this
-procedure. See the [bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation)
-for the failure and remaining checks.
+The dev image's Xdebug build failure is fixed. Frontend loading, login, worker
+startup and scanning remain unverified through this procedure; the verification
+host still needs PHP's `posix` extension. See the
+[bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation) for the
+repair and remaining checks.
 
 ## Prerequisites
 
