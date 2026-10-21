@@ -224,6 +224,21 @@ final class LibraryRepository implements LibraryRepositoryInterface
         ) === 1;
     }
 
+    public function renewScanClaimForWrite(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new LogicException('Guard the scan claim inside the transaction that writes the scan.');
+        }
+
+        return $connection->executeStatement(
+            "UPDATE libraries SET claim_expires_at = clock_timestamp() + make_interval(secs => :lease)
+             WHERE id = :id AND claim_id = :claim AND claim_kind = 'scan'",
+            ['id' => $libraryId->toString(), 'claim' => $claimId->toString(), 'lease' => $leaseSeconds],
+            ['lease' => ParameterType::INTEGER],
+        ) === 1;
+    }
+
     public function endScanClaim(Uuid $claimId, bool $completed): bool
     {
         $libraryId = $this->entityManager->getConnection()->fetchOne(

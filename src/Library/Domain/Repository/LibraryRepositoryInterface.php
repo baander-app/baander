@@ -76,6 +76,14 @@ interface LibraryRepositoryInterface
     public function renewClaim(Uuid $claimId, int $leaseSeconds): bool;
 
     /**
+     * Renews this library's scan claim and holds its row until the caller's write transaction
+     * ends. Requires an active transaction. A lapsed claim may renew if it was not replaced.
+     *
+     * @return bool false when this library no longer holds this scan claim
+     */
+    public function renewScanClaimForWrite(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool;
+
+    /**
      * Ends the claim of the scan $claimId with its outcome: `completed`, which records the scan
      * time, or `failed`. Does nothing when the claim is no longer that scan's.
      *

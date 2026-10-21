@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application;
 
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\Service\LibraryScanLease;
-use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Clock\MockClock;
@@ -160,25 +160,140 @@ final class ScannerAvailabilityTest extends TestCase
 
     /** @param class-string<MusicScanner|MovieScanner> $scannerClass */
     #[DataProvider('scanners')]
-    public function testALostClaimPreventsMissingStateWrites(string $scannerClass, LibraryType $type, string $extension, bool $rescan): void
+    public function testMissingPathsCommitInBoundedTransactions(string $scannerClass, LibraryType $type, string $extension, bool $rescan): void
     {
         $library = $this->library($type);
+        $clock = new MockClock();
+        $libraries = new InMemoryLibraryRepository($clock);
+        $libraries->add($library);
+        $claim = new Uuid();
+        self::assertTrue($libraries->claimScan($library->getId(), $claim, 900)->claimed);
+        $lease = new LibraryScanLease($libraries, $clock, $library, $claim, 900, 60);
+        $paths = array_map(static fn (int $number): string => '/media/missing-' . $number . '.' . $extension, range(1, 2001));
+        $transaction = new PassThroughTransaction();
+        $recorded = [];
         $index = $this->createMock(LibraryFileIndexRepositoryInterface::class);
-        $index->method('findIndexedPathsByLibrary')->willReturn(['/media/missing.' . $extension]);
-        $index->expects(self::never())->method('markUnavailableByPaths');
+        $index->method('findIndexedPathsByLibrary')->willReturn($paths);
+        $index->expects(self::exactly(3))->method('markUnavailableByPaths')
+            ->willReturnCallback(static function (Uuid $libraryId, array $batch) use ($library, $transaction, &$recorded): void {
+                self::assertTrue($libraryId->equals($library->getId()));
+                self::assertTrue($transaction->active);
+                self::assertLessThanOrEqual(1000, count($batch));
+                array_push($recorded, ...$batch);
+            });
         $directory = $this->createStub(DirectoryScannerPortInterface::class);
         $directory->method('scan')->willReturn([]);
-        $libraries = $this->createMock(LibraryRepositoryInterface::class);
-        $libraries->expects(self::once())->method('renewClaim')->willReturn(false);
-        $clock = new MockClock();
-        $cancellation = new class($clock) implements JobCancellationCheckpointInterface {
-            public function __construct(private MockClock $clock) {}
-            public function check(): void { $this->clock->sleep(60); }
-        };
-        $lease = new LibraryScanLease($libraries, $clock, $library, new Uuid(), 900, 60);
 
-        $this->expectException(LibraryScanClaimLostException::class);
-        (new $scannerClass($directory, $index, new NullLogger(), $cancellation, new PassThroughTransaction()))->scan($library, $rescan, lease: $lease);
+        (new $scannerClass($directory, $index, new NullLogger(), new CancelAtCheckpoint(), $transaction))->scan($library, $rescan, lease: $lease);
+
+        self::assertSame($paths, $recorded);
+        self::assertSame(3, $transaction->runs);
+        self::assertSame($claim->toString(), $libraries->claimOf($library));
+    }
+
+    /** @return iterable<string, array{class-string<MusicScanner|MovieScanner>, LibraryType, string, bool, bool}> */
+    public static function lostClaims(): iterable
+    {
+        foreach (self::scanners() as $name => $scanner) {
+            yield $name . ' released' => [...$scanner, false];
+            yield $name . ' replaced' => [...$scanner, true];
+        }
+    }
+
+    /** @param class-string<MusicScanner|MovieScanner> $scannerClass */
+    #[DataProvider('lostClaims')]
+    public function testARecentlyLostClaimPreventsDirectoryIndexAndOutboxWrites(string $scannerClass, LibraryType $type, string $extension, bool $rescan, bool $replace): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'baander-old-scan-');
+        self::assertIsString($path);
+        file_put_contents($path, 'media');
+        try {
+            $library = $this->library($type);
+            $clock = new MockClock('2026-10-21 12:00:00 UTC');
+            $libraries = new InMemoryLibraryRepository($clock);
+            $libraries->add($library);
+            $claimId = new Uuid();
+            self::assertTrue($libraries->claimScan($library->getId(), $claimId, 900)->claimed);
+            $lease = new LibraryScanLease($libraries, $clock, $library, $claimId, 900, 60);
+            $successor = $replace ? new Uuid() : null;
+            $cancellation = $this->releaseAtCheckpoint($libraries, $library, $successor);
+            $index = $this->createMock(LibraryFileIndexRepositoryInterface::class);
+            $index->method('findIndexedPathsByLibrary')->willReturn([]);
+            $index->method('findAvailableIndexPathMapByLibrary')->willReturn([]);
+            $index->expects(self::never())->method('upsert');
+            $index->expects(self::never())->method('markUnavailableByPaths');
+            $directory = $this->createStub(DirectoryScannerPortInterface::class);
+            $directory->method('scan')->willReturn([new MediaFile($path, basename($path), $extension, 5, 1792584000)]);
+            $captured = [];
+            try {
+                (new $scannerClass($directory, $index, new NullLogger(), $cancellation, new PassThroughTransaction()))->scan(
+                    $library, $rescan, static function () use (&$captured): void { $captured[] = 'old directory outbox'; }, $lease,
+                );
+                self::fail('The released scan must stop before directory writes.');
+            } catch (LibraryScanClaimLostException) {
+                self::assertSame([], $captured);
+                self::assertSame($successor?->toString(), $libraries->claimOf($library));
+                self::assertEquals(new \DateTimeImmutable('2026-10-21 12:00:00 UTC'), $clock->now());
+            }
+        } finally {
+            unlink($path);
+        }
+    }
+
+    /** @param class-string<MusicScanner|MovieScanner> $scannerClass */
+    #[DataProvider('lostClaims')]
+    public function testARecentlyLostEmptyScanLeavesSuccessorAvailabilityIntact(string $scannerClass, LibraryType $type, string $extension, bool $rescan, bool $replace): void
+    {
+        $library = $this->library($type);
+        $clock = new MockClock('2026-10-21 12:00:00 UTC');
+        $libraries = new InMemoryLibraryRepository($clock);
+        $libraries->add($library);
+        $claimId = new Uuid();
+        self::assertTrue($libraries->claimScan($library->getId(), $claimId, 900)->claimed);
+        $lease = new LibraryScanLease($libraries, $clock, $library, $claimId, 900, 60);
+        $successor = $replace ? new Uuid() : null;
+        $available = false;
+        $cancellation = $this->releaseAtCheckpoint($libraries, $library, $successor, static function () use (&$available): void { $available = true; });
+        $index = $this->createMock(LibraryFileIndexRepositoryInterface::class);
+        $index->method('findIndexedPathsByLibrary')->willReturn(['/media/restored.' . $extension]);
+        $index->method('markUnavailableByPaths')->willReturnCallback(static function () use (&$available): void { $available = false; });
+        $index->expects(self::never())->method('upsert');
+        $directory = $this->createStub(DirectoryScannerPortInterface::class);
+        $directory->method('scan')->willReturn([]);
+        $captured = [];
+        try {
+            (new $scannerClass($directory, $index, new NullLogger(), $cancellation, new PassThroughTransaction()))->scan(
+                $library, $rescan, static function () use (&$captured): void { $captured[] = 'old directory outbox'; }, $lease,
+            );
+            self::fail('The released scan must stop before marking restored paths unavailable.');
+        } catch (LibraryScanClaimLostException) {
+            self::assertTrue($available);
+            self::assertSame([], $captured);
+            self::assertSame($successor?->toString(), $libraries->claimOf($library));
+            self::assertEquals(new \DateTimeImmutable('2026-10-21 12:00:00 UTC'), $clock->now());
+        }
+    }
+
+    private function releaseAtCheckpoint(InMemoryLibraryRepository $libraries, Library $library, ?Uuid $successor, ?\Closure $restore = null): JobCancellationCheckpointInterface
+    {
+        return new class($libraries, $library, $successor, $restore) implements JobCancellationCheckpointInterface {
+            private bool $released = false;
+            public function __construct(private InMemoryLibraryRepository $libraries, private Library $library, private ?Uuid $successor, private ?\Closure $restore) {}
+            public function check(): void
+            {
+                if ($this->released) {
+                    return;
+                }
+                $this->released = true;
+                TestCase::assertNotNull($this->libraries->releaseClaim($this->library->getId(), evenIfLive: true)->released);
+                if ($this->successor !== null) {
+                    TestCase::assertTrue($this->libraries->claimScan($this->library->getId(), $this->successor, 900)->claimed);
+                }
+                if ($this->restore !== null) {
+                    ($this->restore)();
+                }
+            }
+        };
     }
 
     private function library(LibraryType $type): Library

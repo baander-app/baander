@@ -34,7 +34,7 @@ final class MusicScanner
      * together. The callback must use the same transaction and must not send to an external
      * transport. Capture failure rolls back the directory so a later scan can retry it.
      * A cancelled scan stops before its next directory. Lease renewal retains its existing
-     * cadence; a scan that detects a lost claim stops before its next directory write.
+     * cadence; each write transaction checks ownership before changing the index or outbox.
      *
      * @param (Closure(string, array<DiscoveredFile>): void)|null $publishDirectory
      *
@@ -110,8 +110,8 @@ final class MusicScanner
                 continue;
             }
 
-            $lease?->renew();
-            $this->transaction->run(function () use ($library, $dir, $discoveredFiles, $publishDirectory): void {
+            $this->transaction->run(function () use ($library, $dir, $discoveredFiles, $publishDirectory, $lease): void {
+                $lease?->guardWrite();
                 foreach ($discoveredFiles as $discoveredFile) {
                     $this->fileIndexRepository->upsert(
                         $library->getId(),
@@ -136,8 +136,10 @@ final class MusicScanner
         $missingPaths = array_values(array_filter($indexedPaths, static fn (string $path): bool => !isset($seenPaths[$path])));
         foreach (array_chunk($missingPaths, 1000) as $paths) {
             $this->cancellation->check();
-            $lease?->renew();
-            $this->fileIndexRepository->markUnavailableByPaths($library->getId(), $paths);
+            $this->transaction->run(function () use ($library, $paths, $lease): void {
+                $lease?->guardWrite();
+                $this->fileIndexRepository->markUnavailableByPaths($library->getId(), $paths);
+            });
         }
 
         $this->logger->info('Library scan completed', [

@@ -141,6 +141,18 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
         return true;
     }
 
+    public function renewScanClaimForWrite(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool
+    {
+        $id = $libraryId->toString();
+        $held = $this->claims[$id] ?? null;
+        if ($held === null || $held['claim'] !== $claimId->toString() || $held['kind'] !== LibraryClaimKind::Scan) {
+            return false;
+        }
+        $this->claims[$id]['expiresAt'] = $this->clock->now()->modify(sprintf('+%d seconds', $leaseSeconds));
+
+        return true;
+    }
+
     public function endScanClaim(Uuid $claimId, bool $completed): bool
     {
         $id = $this->holder($claimId, LibraryClaimKind::Scan);

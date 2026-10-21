@@ -13,7 +13,8 @@ use Psr\Clock\ClockInterface;
 /**
  * The claim a running scan holds, from LibraryScanClaims::acquire(). The scanners call renew()
  * at every file and directory; it extends the lease in the database at most once per renewal
- * interval, so frequent calls cost nothing. A renewal that finds the claim gone stops the scan.
+ * interval, so frequent calls cost nothing. Every write transaction also calls guardWrite(),
+ * which checks ownership without throttling and holds the claim until the transaction ends.
  */
 final readonly class LibraryScanLease
 {
@@ -24,7 +25,7 @@ final readonly class LibraryScanLease
         ClockInterface $clock,
         private Library $library,
         private Uuid $claimId,
-        int $leaseSeconds,
+        private int $leaseSeconds,
         int $renewalIntervalSeconds,
     ) {
         $this->renewal = new LibraryClaimRenewal($libraries, $clock, $claimId, $leaseSeconds, $renewalIntervalSeconds, $clock->now());
@@ -39,6 +40,18 @@ final readonly class LibraryScanLease
     public function renew(): void
     {
         if (!$this->renewal->renew()) {
+            throw LibraryScanClaimLostException::forLibrary($this->library->getName());
+        }
+    }
+
+    /**
+     * Checks and renews ownership inside the caller's write transaction, without throttling.
+     *
+     * @throws LibraryScanClaimLostException when this library no longer holds the scan claim
+     */
+    public function guardWrite(): void
+    {
+        if (!$this->libraries->renewScanClaimForWrite($this->library->getId(), $this->claimId, $this->leaseSeconds)) {
             throw LibraryScanClaimLostException::forLibrary($this->library->getName());
         }
     }
