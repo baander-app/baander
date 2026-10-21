@@ -126,8 +126,8 @@ pair described in [Worker deployment](docs-book/part-1-operator-guide/commands/R
 
 A disposable source-installation check verified frontend loading, administrator
 login, worker startup and a sample music scan through ingestion and browser
-catalog display. Sample music playback failed with HTTP 500 because streaming
-rejected an absolute media path; playback remains blocked in that installation.
+catalog display. The scanned track played to completion as original FLAC and
+transcoded Opus; byte-range requests also passed.
 The [roadmap checkpoint](ROADMAP.md#source-installation-documentation)
 records the evidence, environment adaptations and verification limits. Other media
 categories have incomplete browser workflows; they should not be assumed to offer

@@ -8,7 +8,7 @@ use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
-use App\Filesystem\Application\Port\LocalFilesystemPortInterface;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
@@ -16,15 +16,19 @@ final class StreamService implements StreamPortInterface
 {
     public function __construct(
         private readonly SongRepositoryInterface $songRepository,
-        private readonly LocalFilesystemPortInterface $filesystem,
+        private readonly LibraryMediaFileResolverInterface $mediaFiles,
     ) {
     }
 
     public function resolveTrackPath(PublicId $trackId): string
     {
         $song = $this->findSong($trackId);
+        $libraryId = $this->songRepository->getLibraryIdByPublicId($trackId);
+        if ($libraryId === null) {
+            throw new \InvalidArgumentException('Track library not found.');
+        }
 
-        return $this->filesystem->resolve($song->getPath());
+        return $this->mediaFiles->resolve($libraryId, $song->getPath());
     }
 
     public function getTrackMetadata(PublicId $trackId): TrackStreamMetadata

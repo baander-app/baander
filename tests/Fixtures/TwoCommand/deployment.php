@@ -235,7 +235,7 @@ if ($mode === 'prepare') {
     $library = new LibraryEntity('Two command music', 'two-command-music', '/media/source', 'music', 'local');
     $movies = new LibraryEntity('Two command movies', 'two-command-movies', '/media/source', 'movie', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
-    $song = new SongEntity(new PublicId(), $album, 'Worker audio', 'track.flac', (int) filesize(AUDIO), 'audio/flac');
+    $song = new SongEntity(new PublicId(), $album, 'Worker audio', AUDIO, (int) filesize(AUDIO), 'audio/flac');
     $video = new VideoEntity(new PublicId(), VIDEO, hash_file('sha256', VIDEO));
     $video->setDuration(180); $video->setWidth(1280); $video->setHeight(720); $video->setFramerate(30);
     $movie = new MovieEntity(new PublicId(), $movies, 'Two command playback');

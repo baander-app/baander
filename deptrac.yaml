@@ -1169,6 +1169,7 @@ deptrac:
       - 'Media Image Contract'
       - 'Auth Identity Contract'
       - 'Library Read Scope Contract'
+      - 'Library Media Files Contract'
       - 'Shared Application'
       - 'Media Domain'
       - 'Media Application'

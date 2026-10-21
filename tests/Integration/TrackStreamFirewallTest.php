@@ -11,7 +11,9 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
-use App\Filesystem\Application\Port\LocalFilesystemPortInterface;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
+use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
@@ -83,7 +85,6 @@ final class TrackStreamFirewallTest extends TestCase
             self::assertSame(strlen($details['key']), file_put_contents(self::$directory . '/public.pem', $details['key']));
             self::assertTrue(chmod(self::$directory . '/private.pem', 0600));
             self::assertTrue(chmod(self::$directory . '/public.pem', 0600));
-            self::assertSame(strlen(self::BYTES), file_put_contents(self::$directory . '/track.mp3', self::BYTES));
         }
         $this->kernel = new TrackStreamOAuthKernel(self::$directory, $url);
         $this->kernel->boot();
@@ -104,24 +105,28 @@ final class TrackStreamFirewallTest extends TestCase
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
         $this->users = $users;
-        $filesystem = $this->createMock(LocalFilesystemPortInterface::class);
-        $filesystem->method('resolve')->willReturnCallback(function (string $path): string {
+        $libraries = $container->get('track.acceptance.libraries');
+        self::assertInstanceOf(LibraryRepositoryInterface::class, $libraries);
+        $resolver = new LibraryMediaFileResolver($libraries);
+        $mediaFiles = $this->createStub(LibraryMediaFileResolverInterface::class);
+        $mediaFiles->method('resolve')->willReturnCallback(function (Uuid $libraryId, string $path) use ($resolver): string {
             $this->resolvedPaths[] = $path;
 
-            return self::$directory . '/track.mp3';
+            return $resolver->resolve($libraryId, $path);
         });
-        foreach (['exists', 'size', 'read', 'write', 'open'] as $method) {
-            $filesystem->expects(self::never())->method($method);
-        }
-        $container->set(LocalFilesystemPortInterface::class, $filesystem);
+        $container->set(LibraryMediaFileResolverInterface::class, $mediaFiles);
         self::assertInstanceOf(StreamService::class, $container->get('track.acceptance.stream'));
         $this->member = $this->createUser('member');
         $suffix = bin2hex(random_bytes(8));
         foreach (['allowed', 'denied'] as $visibility) {
+            $libraryRoot = self::$directory . '/' . $visibility . '-' . $suffix;
+            self::assertTrue(mkdir($libraryRoot, 0700));
+            $source = $libraryRoot . '/track.mp3';
+            self::assertSame(strlen(self::BYTES), file_put_contents($source, self::BYTES));
             $library = new LibraryEntity(
                 'Track ' . $visibility,
                 'track-' . $visibility . '-' . $suffix,
-                '/tmp/track-' . $visibility . '-' . $suffix,
+                $libraryRoot,
                 'music',
                 'local',
             );
@@ -130,7 +135,7 @@ final class TrackStreamFirewallTest extends TestCase
                 new PublicId(),
                 $album,
                 'Track acceptance song',
-                $visibility . '/track.mp3',
+                $source,
                 strlen(self::BYTES),
                 'audio/mpeg',
             );

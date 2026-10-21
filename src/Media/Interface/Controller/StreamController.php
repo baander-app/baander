@@ -105,11 +105,10 @@ final class StreamController
 
         try {
             $metadata = $this->streamService->getTrackMetadata($trackId);
+            $fullPath = $this->streamService->resolveTrackPath($trackId);
         } catch (\InvalidArgumentException) {
             return $this->notFound($this->trans('errors.track_not_found', domain: 'media'));
         }
-
-        $fullPath = $this->streamService->resolveTrackPath($trackId);
 
         if (!file_exists($fullPath)) {
             return $this->notFound($this->trans('errors.file_not_found', domain: 'media'));

@@ -214,6 +214,56 @@ repeat the browser playback check before treating a scanned music library as
 playback-qualified; do not weaken the filesystem boundary to accept arbitrary
 absolute paths.
 
+Playback repair checkpoint, 2026-10-21: streaming now resolves the catalog's
+absolute source path against its owning library through a narrow Library
+application contract. The shared canonical boundary rejects traversal and symlink
+escapes; the relative-only filesystem contract remains unchanged. Missing or
+rejected sources return 404 after authorization. The regression scans a generated
+FLAC, delivers the scanner's actual message to catalog ingestion, and requests the
+persisted track through production streaming services. It checks original bytes,
+byte ranges and access revocation with the library outside `MEDIA_STORAGE_PATH`.
+
+A fresh disposable installation from `2ab80b39` plus the repair passed frontend
+loading, administrator login, worker admission and ingestion of Playback Tone.
+Original playback returned 206 and advanced to the end of the 12-second track.
+With audio transcoding explicitly enabled, Opus returned 200 `audio/ogg` and played
+to completion at 11.9935 seconds without a browser media error. Original and cached
+Opus range requests returned 206 with exact 16-byte slices and the expected FLAC
+and Ogg signatures.
+
+This fresh setup exposed three required encoder settings missing from the example
+configuration. The installation guide now sets `VIDEO_ENCODER=libx264`, an empty
+`HW_ACCEL_DEVICE` and `HW_BITRATE_MULTIPLIER=1.0` in the nonsecret `.env` before the
+worker image build. The worker credentials allowlist does not accept these keys.
+The initial worker failed before these values were supplied; the rebuilt worker
+then admitted and ingested the sample successfully.
+
+The browser used `https://playback.baander.app:18444` and accepted the disposable
+certificate. As in the previous check, a named checkout volume accommodated the
+remote Docker daemon, and the supported trusted controller container supplied the
+host PHP extensions. The worker image contained the baseline plus the explicit
+encoder settings; the five changed web service/configuration files were copied
+into the disposable checkout and their hashes checked against the repair. Internal
+application networks prevented external metadata requests. No existing database,
+Redis instance or media storage was reused or reset. This closes the sample music
+playback defect above; it does not qualify other media workflows or host hardware.
+
+Verification: 307 focused unit/native tests passed with 1,175 assertions in the CI
+image. After correcting test-container access and PHPUnit stub declarations,
+the affected service tests and all selected media functional/firewall tests passed:
+53 tests, 632 assertions, including 35 functional/integration tests with 479
+assertions. The latter cover real OAuth/DPoP authorization and original, range and
+transcoded responses. Restoring only the old stream consumer made the new
+scan-to-playback test fail at its first response assertion (404 instead of 200);
+with the repair, it passed. Targeted PHPStan passed; Deptrac reported zero violations,
+zero warnings and zero errors, with 484 existing skipped violations. Documentation
+preservation audits, all 35 local links and anchors, and whitespace checks passed; the current summaries
+now report verified playback while historical failures remain recorded. Three
+simplification reviews and five independent code-review lenses found no defects.
+The disposable worker reached the retired state; successful inventories confirmed
+removal of all run-owned containers, networks and volumes. Generated credentials
+and keys were removed, with sanitized evidence and build images retained.
+
 ## Expanded project introduction
 
 Checkpoint, 2026-10-21: expanded the README into a project overview covering library

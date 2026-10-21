@@ -47,7 +47,9 @@ final class StreamControllerSecurityTest extends TestCase
 
     protected function tearDown(): void
     {
-        unlink($this->file);
+        if (is_file($this->file)) {
+            unlink($this->file);
+        }
         rmdir($this->directory);
     }
 
@@ -124,6 +126,38 @@ final class StreamControllerSecurityTest extends TestCase
         $controller = $this->controllerWithScope(MediaReadScope::authenticated(
             new Uuid(),
             LibraryReadScope::none(),
+        ));
+
+        $response = $controller->streamById($this->request());
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+    }
+
+    public function testStreamByIdReturnsNotFoundWhenSourceResolutionRejectsThePath(): void
+    {
+        $this->streamService = $this->createStub(StreamPortInterface::class);
+        $this->streamService->method('getLibraryIdForTrack')->willReturn($this->libraryId);
+        $this->streamService->method('getTrackMetadata')->willReturn($this->metadata());
+        $this->streamService->method('resolveTrackPath')->willThrowException(
+            new \InvalidArgumentException('Path escapes the library root.'),
+        );
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::restricted([$this->libraryId]),
+        ));
+
+        $response = $controller->streamById($this->request());
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+        self::assertStringNotContainsString($this->directory, (string) $response->getContent());
+    }
+
+    public function testStreamByIdReturnsNotFoundWhenSourceFileDisappears(): void
+    {
+        unlink($this->file);
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::restricted([$this->libraryId]),
         ));
 
         $response = $controller->streamById($this->request());

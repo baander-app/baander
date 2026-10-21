@@ -7,8 +7,8 @@ processing needs a separate worker deployment.
 
 A disposable installation verified frontend loading, administrator login, worker
 startup and a sample music scan through ingestion and browser catalog display.
-Sample music playback failed with HTTP 500 because streaming rejected an absolute
-media path; this procedure does not yet establish working playback. See the
+The scanned track played to completion as original FLAC and transcoded Opus;
+byte-range requests also passed. See the
 [bootstrap checkpoint](../../ROADMAP.md#source-installation-documentation) for
 evidence, environment adaptations and verification limits.
 
@@ -57,7 +57,15 @@ MEDIA_STORAGE_PATH=/media/library
 CONVERT_STORAGE_PATH=/storage/conversions
 FFMPEG_PATH=/usr/bin/ffmpeg
 FFPROBE_PATH=/usr/bin/ffprobe
+VIDEO_ENCODER=libx264
+HW_ACCEL_DEVICE=
+HW_BITRATE_MULTIPLIER=1.0
 ```
+
+The encoder settings above select CPU encoding. Set them before building the
+worker image: its media process requires all three, and the worker credentials
+file does not accept these settings. See
+[Transcoding](transcoding.md#hardware-acceleration) for current hardware support.
 
 Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
 the secret placeholders with independently generated values from `openssl rand -hex 32`.

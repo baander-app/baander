@@ -629,6 +629,9 @@ services:
         alias: App\Library\Infrastructure\Doctrine\Repository\LibraryRepository
 
     # --- Library Ports ---
+    App\Library\Application\Port\LibraryMediaFileResolverInterface:
+        alias: App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver
+
     App\Library\Application\Port\LibraryMediaFilesInterface:
         alias: App\Library\Infrastructure\Filesystem\LibraryMediaFiles
 
