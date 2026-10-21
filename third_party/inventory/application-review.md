@@ -197,15 +197,40 @@ The earlier machine-readable review record remains historical evidence. This
 documentation follows the new measured source snapshot; both new inventories
 still report `not-qualified`.
 
+## Local PHP binding notice
+
+On 2026-10-21, the project owner confirmed authorship of `tsduck/php`. Its initial
+package commit identifies Martin Christiansen as the author in 2026. The package
+now contains a [BSD-2-Clause notice](../../packages/tsduck-php-ffi/LICENSE) with that
+attribution, preserving its existing license declaration. Native TSDuck retains
+its separate notices.
+
+The [Composer notice source record](composer-notices/source.json) records the
+author confirmation, new notice hash and pinned SPDX template with its exact
+substitutions. Its existing `local_source` references and hashes still describe
+the previously reviewed package tree, before this notice was added. This is a
+new author notice, not recovered upstream evidence.
+
+Direct checks verified the template transformation, notice hash, unchanged
+manifest and eight unchanged supplemental Composer package records. A disposable
+Docker context export using the repository's `.dockerignore` retained the actual
+notice, manifest and source record byte-for-byte. The existing path-repository
+fixture then generated and verified an inventory bundle, retained the notice and
+source record, and assigned the notice to `composer:tsduck/php` without a
+missing-notice gap for that package. These checks took 1.22 seconds; the script,
+logs and fixture bundle are under
+`var/test-runs/tsduck-binding-license-notice-20261021/`.
+
+This closes the local package's source notice gap. No application images were
+rebuilt or remeasured, and no product code, tests or dependencies changed. The
+historical image identities and raw gap counts remain intact; the fixture's
+`not-qualified` outcome also remains unchanged. Full application suites were not
+rerun for this notice-only change.
+
 ## Remaining redistribution work
 
 The remaining gate concerns these observed contents:
 
-- **Package notices:** the local `tsduck/php` package declares BSD-2-Clause without
-  a retained top-level notice, copyright attribution or established upstream
-  source. Its package tree is unchanged from the initial repository commit.
-  The Composer notice record pins that tree and manifest; repository ownership
-  and the native TSDuck license do not establish the PHP bindings' notice.
 - **Debian evidence:** 149 retained copyright files have no machine-readable
   license declaration. Their text still needs review; resolving the six
   common-license references above does not settle those declarations or

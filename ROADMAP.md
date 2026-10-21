@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-20. This roadmap selects useful future work and records unresolved
+Updated: 2026-10-21. This roadmap selects useful future work and records unresolved
 release acceptance. Current behavior and operating contracts belong in the linked
 guides. Git history retains completed milestones and their verification evidence.
 
@@ -76,10 +76,11 @@ when checking that deployment decision.
   [collection procedure](dev-docs/application-packaged-inventory.md) for each new
   artifact. Preserve the boundaries in [THIRD_PARTY.md](THIRD_PARTY.md).
   The separate Registry inventory is outside this remainder.
-  Checkpoint, 2026-10-20: production and worker images exclude 173 Composer
-  cache files (15,057,283 bytes). Both inventories and the isolated worker smoke
-  passed; installed components are unchanged. The review record retains image
-  identities, supplemental notice resolutions and remaining gaps.
+  Checkpoint, 2026-10-21: the author-confirmed local PHP binding now carries its
+  BSD-2-Clause notice. Exact-byte Docker context and collector fixture checks
+  passed in 1.22 seconds; no new tests or full application suites were needed.
+  The review record retains this source resolution, prior image measurements
+  and remaining gaps. Release qualification remains open.
 - **Selected native media path:** when a release explicitly includes an active
   codec/DSP path, resolve its remaining reproducibility and reference-vector
   acceptance before claiming certification. Use the

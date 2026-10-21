@@ -305,9 +305,30 @@
         "initial_repository_reference": "1268df23cc255fe414d33940dd303228189343e6",
         "manifest_sha256": "54f2c4bcb91ee0b66518ecb36e2fbeb1375d0be3d55787c87db56741e00f9531"
       },
-      "notices": [],
-      "status": "unresolved",
-      "gap": "The package declares BSD-2-Clause but contains no retained license/notice file, copyright attribution or established upstream source. Its package tree is unchanged from the initial repository commit. Repository ownership and the native TSDuck license do not establish the PHP bindings notice."
+      "notices": [
+        {
+          "repository_path": "packages/tsduck-php-ffi/LICENSE",
+          "sha256": "d15998a4b1a6f6863928a0a113acc8d135c5e7757dd67dabaffabbad06d4cd2c"
+        }
+      ],
+      "status": "author-notice-added",
+      "local_source_scope": "Previously reviewed package snapshot, before the author notice was added on 2026-10-21.",
+      "author_confirmation": {
+        "date": "2026-10-21",
+        "basis": "The project owner confirmed that they authored the local PHP bindings.",
+        "copyright_holder": "Martin Christiansen",
+        "copyright_year": 2026,
+        "attribution_basis": "Author name and year from the initial package commit recorded in local_source.initial_repository_reference."
+      },
+      "notice_template": {
+        "url": "https://raw.githubusercontent.com/spdx/license-list-data/93b66352608d470dc094a344a110b94d63fabb73/text/BSD-2-Clause.txt",
+        "reference": "93b66352608d470dc094a344a110b94d63fabb73",
+        "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df",
+        "transformations": [
+          "Replace <year> with 2026 and <owner> with Martin Christiansen.",
+          "Remove trailing whitespace from each line and retain exactly one final newline."
+        ]
+      }
     }
   ]
 }
