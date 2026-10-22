@@ -67,6 +67,23 @@ The token changes after a persisted metadata, song or collaborator edit; song an
 collaborator deletions cascaded from other contexts also invalidate it. Clients
 must treat the token as opaque rather than deriving it from the visible songs.
 
+Adding a song is an append operation. The handler refreshes the complete playlist,
+including its parent metadata and collaborator identities, then checks the actor's
+current editing authority and the song's visibility. A new membership receives one
+greater than the largest stored position, or zero for an empty playlist. Hidden
+songs count toward that ordering, and gaps left by catalog deletion do not cause
+an append to reuse a surviving position. Existing positions are not renumbered.
+The flat `201` response carries the public `songId` and the position from the
+handler's returned membership. Adding a visible song already present succeeds
+without a write and reports its existing position.
+
+An addition committed before the handler's refreshed read is retained in the
+append result. A conflicting write after that read still answers `409` through the
+repository's existing compare-and-swap guard; the append handler does not retry it
+automatically. A collaborator whose membership was removed or whose playlist had
+collaboration disabled between those reads is refused, including for a duplicate
+add. A playlist deleted before the mutation read answers `404`.
+
 Reorder requests require `expectedRevision` alongside `songIds`. A missing token or
 one outside the 64-character lowercase hexadecimal format answers `422`. The
 handler loads the playlist, rechecks the actor's current editing permission, then

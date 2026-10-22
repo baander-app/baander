@@ -539,12 +539,50 @@ was checked in the same review. Prose preservation checks retained tables, fence
 code and historical checkpoints; all 13 local links and anchors resolved, and
 whitespace checks passed. The runners removed their disposable services.
 
-## Observed PHP follow-ups
+## Concurrent playlist appends
 
-This source-traced failure needs its own regression before implementation:
+Checkpoint, 2026-10-22: playlist additions carry append intent and the actor's
+identity rather than a position calculated during the controller's first read.
+The handler refreshes the complete aggregate, checks current edit authority and
+song visibility, then appends after the highest stored position. Catalog deletion
+can leave position gaps; survivors retain their positions and the append follows
+them. The response reports the handled membership's actual position, including
+an existing position when an authorized duplicate add succeeds without a write.
 
-- **Concurrent playlist append:** the controller computes the append position
-  before the handler reloads the playlist. An intervening committed addition can
-  make that position stale, leaving two entries with the same position and an
-  order determined by their IDs. Verify the controller/handler interleaving and
-  derive the append result from the state actually saved.
+The controller/handler regression first produced positions `0, 1, 1` after an
+intervening addition. The real PostgreSQL regression separately exposed stale
+parent metadata retained by Doctrine's identity map. Both now pass. Eight new
+PostgreSQL cases retain that identity map while testing an independent committed
+addition, revoked collaborator authority, collaboration being disabled, duplicate
+requests after revocation, a later write conflict, a catalog deletion cascade and
+a deleted append target.
+The existing compare-and-swap save still rejects changes committed after the
+mutation read. No persistence SQL, schema, lock or retry mechanism changed.
+
+Verification in the CI image passed 342 distinct tests with 4,284 assertions across
+Playlist units, concurrency, read/mutation firewall integration and controller
+functional coverage. PHPStan passes for the Playlist source and unit tests plus
+the changed concurrency integration file. Full Deptrac reports zero violations,
+warnings and errors with 484 existing skipped violations. Creation, update and
+append share handled-result validation while retaining their existing error
+messages.
+The three simplification reviews found no other worthwhile changes.
+
+An earlier broad run encountered a missing PGroonga internal source table during
+an album fixture insert, before playlist creation or the existing test body. The
+final isolated concurrency rerun passed all 26 cases. The setup failure's cause
+remains unconfirmed; no dependency, application or schema workaround was added.
+The final HTTP/controller rerun also passed. Checks used disposable services and
+did not reuse or reset application databases, Redis or media storage. No audio
+tests ran.
+
+Final review confirmed that deletion between the controller and handler reads
+could reach a generic exception through the refreshed lookup. That path now uses
+the standard not-found exception and answers HTTP 404 without recreating the
+playlist. Its real PostgreSQL regression failed before the correction and passed
+afterward. Seven code-review lenses completed; the confirmed finding was applied
+and the affected checks passed. Independent follow-up verified the correction;
+no actionable findings remain. Prose preservation checks retained historical
+checkpoints, fenced code and tables; all 13 local links and anchors resolved, and
+whitespace checks passed. The runners removed their disposable containers,
+networks and volumes.
