@@ -9,6 +9,7 @@ set(TEST_SOURCES
     test_decoder_compliance.cpp
     test_roundtrip.cpp
     test_ratecontrol.cpp
+    test_tools.cpp
     test_interop.cpp
 )
 

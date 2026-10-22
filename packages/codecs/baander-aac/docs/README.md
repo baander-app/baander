@@ -41,8 +41,20 @@ The encoder follows the structure of the Fraunhofer FDK encoder and
 - a bitrate-dependent lowpass (FDK's bandwidth table, full band from
   128 kbit/s per channel) and a per-band minimum SNR derived from the bits
   available per Bark, adapted for quiet bands and local peaks and valleys;
+- TNS with FDK's analysis: lag-windowed, energy-normalized
+  autocorrelation over quarters of the range, an upper and a lower filter
+  on long windows (merged when they agree), one filter per short window
+  with 3-bit coefficients, and filters shared between the channels of a
+  pair when they nearly coincide;
+- perceptual noise substitution at 28 to 48 kbit/s per channel in the
+  constant-rate modes (FDK's AAC-LC tuning): bands above 4.1 kHz whose
+  quarters carry similar power and whose lines are unpredictable are sent
+  as a noise energy instead of coefficients;
+- intensity stereo when the bitrate is below five times the lowpass
+  frequency: regions of at least six bands where the channels correlate
+  above 0.95 and are panned away from the middle carry the left channel
+  and a level difference;
 - per-band M/S stereo chosen by perceptual entropy;
-- TNS on long windows when the spectrum is predictable;
 - thresholds raised towards the bit budget in the fourth-root domain so
   that quiet bands become holes before loud bands lose precision, with
   hole-avoidance flags from spread energy and top-down band release when
@@ -172,22 +184,29 @@ decoder/encoder sessions).
 
 ## Testing
 
-`ctest` runs seven suites: table consistency (prefix-free, complete
+`ctest` runs eight suites: table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands; Princen-Bradley windows), MDCT
 against the direct definition and TDAC, bit reader/writer, ADTS and
 Huffman coding, decoder compliance on hand-built and damaged streams,
 encode/decode roundtrips at every sample rate and rate-control mode, rate
-control, and interoperability with FFmpeg. The interop test skips when
-`ffmpeg` is not on PATH; otherwise it requires our decoder to match
+control, the coding tools (noise substitution keeps the level of the
+substituted region, intensity stereo keeps the balance, TNS covers both
+window types), and interoperability with FFmpeg. The interop test skips
+when `ffmpeg` is not on PATH; otherwise it requires our decoder to match
 FFmpeg's decode of FFmpeg-encoded streams, and FFmpeg to decode our
 streams exactly as our decoder does, both at better than 90 dB difference
-SNR.
+SNR; the streams of ours it checks use TNS, noise substitution and
+intensity stereo.
+
+Noise substitution never signals correlated noise (an M/S flag on a noise
+band): FFmpeg's decoder draws independent noise regardless of the flag,
+and its random sequence would then run ahead of a conforming decoder's.
 
 ## Project structure
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, bitstream, decoder, psychoacoustics, encoder, SIMD
+src/          tables, FFT/MDCT, bitstream, decoder, psychoacoustics, encoder, coding tools, SIMD
 tools/        baac command-line tool
 tests/        CTest suites
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
@@ -200,6 +219,8 @@ The standard tables (spectral and scalefactor Huffman codebooks,
 scalefactor band offsets) are ISO/IEC 14496-3 data, transcribed from
 FFmpeg's `libavcodec/aactab.c` (LGPL 2.1+) and verified against it
 entry by entry. The encoder's allocation strategy, bandwidth table, block
-switching and M/S decision follow the published design of the Fraunhofer
-FDK AAC encoder (AOSP `external/aac`) and 3GPP TS 26.403 as references;
-no FDK code was copied.
+switching, TNS analysis, noise substitution tuning, intensity and M/S
+decisions follow the published design of the Fraunhofer FDK AAC encoder
+(AOSP `external/aac`, the `android17-release` state as mirrored in
+`mstorsjo/fdk-aac`) and 3GPP TS 26.403 as references; no FDK code was
+copied.
