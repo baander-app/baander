@@ -20,4 +20,16 @@ export const IPC_CHANNELS = {
   DISCOVERY_SERVER_FOUND: 'baander:discovery:server-found',
   DISCOVERY_SCAN_STOPPED: 'baander:discovery:scan-stopped',
   DISCOVERY_SCAN_STARTED: 'baander:discovery:scan-started',
+
+  // AAC codec channels (native baander-aac binding in the main process)
+  AAC_INFO: 'baander:aac:info',
+  AAC_DECODE: 'baander:aac:decode',
+  AAC_ENCODE: 'baander:aac:encode',
+  AAC_DECODER_OPEN: 'baander:aac:decoder-open',
+  AAC_DECODER_DECODE: 'baander:aac:decoder-decode',
+  AAC_DECODER_CLOSE: 'baander:aac:decoder-close',
+  AAC_ENCODER_OPEN: 'baander:aac:encoder-open',
+  AAC_ENCODER_ENCODE: 'baander:aac:encoder-encode',
+  AAC_ENCODER_FLUSH: 'baander:aac:encoder-flush',
+  AAC_ENCODER_CLOSE: 'baander:aac:encoder-close',
 } as const;

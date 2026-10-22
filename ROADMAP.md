@@ -539,6 +539,103 @@ was checked in the same review. Prose preservation checks retained tables, fence
 code and historical checkpoints; all 13 local links and anchors resolved, and
 whitespace checks passed. The runners removed their disposable services.
 
+## AAC codec rewrite and desktop binding
+
+Checkpoint, 2026-10-22: `packages/codecs/baander-aac` produced streams no
+other decoder accepted and misdecoded every external stream. Its Huffman
+codebooks 6, 7, 9 and 11, every scalefactor band table and the TNS limits
+differed from ISO/IEC 14496-3; the MDCT and windows did not satisfy time-domain
+aliasing cancellation; the decoder ignored short windows, grouping, KBD windows,
+TNS, intensity stereo and noise substitution; and the encoder inverted the
+scalefactor convention. The tables were regenerated and verified entry by entry
+against FFmpeg's, and the decoder, MDCT and encoder were rewritten. The decoder
+now implements every AAC-LC tool and follows the ADTS stream parameters; the
+encoder implements block switching with lookahead, M/S, TNS and the
+threshold-adjustment and reservoir design of the Fraunhofer FDK encoder, with
+an encoder delay of 2048 samples and a flush that drains it. HE-AAC decoding
+remains out of scope: SBR streams decode as their AAC-LC core and the API
+reports the SBR presence; HE-AAC encoding is refused at creation. The
+placeholder SBR/PS/spectral sources and the stale scratch programs were removed.
+
+The Electron app ships the codec natively as `@baander/aac-native`, an
+ESM-only Node-API package rooted in the codec directory, built by node-gyp
+during `yarn install` and rebuilt for Electron by `electron-rebuild`.
+`AacService` loads it lazily in the main process; an IPC module with payload
+validation and a preload bridge expose one-shot and chunked decoding and
+encoding to the renderer. Node 26 and Electron 45 are the baseline for the
+desktop toolchain. The decoder-only WebAssembly build under
+`packages/dsp/baander-aac` was removed instead of repaired: its loader handed
+linear-memory pointers and `malloc`/`free` to JavaScript, so a host bug could
+free or reuse codec memory, and no browser code consumed it. The Emscripten
+platform and SIMD128 paths left the codec with it.
+
+Verification: the codec's seven CTest suites pass (table consistency, MDCT,
+bitstream, decoder compliance, roundtrips at all twelve sample rates and four
+rate-control modes, rate control, FFmpeg interoperability). Against FFmpeg 6.1.1
+our decoder reproduces FFmpeg's decode of FFmpeg-encoded streams to 135 dB
+difference SNR at 8 to 96 kHz, mono and stereo, 32 to 320 kbit/s, including
+short windows, TNS, intensity stereo, noise substitution and CRC-protected
+ADTS; FFmpeg decodes our streams identically to our decoder in every case.
+At equal bitrate the encoder's SNR matches or exceeds FFmpeg's native encoder
+on tonal, harmonic, transient and mono material and trails it only on pink
+noise at 32 and 64 kbit/s stereo; CBR and ABR land within 1 percent of the
+target. The binding's smoke test passes on Node 22, 24 and 26 and inside the
+Electron 45.0.0 runtime (Node 24.22, Node-API 10); the Electron suite passes
+66 tests under Node 26.12 with the binding built; `yarn install` builds the
+binding through node-gyp; the app type-checks and bundles; and an
+electron-builder `dir` package for Linux carries only the binding's entry,
+manifest and compiled module in `app.asar.unpacked`, from which the packaged
+app encodes and decodes. The Electron header host is unreachable from the
+build environment, so the Electron-ABI rebuild ran against Node headers; a
+Node-API module is ABI-stable across both, which the in-Electron runs
+confirm. Not possible here: listening tests; the encoder's quality claims
+rest on SNR and the FDK-derived allocation design. electron-builder's checked-in
+configurations still reference `ui/electron/build/afterPack.cjs` and
+application icons that are not in the repository; packaging needs those
+before a release build.
+
+Checkpoint, 2026-10-22, encoder tools: the encoder gained the coding tools
+of the FDK encoder as kept in AOSP `external/aac` (read from the
+`android17-release` state of the `mstorsjo/fdk-aac` mirror; the AOSP host
+itself is unreachable from the build environment). TNS now follows
+`aacenc_tns.cpp`: lag-windowed, energy-normalized autocorrelation over
+quarters of the range, an upper and a lower filter on long windows that
+merge when they agree, one filter per short window with 3-bit
+coefficients, and filters shared across a channel pair when they nearly
+coincide; the filter lengths count down from `num_swb` as the decoder
+expects. Perceptual noise substitution uses the AAC-LC tuning rows
+(28 to 48 kbit/s per channel, constant-rate modes, bands above 4.1 kHz,
+quarter-power and unpredictability tests, TNS gating, gap and isolation
+rules) and never signals correlated noise, because FFmpeg's decoder draws
+independent noise regardless and would then run ahead of a conforming
+decoder's random sequence. Intensity stereo follows `intensity.cpp`
+(correlation above 0.95, regions of at least six bands, direction and
+loudness limits, left-channel replacement at the left level) and is
+allowed when the bitrate is below five times the lowpass. The AOSP
+history's own quality commits (VBR bandwidths, reduced bit reservoir for
+low-delay, dead-zone quantization) apply to configurations this encoder
+does not have and were not ported.
+
+Verification: eight CTest suites pass, including the new tools suite
+(noise substitution in 130 of 132 frames of white noise at 40 kbit/s mono
+with the substituted region within 0.1 dB of the source; intensity stereo
+in 131 of 132 frames of a panned harmonic series at 48 kbit/s with the
+balance within 0.1 dB and 30.8 dB SNR; TNS on short windows and with two
+filters on the transient signal) and the interop suite's new intensity and
+noise-substitution cases, where FFmpeg decodes our streams identically to
+our decoder (134.8 and 136.3 dB). Against FFmpeg 6.1.1 the pink-noise case
+at 64 kbit/s stereo moved from 12.9/11.0 dB to 14.0/13.5 dB, now above
+FFmpeg's 13.6/13.2 dB; the two-tone signal at 48 kHz gained 0.8/1.3 dB;
+the click signal at 96 kbit/s lost 0.5 dB, where substitution now covers
+the noise bursts; the other rows of the reference comparison are unchanged
+within 0.2 dB. The binding's smoke test passes after the rebuild. The
+block-switching detector then took FDK's second-order high-pass in place
+of the first difference; it changes no decision on the reference signals
+(every row identical) and stays for fidelity to the reference. The
+remaining FDK elements were compared and not ported: the rate loop here
+bisects on bits where FDK estimates from perceptual entropy, and FDK's
+scalefactor assimilation is a broader form of the smoothing here.
+
 ## Concurrent playlist appends
 
 Checkpoint, 2026-10-22: playlist additions carry append intent and the actor's

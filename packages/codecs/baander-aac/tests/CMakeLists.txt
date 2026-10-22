@@ -1,20 +1,18 @@
-# Test build configuration for baander-aac
+# Test build configuration for baander-aac.  Every test is a standalone
+# executable over the public API (plus the internal headers for the unit
+# tests) and returns nonzero on failure.
 
-# Test sources
 set(TEST_SOURCES
+    test_tables.cpp
     test_mdct.cpp
     test_bitstream.cpp
-    test_roundtrip.cpp
-    test_quality.cpp
     test_decoder_compliance.cpp
+    test_roundtrip.cpp
     test_ratecontrol.cpp
-    test_real_songs.cpp
-    test_sbr_ps.cpp
-    test_reference.cpp
-    test_encoder_regression.cpp
+    test_tools.cpp
+    test_interop.cpp
 )
 
-# Create test executables
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})

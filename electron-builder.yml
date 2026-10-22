@@ -20,6 +20,13 @@ files:
     -   from: "ui/electron/dist-electron/preload"
         to: "."
     - package.json
+    # The native AAC codec ships as its ESM entry, types and compiled binding
+    # only; the C++ sources it was built from stay out of the bundle.
+    - "!node_modules/@baander/aac-native/**"
+    - "node_modules/@baander/aac-native/package.json"
+    - "node_modules/@baander/aac-native/node/index.js"
+    - "node_modules/@baander/aac-native/node/index.d.ts"
+    - "node_modules/@baander/aac-native/build/Release/*.node"
 
 extraResources:
     -   from: "ui/electron/public/dsp"

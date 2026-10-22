@@ -3,12 +3,14 @@ import { deepLinkBridge } from './bridges/deep-link.bridge';
 import { discoveryBridge } from './bridges/discovery.bridge';
 import { systemBridge } from './bridges/system.bridge';
 import { playbackBridge } from './bridges/playback.bridge';
+import { aacBridge } from './bridges/aac.bridge';
 import './bridges/window.bridge';
 
 contextBridge.exposeInMainWorld('electron', {
   deepLink: deepLinkBridge,
   system: systemBridge,
   playback: playbackBridge,
+  aac: aacBridge,
 });
 
 contextBridge.exposeInMainWorld('BaanderElectron', {
