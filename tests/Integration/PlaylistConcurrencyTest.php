@@ -17,6 +17,7 @@ use App\Playlist\Application\CommandHandler\ReorderSongsHandler;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -229,6 +230,28 @@ final class PlaylistConcurrencyTest extends TestCase
         $fresh = $this->load($this->repository($this->manager()));
         self::assertSame([$this->songIds[0]->toString(), $survivor->toString(), $requested->toString()], array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
         self::assertSame([0, 2, 3], array_map(static fn ($song): int => $song->getPosition(), $fresh->getSongs()));
+    }
+
+    public function testAppendReportsNotFoundWhenThePlaylistWasDeletedAfterTheControllerRead(): void
+    {
+        $repository = $this->repository($this->manager());
+        $initial = $repository->findByPublicId($this->load($repository)->getPublicId());
+        self::assertNotNull($initial);
+        $winnerRepository = $this->repository($this->manager());
+        $winnerRepository->delete($this->load($winnerRepository));
+        $before = $this->storedState();
+        self::assertFalse($before['playlist']);
+        $visibility = $this->createMock(PlaylistSongVisibilityInterface::class);
+        $visibility->expects(self::never())->method('isVisible');
+
+        try {
+            (new AddSongHandler($repository, $visibility))(new AddSongCommand(
+                $this->playlistId, $this->songIds[1], $this->ownerId, LibraryReadScope::unrestricted(),
+            ));
+            self::fail('A playlist deleted before the mutation read must be not found.');
+        } catch (NotFoundException) {
+            self::assertSame($before, $this->storedState());
+        }
     }
 
     public function testStaleFullyLoadedSaveCannotOverwriteNewerSongsAndCollaborators(): void

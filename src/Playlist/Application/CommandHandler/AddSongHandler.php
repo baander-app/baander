@@ -9,7 +9,6 @@ use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Application\Exception\NotFoundException;
-use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -30,7 +29,7 @@ final class AddSongHandler
         $playlist = $this->playlistRepository->findByUuid($command->getPlaylistId());
 
         if ($playlist === null) {
-            throw new RuntimeException(sprintf('Playlist %s not found.', $command->getPlaylistId()->toString()));
+            throw new NotFoundException('Playlist not found.');
         }
 
         if (!$playlist->getUserId()->equals($command->getActorUuid())
