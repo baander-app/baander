@@ -1,214 +1,176 @@
 #include "bitstream.h"
 
-#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 
-#include "aac_cpu.h"
-#include "aac_dsp.h"
 #include "aac_tables.h"
-#include "fft.h"
-#include "mdct.h"
 
 /* ── Bit Reader ────────────────────────────────────────────────── */
 
 void aac_bitreader_init(AacBitReader* r, const uint8_t* d, int s) {
   r->data = d;
   r->size = s;
-  r->byte_pos = 0;
-  r->bit_pos = 0;
+  r->pos = 0;
+  r->overread = 0;
 }
 
-int aac_bitreader_bits_left(const AacBitReader* r) {
-  if (r->byte_pos >= r->size) {
+int aac_bitreader_bits_left(const AacBitReader* r) { return r->size * 8 - r->pos; }
+
+uint32_t aac_bitreader_peek(const AacBitReader* r, int n) {
+  if (n <= 0) {
     return 0;
   }
-  return (r->size - r->byte_pos) * 8 - r->bit_pos;
-}
-
-uint32_t aac_bitreader_peek(AacBitReader* r, int n) {
-  uint32_t v = 0;
-  int bp = r->byte_pos, bitp = r->bit_pos;
-  for (int i = 0; i < n; i++) {
-    v <<= 1;
-    if (bp < r->size) { v |= (r->data[bp] >> (7 - bitp)) & 1;
-}
-    bitp++;
-    if (bitp >= 8) {
-      bitp = 0;
-      bp++;
+  const int byte = r->pos >> 3;
+  const int shift = r->pos & 7;
+  uint64_t cache = 0;
+  if (byte + 8 <= r->size) {
+    for (int i = 0; i < 8; i++) {
+      cache = (cache << 8) | r->data[byte + i];
+    }
+  } else {
+    for (int i = 0; i < 8; i++) {
+      const int b = byte + i;
+      cache = (cache << 8) | ((b >= 0 && b < r->size) ? r->data[b] : 0);
     }
   }
-  return v;
+  return (uint32_t)((cache << shift) >> (64 - n));
 }
 
 uint32_t aac_bitreader_read(AacBitReader* r, int n) {
   uint32_t v = aac_bitreader_peek(r, n);
-  r->byte_pos += (r->bit_pos + n) / 8;
-  r->bit_pos = (r->bit_pos + n) % 8;
+  aac_bitreader_skip(r, n);
   return v;
 }
 
-int32_t aac_bitreader_read_signed(AacBitReader* r, int n) {
-  uint32_t u = aac_bitreader_read(r, n);
-  if (n > 0 && (u & (1u << (n - 1)))) { u |= ~((1u << n) - 1);
-}
-  return (int32_t)u;
-}
-
-void aac_bitreader_skip(AacBitReader* r, int n) { aac_bitreader_read(r, n); }
-
-void aac_bitreader_byte_align(AacBitReader* r) {
-  if (r->bit_pos > 0) {
-    r->byte_pos++;
-    r->bit_pos = 0;
+void aac_bitreader_skip(AacBitReader* r, int n) {
+  r->pos += n;
+  if (r->pos > r->size * 8) {
+    r->overread = 1;
+    r->pos = r->size * 8;
   }
 }
 
-int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
-  if (cb < 1 || cb > AAC_NUM_CODEBOOKS) { return AAC_ERR_INVALID_ARG;
-}
-  if (!aac_huff_code[cb] || !aac_huff_len[cb]) { return AAC_ERR_UNSUPPORTED;
-}
+void aac_bitreader_byte_align(AacBitReader* r) { aac_bitreader_skip(r, (8 - (r->pos & 7)) & 7); }
 
-  int n = aac_huff_count[cb];
-  const uint32_t* codes = aac_huff_code[cb];
-  const uint8_t* lens = aac_huff_len[cb];
-  /* Peek enough bits for the longest ISO codeword (16 in CB11). */
-  uint32_t peek = aac_bitreader_peek(r, 16);
+/* ── Huffman decoding trees ────────────────────────────────────── */
 
-  /* Find longest matching codeword (handles non-prefix-free ordering). */
-  int best_idx = -1, best_len = 0;
-  for (int i = 0; i < n; i++) {
-    int len = lens[i];
-    if (!len || len > 16) { continue;
-}
-    if ((peek >> (16 - len)) == (codes[i] >> (32 - len))) {
-      if (len > best_len) {
-        best_idx = i;
-        best_len = len;
+/* Binary decoding tree per codebook: node i has children child[i][0/1];
+ * a negative child encodes the leaf -(index + 1). */
+namespace {
+struct HuffTree {
+  short child[2 * 289][2];
+  int nodes;
+};
+
+HuffTree g_spec_trees[AAC_NUM_CODEBOOKS + 1];
+HuffTree g_sf_tree;
+
+void tree_build(HuffTree* t, const uint32_t* codes_left_aligned, const uint32_t* codes_right,
+                const uint8_t* lens, int count) {
+  t->nodes = 1;
+  t->child[0][0] = t->child[0][1] = 0;
+  for (int i = 0; i < count; i++) {
+    const int len = lens[i];
+    const uint32_t code = codes_left_aligned ? codes_left_aligned[i] >> (32 - len) : codes_right[i];
+    int node = 0;
+    for (int b = len - 1; b >= 0; b--) {
+      const int bit = (int)((code >> b) & 1);
+      if (b == 0) {
+        t->child[node][bit] = (short)-(i + 1);
+      } else {
+        if (t->child[node][bit] <= 0) {
+          const int next = t->nodes++;
+          t->child[next][0] = t->child[next][1] = 0;
+          t->child[node][bit] = (short)next;
+        }
+        node = t->child[node][bit];
       }
     }
   }
-  if (best_idx < 0) { return AAC_ERR_DECODE;
 }
 
-  aac_bitreader_skip(r, best_len);
-  const AacCodebookInfo* info = &aac_codebook_info[cb];
-  int mv = info->max_val;
-  int dim = info->dim;
-  int v[4] = {0, 0, 0, 0};
-  int neg[4] = {0, 0, 0, 0};
+/* Returns the leaf index or -1 for a codeword that is not in the table. */
+int tree_decode(const HuffTree* t, AacBitReader* r) {
+  int node = 0;
+  for (int depth = 0; depth < 20; depth++) {
+    const int next = t->child[node][aac_bitreader_read(r, 1)];
+    if (next < 0) {
+      return -next - 1;
+    }
+    if (next == 0) {
+      return -1;
+    }
+    node = next;
+  }
+  return -1;
+}
 
+struct TreeInit {
+  TreeInit() {
+    aac_tables_init();
+    for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+      tree_build(&g_spec_trees[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
+                 aac_huff_count[cb]);
+    }
+    tree_build(&g_sf_tree, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
+  }
+} g_tree_init;  // NOLINT(bugprone-throwing-static-initialization)
+}  // namespace
+
+int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
+  if (cb < 1 || cb > AAC_NUM_CODEBOOKS) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const int idx = tree_decode(&g_spec_trees[cb], r);
+  if (idx < 0) {
+    return AAC_ERR_DECODE;
+  }
+  const AacCodebookInfo* info = &aac_codebook_info[cb];
+  const int dim = info->dim;
   if (info->is_unsigned) {
-    int mod = mv + 1;
-    int t = best_idx;
+    const int mod = info->max_val + 1;
+    int t = idx;
     for (int k = dim - 1; k >= 0; k--) {
-      v[k] = t % mod;
+      out[k] = t % mod;
       t /= mod;
     }
-    /* Sign bits for every nonzero coefficient, in v[0]..v[dim-1] order. */
     for (int k = 0; k < dim; k++) {
-      if (v[k] != 0) {
-        neg[k] = (int)aac_bitreader_read(r, 1);
+      if (out[k] != 0 && aac_bitreader_read(r, 1)) {
+        out[k] = -out[k];
+      }
+    }
+    if (cb == AAC_CB_ESCAPE) {
+      for (int k = 0; k < dim; k++) {
+        if (out[k] == 16 || out[k] == -16) {
+          int n = 4;
+          while (aac_bitreader_read(r, 1)) {
+            if (++n > 12) {
+              return AAC_ERR_DECODE;
+            }
+          }
+          const int mag = (1 << n) + (int)aac_bitreader_read(r, n);
+          out[k] = out[k] < 0 ? -mag : mag;
+        }
       }
     }
   } else {
-    int mod = 2 * mv + 1;
-    int t = best_idx;
+    const int mv = info->max_val;
+    const int mod = 2 * mv + 1;
+    int t = idx;
     for (int k = dim - 1; k >= 0; k--) {
-      v[k] = (t % mod) - mv;
+      out[k] = (t % mod) - mv;
       t /= mod;
     }
   }
-
-  /* Escape extension for unsigned escape book (cb 11).  Magnitude mv (16)
-   * is ESC and carries (N-4) one-bits + terminating zero + N-bit word;
-   * decoded magnitude is 2^N + word. */
-  if (cb == AAC_CB_ESCAPE) {
-    for (int k = 0; k < dim; k++) {
-      if (v[k] == mv) {
-        int n = 4;
-        while (aac_bitreader_read(r, 1)) {
-          if (++n > 16) {
-            return AAC_ERR_DECODE; /* corrupt escape prefix */
-          }
-        }
-        v[k] = (1 << n) + (int)aac_bitreader_read(r, n);
-      }
-    }
-  }
-
-  for (int k = 0; k < dim; k++) {
-    if (neg[k]) {
-      v[k] = -v[k];
-    }
-    out[k] = v[k];
-  }
-  return 0;
+  return r->overread ? AAC_ERR_DECODE : 0;
 }
 
 int aac_bitreader_read_scalefactor(AacBitReader* r) {
-  /* ISO 14496-3 Table 4.47: index 60 corresponds to a zero DPCM
-   * difference.  Codewords are up to 19 bits long. */
-  uint32_t peek = aac_bitreader_peek(r, 19);
-  int best_idx = -1;
-  int best_len = 0;
-  for (int i = 0; i < 121; i++) {
-    int len = aac_scalefactor_bits[i];
-    if (!len || len > 19) {
-      continue;
-    }
-    if ((peek >> (19 - len)) == aac_scalefactor_code[i]) {
-      if (len > best_len) {
-        best_idx = i;
-        best_len = len;
-      }
-    }
+  const int idx = tree_decode(&g_sf_tree, r);
+  if (idx < 0) {
+    return AAC_SF_INVALID;
   }
-  if (best_idx < 0) {
-    return AAC_ERR_DECODE;
-  }
-  aac_bitreader_skip(r, best_len);
-  return best_idx - AAC_SCALE_DIFF_ZERO;
-}
-
-int aac_bitreader_read_sections(AacBitReader* r, int is_short, int max_sfb,
-                                int* out_codebooks, int max_bands) {
-  if (max_sfb > max_bands) {
-    return AAC_ERR_INVALID_ARG;
-  }
-  int run_bits = is_short ? 3 : 5;
-  int run_esc = (1 << run_bits) - 1;
-  int band = 0;
-  while (band < max_sfb) {
-    if (aac_bitreader_bits_left(r) < 4) {
-      return AAC_ERR_DECODE;
-    }
-    int cb = aac_bitreader_read(r, 4);
-    if (cb == 12) {
-      return AAC_ERR_DECODE; /* reserved */
-    }
-    int run = 0;
-    int incr = 0;
-    do {
-      if (aac_bitreader_bits_left(r) < run_bits) {
-        return AAC_ERR_DECODE;
-      }
-      incr = (int)aac_bitreader_read(r, run_bits);
-      run += incr;
-    } while (incr == run_esc);
-    if (band + run > max_sfb) {
-      return AAC_ERR_DECODE;
-    }
-    for (int i = 0; i < run; i++) {
-      out_codebooks[band + i] = cb;
-    }
-    band += run;
-  }
-  for (int i = band; i < max_bands; i++) {
-    out_codebooks[i] = 0;
-  }
-  return 0;
+  return idx - AAC_SCALE_DIFF_ZERO;
 }
 
 /* ── Bit Writer ────────────────────────────────────────────────── */
@@ -228,10 +190,10 @@ void aac_bitwriter_write(AacBitWriter* w, uint32_t v, int n) {
       w->overflow = 1;
       return;
     }
-    if ((v >> i) & 1) { w->data[w->byte_pos] |= (1 << (7 - w->bit_pos));
-}
-    w->bit_pos++;
-    if (w->bit_pos >= 8) {
+    if ((v >> i) & 1) {
+      w->data[w->byte_pos] |= (uint8_t)(1 << (7 - w->bit_pos));
+    }
+    if (++w->bit_pos == 8) {
       w->bit_pos = 0;
       w->byte_pos++;
     }
@@ -240,74 +202,94 @@ void aac_bitwriter_write(AacBitWriter* w, uint32_t v, int n) {
 
 int aac_bitwriter_overflow(const AacBitWriter* w) { return w->overflow; }
 
-void aac_bitwriter_write_signed(AacBitWriter* w, int32_t v, int n) {
-  aac_bitwriter_write(w, (v < 0) ? ((1u << n) + v) : (uint32_t)v, n);
-}
-
-int aac_bitwriter_write_huffman(AacBitWriter* w, int cb, const int* v_in) {
-  if (cb < 1 || cb > AAC_NUM_CODEBOOKS) { return AAC_ERR_INVALID_ARG;
-}
-  if (!aac_huff_code[cb] || !aac_huff_len[cb]) { return AAC_ERR_UNSUPPORTED;
-}
-
+/* Codebook index of v, or -1 when the values do not fit the book. */
+static int huffman_index(int cb, const int* v) {
   const AacCodebookInfo* info = &aac_codebook_info[cb];
-  int mv = info->max_val;
-  int dim = info->dim;
-  int v[4] = {0, 0, 0, 0};
-  int mag[4] = {0, 0, 0, 0};
-
-  for (int k = 0; k < dim; k++) {
-    v[k] = v_in[k];
-    mag[k] = v[k] < 0 ? -v[k] : v[k];
-  }
-
+  const int mv = info->max_val;
   int idx = 0;
-  if (info->is_unsigned) {
-    int max_mag = (cb == AAC_CB_ESCAPE) ? AAC_ESC_MAX_MAG : mv;
-    int mod = mv + 1;
-    for (int k = 0; k < dim; k++) {
-      if (mag[k] > max_mag) { mag[k] = max_mag;
-}
-      idx = idx * mod + std::min(mag[k], mv);
-    }
-  } else {
-    int mod = 2 * mv + 1;
-    for (int k = 0; k < dim; k++) {
-      int sv = v[k];
-      if (sv < -mv) { sv = -mv;
-}
-      if (sv > mv) { sv = mv;
-}
-      idx = idx * mod + (sv + mv);
+  for (int k = 0; k < info->dim; k++) {
+    if (info->is_unsigned) {
+      int mag = std::abs(v[k]);
+      if (cb == AAC_CB_ESCAPE) {
+        if (mag > AAC_ESC_MAX_MAG) {
+          return -1;
+        }
+        if (mag > 15) {
+          mag = 16;
+        }
+      } else if (mag > mv) {
+        return -1;
+      }
+      idx = idx * (mv + 1) + mag;
+    } else {
+      if (v[k] < -mv || v[k] > mv) {
+        return -1;
+      }
+      idx = idx * (2 * mv + 1) + v[k] + mv;
     }
   }
-  if (idx < 0 || idx >= aac_huff_count[cb]) { return AAC_ERR_INVALID_ARG;
+  return idx;
 }
 
-  int len = aac_huff_len[cb][idx];
-  aac_bitwriter_write(w, aac_huff_code[cb][idx] >> (32 - len), len);
+static int escape_bits(int mag) {
+  int n = 4;
+  while (mag >= (1 << (n + 1))) {
+    n++;
+  }
+  return (n - 4) + 1 + n;
+}
 
-  /* Sign bits for unsigned books, in v[0]..v[dim-1] order. */
+int aac_huffman_bits(int cb, const int* v) {
+  const int idx = huffman_index(cb, v);
+  if (idx < 0) {
+    return 1 << 20;
+  }
+  const AacCodebookInfo* info = &aac_codebook_info[cb];
+  int bits = aac_huff_len[cb][idx];
   if (info->is_unsigned) {
-    for (int k = 0; k < dim; k++) {
+    for (int k = 0; k < info->dim; k++) {
       if (v[k] != 0) {
-        aac_bitwriter_write(w, v[k] < 0 ? 1u : 0u, 1);
+        bits++;
+      }
+      if (cb == AAC_CB_ESCAPE && std::abs(v[k]) > 15) {
+        bits += escape_bits(std::abs(v[k]));
       }
     }
   }
+  return bits;
+}
 
-  /* Escape extension for unsigned escape book. */
+int aac_bitwriter_write_huffman(AacBitWriter* w, int cb, const int* v) {
+  if (cb < 1 || cb > AAC_NUM_CODEBOOKS) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const int idx = huffman_index(cb, v);
+  if (idx < 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const AacCodebookInfo* info = &aac_codebook_info[cb];
+  const int len = aac_huff_len[cb][idx];
+  aac_bitwriter_write(w, aac_huff_code[cb][idx] >> (32 - len), len);
+  if (!info->is_unsigned) {
+    return 0;
+  }
+  for (int k = 0; k < info->dim; k++) {
+    if (v[k] != 0) {
+      aac_bitwriter_write(w, v[k] < 0 ? 1u : 0u, 1);
+    }
+  }
   if (cb == AAC_CB_ESCAPE) {
-    for (int k = 0; k < dim; k++) {
-      if (mag[k] >= mv) {
-        /* value = 2^n + word with word < 2^n; prefix is (n-4) ones + zero */
+    for (int k = 0; k < info->dim; k++) {
+      const int mag = std::abs(v[k]);
+      if (mag > 15) {
+        /* value = 2^n + word, word < 2^n; prefix is (n - 4) ones + a zero */
         int n = 4;
-        while (mag[k] >= (1 << (n + 1))) {
+        while (mag >= (1 << (n + 1))) {
           n++;
         }
-        aac_bitwriter_write(w, (uint32_t)((1 << (n - 4)) - 1), n - 4);
+        aac_bitwriter_write(w, (1u << (n - 4)) - 1, n - 4);
         aac_bitwriter_write(w, 0, 1);
-        aac_bitwriter_write(w, (uint32_t)(mag[k] - (1 << n)), n);
+        aac_bitwriter_write(w, (uint32_t)(mag - (1 << n)), n);
       }
     }
   }
@@ -315,40 +297,12 @@ int aac_bitwriter_write_huffman(AacBitWriter* w, int cb, const int* v_in) {
 }
 
 void aac_bitwriter_write_scalefactor(AacBitWriter* w, int diff) {
-  int idx = diff + AAC_SCALE_DIFF_ZERO;
-  if (idx < 0) {
-    idx = 0;
-  } else if (idx > 120) {
-    idx = 120;
-  }
-  aac_bitwriter_write(w, aac_scalefactor_code[idx], aac_scalefactor_bits[idx]);
-}
-
-void aac_bitwriter_write_sections(AacBitWriter* w, int is_short, const int* codebooks, int nb) {
-  if (nb <= 0) {
+  const int idx = diff + AAC_SCALE_DIFF_ZERO;
+  if (idx < 0 || idx > 120) {
+    w->overflow = 1; /* callers keep differences within +-60 */
     return;
   }
-  int run_bits = is_short ? 3 : 5;
-  int run_esc = (1 << run_bits) - 1;
-  int i = 0;
-  while (i < nb) {
-    int cb = codebooks[i];
-    if (cb == 12) {
-      cb = 0; /* map reserved to zero */
-    }
-    aac_bitwriter_write(w, cb, 4);
-    int run = 1;
-    while (i + run < nb && codebooks[i + run] == cb) {
-      run++;
-    }
-    int count = run;
-    while (count >= run_esc) {
-      aac_bitwriter_write(w, run_esc, run_bits);
-      count -= run_esc;
-    }
-    aac_bitwriter_write(w, count, run_bits);
-    i += run;
-  }
+  aac_bitwriter_write(w, aac_scalefactor_code[idx], aac_scalefactor_bits[idx]);
 }
 
 void aac_bitwriter_byte_align(AacBitWriter* w) {
@@ -358,37 +312,37 @@ void aac_bitwriter_byte_align(AacBitWriter* w) {
   }
 }
 
+int aac_bitwriter_bits_written(const AacBitWriter* w) { return w->byte_pos * 8 + w->bit_pos; }
+
 int aac_bitwriter_bytes_written(const AacBitWriter* w) {
   return w->byte_pos + (w->bit_pos > 0 ? 1 : 0);
 }
 
-/* ── ADTS ──────────────────────────────────────────────────────── */
+/* ── ADTS (ISO/IEC 13818-7 6.2 / ISO/IEC 14496-3 1.A.2) ─────────── */
 
 int aac_adts_parse(AacAdtsHeader* h, const uint8_t* d, int s) {
-  if (s < 7 || d[0] != 0xFF || (d[1] & 0xF0) != 0xF0) { return AAC_ERR_DECODE;
-}
+  if (s < AAC_ADTS_HEADER_SIZE || d[0] != 0xFF || (d[1] & 0xF6) != 0xF0) {
+    return AAC_ERR_DECODE;
+  }
   AacBitReader r;
   aac_bitreader_init(&r, d, s);
-  aac_bitreader_read(&r, 12);
-  h->id = aac_bitreader_read(&r, 1);
-  h->layer = aac_bitreader_read(&r, 2);
-  h->protection_absent = aac_bitreader_read(&r, 1);
-  h->profile = (AacObjectType)(aac_bitreader_read(&r, 2) + 1);
-  h->sample_rate_index = aac_bitreader_read(&r, 4);
-  h->private_bit = aac_bitreader_read(&r, 1);
-  h->channel_config = aac_bitreader_read(&r, 3);
-  h->original_copy = aac_bitreader_read(&r, 1);
-  h->home = aac_bitreader_read(&r, 1);
-  h->copyright_id_bit = aac_bitreader_read(&r, 1);
-  h->copyright_id_start = aac_bitreader_read(&r, 1);
-  h->frame_length = aac_bitreader_read(&r, 13);
-  h->buffer_fullness = aac_bitreader_read(&r, 11);
-  h->num_aac_frames = aac_bitreader_read(&r, 2);
-  /* Sanity: frame_length covers the header itself plus (when
-   * protection_absent == 0) the 16-bit CRC check that follows it.
-   * ISO 13818-7 §8.1.1: aac_frame_length = header + CRC + raw data. */
-  int min_len = AAC_ADTS_HEADER_SIZE + (h->protection_absent ? 0 : 2);
-  if (h->frame_length < min_len) {
+  aac_bitreader_skip(&r, 12);
+  h->id = (int)aac_bitreader_read(&r, 1);
+  h->layer = (int)aac_bitreader_read(&r, 2);
+  h->protection_absent = (int)aac_bitreader_read(&r, 1);
+  h->object_type = (int)aac_bitreader_read(&r, 2) + 1;
+  h->sample_rate_index = (int)aac_bitreader_read(&r, 4);
+  h->private_bit = (int)aac_bitreader_read(&r, 1);
+  h->channel_config = (int)aac_bitreader_read(&r, 3);
+  h->original_copy = (int)aac_bitreader_read(&r, 1);
+  h->home = (int)aac_bitreader_read(&r, 1);
+  h->copyright_id_bit = (int)aac_bitreader_read(&r, 1);
+  h->copyright_id_start = (int)aac_bitreader_read(&r, 1);
+  h->frame_length = (int)aac_bitreader_read(&r, 13);
+  h->buffer_fullness = (int)aac_bitreader_read(&r, 11);
+  h->num_raw_blocks = (int)aac_bitreader_read(&r, 2) + 1;
+  const int min_len = AAC_ADTS_HEADER_SIZE + (h->protection_absent ? 0 : 2);
+  if (h->frame_length < min_len || h->sample_rate_index >= AAC_NUM_SAMPLE_RATES) {
     return AAC_ERR_DECODE;
   }
   return 0;
@@ -396,12 +350,12 @@ int aac_adts_parse(AacAdtsHeader* h, const uint8_t* d, int s) {
 
 int aac_adts_write(const AacAdtsHeader* h, uint8_t* o) {
   AacBitWriter w;
-  aac_bitwriter_init(&w, o, 7);
+  aac_bitwriter_init(&w, o, AAC_ADTS_HEADER_SIZE);
   aac_bitwriter_write(&w, 0xFFF, 12);
   aac_bitwriter_write(&w, h->id, 1);
   aac_bitwriter_write(&w, h->layer, 2);
   aac_bitwriter_write(&w, h->protection_absent, 1);
-  aac_bitwriter_write(&w, h->profile - 1, 2);
+  aac_bitwriter_write(&w, h->object_type - 1, 2);
   aac_bitwriter_write(&w, h->sample_rate_index, 4);
   aac_bitwriter_write(&w, h->private_bit, 1);
   aac_bitwriter_write(&w, h->channel_config, 3);
@@ -411,85 +365,6 @@ int aac_adts_write(const AacAdtsHeader* h, uint8_t* o) {
   aac_bitwriter_write(&w, h->copyright_id_start, 1);
   aac_bitwriter_write(&w, h->frame_length, 13);
   aac_bitwriter_write(&w, h->buffer_fullness, 11);
-  aac_bitwriter_write(&w, h->num_aac_frames, 2);
+  aac_bitwriter_write(&w, h->num_raw_blocks - 1, 2);
   return aac_bitwriter_bytes_written(&w);
-}
-
-/* ── Scalar vector operation defaults ─────────────────────────────── */
-
-static void aac_vector_fmul_c(float* dst, const float* a, const float* b, int len) {
-  for (int i = 0; i < len; i++) { dst[i] = a[i] * b[i];
-}
-}
-static void aac_vector_fmul_scalar_c(float* dst, const float* a, float scale, int len) {
-  for (int i = 0; i < len; i++) { dst[i] = a[i] * scale;
-}
-}
-static void aac_vector_fmul_add_c(float* dst, const float* a, const float* b, const float* c,
-                                  int len) {
-  for (int i = 0; i < len; i++) { dst[i] = a[i] * b[i] + c[i];
-}
-}
-static void aac_vector_fmul_window_c(float* dst, const float* a, const float* b, const float* win,
-                                     int n) {
-  for (int i = 0; i < n; i++) { dst[i] = a[i] * win[i] + b[i] * win[n - 1 - i];
-}
-}
-static void aac_vector_fmul_reverse_c(float* dst, const float* a, const float* b, int len) {
-  for (int i = 0; i < len; i++) { dst[i] = a[i] * b[len - 1 - i];
-}
-}
-static void aac_vector_fmul_accumulate_c(float* dst, const float* a, const float* b, int len) {
-  for (int i = 0; i < len; i++) { dst[i] += a[i] * b[i];
-}
-}
-
-/* ── DSP Init: wire all scalar defaults + platform overrides ────── */
-
-void aac_dsp_init(AacDSP* dsp) {
-  dsp->fft_forward = aac_fft_forward_c;
-  dsp->fft_inverse = aac_fft_inverse_c;
-  dsp->mdct_forward = aac_mdct_forward_c;
-  dsp->imdct_half = aac_imdct_half_c;
-  dsp->vector_fmul = aac_vector_fmul_c;
-  dsp->vector_fmul_scalar = aac_vector_fmul_scalar_c;
-  dsp->vector_fmul_add = aac_vector_fmul_add_c;
-  dsp->vector_fmul_window = aac_vector_fmul_window_c;
-  dsp->vector_fmul_reverse = aac_vector_fmul_reverse_c;
-  dsp->vector_fmul_accumulate = aac_vector_fmul_accumulate_c;
-  dsp->huffman_decode = nullptr;
-  dsp->sbr_qmf_analysis = nullptr;
-  dsp->sbr_qmf_synthesis = nullptr;
-
-  /* Default scalar psycho spreading (matrix-vector) */
-  dsp->psycho_spreading = [](float* spread, const float* energy, const float* /*threshold*/,
-                             int n_sfb) {
-    /* Note: threshold param currently unused in this default; real spreading only */
-    for (int b = 0; b < n_sfb; b++) {
-      float sp = 0.0f;
-      for (int j = 0; j < n_sfb; j++) {
-        sp += energy[j] * /* spreading would come from caller context, but for DSP we assume simple
-                             identity or external */
-              0.0f;       /* placeholder - real impl needs spreading matrix */
-      }
-      spread[b] = sp;
-    }
-  };
-
-  int flags = aac_get_cpu_flags();
-#if defined(BAAC_AAC_SSE2)
-  if (flags & AAC_CPU_FLAG_SSE2) { aac_dsp_init_sse2(dsp);
-}
-#endif
-#if defined(BAAC_AAC_AVX2)
-  if (flags & AAC_CPU_FLAG_AVX2) { aac_dsp_init_avx2(dsp);
-}
-#endif
-#if defined(BAAC_AAC_NEON)
-  if (flags & AAC_CPU_FLAG_NEON) aac_dsp_init_neon(dsp);
-#endif
-#if defined(BAAC_AAC_WASM)
-  if (flags & AAC_CPU_FLAG_WASM_SIMD128) aac_dsp_init_wasm(dsp);
-#endif
-  (void)flags;
 }
