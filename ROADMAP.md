@@ -628,7 +628,13 @@ at 64 kbit/s stereo moved from 12.9/11.0 dB to 14.0/13.5 dB, now above
 FFmpeg's 13.6/13.2 dB; the two-tone signal at 48 kHz gained 0.8/1.3 dB;
 the click signal at 96 kbit/s lost 0.5 dB, where substitution now covers
 the noise bursts; the other rows of the reference comparison are unchanged
-within 0.2 dB. The binding's smoke test passes after the rebuild.
+within 0.2 dB. The binding's smoke test passes after the rebuild. The
+block-switching detector then took FDK's second-order high-pass in place
+of the first difference; it changes no decision on the reference signals
+(every row identical) and stays for fidelity to the reference. The
+remaining FDK elements were compared and not ported: the rate loop here
+bisects on bits where FDK estimates from perceptual entropy, and FDK's
+scalefactor assimilation is a broader form of the smoothing here.
 
 ## Concurrent playlist appends
 
