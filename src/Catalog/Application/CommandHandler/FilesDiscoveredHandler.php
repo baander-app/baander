@@ -390,7 +390,7 @@ final class FilesDiscoveredHandler
                 if ($current === []) {
                     return [];
                 }
-                [$movie] = $this->resolveMovie($message->libraryId, basename($message->directory));
+                $movie = $this->resolveMovie($message->libraryId, basename($message->directory));
                 $written = [];
                 foreach ($current as $entry) {
                     try {
@@ -489,20 +489,17 @@ final class FilesDiscoveredHandler
         return [null, false];
     }
 
-    /**
-     * @return array{Movie|null, bool}
-     */
-    private function resolveMovie(Uuid $libraryId, string $title): array
+    private function resolveMovie(Uuid $libraryId, string $title): Movie
     {
         $existing = $this->movieService->findByTitleAndLibrary($title, $libraryId);
         if ($existing !== null) {
-            return [$existing, false];
+            return $existing;
         }
 
         $movie = Movie::create(libraryId: $libraryId, title: $title);
         $this->movieService->persist($movie);
 
-        return [$movie, true];
+        return $movie;
     }
 
     /**
