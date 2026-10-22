@@ -16,8 +16,7 @@ using AacCpuFlags = enum AacCpuFlags_ {
   AAC_CPU_FLAG_FMA3 = (1 << 3),
   AAC_CPU_FLAG_BMI2 = (1 << 4),
   AAC_CPU_FLAG_NEON = (1 << 5),
-  AAC_CPU_FLAG_WASM_SIMD128 = (1 << 6),
-  AAC_CPU_FLAG_SSE41 = (1 << 7),
+  AAC_CPU_FLAG_SSE41 = (1 << 6),
 };
 
 /* Returns CPU feature flags — lazily initialized, thread-safe */

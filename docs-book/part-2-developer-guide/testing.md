@@ -1786,6 +1786,33 @@ yarn test:coverage     # With coverage
 
 See the [Frontend Development](frontend-development.md) page for more details.
 
+The Electron app has its own Node test suite, run with Node 26:
+
+```bash
+cd ui/electron
+yarn test              # node --import tsx --experimental-test-module-mocks --test tests/*.test.ts
+```
+
+It covers the preload bridges, IPC validation and renderer trust, the
+discovery and deep-link services, DSP asset regeneration and the native AAC
+codec service. The codec tests use the compiled `@baander/aac-native` binding
+from `node_modules` or from a build in the codec directory, and skip the
+binding-dependent cases when neither exists.
+
+The codec itself has CTest suites and a binding smoke test:
+
+```bash
+cd packages/codecs/baander-aac
+mkdir -p cmake-build && cd cmake-build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ctest
+cd .. && npm install && npm test
+```
+
+The CTest suites check the standard tables, the MDCT, bitstream coding,
+decoder behaviour on hand-built and damaged streams, encode/decode roundtrips
+at every sample rate and rate-control mode, rate control, and interoperability
+with FFmpeg's encoder and decoder when `ffmpeg` is on `PATH`; the interop
+suite skips otherwise.
+
 The native audio graph suite also runs normalization against the shipped loudness
 WASM without mounting Equalizer. It checks output attenuation, independent volume
 and mute, chain rebuilds, disable, and programme reset. Unit coverage checks

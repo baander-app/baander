@@ -1,59 +1,55 @@
 #include "fft.h"
 
 #include <cmath>
-#include <cstring>
 
-static void bit_reverse(float* re, float* im, int n) {
-  int j = 0;
-  for (int i = 0; i < n - 1; i++) {
-    if (i < j) {
-      float tr = re[i];
-      re[i] = re[j];
-      re[j] = tr;
-      float ti = im[i];
-      im[i] = im[j];
-      im[j] = ti;
+void aac_fft_init(AacFft* f, int n) {
+  f->n = n;
+  int bits = 0;
+  while ((1 << bits) < n) {
+    bits++;
+  }
+  for (int i = 0; i < n; i++) {
+    int r = 0;
+    for (int b = 0; b < bits; b++) {
+      r |= ((i >> b) & 1) << (bits - 1 - b);
     }
-    int k = n >> 1;
-    while (k <= j) {
-      j -= k;
-      k >>= 1;
-    }
-    j += k;
+    f->bitrev[i] = (short)r;
+  }
+  for (int k = 0; k < n / 2; k++) {
+    double a = -2.0 * M_PI * k / n;
+    f->tw_re[k] = (float)cos(a);
+    f->tw_im[k] = (float)sin(a);
   }
 }
 
-void aac_fft_forward_c(float* re, float* im, int n) {
-  bit_reverse(re, im, n);
-  for (int s = 1; s < n; s <<= 1) {
-    int m = s << 1;
-    float wn_re = cosf((float)M_PI / (float)s);
-    float wn_im = -sinf((float)M_PI / (float)s);
-    for (int k = 0; k < n; k += m) {
-      float w_re = 1.0f, w_im = 0.0f;
-      for (int j = 0; j < s; j++) {
-        float t_re = w_re * re[k + j + s] - w_im * im[k + j + s];
-        float t_im = w_re * im[k + j + s] + w_im * re[k + j + s];
-        re[k + j + s] = re[k + j] - t_re;
-        im[k + j + s] = im[k + j] - t_im;
-        re[k + j] += t_re;
-        im[k + j] += t_im;
-        float nw_re = w_re * wn_re - w_im * wn_im;
-        float nw_im = w_re * wn_im + w_im * wn_re;
-        w_re = nw_re;
-        w_im = nw_im;
+void aac_fft_forward(const AacFft* f, float* re, float* im) {
+  const int n = f->n;
+  for (int i = 0; i < n; i++) {
+    int j = f->bitrev[i];
+    if (i < j) {
+      float t = re[i];
+      re[i] = re[j];
+      re[j] = t;
+      t = im[i];
+      im[i] = im[j];
+      im[j] = t;
+    }
+  }
+  for (int half = 1; half < n; half <<= 1) {
+    const int stride = n / (2 * half);
+    for (int start = 0; start < n; start += 2 * half) {
+      for (int j = 0; j < half; j++) {
+        const float wr = f->tw_re[j * stride];
+        const float wi = f->tw_im[j * stride];
+        const int a = start + j;
+        const int b = a + half;
+        const float tr = re[b] * wr - im[b] * wi;
+        const float ti = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - tr;
+        im[b] = im[a] - ti;
+        re[a] += tr;
+        im[a] += ti;
       }
     }
-  }
-}
-
-void aac_fft_inverse_c(float* re, float* im, int n) {
-  for (int i = 0; i < n; i++) { im[i] = -im[i];
-}
-  aac_fft_forward_c(re, im, n);
-  float inv = 1.0f / (float)n;
-  for (int i = 0; i < n; i++) {
-    re[i] *= inv;
-    im[i] = -im[i] * inv;
   }
 }

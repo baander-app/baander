@@ -2,12 +2,14 @@ import type { SystemBridge } from '../system.bridge';
 import type { DeepLinkBridge } from '../deep-link.bridge';
 import type { DiscoveryBridge } from '../discovery.bridge';
 import type { PlaybackBridge } from '../playback.bridge';
+import type { AacBridge } from '../aac.bridge';
 
 
 export type ElectronAPI = {
   deepLink: DeepLinkBridge;
   system: SystemBridge;
   playback: PlaybackBridge;
+  aac: AacBridge;
   ipcRenderer: {
     invoke: (channel: string, ...args: any[]) => Promise<any>;
     on: (channel: string, func: (...args: any[]) => void) => void;

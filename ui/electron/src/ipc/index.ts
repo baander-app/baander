@@ -1,3 +1,4 @@
+import { registerAacIpc } from './modules/aac.ipc';
 import { registerConfigIpc } from './modules/config.ipc';
 import { registerDeepLinkIpc } from './modules/deep-link.ipc';
 import { registerDiscoveryIpc } from './modules/discovery.ipc';
@@ -24,4 +25,5 @@ export function registerIpc(ctx: IpcContext) {
   registerDeepLinkIpc(ctx);
   registerDiscoveryIpc();
   registerPlaybackIpc();
+  registerAacIpc();
 }

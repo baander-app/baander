@@ -1,0 +1,13 @@
+# Only what the Node-API binding needs to build travels with the package.
+build/
+cmake-build*/
+node_modules/
+docs/
+tests/
+tools/
+node/test/
+compile_commands.json
+.clang-format
+.clang-tidy
+CMakeLists.txt
+package-lock.json

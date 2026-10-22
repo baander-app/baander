@@ -1,172 +1,163 @@
-/*
- * Bitstream reader/writer roundtrip tests.
- * Verifies: bit read/write, ADTS parse/write, Huffman encode/decode.
- */
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-
+/* Bit reader/writer, ADTS headers, and the Huffman coding of spectral
+ * values and scalefactors. */
 #include "aac_tables.h"
 #include "bitstream.h"
+#include "test_util.h"
 
-static int test_bit_rw_roundtrip() {
-  uint8_t buf[256];
+static void test_bits() {
+  uint8_t buf[64];
   AacBitWriter w;
   aac_bitwriter_init(&w, buf, sizeof(buf));
-
-  /* Write 1000 random-ish bit patterns */
-  struct Pattern {
-    uint32_t val;
+  const struct {
+    uint32_t v;
     int bits;
-  };
-  Pattern patterns[20];
-  uint32_t rng = 12345;
-  for (int i = 0; i < 20; i++) {
-    rng = rng * 1103515245 + 12345;
-    patterns[i].bits = (rng % 30) + 1;
-    patterns[i].val = (rng >> 8) & ((1u << patterns[i].bits) - 1);
-    aac_bitwriter_write(&w, patterns[i].val, patterns[i].bits);
+  } p[] = {{1, 1}, {0, 1}, {5, 3}, {0xABCD, 16}, {0, 7}, {0x1FFFFF, 21}, {0xFFFFFFFF, 32}, {3, 2}};
+  int total = 0;
+  for (const auto& e : p) {
+    aac_bitwriter_write(&w, e.v, e.bits);
+    total += e.bits;
   }
-
-  /* Read back */
+  CHECK(aac_bitwriter_bits_written(&w) == total, "bits written %d", aac_bitwriter_bits_written(&w));
+  CHECK(aac_bitwriter_bytes_written(&w) == (total + 7) / 8, "bytes written");
   AacBitReader r;
   aac_bitreader_init(&r, buf, sizeof(buf));
-  int failures = 0;
-  for (int i = 0; i < 20; i++) {
-    uint32_t got = aac_bitreader_read(&r, patterns[i].bits);
-    if (got != patterns[i].val) {
-      printf("FAIL: bit pattern %d: wrote %u, read %u (%d bits)\n", i, patterns[i].val, got,
-             patterns[i].bits);
-      failures++;
-    }
+  for (const auto& e : p) {
+    const uint32_t got = aac_bitreader_read(&r, e.bits);
+    CHECK(got == e.v, "read %u, wrote %u (%d bits)", got, e.v, e.bits);
   }
-  printf("Bit read/write roundtrip: %d failures\n", failures);
-  if (failures) {
-    return 1;
-  }
-  printf("PASS\n\n");
-  return 0;
+  CHECK(aac_bitreader_bits_left(&r) == (int)sizeof(buf) * 8 - total, "bits left");
+  CHECK(aac_bitreader_peek(&r, 8) == buf[total / 8 + 1] || (total % 8), "peek");
+
+  /* Reading past the end yields zeros and flags the overread. */
+  aac_bitreader_init(&r, buf, 2);
+  aac_bitreader_skip(&r, 12);
+  CHECK(!r.overread, "no overread yet");
+  CHECK(aac_bitreader_read(&r, 8) == (uint32_t)((buf[1] & 0x0F) << 4), "tail bits then zeros");
+  CHECK(r.overread, "overread flagged");
+
+  /* Writing past the capacity flags the overflow. */
+  aac_bitwriter_init(&w, buf, 1);
+  aac_bitwriter_write(&w, 0xFF, 8);
+  CHECK(!aac_bitwriter_overflow(&w), "exactly full is not an overflow");
+  aac_bitwriter_write(&w, 1, 1);
+  CHECK(aac_bitwriter_overflow(&w), "overflow flagged");
 }
 
-static int test_adts_roundtrip() {
-  AacAdtsHeader hdr = {};  // NOLINT(bugprone-invalid-enum-default-initialization)
-  hdr.id = 0;
-  hdr.layer = 0;
-  hdr.protection_absent = 1;
-  hdr.profile = AAC_AOT_LC;
-  hdr.sample_rate_index = 3; /* 48000 */
-  hdr.channel_config = 2;
-  hdr.frame_length = 256;
-  hdr.buffer_fullness = 0x7FF;
-  hdr.num_aac_frames = 1;
+static void test_adts() {
+  AacAdtsHeader h = {};
+  h.protection_absent = 1;
+  h.object_type = AAC_AOT_LC;
+  h.sample_rate_index = 4;
+  h.channel_config = 2;
+  h.frame_length = 345;
+  h.buffer_fullness = 0x7FF;
+  h.num_raw_blocks = 1;
+  uint8_t buf[AAC_ADTS_HEADER_SIZE];
+  CHECK(aac_adts_write(&h, buf) == AAC_ADTS_HEADER_SIZE, "header size");
+  AacAdtsHeader p;
+  CHECK(aac_adts_parse(&p, buf, sizeof(buf)) == 0, "parse");
+  CHECK(p.object_type == AAC_AOT_LC && p.sample_rate_index == 4 && p.channel_config == 2 &&
+            p.frame_length == 345 && p.buffer_fullness == 0x7FF && p.num_raw_blocks == 1 &&
+            p.protection_absent == 1,
+        "fields survive the roundtrip");
 
-  uint8_t buf[7];
-  aac_adts_write(&hdr, buf);
-
-  AacAdtsHeader parsed;
-  int ret = aac_adts_parse(&parsed, buf, 7);
-  if (ret != 0) {
-    printf("FAIL: ADTS parse returned %d\n", ret);
-    return 1;
-  }
-
-  int failures = 0;
-  if (parsed.profile != hdr.profile) {
-    printf("FAIL: profile mismatch\n");
-    failures++;
-  }
-  if (parsed.sample_rate_index != hdr.sample_rate_index) {
-    printf("FAIL: sample_rate_index mismatch\n");
-    failures++;
-  }
-  if (parsed.channel_config != hdr.channel_config) {
-    printf("FAIL: channel_config mismatch\n");
-    failures++;
-  }
-  if (parsed.frame_length != hdr.frame_length) {
-    printf("FAIL: frame_length mismatch\n");
-    failures++;
-  }
-
-  printf("ADTS roundtrip: %d failures\n", failures);
-  if (failures) {
-    return 1;
-  }
-  printf("PASS\n\n");
-  return 0;
+  h.protection_absent = 0;
+  h.frame_length = AAC_ADTS_HEADER_SIZE + 2;
+  aac_adts_write(&h, buf);
+  CHECK(aac_adts_parse(&p, buf, sizeof(buf)) == 0 && p.protection_absent == 0,
+        "CRC-protected header");
+  h.frame_length = AAC_ADTS_HEADER_SIZE + 1;
+  aac_adts_write(&h, buf);
+  CHECK(aac_adts_parse(&p, buf, sizeof(buf)) != 0, "frame shorter than header plus CRC rejected");
+  h.protection_absent = 1;
+  h.frame_length = 3;
+  aac_adts_write(&h, buf);
+  CHECK(aac_adts_parse(&p, buf, sizeof(buf)) != 0, "frame shorter than header rejected");
+  buf[0] = 0x00;
+  CHECK(aac_adts_parse(&p, buf, sizeof(buf)) != 0, "missing syncword rejected");
 }
 
-static int test_huffman_roundtrip() {
-  int failures = 0;
-  /* Test all populated codebooks. */
+/* Every value combination of every codebook, and escapes up to the limit,
+ * must survive write/read and cost what aac_huffman_bits predicts. */
+static void test_huffman() {
+  aac_tables_init();
+  uint8_t buf[64];
   for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
-    if (!aac_huff_code[cb] || !aac_huff_len[cb]) {
-      continue;
-    }
     const AacCodebookInfo* info = &aac_codebook_info[cb];
-    int mv = info->max_val;
-    int dim = info->dim;
-
-    /* Build a simple test vector covering signed/unsigned and zero/nonzero. */
-    int v[4] = {0, 0, 0, 0};
-    int r[4] = {0, 0, 0, 0};
-    for (int pat = 0; pat < 8; pat++) {
-      for (int k = 0; k < dim; k++) {
-        int base = (pat >> k) & 1;
-        if (info->is_unsigned) {
-          v[k] = base * (mv > 0 ? mv : 1);
-        } else {
-          v[k] = base == 0 ? 0 : (k & 1 ? -1 : 1);
-        }
+    const int dim = info->dim;
+    const int lo = info->is_unsigned ? -info->max_val : -info->max_val;
+    int hi = info->max_val;
+    if (cb == AAC_CB_ESCAPE) {
+      hi = 15;
+    }
+    const int range = hi - lo + 1;
+    const int combos = (int)pow(range, dim);
+    int failures_before = g_failures;
+    for (int idx = 0; idx < combos && g_failures == failures_before; idx++) {
+      int v[4] = {0, 0, 0, 0};
+      int t = idx;
+      for (int k = dim - 1; k >= 0; k--) {
+        v[k] = lo + t % range;
+        t /= range;
       }
-      uint8_t buf[32];
       AacBitWriter w;
       aac_bitwriter_init(&w, buf, sizeof(buf));
-      aac_bitwriter_write_huffman(&w, cb, v);
-
-      AacBitReader rd;
-      aac_bitreader_init(&rd, buf, sizeof(buf));
-      int ret = aac_bitreader_read_huffman(&rd, cb, r);
-      if (ret != 0) {
-        printf("FAIL: Huffman cb=%d: decode returned %d\n", cb, ret);
-        failures++;
-        continue;
-      }
-      int mismatch = 0;
+      CHECK(aac_bitwriter_write_huffman(&w, cb, v) == 0, "cb %d write", cb);
+      CHECK(aac_bitwriter_bits_written(&w) == aac_huffman_bits(cb, v), "cb %d bit estimate", cb);
+      AacBitReader r;
+      aac_bitreader_init(&r, buf, sizeof(buf));
+      int out[4] = {0, 0, 0, 0};
+      CHECK(aac_bitreader_read_huffman(&r, cb, out) == 0, "cb %d read", cb);
       for (int k = 0; k < dim; k++) {
-        if (r[k] != v[k]) {
-          mismatch = 1;
-        }
+        CHECK(out[k] == v[k], "cb %d value %d: wrote %d read %d", cb, k, v[k], out[k]);
       }
-      if (mismatch) {
-        printf("FAIL: Huffman cb=%d dim=%d: wrote (", cb, dim);
-        for (int k = 0; k < dim; k++) {
-          printf("%d%s", v[k], k + 1 < dim ? "," : "");
-        }
-        printf("), read (");
-        for (int k = 0; k < dim; k++) {
-          printf("%d%s", r[k], k + 1 < dim ? "," : "");
-        }
-        printf(")\n");
-        failures++;
-      }
+      CHECK(r.pos == aac_bitwriter_bits_written(&w), "cb %d consumed all bits", cb);
     }
   }
-  printf("Huffman roundtrip: %d failures\n", failures);
-  if (failures) {
-    return 1;
+  /* Escape sequences. */
+  const int esc_values[] = {16, 17, 31, 32, 100, 1000, 4095, 4096, 8191, -16, -8191};
+  for (int a : esc_values) {
+    const int v[2] = {a, -3};
+    AacBitWriter w;
+    aac_bitwriter_init(&w, buf, sizeof(buf));
+    CHECK(aac_bitwriter_write_huffman(&w, AAC_CB_ESCAPE, v) == 0, "escape %d write", a);
+    CHECK(aac_bitwriter_bits_written(&w) == aac_huffman_bits(AAC_CB_ESCAPE, v), "escape %d bits",
+          a);
+    AacBitReader r;
+    aac_bitreader_init(&r, buf, sizeof(buf));
+    int out[2] = {0, 0};
+    CHECK(aac_bitreader_read_huffman(&r, AAC_CB_ESCAPE, out) == 0 && out[0] == a && out[1] == -3,
+          "escape %d read back %d,%d", a, out[0], out[1]);
   }
-  printf("PASS\n\n");
-  return 0;
+  const int too_big[2] = {8192, 0};
+  CHECK(aac_bitwriter_write_huffman(&(AacBitWriter&)*new AacBitWriter(), AAC_CB_ESCAPE, too_big) ==
+            AAC_ERR_INVALID_ARG,
+        "value beyond the escape range is refused");
+  const int outside[4] = {2, 0, 0, 0};
+  CHECK(aac_huffman_bits(1, outside) > 1000, "value outside codebook 1 is unaffordable");
+
+  /* Scalefactor differences. */
+  for (int d = -60; d <= 60; d++) {
+    AacBitWriter w;
+    aac_bitwriter_init(&w, buf, sizeof(buf));
+    aac_bitwriter_write_scalefactor(&w, d);
+    CHECK(aac_bitwriter_bits_written(&w) == aac_scalefactor_bits[d + AAC_SCALE_DIFF_ZERO],
+          "scalefactor %d bits", d);
+    AacBitReader r;
+    aac_bitreader_init(&r, buf, sizeof(buf));
+    CHECK(aac_bitreader_read_scalefactor(&r) == d, "scalefactor %d roundtrip", d);
+  }
+  /* The table is complete, so every bit pattern decodes; an empty reader
+   * still yields a value rather than reading out of bounds. */
+  AacBitReader r;
+  aac_bitreader_init(&r, buf, 0);
+  (void)aac_bitreader_read_scalefactor(&r);
+  CHECK(r.overread, "reading a scalefactor from nothing flags the overread");
 }
 
 int main() {
-  aac_tables_init();
-  int failures = 0;
-  printf("=== Bitstream Tests ===\n\n");
-  failures += test_bit_rw_roundtrip();
-  failures += test_adts_roundtrip();
-  failures += test_huffman_roundtrip();
-  printf("=== %d test(s) failed ===\n", failures);
-  return failures;
+  test_bits();
+  test_adts();
+  test_huffman();
+  return test_summary("test_bitstream");
 }
