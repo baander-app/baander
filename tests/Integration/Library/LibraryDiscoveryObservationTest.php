@@ -280,6 +280,24 @@ SQL);
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM library_file_index WHERE available'));
     }
 
+    public function testIdenticalNewVideoFilesShareOnePersistedVideoAndRetryStaysStable(): void
+    {
+        $library = $this->library(LibraryType::Movie);
+        $first = $this->video('a.mp4');
+        $second = $this->root . '/Movie/z.mp4';
+        self::assertTrue(copy($first, $second));
+        $this->seed($library, [$first, $second]);
+        $message = $this->message($library, [$first, $second]);
+
+        ($this->consumer())($message);
+        ($this->consumer())($message);
+
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM movies'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM videos'));
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM movie_video'));
+        self::assertSame($message->files[0]->hash, $this->observer->fetchOne('SELECT hash FROM videos'));
+    }
+
     public function testRealProbeFailureLeavesNoParentAndRestoredSourceImportsOnRetry(): void
     {
         $library = $this->library(LibraryType::Movie);

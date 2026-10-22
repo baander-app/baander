@@ -394,11 +394,17 @@ final class FilesDiscoveredHandler
                 $written = [];
                 foreach ($current as $entry) {
                     try {
+                        $video = $entry['video'];
                         if ($entry['isNew']) {
-                            $this->videoRepository->save($entry['video']);
+                            $existing = $this->videoRepository->findByHash($entry['file']->hash);
+                            if ($existing !== null) {
+                                $video = $existing;
+                            } else {
+                                $this->videoRepository->save($video);
+                            }
                         }
-                        if (!in_array($entry['video']->getId()->toString(), $movie->getVideoIds(), true)) {
-                            $movie->addVideo($entry['video']->getId());
+                        if (!in_array($video->getId()->toString(), $movie->getVideoIds(), true)) {
+                            $movie->addVideo($video->getId());
                             $this->movieService->persist($movie);
                         }
                         $written[] = $entry['file']->absolutePath;
