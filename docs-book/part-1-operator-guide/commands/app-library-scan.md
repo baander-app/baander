@@ -58,6 +58,15 @@ ingestion; it can do this while the scan continues. A failed index write or inte
 capture rolls back that directory and fails the scan. Earlier committed
 directories remain pending or delivered.
 
+Before importing a queued file, the worker compares its recorded hash with the
+latest available file-index observation for that library and path. It skips a
+snapshot that a later scan replaced or marked unavailable, or whose index row was
+explicitly removed. It repeats the check in the transaction that writes catalog
+records. A mixed message still imports its current files. An unchanged file that
+returns and is rescanned is eligible again, as is a current duplicate delivery.
+This compares recorded observations; it does not prevent files changing on disk
+between scans.
+
 A Redis send failure leaves the committed intent for the relay to retry. It does
 not undo the directory's index or fail a scan that already accepted it. After five
 failed relay attempts, the intent is dead-lettered. See

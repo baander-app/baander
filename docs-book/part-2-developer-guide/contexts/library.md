@@ -51,11 +51,30 @@ With its index row gone, a file the deletion leaves on disk reads as new to the 
 
 `MediaFileGuard` checks each file again immediately before unlinking it. PHP has no `unlinkat()`, so a parent directory replaced with a symlink between that check and the unlink is not caught. This is an accepted limit, documented for operators on the delete command pages; only a user who can write the library's directories can cause it.
 
-Catalog's `FilesDiscoveredHandler` uses the port in three more ways when it imports a directory:
+Catalog's `FilesDiscoveredHandler` also uses the port when it imports a directory:
 
 - `isHeldByDelete()` is true while a delete claim holds the library. Before it starts, the handler then puts the message back on the `async` transport with a 30-second delay and imports nothing, so it cannot import a file the delete is about to unlink (a scan only drops index rows, so such a song would stay in the catalog). The claim lapses with its lease if the delete dies, so the wait ends.
-- `forgetMissing()` names the paths with no file now and deletes their `library_file_index` rows. The handler drops these paths before it resolves the album or probes a video, so a directory whose files are all gone creates no album or movie. The scan indexed each path when it queued the import; without that row, a file that comes back unchanged, as on storage mounted again, reads as new to the next incremental scan, which imports it.
+- `markMissingUnavailable()` names paths with no file now and marks their retained `library_file_index` rows unavailable. The handler skips these paths before resolving the album or probing a video, so a directory whose files are all gone creates no album or movie. A later scan restores availability and queues unchanged returning files again.
 - `isHeldByDeleteForImport()` guards each write. The handler reads the metadata of up to 50 files, then writes their songs, artist links and genres in one transaction (`TransactionPortInterface`) that first calls this method. It takes `pg_advisory_xact_lock_shared` on a key derived from the library ID and then reads the claim; `claimDelete()` takes `pg_advisory_xact_lock` on the same key in the transaction of its claim statement. A delete claim therefore waits for the writes in flight to commit, and every later write sees the claim. A write that sees it writes nothing; the handler puts the files whose songs it has not committed back on the queue with the same delay, and the songs already committed stay. The key is `hashtextextended(<library ID>, 20261010120000)`; the seed keeps it apart from the application's other advisory locks, and a hash collision only makes two libraries wait for each other. The read of the claim is a statement of its own, so under PostgreSQL's default READ COMMITTED isolation its snapshot is taken after the lock is granted. A scan claim takes no import lock.
+
+`findAvailableHashesByPaths()` reads the current available observations for the
+requested library and paths. Ingestion filters queued files against these hashes
+before checking presence or reading metadata. Missing, unavailable and mismatched
+observations are skipped. `lockAvailableHashesByPathsForImport()` repeats the read
+with `FOR SHARE` inside an active transaction, after the shared import/delete
+guard. Album and movie parent writes, song and video writes, and source rename
+reconciliation use this boundary. Metadata reads and FFprobe run before the locks.
+If an album's metadata source becomes superseded during preparation, the handler
+reselects from the remaining current candidates; each failed selection removes at
+least one candidate. Current files in a mixed message still import.
+
+The index locks use bytewise path order across bounded SQL statements. Scanners
+sort a copy for their database upserts while preserving result and event order.
+Bulk unavailable/removal operations lock existing target rows in the same order
+and mutate only those locked paths, so a path inserted after the lock query is not
+changed by that older operation. Import locks hold the matched observations stable
+through commit or rollback. Hash equality permits a latest observation that returns
+to an earlier hash; this is a committed-index check, not a live filesystem snapshot.
 
 Each path gets a `LibraryMediaFileVerdict`: `deletable`, `missing` (nothing at the path, or a symlink to nothing; only the index row goes), `outside_root`, or `directory_not_writable`. `LibraryRepositoryInterface::liveClaimKind()` answers which kind of claim, if any, holds the library without having lapsed, by the database clock (`clock_timestamp()`); `liveClaimKindForImport()` answers the same after taking the import lock, and throws a `LogicException` outside a transaction, where the lock would end with its own statement.
 

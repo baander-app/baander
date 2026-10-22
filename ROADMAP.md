@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-21. This roadmap selects useful future work and records unresolved
+Updated: 2026-10-22. This roadmap selects useful future work and records unresolved
 release acceptance. Current behavior and operating contracts belong in the linked
 guides. Git history retains completed milestones and their verification evidence.
 
@@ -457,3 +457,63 @@ was needed. Final correctness and independent adversarial review found no
 actionable defects. Prose preservation checks retained historical entries, fenced
 code and tables; all 17 local links and anchors resolved, and whitespace checks
 passed. The runners removed their containers and networks.
+
+## Superseded discovery imports
+
+Checkpoint, 2026-10-22: queued imports compare each file's recorded hash with the
+latest available index observation for its library and path. A superseded,
+unindexed or unavailable snapshot is skipped before metadata preparation and
+checked again under shared row locks before catalog writes. Album/movie parents,
+songs/videos and source renames use that write boundary. A stale album metadata
+candidate is discarded so another current file in the message can still import.
+Current duplicate messages, hash reversion and unchanged restored sources remain
+eligible. This checks committed observations; it does not provide a snapshot of
+files changing on disk between scans.
+
+Scanner upserts use a sorted copy of their files while keeping event/result order.
+Bulk unavailable and removal operations lock existing paths in the same order and
+mutate only that fixed set. A later insertion is excluded from the older bulk
+operation. Metadata reads and FFprobe stay outside the write locks; the existing
+import/delete guard remains first. No schema or message payload changed.
+
+Verification in the CI image passed 982 distinct tests with 6,084 assertions across
+Library/Catalog units, index/media-file/publication integration, compatibility and
+new observation-concurrency cases. The original real-FLAC regression failed with
+two songs after B imported and A replayed; the repaired path retains only B.
+Fifteen new PostgreSQL cases exercise real music/movie imports, reversed scanner
+and bulk-writer inputs, commit/rollback ordering, more than 1000 target paths,
+phantom exclusion and current-message replay. They also cover actual FFprobe
+failure/retry and a metadata read exception followed by real-reader recovery.
+
+Final review caught a new same-batch duplicate-video regression: preparation
+could classify two identical new files as separate videos, then roll back on the
+unique hash constraint. The guarded write now rechecks and reuses the persisted
+video. Its real regression failed before the correction and now verifies one
+video, one movie link and stable redelivery.
+
+All changed PHP files pass PHPStan. Full Deptrac reports zero violations, warnings
+and errors with 484 existing skipped violations. Tests generate temporary media
+without playing audio and use disposable services; existing application databases,
+Redis and media storage were not reused or reset.
+
+Simplification at both implementation boundaries removed an unnecessary movie
+return wrapper and grouped concurrency-fixture setup in one transaction. Eight
+final review lenses completed; the duplicate-video finding was applied and
+independently verified, with no open findings. Documentation preservation and
+local-link checks passed, as did whitespace checks. Disposable test containers,
+networks and volumes were removed.
+
+## Observed PHP follow-ups
+
+These source-traced failures need their own regression before implementation:
+
+- **Transcoding after a source rename:** a repaired track retains its ID while its
+  canonical source path changes. If size and modification time stay equal, the
+  audio rendition key still names the previous immutable input, so the transcode
+  request fails with HTTP 500. Verify this sequence through the rendition cache
+  and executor before changing their shared source signature.
+- **Concurrent playlist append:** the controller computes the append position
+  before the handler reloads the playlist. An intervening committed addition can
+  make that position stale, leaving two entries with the same position and an
+  order determined by their IDs. Verify the controller/handler interleaving and
+  derive the append result from the state actually saved.
