@@ -46,15 +46,18 @@ static int detect_x86_flags() {
 
   cpuid(0, 0, &eax, &ebx, &ecx, &edx);
   unsigned int max_leaf = eax;
-  if (max_leaf < 1) { return 0;
-}
+  if (max_leaf < 1) {
+    return 0;
+  }
 
   /* Leaf 1: SSE2, SSE4.1, AVX, FMA3 */
   cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-  if (edx & (1u << 26)) { flags |= AAC_CPU_FLAG_SSE2;
-}
-  if (ecx & (1u << 19)) { flags |= AAC_CPU_FLAG_SSE41;
-}
+  if (edx & (1u << 26)) {
+    flags |= AAC_CPU_FLAG_SSE2;
+  }
+  if (ecx & (1u << 19)) {
+    flags |= AAC_CPU_FLAG_SSE41;
+  }
 
   /* AVX + FMA3: require OSXSAVE + XGETBV OS support */
   int has_osxsave = (ecx & (1u << 27)) != 0;
@@ -71,18 +74,21 @@ static int detect_x86_flags() {
 #endif
     if ((xcr0 & 0x6) == 0x6) {
       flags |= AAC_CPU_FLAG_AVX;
-      if (has_fma3_cpu) { flags |= AAC_CPU_FLAG_FMA3;
-}
+      if (has_fma3_cpu) {
+        flags |= AAC_CPU_FLAG_FMA3;
+      }
     }
   }
 
   /* Leaf 7: AVX2, BMI2 */
   if (max_leaf >= 7) {
     cpuid(7, 0, &eax, &ebx, &ecx, &edx);
-    if ((flags & AAC_CPU_FLAG_AVX) && (ebx & (1u << 5))) { flags |= AAC_CPU_FLAG_AVX2;
-}
-    if ((ebx & (1u << 8)) && (ebx & (1u << 3))) { flags |= AAC_CPU_FLAG_BMI2;
-}
+    if ((flags & AAC_CPU_FLAG_AVX) && (ebx & (1u << 5))) {
+      flags |= AAC_CPU_FLAG_AVX2;
+    }
+    if ((ebx & (1u << 8)) && (ebx & (1u << 3))) {
+      flags |= AAC_CPU_FLAG_BMI2;
+    }
   }
 
   return flags;
@@ -124,18 +130,6 @@ static int detect_arm_flags(void) {
   return flags;
 }
 
-/* ── WASM: compile-time ────────────────────────────────────────── */
-
-#elif defined(__wasm__)
-
-static int detect_wasm_flags(void) {
-  int flags = 0;
-#if defined(__wasm_simd128__)
-  flags |= AAC_CPU_FLAG_WASM_SIMD128;
-#endif
-  return flags;
-}
-
 #else
 static int detect_generic_flags(void) { return 0; }
 #endif
@@ -144,8 +138,9 @@ static int detect_generic_flags(void) { return 0; }
 
 int aac_get_cpu_flags(void) {
   int flags = g_cpu_flags.load(std::memory_order_acquire);
-  if (flags >= 0) { return flags;
-}
+  if (flags >= 0) {
+    return flags;
+  }
 
   int ov = g_cpu_flags_override.load(std::memory_order_acquire);
   if (ov >= 0) {
@@ -157,8 +152,6 @@ int aac_get_cpu_flags(void) {
   flags = detect_x86_flags();
 #elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
   flags = detect_arm_flags();
-#elif defined(__wasm__)
-  flags = detect_wasm_flags();
 #else
   flags = 0;
 #endif
@@ -180,9 +173,9 @@ const char* aac_cpu_flags_string(int flags) {
   F(AAC_CPU_FLAG_FMA3, "FMA3");
   F(AAC_CPU_FLAG_BMI2, "BMI2");
   F(AAC_CPU_FLAG_NEON, "NEON");
-  F(AAC_CPU_FLAG_WASM_SIMD128, "WASM-SIMD128");
 #undef F
-  if (pos == 0) { snprintf(buf, sizeof(buf), "scalar-only");
-}
+  if (pos == 0) {
+    snprintf(buf, sizeof(buf), "scalar-only");
+  }
   return buf;
 }

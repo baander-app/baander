@@ -1,175 +1,85 @@
-# Reference Codec Comparison
+# Reference comparison
 
-How baander-aac measures up against production AAC encoders, what the gaps are,
-and what is known about their root causes.
+Measured on 2026-10-22 with FFmpeg 6.1.1 (native `aac` encoder and
+decoder) on synthetic signals: `click44` (decaying noise bursts, stereo),
+`music44` (pink noise plus a 330 Hz tone, stereo, the hardest case for
+any AAC encoder), `song44` (harmonic chords, melody, kick and hi-hat,
+stereo), `mono44` (pink noise plus tone, mono), `tone48` (two tones per
+channel at 48 kHz). SNR is measured against the source after delay
+alignment; it rewards accurate reconstruction, not perceived quality, so
+treat the numbers as a sanity check of the allocation, not as a listening
+test.
 
-**Date:** 2026-07-15
-**References:** libfdk-aac (Fraunhofer FDK, via FFmpeg), FFmpeg native AAC (`aac`)
-**Test harness:** `tests/test_reference.cpp`
+## Decoder
 
----
+Our decoder against FFmpeg's decoder on FFmpeg-encoded streams (difference
+SNR between the two decodes; 135 dB is floating-point rounding):
 
-## Methodology
+| Stream | Difference SNR |
+|--------|---------------:|
+| 44.1 kHz stereo 32, 128, 320 kbit/s | 135.7–136.4 dB |
+| 44.1 kHz stereo, `-aac_coder fast` | 136.5 dB |
+| 44.1 kHz stereo, transients (short windows, TNS) | 136.3 dB |
+| 44.1 kHz mono 64 kbit/s | 135.8 dB |
+| 8, 16, 22.05, 32, 96 kHz stereo | 135.4–136.0 dB |
+| CRC-protected ADTS | 136.2 dB |
 
-`test_reference` generates synthetic mono 44.1 kHz signals, encodes them three
-ways — baander-aac (in-process), libfdk-aac and FFmpeg's native AAC encoder
-(both via `ffmpeg` CLI roundtrips through temp files) — decodes back to PCM,
-and measures SNR against the original.
+FFmpeg's streams use short windows with grouping, KBD and sine windows,
+TNS, intensity stereo, perceptual noise substitution and escape codes;
+all decode identically.
 
-- **Signals:** `multitone` (5 sinusoids), `harmonics` (fundamental + harmonics
-  with decay), `white_noise`, `impulses` (periodic clicks).
-- **Bitrates:** 64k, 128k, 256k (CBR where supported).
-- **Delay alignment:** encoder/decoder delay differs per codec, so SNR is
-  maximized over a scan of sample offsets before comparison.
-- **Regression floor:** the test fails if 128k multitone SNR drops below 15 dB,
-  and warns when SNR is non-monotonic across bitrates.
+## Encoder
 
-Run it directly (it is part of `ctest`, ~5 s) with:
+Our encoder (CBR unless noted) against FFmpeg's encoder at the same target
+bitrate, each decoded by FFmpeg. The decode of our streams by FFmpeg
+matches our own decoder to 135 dB in every case.
 
-```bash
-cd build && ./tests/test_reference
-```
+| Signal | Rate | Ours: kbit/s, SNR L/R | FFmpeg: kbit/s, SNR L/R |
+|--------|-----:|----------------------:|------------------------:|
+| click44 | 96 k | 63.8, 6.3 / 6.8 dB | 101.6, 3.8 / 4.2 dB |
+| music44 | 32 k | 31.5, 8.3 / 6.2 dB | 34.2, 11.4 / 11.0 dB |
+| music44 | 64 k | 63.8, 14.0 / 13.5 dB | 66.7, 13.6 / 13.2 dB |
+| music44 | 128 k | 128.2, 19.0 / 17.8 dB | 130.3, 15.9 / 15.7 dB |
+| music44 | 256 k | 256.3, 24.7 / 22.9 dB | 258.2, 25.1 / 24.4 dB |
+| music44 | 512 k | 486.0, 30.8 / 29.0 dB | 373.3, 33.6 / 32.3 dB |
+| song44 | 64 k | 63.9, 18.2 / 15.7 dB | 68.1, 15.0 / 13.2 dB |
+| song44 | 128 k | 127.5, 19.9 / 17.4 dB | 143.9, 19.3 / 16.6 dB |
+| song44 | 256 k | 197.8, 29.6 / 30.0 dB | 268.3, 28.1 / 24.4 dB |
+| mono44 | 64 k | 64.1, 16.7 dB | 67.1, 14.0 dB |
+| tone48 | 128 k | 104.1, 47.8 / 45.5 dB | 130.6, 22.4 / 24.0 dB |
+| harm44 | 48 k | 47.8, 31.0 / 30.5 dB | 59.7, 13.3 / 12.6 dB |
+| trans44 | 48 k | 25.5, 2.4 / 2.4 dB | 39.1, 1.8 / 1.8 dB |
+| trans44 | 96 k | 44.8, 4.9 / 4.9 dB | 71.0, 5.9 / 5.8 dB |
+| noise44 | 64 k | 63.6, 0.0 / 0.0 dB | 66.9, 0.3 / 0.4 dB |
 
-Requires `ffmpeg` with `libfdk_aac` on `$PATH`; the FDK column is skipped
-gracefully if unavailable.
+`harm44` is the test suite's harmonic series with the right channel at
+0.7 of the left, `trans44` its decaying noise bursts (right at 0.8) and
+`noise44` its white noise, all at 44.1 kHz stereo.
 
-FFmpeg's native AAC encoder is included as a second data point: it is itself
-10–18 dB below FDK on tonal content, which confirms **libfdk-aac is the right
-reference target** (it is also what Android ships and roughly what Apple's
-encoder achieves).
+Tool usage on these streams (frames carrying the tool, of all frames):
+noise substitution on 216 of 218 `music44` frames at 64 kbit/s and 130 of
+132 `noise44` frames; intensity stereo on 220 of 347 `song44` frames at
+64 kbit/s, 131 of 132 `harm44` frames and 55 of 132 `trans44` frames;
+TNS on 331 of 347 `song44` frames (33 with short windows) and on 214 of
+218 `click44` frames, 177 of them with two filters.
 
-## Results (2026-07-15, this tree)
+Notes:
 
-```
-signal           br  baander_snr      fdk_snr    ffaac_snr   gap_vs_fdk
-multitone       64k       36.0 dB       40.4 dB       17.1 dB       -4.4 dB
-multitone      128k       40.6 dB       43.2 dB       20.3 dB       -2.6 dB
-multitone      256k       45.5 dB       44.6 dB       34.6 dB       +0.8 dB
-harmonics       64k       37.2 dB       40.8 dB       16.5 dB       -3.6 dB
-harmonics      128k       44.6 dB       41.8 dB       17.8 dB       +2.8 dB
-harmonics      256k       48.4 dB       43.4 dB       31.1 dB       +5.0 dB
-white_noise     64k        1.6 dB        3.7 dB        1.2 dB       -2.1 dB
-white_noise    128k        3.7 dB        6.1 dB        4.9 dB       -2.4 dB
-white_noise    256k        8.0 dB        6.3 dB       12.3 dB       +1.7 dB
-impulses        64k        1.3 dB        4.4 dB        3.0 dB       -3.1 dB
-impulses       128k        3.2 dB        6.4 dB        7.8 dB       -3.2 dB
-impulses       256k        7.1 dB        6.4 dB       26.7 dB       +0.7 dB
-
-baander-aac avg SNR: 23.1 dB   libfdk-aac avg SNR: 24.0 dB   gap: -0.9 dB
-```
-
-`tests/test_quality.cpp` (pure baander roundtrip, multitone) reports
-38.2 / 39.2 / 40.9 / 49.6 / 48.8 dB across 64k–256k with frame sizes of
-157–535 bytes (frames now scale with the CBR budget).
-
-## Gaps
-
-### GAP-1 — Tonal-content SNR vs libfdk-aac (mostly closed)
-
-Was: baander plateaued at ~25 dB on multitone/harmonics where FDK reaches
-40–45 dB.  Now: 36–48 dB, beating FDK at 128k/256k on harmonics and at 256k
-on multitone.  Status of the three root causes:
-
-1. ~~**12-level signed codebook ceiling.**~~ **FIXED.**  Codebook 11 escape
-   sequences are implemented on both ends (`aac_bitwriter_write_huffman` /
-   `aac_bitreader_read_huffman`, sign bit per nonzero coefficient + escape
-   extension `value = 2^N + word` for magnitudes ≥ 16, per
-   ISO 14496-3 §4.6.3.3).  The quantizer clamp is now `AAC_ESC_MAX_MAG`
-   (8191) instead of ±12, and the per-band `sf_cap` scales accordingly.
-   CB8/CB10 uniform placeholder tables were also replaced with the real
-   ISO magnitude VLCs (+ sign bits), imported from FFmpeg's `aactab.c`
-   like CB6/7/9/11 were from FDK.
-2. **Sine window instead of KBD.** Still open.  The encoder analyzes with
-   `AAC_WIN_SINE` and signals it in the bitstream.  KBD (α=4/6) has better
-   stop-band attenuation, so tonal energy concentrates in fewer
-   coefficients.  Note the decoder's fast `imdct_fft` path folds the window
-   into the DCT-IV and is **sine-only** (`src/mdct.cpp`), so KBD support
-   needs the generic IMDCT path (or a new fast path) too.
-3. **Simplified psychoacoustic model.** Partially addressed: the TLS now
-   runs a second pass under bit pressure that pre-zeros deeply-masked bands
-   (energy ≥ 6 dB below threshold) and keeps whichever pass has less total
-   audibility-normalized noise (see GAP-2 fix).  Still missing: tonality
-   detection / masking-peak tracking and per-band threshold reduction
-   (3GPP TS 26.403 §5.6.1).  The remaining 64k gap (-4.4 dB on multitone)
-   is mostly here and in scalefactor coding (raw 9-bit DPCM per band where
-   FDK uses the ISO scalefactor Huffman table, ~2-3 bits typical).
-
-### GAP-2 — SNR and frame size scale with bitrate (closed)
-
-Was: 25.1 → 25.8 dB from 64k → 256k, frames stuck at 65–72 bytes.
-Now: 36.0 → 45.5 dB (multitone), 157 → 741-byte frames — the two-loop
-search spends the CBR budget.  Two fixes combined:
-
-- **Escape sequences** (GAP-1 cause 1) removed the precision ceiling, so
-  spare bits have somewhere to go.
-- **Masked-band bit stealing.** Bands below their masking threshold used
-  to be pre-zeroed unconditionally, which capped high-bitrate SNR at the
-  sum of their energies; NOT zeroing them (needed for SNR scaling) let
-  ~40 masked bands eat bits at q≈1–4 that audible bands needed at low
-  bitrate.  `aac_quantize_bands` now runs the TLS twice under budget
-  pressure: pass 1 codes every band, pass 2 pre-zeros deeply-masked bands
-  (`e ≤ thr/4`, libfdk-aac's ZERO_HCB-under-pressure behaviour), and keeps
-  the pass with less total audibility-normalized noise
-  (`Σ noise/threshold` over all bands — zeroing a masked band costs its
-  energy, so pass 2 only wins when bits are genuinely scarce).
-
-### GAP-3 — White-noise SNR non-monotonic across bitrates (closed)
-
-Was: 7.3 / 4.9 / 8.1 dB at 64k/128k/256k.  Now monotonic: 1.6 / 3.7 / 8.0
-dB — the mid-bitrate dip is gone with the two-pass TLS.  (Absolute values
-remain low for everyone; white noise is unmaskable and SNR is not the
-right perceptual metric there.)
-
-### GAP-4 — Transients: no block switching
-
-Impulse SNR is 1.3 dB at 64k. The encoder hardcodes `AAC_WIN_ONLY_LONG`
-— there is no short-window (EIGHT_SHORT) path at all, so pre-echo on
-transients cannot be contained. 3GPP TS 26.403 §5.4.1 block switching
-driven by the psycho model's perceptual entropy is the standard fix.
-This is a structural feature gap, not a tuning issue.  TNS (decoder-side
-`aac_apply_tns` exists; no encoder analysis or bitstream signaling) is the
-other standard transient/tonal tool and is likewise unimplemented.
-
-### GAP-5 — No Huffman escape sequences, codebook 11 (closed)
-
-Implemented, see GAP-1 cause 1.  The decoder peeks 16 bits for long
-codewords and parses sign bits + escape extensions; the encoder emits
-them for magnitudes > 12 and uses CB8/CB10's real ISO magnitude VLCs for
-mixed-sign mid-range bands.
-
-## Recently fixed (for context)
-
-These were found during the 2026-07 debugging round and are **closed**;
-listed here so the numbers above are interpretable:
-
-- **0.0 dB SNR / silent output.** Two compounding bugs: (a) the psycho model
-  initialized `threshold_previous[b] = 0`, collapsing first-frame masking
-  thresholds to 0.01× and zeroing the spectrum (now initialized to a 1e30f
-  sentinel, `src/psycho.cpp`); (b) the two-loop quantization outer loop could
-  walk scalefactors to 155, past the q=12 clamp region, where dequantized
-  output collapses (now guarded by per-band `sf_cap` plus a stall detector,
-  `src/encoder.cpp`). SNR went 0.0 → ~24–25 dB on `test_quality`.
-- **Huffman decode rejected valid codewords > 11 bits.** The decoder peeked
-  only 11 bits while CB7/CB9/CB11 contain 12–15-bit codes. Now peeks 16 bits
-  (`src/bitstream.cpp`).
-- **M/S in-place aliasing.** `aac_ms_encode` was called fully in-place
-  (`mid == L`, `side == R`) and wrote `mid[i]` before reading `L[i]` for
-  `side[i]`, corrupting the side channel into `0.5·L - 0.207·R`.  Decoded
-  identical-channel stereo had a constant ~13.7 dB SNR floor at every
-  bitrate; now reads both inputs into locals first (`src/spectral.cpp`) and
-  identical-channel stereo tracks mono-at-half-bitrate plus M/S gains
-  (34–51 dB from 64k–384k).
-- **Flat bitrate scaling.** See GAP-2: escape sequences + two-pass
-  masked-band zeroing.  23.6 dB flat → 31–51 dB scaling (`test_quality`).
-- **Uniform placeholder VLCs.** CB8/CB10 replaced with the real ISO
-  magnitude tables (from FFmpeg `aactab.c`), sign-coded like CB11.
-
-## Reproducing
-
-```bash
-mkdir -p build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build . -j4
-./tests/test_reference     # needs ffmpeg (+ libfdk_aac) on PATH
-./tests/test_quality       # baander-only SNR floors + monotonicity
-```
+- At 32 kbit/s stereo (16 kbit/s per channel) the minimum SNR per band
+  collapses to −1 dB as in FDK, so the encoder spreads bits over more
+  bands than FFmpeg does; FFmpeg's higher SNR there comes from coding
+  fewer bands at 25 dB.
+- On tonal and sparse material the encoder stops spending once every
+  band sits 24 dB below its masking threshold, which is why `tone48` and
+  `song44` at 256 kbit/s use less than the target. The reservoir then
+  stays full; frames are not padded.
+- Noise substitution lowers the SNR by design: the substituted bands are
+  noise of the right level, not the original lines, so `noise44` and the
+  bursts of `trans44` sit near 0 dB for both encoders.  Intensity stereo
+  on `harm44` reproduces the panned harmonics almost exactly because the
+  channels are copies at different levels.
+- The transient signals use well under the target rate: between the
+  bursts the bands fall below the PCM floor and are not coded, and the
+  encoder does not pad.  FFmpeg spends its reservoir on the bursts.
+- Encoding runs at roughly 15–60 times real time for stereo 44.1 kHz on
+  one core, depending on the material.

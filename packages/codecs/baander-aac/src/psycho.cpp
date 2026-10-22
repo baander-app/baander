@@ -3,132 +3,154 @@
 #include <cmath>
 #include <cstring>
 
-#include "aac_tables.h"
+/* Psychoacoustic model after 3GPP TS 26.403 section 5.4: an initial
+ * signal-to-mask ratio per band, threshold spreading across neighbouring
+ * bands on the Bark scale, a PCM-resolution floor, pre-echo control
+ * between long frames and the spread energy used for hole avoidance.  The
+ * encoder scales the thresholds to meet its bit budget, so only their shape
+ * matters here. */
 
-/* ── 3GPP TS 26.403-inspired psychoacoustic model ──────────────────
- *
- * The previous model mixed units: band energy was per-bin, the ATH came from
- * a dB-domain formula, and the encoder summed quantization noise as total band
- * energy. "noise < threshold" was therefore meaningless and the encoder could
- * not allocate bits by audibility.
- *
- * This model keeps every quantity in total-MDCT-band-energy units (sum of
- * coefficient squared), so the thresholds it emits are directly comparable to
- * the per-band quantization noise the two-loop-search quantizer computes:
- *
- *   band.energy   = Σ coef²                         (total band energy)
- *   band.thr      = energy × 0.001258925            (≈ -29 dB initial SNR)
- *                 → two-slope Bark spreading (forward + backward)
- *                 → ATH floor (energy units)
- *                 → pre-echo limiting against the previous frame
- *
- * The TLS quantizer then drives each band's quantization noise down to its
- * threshold, spending bits only on audible distortion.
- */
+namespace {
 
-/* Schroeder/Bark scale. */
-static float calc_bark(float f) {
+constexpr float kInitialSmr = 0.001258925f; /* -29 dB */
+/* Threshold spreading slopes in dB per Bark. */
+constexpr float kThrSpreadHigh = 15.0f; /* towards higher frequencies */
+constexpr float kThrSpreadLow = 30.0f;  /* towards lower frequencies */
+/* Energy spreading slopes in dB per Bark. */
+constexpr float kEnSpreadHighLong = 20.0f;
+constexpr float kEnSpreadHighLowRate = 15.0f; /* long windows below 22 kbit/s per channel */
+constexpr float kEnSpreadHighShort = 15.0f;
+constexpr float kEnSpreadLowLong = 30.0f;
+constexpr float kEnSpreadLowShort = 20.0f;
+constexpr float kPreEchoRise = 2.0f;
+constexpr float kPreEchoMin = 0.01f;
+constexpr float kInputScale = 32768.0f;
+
+float bark(float f) {
   return 13.3f * atanf(0.00076f * f) + 3.5f * atanf((f / 7500.0f) * (f / 7500.0f));
 }
 
-/* ATH in dB (LAME-style). Anchored so a full-scale tone sits well above it. */
-static float ath_db(float f) {
-  f /= 1000.0f;
-  return 3.64f * powf(f, -0.8f) - 6.8f * expf(-0.6f * (f - 3.4f) * (f - 3.4f)) +
-         6.0f * expf(-0.15f * (f - 8.7f) * (f - 8.7f)) + 0.6f * 0.001f * f * f * f * f;
+/* Floor of the thresholds: the quantization noise of 16-bit PCM, as in
+ * libfdk-aac (psy_configuration.cpp, "minimum PCM resolution").  Uniform
+ * noise of one LSB has variance 1/12 per sample and lands with the window
+ * length as gain in each spectral line. */
+float pcm_floor_energy(int lines, int window_len) {
+  return (float)lines * (float)window_len / 12.0f;
 }
 
-/* MDCT band energy of a full-scale (~1.0 amplitude) sine, used to map the
- * dB-domain ATH into the encoder's energy scale. A sine of amplitude A produces
- * an MDCT peak of order A*N/2 with a sine window; its single-bin energy is
- * roughly (A*N/4)². This anchor is approximate and intentionally conservative
- * (ATH should only floor near-silent bands; masking dominates for real audio). */
-#define FS_SINE_BIN_ENERGY (0.25f * 1024.0f * 1024.0f / 4.0f)
-/* SPL of a full-scale sine (≈ 16-bit PCM dynamic range). */
-#define FS_SPL 96.0f
+float db_per_bark_to_factor(float db_per_bark, float width) {
+  return powf(10.0f, -db_per_bark * width / 10.0f);
+}
 
-void aac_psycho_init(AacPsychoState* s, int sr, int fs) {
-  memset(s, 0, sizeof(*s));
-  s->sample_rate = sr;
-  s->frame_size = fs;
-  s->preecho_factor = 0.3f;
-  for (int i = 0; i < AAC_NUM_SAMPLE_RATES; i++) {
-    if (aac_sample_rates[i] == sr) {
-      s->rate_index = i;
-      break;
+}  // namespace
+
+void aac_psy_init(AacPsyChannel* p) {
+  memset(p, 0, sizeof(*p));
+  p->prev_long = 0;
+}
+
+void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
+                        const AacIcsInfo* ics, const float* coef, float* energy, float* thr,
+                        float* spread_energy) {
+  const int is_short = ics->num_windows == 8;
+  const int nswb = ics->num_swb;
+  const int* off = ics->swb_offset;
+  const int window_len = is_short ? 256 : 2048;
+  const float line_hz = (float)sample_rate / (float)window_len;
+  const float en_high = is_short                   ? kEnSpreadHighShort
+                        : channel_bitrate <= 22000 ? kEnSpreadHighLowRate
+                                                   : kEnSpreadHighLong;
+  const float en_low = is_short ? kEnSpreadLowShort : kEnSpreadLowLong;
+
+  float thr_hi[AAC_MAX_SFB_LONG], thr_lo[AAC_MAX_SFB_LONG];
+  float en_hi[AAC_MAX_SFB_LONG], en_lo[AAC_MAX_SFB_LONG];
+  float ath[AAC_MAX_SFB_LONG];
+  float prev_bark = 0.0f;
+  for (int b = 0; b < nswb; b++) {
+    const float fc = 0.5f * (float)(off[b] + off[b + 1]) * line_hz;
+    const float bk = bark(fc);
+    const float width = b ? bk - prev_bark : 0.0f;
+    thr_hi[b] = db_per_bark_to_factor(kThrSpreadHigh, width);
+    thr_lo[b] = db_per_bark_to_factor(kThrSpreadLow, width);
+    en_hi[b] = db_per_bark_to_factor(en_high, width);
+    en_lo[b] = db_per_bark_to_factor(en_low, width);
+    ath[b] = pcm_floor_energy(off[b + 1] - off[b], window_len);
+    prev_bark = bk;
+  }
+
+  int w0 = 0;
+  for (int g = 0; g < ics->num_window_groups; g++) {
+    float* e = energy + g * nswb;
+    float* t = thr + g * nswb;
+    float* se = spread_energy + g * nswb;
+    for (int b = 0; b < nswb; b++) {
+      float sum = 0.0f;
+      for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+        const float* x = coef + w * 128;
+        for (int i = off[b]; i < off[b + 1]; i++) {
+          sum += x[i] * x[i];
+        }
+      }
+      e[b] = sum;
+      t[b] = sum * kInitialSmr;
+      se[b] = sum;
     }
+    for (int b = 1; b < nswb; b++) {
+      t[b] = fmaxf(t[b], t[b - 1] * thr_hi[b]);
+      se[b] = fmaxf(se[b], se[b - 1] * en_hi[b]);
+    }
+    for (int b = nswb - 2; b >= 0; b--) {
+      t[b] = fmaxf(t[b], t[b + 1] * thr_lo[b + 1]);
+      se[b] = fmaxf(se[b], se[b + 1] * en_lo[b + 1]);
+    }
+    for (int b = 0; b < nswb; b++) {
+      t[b] = fmaxf(t[b], ath[b]);
+      if (!is_short && p->prev_long) {
+        t[b] = fmaxf(kPreEchoMin * t[b], fminf(t[b], kPreEchoRise * p->prev_thr[b]));
+      }
+    }
+    if (!is_short) {
+      memcpy(p->prev_thr, t, (size_t)nswb * sizeof(float));
+    }
+    w0 += ics->group_len[g];
   }
-  s->num_bands = aac_num_sfb_long[s->rate_index];
-  s->threshold_scale = 1.0f;
-  /* threshold_previous is compared against in aac_psycho_analyze.  Zero would
-   * collapse the first frame's thresholds (min(thr, 0) = 0), so start high
-   * enough that the pre-echo clamp is inactive on the first frame. */
-  for (int b = 0; b < 49; b++) {
-    s->threshold_previous[b] = 1e30f;
-  }
+  p->prev_long = !is_short;
 }
 
-void aac_psycho_analyze(AacPsychoState* s, const float* spec, int nb, const int* sfb) {
-  const float line_freq = (float)s->sample_rate / (2.0f * (float)s->frame_size);
-
-  /* 1. Per-band energy, initial threshold (-29 dB SNR), Bark value, ATH floor. */
-  float bark[49];
-  float ath[49];
-  for (int b = 0; b < nb; b++) {
+void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_energy) {
+  /* The high-pass of libfdk-aac block_switch.cpp, run from rest at the
+   * start of the region. */
+  float y = 0.0f;
+  float prev = x[start - 1];
+  for (int j = 0; j < count / 128; j++) {
+    const float* s = x + start + j * 128;
     float e = 0.0f;
-    for (int i = sfb[b]; i < sfb[b + 1]; i++) {
-      e += spec[i] * spec[i];
+    for (int i = 0; i < 128; i++) {
+      y = 0.7548f * (s[i] - prev) + 0.5095f * y;
+      prev = s[i];
+      e += y * y;
     }
-    s->bands[b].energy = e;
-    s->bands[b].spreaded_energy = e;
-    /* Initial threshold: energy × 10^(-29/10) × threshold_scale.  The scale
-     * lets the encoder trade quantization noise for bitrate (see
-     * aac_encoder_state_create). */
-    s->bands[b].threshold = e * 0.001258925f * s->threshold_scale;
-
-    float fcenter = (float)(sfb[b] + sfb[b + 1]) * 0.5f * line_freq;
-    bark[b] = calc_bark(fcenter);
-    /* ATH (dB SPL) → dBFS → energy in the encoder's MDCT scale. */
-    float dbfs = ath_db(fcenter) - FS_SPL;
-    ath[b] = FS_SINE_BIN_ENERGY * powf(10.0f, dbfs / 10.0f);
-  }
-
-  /* 2. Forward spreading (low → high frequency): uphill 1.5 dB/Bark on
-     threshold, 2.0 dB/Bark on energy. */
-  for (int b = 1; b < nb; b++) {
-    float db = bark[b] - bark[b - 1];
-    float th_slope = powf(10.0f, -db * 1.5f / 10.0f);
-    float en_slope = powf(10.0f, -db * 2.0f / 10.0f);
-    s->bands[b].threshold = fmaxf(s->bands[b].threshold, s->bands[b - 1].threshold * th_slope);
-    s->bands[b].spreaded_energy =
-        fmaxf(s->bands[b].spreaded_energy, s->bands[b - 1].spreaded_energy * en_slope);
-  }
-  /* 3. Backward spreading (high → low frequency): downhill 3.0 dB/Bark. */
-  for (int b = nb - 2; b >= 0; b--) {
-    float db = bark[b + 1] - bark[b];
-    float th_slope = powf(10.0f, -db * 3.0f / 10.0f);
-    s->bands[b].threshold = fmaxf(s->bands[b].threshold, s->bands[b + 1].threshold * th_slope);
-  }
-
-  /* 4. ATH floor, pre-echo limiting, publish. */
-  s->total_pe = 0;
-  for (int b = 0; b < nb; b++) {
-    float thr = fmaxf(s->bands[b].threshold, ath[b]);
-    /* Pre-echo: keep threshold from dropping too fast frame-to-frame, but allow
-     * it to rise instantly on transients.  Skip the clamp for the first frame
-     * (threshold_previous sentinel is -1); 3GPP 26.403 5.4.2.5 does not apply
-     * pre-echo control when no previous frame exists. */
-    if (s->threshold_previous[b] >= 0.0f) {
-      thr = fmaxf(0.01f * thr, fminf(thr, 2.0f * s->threshold_previous[b]));
-    }
-    s->threshold_previous[b] = thr;
-    s->bands[b].threshold = thr;
-    s->thresholds[b] = thr;
-    if (s->bands[b].energy > thr) {
-      s->total_pe += 6.0f * log2f(s->bands[b].energy / thr);
-    }
+    sub_energy[j] = e;
   }
 }
 
-float aac_psycho_get_pe(const AacPsychoState* s) { return s->total_pe; }
-const float* aac_psycho_get_thresholds(const AacPsychoState* s) { return s->thresholds; }
+int aac_psy_attack(const float* x, int start, int count) {
+  /* Sub-blocks below about -51 dBFS RMS never count as attacks, and an
+   * attack must exceed ten times the smoothed energy of what came before
+   * (libfdk-aac block_switch.cpp). */
+  const float min_energy = 128.0f * (kInputScale * 0.0028f) * (kInputScale * 0.0028f);
+  const float ratio = 10.0f;
+  float e[64];
+  const int history = 3;
+  const int n = count / 128 + history;
+  aac_psy_subblock_energies(x, start - history * 128, n * 128, e);
+  float acc = (e[0] + e[1] + e[2]) / 3.0f;
+  int attack = 0;
+  for (int j = history; j < n; j++) {
+    if (e[j] > min_energy && e[j] > ratio * acc) {
+      attack = j - history + 1;
+    }
+    acc = 0.7f * acc + 0.3f * e[j];
+  }
+  return attack;
+}
