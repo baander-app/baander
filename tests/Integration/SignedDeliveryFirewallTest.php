@@ -77,7 +77,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private const string SIGN_REQUEST_REFUSED = 'Expected a video manifest path and a lifetime from 1 to 86400 seconds.';
     private const array STREAMING_METHODS = [
         'getMasterManifest', 'getMediaManifest', 'getDashManifest', 'getSubtitleManifest',
-        'getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability',
+        'getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability',
     ];
 
     private static string $directory;
@@ -106,6 +106,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     /** @var list<array{string, string}> request path and response body */
     private array $bodies = [];
     private bool $signedUrlRequested = false;
+    private string $mediaTrack = 'video';
 
     public static function setUpBeforeClass(): void
     {
@@ -156,7 +157,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->streaming->method('getSubtitleManifest')->willReturn('#EXTINF:6');
         $this->streaming->method('getInitSegmentPath')->willReturn(self::$directory . '/segment.mp4');
         $this->streaming->method('getSubtitleSegmentPath')->willReturn(self::$directory . '/segment.mp4');
-        $this->streaming->method('resolveVideoSegmentAvailability')->willReturn([
+        $this->streaming->method('resolveSegmentAvailability')->willReturn([
             'jobId' => new Uuid(), 'tierKey' => '720p', 'path' => self::$directory . '/segment.mp4',
         ]);
         $this->streaming->method('getQualityLadderForVideo')->willReturn([]);
@@ -199,21 +200,24 @@ final class SignedDeliveryFirewallTest extends TestCase
         parent::tearDown();
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{string, string}> */
     public static function actors(): iterable
     {
         foreach (['anonymous', 'owner', 'member', 'unrelated', 'admin'] as $actor) {
-            yield $actor => [$actor];
+            foreach (['video', 'audio'] as $track) {
+                yield $actor . ' ' . $track => [$actor, $track];
+            }
         }
     }
 
     #[DataProvider('actors')]
-    public function testSignedCapabilityAllowsDeliveryWithoutDpopProofForEveryActor(string $actor): void
+    public function testSignedCapabilityAllowsDeliveryWithoutDpopProofForEveryActor(string $actor, string $track): void
     {
+        $this->mediaTrack = $track;
         $jwt = $actor === 'anonymous' ? null : $this->actorToken($actor);
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
-            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
+            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
         foreach ($this->deliveryPaths() as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path), $jwt);
@@ -230,13 +234,13 @@ final class SignedDeliveryFirewallTest extends TestCase
             $this->streaming->expects($this->never())->method($method);
         }
 
-        $this->assertSignatureRefused($this->request('GET', 'https://baander.app/api/transcode/sessions/init'), 'stream_segment_init_segment');
+        $this->assertSignatureRefused($this->request('GET', 'https://baander.app/api/transcode/sessions/tracks/video/init.mp4'), 'stream_segment_init_segment');
     }
 
     /** @return iterable<string, array{string}> */
     public static function invalidSignatures(): iterable
     {
-        foreach (['missing', 'expired', 'wrong-key', 'tampered-path', 'tampered-query', 'substituted-index'] as $kind) {
+        foreach (['missing', 'expired', 'wrong-key', 'tampered-path', 'tampered-query', 'substituted-index', 'substituted-track'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -252,7 +256,11 @@ final class SignedDeliveryFirewallTest extends TestCase
             if ($kind === 'substituted-index' && $route !== 'stream_segment_segment') {
                 continue;
             }
+            if ($kind === 'substituted-track' && !str_contains($path, '/tracks/')) {
+                continue;
+            }
             $url = match ($kind) {
+                'substituted-track' => str_replace('/tracks/video/', '/tracks/audio/', $this->signedUrl($path)),
                 'missing' => 'https://baander.app' . $path,
                 'expired' => $this->signedUrl($path, -10),
                 'wrong-key' => $this->signedUrl($path, signer: new HmacStreamAuthAdapter('other-secret', 'https://baander.app')),
@@ -310,7 +318,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $sends = $condition === 'reused proof' ? 2 : 1;
         $this->bus->expects($this->never())->method('dispatch');
         $this->streaming->expects($status === 200 ? ($route === 'stream_master_manifest' ? $this->exactly($sends) : $this->atLeast($sends)) : $this->never())
-            ->method($route === 'stream_master_manifest' ? 'getMasterManifest' : 'resolveVideoSegmentAvailability');
+            ->method($route === 'stream_master_manifest' ? 'getMasterManifest' : 'resolveSegmentAvailability');
         $url = $this->signedUrl($this->deliveryPaths()[$route]);
         if ($condition === 'reused proof') {
             self::assertIsString($jwt);
@@ -329,7 +337,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $foreign = $this->createVideoLibrary(false);
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
-            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
+            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
         foreach (SignedDeliveryRoutes::paths($foreign->getPublicId()->toString(), $this->jobId->toString()) as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path));
@@ -428,7 +436,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $manifest = '/api/transcode/{video}/master.m3u8';
         yield 'internal video UUID' => [['path' => '/api/transcode/{internalVideo}/master.m3u8'], self::SIGN_REQUEST_REFUSED];
         yield 'media manifest path' => [['path' => '/api/transcode/{job}/media.m3u8'], self::SIGN_REQUEST_REFUSED];
-        yield 'segment path' => [['path' => '/api/transcode/{job}/segment'], self::SIGN_REQUEST_REFUSED];
+        yield 'segment path' => [['path' => '/api/transcode/{job}/tracks/video/segment.m4s'], self::SIGN_REQUEST_REFUSED];
         yield 'path with a query' => [['path' => $manifest . '?index=0'], self::SIGN_REQUEST_REFUSED];
         yield 'path with a trailing newline' => [['path' => $manifest . "\n"], self::SIGN_REQUEST_REFUSED];
         yield 'lifetime of 0' => [['path' => $manifest, 'expiresInSeconds' => 0], self::SIGN_REQUEST_REFUSED];
@@ -531,7 +539,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     /** @return array<string, string> route name => request path */
     private function deliveryPaths(): array
     {
-        return SignedDeliveryRoutes::paths($this->videoId->toString(), $this->jobId->toString());
+        return SignedDeliveryRoutes::paths($this->videoId->toString(), $this->jobId->toString(), track: $this->mediaTrack);
     }
 
     /**

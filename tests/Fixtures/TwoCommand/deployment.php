@@ -171,20 +171,56 @@ function decodeVideo(StreamClient $client, array $state, float $readinessSeconds
     ensure($master->status() === 200, 'Master playlist is unavailable: ' . $master->body);
     preg_match('~^([^#\r\n][^\r\n]*)~m', $master->body, $mediaMatch);
     ensure(isset($mediaMatch[1]), 'Master playlist has no rendition.');
-    $mediaUrl = url($mediaMatch[1]);
-    $media = (new HttpExchange($mediaUrl, []))->complete();
-    ensure($media->status() === 200, 'Media playlist is unavailable.');
-    preg_match('/#EXT-X-MAP:URI="([^"]+)"/', $media->body, $initMatch);
-    preg_match('~^([^#\r\n][^\r\n]*)~m', $media->body, $segmentMatch);
-    ensure(isset($initMatch[1], $segmentMatch[1]), 'Playlist omitted init or fragment.');
-    $init = (new HttpExchange(url($initMatch[1]), []))->complete();
-    $segment = (new HttpExchange(url($segmentMatch[1]), []))->complete();
-    ensure($init->status() === 200 && $segment->status() === 200, 'Worker init or fragment is unavailable.');
-    $path = ROOT . '/decoded-generation-' . $playback['generation'] . '.mp4';
-    file_put_contents($path, $init->body . $segment->body);
-    $decoded = decodeMedia($path, 'decoded-generation-' . $playback['generation']);
+    preg_match_all('/^#EXT-X-MEDIA:TYPE=AUDIO,[^\r\n]+/m', $master->body, $audioLines);
+    ensure(count($audioLines[0]) === 1, 'Master must expose one canonical audio rendition.');
+    preg_match('/URI="([^"]+)"/', $audioLines[0][0], $audioUri);
+    ensure(isset($audioUri[1]), 'Canonical audio rendition omitted its playlist.');
+    $tracks = [];
+    foreach (['video' => $mediaMatch[1], 'audio' => $audioUri[1]] as $kind => $playlistUrl) {
+        $media = (new HttpExchange(url($playlistUrl), []))->complete();
+        ensure($media->status() === 200, $kind . ' media playlist is unavailable.');
+        preg_match('/#EXT-X-MAP:URI="([^"]+)"/', $media->body, $initMatch);
+        preg_match('~^([^#\r\n][^\r\n]*)~m', $media->body, $segmentMatch);
+        preg_match('/#EXTINF:([0-9.]+)/', $media->body, $durationMatch);
+        ensure(isset($initMatch[1], $segmentMatch[1], $durationMatch[1]), 'Playlist omitted init, fragment or duration.');
+        $tracks[$kind] = inspectTrack($kind, url($initMatch[1]), url($segmentMatch[1]), 'hls-' . $playback['generation']);
+        $tracks[$kind]['mediaUrl'] = url($playlistUrl);
+        $tracks[$kind]['firstDuration'] = (float) $durationMatch[1];
+    }
+    $decoded = decodeMedia(url($playback['manifestUrl']), 'decoded-hls-generation-' . $playback['generation'], 1.0);
     $subtitles = verifySubtitles($master->body, $playback);
-    return $playback + $decoded + ['mediaUrl' => $mediaUrl, 'initUrl' => url($initMatch[1]), 'segmentUrl' => url($segmentMatch[1]), 'decodedBytes' => strlen($init->body) + strlen($segment->body), 'subtitles' => $subtitles];
+    return $playback + $decoded + ['tracks' => $tracks, 'decodedBytes' => array_sum(array_column($tracks, 'bytes')), 'subtitles' => $subtitles];
+}
+
+/** @return array<string,mixed> */
+function inspectTrack(string $kind, string $initUrl, string $segmentUrl, string $name): array
+{
+    $init = (new HttpExchange($initUrl, []))->complete();
+    $segment = (new HttpExchange($segmentUrl, []))->complete();
+    ensure($init->status() === 200 && $segment->status() === 200, sprintf(
+        '%s init or fragment is unavailable (init HTTP %d, fragment HTTP %d).',
+        $kind, $init->status(), $segment->status(),
+    ));
+    ensure(str_contains($initUrl, '/tracks/' . $kind . '/init.mp4') && str_contains($segmentUrl, '/tracks/' . $kind . '/segment.m4s'), 'Track resource identity is absent.');
+    $path = ROOT . '/' . $name . '-' . $kind . '.mp4';
+    file_put_contents($path, $init->body . $segment->body);
+    $probe = new Process(['ffprobe', '-v', 'error', '-show_streams', '-of', 'json', $path]);
+    $probe->setTimeout(10); $probe->mustRun();
+    $streams = json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR)['streams'];
+    ensure(count($streams) === 1 && $streams[0]['codec_type'] === $kind, 'Fragment must contain exactly its declared track.');
+    $tampering = [
+        'track' => str_replace('/tracks/' . $kind . '/', '/tracks/' . ($kind === 'video' ? 'audio' : 'video') . '/', $segmentUrl),
+        'index' => $segmentUrl . '&index=999999',
+        'generation' => $segmentUrl . '&generation=999999',
+    ];
+    $statuses = [];
+    foreach ($tampering as $field => $altered) {
+        $response = (new HttpExchange($altered, []))->complete(5);
+        ensure(in_array($response->status(), [400, 403, 404], true), 'Altered ' . $field . ' signature was accepted.');
+        $statuses[$field] = $response->status();
+    }
+    return ['initUrl' => $initUrl, 'segmentUrl' => $segmentUrl, 'bytes' => strlen($init->body) + strlen($segment->body),
+        'codec' => $streams[0]['codec_name'], 'timeBase' => $streams[0]['time_base'], 'tamperedStatuses' => $statuses];
 }
 
 /**
@@ -236,8 +272,9 @@ function verifySubtitles(string $master, array $playback): array
  * @param array<string,mixed> $state
  * @return array<string,mixed>
  */
-function verifyDash(StreamClient $client, array $state, bool $qualifyDemux = false): array
+function verifyDash(StreamClient $client, array $state): array
 {
+    global $db;
     $signed = twoCommandExchange($client, '/api/stream/sign', 'POST', [
         'path' => '/api/transcode/' . $state['video'] . '/manifest.mpd', 'refresh' => true,
     ])->complete();
@@ -250,28 +287,44 @@ function verifyDash(StreamClient $client, array $state, bool $qualifyDemux = fal
     ensure($xml->loadXML($manifest->body, LIBXML_NONET), 'DASH manifest is invalid XML.');
     ensure($xml->documentElement?->getAttribute('profiles') === 'urn:mpeg:dash:profile:full:2011', 'DASH profile does not describe SegmentList output.');
     $xpath = new DOMXPath($xml); $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
-    $initializations = $xpath->query('//mpd:Initialization/@sourceURL');
-    $segments = $xpath->query('//mpd:SegmentURL/@media');
-    ensure($initializations !== false && $segments !== false, 'DASH addressing query failed.');
-    $init = $initializations->item(0)?->nodeValue;
-    $segment = $segments->item(0)?->nodeValue;
-    ensure(is_string($init) && is_string($segment), 'DASH omitted initialization or media addressing.');
+    $runtime = row($db, $state);
+    ensure((int) $runtime['generation'] === (int) $snapshot['generation'], 'DASH output changed generation during inspection.');
+    $presentation = (new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader())->read($runtime['output_directory']);
+    ensure($presentation !== null, 'DASH native presentation is unavailable.');
     $resources = [];
-    foreach (['init' => $init, 'segment' => $segment] as $kind => $resource) {
-        $response = (new HttpExchange(url($resource), []))->complete();
-        ensure($response->status() === 200 && strlen($response->body) > 0, 'Signed DASH ' . $kind . ' is unavailable.');
-        $resources[$kind] = ['status' => $response->status(), 'bytes' => strlen($response->body)];
+    foreach (['video', 'audio'] as $kind) {
+        $representations = $xpath->query('//mpd:AdaptationSet[@contentType="' . $kind . '"]/mpd:Representation');
+        ensure($representations !== false && $representations->length > 0, 'DASH omitted ' . $kind . ' representations.');
+        ensure($kind !== 'audio' || $representations->length === 1, 'DASH must expose one canonical audio representation.');
+        $representation = $representations->item(0);
+        if (!$representation instanceof DOMElement || $representation->getAttribute('codecs') === '') {
+            throw new RuntimeException('DASH omitted native codec declarations.');
+        }
+        $init = $xpath->evaluate('string(.//mpd:Initialization/@sourceURL)', $representation);
+        $segment = $xpath->evaluate('string(.//mpd:SegmentURL/@media)', $representation);
+        $points = $xpath->query('.//mpd:SegmentTimeline/mpd:S', $representation);
+        $lists = $xpath->query('.//mpd:SegmentList', $representation);
+        ensure($points !== false && $lists !== false, 'DASH timeline query failed.');
+        $timing = $points->item(0);
+        $list = $lists->item(0);
+        if (!is_string($init) || $init === '' || !is_string($segment) || $segment === '' || !$timing instanceof DOMElement || !$list instanceof DOMElement) {
+            throw new RuntimeException('DASH omitted explicit addressing or track timing.');
+        }
+        $resources[$kind] = inspectTrack($kind, url($init), url($segment), 'dash-' . $snapshot['generation']);
+        $resources[$kind]['timescale'] = (int) $list->getAttribute('timescale');
+        $resources[$kind]['startTicks'] = (int) $timing->getAttribute('t');
+        $resources[$kind]['durationTicks'] = (int) $timing->getAttribute('d');
+        ensure($resources[$kind]['timescale'] > 0 && $resources[$kind]['durationTicks'] > 0, 'DASH track timing must be positive.');
+        $native = $presentation->track(App\Transcode\Application\DTO\MediaTrack::from($kind));
+        ensure($native !== null && $resources[$kind]['timescale'] === $native->timescale
+            && $resources[$kind]['startTicks'] === $native->segments[0]->start
+            && $resources[$kind]['durationTicks'] === $native->segments[0]->duration
+            && $representation->getAttribute('codecs') === $native->codec,
+            'Signed DASH timing or codec differs from the native publication.');
     }
-    $result = ['generation' => $snapshot['generation'], 'profile' => $xml->documentElement->getAttribute('profiles'),
-        'qualification' => 'manifest-http-only', 'demuxQualified' => false, 'resources' => $resources];
-    if ($qualifyDemux) {
-        // Strict qualification intentionally fails until the real DASH demuxer
-        // produces both decoded video frames and audio from the signed MPD.
-        $result += decodeMedia(url($snapshot['url']), 'decoded-dash-generation-' . $snapshot['generation'], 1.0);
-        $result['qualification'] = 'decoded-audio-and-video';
-        $result['demuxQualified'] = true;
-    }
-    return $result;
+    return ['generation' => $snapshot['generation'], 'profile' => $xml->documentElement->getAttribute('profiles'),
+        'qualification' => 'decoded-audio-and-video', 'demuxQualified' => true, 'resources' => $resources]
+        + decodeMedia(url($snapshot['url']), 'decoded-dash-generation-' . $snapshot['generation'], 1.0);
 }
 /**
  * @param array<string,mixed> $decoded
@@ -281,7 +334,7 @@ function videoEvidence(array $decoded): array
 {
     return array_intersect_key($decoded, array_flip([
         'jobId', 'sessionId', 'ready', 'generation', 'revision', 'status',
-        'position', 'startTime', 'duration', 'renditionSet', 'decodedBytes', 'decodedFrames', 'decodedPcmBytes', 'subtitles',
+        'position', 'startTime', 'duration', 'renditionSet', 'decodedBytes', 'decodedFrames', 'decodedPcmBytes', 'tracks', 'subtitles',
     ]));
 }
 /**
@@ -293,19 +346,35 @@ function retainVideoOutput(Doctrine\DBAL\Connection $db, array $state, array $de
 {
     $runtime = row($db, $state);
     ensure((int) $runtime['generation'] === (int) $decoded['generation'], 'Output changed generation during retention.');
-    parse_str((string) parse_url($decoded['segmentUrl'], PHP_URL_QUERY), $query);
-    ensure(isset($query['index']) && ctype_digit((string) $query['index']), 'Retained fragment omitted its index.');
-    $fragments = glob($runtime['output_directory'] . '/*_' . $query['index'] . '.m4s') ?: [];
-    ensure(count($fragments) === 1, 'Cannot identify exact retained fragment.');
     $files = [];
-    $paths = ['init' => $runtime['output_directory'] . '/init.mp4', 'media' => $fragments[0]];
+    $paths = [];
+    $urls = [];
+    $presentation = (new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader())->read($runtime['output_directory']);
+    ensure($presentation !== null, 'Cannot read retained native presentation.');
+    foreach (App\Transcode\Application\DTO\MediaTrack::cases() as $kind) {
+        $track = $presentation->track($kind);
+        ensure($track !== null, 'Retained presentation omitted ' . $kind->value . '.');
+        $delivery = $decoded['tracks'][$kind->value];
+        parse_str((string) parse_url($delivery['segmentUrl'], PHP_URL_QUERY), $query);
+        ensure(isset($query['index']) && ctype_digit((string) $query['index']), 'Retained fragment omitted its ordinal.');
+        $segment = $track->segments[(int) $query['index']] ?? null;
+        ensure($segment !== null, 'Retained fragment is absent from the published index.');
+        ensure(abs($delivery['firstDuration'] - $segment->duration / $track->timescale) < .00001,
+            'Signed HLS duration differs from the native publication.');
+        foreach (['init' => $track->initFile, 'media' => $segment->file] as $part => $file) {
+            $key = $kind->value . '-' . $part;
+            $paths[$key] = $runtime['output_directory'] . '/' . $file;
+            $urls[$key] = $delivery[$part === 'init' ? 'initUrl' : 'segmentUrl'];
+        }
+    }
     foreach ($decoded['subtitles'] as $key => $subtitle) {
         $paths[$key] = $runtime['output_directory'] . '/subtitles/' . $key . '/full.vtt';
+        $urls[$key] = $subtitle['url'];
     }
     foreach ($paths as $kind => $path) {
         $copy = ROOT . '/retained-' . $name . '-' . $kind . '.bin';
         ensure(is_file($path) && filesize($path) > 0 && copy($path, $copy) && chmod($copy, 0600), 'Cannot retain closed native output.');
-        $files[$kind] = ['path' => $path, 'copy' => $copy, 'url' => $decoded['subtitles'][$kind]['url'] ?? $decoded[$kind === 'init' ? 'initUrl' : 'segmentUrl']];
+        $files[$kind] = ['path' => $path, 'copy' => $copy, 'url' => $urls[$kind]];
     }
     return ['generation' => (int) $decoded['generation'], 'files' => $files];
 }
@@ -500,7 +569,7 @@ if ($mode === 'prepare') {
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
     $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
 } elseif ($mode === 'dash') {
-    $result = verifyDash($client(), state(), true);
+    $result = verifyDash($client(), state());
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
     $state = state(); $auth = $client();
     if ($mode === 'seek-paused' || $mode === 'pause-absent') {
@@ -533,6 +602,7 @@ if ($mode === 'prepare') {
         ensure($resume->status() === 200, 'Resume failed: ' . $resume->body);
         $current = acknowledged($db, $state, 'running', 30);
         $decoded = decodeVideo($auth, $state);
+        $result['dash'] = verifyDash($auth, $state);
         $state['preTakeoverOutput'] = retainVideoOutput($db, $state, $decoded, 'pre-takeover'); save($state);
     } else {
         $cancel = twoCommandExchange($auth, '/api/transcode/sessions/' . $state['session'], 'DELETE')->complete();
@@ -549,6 +619,7 @@ if ($mode === 'prepare') {
     ensure((int) $current['generation'] > $state['preTakeoverOutput']['generation'], 'Successor did not advance the retired execution generation.');
     $retiredStatuses = rejectRetiredVideoOutput($state['preTakeoverOutput']);
     $result = ['workerBoot' => $current['worker_boot_id'], 'playback' => videoEvidence($decoded),
+        'dash' => verifyDash($auth, $state),
         'retiredGeneration' => $state['preTakeoverOutput']['generation'], 'retiredOutputStatuses' => $retiredStatuses, 'retainedOutputFiles' => count($retiredStatuses)];
 } elseif ($mode === 'dependency') {
     $response = twoCommandExchange($client(), '/api/admin/recommendations/generate', 'POST', ['mode' => 'full'])->complete(15);

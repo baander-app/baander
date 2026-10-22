@@ -191,10 +191,12 @@ ensure($seekSeconds <= 30 && $decoded['status'] === 'paused' && (float) $decoded
 ensure(is_dir($initialAttempt['outputDirectory']) || mkdir($initialAttempt['outputDirectory'], 0750, true), 'Cannot retain old output directory.');
 foreach ($retainedFiles as $path => $bytes) { ensure(file_put_contents($path, $bytes) === strlen($bytes), 'Cannot retain old output bytes.'); }
 $retained = [];
-foreach (['initUrl', 'segmentUrl'] as $key) {
-    $response = (new HttpExchange($oldOutput[$key], []))->complete(5);
-    ensure(in_array($response->status(), [403, 404, 410], true), 'Retired generation delivered bytes.');
-    $retained[$key] = $response->status();
+foreach ($oldOutput['tracks'] as $kind => $track) {
+    foreach (['initUrl', 'segmentUrl'] as $key) {
+        $response = (new HttpExchange($track[$key], []))->complete(5);
+        ensure(in_array($response->status(), [403, 404, 410], true), 'Retired generation delivered bytes.');
+        $retained[$kind . '-' . $key] = $response->status();
+    }
 }
 $stale = $control(['position' => 45, 'action' => 'seek', 'generation' => (int) $initialRuntime['generation'], 'requestId' => Uuid::v7()->toString()], 'paused', true);
 ensure($stale['desired_revision'] === $current['desired_revision'] && $stale['generation'] === $current['generation'], 'Stale socket seek changed current generation.');

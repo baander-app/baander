@@ -162,6 +162,27 @@ The immutable set of owned video job public IDs and their individual execution
 generations carried by a signed adaptive HLS or DASH manifest request. It fixes
 which outputs the player may switch between; a changed set needs a new signature.
 
+### Published presentation
+
+The closed video and audio fragments recorded by one generation's atomic native
+manifest, with their actual clocks, durations and codec declarations. Delivery
+uses this index to advertise available media. Public fragment indexes are
+zero-based ordinals within each generation and track; native file sequence numbers
+remain separate.
+
+### Canonical audio track
+
+The primary playback job's audio track shared by the video representations in a
+signed rendition set. Other quality tiers do not become separate audio choices.
+A source without audio has no canonical audio track.
+
+### Source position
+
+A playback position measured from the beginning of the source video. Subtracting
+the execution generation's source start time gives its local media position. The
+movie seek control spans the full source duration even while the published
+presentation contains only part of the remaining media.
+
 ### Transcode control receipt
 
 A durable record that one session has applied a request identity. It prevents the

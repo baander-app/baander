@@ -66,14 +66,15 @@ final class DeliveryRouteInventoryTest extends TestCase
 
     public function testFixturePathsResolveToEveryPublicDeliveryRoute(): void
     {
-        $paths = SignedDeliveryRoutes::paths(self::VIDEO_ID, self::JOB_ID);
         $matcher = new UrlMatcher(self::$routes, new RequestContext());
-
-        self::assertEqualsCanonicalizing($this->publicDeliveryRoutes(), array_keys($paths));
-        foreach ($paths as $name => $path) {
-            $pathInfo = parse_url($path, PHP_URL_PATH);
-            self::assertIsString($pathInfo);
-            self::assertSame($name, $matcher->match($pathInfo)['_route'], $path);
+        foreach (['video', 'audio'] as $track) {
+            $paths = SignedDeliveryRoutes::paths(self::VIDEO_ID, self::JOB_ID, track: $track);
+            self::assertEqualsCanonicalizing($this->publicDeliveryRoutes(), array_keys($paths));
+            foreach ($paths as $name => $path) {
+                $pathInfo = parse_url($path, PHP_URL_PATH);
+                self::assertIsString($pathInfo);
+                self::assertSame($name, $matcher->match($pathInfo)['_route'], $path);
+            }
         }
     }
 
@@ -102,7 +103,7 @@ final class DeliveryRouteInventoryTest extends TestCase
                 if ($methods !== [] && !in_array('GET', $methods, true)) {
                     continue;
                 }
-                if (preg_match('{' . $rule['path'] . '}', $route->getPath()) !== 1) {
+                if (preg_match('{' . $rule['path'] . '}', str_replace('{track}', 'video', $route->getPath())) !== 1) {
                     continue;
                 }
                 if (in_array('PUBLIC_ACCESS', (array) ($rule['roles'] ?? []), true)) {

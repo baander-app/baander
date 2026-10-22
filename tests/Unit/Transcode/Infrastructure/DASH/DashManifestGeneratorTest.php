@@ -4,327 +4,78 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Transcode\Infrastructure\DASH;
 
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
+use App\Transcode\Infrastructure\Packaging\PublishedSegment;
+use App\Transcode\Infrastructure\Packaging\PublishedTrack;
 use PHPUnit\Framework\TestCase;
 
 final class DashManifestGeneratorTest extends TestCase
 {
-    private DashManifestGenerator $generator;
-
-    protected function setUp(): void
+    public function testExplicitTrackTimelinesPreserveNativeTicksAndPublishOnlySignedOrdinals(): void
     {
-        $this->generator = new DashManifestGenerator();
-    }
-
-    public function testGenerateProducesValidMpdWithMultipleRepresentations(): void
-    {
-        $renditions = $this->buildRenditions([
-            'p360' => QualityTier::p360(),
-            'p720' => QualityTier::p720(),
-            'p1080' => QualityTier::p1080(),
-            'p4k' => QualityTier::p4K(),
-        ]);
-
-        $output = $this->generator->generate($renditions, [], 4.0);
+        $video = $this->track(MediaTrack::Video, 'avc1.640028', 12288, 1024, [new PublishedSegment(0, 1, 1024, 73728, 'video.m4s')]);
+        $audio = $this->track(MediaTrack::Audio, 'mp4a.40.2', 48000, 0, [new PublishedSegment(0, 1, 0, 284672, 'audio.m4s')]);
+        $presentation = new PublishedPresentation(false, ['availabilityStartTime' => '2026-10-22T10:00:00Z', 'publishTime' => '2026-10-22T10:00:06Z', 'minimumUpdatePeriod' => 'PT6S'], ['start' => 'PT0S'], []);
+        $output = (new DashManifestGenerator())->generate([
+            '720p' => ['quality_tier' => QualityTier::p720(), 'track' => $video, 'init_url' => '/tracks/video/init.mp4?generation=3&sig=video', 'segment_urls' => [0 => '/tracks/video/segment.m4s?index=0&generation=3'], 'bandwidth' => 4200000],
+        ], ['track' => $audio, 'init_url' => '/tracks/audio/init.mp4', 'segment_urls' => [0 => '/tracks/audio/segment.m4s?index=0'], 'language' => 'en', 'bandwidth' => 384000, 'sample_rate' => 44100, 'channels' => 6], $presentation);
         $xml = new \SimpleXMLElement($output);
-
-        // Verify root MPD element attributes
-        $namespaces = $xml->getNamespaces(true);
-        $this->assertArrayHasKey('', $namespaces);
-        $this->assertSame('urn:mpeg:dash:schema:mpd:2011', $namespaces['']);
-        $this->assertSame('static', (string) $xml['type']);
-        $this->assertSame('urn:mpeg:dash:profile:full:2011', (string) $xml['profiles']);
-        $this->assertSame('PT6S', (string) $xml['minBufferTime']);
-        $this->assertSame('PT4S', (string) $xml['mediaPresentationDuration']);
-
-        // Verify Period exists
-        $period = $xml->Period;
-        $this->assertCount(1, $period);
-
-        // Verify video AdaptationSet
-        $adaptationSets = $period->AdaptationSet;
-        $videoAdaptationSet = $adaptationSets[0];
-        $this->assertSame('video/mp4', (string) $videoAdaptationSet['mimeType']);
-        $this->assertSame('video', (string) $videoAdaptationSet['contentType']);
-        $this->assertSame('true', (string) $videoAdaptationSet['segmentAlignment']);
-        $this->assertSame('1', (string) $videoAdaptationSet['startWithSAP']);
-
-        // Verify all 4 representations are present
-        $representations = $videoAdaptationSet->Representation;
-        $this->assertCount(4, $representations);
-
-        // Verify 360p representation attributes
-        $p360 = $representations[0];
-        $this->assertSame('p360', (string) $p360['id']);
-        $this->assertSame((string) QualityTier::p360()->maxBitrate, (string) $p360['bandwidth']);
-        $this->assertSame('640', (string) $p360['width']);
-        $this->assertSame('360', (string) $p360['height']);
-
-        // Verify 4K representation attributes
-        $p4k = $representations[3];
-        $this->assertSame('p4k', (string) $p4k['id']);
-        $this->assertSame((string) QualityTier::p4K()->maxBitrate, (string) $p4k['bandwidth']);
-        $this->assertSame('3840', (string) $p4k['width']);
-        $this->assertSame('2160', (string) $p4k['height']);
+        self::assertSame('dynamic', (string) $xml['type']);
+        self::assertSame('2026-10-22T10:00:00Z', (string) $xml['availabilityStartTime']);
+        self::assertSame('urn:mpeg:dash:profile:full:2011', (string) $xml['profiles']);
+        self::assertCount(2, $xml->Period->AdaptationSet);
+        $v = $xml->Period->AdaptationSet[0]->Representation;
+        self::assertSame('video', (string) $xml->Period->AdaptationSet[0]['contentType']);
+        self::assertSame('avc1.640028', (string) $v['codecs']);
+        self::assertSame('4200000', (string) $v['bandwidth']);
+        self::assertSame('0', (string) $v->SegmentList['startNumber']);
+        self::assertSame('12288', (string) $v->SegmentList['timescale']);
+        self::assertSame('1024', (string) $v->SegmentList['presentationTimeOffset']);
+        self::assertSame('INF', (string) $v->SegmentList['availabilityTimeOffset']);
+        self::assertSame('true', (string) $v->SegmentList['availabilityTimeComplete']);
+        self::assertSame('1024', (string) $v->SegmentList->SegmentTimeline->S['t']);
+        self::assertSame('73728', (string) $v->SegmentList->SegmentTimeline->S['d']);
+        self::assertSame('/tracks/video/init.mp4?generation=3&sig=video', (string) $v->SegmentList->Initialization['sourceURL']);
+        self::assertCount(1, $v->SegmentList->SegmentURL);
+        self::assertSame('/tracks/video/segment.m4s?index=0&generation=3', (string) $v->SegmentList->SegmentURL['media']);
+        $a = $xml->Period->AdaptationSet[1]->Representation;
+        self::assertSame('audio', (string) $xml->Period->AdaptationSet[1]['contentType']);
+        self::assertSame('mp4a.40.2', (string) $a['codecs']);
+        self::assertSame('44100', (string) $a['audioSamplingRate']);
+        self::assertSame('384000', (string) $a['bandwidth']);
+        self::assertSame('6', (string) $a->AudioChannelConfiguration['value']);
+        self::assertSame('48000', (string) $a->SegmentList['timescale']);
+        self::assertSame('284672', (string) $a->SegmentList->SegmentTimeline->S['d']);
+        self::assertStringNotContainsString('SegmentTemplate', $output);
     }
 
-    public function testSegmentTimelineContainsCorrectDurations(): void
+    public function testCompletedSnapshotDropsLiveClockAndRetainsNativeDuration(): void
     {
-        $renditions = [
-            'p720' => $this->buildRendition(
-                QualityTier::p720(),
-                [
-                    0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 2.0],
-                    1 => ['url' => '/seg/seg_000001.m4s', 'duration' => 3.5],
-                    2 => ['url' => '/seg/seg_000002.m4s', 'duration' => 1.0],
-                ],
-                publicId: 'video-seg-test',
-            ),
-        ];
-
-        $output = $this->generator->generate($renditions, [], 6.5);
-        $xml = new \SimpleXMLElement($output);
-
-        $segmentList = $xml->Period->AdaptationSet->Representation->SegmentList;
-        $initialization = $segmentList->Initialization;
-        $this->assertSame('/api/stream/video-seg-test/init.mp4', (string) $initialization['sourceURL']);
-
-        $segmentTimeline = $segmentList->SegmentTimeline;
-        $segments = $segmentTimeline->S;
-        $this->assertCount(3, $segments);
-
-        // Durations in milliseconds
-        $this->assertSame('2000', (string) $segments[0]['d']);
-        $this->assertSame('0', (string) $segments[0]['t']); // First segment has t=0
-
-        $this->assertSame('3500', (string) $segments[1]['d']);
-        $this->assertEmpty((string) $segments[1]['t']); // Subsequent segments have no t
-
-        $this->assertSame('1000', (string) $segments[2]['d']);
-        $this->assertEmpty((string) $segments[2]['t']);
-
-        // SegmentURLs follow the timeline
-        $segmentUrls = $segmentList->SegmentURL;
-        $this->assertCount(3, $segmentUrls);
-        $this->assertSame('/seg/seg_000000.m4s', (string) $segmentUrls[0]['media']);
+        $track = $this->track(MediaTrack::Video, 'avc1.640028', 1000, 0, [new PublishedSegment(0, 1, 0, 2010, 'video.m4s')]);
+        $xml = new \SimpleXMLElement((new DashManifestGenerator())->generate([
+            '720p' => ['quality_tier' => QualityTier::p720(), 'track' => $track, 'init_url' => '/init', 'segment_urls' => [0 => '/segment'], 'bandwidth' => 4000000],
+        ], null, new PublishedPresentation(true, ['availabilityStartTime' => '2026-10-22T10:00:00Z', 'minimumUpdatePeriod' => 'PT6S', 'mediaPresentationDuration' => 'PT2.01S'], ['start' => 'PT0S'], [])));
+        self::assertSame('static', (string) $xml['type']);
+        self::assertSame('PT2.01S', (string) $xml['mediaPresentationDuration']);
+        self::assertFalse(isset($xml['availabilityStartTime']));
+        self::assertFalse(isset($xml['minimumUpdatePeriod']));
+        self::assertFalse(isset($xml->Period->AdaptationSet->Representation->SegmentList['availabilityTimeOffset']));
+        self::assertCount(1, $xml->Period->AdaptationSet);
     }
 
-    public function testNoCompletedSegmentsReturnsMpdWithEmptySegmentTimeline(): void
+    public function testUnavailableSetHasNoPlayableRepresentation(): void
     {
-        $renditions = [
-            'p720' => $this->buildRendition(QualityTier::p720(), []),
-        ];
-
-        $output = $this->generator->generate($renditions, [], 0.0);
-        $xml = new \SimpleXMLElement($output);
-
-        // Period should exist
-        $period = $xml->Period;
-        $this->assertCount(1, $period);
-
-        // Representation should exist but SegmentTimeline should have no S elements
-        $representation = $period->AdaptationSet->Representation;
-        $this->assertCount(1, $representation);
-
-        $timeline = $representation->SegmentList->SegmentTimeline;
-        $this->assertCount(0, $timeline->S);
+        $xml = new \SimpleXMLElement((new DashManifestGenerator())->generate([]));
+        self::assertSame('static', (string) $xml['type']);
+        self::assertCount(0, $xml->Period->AdaptationSet);
     }
 
-    public function testSingleQualityTierReturnsSingleRepresentation(): void
+    /** @param list<PublishedSegment> $segments */
+    private function track(MediaTrack $kind, string $codec, int $timescale, int $offset, array $segments): PublishedTrack
     {
-        $renditions = [
-            'p1080' => $this->buildRendition(
-                QualityTier::p1080(),
-                [
-                    0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 4.0],
-                ],
-                videoCodec: 'hvc1.1.6.L120.B0',
-            ),
-        ];
-
-        $output = $this->generator->generate($renditions, [], 4.0);
-        $xml = new \SimpleXMLElement($output);
-
-        $representations = $xml->Period->AdaptationSet->Representation;
-        $this->assertCount(1, $representations);
-
-        $rep = $representations[0];
-        $this->assertSame('p1080', (string) $rep['id']);
-        $this->assertSame((string) QualityTier::p1080()->maxBitrate, (string) $rep['bandwidth']);
-        $this->assertSame('1920', (string) $rep['width']);
-        $this->assertSame('1080', (string) $rep['height']);
-        // Video Representation only contains the video codec
-        $this->assertSame('hvc1.1.6.L120.B0', (string) $rep['codecs']);
-    }
-
-    public function testGeneratedXmlIsWellFormed(): void
-    {
-        $renditions = $this->buildRenditions([
-            'p480' => QualityTier::p480(),
-            'p1440' => QualityTier::p1440(),
-        ]);
-
-        $output = $this->generator->generate($renditions, [], 6.0);
-
-        // SimpleXMLElement constructor throws an exception on malformed XML
-        $xml = new \SimpleXMLElement($output);
-        $this->assertInstanceOf(\SimpleXMLElement::class, $xml);
-
-        // Verify it has the expected structure
-        $this->assertCount(1, $xml->Period);
-        $this->assertCount(1, $xml->Period->AdaptationSet);
-        $this->assertCount(2, $xml->Period->AdaptationSet->Representation);
-
-        // Verify XML declaration is present
-        $this->assertStringStartsWith('<?xml', $output);
-    }
-
-    public function testEmptyRenditionsReturnsMinimalManifest(): void
-    {
-        $output = $this->generator->generate([], [], 0.0);
-
-        $xml = new \SimpleXMLElement($output);
-
-        $namespaces = $xml->getNamespaces(true);
-        $this->assertArrayHasKey('', $namespaces);
-        $this->assertSame('urn:mpeg:dash:schema:mpd:2011', $namespaces['']);
-        $this->assertSame('static', (string) $xml['type']);
-        $this->assertEmpty((string) $xml['mediaPresentationDuration']);
-
-        $period = $xml->Period;
-        $this->assertCount(1, $period);
-
-        // Empty period should have no AdaptationSet
-        $this->assertCount(0, $period->AdaptationSet);
-    }
-
-    public function testVideoCodecsAttributeContainsOnlyVideoCodec(): void
-    {
-        $renditions = [
-            'p720' => $this->buildRendition(
-                QualityTier::p720(),
-                [
-                    0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 2.0],
-                ],
-                videoCodec: 'avc1.64001f',
-            ),
-        ];
-
-        $output = $this->generator->generate($renditions, [], 2.0);
-        $xml = new \SimpleXMLElement($output);
-
-        $codecs = (string) $xml->Period->AdaptationSet->Representation['codecs'];
-        $this->assertSame('avc1.64001f', $codecs);
-    }
-
-    public function testAudioAdaptationSetIsCreatedForAudioTracks(): void
-    {
-        $renditions = [
-            'p720' => $this->buildRendition(
-                QualityTier::p720(),
-                [
-                    0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 2.0],
-                ],
-            ),
-        ];
-
-        $audioAdaptations = [
-            'en' => [
-                'language' => 'en',
-                'init_url' => '/api/stream/video-codec/audio/en/init.mp4',
-                'segment_map' => [
-                    0 => ['url' => '/audio/en/seg_000000.m4s', 'duration' => 2.0],
-                ],
-                'codec_rfc6381' => 'mp4a.40.2',
-            ],
-        ];
-
-        $output = $this->generator->generate($renditions, $audioAdaptations, 2.0);
-        $xml = new \SimpleXMLElement($output);
-
-        $adaptationSets = $xml->Period->AdaptationSet;
-        $this->assertCount(2, $adaptationSets);
-
-        $audioAdaptationSet = $adaptationSets[1];
-        $this->assertSame('audio/mp4', (string) $audioAdaptationSet['mimeType']);
-        $this->assertSame('audio', (string) $audioAdaptationSet['contentType']);
-        $this->assertSame('en', (string) $audioAdaptationSet['lang']);
-
-        $audioRepresentation = $audioAdaptationSet->Representation;
-        $this->assertSame('audio_en', (string) $audioRepresentation['id']);
-        $this->assertSame('mp4a.40.2', (string) $audioRepresentation['codecs']);
-
-        $audioChannelConfig = $audioRepresentation->AudioChannelConfiguration;
-        $this->assertSame('2', (string) $audioChannelConfig['value']);
-    }
-
-    public function testAudioCodecParameterIsUsed(): void
-    {
-        $renditions = [
-            'p720' => $this->buildRendition(
-                QualityTier::p720(),
-                [
-                    0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 2.0],
-                ],
-            ),
-        ];
-
-        $audioAdaptations = [
-            'en' => [
-                'language' => 'en',
-                'init_url' => '/api/stream/video-opus/audio/en/init.mp4',
-                'segment_map' => [
-                    0 => ['url' => '/audio/en/seg_000000.m4s', 'duration' => 2.0],
-                ],
-                'codec_rfc6381' => 'Opus',
-            ],
-        ];
-
-        $output = $this->generator->generate($renditions, $audioAdaptations, 2.0);
-        $xml = new \SimpleXMLElement($output);
-
-        $audioRepresentation = $xml->Period->AdaptationSet[1]->Representation;
-        $this->assertSame('Opus', (string) $audioRepresentation['codecs']);
-    }
-
-    /**
-     * @param array<string, QualityTier> $tiers
-     * @return array<string, array<string, mixed>>
-     */
-    private function buildRenditions(array $tiers): array
-    {
-        $renditions = [];
-        foreach ($tiers as $name => $tier) {
-            $renditions[$name] = $this->buildRendition($tier);
-        }
-
-        return $renditions;
-    }
-
-    /**
-     * @param array<int, array{url: string, duration: float}> $segmentMap
-     * @return array<string, mixed>
-     */
-    private function buildRendition(
-        QualityTier $tier,
-        array $segmentMap = [
-            0 => ['url' => '/seg/seg_000000.m4s', 'duration' => 2.0],
-            1 => ['url' => '/seg/seg_000001.m4s', 'duration' => 2.0],
-        ],
-        string $videoCodec = 'hvc1.1.6.L93.B0',
-        ?string $publicId = null,
-    ): array {
-        $id = $publicId ?? 'video-' . strtolower($tier->name);
-
-        return [
-            'public_id' => $id,
-            'quality_tier' => $tier,
-            'init_url' => '/api/stream/' . $id . '/init.mp4',
-            'segment_map' => $segmentMap,
-            'total_duration' => array_sum(array_column($segmentMap, 'duration')),
-            'video_codec_rfc6381' => $videoCodec,
-            'audio_codec_rfc6381' => 'mp4a.40.2',
-        ];
+        return new PublishedTrack($kind, $kind->value, $codec, $timescale, $offset, 'init.mp4', $segments, ['frameRate' => '24/1'], []);
     }
 }

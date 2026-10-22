@@ -17,67 +17,35 @@ final class ManifestGeneratorTest extends TestCase
         $this->generator = new ManifestGenerator();
     }
 
-    public function testMediaManifestIncludesRequiredHeaders(): void
+    public function testGrowingTrackUsesActualDurationsAndStableTargetUntilEof(): void
     {
-        $tier = QualityTier::p720();
-        $manifest = $this->generator->generateMediaManifest(
-            $tier,
-            '/api/stream/xxx/init.mp4',
-            [],
-        );
-
-        $this->assertStringContainsString('#EXTM3U', $manifest);
-        $this->assertStringContainsString('#EXT-X-VERSION:6', $manifest);
-        $this->assertStringContainsString('#EXT-X-INDEPENDENT-SEGMENTS', $manifest);
-        $this->assertStringContainsString('#EXT-X-TARGETDURATION:6', $manifest);
-        $this->assertStringContainsString('#EXT-X-ENDLIST', $manifest);
+        $segments = [0 => ['url' => '/tracks/audio/segment.m4s?index=0', 'duration' => 6.016]];
+        $growing = $this->generator->generateMediaManifest('/tracks/audio/init.mp4', $segments, false);
+        self::assertStringContainsString('#EXT-X-PLAYLIST-TYPE:EVENT', $growing);
+        self::assertStringContainsString('#EXT-X-TARGETDURATION:7', $growing);
+        self::assertStringContainsString('#EXTINF:6.016000,', $growing);
+        self::assertStringContainsString('#EXT-X-MEDIA-SEQUENCE:0', $growing);
+        self::assertStringContainsString('#EXT-X-MAP:URI="/tracks/audio/init.mp4"', $growing);
+        self::assertStringNotContainsString('#EXT-X-ENDLIST', $growing);
+        $segments[1] = ['url' => '/tracks/audio/segment.m4s?index=1', 'duration' => 2.026667];
+        $complete = $this->generator->generateMediaManifest('/tracks/audio/init.mp4', $segments, true);
+        self::assertStringContainsString('#EXT-X-TARGETDURATION:7', $complete);
+        self::assertStringContainsString('#EXTINF:2.026667,', $complete);
+        self::assertStringContainsString('#EXT-X-ENDLIST', $complete);
     }
 
-    public function testMediaManifestIncludesMapWhenSegmentsExist(): void
+    public function testUnpublishedTrackHasNoMapOrInventedSegments(): void
     {
-        $tier = QualityTier::p720();
-        $segments = [
-            0 => ['path' => '/seg_0.m4s', 'duration' => 6.0],
-            1 => ['path' => '/seg_1.m4s', 'duration' => 6.0],
-        ];
-
-        $manifest = $this->generator->generateMediaManifest(
-            $tier,
-            '/api/stream/xxx/init.mp4',
-            $segments,
-        );
-
-        $this->assertStringContainsString('#EXT-X-MAP:URI="/api/stream/xxx/init.mp4"', $manifest);
-        $this->assertStringContainsString('seg_0.m4s', $manifest);
-        $this->assertStringContainsString('seg_1.m4s', $manifest);
+        $manifest = $this->generator->generateMediaManifest('', [], false);
+        self::assertStringNotContainsString('#EXT-X-MAP', $manifest);
+        self::assertStringNotContainsString('#EXTINF', $manifest);
+        self::assertStringNotContainsString('#EXT-X-ENDLIST', $manifest);
     }
 
-    public function testMediaManifestSkipsMapWhenNoSegments(): void
+    public function testUnexpectedSegmentDurationCannotMutateTarget(): void
     {
-        $tier = QualityTier::p720();
-        $manifest = $this->generator->generateMediaManifest(
-            $tier,
-            '/api/stream/xxx/init.mp4',
-            [],
-        );
-
-        $this->assertStringNotContainsString('#EXT-X-MAP', $manifest);
-    }
-
-    public function testMediaManifestSegmentDurationPrecision(): void
-    {
-        $tier = QualityTier::p1080();
-        $segments = [
-            0 => ['path' => '/seg_0.m4s', 'duration' => 5.998],
-        ];
-
-        $manifest = $this->generator->generateMediaManifest(
-            $tier,
-            '/init.mp4',
-            $segments,
-        );
-
-        $this->assertStringContainsString('#EXTINF:5.998000,', $manifest);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->generator->generateMediaManifest('/init', [['url' => '/segment', 'duration' => 7.5]], false);
     }
 
     public function testMasterManifestIncludesAllTiers(): void
@@ -105,12 +73,10 @@ final class ManifestGeneratorTest extends TestCase
             ['groupId' => 'aac', 'language' => 'en', 'name' => 'English', 'uri' => '/audio/en/media.m3u8', 'channels' => '2', 'isDefault' => true, 'codec' => 'mp4a.40.2'],
         ];
 
-        $manifest = $this->generator->generateMasterManifest($urls, $audioGroups);
+        $manifest = $this->generator->generateMasterManifest($urls, $audioGroups, [], ['1080p' => 'avc1.640028,mp4a.40.2']);
 
-        // When audio is delivered via a separate EXT-X-MEDIA group, the variant
-        // CODECS attribute must list only the video codec.
-        $this->assertStringContainsString('CODECS="hvc1.1.6.L120.B0"', $manifest);
-        $this->assertStringNotContainsString('hvc1.1.6.L120.B0,mp4a.40.2', $manifest);
+        self::assertStringContainsString('CODECS="avc1.640028,mp4a.40.2"', $manifest);
+        self::assertStringContainsString('AUDIO="aac"', $manifest);
     }
 
     public function testMasterManifestWithSingleTier(): void

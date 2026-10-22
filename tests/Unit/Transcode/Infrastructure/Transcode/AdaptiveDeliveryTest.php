@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Application\Port\SleeperInterface;
+use App\Tests\Support\PublishedPresentationFixture;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
@@ -79,7 +82,8 @@ final class AdaptiveDeliveryTest extends TestCase
                 $generation = [2, 4, 7][$index];
                 $directory = $this->root.'/'.$this->video.'/'.$tier->name.'/job-'.$job->getId().'/generation-'.$generation;
                 mkdir($directory, 0700, true);
-                file_put_contents($directory.'/generation.json', json_encode(['schemaVersion' => 1, 'generation' => $generation, 'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => 'aac', 'audioProfile' => AudioProfile::streamingStereo()->jsonSerialize(), 'segmentDuration' => 6, 'totalSegments' => 2, 'duration' => 10, 'startSegment' => 0, 'startTime' => 0], JSON_THROW_ON_ERROR));
+                file_put_contents($directory.'/generation.json', json_encode(['schemaVersion' => 2, 'generation' => $generation, 'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => 'aac', 'audioProfile' => AudioProfile::streamingStereo()->jsonSerialize(), 'duration' => 1000, 'startTime' => 0, 'nativeAvailabilityStartTime' => '2026-10-22T10:00:00Z'], JSON_THROW_ON_ERROR));
+                PublishedPresentationFixture::write($directory, $user->equals($this->other) ? 167 : 2, audio: true);
                 $runtime = new TranscodeRuntimeSnapshot($job->getId(), $session->getId(), 'admission', new DesiredTranscodeState(AudioProfile::streamingStereo(), $user->equals($this->other) ? 'paused' : 'running', $user->equals($this->other) ? 999 : 0), 1, 1, $generation, 'ready', $directory, null, true);
                 $this->jobs[$job->getPublicId()->toString()] = $job;
                 $this->runtimes[$job->getId()->toString()] = $runtime;
@@ -102,11 +106,11 @@ final class AdaptiveDeliveryTest extends TestCase
             return $this->runtimes[$id->toString()] ?? null;
         });
         $auth = new HmacStreamAuthAdapter('adaptive-secret');
-        $this->streaming = new TranscodeStreamingService($jobs, new TranscodeFileStorage(new SegmentFileResolver($this->root)), new ManifestGenerator(), new DashManifestGenerator(), new QualityLadderRenderer(), $auth, $ownership);
+        $this->streaming = new TranscodeStreamingService($jobs, new TranscodeFileStorage(new SegmentFileResolver($this->root)), new ManifestGenerator(), new DashManifestGenerator(), new QualityLadderRenderer(), $auth, $ownership, new PublishedPresentationReader());
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($this->video);
         $this->signing = new StreamSigningController($auth, $playback, $videos, $this->streaming);
-        $this->manifests = new StreamManifestController($this->streaming, new SignedStreamRequest($auth), $playback, $videos);
+        $this->manifests = new StreamManifestController($this->streaming, new SignedStreamRequest($auth), $playback, $videos, $this->createStub(SleeperInterface::class));
     }
 
     protected function tearDown(): void
@@ -145,7 +149,8 @@ final class AdaptiveDeliveryTest extends TestCase
         $signed = $this->sign(true, 'manifest.mpd');
         $response = $this->manifests->dashManifest($this->videoPublic->toString(), Request::create($signed['url']));
         ob_start(); $response->sendContent(); $manifest = ob_get_clean();
-        self::assertSame(3, substr_count($manifest, '<Representation '));
+        self::assertSame(4, substr_count($manifest, '<Representation '));
+        self::assertSame(1, substr_count($manifest, 'contentType="audio"'));
         foreach ([2, 4, 7] as $generation) { self::assertStringContainsString('generation='.$generation, $manifest); }
         $job = array_values($this->jobs)[1];
         $old = $this->runtimes[$job->getId()->toString()];
@@ -186,6 +191,68 @@ final class AdaptiveDeliveryTest extends TestCase
         $tampered = str_replace('.4', '.5', $signed['url']);
         $this->expectException(\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException::class);
         $this->manifests->masterManifest($this->videoPublic->toString(), Request::create($tampered));
+    }
+
+    public function testCanonicalAudioIsSharedAcrossVideoRenditions(): void
+    {
+        $signed = $this->sign(true);
+        $master = $this->master($signed['url']);
+        self::assertSame(1, substr_count($master, 'TYPE=AUDIO'));
+        self::assertSame(3, substr_count($master, 'AUDIO="audio"'));
+        self::assertSame(3, substr_count($master, 'CODECS="avc1.64001f,mp4a.40.2"'));
+        $primary = array_values($this->jobs)[0];
+        self::assertStringContainsString('/'.$primary->getPublicId().'/tracks/audio/media.m3u8', $master);
+    }
+
+    public function testUnreadyPrimaryIsNotReplacedAndIncompatibleOriginIsOmitted(): void
+    {
+        $jobs = array_values($this->jobs);
+        $primary = $this->runtimes[$jobs[0]->getId()->toString()];
+        $path = $this->runtimes[$jobs[1]->getId()->toString()]->outputDirectory.'/manifest.mpd';
+        file_put_contents($path, str_replace('<Period>', '<Period start="PT6S">', file_get_contents($path)));
+        $before = $this->sign(true);
+        self::assertSame(2, substr_count($this->master($before['url']), '#EXT-X-STREAM-INF:'));
+        $this->runtimes[$jobs[0]->getId()->toString()] = new TranscodeRuntimeSnapshot($primary->jobId, $primary->sessionId, $primary->requestId, $primary->desired, 1, 0, $primary->generation, 'accepted', null, null, true);
+        $after = $this->sign(true);
+        self::assertSame($before['jobId'], $after['jobId']);
+        self::assertNull($after['url']);
+    }
+
+    public function testMergedDashRemainsDynamicUntilAllSelectedVideosComplete(): void
+    {
+        $jobs = array_values($this->jobs);
+        $sibling = $this->runtimes[$jobs[1]->getId()->toString()];
+        PublishedPresentationFixture::write($sibling->outputDirectory, 1, audio: true, complete: false);
+        $signed = $this->sign(true, 'manifest.mpd');
+        $manifest = $this->dash($signed['url']);
+        self::assertStringContainsString('type="dynamic"', $manifest);
+        self::assertStringContainsString('availabilityStartTime="2026-10-22T10:00:00Z"', $manifest);
+        self::assertSame(4, substr_count($manifest, '<Representation '));
+        PublishedPresentationFixture::write($sibling->outputDirectory, 2, audio: true);
+        $manifest = $this->dash($signed['url']);
+        self::assertStringContainsString('type="static"', $manifest);
+        self::assertStringNotContainsString('availabilityStartTime=', $manifest);
+    }
+
+    public function testCompletedPrimaryWithoutCapturedClockOmitsGrowingSibling(): void
+    {
+        $jobs = array_values($this->jobs);
+        $primary = $this->runtimes[$jobs[0]->getId()->toString()];
+        $path = $primary->outputDirectory.'/generation.json';
+        $metadata = json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        $metadata['nativeAvailabilityStartTime'] = null;
+        file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
+        $sibling = $this->runtimes[$jobs[1]->getId()->toString()];
+        PublishedPresentationFixture::write($sibling->outputDirectory, 1, audio: true, complete: false);
+        $signed = $this->sign(true);
+        self::assertSame(2, substr_count($this->master($signed['url']), '#EXT-X-STREAM-INF:'));
+    }
+
+    private function dash(string $url): string
+    {
+        $response = $this->manifests->dashManifest($this->videoPublic->toString(), Request::create($url));
+        self::assertSame(200, $response->getStatusCode());
+        ob_start(); $response->sendContent(); return (string) ob_get_clean();
     }
 
     /** @return array<string, mixed> */

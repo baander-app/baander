@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\QoL;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Domain\Service\QualityLadder;
 use Psr\Log\LoggerInterface;
@@ -97,34 +98,34 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return implode("\n", $filtered);
     }
 
-    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string
+    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation): string
     {
-        return $this->inner->getMediaManifest($jobPublicId, $audioProfileName, $generation);
+        return $this->inner->getMediaManifest($jobPublicId, $track, $generation);
     }
 
-    public function getSegment(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
+    public function getSegment(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string
     {
-        return $this->inner->getSegment($jobPublicId, $segmentIndex, $generation);
+        return $this->inner->getSegment($jobPublicId, $track, $segmentIndex, $generation);
     }
 
-    public function getInitSegment(PublicId $jobPublicId, int $generation): ?string
+    public function getInitSegment(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string
     {
-        return $this->inner->getInitSegment($jobPublicId, $generation);
+        return $this->inner->getInitSegment($jobPublicId, $track, $generation);
     }
 
-    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
+    public function getSegmentPath(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string
     {
-        return $this->inner->getSegmentPath($jobPublicId, $segmentIndex, $generation);
+        return $this->inner->getSegmentPath($jobPublicId, $track, $segmentIndex, $generation);
     }
 
-    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex, int $generation): ?array
+    public function resolveSegmentAvailability(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?array
     {
-        return $this->inner->resolveVideoSegmentAvailability($jobPublicId, $segmentIndex, $generation);
+        return $this->inner->resolveSegmentAvailability($jobPublicId, $track, $segmentIndex, $generation);
     }
 
-    public function getInitSegmentPath(PublicId $jobPublicId, int $generation): ?string
+    public function getInitSegmentPath(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string
     {
-        return $this->inner->getInitSegmentPath($jobPublicId, $generation);
+        return $this->inner->getInitSegmentPath($jobPublicId, $track, $generation);
     }
 
     public function getDashManifest(Uuid $videoId, array $renditions): string
@@ -134,53 +135,34 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->filterDashManifest($manifest);
     }
 
-    /**
-     * Filter DASH manifest — remove <Representation> elements for disallowed tiers.
-     *
-     * DashManifestGenerator creates a single <AdaptationSet> containing all
-     * <Representation> children keyed by tier name in the id attribute.
-     * We strip individual <Representation id="{tier}"> blocks.
-     */
+    /** Remove disallowed video tiers while preserving the canonical audio adaptation. */
     private function filterDashManifest(string $manifest): string
     {
-        $allowed = $this->allowedTiers->allowedTierNames();
-
-        // During learning, all tiers are allowed — no filtering needed
-        if (count($allowed) === count(QualityLadder::defaultTiers())) {
+        $allowed = array_flip($this->allowedTiers->allowedTierNames());
+        $xml = new \DOMDocument();
+        if (!$xml->loadXML($manifest, LIBXML_NONET)) {
             return $manifest;
         }
-
-        $allowedSet = array_flip($allowed);
-        $removedCount = 0;
-
-        $result = preg_replace_callback(
-            '/<Representation\s[^>]*>.*?<\/Representation>/s',
-            function (array $match) use ($allowedSet, &$removedCount): string {
-                $content = $match[0];
-
-                // Extract id attribute from <Representation id="...">
-                if (preg_match('/id="([^"]+)"/', $content, $idMatch)) {
-                    $tier = $idMatch[1];
-                    if (!isset($allowedSet[$tier])) {
-                        $removedCount++;
-
-                        return ''; // Remove this representation
-                    }
+        $xpath = new \DOMXPath($xml);
+        $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
+        $videos = $xpath->query('//mpd:AdaptationSet[@contentType="video"]/mpd:Representation');
+        if ($videos !== false) {
+            foreach ($videos as $representation) {
+                if ($representation instanceof \DOMElement && !isset($allowed[$representation->getAttribute('id')])) {
+                    $representation->parentNode?->removeChild($representation);
                 }
-
-                return $content;
-            },
-            $manifest,
-        );
-
-        if ($removedCount > 0) {
-            $this->logger->debug('QualityFilter: removed DASH representations from manifest', [
-                'removed' => $removedCount,
-                'allowed' => $allowed,
-            ]);
+            }
         }
-
-        return $result ?? $manifest;
+        $remaining = $xpath->query('//mpd:AdaptationSet[@contentType="video"]/mpd:Representation');
+        if ($remaining !== false && $remaining->length === 0) {
+            $adaptations = $xpath->query('//mpd:AdaptationSet');
+            if ($adaptations !== false) {
+                foreach ($adaptations as $adaptation) {
+                    $adaptation->parentNode?->removeChild($adaptation);
+                }
+            }
+        }
+        return $xml->saveXML();
     }
 
     /**

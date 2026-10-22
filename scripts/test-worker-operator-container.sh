@@ -44,13 +44,6 @@ control_name=''
 web_name="$run_id-web"
 web_port=''
 two_command="${BAANDER_TEST_TWO_COMMAND:-0}"
-dash_qualification="${BAANDER_TEST_DASH_QUALIFICATION:-0}"
-[[ "$dash_qualification" = 0 || "$dash_qualification" = 1 ]] || {
-    echo 'BAANDER_TEST_DASH_QUALIFICATION must be 0 or 1.' >&2; exit 2;
-}
-if [ "$dash_qualification" = 1 ] && [ "$two_command" != 1 ]; then
-    echo 'DASH qualification requires the two-command deployment drill.' >&2; exit 2
-fi
 lifecycle_phase="${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}"
 case "$lifecycle_phase" in ''|redis|postgres) ;; *) echo 'Invalid worker lifecycle phase.' >&2; exit 2 ;; esac
 if [ -n "$lifecycle_phase" ] && { [ "$two_command" != 0 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; }; then
@@ -683,7 +676,6 @@ assert all(isinstance(u['containerId'], str) and len(u['containerId']) == 64 for
 PY
 if [ "$two_command" = 1 ]; then
     combined_phase attach
-    if [ "$dash_qualification" = 1 ]; then combined_phase dash; fi
     snapshot web "$web_name" web-attached
     snapshot worker "$worker_name" worker-attached
     python3 - "$artifacts/worker-attached-processes.json" <<'PYOWNER'

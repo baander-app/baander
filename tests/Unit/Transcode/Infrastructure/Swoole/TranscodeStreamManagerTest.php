@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Transcode\Infrastructure\Swoole;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -194,7 +195,7 @@ final class TranscodeStreamManagerTest extends TestCase
         $job = $this->makeJob();
         $outputDir = $this->manager->startStream($job, '/src.mkv', QualityTier::p720(), '');
         // Produce a segment so the exit is treated as normal completion.
-        file_put_contents($outputDir . '/v0_a0_720p_0.m4s', str_repeat('x', 1024));
+        PublishedPresentationFixture::write($outputDir);
 
         $this->spawner->running = true;
         self::assertTrue($this->manager->pollOnce($job->getId()));
@@ -232,9 +233,9 @@ final class TranscodeStreamManagerTest extends TestCase
         $outputDir = sys_get_temp_dir() . '/stream-avail-test-' . uniqid('', true);
         @mkdir($outputDir, 0755, true);
 
-        // Create a fake muxed segment file (identity-encoded name)
-        $segPath = $outputDir . '/v0_a0_720p_5.m4s';
-        file_put_contents($segPath, str_repeat('x', 1024));
+        // Native numbering starts at six, but the public ordinal starts at zero.
+        $segPath = $outputDir . '/track-0-seg-00006.m4s';
+        PublishedPresentationFixture::write($outputDir, startNumber: 6);
 
         // Override storage to return our dir
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
@@ -254,13 +255,12 @@ final class TranscodeStreamManagerTest extends TestCase
         $this->availability
             ->expects(self::once())
             ->method('markReady')
-            ->with($job->getId(), '720p', 5, $segPath);
+            ->with($job->getId(), '720p/video', 0, $segPath);
 
         $manager->pollOnce($job->getId());
 
         // Clean up
-        @unlink($segPath);
-        @rmdir($outputDir);
+        $this->removeScannerDirectory($outputDir);
     }
 
     public function testPollOnceDoesNotRemarkAlreadyMarkedSegments(): void
@@ -272,8 +272,7 @@ final class TranscodeStreamManagerTest extends TestCase
         $outputDir = sys_get_temp_dir() . '/stream-remark-test-' . uniqid('', true);
         @mkdir($outputDir, 0755, true);
 
-        $segPath = $outputDir . '/v0_a0_720p_0.m4s';
-        file_put_contents($segPath, str_repeat('x', 512));
+        PublishedPresentationFixture::write($outputDir);
 
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('resolveJobDirectory')->willReturn($outputDir);
@@ -295,20 +294,22 @@ final class TranscodeStreamManagerTest extends TestCase
         $manager->pollOnce($job->getId());
         $manager->pollOnce($job->getId());
 
-        @unlink($segPath);
-        @rmdir($outputDir);
+        $this->removeScannerDirectory($outputDir);
     }
 
-    public function testScannerIgnoresOtherIdentitiesAndInvalidIndexes(): void
+    public function testScannerPublishesOnlyFilesReferencedByNativeIndex(): void
     {
         $directory = $this->scannerDirectory();
         try {
+            PublishedPresentationFixture::write($directory);
+            file_put_contents($directory . '/track-0-seg-00002.m4s', PublishedPresentationFixture::fragment());
             foreach (['v1_a0_720p_1', 'v0_a1_720p_2', 'v0_a0_1080p_3', 'junk_4', 'v0_a0_720p_5_extra', 'v0_a0_720p_' . str_repeat('9', 100)] as $name) {
                 file_put_contents($directory . '/' . $name . '.m4s', 'not-this-rendition');
             }
             mkdir($directory . '/v0_a0_720p_6.m4s');
             $availability = $this->createMock(SegmentAvailabilityInterface::class);
-            $availability->expects(self::never())->method('markReady');
+            $availability->expects(self::once())->method('markReady')
+                ->with(self::anything(), '720p/video', 0, $directory . '/track-0-seg-00001.m4s');
             [$manager, $job] = $this->scannerManager($directory, $availability);
             self::assertTrue($manager->pollOnce($job->getId()));
         } finally { $this->removeScannerDirectory($directory); }
@@ -318,9 +319,10 @@ final class TranscodeStreamManagerTest extends TestCase
     {
         $directory = $this->scannerDirectory();
         try {
-            $temporary = $directory . '/v0_a0_720p_5.m4s.tmp';
-            $published = $directory . '/v0_a0_720p_5.m4s';
-            file_put_contents($temporary, 'finished-segment');
+            $published = $directory . '/track-0-seg-00006.m4s';
+            $temporary = $published . '.tmp';
+            PublishedPresentationFixture::write($directory, startNumber: 6);
+            rename($published, $temporary);
             $observed = [];
             $availability = $this->createStub(SegmentAvailabilityInterface::class);
             $availability->method('markReady')->willReturnCallback(static function (Uuid $jobId, string $tier, int $index, string $path) use (&$observed): void {
@@ -332,7 +334,7 @@ final class TranscodeStreamManagerTest extends TestCase
             self::assertTrue(rename($temporary, $published));
             $manager->pollOnce($job->getId());
             $manager->pollOnce($job->getId());
-            self::assertSame([['720p', 5, $published]], $observed);
+            self::assertSame([['720p/video', 0, $published]], $observed);
         } finally { $this->removeScannerDirectory($directory); }
     }
 
@@ -340,13 +342,14 @@ final class TranscodeStreamManagerTest extends TestCase
     {
         $directory = $this->scannerDirectory();
         try {
-            $published = $directory . '/v0_a0_720p_0.m4s';
+            $published = $directory . '/track-0-seg-00001.m4s';
+            PublishedPresentationFixture::write($directory);
             $temporary = $published . '.tmp';
             file_put_contents($published, '');
-            file_put_contents($temporary, 'published');
+            file_put_contents($temporary, PublishedPresentationFixture::fragment());
             self::assertSame(0, filesize($published));
             $availability = $this->createMock(SegmentAvailabilityInterface::class);
-            $availability->expects(self::once())->method('markReady')->with(self::anything(), '720p', 0, $published);
+            $availability->expects(self::once())->method('markReady')->with(self::anything(), '720p/video', 0, $published);
             [$manager, $job] = $this->scannerManager($directory, $availability);
             $manager->pollOnce($job->getId());
             // A separate producer does not invalidate this process's stat cache.
@@ -390,8 +393,7 @@ final class TranscodeStreamManagerTest extends TestCase
     {
         $directory = $this->scannerDirectory();
         try {
-            file_put_contents($directory . '/init.mp4', 'init');
-            file_put_contents($directory . '/v0_a0_720p_0.m4s', 'completed-fragment');
+            PublishedPresentationFixture::write($directory);
             [$manager, $job] = $this->scannerManager($directory, $this->createStub(SegmentAvailabilityInterface::class));
             $this->spawner->running = false;
             $this->spawner->exitCode = $exitCode;
@@ -401,6 +403,42 @@ final class TranscodeStreamManagerTest extends TestCase
             } catch (FFmpegProcessFailedException $error) {
                 self::assertSame($exitCode, $error->getExitCode());
             }
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testTrackAvailabilityUsesGenerationAndIndependentPublicOrdinals(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            PublishedPresentationFixture::write($directory, audio: true, startNumber: 8);
+            $observed = [];
+            $availability = $this->createStub(SegmentAvailabilityInterface::class);
+            $availability->method('markReady')->willReturnCallback(static function (Uuid $jobId, string $tier, int $index, string $path) use (&$observed): void {
+                $observed[] = [$tier, $index, basename($path)];
+            });
+            $storage = $this->createStub(TranscodeStoragePortInterface::class);
+            $storage->method('resolveJobDirectory')->willReturn($directory);
+            $manager = new TranscodeStreamManager($availability, $storage, $this->segmentEncoder, new NullLogger(), $this->spawner);
+            $job = $this->makeJob();
+            $manager->startStream($job, '/src.mkv', QualityTier::p720(), '', generation: 4);
+            $manager->pollOnce($job->getId());
+            $manager->pollOnce($job->getId());
+            self::assertSame([
+                ['720p/generation-4/video', 0, 'track-0-seg-00008.m4s'],
+                ['720p/generation-4/audio', 0, 'track-1-seg-00008.m4s'],
+            ], $observed);
+        } finally { $this->removeScannerDirectory($directory); }
+    }
+
+    public function testSuccessfulExitRequiresFinalNativeManifest(): void
+    {
+        $directory = $this->scannerDirectory();
+        try {
+            PublishedPresentationFixture::write($directory, complete: false);
+            [$manager, $job] = $this->scannerManager($directory, $this->createStub(SegmentAvailabilityInterface::class));
+            $this->spawner->running = false;
+            $this->expectException(FFmpegProcessFailedException::class);
+            $manager->pollOnce($job->getId());
         } finally { $this->removeScannerDirectory($directory); }
     }
 

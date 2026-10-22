@@ -9,6 +9,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -59,7 +60,7 @@ final class SegmentEncoderPublicationTest extends TestCase
             $publications = [];
             foreach ($events as $index => $event) {
                 self::assertSame(0, $event['mask'] & IN_Q_OVERFLOW, 'inotify queue must capture every publication');
-                if (!str_ends_with($event['name'], '.m4s') && $event['name'] !== 'stream.m3u8') {
+                if (!str_ends_with($event['name'], '.m4s') && $event['name'] !== 'manifest.mpd') {
                     continue;
                 }
                 self::assertSame(0, $event['mask'] & (IN_CREATE | IN_CLOSE_WRITE),
@@ -90,38 +91,44 @@ final class SegmentEncoderPublicationTest extends TestCase
                 self::assertLessThan($movedFromAt, $closedAt);
                 $publications[$event['name']] = $index;
             }
-            self::assertArrayHasKey('stream.m3u8', $publications);
+            self::assertArrayHasKey('manifest.mpd', $publications);
             $segments = array_filter(array_keys($publications), static fn (string $name): bool => str_ends_with($name, '.m4s'));
             self::assertNotEmpty($segments);
-            $firstIndex = $startSegment ?? 0;
-            self::assertSame('v0_a0_fixture_' . $firstIndex . '.m4s', array_values($segments)[0]);
+            self::assertContains('track-0-seg-00001.m4s', $segments);
+            self::assertContains('track-1-seg-00001.m4s', $segments);
             foreach ($segments as $segment) {
-                self::assertLessThan($publications['stream.m3u8'], $publications[$segment],
-                    'VOD playlist publication must follow all media publications');
+                self::assertLessThan($publications['manifest.mpd'], $publications[$segment],
+                    'The final native index must follow every media publication');
             }
-            // temp_file applies to fragments and playlists. init.mp4 is written
-            // directly, so its readiness still needs the controller's own check.
-            $initClosures = array_filter($events, static fn (array $event): bool =>
-                $event['name'] === 'init.mp4' && ($event['mask'] & IN_CLOSE_WRITE) !== 0);
-            self::assertNotEmpty($initClosures);
-            $init = file_get_contents($output . '/init.mp4');
-            self::assertNotFalse($init);
-            foreach ($segments as $segment) {
-                $fragment = file_get_contents($output . '/' . $segment);
-                self::assertNotFalse($fragment);
-                self::assertNotSame('', $fragment);
-                $combined = $this->directory . '/combined.mp4';
-                file_put_contents($combined, $init . $fragment);
-                if ($segment === array_values($segments)[0]) {
-                    $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=start_time', '-of', 'json', $combined]);
-                    $probe->mustRun();
-                    $metadata = json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR);
-                    $firstTimestamp = (float) $metadata['format']['start_time'];
-                    self::assertGreaterThanOrEqual(0.0, $firstTimestamp);
-                    self::assertLessThan(1.0, $firstTimestamp, 'A fresh generation uses a local media timeline after input seeking.');
+            $presentation = (new PublishedPresentationReader())->read($output);
+            self::assertNotNull($presentation);
+            self::assertTrue($presentation->complete);
+            self::assertCount(2, $presentation->tracks);
+            foreach ($presentation->tracks as $track) {
+                $initClosures = array_filter($events, static fn (array $event): bool =>
+                    $event['name'] === $track->initFile && ($event['mask'] & IN_CLOSE_WRITE) !== 0);
+                self::assertNotEmpty($initClosures);
+                $init = file_get_contents($output . '/' . $track->initFile);
+                self::assertNotFalse($init);
+                foreach ($track->segments as $segment) {
+                    self::assertArrayHasKey($segment->file, $publications);
+                    $fragment = file_get_contents($output . '/' . $segment->file);
+                    self::assertNotFalse($fragment);
+                    self::assertNotSame('', $fragment);
+                    $combined = $this->directory . '/combined.mp4';
+                    file_put_contents($combined, $init . $fragment);
+                    if ($segment->ordinal === 0) {
+                        $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=start_time:stream=codec_type', '-of', 'json', $combined]);
+                        $probe->mustRun();
+                        $metadata = json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+                        self::assertSame([$track->kind->value], array_column($metadata['streams'], 'codec_type'));
+                        $firstTimestamp = (float) $metadata['format']['start_time'];
+                        self::assertGreaterThanOrEqual(-0.1, $firstTimestamp);
+                        self::assertLessThan(1.0, $firstTimestamp, 'A fresh generation uses a local media timeline after input seeking.');
+                    }
+                    $this->runFfmpeg(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
+                        '-i', $combined, '-f', 'null', '-']);
                 }
-                $this->runFfmpeg(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
-                    '-i', $combined, '-f', 'null', '-']);
             }
             self::assertSame([], glob($output . '/*.tmp'));
         } finally {

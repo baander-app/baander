@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Storage;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 use InvalidArgumentException;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -148,6 +149,25 @@ final class SegmentFileResolver
         $prefix = $this->segmentPrefix($videoStreamIndex, $audioStreamIndex, $qualityTier);
 
         return $this->videoPath($videoId, $qualityTier, sprintf('%s_%d.m4s', $prefix, $segmentIndex));
+    }
+
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string
+    {
+        return $this->videoPath($videoId, $qualityTier, 'manifest.mpd');
+    }
+
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string
+    {
+        return $this->videoPath($videoId, $qualityTier, $track === MediaTrack::Video ? 'init-0.mp4' : 'init-1.mp4');
+    }
+
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string
+    {
+        if ($nativeNumber < 1) {
+            throw new InvalidArgumentException('Native segment numbers must be positive.');
+        }
+        return $this->videoPath($videoId, $qualityTier,
+            sprintf('track-%d-seg-%05d.m4s', $track === MediaTrack::Video ? 0 : 1, $nativeNumber));
     }
 
     // --- Audio Paths ---

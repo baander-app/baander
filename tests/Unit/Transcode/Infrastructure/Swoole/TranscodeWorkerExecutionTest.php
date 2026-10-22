@@ -8,6 +8,7 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\PublishedPresentationFixture;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
@@ -268,7 +269,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
 
     public function testPauseAndResumeApplyCommittedDesiredRevisions(): void
     {
+        $this->sourceDuration = 180.0;
         $this->current = $this->claim(1, 1, 'paused');
+        $this->spawner->initialCount = 4;
         $this->spawner->running = true;
         $phase = 0;
         $this->spawner->onRunning = function () use (&$phase): void {
@@ -343,9 +346,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $command = $this->spawner->commands[0];
             $directory = dirname($command[array_key_last($command)]);
             if ($polls === 1) {
-                file_put_contents($directory . '/v0_a0_720p_30.m4s', 'current position');
+                $this->spawner->publish(4);
             } elseif ($polls === 2) {
-                file_put_contents($directory . '/v0_a0_720p_42.m4s', 'buffer high watermark');
+                $this->spawner->publish(16);
             }
             if (!$progressed && in_array('signal-19:1', $this->spawner->events, true)) {
                 $progressed = true;
@@ -369,26 +372,26 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->current = $this->claim(1, 1, position: 180.0);
         $this->spawner->onRunning = function (): void {
             $command = $this->spawner->commands[0];
-            file_put_contents(dirname($command[array_key_last($command)]) . '/v0_a0_720p_30.m4s', 'requested cursor');
+            $this->spawner->publish(4);
         };
         $this->worker->run($this->current, static fn(): bool => false);
         self::assertContains('ready', $this->observed);
         $metadata = json_decode(file_get_contents($this->job->getOutputDirectory() . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame(27, $metadata['startSegment']);
+        self::assertSame(2, $metadata['schemaVersion']);
         self::assertSame(162.0, (float) $metadata['startTime']);
         $command = $this->spawner->commands[0];
         self::assertSame('162.000000', $command[array_search('-ss', $command, true) + 1]);
-        self::assertSame('27', $command[array_search('-start_number', $command, true) + 1]);
+        self::assertNotContains('-start_number', $command);
     }
 
     public function testPausedSeekContinuesUntilTheRequestedFragmentIsClosed(): void
     {
-        $this->assertPausedCursorPreroll(30.0, 180.0, 5, 2);
+        $this->assertPausedCursorPreroll(30.0, 180.0, 3, 2);
     }
 
     public function testPausedSeekAtEndOfFileWaitsForTheLastFragment(): void
     {
-        $this->assertPausedCursorPreroll(30.0, 30.0, 4, 1);
+        $this->assertPausedCursorPreroll(30.0, 30.0, 3, 1);
     }
 
     public function testResumeDuringPrerollCannotPublishBeforeTheRequestedFragmentIsClosed(): void
@@ -401,14 +404,14 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner->onRunning = function () use (&$polls, &$readyBeforeTarget): void {
             ++$polls;
             $command = $this->spawner->commands[0];
-            $path = dirname($command[array_key_last($command)]) . '/v0_a0_720p_5.m4s';
+            $path = dirname($command[array_key_last($command)]) . '/track-0-seg-00004.m4s';
             if ($polls === 1) {
-                file_put_contents($path . '.tmp', 'target fragment still encoding');
+                file_put_contents($path . '.tmp', PublishedPresentationFixture::fragment());
             } elseif ($polls === 2) {
                 $this->current = $this->claim(1, 2, 'running', position: 30.0);
             } elseif ($polls === 4) {
                 $readyBeforeTarget = in_array('ready', $this->observed, true);
-                rename($path . '.tmp', $path);
+                $this->spawner->publish(4);
             } elseif ($polls >= 5) {
                 $this->current = $this->claim(1, 3, 'cancelled', position: 30.0);
             }
@@ -433,12 +436,12 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $command = $this->spawner->commands[0];
             $directory = dirname($command[array_key_last($command)]);
             if ($polls === 1) {
-                file_put_contents($directory . '/v0_a0_720p_2.m4s', 'initial running cursor');
+                $this->spawner->publish(3);
             } elseif ($polls === 2) {
                 $this->current = $this->claim(1, 2, 'paused', position: 30.0);
             } elseif ($polls === 4) {
                 $pausedBeforeTarget = in_array('signal-19:1', $this->spawner->events, true);
-                file_put_contents($directory . '/v0_a0_720p_5.m4s', 'requested cursor');
+                $this->spawner->publish(9);
             } elseif ($polls >= 6) {
                 $this->current = $this->claim(1, 3, 'cancelled', position: 30.0);
             }
@@ -483,6 +486,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->subtitleStreams = [['index' => 2, 'codec_type' => 'subtitle', 'codec_name' => 'subrip', 'tags' => ['language' => 'eng']]];
         $this->subtitleDelay = 4;
         $this->subtitleFails = true;
+        $this->sourceDuration = 180.0;
+        $this->spawner->initialCount = 4;
         $this->spawner->running = true;
         $readyBeforeFinished = false;
         $this->onSubtitlePoll = function () use (&$readyBeforeFinished): void {
@@ -556,6 +561,61 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
     }
 
+    public function testRequiredAudioAbsenceCannotAcknowledgeReadiness(): void
+    {
+        $this->spawner->publishAudio = false;
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertSame(['accepted', 'failed'], $this->observed);
+        self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+    }
+
+    public function testCompletionSettlesTheActualGenerationLocalCount(): void
+    {
+        $this->sourceDuration = 6.01;
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+        self::assertSame(1, $this->job->getTotalSegments());
+        self::assertSame(1, $this->job->getCompletedSegments());
+        self::assertSame(100.0, $this->job->getProgress());
+    }
+
+    public function testExactPausedEofAcceptsAShorterCompletedAudioTail(): void
+    {
+        $this->current = $this->claim(1, 1, 'paused', position: 6.0);
+        $this->spawner->onSpawn = function (): void {
+            $command = $this->spawner->commands[0];
+            $path = $command[array_key_last($command)];
+            $xml = new \DOMDocument();
+            $xml->load($path);
+            $xpath = new \DOMXPath($xml);
+            $xpath->registerNamespace('m', 'urn:mpeg:dash:schema:mpd:2011');
+            $points = $xpath->query('//m:AdaptationSet[@contentType="audio"]//m:S');
+            self::assertNotFalse($points);
+            $point = $points->item(0);
+            self::assertInstanceOf(\DOMElement::class, $point);
+            $point->setAttribute('d', '5989');
+            $xml->save($path);
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+        self::assertSame(6.0, $this->current->runtime->desired->position);
+    }
+
+    public function testDynamicClockIsCapturedBeforeReadiness(): void
+    {
+        $this->sourceDuration = 180.0;
+        $this->spawner->running = true;
+        $this->spawner->onRunning = function (): void {
+            if (in_array('ready', $this->observed, true)) {
+                $this->current = $this->claim(1, 2, 'cancelled');
+            }
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        $metadata = json_decode(file_get_contents($this->job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('2026-10-22T00:00:00Z', $metadata['nativeAvailabilityStartTime']);
+        self::assertSame(['accepted', 'ready', 'cancelled'], $this->observed);
+    }
+
     private function assertPausedCursorPreroll(float $position, float $duration, int $target, int $start): void
     {
         $this->sourceDuration = $duration;
@@ -565,19 +625,21 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $pausedBeforeTarget = false;
         $readyBeforeTarget = false;
         $pausedWithTarget = false;
-        $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget, &$readyBeforeTarget, &$pausedWithTarget, $target): void {
+        $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget, &$readyBeforeTarget, &$pausedWithTarget, $target, $position): void {
             ++$polls;
             $command = $this->spawner->commands[0];
             $directory = dirname($command[array_key_last($command)]);
-            $path = $directory . '/v0_a0_720p_' . $target . '.m4s';
+            $path = $directory . sprintf('/track-0-seg-%05d.m4s', $target + 1);
             if ($polls === 1) {
-                file_put_contents($path, '');
-                file_put_contents($path . '.tmp', 'fragment still being encoded');
+                file_put_contents($path . '.tmp', PublishedPresentationFixture::fragment());
             } elseif ($polls === 3) {
                 $pausedBeforeTarget = in_array('signal-19:1', $this->spawner->events, true);
                 $readyBeforeTarget = in_array('ready', $this->observed, true);
-                rename($path . '.tmp', $path);
-            } elseif ($polls >= 5) {
+                // Closing just the cursor fragment still does not provide the player's holdback.
+                $this->spawner->publish($target + 1, $this->sourceDuration <= $position);
+            } elseif ($polls === 4 && $this->sourceDuration > $position) {
+                $this->spawner->publish($target + 5);
+            } elseif ($polls >= 6) {
                 $pausedWithTarget = in_array('signal-19:1', $this->spawner->events, true);
                 $this->current = $this->claim(1, 2, 'cancelled');
             }
@@ -590,7 +652,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(0, $this->allocations);
         self::assertSame(1, $this->releases);
         $metadata = json_decode(file_get_contents($this->job->getOutputDirectory() . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
-        self::assertSame($start, $metadata['startSegment']);
+        self::assertSame($start * 6.0, (float) $metadata['startTime']);
     }
 
     private function claim(int $generation, int $revision, string $status = 'running', ?AudioProfile $profile = null, float $position = 0.0): TranscodeExecutionClaim
@@ -614,6 +676,8 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
     /** @var list<string> */
     public array $events = [];
     public bool $running = false;
+    public int $initialCount = 1;
+    public ?bool $publishAudio = null;
     public string $initBytes = "\0\0\0\x0cftypisom\0\0\0\x08moov";
     public ?Closure $onRunning = null;
     public ?Closure $onSpawn = null;
@@ -624,12 +688,16 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
         $pid = count($this->commands);
         $this->events[] = 'spawn:' . $pid;
         $directory = dirname($command[array_key_last($command)]);
-        file_put_contents($directory . '/init.mp4', $this->initBytes);
-        $number = array_search('-start_number', $command, true);
-        $start = $number === false ? 0 : (int) $command[$number + 1];
-        file_put_contents($directory . '/v0_a0_720p_' . $start . '.m4s', 'segment');
+        $this->publish($this->initialCount);
         ($this->onSpawn)?->__invoke();
         return $pid;
+    }
+    public function publish(int $count, ?bool $complete = null): void
+    {
+        $command = $this->commands[array_key_last($this->commands)];
+        $directory = dirname($command[array_key_last($command)]);
+        PublishedPresentationFixture::write($directory, $count, $this->publishAudio ?? in_array('0:a:0', $command, true), $complete ?? !$this->running);
+        file_put_contents($directory . '/init-0.mp4', $this->initBytes);
     }
     public function status(mixed $handle): array { ($this->onRunning)?->__invoke(); return ['state' => $this->running ? 'running' : 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '', 'error' => null]; }
     public function signal(mixed $pid, string $signal): void { $this->events[] = ($signal === 'stop' ? 'kill:' : 'signal-' . ($signal === 'pause' ? '19' : '18') . ':') . $pid; }

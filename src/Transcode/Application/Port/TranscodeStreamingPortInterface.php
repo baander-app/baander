@@ -6,6 +6,7 @@ namespace App\Transcode\Application\Port;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 
 interface TranscodeStreamingPortInterface
 {
@@ -18,16 +19,16 @@ interface TranscodeStreamingPortInterface
     /** @param list<array{jobId: string, generation: int}> $renditions */
     public function getMasterManifest(Uuid $videoId, array $renditions): string;
 
-    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string;
+    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation): string;
 
-    public function getSegment(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string;
+    public function getSegment(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string;
 
-    public function getInitSegment(PublicId $jobPublicId, int $generation): ?string;
+    public function getInitSegment(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string;
 
-    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string;
+    public function getSegmentPath(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string;
 
     /**
-     * Resolve the availability-table key for a video segment.
+     * Resolve the availability-table key for a published track segment.
      *
      * Returns [jobId, tierKey, path] so the HTTP layer can check
      * SegmentAvailabilityInterface::isReady() before falling back to
@@ -35,9 +36,9 @@ interface TranscodeStreamingPortInterface
      *
      * @return array{jobId: Uuid, tierKey: string, path: string}|null
      */
-    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex, int $generation): ?array;
+    public function resolveSegmentAvailability(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?array;
 
-    public function getInitSegmentPath(PublicId $jobPublicId, int $generation): ?string;
+    public function getInitSegmentPath(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string;
 
     /** @param list<array{jobId: string, generation: int}> $renditions */
     public function getDashManifest(Uuid $videoId, array $renditions): string;

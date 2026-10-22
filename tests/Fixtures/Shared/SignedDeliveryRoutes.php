@@ -16,15 +16,15 @@ final class SignedDeliveryRoutes
      * @return array<string, string> route name => request path, including the query a
      *                               segment request needs
      */
-    public static function paths(string $videoId, string $jobId, string $language = 'en'): array
+    public static function paths(string $videoId, string $jobId, string $language = 's2', string $track = 'video'): array
     {
         return [
             'stream_master_manifest' => "/api/transcode/$videoId/master.m3u8",
             'stream_dash_manifest' => "/api/transcode/$videoId/manifest.mpd",
-            'stream_media_manifest' => "/api/transcode/$jobId/media.m3u8",
+            'stream_media_manifest' => "/api/transcode/$jobId/tracks/$track/media.m3u8",
             'stream_subtitle_manifest' => "/api/transcode/$jobId/subtitles/$language/media.m3u8",
-            'stream_segment_init_segment' => "/api/transcode/$jobId/init",
-            'stream_segment_segment' => "/api/transcode/$jobId/segment?index=0",
+            'stream_segment_init_segment' => "/api/transcode/$jobId/tracks/$track/init.mp4",
+            'stream_segment_segment' => "/api/transcode/$jobId/tracks/$track/segment.m4s?index=0",
             'stream_segment_subtitle_segment' => "/api/transcode/$jobId/subtitles/$language/0.vtt",
         ];
     }

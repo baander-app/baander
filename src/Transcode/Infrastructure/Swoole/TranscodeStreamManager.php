@@ -7,6 +7,9 @@ namespace App\Transcode\Infrastructure\Swoole;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
+use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Exception\FFmpegProcessFailedException;
 use App\Transcode\Domain\Model\TranscodeJob;
@@ -20,7 +23,7 @@ use RuntimeException;
  * Manages long-lived FFmpeg processes for on-the-fly video transcoding.
  *
  * Each (job, tier) gets ONE continuous FFmpeg process that produces all video
- * segments via the HLS muxer with fMP4 fragments. The manager polls the output
+ * segments via the DASH muxer with separate fMP4 tracks. The manager polls the output
  * directory for new segment files and signals their availability through the
  * SegmentAvailabilityInterface (Swoole Table).
  *
@@ -28,9 +31,6 @@ use RuntimeException;
  * - Throttle: SIGSTOP/SIGCONT (preserves amortized encoder init; 0.38s resume)
  * - Seek:     kill + restart-with-headroom (SIGSTOP cannot reposition the read head;
  *             cold-start ~0.6s is imperceptible)
- *
- * Audio is muxed inline into each segment — the long process maps both
- * -map 0:v:0 -map 0:a:0, producing muxed fMP4 segments.
  *
  * Native attempts run in execution; control polls their bounded status and
  * generation output without owning local child descriptors.
@@ -40,7 +40,7 @@ final class TranscodeStreamManager
     private const int DEFAULT_MAX_CONCURRENT = 4;
     private const float POLL_INTERVAL_SECONDS = 0.1;
 
-    /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool}> */
+    /** @var array<string, array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string, bool>, publication: ?PublishedPresentation}> */
     private array $streams = [];
 
     public function __construct(
@@ -50,6 +50,7 @@ final class TranscodeStreamManager
         private readonly LoggerInterface $logger,
         private readonly ProcessSpawnerInterface $spawner,
         private readonly int $maxConcurrentStreams = self::DEFAULT_MAX_CONCURRENT,
+        private readonly PublishedPresentationReader $presentations = new PublishedPresentationReader(),
     ) {
     }
 
@@ -118,7 +119,7 @@ final class TranscodeStreamManager
             'tier_name' => $tier->name,
             'availability_tier' => $generation === null ? $tier->name : $tier->name . '/generation-' . $generation,
             'marked' => [],
-            'init_marked' => false,
+            'publication' => null,
         ];
 
         return $outputDir;
@@ -156,17 +157,18 @@ final class TranscodeStreamManager
             }
             $this->assertStreamIdentity($jobKey, $entry['identity']);
 
-            if (!$running) {
-                // Final scan to catch segments written after the last poll
-                $this->scanForNewSegments($jobKey, $entry);
-                $this->assertStreamIdentity($jobKey, $entry['identity']);
-                $this->streams[$jobKey] = $entry;
+            // Status RPCs may yield while the producer publishes another index.
+            $this->scanForNewSegments($jobKey, $entry);
+            $this->assertStreamIdentity($jobKey, $entry['identity']);
+            $this->streams[$jobKey] = $entry;
 
+            if (!$running) {
                 // Only a confirmed zero exit can acknowledge completion. Existing
                 // cache fragments or an init hint cannot hide failure/unknown status.
                 $exitCode = $status['exitCode'] ?? -1;
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
-                $producedCount = $this->countProducedSegments($entry['output_dir'], $entry['tier_name']);
+                $publication = $entry['publication'];
+                $producedCount = count($publication?->track(MediaTrack::Video)->segments ?? []);
                 $this->assertStreamIdentity($jobKey, $entry['identity']);
                 if ($exitCode !== 0) {
                     throw new FFmpegProcessFailedException(
@@ -175,7 +177,7 @@ final class TranscodeStreamManager
                         $exitCode,
                     );
                 }
-                if ($producedCount === 0) {
+                if ($producedCount === 0 || $publication === null || !$publication->complete) {
                     throw FFmpegProcessFailedException::fromProcess($status['stderr'], $exitCode);
                 }
             }
@@ -283,43 +285,31 @@ final class TranscodeStreamManager
         }
     }
 
+    public function publication(Uuid $jobId): ?PublishedPresentation
+    {
+        return $this->streams[$jobId->toString()]['publication'] ?? null;
+    }
+
     /**
-     * @param array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool} $entry
+     * @param array{identity: \stdClass, handle: mixed, output_dir: string, tier_name: string, availability_tier: string, marked: array<string,bool>, publication: ?PublishedPresentation} $entry
      */
     private function scanForNewSegments(string $jobKey, array &$entry): void
     {
         $this->assertStreamIdentity($jobKey, $entry['identity']);
-        $dir = $entry['output_dir'];
+        $entry['publication'] = $this->presentations->read($entry['output_dir']);
         $jobId = Uuid::fromString($jobKey);
-
-        // Check for init segment
-        if (!$entry['init_marked']) {
-            $initPath = $dir . '/init.mp4';
-            if ($this->isNonemptyRegularFile($initPath)) {
-                // This nonempty-file hint is informational only; it does not
-                // prove init completion. The controller checks init separately.
-                $entry['init_marked'] = true;
+        foreach ($entry['publication']->tracks ?? [] as $track) {
+            foreach ($track->segments as $segment) {
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
+                $key = $track->kind->value . ':' . $segment->ordinal;
+                if (isset($entry['marked'][$key])) {
+                    continue;
+                }
+                $this->availability->markReady($jobId, $entry['availability_tier'] . '/' . $track->kind->value,
+                    $segment->ordinal, $entry['output_dir'] . '/' . $segment->file);
+                $this->assertStreamIdentity($jobKey, $entry['identity']);
+                $entry['marked'][$key] = true;
             }
-        }
-
-        // Only the current encoder's default source identity belongs to this
-        // tier. Existing final files remain cache entries, not job generations.
-        foreach ($this->findSegments($dir, $entry['tier_name']) as $index => $file) {
-            $this->assertStreamIdentity($jobKey, $entry['identity']);
-            if (isset($entry['marked'][$index])) {
-                continue;
-            }
-
-            // The encoder's start_number makes the filename index absolute.
-            $this->availability->markReady($jobId, $entry['availability_tier'], $index, $file);
-            $this->assertStreamIdentity($jobKey, $entry['identity']);
-            $entry['marked'][$index] = true;
-
-            $this->logger->debug('Segment available', [
-                'jobId' => $jobKey,
-                'tier' => $entry['tier_name'],
-                'index' => $index,
-            ]);
         }
     }
 
@@ -337,41 +327,4 @@ final class TranscodeStreamManager
         }
     }
 
-    /**
-     * Count eligible final files, including existing cache entries. This check
-     * rejects empty output directories; it is not a current-generation receipt.
-     */
-    private function countProducedSegments(string $outputDir, string $tierName): int
-    {
-        return count($this->findSegments($outputDir, $tierName));
-    }
-
-    /** @return array<int,string> Final filenames for the selected rendition, including existing cache entries. */
-    private function findSegments(string $outputDir, string $tierName): array
-    {
-        $segments = [];
-        $pattern = '/^v0_a0_' . preg_quote($tierName, '/') . '_(\d+)\.m4s$/D';
-        $maximum = (string) PHP_INT_MAX;
-        foreach (glob($outputDir . '/*.m4s') ?: [] as $file) {
-            if (!preg_match($pattern, basename($file), $matches)) {
-                continue;
-            }
-            $decimal = ltrim($matches[1], '0');
-            $decimal = $decimal === '' ? '0' : $decimal;
-            if (strlen($decimal) > strlen($maximum) ||
-                (strlen($decimal) === strlen($maximum) && strcmp($decimal, $maximum) > 0) ||
-                !$this->isNonemptyRegularFile($file)) {
-                continue;
-            }
-            $segments[(int) $decimal] = $file;
-        }
-        return $segments;
-    }
-
-    private function isNonemptyRegularFile(string $path): bool
-    {
-        clearstatcache(true, $path);
-        $stat = @stat($path);
-        return $stat !== false && ($stat['mode'] & 0170000) === 0100000 && $stat['size'] > 0;
-    }
 }

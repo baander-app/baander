@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Storage;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use InvalidArgumentException;
@@ -35,6 +36,21 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
     {
         return $this->resolver->resolveSegmentPath($videoId, $qualityTier, $segmentIndex);
+    }
+
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string
+    {
+        return $this->resolver->resolveNativeManifestPath($videoId, $qualityTier);
+    }
+
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string
+    {
+        return $this->resolver->resolveTrackInitSegmentPath($videoId, $qualityTier, $track);
+    }
+
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string
+    {
+        return $this->resolver->resolveTrackSegmentPath($videoId, $qualityTier, $track, $nativeNumber);
     }
 
     public function resolveAudioDirectory(Uuid $videoId, string $language): string

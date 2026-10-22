@@ -93,40 +93,33 @@ final class ManifestGenerator
     }
 
     /**
-     * Generate an HLS v6 media playlist for a single quality tier.
-     *
-     * The current encoder muxes video and audio in each rendition.
-     *
-     * @param QualityTier $tier Quality tier for this rendition
-     * @param string $initSegmentUrl URL to the init segment
-     * @param array<int, array{url?: string, path?: string, duration: float}> $segments Map of index => segment info; 'url' is preferred when present
-     * @param float $targetDuration Target segment duration for EXT-X-TARGETDURATION
+     * @param array<int, array{url: string, duration: float}> $segments Published track segments keyed by generation-local ordinal
      */
     public function generateMediaManifest(
-        QualityTier $tier,
         string $initSegmentUrl,
         array $segments,
-        float $targetDuration = 6.0,
+        bool $complete,
+        float $targetDuration = 7.0,
     ): string {
-        $lines = [];
-        $lines[] = '#EXTM3U';
-        $lines[] = '#EXT-X-VERSION:6';
-        $lines[] = '#EXT-X-INDEPENDENT-SEGMENTS';
-        $lines[] = sprintf('#EXT-X-TARGETDURATION:%d', (int) ceil($targetDuration));
-
-        if (!empty($segments)) {
+        if (!is_finite($targetDuration) || $targetDuration < 1 || floor($targetDuration) !== $targetDuration) {
+            throw new \InvalidArgumentException('HLS target duration must be a positive integer.');
+        }
+        $lines = ['#EXTM3U', '#EXT-X-VERSION:6', '#EXT-X-PLAYLIST-TYPE:EVENT',
+            '#EXT-X-TARGETDURATION:' . (int) $targetDuration];
+        if ($segments !== []) {
             $lines[] = '#EXT-X-MEDIA-SEQUENCE:' . array_key_first($segments);
-            $lines[] = '#EXT-X-MAP:URI="' . $initSegmentUrl . '"';
+            $lines[] = '#EXT-X-MAP:URI="' . self::quoted($initSegmentUrl) . '"';
         }
-
-        foreach ($segments as $index => $segment) {
-            $duration = round($segment['duration'], 6);
-            $lines[] = sprintf('#EXTINF:%.6f,', $duration);
-            $lines[] = $segment['url'] ?? sprintf('seg_%d.m4s', $index);
+        foreach ($segments as $segment) {
+            if (!is_finite($segment['duration']) || $segment['duration'] <= 0 || round($segment['duration']) > $targetDuration) {
+                throw new \InvalidArgumentException('Published segment duration exceeds the stable HLS target.');
+            }
+            $lines[] = sprintf('#EXTINF:%.6f,', $segment['duration']);
+            $lines[] = $segment['url'];
         }
-
-        $lines[] = '#EXT-X-ENDLIST';
-
+        if ($complete) {
+            $lines[] = '#EXT-X-ENDLIST';
+        }
         return implode("\n", $lines) . "\n";
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Application\Port;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Domain\ValueObject\QualityTier;
 
 interface TranscodeStoragePortInterface
@@ -16,6 +17,12 @@ interface TranscodeStoragePortInterface
     public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string;
 
     public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string;
+
+    public function resolveNativeManifestPath(Uuid $videoId, QualityTier $qualityTier): string;
+
+    public function resolveTrackInitSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track): string;
+
+    public function resolveTrackSegmentPath(Uuid $videoId, QualityTier $qualityTier, MediaTrack $track, int $nativeNumber): string;
 
     // --- Audio Track Paths ---
 

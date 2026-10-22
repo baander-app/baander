@@ -7130,7 +7130,7 @@ export type GetStreamSegmentSegmentParams = {
  */
 generation: number;
 /**
- * Segment index
+ * Zero-based generation-local published segment ordinal
  */
 index: number;
 /**
@@ -30055,6 +30055,7 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
 
 
 export const getGetStreamMediaManifestUrl = (jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -30067,16 +30068,17 @@ export const getGetStreamMediaManifestUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/media.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/media.m3u8`
 }
 
 /**
  * @summary Get HLS media playlist for a specific rendition
  */
 export const getStreamMediaManifest = async (jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<unknown>(getGetStreamMediaManifestUrl(jobPublicId,params),
+  return customInstance<unknown>(getGetStreamMediaManifestUrl(jobPublicId,track,params),
   {
     ...options,
     method: 'GET'
@@ -30090,30 +30092,32 @@ export const getStreamMediaManifest = async (jobPublicId: string,
 
 
 export const getGetStreamMediaManifestQueryKey = (jobPublicId: string,
+    track: 'video' | 'audio',
     params?: GetStreamMediaManifestParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/media.m3u8`, ...(params ? [params] : [])
+    `/api/transcode/${jobPublicId}/tracks/${track}/media.m3u8`, ...(params ? [params] : [])
     ] as const;
     }
 
 
 export const getGetStreamMediaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamMediaManifestQueryKey(jobPublicId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamMediaManifestQueryKey(jobPublicId,track,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMediaManifest>>> = ({ signal }) => getStreamMediaManifest(jobPublicId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMediaManifest>>> = ({ signal }) => getStreamMediaManifest(jobPublicId,track,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetStreamMediaManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamMediaManifest>>>
@@ -30122,6 +30126,7 @@ export type GetStreamMediaManifestQueryError = ErrorType<unknown>
 
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMediaManifest>>,
@@ -30133,6 +30138,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMediaManifest>>,
@@ -30144,6 +30150,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -30153,11 +30160,12 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
 
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamMediaManifestQueryOptions(jobPublicId,params,options)
+  const queryOptions = getGetStreamMediaManifestQueryOptions(jobPublicId,track,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -30512,6 +30520,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
 
 
 export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -30524,16 +30533,17 @@ export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/init?${stringifiedParams}` : `/api/transcode/${jobPublicId}/init`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/init.mp4?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/init.mp4`
 }
 
 /**
- * @summary Get CMAF init segment
+ * @summary Get fMP4 track initialization segment
  */
 export const getStreamSegmentInitSegment = async (jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: RequestInit): Promise<Blob> => {
 
-  return customInstance<Blob>(getGetStreamSegmentInitSegmentUrl(jobPublicId,params),
+  return customInstance<Blob>(getGetStreamSegmentInitSegmentUrl(jobPublicId,track,params),
   {
     ...options,
     method: 'GET'
@@ -30547,30 +30557,32 @@ export const getStreamSegmentInitSegment = async (jobPublicId: string,
 
 
 export const getGetStreamSegmentInitSegmentQueryKey = (jobPublicId: string,
+    track: 'video' | 'audio',
     params?: GetStreamSegmentInitSegmentParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/init`, ...(params ? [params] : [])
+    `/api/transcode/${jobPublicId}/tracks/${track}/init.mp4`, ...(params ? [params] : [])
     ] as const;
     }
 
 
 export const getGetStreamSegmentInitSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentInitSegmentQueryKey(jobPublicId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentInitSegmentQueryKey(jobPublicId,track,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>> = ({ signal }) => getStreamSegmentInitSegment(jobPublicId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>> = ({ signal }) => getStreamSegmentInitSegment(jobPublicId,track,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetStreamSegmentInitSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>>
@@ -30579,6 +30591,7 @@ export type GetStreamSegmentInitSegmentQueryError = ErrorType<GetStreamSegmentIn
 
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentInitSegment>>,
@@ -30590,6 +30603,7 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentInitSegment>>,
@@ -30601,20 +30615,22 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get CMAF init segment
+ * @summary Get fMP4 track initialization segment
  */
 
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamSegmentInitSegmentQueryOptions(jobPublicId,params,options)
+  const queryOptions = getGetStreamSegmentInitSegmentQueryOptions(jobPublicId,track,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -30628,6 +30644,7 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
 
 
 export const getGetStreamSegmentSegmentUrl = (jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -30640,16 +30657,17 @@ export const getGetStreamSegmentSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/segment?${stringifiedParams}` : `/api/transcode/${jobPublicId}/segment`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/segment.m4s?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/segment.m4s`
 }
 
 /**
  * @summary Get fMP4 media segment (query-param routed)
  */
 export const getStreamSegmentSegment = async (jobPublicId: string,
-    params: GetStreamSegmentSegmentParams, options?: RequestInit): Promise<Blob | void> => {
+    track: 'video' | 'audio',
+    params: GetStreamSegmentSegmentParams, options?: RequestInit): Promise<Blob> => {
 
-  return customInstance<Blob | void>(getGetStreamSegmentSegmentUrl(jobPublicId,params),
+  return customInstance<Blob>(getGetStreamSegmentSegmentUrl(jobPublicId,track,params),
   {
     ...options,
     method: 'GET'
@@ -30663,30 +30681,32 @@ export const getStreamSegmentSegment = async (jobPublicId: string,
 
 
 export const getGetStreamSegmentSegmentQueryKey = (jobPublicId: string,
+    track: 'video' | 'audio',
     params?: GetStreamSegmentSegmentParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/segment`, ...(params ? [params] : [])
+    `/api/transcode/${jobPublicId}/tracks/${track}/segment.m4s`, ...(params ? [params] : [])
     ] as const;
     }
 
 
 export const getGetStreamSegmentSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentSegmentQueryKey(jobPublicId,params);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamSegmentSegmentQueryKey(jobPublicId,track,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentSegment>>> = ({ signal }) => getStreamSegmentSegment(jobPublicId,params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSegmentSegment>>> = ({ signal }) => getStreamSegmentSegment(jobPublicId,track,params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: jobPublicId !== null && jobPublicId !== undefined && track !== null && track !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetStreamSegmentSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamSegmentSegment>>>
@@ -30695,6 +30715,7 @@ export type GetStreamSegmentSegmentQueryError = ErrorType<void | ApiError>
 
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentSegment>>,
@@ -30706,6 +30727,7 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentSegment>>,
@@ -30717,6 +30739,7 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -30726,11 +30749,12 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
 
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
+    track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamSegmentSegmentQueryOptions(jobPublicId,params,options)
+  const queryOptions = getGetStreamSegmentSegmentQueryOptions(jobPublicId,track,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

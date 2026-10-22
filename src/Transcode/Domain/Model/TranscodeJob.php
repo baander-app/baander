@@ -120,7 +120,7 @@ final class TranscodeJob
 
     public function markSegmentCompleted(int $index, string $path, int $size, float $duration): void
     {
-        if ($index < 0 || ($this->state->totalSegments > 0 && $index >= $this->state->totalSegments)) {
+        if ($index < 0) {
             return;
         }
 
@@ -130,6 +130,7 @@ final class TranscodeJob
             'duration' => $duration,
         ];
         $this->state->completedSegments = count($this->state->segmentMap);
+        $this->state->totalSegments = max($this->state->totalSegments, $index + 1);
         $this->state->updatedAt = new DateTimeImmutable();
     }
 

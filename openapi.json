@@ -18483,7 +18483,7 @@
                 }
             }
         },
-        "/api/transcode/{jobPublicId}/media.m3u8": {
+        "/api/transcode/{jobPublicId}/tracks/{track}/media.m3u8": {
             "get": {
                 "tags": [
                     "Streaming"
@@ -18491,6 +18491,20 @@
                 "summary": "Get HLS media playlist for a specific rendition",
                 "operationId": "get_stream_media_manifest",
                 "parameters": [
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "description": "Published media component",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    },
                     {
                         "name": "generation",
                         "in": "query",
@@ -18666,14 +18680,28 @@
                 }
             }
         },
-        "/api/transcode/{jobPublicId}/init": {
+        "/api/transcode/{jobPublicId}/tracks/{track}/init.mp4": {
             "get": {
                 "tags": [
                     "Stream"
                 ],
-                "summary": "Get CMAF init segment",
+                "summary": "Get fMP4 track initialization segment",
                 "operationId": "get_stream_segment_init_segment",
                 "parameters": [
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "description": "Published media component",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    },
                     {
                         "name": "generation",
                         "in": "query",
@@ -18717,6 +18745,12 @@
                         "description": "fMP4 init segment",
                         "content": {
                             "video/mp4": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "audio/mp4": {
                                 "schema": {
                                     "type": "string",
                                     "format": "binary"
@@ -18768,13 +18802,19 @@
                                     "type": "string",
                                     "format": "binary"
                                 }
+                            },
+                            "audio/mp4": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
                             }
                         }
                     }
                 }
             }
         },
-        "/api/transcode/{jobPublicId}/segment": {
+        "/api/transcode/{jobPublicId}/tracks/{track}/segment.m4s": {
             "get": {
                 "tags": [
                     "Stream"
@@ -18782,6 +18822,20 @@
                 "summary": "Get fMP4 media segment (query-param routed)",
                 "operationId": "get_stream_segment_segment",
                 "parameters": [
+                    {
+                        "name": "track",
+                        "in": "path",
+                        "description": "Published media component",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "video|audio",
+                            "enum": [
+                                "video",
+                                "audio"
+                            ]
+                        }
+                    },
                     {
                         "name": "generation",
                         "in": "query",
@@ -18804,7 +18858,7 @@
                     {
                         "name": "index",
                         "in": "query",
-                        "description": "Segment index",
+                        "description": "Zero-based generation-local published segment ordinal",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -18833,11 +18887,12 @@
                     "200": {
                         "description": "fMP4 media segment",
                         "content": {
-                            "video/mp4": {}
+                            "video/mp4": {},
+                            "audio/mp4": {}
                         }
                     },
-                    "202": {
-                        "description": "Segment not yet encoded"
+                    "503": {
+                        "description": "Published segment is temporarily unavailable"
                     },
                     "403": {
                         "description": "Invalid or expired signature"

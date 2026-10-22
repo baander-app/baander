@@ -20,6 +20,7 @@ interface TranscodeExecutionOwnershipPort
     public function lockSession(Uuid $sessionId): void;
     public function admit(Uuid $jobId, Uuid $sessionId, string $requestId, DesiredTranscodeState $desired, int $deadlineSeconds = 5): TranscodeRuntimeSnapshot;
     public function control(Uuid $jobId, Uuid $sessionId, string $requestId, ?string $status = null, ?AudioProfile $audioProfile = null, ?float $position = null, ?int $segmentIndex = null, bool $seek = true): TranscodeControlResult;
+    /** @phpstan-impure Runtime ownership may change between consecutive reads. */
     public function find(Uuid $jobId): ?TranscodeRuntimeSnapshot;
     /** @return list<TranscodeRuntimeSnapshot> */
     public function pending(int $limit = 100): array;

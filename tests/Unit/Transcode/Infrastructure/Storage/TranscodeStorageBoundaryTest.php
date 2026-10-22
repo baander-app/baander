@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\Storage;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
@@ -254,6 +255,19 @@ final class TranscodeStorageBoundaryTest extends TestCase
             'subtitle-segment' => $this->resolver->resolveSubtitleSegmentPath($this->videoId, 'en', 'full'),
             default => throw new LogicException('Unknown generated path fixture.'),
         };
+    }
+
+    public function testSeparateTracksStayInsideTheirJobGeneration(): void
+    {
+        $tier = QualityTier::p720();
+        $scoped = $this->storage->forGeneration($this->videoId, $tier, 7, $this->jobId);
+        $directory = $scoped->resolveJobDirectory($this->videoId, $tier);
+        self::assertSame($directory . '/manifest.mpd', $scoped->resolveNativeManifestPath($this->videoId, $tier));
+        self::assertSame($directory . '/init-0.mp4', $scoped->resolveTrackInitSegmentPath($this->videoId, $tier, MediaTrack::Video));
+        self::assertSame($directory . '/init-1.mp4', $scoped->resolveTrackInitSegmentPath($this->videoId, $tier, MediaTrack::Audio));
+        self::assertSame($directory . '/track-1-seg-00002.m4s', $scoped->resolveTrackSegmentPath($this->videoId, $tier, MediaTrack::Audio, 2));
+        $this->assertRejected(fn () => $scoped->resolveTrackSegmentPath($this->videoId, $tier, MediaTrack::Video, 0));
+        $this->assertRejected(fn () => $scoped->resolveTrackInitSegmentPath(Uuid::generate(), $tier, MediaTrack::Audio));
     }
 
     private function assertRejected(Closure $operation): void

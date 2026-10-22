@@ -222,4 +222,15 @@ class TranscodeJobTest extends TestCase
 
         $this->assertSame($loudness, $job->getMeasuredLoudness());
     }
+    public function testActualPublishedSegmentsCanExceedTheInitialEstimate(): void
+    {
+        $job = TranscodeJob::create($this->videoId, QualityTier::p720(), '/storage/conv', Uuid::generate());
+        $job->setTotalSegments(1);
+        $job->markSegmentCompleted(0, '/storage/conv/track-0-seg-00001.m4s', 100, 6.006);
+        $job->markSegmentCompleted(1, '/storage/conv/track-0-seg-00002.m4s', 80, 0.042);
+        self::assertSame(2, $job->getCompletedSegments());
+        self::assertSame(2, $job->getTotalSegments());
+        self::assertSame(0.042, array_values($job->getSegmentMap())[1]['duration']);
+    }
+
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Service\AudioProcessingRules;
@@ -48,42 +50,117 @@ final class SegmentEncoderMediaTest extends TestCase
         $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, $start,
             audioFilters: $hasAudio ? 'aformat=channel_layouts=stereo' : '', hasAudio: $hasAudio));
 
-        $playlist = file_get_contents($this->directory . '/stream.m3u8');
-        self::assertNotFalse($playlist);
-        preg_match_all('/#EXTINF:([\d.]+),\R([^\r\n]+)/', $playlist, $segments, PREG_SET_ORDER);
-        self::assertCount(3 - $start, $segments);
+        $presentation = (new PublishedPresentationReader())->read($this->directory);
+        self::assertNotNull($presentation);
+        self::assertTrue($presentation->complete);
+        self::assertSame($hasAudio ? ['video', 'audio'] : ['video'], array_keys($presentation->tracks));
         $rateParts = explode('/', $rate);
         $fps = (float) $rateParts[0] / (float) ($rateParts[1] ?? 1);
-        $previousDts = [];
-        $firstVideoTimestamp = null;
-        foreach ($segments as $index => $segment) {
-            $duration = (float) $segment[1];
-            $expected = $start + $index === 2 ? 2.0 : 6.0;
-            self::assertEqualsWithDelta($expected, $duration, 1 / $fps + 0.025);
-            self::assertSame('v0_a0_fixture_' . ($start + $index) . '.m4s', $segment[2]);
-            $combined = $this->directory . '/fragment.mp4';
-            file_put_contents($combined, file_get_contents($this->directory . '/init.mp4')
-                . file_get_contents($this->directory . '/' . $segment[2]));
-            $probe = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_packets',
-                '-of', 'json', $combined]), true, 512, JSON_THROW_ON_ERROR);
-            self::assertSame($hasAudio ? ['video', 'audio'] : ['video'], array_column($probe['streams'], 'codec_type'));
-            $videoPackets = array_values(array_filter($probe['packets'], static fn (array $packet): bool => $packet['stream_index'] === 0));
-            self::assertNotEmpty($videoPackets);
-            self::assertStringContainsString('K', $videoPackets[0]['flags']);
-            $videoTimestamp = (float) $videoPackets[0]['pts_time'];
-            $firstVideoTimestamp ??= $videoTimestamp;
-            self::assertEqualsWithDelta($index * 6.0, $videoTimestamp - $firstVideoTimestamp, 1 / $fps);
-            foreach ($probe['packets'] as $packet) {
-                $stream = $packet['stream_index'];
-                $dts = (float) $packet['dts_time'];
-                if (isset($previousDts[$stream])) {
-                    self::assertGreaterThan($previousDts[$stream], $dts);
+        foreach ($presentation->tracks as $track) {
+            self::assertCount(3 - $start, $track->segments);
+            $previousDts = null;
+            $firstTimestamp = null;
+            $previousTimelineEnd = null;
+            foreach ($track->segments as $index => $segment) {
+                if ($track->kind === MediaTrack::Video) {
+                    $expected = $start + $index === 2 ? 2.0 : 6.0;
+                    self::assertEqualsWithDelta($expected, $segment->duration / $track->timescale, 1 / $fps + 0.05);
                 }
-                $previousDts[$stream] = $dts;
+                if ($previousTimelineEnd !== null) {
+                    self::assertSame($previousTimelineEnd, $segment->start, 'Native track segments must form a continuous timeline.');
+                }
+                $previousTimelineEnd = $segment->start + $segment->duration;
+                self::assertSame($index, $segment->ordinal);
+                self::assertSame($index + 1, $segment->nativeNumber);
+                self::assertSame(sprintf('track-%s-seg-%05d.m4s', $track->representationId, $index + 1), $segment->file);
+                $combined = $this->directory . '/fragment.mp4';
+                file_put_contents($combined, file_get_contents($this->directory . '/' . $track->initFile)
+                    . file_get_contents($this->directory . '/' . $segment->file));
+                $probe = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_packets',
+                    '-of', 'json', $combined]), true, 512, JSON_THROW_ON_ERROR);
+                self::assertSame([$track->kind->value], array_column($probe['streams'], 'codec_type'));
+                self::assertNotEmpty($probe['packets']);
+                $timestamp = (float) $probe['packets'][0]['pts_time'];
+                $firstTimestamp ??= $timestamp;
+                if ($track->kind === MediaTrack::Audio) {
+                    $packetStart = $timestamp;
+                    if ($packetStart < 0) {
+                        self::assertSame(0, $index, 'Only the initial audio fragment may contain encoder preroll.');
+                        $sampleRate = (int) $probe['streams'][0]['sample_rate'];
+                        self::assertEqualsWithDelta(-1024 / $sampleRate, $packetStart, 1 / $track->timescale,
+                            'AAC-LC encoder preroll must occupy exactly one 1024-sample frame.');
+                        foreach ($probe['packets'][0]['side_data_list'] ?? [] as $sideData) {
+                            if ($sideData['side_data_type'] === 'Skip Samples') {
+                                self::assertSame(1024, (int) $sideData['skip_samples']);
+                            }
+                        }
+                        // FFprobe 5 exposes the edit-list preroll as a negative packet;
+                        // newer versions also report its skipped samples. The native
+                        // presentation begins at zero after that verified AAC frame.
+                        $packetStart = 0.0;
+                    }
+                    $lastPacket = $probe['packets'][array_key_last($probe['packets'])];
+                    $packetEnd = (float) $lastPacket['pts_time'] + (float) $lastPacket['duration_time'];
+                    self::assertEqualsWithDelta(($segment->start - $track->presentationTimeOffset) / $track->timescale,
+                        $packetStart, 1 / $track->timescale);
+                    if ($index === array_key_last($track->segments)) {
+                        self::assertSame('aac', $probe['streams'][0]['codec_name']);
+                        self::assertSame('LC', $probe['streams'][0]['profile']);
+                        self::assertSame('1/' . $track->timescale, $probe['streams'][0]['time_base']);
+                        self::assertSame($track->timescale, (int) $probe['streams'][0]['sample_rate']);
+                        $lastPacketDuration = (int) $lastPacket['duration'];
+                        self::assertGreaterThan(0, $lastPacketDuration);
+                        self::assertLessThanOrEqual(1024, $lastPacketDuration);
+                        $nativeEnd = $segment->start + $segment->duration - $track->presentationTimeOffset;
+                        $codedEnd = (int) $lastPacket['pts'] + $lastPacketDuration;
+                        self::assertGreaterThan((int) $lastPacket['pts'], $nativeEnd,
+                            'The native presentation must include samples from the final AAC packet.');
+                        $trimmedSamples = $codedEnd - $nativeEnd;
+                        self::assertGreaterThanOrEqual(0, $trimmedSamples);
+                        self::assertLessThan(1024, $trimmedSamples,
+                            'The final presentation may trim padding within one coded AAC-LC frame.');
+                    } else {
+                        self::assertEqualsWithDelta($segment->duration / $track->timescale,
+                            $packetEnd - $packetStart, 1 / $track->timescale,
+                            'Interior AAC fragment durations must describe their presented samples.');
+                    }
+                }
+                if ($track->kind === MediaTrack::Video) {
+                    self::assertStringContainsString('K', $probe['packets'][0]['flags']);
+                    self::assertEqualsWithDelta($index * 6.0, $timestamp - $firstTimestamp, 1 / $fps);
+                }
+                foreach ($probe['packets'] as $packet) {
+                    $dts = (float) $packet['dts_time'];
+                    if ($previousDts !== null) {
+                        self::assertGreaterThan($previousDts, $dts);
+                    }
+                    $previousDts = $dts;
+                }
+                $decoded = $this->directory . '/decoded.raw';
+                $decode = ['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y', '-i', $combined];
+                if ($track->kind === MediaTrack::Video) {
+                    array_push($decode, '-map', '0:v:0', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', $decoded);
+                } else {
+                    array_push($decode, '-map', '0:a:0', '-ac', '2', '-ar', '48000', '-f', 'f32le', $decoded);
+                }
+                $this->runMedia($decode);
+                clearstatcache(true, $decoded);
+                $decodedBytes = filesize($decoded);
+                self::assertGreaterThan(0, $decodedBytes, 'Every independent fragment must emit decoded frames or PCM samples.');
+                self::assertSame(0, $decodedBytes % ($track->kind === MediaTrack::Video ? 6144 : 8));
             }
-            $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-i', $combined, '-f', 'null', '-']);
+            self::assertGreaterThanOrEqual(-0.1, $firstTimestamp);
+            self::assertLessThan(1.0, $firstTimestamp);
         }
-        self::assertLessThan(1.0, $firstVideoTimestamp);
+        if ($hasAudio) {
+            $audio = $presentation->track(MediaTrack::Audio);
+            $video = $presentation->track(MediaTrack::Video);
+            self::assertNotNull($audio);
+            self::assertNotNull($video);
+            // Source video can end within one frame of the audio; source and output
+            // AAC encoding each round their tail to a 1024-sample frame at 48 kHz.
+            self::assertEqualsWithDelta($video->end(), $audio->end(), 1 / $fps + 2 * 1024 / 48000);
+        }
         self::assertSame([], glob($this->directory . '/*.tmp'));
     }
 

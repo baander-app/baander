@@ -1,5 +1,6 @@
 {
   "tests/Integration/NativeExecutionDaemonTest.php": "Owns a Unix socket daemon and real FFmpeg process groups.",
+  "tests/Integration/Transcode/Infrastructure/Packaging/ProgressiveMediaPublicationTest.php": "Owns a disposable loopback HTTP server and real FFmpeg producer/readers through publication and completion.",
   "tests/Unit/Auth/Infrastructure/Swoole/RevokedSocketReconcilerProbeTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",
   "tests/Unit/Auth/Infrastructure/Swoole/RevokedSocketReconcilerTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",
   "tests/Unit/Filesystem/Infrastructure/Service/FilesystemBoundaryTest.php": "native coroutine/reactor/server",

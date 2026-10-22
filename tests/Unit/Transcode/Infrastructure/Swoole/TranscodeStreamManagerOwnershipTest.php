@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -164,7 +165,6 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
 
     private function writeFragments(): void
     {
-        file_put_contents($this->directory . '/v0_a0_720p_0.m4s', 'first');
-        file_put_contents($this->directory . '/v0_a0_720p_1.m4s', 'second');
+        PublishedPresentationFixture::write($this->directory, count: 2);
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\Port\SleeperInterface;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -30,6 +32,7 @@ final class StreamManifestController
         private readonly SignedStreamRequest $signedRequest,
         private readonly PlaybackPortInterface $playback,
         private readonly TranscodePublicViewInterface $publicView,
+        private readonly SleeperInterface $sleeper,
     ) {
     }
 
@@ -60,9 +63,10 @@ final class StreamManifestController
     }
 
     #[OA\Get(
-        path: '/api/transcode/{jobPublicId}/media.m3u8',
+        path: '/api/transcode/{jobPublicId}/tracks/{track}/media.m3u8',
         summary: 'Get HLS media playlist for a specific rendition',
         parameters: [
+            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
             new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
@@ -70,13 +74,13 @@ final class StreamManifestController
             new OA\Response(response: '200', description: 'HLS media manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl')),
         ],
     )]
-    #[Route('/{jobPublicId}/media.m3u8', name: 'media_manifest', methods: ['GET'])]
-    public function mediaManifest(string $jobPublicId, Request $request): StreamedResponse
+    #[Route('/{jobPublicId}/tracks/{track}/media.m3u8', name: 'media_manifest', requirements: ['track' => 'video|audio'], methods: ['GET'])]
+    public function mediaManifest(string $jobPublicId, MediaTrack $track, Request $request): StreamedResponse
     {
         $this->signedRequest->validate($request);
         $publicId = PublicId::fromString($jobPublicId);
 
-        $manifest = $this->streamingService->getMediaManifest($publicId, 'streaming_stereo', $request->query->getInt('generation'));
+        $manifest = $this->streamingService->getMediaManifest($publicId, $track, $request->query->getInt('generation'));
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -100,12 +104,17 @@ final class StreamManifestController
     public function dashManifest(string $videoId, Request $request): StreamedResponse
     {
         $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getDashManifest($this->requireVideo($videoId), $this->renditionSet($request));
-
+        $video = $this->requireVideo($videoId);
+        $renditions = $this->renditionSet($request);
+        $manifest = $this->streamingService->getDashManifest($video, $renditions);
+        if (str_contains($manifest, 'type="dynamic"')) {
+            // Some readers ignore the update interval when a growing SegmentList is exhausted.
+            $this->sleeper->sleep(1.0);
+            $this->signedRequest->validate($request);
+            $manifest = $this->streamingService->getDashManifest($video, $renditions);
+        }
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
-            'Cache-Control' => 'no-store',
-            'Retry-After' => '2',
-            'Content-Type' => 'application/dash+xml',
+            'Cache-Control' => 'no-store', 'Retry-After' => '2', 'Content-Type' => 'application/dash+xml',
         ]);
     }
 

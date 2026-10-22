@@ -109,13 +109,12 @@ final class SegmentEncoder
     /**
      * Build the FFmpeg command for the long-lived video stream.
      *
-     * Produces a continuous stream of fMP4 segments via the HLS muxer.
+     * Produces separate fMP4 tracks with a native DASH index and HLS playlists.
      * One process produces all video segments for a tier — no per-segment
      * re-seek or encoder re-init.
      *
-     * Selected video and available audio are muxed into one rendition.
-     * Media fragments are written to temporary files and renamed after close; init.mp4 is
-     * separate and does not inherit this publication guarantee.
+     * The native index publishes actual track timing after closed media files
+     * are renamed. Initialization files are validated before readiness.
      *
      * @param string $sourcePath Path to the source video file
      * @param QualityTier $tier Target quality tier
@@ -166,11 +165,7 @@ final class SegmentEncoder
         $args[] = '-i';
         $args[] = $sourcePath;
 
-        // Map selected video and available audio into one HLS rendition.
-        // Each segment carries video and any audio together, so the
-        // media playlist has a single variant per tier (no EXT-X-MEDIA audio
-        // groups). Stream indices are encoded in the segment filename for
-        // cache provenance.
+        // One encoder process produces separate video and available audio tracks.
         $args[] = '-map';
         $args[] = sprintf('0:v:%d', $videoStreamIndex);
         if ($hasAudio) {
@@ -216,30 +211,15 @@ final class SegmentEncoder
             $args[] = $videoFilters;
         }
 
-        $args[] = '-f';
-        $args[] = 'hls';
-        $args[] = '-hls_segment_type';
-        $args[] = 'fmp4';
-        $args[] = '-hls_time';
-        $args[] = (string) $segmentDuration;
-        $args[] = '-hls_playlist_type';
-        $args[] = 'vod';
-        // Publish only closed media fragments at the final .m4s names.
-        $args[] = '-hls_flags';
-        $args[] = 'temp_file';
-
-        if ($startSegment !== null && $startSegment > 0) {
-            $args[] = '-start_number';
-            $args[] = (string) $startSegment;
-        }
-
-        // Identity-encoded segment filename: v{vIdx}_a{aIdx}_{tier}_{seg}.m4s.
-        // The prefix lets a cache-sweep job identify provenance and lets
-        // different stream selections coexist without collision.
-        $prefix = sprintf('v%d_a%d_%s', $videoStreamIndex, $audioStreamIndex, $tier->name);
-        $args[] = '-hls_segment_filename';
-        $args[] = rtrim($outputDir, '/') . '/' . $prefix . '_%d.m4s';
-        $args[] = rtrim($outputDir, '/') . '/stream.m3u8';
+        array_push($args,
+            '-f', 'dash', '-seg_duration', (string) $segmentDuration,
+            '-use_template', '1', '-use_timeline', '1',
+            '-hls_playlist', '1', '-hls_master_name', 'master.m3u8',
+            '-adaptation_sets', $hasAudio ? 'id=0,streams=v id=1,streams=a' : 'id=0,streams=v',
+            '-init_seg_name', 'init-$RepresentationID$.mp4',
+            '-media_seg_name', 'track-$RepresentationID$-seg-$Number%05d$.m4s',
+            rtrim($outputDir, '/') . '/manifest.mpd',
+        );
 
         return $args;
     }

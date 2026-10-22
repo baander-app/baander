@@ -43,7 +43,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertStringContainsString('frame-threads=2', $parameters);
     }
 
-    public function testBuildStreamArgsProducesCoreHlsFmp4Flags(): void
+    public function testBuildStreamArgsProducesSeparateNativeDashTracksAndHlsIndexes(): void
     {
         $args = $this->encoder()->buildStreamArgs(
             '/videos/source.mkv',
@@ -57,25 +57,16 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains('-nostats', $args);
         self::assertContains('error', $args);
         self::assertContains('-f', $args);
-        self::assertContains('hls', $args);
-        self::assertContains('-hls_segment_type', $args);
-        self::assertContains('fmp4', $args);
-        self::assertContains('-hls_time', $args);
-        self::assertContains((string) (int) ceil(SegmentEncoder::getSegmentDuration()), $args);
-        self::assertContains('-hls_playlist_type', $args);
-        self::assertContains('vod', $args);
-        $flagsIndex = array_search('-hls_flags', $args, true);
-        self::assertNotFalse($flagsIndex);
-        self::assertSame('temp_file', $args[$flagsIndex + 1]);
-        // Muxed: video + audio mapped together (no -an)
-        self::assertNotContains('-an', $args);
-        self::assertContains('-map', $args);
+        self::assertContains('dash', $args);
+        self::assertSame('6', $args[array_search('-seg_duration', $args, true) + 1]);
+        self::assertSame('1', $args[array_search('-hls_playlist', $args, true) + 1]);
+        self::assertSame('id=0,streams=v id=1,streams=a', $args[array_search('-adaptation_sets', $args, true) + 1]);
+        self::assertSame('init-$RepresentationID$.mp4', $args[array_search('-init_seg_name', $args, true) + 1]);
+        self::assertSame('track-$RepresentationID$-seg-$Number%05d$.m4s', $args[array_search('-media_seg_name', $args, true) + 1]);
+        self::assertSame('/out/p720/manifest.mpd', $args[array_key_last($args)]);
         self::assertContains('0:v:0', $args);
         self::assertContains('0:a:0', $args);
-        self::assertContains('-c:a', $args);
         self::assertContains('aac', $args);
-        // Identity-encoded filename: v0_a0_720p_%d.m4s pattern (tier in dir + filename)
-        self::assertTrue(in_array('/out/p720/v0_a0_720p_%d.m4s', $args, true), 'segment filename must carry rendition identity');
     }
 
     public function testBuildStreamArgsIncludesBitrateFlagsFromTier(): void
@@ -114,7 +105,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertNotContains('-hls_start_number', $args);
     }
 
-    public function testBuildStreamArgsIncludesSeekAndStartNumberWhenStartSegmentProvided(): void
+    public function testBuildStreamArgsSeeksInputWhileNativeNumberingRemainsGenerationLocal(): void
     {
         $startSegment = 30;
         $expectedStart = sprintf('%.6f', $startSegment * SegmentEncoder::getSegmentDuration());
@@ -125,9 +116,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertNotFalse($ssIndex);
         self::assertSame($expectedStart, $args[$ssIndex + 1]);
 
-        $snIndex = array_search('-start_number', $args, true);
-        self::assertNotFalse($snIndex);
-        self::assertSame((string) $startSegment, $args[$snIndex + 1]);
+        self::assertNotContains('-start_number', $args);
     }
 
     public function testBuildStreamArgsReturnsArrayNotString(): void
@@ -199,6 +188,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertNotContains('-c:a', $args);
         self::assertNotContains('-b:a', $args);
         self::assertNotContains('-af', $args);
+        self::assertSame('id=0,streams=v', $args[array_search('-adaptation_sets', $args, true) + 1]);
     }
 
     public function testProbeFieldOrderEnablesDeinterlacing(): void

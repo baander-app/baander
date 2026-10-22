@@ -6,6 +6,7 @@ namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
@@ -34,16 +35,17 @@ final class StreamSegmentController
     }
 
     #[OA\Get(
-        path: '/api/transcode/{jobPublicId}/init',
-        summary: 'Get CMAF init segment',
+        path: '/api/transcode/{jobPublicId}/tracks/{track}/init.mp4',
+        summary: 'Get fMP4 track initialization segment',
         parameters: [
+            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
             new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'fMP4 init segment', content: new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))),
+            new OA\Response(response: '200', description: 'fMP4 init segment', content: [new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary')), new OA\MediaType(mediaType: 'audio/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))]),
             new OA\Response(response: '403', description: 'Invalid or expired signature', content: new OA\JsonContent(
                 required: ['error'],
                 properties: [new OA\Property(property: 'error', type: 'string')],
@@ -51,18 +53,18 @@ final class StreamSegmentController
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '503', description: 'Init segment is not ready; empty response body', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
-            ], content: new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))),
+            ], content: [new OA\MediaType(mediaType: 'video/mp4', schema: new OA\Schema(type: 'string', format: 'binary')), new OA\MediaType(mediaType: 'audio/mp4', schema: new OA\Schema(type: 'string', format: 'binary'))]),
         ],
     )]
-    #[Route('/init', name: 'init_segment', methods: ['GET'])]
-    public function initSegment(string $jobPublicId, Request $request): Response
+    #[Route('/tracks/{track}/init.mp4', name: 'init_segment', requirements: ['track' => 'video|audio'], methods: ['GET'])]
+    public function initSegment(string $jobPublicId, MediaTrack $track, Request $request): Response
     {
         if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 
         $generation = $request->query->getInt('generation');
-        $resolve = fn (): ?string => $this->streamingService->getInitSegmentPath(PublicId::fromString($jobPublicId), $generation);
+        $resolve = fn (): ?string => $this->streamingService->getInitSegmentPath(PublicId::fromString($jobPublicId), $track, $generation);
         $path = $resolve();
 
         if ($path === null) {
@@ -75,32 +77,33 @@ final class StreamSegmentController
             return new StreamedResponse(
                 static fn() => print '',
                 Response::HTTP_SERVICE_UNAVAILABLE,
-                ['Content-Type' => 'video/mp4', 'Retry-After' => '2'],
+                ['Content-Type' => $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', 'Retry-After' => '2'],
             );
         }
 
-        return $this->streamFile($readyPath, 'video/mp4', $valid);
+        return $this->streamFile($readyPath, $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', $valid);
     }
 
     #[OA\Get(
-        path: '/api/transcode/{jobPublicId}/segment',
+        path: '/api/transcode/{jobPublicId}/tracks/{track}/segment.m4s',
         summary: 'Get fMP4 media segment (query-param routed)',
         parameters: [
+            new OA\Parameter(name: 'track', description: 'Published media component', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['video', 'audio'])),
             new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'index', description: 'Segment index', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'index', description: 'Zero-based generation-local published segment ordinal', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'fMP4 media segment', content: new OA\MediaType(mediaType: 'video/mp4')),
-            new OA\Response(response: '202', description: 'Segment not yet encoded'),
+            new OA\Response(response: '200', description: 'fMP4 media segment', content: [new OA\MediaType(mediaType: 'video/mp4'), new OA\MediaType(mediaType: 'audio/mp4')]),
+            new OA\Response(response: '503', description: 'Published segment is temporarily unavailable'),
             new OA\Response(response: '403', description: 'Invalid or expired signature'),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/segment', name: 'segment', methods: ['GET'])]
-    public function segment(string $jobPublicId, Request $request): Response
+    #[Route('/tracks/{track}/segment.m4s', name: 'segment', requirements: ['track' => 'video|audio'], methods: ['GET'])]
+    public function segment(string $jobPublicId, MediaTrack $track, Request $request): Response
     {
         if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
@@ -112,7 +115,7 @@ final class StreamSegmentController
         }
 
         $generation = $request->query->getInt('generation');
-        $resolve = fn (): ?array => $this->streamingService->resolveVideoSegmentAvailability(PublicId::fromString($jobPublicId), $index, $generation);
+        $resolve = fn (): ?array => $this->streamingService->resolveSegmentAvailability(PublicId::fromString($jobPublicId), $track, $index, $generation);
         $resolved = $resolve();
 
         if ($resolved === null) {
@@ -133,11 +136,11 @@ final class StreamSegmentController
             return new StreamedResponse(
                 static fn() => print '',
                 Response::HTTP_SERVICE_UNAVAILABLE,
-                ['Content-Type' => 'video/mp4', 'Retry-After' => '2'],
+                ['Content-Type' => $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', 'Retry-After' => '2'],
             );
         }
 
-        return $this->streamFile($readyPath, 'video/mp4', $valid);
+        return $this->streamFile($readyPath, $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', $valid);
     }
 
     // --- Subtitle Segment Delivery ---

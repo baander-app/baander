@@ -5,142 +5,129 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\DASH;
 
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentation;
+use App\Transcode\Infrastructure\Packaging\PublishedTrack;
 
+/**
+ * @phpstan-type VideoRepresentation array{quality_tier: QualityTier, track: PublishedTrack, init_url: string, segment_urls: array<int, string>, bandwidth: int}
+ * @phpstan-type AudioRepresentation array{track: PublishedTrack, init_url: string, segment_urls: array<int, string>, language: string, bandwidth: int, sample_rate: int, channels: int}
+ */
 final class DashManifestGenerator
 {
-    private const MPD_NS = 'urn:mpeg:dash:schema:mpd:2011';
+    private const string MPD_NS = 'urn:mpeg:dash:schema:mpd:2011';
 
-    /**
-     * Generate a DASH onDemand manifest for the given video jobs and audio tracks.
-     *
-     * @param array<string, array{public_id: string, quality_tier: QualityTier, init_url: string, segment_map: array<int, array{url: string, duration: float}>, total_duration: float, video_codec_rfc6381: string, audio_codec_rfc6381: string, bandwidth?: int}> $renditions
-     * @param array<string, array{language: string, init_url: string, segment_map: array<int, array{url: string, duration: float}>, codec_rfc6381: string}> $audioAdaptations
+    /** @param array<string, VideoRepresentation> $renditions
+     * @param AudioRepresentation|null $audio
      */
-    public function generate(array $renditions, array $audioAdaptations = [], float $totalDuration = 0.0): string
+    public function generate(array $renditions, ?array $audio = null, ?PublishedPresentation $presentation = null): string
     {
-        if (empty($renditions)) {
-            return $this->emptyManifest();
-        }
-
         $xml = new \DOMDocument('1.0', 'UTF-8');
         $xml->formatOutput = true;
-
         $mpd = $xml->createElementNS(self::MPD_NS, 'MPD');
-        $mpd->setAttribute('xmlns', self::MPD_NS);
-        $mpd->setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
+        foreach ($presentation->mpdAttributes ?? [] as $name => $value) {
+            if (in_array($name, ['availabilityStartTime', 'publishTime', 'minimumUpdatePeriod', 'minBufferTime', 'maxSegmentDuration', 'suggestedPresentationDelay', 'mediaPresentationDuration', 'timeShiftBufferDepth'], true)) {
+                $mpd->setAttribute($name, $value);
+            }
+        }
         $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:full:2011');
-        $mpd->setAttribute('type', 'static');
-        $mpd->setAttribute('mediaPresentationDuration', sprintf('PT%dS', (int) ceil($totalDuration)));
-        $mpd->setAttribute('minBufferTime', 'PT6S');
-
+        $dynamic = $presentation !== null && !$presentation->complete;
+        $mpd->setAttribute('type', $dynamic ? 'dynamic' : 'static');
+        if (!$dynamic) {
+            foreach (['availabilityStartTime', 'publishTime', 'minimumUpdatePeriod', 'suggestedPresentationDelay', 'timeShiftBufferDepth'] as $name) {
+                $mpd->removeAttribute($name);
+            }
+        }
+        if (!$mpd->hasAttribute('minBufferTime')) {
+            $mpd->setAttribute('minBufferTime', 'PT1S');
+        }
         $period = $xml->createElement('Period');
-        $period->setAttribute('id', '0');
-
-        // Video AdaptationSet
-        $videoAdaptationSet = $xml->createElement('AdaptationSet');
-        $videoAdaptationSet->setAttribute('mimeType', 'video/mp4');
-        $videoAdaptationSet->setAttribute('contentType', 'video');
-        $videoAdaptationSet->setAttribute('segmentAlignment', 'true');
-        $videoAdaptationSet->setAttribute('startWithSAP', '1');
-        $videoAdaptationSet->setAttribute('subsegmentAlignment', 'true');
-
-        foreach ($renditions as $tierName => $rendition) {
-            $tier = $rendition['quality_tier'];
-
-            $representation = $xml->createElement('Representation');
-            $representation->setAttribute('id', $tierName);
-            $representation->setAttribute('bandwidth', (string) ($rendition['bandwidth'] ?? $tier->maxBitrate));
-            $representation->setAttribute('width', (string) $tier->width);
-            $representation->setAttribute('height', (string) $tier->height);
-            $representation->setAttribute('codecs', $rendition['video_codec_rfc6381']);
-
-            $segmentList = $this->buildSegmentList($xml, $rendition['init_url'], $rendition['segment_map']);
-            $representation->appendChild($segmentList);
-            $videoAdaptationSet->appendChild($representation);
+        foreach ($presentation->periodAttributes ?? [] as $name => $value) {
+            if (in_array($name, ['id', 'start', 'duration'], true)) {
+                $period->setAttribute($name, $value);
+            }
         }
-
-        $period->appendChild($videoAdaptationSet);
-
-        // Audio AdaptationSets
-        foreach ($audioAdaptations as $language => $audio) {
-            $audioAdaptationSet = $xml->createElement('AdaptationSet');
-            $audioAdaptationSet->setAttribute('mimeType', 'audio/mp4');
-            $audioAdaptationSet->setAttribute('contentType', 'audio');
-            $audioAdaptationSet->setAttribute('lang', $language);
-            $audioAdaptationSet->setAttribute('segmentAlignment', 'true');
-
-            $representation = $xml->createElement('Representation');
-            $representation->setAttribute('id', sprintf('audio_%s', $language));
-            $representation->setAttribute('bandwidth', '128000');
-            $representation->setAttribute('audioSamplingRate', '48000');
-            $representation->setAttribute('codecs', $audio['codec_rfc6381']);
-
-            $audioChannelConfig = $xml->createElement('AudioChannelConfiguration');
-            $audioChannelConfig->setAttribute('schemeIdUri', 'urn:mpeg:dash:23003:3:audio_channel_configuration:2011');
-            $audioChannelConfig->setAttribute('value', '2');
-            $representation->appendChild($audioChannelConfig);
-
-            $segmentList = $this->buildSegmentList($xml, $audio['init_url'], $audio['segment_map']);
-            $representation->appendChild($segmentList);
-            $audioAdaptationSet->appendChild($representation);
-            $period->appendChild($audioAdaptationSet);
+        if (!$period->hasAttribute('id')) {
+            $period->setAttribute('id', '0');
         }
-
+        if ($renditions !== []) {
+            $video = $xml->createElement('AdaptationSet');
+            $video->setAttribute('id', 'video');
+            $video->setAttribute('mimeType', 'video/mp4');
+            $video->setAttribute('contentType', 'video');
+            $video->setAttribute('segmentAlignment', 'true');
+            foreach ($renditions as $name => $rendition) {
+                $track = $rendition['track'];
+                $representation = $this->representation($xml, $name, $track, $rendition['bandwidth']);
+                $representation->setAttribute('width', (string) $rendition['quality_tier']->width);
+                $representation->setAttribute('height', (string) $rendition['quality_tier']->height);
+                $representation->appendChild($this->segmentList($xml, $track, $rendition['init_url'], $rendition['segment_urls'], $dynamic));
+                $video->appendChild($representation);
+            }
+            $period->appendChild($video);
+            if ($audio !== null) {
+                $adaptation = $xml->createElement('AdaptationSet');
+                $adaptation->setAttribute('id', 'audio');
+                $adaptation->setAttribute('mimeType', 'audio/mp4');
+                $adaptation->setAttribute('contentType', 'audio');
+                $adaptation->setAttribute('lang', $audio['language']);
+                $representation = $this->representation($xml, 'audio', $audio['track'], $audio['bandwidth']);
+                $representation->setAttribute('audioSamplingRate', (string) $audio['sample_rate']);
+                $channels = $xml->createElement('AudioChannelConfiguration');
+                $channels->setAttribute('schemeIdUri', 'urn:mpeg:dash:23003:3:audio_channel_configuration:2011');
+                $channels->setAttribute('value', (string) $audio['channels']);
+                $representation->appendChild($channels);
+                $representation->appendChild($this->segmentList($xml, $audio['track'], $audio['init_url'], $audio['segment_urls'], $dynamic));
+                $adaptation->appendChild($representation);
+                $period->appendChild($adaptation);
+            }
+        }
         $mpd->appendChild($period);
         $xml->appendChild($mpd);
-
         return $xml->saveXML();
     }
 
-    /**
-     * @param array<int, array{url: string, duration: float}> $segmentMap
-     */
-    private function buildSegmentList(\DOMDocument $xml, string $initUrl, array $segmentMap): \DOMElement
+    private function representation(\DOMDocument $xml, string $id, PublishedTrack $track, int $bandwidth): \DOMElement
     {
-        $segmentList = $xml->createElement('SegmentList');
-        $segmentList->setAttribute('timescale', '1000');
+        $element = $xml->createElement('Representation');
+        $element->setAttribute('id', $id);
+        foreach ($track->representationAttributes as $name => $value) {
+            if (in_array($name, ['sar', 'frameRate', 'scanType'], true)) {
+                $element->setAttribute($name, $value);
+            }
+        }
+        $element->setAttribute('bandwidth', (string) $bandwidth);
+        $element->setAttribute('codecs', $track->codec);
+        return $element;
+    }
 
+    /** @param array<int, string> $urls */
+    private function segmentList(\DOMDocument $xml, PublishedTrack $track, string $initUrl, array $urls, bool $dynamic): \DOMElement
+    {
+        $list = $xml->createElement('SegmentList');
+        $list->setAttribute('timescale', (string) $track->timescale);
+        $list->setAttribute('presentationTimeOffset', (string) $track->presentationTimeOffset);
+        $list->setAttribute('startNumber', (string) ($track->segments[0]->ordinal ?? 0));
+        if ($dynamic) {
+            // Every listed resource has closed; accelerated encoding need not wait for its wall-clock media time.
+            $list->setAttribute('availabilityTimeOffset', 'INF');
+            $list->setAttribute('availabilityTimeComplete', 'true');
+        }
         $initialization = $xml->createElement('Initialization');
         $initialization->setAttribute('sourceURL', $initUrl);
-        $segmentList->appendChild($initialization);
-
-        $segmentTimeline = $xml->createElement('SegmentTimeline');
-        $segmentIndex = 0;
-        foreach ($segmentMap as $segment) {
+        $list->appendChild($initialization);
+        $timeline = $xml->createElement('SegmentTimeline');
+        foreach ($track->segments as $segment) {
             $s = $xml->createElement('S');
-            $s->setAttribute('d', (string) round($segment['duration'] * 1000));
-            if ($segmentIndex === 0) {
-                $s->setAttribute('t', '0');
-            }
-            $segmentTimeline->appendChild($s);
-            $segmentIndex++;
+            $s->setAttribute('t', (string) $segment->start);
+            $s->setAttribute('d', (string) $segment->duration);
+            $timeline->appendChild($s);
         }
-        $segmentList->appendChild($segmentTimeline);
-
-        foreach ($segmentMap as $segment) {
-            $segmentUrl = $xml->createElement('SegmentURL');
-            $segmentUrl->setAttribute('media', $segment['url']);
-            $segmentList->appendChild($segmentUrl);
+        $list->appendChild($timeline);
+        foreach ($track->segments as $segment) {
+            $url = $xml->createElement('SegmentURL');
+            $url->setAttribute('media', $urls[$segment->ordinal]);
+            $list->appendChild($url);
         }
-
-        return $segmentList;
-    }
-
-    private function emptyManifest(): string
-    {
-        $xml = new \DOMDocument('1.0', 'UTF-8');
-        $xml->formatOutput = true;
-
-        $mpd = $xml->createElementNS(self::MPD_NS, 'MPD');
-        $mpd->setAttribute('xmlns', self::MPD_NS);
-        $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:full:2011');
-        $mpd->setAttribute('type', 'static');
-        $mpd->setAttribute('minBufferTime', 'PT6S');
-
-        $period = $xml->createElement('Period');
-        $mpd->appendChild($period);
-        $xml->appendChild($mpd);
-
-        return $xml->saveXML();
+        return $list;
     }
 }
