@@ -31,14 +31,14 @@ final class VideoHelperPayloadTest extends TestCase
         $replacement = $facade->probeVideo($job, '/media/source with spaces.mkv', 2);
         $directory = sys_get_temp_dir() . '/baander-remote-subtitle-' . bin2hex(random_bytes(6));
         try {
-            $subtitle = $facade->extractSubtitles($job, '/media/source with spaces.mkv', 'en', $directory . '/full.vtt', 2);
+            $subtitle = $facade->extractSubtitles($job, '/media/source with spaces.mkv', 2, $directory . '/full.vtt', 2);
             self::assertNotSame($first, $replacement);
             self::assertStringEndsWith(':2', $replacement);
-            self::assertStringEndsWith(':2:en', $subtitle);
+            self::assertStringEndsWith(':2:s2', $subtitle);
             self::assertSame('/usr/bin/ffprobe', $commands[1][0]);
             self::assertSame('/media/source with spaces.mkv', $commands[1][array_key_last($commands[1])]);
-            self::assertSame('0:s:m:language:en', $commands[2][array_search('-map', $commands[2], true) + 1]);
-            self::assertSame($directory . '/full.vtt', $commands[2][array_key_last($commands[2])]);
+            self::assertSame('0:2', $commands[2][array_search('-map', $commands[2], true) + 1]);
+            self::assertSame($directory . '/full.vtt.part', $commands[2][array_key_last($commands[2])]);
         } finally {
             rmdir($directory);
         }

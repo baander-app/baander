@@ -16,12 +16,13 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
 
 /**
- * @phpstan-type GenerationMetadata array{videoCodec: 'h264'|'hevc'|'av1', audioCodec: string, audioProfile: array<string, mixed>, segmentDuration: int|float, totalSegments: int, duration: float, startSegment: int, startTime: float}
+ * @phpstan-type GenerationMetadata array{videoCodec: 'h264'|'hevc'|'av1', audioCodec: ?string, audioProfile: array<string, mixed>, segmentDuration: int|float, totalSegments: int, duration: float, startSegment: int, startTime: float}
  */
 final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 {
@@ -76,21 +77,29 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     public function getMasterManifest(Uuid $videoId, array $renditions): string
     {
         $contexts = $this->renditions($videoId, $renditions);
-        $urls = $codecs = $subtitles = [];
+        $urls = $codecs = $subtitles = $bandwidths = [];
         foreach ($contexts ?? [] as $entry) {
             $job = $entry['job'];
             $context = $entry['context'];
             $generation = $context['runtime']->generation;
             $tier = QualityTier::fromString($job->getQualityTierName());
             $urls[$tier->name] = $this->signed('/api/transcode/'.$job->getPublicId().'/media.m3u8', $generation, ['tier' => $tier->name]);
-            $codecs[$tier->name] = $this->videoCodec($context['metadata'], $tier).','.$this->audioCodecToRfc6381($context['metadata']['audioCodec']);
+            $codecs[$tier->name] = $this->renditionCodecs($context['metadata'], $tier);
+            $bandwidths[$tier->name] = $this->bandwidth($context['metadata'], $tier);
             if ($subtitles === []) {
-                foreach (array_column($job->getProbeData()['subtitleStreams'] ?? [], 'language') as $language) {
-                    $subtitles[] = ['language' => $language, 'name' => $this->languageName($language), 'uri' => $this->signed('/api/transcode/'.$job->getPublicId().'/subtitles/'.rawurlencode($language).'/media.m3u8', $generation), 'isDefault' => $subtitles === [], 'groupId' => 'subs'];
+                $hasDefault = false;
+                foreach ($job->getProbeData()['subtitleStreams'] ?? [] as $data) {
+                    $track = SubtitleTrackInfo::fromSerialized($data);
+                    if (!$track->isText() || $this->subtitlePath($job, $context['storage'], $track->trackKey(), 'full') === null) {
+                        continue;
+                    }
+                    $default = $track->isDefault && !$hasDefault;
+                    $hasDefault = $hasDefault || $default;
+                    $subtitles[] = ['language' => $track->language, 'name' => $track->getDisplayName().' ('.$track->trackKey().')', 'uri' => $this->signed('/api/transcode/'.$job->getPublicId().'/subtitles/'.$track->trackKey().'/media.m3u8', $generation), 'isDefault' => $default, 'isForced' => $track->isForced, 'groupId' => 'subs'];
                 }
             }
         }
-        return $this->manifestGenerator->generateMasterManifest($urls, [], $subtitles, $codecs);
+        return $this->manifestGenerator->generateMasterManifest($urls, [], $subtitles, $codecs, $bandwidths);
     }
 
     public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string
@@ -187,8 +196,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
                 'init_url' => $this->signed('/api/transcode/'.$job->getPublicId().'/init', $generation),
                 'segment_map' => $this->segments($job, $metadata, $generation),
                 'total_duration' => $metadata['duration'] - $metadata['startTime'],
-                'video_codec_rfc6381' => $this->videoCodec($metadata, $tier).','.$this->audioCodecToRfc6381($metadata['audioCodec']),
-                'audio_codec_rfc6381' => $this->audioCodecToRfc6381($metadata['audioCodec']),
+                'video_codec_rfc6381' => $this->renditionCodecs($metadata, $tier),
+                'bandwidth' => $this->bandwidth($metadata, $tier),
+                'audio_codec_rfc6381' => $metadata['audioCodec'] === null ? '' : $this->audioCodecToRfc6381($metadata['audioCodec']),
             ];
             $duration = max($duration, $metadata['duration'] - $metadata['startTime']);
         }
@@ -216,19 +226,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $job = $this->jobRepository->findByPublicId($jobPublicId);
         $context = $job === null ? null : $this->context($job, $generation);
         $segments = [];
-        if ($context !== null) {
-            try {
-                $directory = $context['storage']->resolveSubtitleDirectory($job->getVideoId(), $language);
-            } catch (\InvalidArgumentException) {
-                return $this->manifestGenerator->generateSubtitleManifest($language, []);
-            }
-            $files = glob($directory.'/*.vtt') ?: []; sort($files);
-            foreach ($files as $file) {
-                $name = basename($file, '.vtt');
-                if ($this->subtitlePath($job, $context['storage'], $language, $name) !== null) {
-                    $segments[] = ['segmentName' => $name, 'duration' => $context['metadata']['segmentDuration'], 'url' => $this->signed('/api/transcode/'.$jobPublicId.'/subtitles/'.rawurlencode($language).'/'.rawurlencode($name).'.vtt', $generation)];
-                }
-            }
+        if ($context !== null && preg_match('/^s[0-9]+$/D', $language) === 1
+            && $this->subtitlePath($job, $context['storage'], $language, 'full') !== null) {
+            $segments[] = ['segmentName' => 'full', 'duration' => $context['metadata']['duration'] - $context['metadata']['startTime'], 'url' => $this->signed('/api/transcode/'.$jobPublicId.'/subtitles/'.$language.'/full.vtt', $generation)];
         }
         if ($context !== null) {
             $runtime = $this->ownership->find($job->getId());
@@ -236,7 +236,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
                 $segments = [];
             }
         }
-        return $this->manifestGenerator->generateSubtitleManifest($language, $segments);
+        return $this->manifestGenerator->generateSubtitleManifest($language, $segments, $segments[0]['duration'] ?? 6.0);
     }
 
     public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
@@ -257,6 +257,9 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 
     private function subtitlePath(TranscodeJob $job, TranscodeStoragePortInterface $storage, string $language, string $segmentName): ?string
     {
+        if (preg_match('/^s[0-9]+$/D', $language) !== 1 || $segmentName !== 'full') {
+            return null;
+        }
         try {
             $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $language, $segmentName);
             return $storage->exists($path) && is_file($path) ? $path : null;
@@ -296,7 +299,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
             if (!is_array($metadata) || ($metadata['schemaVersion'] ?? null) !== 1 || ($metadata['generation'] ?? null) !== $generation
                 || !in_array($metadata['videoCodec'] ?? null, ['h264', 'hevc', 'av1'], true)
-                || !is_string($metadata['videoEncoder'] ?? null) || !is_string($metadata['audioCodec'] ?? null)
+                || !is_string($metadata['videoEncoder'] ?? null) || !array_key_exists('audioCodec', $metadata) || ($metadata['audioCodec'] !== null && !is_string($metadata['audioCodec']))
                 || !is_array($metadata['audioProfile'] ?? null) || json_encode($metadata['audioProfile'], JSON_THROW_ON_ERROR) !== json_encode($runtime->desired->audioProfile->jsonSerialize(), JSON_THROW_ON_ERROR)
                 || (!is_int($metadata['segmentDuration'] ?? null) && !is_float($metadata['segmentDuration'] ?? null)) || $metadata['segmentDuration'] <= 0
                 || !is_int($metadata['totalSegments'] ?? null) || $metadata['totalSegments'] < 1
@@ -401,6 +404,18 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
     }
 
     /** @param GenerationMetadata $metadata */
+    private function renditionCodecs(array $metadata, QualityTier $tier): string
+    {
+        return $this->videoCodec($metadata, $tier) . ($metadata['audioCodec'] === null ? '' : ',' . $this->audioCodecToRfc6381($metadata['audioCodec']));
+    }
+
+    /** @param GenerationMetadata $metadata */
+    private function bandwidth(array $metadata, QualityTier $tier): int
+    {
+        return (int) ceil(($tier->maxBitrate + ($metadata['audioCodec'] === null ? 0 : (int) ($metadata['audioProfile']['bitrate'] ?? 0))) * 1.05);
+    }
+
+    /** @param GenerationMetadata $metadata */
     private function videoCodec(array $metadata, QualityTier $tier): string
     {
         return VideoProcessingRules::codecRfc6381(match ($metadata['videoCodec']) { 'h264' => 'libx264', 'hevc' => 'libx265', 'av1' => 'libsvtav1' }, $tier->height);
@@ -415,8 +430,4 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         };
     }
 
-    private function languageName(string $code): string
-    {
-        return ['en' => 'English', 'es' => 'Español', 'fr' => 'Français', 'de' => 'Deutsch', 'it' => 'Italiano', 'pt' => 'Português', 'ja' => '日本語', 'ko' => '한국어', 'zh' => '中文', 'ru' => 'Русский', 'ar' => 'العربية', 'hi' => 'हिन्दी'][$code] ?? $code;
-    }
 }

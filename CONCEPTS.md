@@ -168,6 +168,13 @@ A durable record that one session has applied a request identity. It prevents th
 same request from applying again after other controls have intervened. Controls
 fan out transactionally to sibling renditions of the same playback owner and video.
 
+### Source subtitle track key
+
+The letter `s` followed by a subtitle stream's absolute FFprobe index, such as
+`s2`. It identifies that source track in extraction jobs, generation output and
+signed subtitle URLs. Language, title and dispositions describe the track and do
+not identify it; two tracks may share a language.
+
 ## Asynchronous execution
 
 ### Asynchronous workload catalog

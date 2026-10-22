@@ -57,6 +57,18 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private bool $renewAllowed = true;
     private ?Closure $onFence = null;
     private float $sourceDuration = 6.0;
+    private bool $sourceHasAudio = true;
+    /** @var list<array<string, mixed>> */
+    private array $subtitleStreams = [];
+    /** @var array<int, list<string>> */
+    private array $subtitleCommands = [];
+    /** @var list<int> */
+    private array $subtitleStopped = [];
+    private int $subtitlePolls = 0;
+    private int $subtitleDelay = 0;
+    private bool $subtitleFails = false;
+    private ?Closure $onSubtitlePoll = null;
+    private TranscodeProcessPool $helpers;
 
     protected function setUp(): void
     {
@@ -81,12 +93,40 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $videos->method('findByUuid')->willReturn($video);
         $pool = $this->createStub(NativeExecutionClientInterface::class);
         $pool->method('handshake')->willReturn(['ready' => true]);
-        $pool->method('signal')->willReturn(['state' => 'exited']);
+        $pool->method('signal')->willReturnCallback(function (NativeExecutionHandle $handle): array {
+            $this->subtitleStopped[] = $handle->attempt;
+            return ['state' => 'exited'];
+        });
         $pool->method('release')->willReturn(true);
-        $pool->method('submit')->willReturnCallback(function (): NativeExecutionHandle { ($this->onDispatch)?->__invoke(); return new NativeExecutionHandle(str_repeat('a', 64), 1); });
-        $pool->method('inspect')->willReturnCallback(fn(): array => ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode([
-            'format' => ['duration' => $this->sourceDuration], 'streams' => [['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720]],
-        ], JSON_THROW_ON_ERROR)]);
+        $pool->method('submit')->willReturnCallback(function (array $arguments): NativeExecutionHandle {
+            if ($arguments[0] === '/usr/bin/ffprobe') {
+                ($this->onDispatch)?->__invoke();
+                return new NativeExecutionHandle(str_repeat('a', 64), 1);
+            }
+            $index = count($this->subtitleCommands) + 1;
+            $this->subtitleCommands[$index] = $arguments;
+            return new NativeExecutionHandle(str_repeat('c', 64), $index);
+        });
+        $pool->method('inspect')->willReturnCallback(function (NativeExecutionHandle $handle): array {
+            if ($handle->token === str_repeat('c', 64)) {
+                ++$this->subtitlePolls;
+                ($this->onSubtitlePoll)?->__invoke();
+                if (in_array($handle->attempt, $this->subtitleStopped, true)) {
+                    return ['state' => 'exited', 'exitCode' => 1, 'stderr' => 'Stopped', 'error' => null, 'stdout' => ''];
+                }
+                if ($this->subtitlePolls <= $this->subtitleDelay) {
+                    return ['state' => 'running'];
+                }
+                $arguments = $this->subtitleCommands[$handle->attempt];
+                file_put_contents($arguments[array_key_last($arguments)], "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
+                return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => ''];
+            }
+            return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode([
+                'format' => ['duration' => $this->sourceDuration],
+                'streams' => array_merge([['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720]],
+                    $this->sourceHasAudio ? [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000']] : [], $this->subtitleStreams),
+            ], JSON_THROW_ON_ERROR)];
+        });
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
         $ffmpeg->method('probeVideo')->willReturn(VideoProbeResult::fromProbeOutput([
             'format' => ['duration' => 6.0],
@@ -126,8 +166,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $encoder = new SegmentEncoder($ffmpeg, $storage, EncoderProfile::software('libx264'));
         $this->spawner = new VideoExecutionSpawner();
         $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $encoder, new NullLogger(), $this->spawner);
+        $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder());
         $this->worker = new TranscodeSessionSubscriber($jobs, $sessions, $storage,
-            new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder()),
+            $this->helpers,
             $encoder, $videos, new NullLogger(), $ownership, $control, $streams, $this->timer, $admission);
     }
 
@@ -408,6 +449,84 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(['accepted', 'ready', 'ready', 'cancelled'], $this->observed);
         self::assertCount(1, $this->spawner->commands);
         self::assertSame(0, $this->allocations);
+    }
+
+    public function testSlowFailedSubtitlesKeepPauseAndCancelControlsResponsive(): void
+    {
+        $this->subtitleStreams = [['index' => 2, 'codec_type' => 'subtitle', 'codec_name' => 'subrip', 'tags' => ['language' => 'eng']]];
+        $this->subtitleDelay = 4;
+        $this->subtitleFails = true;
+        $this->spawner->running = true;
+        $readyBeforeFinished = false;
+        $this->onSubtitlePoll = function () use (&$readyBeforeFinished): void {
+            $readyBeforeFinished = $readyBeforeFinished || in_array('ready', $this->observed, true);
+            if ($this->subtitlePolls === 1) {
+                $this->current = $this->claim(1, 2, 'paused');
+            }
+        };
+        $this->spawner->onRunning = function (): void {
+            if (in_array('ready', $this->observed, true)) {
+                $this->current = $this->claim(1, 3, 'cancelled');
+            }
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertFalse($readyBeforeFinished);
+        self::assertGreaterThan(4, $this->subtitlePolls);
+        self::assertContains('signal-19:1', $this->spawner->events);
+        self::assertSame(['accepted', 'ready', 'cancelled'], $this->observed);
+        self::assertFileDoesNotExist($this->job->getOutputDirectory().'/subtitles/s2/full.vtt');
+        self::assertFileDoesNotExist($this->job->getOutputDirectory().'/subtitles/s2/full.vtt.part');
+        self::assertSame(0, $this->allocations);
+    }
+
+    public function testSeekRetiresSlowSubtitleHelpersBeforeReplacementPublishes(): void
+    {
+        $this->subtitleStreams = [['index' => 2, 'codec_type' => 'subtitle', 'codec_name' => 'subrip']];
+        $this->subtitleDelay = 1;
+        $this->onSubtitlePoll = function (): void {
+            if ($this->subtitlePolls === 1) {
+                $this->current = $this->claim(2, 2);
+            }
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertSame([1], $this->subtitleStopped);
+        self::assertCount(2, $this->subtitleCommands);
+        $oldPath = $this->subtitleCommands[1][array_key_last($this->subtitleCommands[1])];
+        self::assertStringContainsString('/generation-1/', $oldPath);
+        self::assertFileDoesNotExist($oldPath);
+        self::assertFileDoesNotExist(substr($oldPath, 0, -5));
+        self::assertFileExists($this->job->getOutputDirectory().'/subtitles/s2/full.vtt');
+        self::assertStringEndsWith('/generation-2', $this->job->getOutputDirectory());
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+    }
+
+    public function testExpiredSubtitleBatchRetiresHelpersAndClearsQueuedTracks(): void
+    {
+        $track = \App\Transcode\Domain\ValueObject\SubtitleTrackInfo::fromProbeStream(['index' => 2, 'codec_name' => 'subrip']);
+        $path = $this->root.'/subtitles/s2/full.vtt';
+        $key = $this->helpers->extractSubtitles($this->job, $this->root.'/source', 2, $path, 1);
+        file_put_contents($path.'.part', 'unfinished');
+        $queue = [$track];
+        $active = [$key => $track];
+        $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
+        $arguments = [$this->current, $this->job, $this->root.'/source', $storage, 0.0, &$queue, &$active, hrtime(true) - 1];
+        (new \ReflectionMethod(TranscodeSessionSubscriber::class, 'pollSubtitles'))->invokeArgs($this->worker, $arguments);
+        self::assertSame([], $queue);
+        self::assertSame([], $active);
+        self::assertSame([1], $this->subtitleStopped);
+        self::assertFileDoesNotExist($path);
+        self::assertFileDoesNotExist($path.'.part');
+    }
+
+    public function testVideoOnlyGenerationDoesNotAdvertiseOrMapAudio(): void
+    {
+        $this->sourceHasAudio = false;
+        $this->worker->run($this->current, static fn (): bool => false);
+        $metadata = json_decode(file_get_contents($this->job->getOutputDirectory().'/generation.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertNull($metadata['audioCodec']);
+        self::assertNotContains('-c:a', $this->spawner->commands[0]);
+        self::assertNotContains('0:a:0', $this->spawner->commands[0]);
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
     }
 
     private function assertPausedCursorPreroll(float $position, float $duration, int $target, int $start): void

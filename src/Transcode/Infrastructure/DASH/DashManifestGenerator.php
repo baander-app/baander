@@ -13,7 +13,7 @@ final class DashManifestGenerator
     /**
      * Generate a DASH onDemand manifest for the given video jobs and audio tracks.
      *
-     * @param array<string, array{public_id: string, quality_tier: QualityTier, init_url: string, segment_map: array<int, array{url: string, duration: float}>, total_duration: float, video_codec_rfc6381: string, audio_codec_rfc6381: string}> $renditions
+     * @param array<string, array{public_id: string, quality_tier: QualityTier, init_url: string, segment_map: array<int, array{url: string, duration: float}>, total_duration: float, video_codec_rfc6381: string, audio_codec_rfc6381: string, bandwidth?: int}> $renditions
      * @param array<string, array{language: string, init_url: string, segment_map: array<int, array{url: string, duration: float}>, codec_rfc6381: string}> $audioAdaptations
      */
     public function generate(array $renditions, array $audioAdaptations = [], float $totalDuration = 0.0): string
@@ -28,7 +28,7 @@ final class DashManifestGenerator
         $mpd = $xml->createElementNS(self::MPD_NS, 'MPD');
         $mpd->setAttribute('xmlns', self::MPD_NS);
         $mpd->setAttribute('xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance');
-        $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:isoff-on-demand:2011');
+        $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:full:2011');
         $mpd->setAttribute('type', 'static');
         $mpd->setAttribute('mediaPresentationDuration', sprintf('PT%dS', (int) ceil($totalDuration)));
         $mpd->setAttribute('minBufferTime', 'PT6S');
@@ -49,7 +49,7 @@ final class DashManifestGenerator
 
             $representation = $xml->createElement('Representation');
             $representation->setAttribute('id', $tierName);
-            $representation->setAttribute('bandwidth', (string) $tier->videoBitrate);
+            $representation->setAttribute('bandwidth', (string) ($rendition['bandwidth'] ?? $tier->maxBitrate));
             $representation->setAttribute('width', (string) $tier->width);
             $representation->setAttribute('height', (string) $tier->height);
             $representation->setAttribute('codecs', $rendition['video_codec_rfc6381']);
@@ -133,7 +133,7 @@ final class DashManifestGenerator
 
         $mpd = $xml->createElementNS(self::MPD_NS, 'MPD');
         $mpd->setAttribute('xmlns', self::MPD_NS);
-        $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:isoff-on-demand:2011');
+        $mpd->setAttribute('profiles', 'urn:mpeg:dash:profile:full:2011');
         $mpd->setAttribute('type', 'static');
         $mpd->setAttribute('minBufferTime', 'PT6S');
 

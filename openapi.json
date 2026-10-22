@@ -18620,7 +18620,7 @@
                 "tags": [
                     "Streaming"
                 ],
-                "summary": "Get HLS subtitle playlist for a language",
+                "summary": "Get HLS subtitle playlist for a source track",
                 "operationId": "get_stream_subtitle_manifest",
                 "parameters": [
                     {
@@ -18645,7 +18645,7 @@
                     {
                         "name": "language",
                         "in": "path",
-                        "description": "BCP-47 language tag",
+                        "description": "Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -18885,7 +18885,7 @@
                     {
                         "name": "language",
                         "in": "path",
-                        "description": "BCP-47 language tag",
+                        "description": "Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)",
                         "required": true,
                         "schema": {
                             "type": "string"

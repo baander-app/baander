@@ -92,9 +92,9 @@ final class ManifestGeneratorTest extends TestCase
         $this->assertStringContainsString('#EXTM3U', $manifest);
         $this->assertStringContainsString('#EXT-X-VERSION:6', $manifest);
         $this->assertStringContainsString('#EXT-X-INDEPENDENT-SEGMENTS', $manifest);
-        $this->assertStringContainsString('BANDWIDTH=2800000', $manifest);
+        $this->assertStringContainsString('BANDWIDTH=' . QualityTier::p720()->maxBitrate, $manifest);
         $this->assertStringContainsString('RESOLUTION=1280x720', $manifest);
-        $this->assertStringContainsString('BANDWIDTH=5000000', $manifest);
+        $this->assertStringContainsString('BANDWIDTH=' . QualityTier::p1080()->maxBitrate, $manifest);
         $this->assertStringContainsString('RESOLUTION=1920x1080', $manifest);
     }
 
@@ -164,5 +164,18 @@ final class ManifestGeneratorTest extends TestCase
         $this->assertStringContainsString('CODECS="hvc1.1.6.L93.B0"', $manifest);
         $this->assertStringNotContainsString('AUDIO="', $manifest);
         $this->assertStringNotContainsString('SUBTITLES="', $manifest);
+    }
+
+    public function testSubtitleMetadataCannotInjectPlaylistLines(): void
+    {
+        $manifest = $this->generator->generateMasterManifest(['720p' => '/media.m3u8'], [], [[
+            'language' => "en\"\n#EXT-X-ENDLIST", 'name' => "Dialogue \"SDH\"\r\nInjected", 'uri' => '/s2/media.m3u8', 'isForced' => true,
+        ]], 'avc1.64001f,mp4a.40.2', ['720p' => 4300000]);
+        self::assertStringContainsString('LANGUAGE="und"', $manifest);
+        self::assertStringContainsString("NAME=\"Dialogue 'SDH'  Injected\"", $manifest);
+        self::assertStringContainsString('FORCED=YES', $manifest);
+        self::assertStringContainsString('BANDWIDTH=4300000', $manifest);
+        self::assertStringNotContainsString("\n#EXT-X-ENDLIST", $manifest);
+        self::assertSame(7, count(explode("\n", $manifest)));
     }
 }

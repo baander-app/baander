@@ -30405,7 +30405,7 @@ export const getGetStreamSubtitleManifestUrl = (jobPublicId: string,
 }
 
 /**
- * @summary Get HLS subtitle playlist for a language
+ * @summary Get HLS subtitle playlist for a source track
  */
 export const getStreamSubtitleManifest = async (jobPublicId: string,
     language: string,
@@ -30488,7 +30488,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get HLS subtitle playlist for a language
+ * @summary Get HLS subtitle playlist for a source track
  */
 
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(

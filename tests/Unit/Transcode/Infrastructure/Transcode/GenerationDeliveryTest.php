@@ -115,15 +115,16 @@ final class GenerationDeliveryTest extends TestCase
 
     public function testSubtitleUrlsAreSignedForTheirGenerationAndRetirementDiscardsTheManifest(): void
     {
-        $subtitles = $this->directory.'/subtitles/en';
+        $subtitles = $this->directory.'/subtitles/s2';
         mkdir($subtitles, 0700, true);
-        file_put_contents($subtitles.'/seg_0.vtt', 'WEBVTT');
-        file_put_contents($subtitles.'/seg_1.vtt', 'WEBVTT');
-        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 'en', 3);
-        self::assertSame(2, substr_count($manifest, 'generation=3'));
-        self::assertSame(2, substr_count($manifest, '&sig='));
+        file_put_contents($subtitles.'/full.vtt', 'WEBVTT');
+        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3);
+        self::assertSame(1, substr_count($manifest, 'generation=3'));
+        self::assertStringContainsString('#EXTINF:10.000000,', $manifest);
+        self::assertStringContainsString('#EXT-X-TARGETDURATION:10', $manifest);
+        self::assertSame(1, substr_count($manifest, '&sig='));
         $this->retireAfterFirstRead = true;
-        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 'en', 3);
+        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3);
         self::assertStringNotContainsString('#EXTINF:', $manifest);
     }
 
@@ -144,6 +145,41 @@ final class GenerationDeliveryTest extends TestCase
         $state = $this->service->getPlaybackState($this->job->getVideoId(), [$this->job->getPublicId()->toString()]);
         self::assertSame(162.0, $state['startTime']);
         self::assertSame(600.0, $state['duration']);
+    }
+
+    public function testOnlyPublishedTextTracksAreAdvertisedWithDistinctIdentity(): void
+    {
+        $this->job->updateProbeData(['subtitleStreams' => [
+            ['index' => 2, 'language' => 'eng', 'codec' => 'subrip', 'title' => 'Dialogue', 'isDefault' => true],
+            ['index' => 3, 'language' => 'eng', 'codec' => 'ass', 'title' => 'Commentary', 'isForced' => true],
+            ['index' => 4, 'language' => 'und', 'codec' => 'hdmv_pgs_subtitle', 'title' => 'Bitmap'],
+            ['index' => 5, 'language' => 'und', 'codec' => 'subrip', 'title' => 'Not ready'],
+        ]]);
+        foreach (['s2', 's3', 's4'] as $key) {
+            mkdir($this->directory.'/subtitles/'.$key, 0700, true);
+            file_put_contents($this->directory.'/subtitles/'.$key.'/full.vtt', 'WEBVTT');
+        }
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]]);
+        self::assertSame(2, substr_count($master, 'TYPE=SUBTITLES'));
+        self::assertStringContainsString('NAME="Dialogue (s2)",DEFAULT=YES', $master);
+        self::assertStringContainsString('NAME="Commentary (s3)",DEFAULT=NO,AUTOSELECT=YES,FORCED=YES', $master);
+        self::assertStringContainsString('/subtitles/s2/media.m3u8', $master);
+        self::assertStringContainsString('/subtitles/s3/media.m3u8', $master);
+    }
+
+    public function testVideoOnlyMetadataOmitsAudioCodecAndUsesWholeRenditionBandwidth(): void
+    {
+        $path = $this->directory.'/generation.json';
+        $metadata = json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        $metadata['audioCodec'] = null;
+        file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
+        $set = [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]];
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), $set);
+        self::assertStringNotContainsString('mp4a.', $master);
+        self::assertStringContainsString('BANDWIDTH='.(int) ceil(QualityTier::p720()->maxBitrate * 1.05), $master);
+        $dash = $this->service->getDashManifest($this->job->getVideoId(), $set);
+        self::assertStringNotContainsString('mp4a.', $dash);
+        self::assertStringContainsString('urn:mpeg:dash:profile:full:2011', $dash);
     }
 
     private function snapshot(bool $live = true, string $outcome = 'ready', ?string $directory = null): TranscodeRuntimeSnapshot

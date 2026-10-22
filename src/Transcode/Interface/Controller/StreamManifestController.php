@@ -131,11 +131,11 @@ final class StreamManifestController
 
     #[OA\Get(
         path: '/api/transcode/{jobPublicId}/subtitles/{language}/media.m3u8',
-        summary: 'Get HLS subtitle playlist for a language',
+        summary: 'Get HLS subtitle playlist for a source track',
         parameters: [
             new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'language', description: 'BCP-47 language tag', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'language', description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'HLS subtitle manifest', content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl', schema: new OA\Schema(type: 'string'))),

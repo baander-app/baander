@@ -13,7 +13,8 @@ final class ManifestGenerator
      *
      * @param array<string, string> $mediaManifestUrls Map of tier name => video manifest URL
      * @param list<array{language: string, name: string, uri: string, channels?: string, isDefault?: bool, groupId?: string, codec?: string}> $audioGroups Audio track definitions
-     * @param list<array{language: string, name: string, uri: string, isDefault?: bool, groupId?: string}> $subtitleGroups Subtitle track definitions
+     * @param list<array{language: string, name: string, uri: string, isDefault?: bool, isForced?: bool, groupId?: string}> $subtitleGroups Subtitle track definitions
+     * @param array<string, int> $bandwidths Whole-rendition peak bitrate estimates
      * @param string|array<string, string>|null $videoCodecRfc6381 RFC6381 codec override (per-tier map or single string)
      */
     public function generateMasterManifest(
@@ -21,6 +22,7 @@ final class ManifestGenerator
         array $audioGroups = [],
         array $subtitleGroups = [],
         string|array|null $videoCodecRfc6381 = null,
+        array $bandwidths = [],
     ): string {
         $lines = [];
         $lines[] = '#EXTM3U';
@@ -37,9 +39,9 @@ final class ManifestGenerator
             $autoselect = 'YES';
             $lines[] = sprintf(
                 '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",DEFAULT=%s,AUTOSELECT=%s,CHANNELS="%s",URI="%s"',
-                $audioGroupId,
-                $audio['language'],
-                $audio['name'],
+                self::quoted($audioGroupId),
+                self::language($audio['language']),
+                self::quoted($audio['name']),
                 $default,
                 $autoselect,
                 $audio['channels'] ?? '2',
@@ -52,13 +54,14 @@ final class ManifestGenerator
             $default = ($sub['isDefault'] ?? false) ? 'YES' : 'NO';
             $autoselect = 'YES';
             $lines[] = sprintf(
-                '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",DEFAULT=%s,AUTOSELECT=%s,URI="%s"',
-                $subtitleGroupId,
-                $sub['language'],
-                $sub['name'],
+                '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",DEFAULT=%s,AUTOSELECT=%s,FORCED=%s,URI="%s"',
+                self::quoted($subtitleGroupId),
+                self::language($sub['language']),
+                self::quoted($sub['name']),
                 $default,
                 $autoselect,
-                $sub['uri'],
+                ($sub['isForced'] ?? false) ? 'YES' : 'NO',
+                self::quoted($sub['uri']),
             );
         }
 
@@ -67,14 +70,9 @@ final class ManifestGenerator
             $tier = QualityTier::fromString($tierName);
 
             $codecs = is_array($videoCodecRfc6381) ? ($videoCodecRfc6381[$tierName] ?? $tier->rfc6381Codec) : ($videoCodecRfc6381 ?? $tier->rfc6381Codec);
-            // When audio is delivered via a separate EXT-X-MEDIA group, the
-            // variant segments are video-only and the CODECS attribute must
-            // list only the video codec. Listing the audio codec here makes
-            // players expect an audio track inside the video segment, which
-            // causes fragment parsing errors.
             $streamInf = sprintf(
                 '#EXT-X-STREAM-INF:BANDWIDTH=%d,RESOLUTION=%dx%d,CODECS="%s"',
-                $tier->videoBitrate,
+                $bandwidths[$tierName] ?? $tier->maxBitrate,
                 $tier->width,
                 $tier->height,
                 $codecs,
@@ -95,9 +93,9 @@ final class ManifestGenerator
     }
 
     /**
-     * Generate an HLS v6 video-only media playlist for a single quality tier.
+     * Generate an HLS v6 media playlist for a single quality tier.
      *
-     * Video-only — no audio muxed in. Audio is delivered separately via EXT-X-MEDIA.
+     * The current encoder muxes video and audio in each rendition.
      *
      * @param QualityTier $tier Quality tier for this rendition
      * @param string $initSegmentUrl URL to the init segment
@@ -157,5 +155,15 @@ final class ManifestGenerator
         $lines[] = '#EXT-X-ENDLIST';
 
         return implode("\n", $lines) . "\n";
+    }
+
+    private static function quoted(string $value): string
+    {
+        return str_replace('"', "'", preg_replace('/[\x00-\x1F\x7F]/u', ' ', $value) ?? '');
+    }
+
+    private static function language(string $value): string
+    {
+        return preg_match('/^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$/D', $value) === 1 ? $value : 'und';
     }
 }

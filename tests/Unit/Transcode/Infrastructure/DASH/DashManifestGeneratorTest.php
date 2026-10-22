@@ -34,7 +34,7 @@ final class DashManifestGeneratorTest extends TestCase
         $this->assertArrayHasKey('', $namespaces);
         $this->assertSame('urn:mpeg:dash:schema:mpd:2011', $namespaces['']);
         $this->assertSame('static', (string) $xml['type']);
-        $this->assertSame('urn:mpeg:dash:profile:isoff-on-demand:2011', (string) $xml['profiles']);
+        $this->assertSame('urn:mpeg:dash:profile:full:2011', (string) $xml['profiles']);
         $this->assertSame('PT6S', (string) $xml['minBufferTime']);
         $this->assertSame('PT4S', (string) $xml['mediaPresentationDuration']);
 
@@ -57,14 +57,14 @@ final class DashManifestGeneratorTest extends TestCase
         // Verify 360p representation attributes
         $p360 = $representations[0];
         $this->assertSame('p360', (string) $p360['id']);
-        $this->assertSame('800000', (string) $p360['bandwidth']);
+        $this->assertSame((string) QualityTier::p360()->maxBitrate, (string) $p360['bandwidth']);
         $this->assertSame('640', (string) $p360['width']);
         $this->assertSame('360', (string) $p360['height']);
 
         // Verify 4K representation attributes
         $p4k = $representations[3];
         $this->assertSame('p4k', (string) $p4k['id']);
-        $this->assertSame('20000000', (string) $p4k['bandwidth']);
+        $this->assertSame((string) QualityTier::p4K()->maxBitrate, (string) $p4k['bandwidth']);
         $this->assertSame('3840', (string) $p4k['width']);
         $this->assertSame('2160', (string) $p4k['height']);
     }
@@ -151,7 +151,7 @@ final class DashManifestGeneratorTest extends TestCase
 
         $rep = $representations[0];
         $this->assertSame('p1080', (string) $rep['id']);
-        $this->assertSame('5000000', (string) $rep['bandwidth']);
+        $this->assertSame((string) QualityTier::p1080()->maxBitrate, (string) $rep['bandwidth']);
         $this->assertSame('1920', (string) $rep['width']);
         $this->assertSame('1080', (string) $rep['height']);
         // Video Representation only contains the video codec

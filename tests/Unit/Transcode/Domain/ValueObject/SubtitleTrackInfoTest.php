@@ -27,16 +27,21 @@ final class SubtitleTrackInfoTest extends TestCase
     public function testFromProbeStreamExtractsFields(): void
     {
         $stream = [
+            'index' => 4,
+            'disposition' => ['default' => 1, 'forced' => 1],
             'codec_name' => 'subrip',
             'tags' => [
                 'language' => 'fr',
                 'title' => 'French',
-                'default' => 'true',
             ],
         ];
 
         $info = SubtitleTrackInfo::fromProbeStream($stream);
 
+        $this->assertSame(4, $info->index);
+        $this->assertSame('s4', $info->trackKey());
+        $this->assertTrue($info->isForced);
+        $this->assertTrue($info->isText());
         $this->assertSame('fr', $info->language);
         $this->assertSame('subrip', $info->codec);
         $this->assertSame('French', $info->title);
@@ -59,6 +64,13 @@ final class SubtitleTrackInfoTest extends TestCase
         $restored = SubtitleTrackInfo::fromSerialized($data);
 
         $this->assertTrue($original->equals($restored));
+    }
+
+    public function testBitmapTrackIsNotTextAndStreamIndexDistinguishesTracks(): void
+    {
+        $bitmap = new SubtitleTrackInfo('en', 'hdmv_pgs_subtitle', 'English', false, 3);
+        self::assertFalse($bitmap->isText());
+        self::assertFalse($bitmap->equals(new SubtitleTrackInfo('en', 'hdmv_pgs_subtitle', 'English', false, 4)));
     }
 
     public function testEqualsReturnsTrueForIdenticalInstances(): void
@@ -132,6 +144,8 @@ final class SubtitleTrackInfoTest extends TestCase
             'codec' => 'subrip',
             'title' => 'English',
             'isDefault' => true,
+            'index' => 0,
+            'isForced' => false,
         ], $data);
     }
 }

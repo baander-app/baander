@@ -16,6 +16,8 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
         public string $codec,
         public string $title,
         public bool $isDefault,
+        public int $index = 0,
+        public bool $isForced = false,
     ) {
     }
 
@@ -34,7 +36,9 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
             language: $language,
             codec: $stream['codec_name'] ?? 'unknown',
             title: $title,
-            isDefault: ($tags['default'] ?? 'false') === 'true',
+            isDefault: (bool) ($stream['disposition']['default'] ?? false),
+            index: (int) ($stream['index'] ?? 0),
+            isForced: (bool) ($stream['disposition']['forced'] ?? false),
         );
     }
 
@@ -49,7 +53,19 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
             codec: $data['codec'] ?? 'unknown',
             title: $data['title'] ?? '',
             isDefault: (bool) ($data['isDefault'] ?? false),
+            index: (int) ($data['index'] ?? 0),
+            isForced: (bool) ($data['isForced'] ?? false),
         );
+    }
+
+    public function trackKey(): string
+    {
+        return 's' . $this->index;
+    }
+
+    public function isText(): bool
+    {
+        return in_array($this->codec, ['subrip', 'srt', 'ass', 'ssa', 'webvtt', 'mov_text', 'text', 'microdvd', 'mpl2', 'jacosub', 'sami', 'realtext', 'subviewer', 'subviewer1', 'vplayer', 'pjs'], true);
     }
 
     public function getDisplayName(): string
@@ -64,11 +80,13 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
         return $this->language === $other->language
             && $this->codec === $other->codec
             && $this->title === $other->title
-            && $this->isDefault === $other->isDefault;
+            && $this->isDefault === $other->isDefault
+            && $this->index === $other->index
+            && $this->isForced === $other->isForced;
     }
 
     /**
-     * @return array{language: string, codec: string, title: string, isDefault: bool}
+     * @return array{language: string, codec: string, title: string, isDefault: bool, index: int, isForced: bool}
      */
     public function jsonSerialize(): array
     {
@@ -77,6 +95,8 @@ final readonly class SubtitleTrackInfo implements JsonSerializable
             'codec' => $this->codec,
             'title' => $this->title,
             'isDefault' => $this->isDefault,
+            'index' => $this->index,
+            'isForced' => $this->isForced,
         ];
     }
 }

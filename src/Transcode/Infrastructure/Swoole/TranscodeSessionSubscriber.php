@@ -17,6 +17,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionState;
+use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
@@ -117,6 +118,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             $active = $this->refresh($active, $local, $stopRequested);
             $total = (int) ceil($probe->duration / SegmentEncoder::getSegmentDuration());
             $generation = null;
+            $start = 0;
             $output = null;
             $scoped = null;
             $paused = false;
@@ -125,6 +127,9 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             $finished = false;
             $appliedRevision = 0;
             $seen = [];
+            $subtitleQueue = [];
+            $subtitleActive = [];
+            $subtitleDeadline = 0;
             while (true) {
                 try {
                     $latest = $this->refresh($active, $local, $stopRequested);
@@ -138,6 +143,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     if ($generation !== $latest->runtime->generation) {
                         // Reap the captured process before advancing the write fence.
                         $this->streamManager->stopStream($jobId);
+                        $this->processPool->shutdown();
+                        $subtitleQueue = array_values(array_filter($probe->subtitleStreams, static fn (SubtitleTrackInfo $track): bool => $track->isText()));
+                        $subtitleActive = [];
+                        $subtitleDeadline = hrtime(true) + 30_000_000_000;
                         $active = $latest;
                         $scoped = $this->storage->forGeneration($job->getVideoId(), $tier, $active->runtime->generation, $job->getId());
                         $output = $scoped->resolveJobDirectory($job->getVideoId(), $tier);
@@ -166,7 +175,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $filters = $this->segmentEncoder->buildVideoFilters($probe, $tier);
                         $audioFilters = $this->segmentEncoder->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
                         $this->assertCurrent($active, $local, $stopRequested);
-                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation);
+                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $probe->hasAudio());
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;
@@ -192,6 +201,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     if ($output === null || $scoped === null) {
                         throw new RuntimeException('Generation output has not initialized.');
                     }
+                    $this->pollSubtitles($active, $job, $source, $scoped, $start * SegmentEncoder::getSegmentDuration(), $subtitleQueue, $subtitleActive, $subtitleDeadline);
                     $segments = glob($output . '/v0_a0_' . $tier->name . '_*.m4s') ?: [];
                     $new = [];
                     $highest = 0;
@@ -218,7 +228,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         }
                     }
                     if ((!$ready || $appliedRevision !== $active->runtime->desiredRevision)
-                        && isset($seen[$playbackSegment]) && $this->completeInit($init)) {
+                        && isset($seen[$playbackSegment]) && $this->completeInit($init) && $subtitleQueue === [] && $subtitleActive === []) {
                         if ($desiredPaused && !$paused && !$finished) {
                             $this->streamManager->pauseStream($jobId);
                             $paused = true;
@@ -232,10 +242,13 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $this->persistSessionReady($active);
                     }
                     if ($finished) {
+                        if (!$ready && ($subtitleQueue !== [] || $subtitleActive !== [])) {
+                            Async::sleep(0.1);
+                            continue;
+                        }
                         if (!$ready) {
                             throw new RuntimeException('Encoder exited before publishing playable video.');
                         }
-                        $this->extractSubtitles($active, $job, $source, $probe, $scoped, $local, $stopRequested);
                         $this->assertCurrent($active, $local, $stopRequested);
                         $this->streamManager->stopStream($jobId);
                         $this->persist($active, static function (TranscodeJob $fresh): void {
@@ -428,7 +441,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         $metadata = json_encode([
             'schemaVersion' => 1, 'generation' => $claim->runtime->generation,
             'videoCodec' => $codec, 'videoEncoder' => $encoder,
-            'audioCodec' => $claim->runtime->desired->audioProfile->codec,
+            'audioCodec' => $probe->hasAudio() ? $claim->runtime->desired->audioProfile->codec : null,
             'audioProfile' => $claim->runtime->desired->audioProfile->jsonSerialize(),
             'segmentDuration' => SegmentEncoder::getSegmentDuration(),
             'startSegment' => $startSegment,
@@ -441,21 +454,33 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         }
     }
 
-    private function extractSubtitles(TranscodeExecutionClaim $claim, TranscodeJob $job, string $source, VideoProbeResult $probe, TranscodeStoragePortInterface $storage, TranscodeLoopOwnership $local, callable $stopRequested): void
+    /**
+     * @param list<SubtitleTrackInfo> $queue
+     * @param array<string, SubtitleTrackInfo> $active
+     */
+    private function pollSubtitles(TranscodeExecutionClaim $claim, TranscodeJob $job, string $source, TranscodeStoragePortInterface $storage, float $startTime, array &$queue, array &$active, int $deadline): void
     {
-        foreach ($probe->subtitleStreams as $subtitle) {
-            $this->assertCurrent($claim, $local, $stopRequested);
-            $directory = $storage->resolveSubtitleDirectory($job->getVideoId(), $subtitle->language);
-            if (!is_dir($directory)) {
-                mkdir($directory, 0755, true);
+        if (($queue !== [] || $active !== []) && hrtime(true) >= $deadline) {
+            $this->processPool->shutdown();
+            $this->logger->warning('Subtitle startup deadline expired; unfinished tracks omitted', ['jobId' => $job->getId()->toString(), 'generation' => $claim->runtime->generation, 'tracks' => count($queue) + count($active)]);
+            $queue = $active = [];
+            return;
+        }
+        foreach ($active as $key => $track) {
+            $result = $this->processPool->readResult($key);
+            if ($result === null) {
+                continue;
             }
-            $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $subtitle->language, 'full');
-            $key = $this->processPool->extractSubtitles($job, $source, $subtitle->language, $path, $claim->runtime->generation);
-            $deadline = hrtime(true) + 120_000_000_000;
-            while ($this->processPool->readResult($key) === null && hrtime(true) < $deadline) {
-                $this->assertCurrent($claim, $local, $stopRequested);
-                Async::sleep(0.1);
+            unset($active[$key]);
+            if ($result['status'] !== 'ok') {
+                $this->logger->warning('Subtitle extraction failed; track omitted', ['jobId' => $job->getId()->toString(), 'track' => $track->trackKey(), 'error' => $result['data']]);
             }
+        }
+        while (count($active) < 2 && $queue !== []) {
+            $track = array_shift($queue);
+            $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $track->trackKey(), 'full');
+            $key = $this->processPool->extractSubtitles($job, $source, $track->index, $path, $claim->runtime->generation, $startTime);
+            $active[$key] = $track;
         }
     }
 }
