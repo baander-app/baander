@@ -451,6 +451,33 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(0, $this->allocations);
     }
 
+    public function testSubtitleTracksQueueBehindOneHelperUntilAllTracksPublish(): void
+    {
+        foreach ([2, 3, 4] as $index) {
+            $this->subtitleStreams[] = ['index' => $index, 'codec_type' => 'subtitle', 'codec_name' => 'subrip'];
+        }
+        $this->subtitleDelay = 3;
+        $maximumActive = 0;
+        $this->onSubtitlePoll = function () use (&$maximumActive): void {
+            $active = 0;
+            foreach ($this->subtitleCommands as $arguments) {
+                $temporary = $arguments[array_key_last($arguments)];
+                if (!is_file(substr($temporary, 0, -5))) {
+                    ++$active;
+                }
+            }
+            $maximumActive = max($maximumActive, $active);
+            self::assertNotContains('ready', $this->observed, 'Initial readiness must settle the complete subtitle queue.');
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        self::assertSame(1, $maximumActive, 'Three video jobs must fit their encoders and subtitle helpers within the shared native budget.');
+        self::assertCount(3, $this->subtitleCommands);
+        foreach (['s2', 's3', 's4'] as $key) {
+            self::assertFileExists($this->job->getOutputDirectory().'/subtitles/'.$key.'/full.vtt');
+        }
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+    }
+
     public function testSlowFailedSubtitlesKeepPauseAndCancelControlsResponsive(): void
     {
         $this->subtitleStreams = [['index' => 2, 'codec_type' => 'subtitle', 'codec_name' => 'subrip', 'tags' => ['language' => 'eng']]];

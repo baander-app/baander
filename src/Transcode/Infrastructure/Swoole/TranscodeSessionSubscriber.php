@@ -476,7 +476,8 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 $this->logger->warning('Subtitle extraction failed; track omitted', ['jobId' => $job->getId()->toString(), 'track' => $track->trackKey(), 'error' => $result['data']]);
             }
         }
-        while (count($active) < 2 && $queue !== []) {
+        // Three video encoders, one helper each, and one audio encoder use seven of eight native slots.
+        while ($active === [] && $queue !== []) {
             $track = array_shift($queue);
             $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $track->trackKey(), 'full');
             $key = $this->processPool->extractSubtitles($job, $source, $track->index, $path, $claim->runtime->generation, $startTime);
