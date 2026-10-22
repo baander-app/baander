@@ -25,7 +25,7 @@ final class AudioFilterBuilder
             return $this;
         }
 
-        $downmix = AudioProcessingRules::downmixFilter($probe->audioChannels);
+        $downmix = AudioProcessingRules::downmixFilter($probe->audioChannels, $probe->audioChannelLayout);
         if ($downmix !== '') {
             $this->filters[] = $downmix;
         }

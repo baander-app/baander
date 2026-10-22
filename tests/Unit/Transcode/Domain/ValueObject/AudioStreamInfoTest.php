@@ -37,10 +37,10 @@ final class AudioStreamInfoTest extends TestCase
             'channels' => 2,
             'sample_rate' => 48_000,
             'bit_rate' => 128_000,
+            'disposition' => ['default' => 1],
             'tags' => [
                 'language' => 'en',
                 'title' => 'English',
-                'default' => 'true',
             ],
         ];
 
@@ -69,7 +69,7 @@ final class AudioStreamInfoTest extends TestCase
 
     public function testFromSerializedRoundTrips(): void
     {
-        $original = new AudioStreamInfo('fr', 'opus', 2, 48_000, 96_000, 'French', false);
+        $original = new AudioStreamInfo('fr', 'opus', 2, 48_000, 96_000, 'French', false, 'stereo');
         $data = $original->jsonSerialize();
         $restored = AudioStreamInfo::fromSerialized($data);
 
@@ -174,6 +174,7 @@ final class AudioStreamInfoTest extends TestCase
             'bitrate' => 128_000,
             'title' => 'English',
             'isDefault' => true,
+            'channelLayout' => '',
         ], $data);
     }
 }

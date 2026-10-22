@@ -28,6 +28,7 @@ final readonly class VideoProbeResult implements JsonSerializable
         public bool $isInterlaced,
         public array $audioStreams = [],
         public array $subtitleStreams = [],
+        public string $audioChannelLayout = '',
     ) {
     }
 
@@ -87,8 +88,7 @@ final readonly class VideoProbeResult implements JsonSerializable
         $pixFmt = $videoStream['pix_fmt'] ?? null;
 
         $fieldOrder = $videoStream['field_order'] ?? '';
-        $isInterlaced = in_array($fieldOrder, ['tt', 'bb', 'tb', 'bt', 'progressive'], true) === false
-            && str_contains(strtolower($fieldOrder), 'interlaced');
+        $isInterlaced = in_array($fieldOrder, ['tt', 'bb', 'tb', 'bt'], true);
 
         return new self(
             duration: (float) ($format['duration'] ?? 0.0),
@@ -106,6 +106,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             isInterlaced: $isInterlaced,
             audioStreams: $audioStreams,
             subtitleStreams: $subtitleStreams,
+            audioChannelLayout: (string) ($audioStream['channel_layout'] ?? ''),
         );
     }
 
@@ -155,6 +156,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             isInterlaced: (bool) ($data['isInterlaced'] ?? false),
             audioStreams: $audioStreams,
             subtitleStreams: $subtitleStreams,
+            audioChannelLayout: (string) ($data['audioChannelLayout'] ?? ''),
         );
     }
 
@@ -178,6 +180,11 @@ final readonly class VideoProbeResult implements JsonSerializable
     public function isHdr(): bool
     {
         return $this->colorSpace !== null && $this->colorSpace->isHdr();
+    }
+
+    public function hasAudio(): bool
+    {
+        return $this->audioStreams !== [];
     }
 
     public function isSurround(): bool
@@ -241,6 +248,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             'videoBitrate' => $this->videoBitrate,
             'videoCodec' => $this->videoCodec,
             'audioChannels' => $this->audioChannels,
+            'audioChannelLayout' => $this->audioChannelLayout,
             'audioCodec' => $this->audioCodec,
             'audioSampleRate' => $this->audioSampleRate,
             'isHdr' => $this->isHdr(),

@@ -22,6 +22,7 @@ final readonly class AudioStreamInfo implements JsonSerializable
         public int $bitrate,
         public string $title,
         public bool $isDefault,
+        public string $channelLayout = '',
     ) {
     }
 
@@ -43,7 +44,8 @@ final readonly class AudioStreamInfo implements JsonSerializable
             sampleRate: (int) ($stream['sample_rate'] ?? 48_000),
             bitrate: (int) ($stream['bit_rate'] ?? 0),
             title: $title,
-            isDefault: ($tags['default'] ?? 'false') === 'true',
+            isDefault: (bool) ($stream['disposition']['default'] ?? false),
+            channelLayout: (string) ($stream['channel_layout'] ?? ''),
         );
     }
 
@@ -61,6 +63,7 @@ final readonly class AudioStreamInfo implements JsonSerializable
             bitrate: (int) ($data['bitrate'] ?? 0),
             title: $data['title'] ?? '',
             isDefault: (bool) ($data['isDefault'] ?? false),
+            channelLayout: (string) ($data['channelLayout'] ?? ''),
         );
     }
 
@@ -79,11 +82,12 @@ final readonly class AudioStreamInfo implements JsonSerializable
             && $this->sampleRate === $other->sampleRate
             && $this->bitrate === $other->bitrate
             && $this->title === $other->title
-            && $this->isDefault === $other->isDefault;
+            && $this->isDefault === $other->isDefault
+            && $this->channelLayout === $other->channelLayout;
     }
 
     /**
-     * @return array{language: string, codec: string, channels: int, sampleRate: int, bitrate: int, title: string, isDefault: bool}
+     * @return array{language: string, codec: string, channels: int, sampleRate: int, bitrate: int, title: string, isDefault: bool, channelLayout: string}
      */
     public function jsonSerialize(): array
     {
@@ -95,6 +99,7 @@ final readonly class AudioStreamInfo implements JsonSerializable
             'bitrate' => $this->bitrate,
             'title' => $this->title,
             'isDefault' => $this->isDefault,
+            'channelLayout' => $this->channelLayout,
         ];
     }
 }

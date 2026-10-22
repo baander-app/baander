@@ -48,7 +48,7 @@ final class AudioProcessingRules
      *
      * Returns empty string if source has no surround channels.
      */
-    public static function downmixFilter(int $sourceChannels): string
+    public static function downmixFilter(int $sourceChannels, string $sourceLayout = ''): string
     {
         if ($sourceChannels === 8) {
             // 7.1 → Stereo (ITU-R BS.775-3)
@@ -61,9 +61,12 @@ final class AudioProcessingRules
         if ($sourceChannels === 6) {
             // 5.1 → Stereo (ITU-R BS.775-3)
             // FL sum ≈ 1.0, FR sum ≈ 1.0
+            $leftSurround = $sourceLayout === '5.1(side)' ? 'SL' : 'BL';
+            $rightSurround = $sourceLayout === '5.1(side)' ? 'SR' : 'BR';
+
             return 'pan=stereo|'
-                . 'FL=0.3694*FC+0.3694*FL+0.1847*BL+0.0739*LFE|'
-                . 'FR=0.3694*FC+0.3694*FR+0.1847*BR+0.0739*LFE';
+                . sprintf('FL=0.3694*FC+0.3694*FL+0.1847*%s+0.0739*LFE|', $leftSurround)
+                . sprintf('FR=0.3694*FC+0.3694*FR+0.1847*%s+0.0739*LFE', $rightSurround);
         }
 
         return '';

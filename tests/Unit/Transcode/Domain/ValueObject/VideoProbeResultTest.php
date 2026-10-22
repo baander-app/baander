@@ -267,4 +267,26 @@ class VideoProbeResultTest extends TestCase
         $this->assertSame('bt2020', $result->colorSpace->primaries);
         $this->assertTrue($result->isHdr());
     }
+    public function testStandardFieldOrdersRecognizeOnlyInterlacedVideo(): void
+    {
+        foreach (['tt' => true, 'bb' => true, 'tb' => true, 'bt' => true, 'progressive' => false, 'unknown' => false] as $fieldOrder => $expected) {
+            $probe = VideoProbeResult::fromProbeOutput(['streams' => [['codec_type' => 'video', 'field_order' => $fieldOrder]]]);
+            self::assertSame($expected, $probe->isInterlaced, $fieldOrder);
+        }
+    }
+
+    public function testAudioPresenceAndLayoutSurviveSerialization(): void
+    {
+        $silent = VideoProbeResult::fromProbeOutput(['streams' => [['codec_type' => 'video']]]);
+        self::assertFalse($silent->hasAudio());
+        $probe = VideoProbeResult::fromProbeOutput(['streams' => [
+            ['codec_type' => 'video'],
+            ['codec_type' => 'audio', 'channels' => 6, 'channel_layout' => '5.1(side)'],
+        ]]);
+        $restored = VideoProbeResult::fromSerialized($probe->jsonSerialize());
+        self::assertTrue($restored->hasAudio());
+        self::assertSame('5.1(side)', $restored->audioChannelLayout);
+        self::assertSame('5.1(side)', $restored->audioStreams[0]->channelLayout);
+    }
+
 }

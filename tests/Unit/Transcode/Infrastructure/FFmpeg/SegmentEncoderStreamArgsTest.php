@@ -179,4 +179,43 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains('-tag:v', $args);
         self::assertContains('hvc1', $args);
     }
+    public function testHardwareDeviceIsDeliveredAsOneLiteralArgument(): void
+    {
+        $profile = EncoderProfile::fromEncoderName('hevc_vaapi', '/dev/dri/device with spaces');
+        $encoder = new SegmentEncoder(
+            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
+            $profile,
+        );
+        $args = $encoder->buildStreamArgs('/source.mp4', QualityTier::p720(), '', '/output');
+        self::assertSame('/dev/dri/device with spaces', $args[array_search('-hwaccel_device', $args, true) + 1]);
+    }
+
+    public function testVideoOnlyOutputOmitsAudioMappingAndFilters(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mp4', QualityTier::p720(), '', '/output',
+            audioFilters: 'aformat=channel_layouts=stereo', hasAudio: false);
+        self::assertNotContains('0:a:0', $args);
+        self::assertNotContains('-c:a', $args);
+        self::assertNotContains('-b:a', $args);
+        self::assertNotContains('-af', $args);
+    }
+
+    public function testProbeFieldOrderEnablesDeinterlacing(): void
+    {
+        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+            'streams' => [['codec_type' => 'video', 'field_order' => 'tt']],
+        ]);
+        self::assertStringStartsWith('yadif,', $this->encoder()->buildVideoFilters($probe, QualityTier::p720()));
+    }
+
+    public function testVideoOnlyProbeProducesNoAudioFilters(): void
+    {
+        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+            'streams' => [['codec_type' => 'video']],
+        ]);
+        self::assertSame('', $this->encoder()->buildAudioFiltersForProfile($probe,
+            \App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()));
+    }
+
 }

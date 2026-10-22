@@ -11,9 +11,8 @@ use App\Transcode\Domain\ValueObject\VideoProbeResult;
 final class VideoProcessingRules
 {
     /**
-     * GOP size for CMAF segment alignment.
-     * At 30fps with 6s segments: 30 × 6 = 180 frames per GOP.
-     * Ensures every segment boundary falls on a keyframe.
+     * Maximum GOP size at 30fps with six-second segments.
+     * Explicit forced random-access frames also align lower frame rates.
      */
     private const SEGMENT_DURATION = 6.0;
     private const TARGET_FPS = 30;
@@ -25,7 +24,7 @@ final class VideoProcessingRules
 
         return match ($encoder) {
             'libx265' => sprintf(
-                '-c:v libx265 -tag:v hvc1 -pix_fmt yuv420p -g %1$d -keyint_min %1$d %2$s'
+                '-c:v libx265 -forced-idr 1 -tag:v hvc1 -pix_fmt yuv420p -g %1$d -keyint_min %1$d %2$s'
                 . ' -x265-params "log-level=error:no-sao=1:no-deblock=1:no-scenecut=1:keyint=%1$d:min-keyint=%1$d"',
                 self::GOP_SIZE,
                 $forceKeyFrames,
@@ -96,7 +95,7 @@ final class VideoProcessingRules
             ),
             // --- Default fallback ---
             default => sprintf(
-                '-c:v libx265 -tag:v hvc1 -pix_fmt yuv420p -g %1$d -keyint_min %1$d %2$s'
+                '-c:v libx265 -forced-idr 1 -tag:v hvc1 -pix_fmt yuv420p -g %1$d -keyint_min %1$d %2$s'
                 . ' -x265-params "log-level=error:no-sao=1:no-deblock=1:no-scenecut=1:keyint=%1$d:min-keyint=%1$d"',
                 self::GOP_SIZE,
                 $forceKeyFrames,

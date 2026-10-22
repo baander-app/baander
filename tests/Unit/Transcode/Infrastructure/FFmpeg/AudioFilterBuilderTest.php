@@ -279,4 +279,14 @@ final class AudioFilterBuilderTest extends TestCase
 
         $this->assertSame('', $filter);
     }
+    public function testSideSurroundProbeSelectsTheSourceChannelNames(): void
+    {
+        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+            'streams' => [['codec_type' => 'audio', 'channels' => 6, 'channel_layout' => '5.1(side)']],
+        ]);
+        $filter = AudioFilterBuilder::create()->downmix($probe, AudioProfile::streamingStereo())->build();
+        self::assertStringContainsString('0.1847*SL', $filter);
+        self::assertStringContainsString('0.1847*SR', $filter);
+    }
+
 }

@@ -91,6 +91,10 @@ final class SegmentEncoder
     /** @param array<string, mixed> $measuredLoudness */
     public function buildAudioFiltersForProfile(VideoProbeResult $probe, AudioProfile $profile, array $measuredLoudness = []): string
     {
+        if (!$probe->hasAudio()) {
+            return '';
+        }
+
         $builder = AudioFilterBuilder::create();
         $builder->downmix($probe, $profile);
         $builder->dialogueEnhancement($probe, $profile);
@@ -109,8 +113,8 @@ final class SegmentEncoder
      * One process produces all video segments for a tier — no per-segment
      * re-seek or encoder re-init.
      *
-     * Selected video and audio are muxed into one rendition. Media fragments
-     * are written to temporary files and renamed after close; init.mp4 is
+     * Selected video and available audio are muxed into one rendition.
+     * Media fragments are written to temporary files and renamed after close; init.mp4 is
      * separate and does not inherit this publication guarantee.
      *
      * @param string $sourcePath Path to the source video file
@@ -120,6 +124,7 @@ final class SegmentEncoder
      * @param ?int $startSegment Starting segment number (for seek support)
      * @param int $videoStreamIndex Source video stream index (default 0)
      * @param int $audioStreamIndex Source audio stream index (default 0)
+     * @param bool $hasAudio Whether the source contains an audio stream
      * @return list<string> FFmpeg argument array (bypasses shell entirely via proc_open array form)
      */
     public function buildStreamArgs(
@@ -132,12 +137,11 @@ final class SegmentEncoder
         int $audioStreamIndex = 0,
         ?AudioProfile $audioProfile = null,
         string $audioFilters = '',
+        bool $hasAudio = true,
     ): array {
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
         $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], ['pools=2:frame-threads=2:log-level=error', 'lp=2:fast-decode=1'], $encoderFlags);
-        $hwAccelFlags = $this->encoderProfile->hwaccelInputFlags();
-        $decoderFlags = $this->encoderProfile->decoderFlags();
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
@@ -152,15 +156,7 @@ final class SegmentEncoder
             '-filter_complex_threads', '1',
         ];
 
-        // hwaccel/decoder/encoder flags come from trusted config/code as
-        // space-separated token strings. Tokenize and append individually so
-        // proc_open receives a real arg array and the shell is never invoked.
-        if ($hwAccelFlags !== '') {
-            array_push($args, ...$this->tokenize($hwAccelFlags));
-        }
-        if ($decoderFlags !== '') {
-            array_push($args, ...$this->tokenize($decoderFlags));
-        }
+        array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
         if ($startSegment !== null && $startSegment > 0) {
             $args[] = '-ss';
@@ -170,34 +166,40 @@ final class SegmentEncoder
         $args[] = '-i';
         $args[] = $sourcePath;
 
-        // Muxed rendition: map the selected video AND audio streams into one
-        // HLS variant. Each segment carries video + its audio together, so the
+        // Map selected video and available audio into one HLS rendition.
+        // Each segment carries video and any audio together, so the
         // media playlist has a single variant per tier (no EXT-X-MEDIA audio
         // groups). Stream indices are encoded in the segment filename for
         // cache provenance.
         $args[] = '-map';
         $args[] = sprintf('0:v:%d', $videoStreamIndex);
-        $args[] = '-map';
-        $args[] = sprintf('0:a:%d', $audioStreamIndex);
-
-        if ($encoderFlags !== '') {
-            array_push($args, ...$this->tokenize($encoderFlags));
+        if ($hasAudio) {
+            $args[] = '-map';
+            $args[] = sprintf('0:a:%d', $audioStreamIndex);
         }
 
-        // Audio codec: AAC stereo, matching the existing audio delivery.
-        $args[] = '-c:a';
-        $args[] = ($audioProfile ?? AudioProfile::streamingStereo())->codec;
-        $args[] = '-b:a';
-        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->bitrate;
-        $args[] = '-ac';
-        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->channelCount;
-        $args[] = '-ar';
-        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->sampleRate;
+        if ($encoderFlags !== '') {
+            array_push($args, ...FFmpegArguments::flags($encoderFlags));
+        }
+
+        if ($hasAudio) {
+            // Audio codec: AAC stereo, matching the existing audio delivery.
+            $args[] = '-c:a';
+            $args[] = ($audioProfile ?? AudioProfile::streamingStereo())->codec;
+            $args[] = '-b:a';
+            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->bitrate;
+            $args[] = '-ac';
+            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->channelCount;
+            $args[] = '-ar';
+            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->sampleRate;
+        }
         $args[] = '-threads:v';
         $args[] = '2';
-        $args[] = '-threads:a';
-        $args[] = '1';
-        if ($audioFilters !== '') {
+        if ($hasAudio) {
+            $args[] = '-threads:a';
+            $args[] = '1';
+        }
+        if ($hasAudio && $audioFilters !== '') {
             $args[] = '-af';
             $args[] = $audioFilters;
         }
@@ -240,37 +242,6 @@ final class SegmentEncoder
         $args[] = rtrim($outputDir, '/') . '/stream.m3u8';
 
         return $args;
-    }
-
-    /**
-     * Tokenize a space-separated flag string into individual arg tokens.
-     *
-     * Trusted flag strings from VideoProcessingRules / EncoderProfile may
-     * contain quoted multi-word values (e.g. -force_key_frames "expr:...").
-     * preg_split with the REGEX_QUOTES pattern preserves quoted phrases as
-     * single tokens. This is safe because the input is never user-controlled;
-     * proc_open's array form is the real injection guard.
-     *
-     * @return list<string>
-     */
-    private function tokenize(string $flags): array
-    {
-        if ($flags === '') {
-            return [];
-        }
-
-        // Match sequences of non-whitespace, or double-quoted strings.
-        // Strip the surrounding quotes from quoted tokens so they are not
-        // passed literally to proc_open — ffmpeg would then receive
-        // -force_key_frames "expr:..." (quotes included) and fail with
-        // "Invalid duration specification".
-        preg_match_all('/"[^"]*"|\S+/', $flags, $matches);
-
-        return array_map(
-            static fn (string $token): string =>
-                $token !== '' && $token[0] === '"' ? substr($token, 1, -1) : $token,
-            $matches[0],
-        );
     }
 
     /**
