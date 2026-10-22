@@ -78,6 +78,11 @@ jobs:
             -   name: Xdebug runtime contract
                 run: BAANDER_TEST_IMAGE="$CI_IMAGE" bash scripts/test-dev-xdebug-container.sh
 
+            -   name: Progressive DASH browser completion
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                      bash scripts/test-transcode-publication-browser.sh
+
             -   name: Build production worker image
                 run: |
                     docker buildx build --target worker --load \

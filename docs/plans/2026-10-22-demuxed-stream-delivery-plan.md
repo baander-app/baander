@@ -1,7 +1,7 @@
 ---
 title: Separate media tracks and actual publication timing for HLS and DASH
 date: 2026-10-22
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -264,6 +264,23 @@ apply justified findings before final acceptance.
    claims. Full CMAF validation, native caption qualification, Safari/Firefox,
    hardware/HDR/VFR breadth, URL lifetime policy and cache/performance work remain
    distinct roadmap items unless direct evidence in this phase resolves one.
+
+## Verification checkpoint
+
+The delivered phase passes the acceptance criteria within the reader-specific
+limits above. Combined current-test evidence contains 994 backend tests and 18,476
+assertions; the final delivery rerun passed all 261 selected tests. The player and
+attachment suites pass 71 tests. Full PHPStan, Deptrac, OpenAPI consistency,
+frontend typechecking, targeted lint, production build and asset verification pass.
+
+Native publication evidence is retained under
+`var/test-runs/20261022-205311-8dd1d1ad`; reference-browser natural DASH completion is
+under `var/test-runs/demux-reference-browser-first`. The final production drill
+passed all seven checkpoints, including stable decoded paused media through a
+failed signing poll and reconnection, active subtitle cues, worker recovery and
+retired-resource rejection. Its evidence and verified cleanup are under
+`var/test-runs/demux-production-final`. Independent final review found no blocker.
+`ROADMAP.md` records the individual results, diagnostic failures and remaining work.
 
 ## References
 

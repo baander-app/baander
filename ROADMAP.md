@@ -776,3 +776,122 @@ reviews found no remaining blocker in the delivered repairs and harness. Prose
 checks preserve historical roadmap content byte-for-byte; local links resolve and
 whitespace checks pass. All run-owned services were removed; existing application
 databases, Redis and media storage were not reused or reset.
+
+
+### Separate media tracks and progressive playback — 2026-10-22
+
+The next repair replaces muxed audio/video fragments with separate video and audio
+tracks from one FFmpeg process. The native MPD supplies actual codecs, timestamps,
+timescales, durations and completion state for both delivery formats. A bounded
+reader accepts closed local media only. Readiness requires every required track to
+cover the requested cursor; observed output determines the final segment count.
+HLS playlists grow until ENDLIST, and DASH remains dynamic until every signed
+rendition completes. The primary rendition supplies one canonical audio track.
+
+Signed delivery now identifies the track, generation and segment ordinal. Requests
+revalidate ownership while waiting; retired audio and video remain inaccessible
+even if their files are restored. Public playlist, initialization and fragment
+routes carry media extensions required by native readers. Dynamic DASH responses
+wait cooperatively for one second before reloading and validating the publication
+index. This bounds sequential reader polling without delaying completed manifests.
+The ordinary deployment drill now requires positive HLS and DASH frame and PCM
+output; the preceding optional DASH qualification switch has been removed.
+
+Position-only telemetry no longer invalidates a published resource merely because
+the control revision changes during validation. The final check still rejects
+changed audio profiles, generations, lifecycle state and ownership.
+
+The movie player uses HLS.js 1.7.3 through Media Source Extensions where supported.
+Its full-source seek control can request a position beyond the published window,
+while restoration still requires a real seekable range. Each attachment owns and
+destroys its player instance; stale imports, callbacks and playback promises cannot
+change a replacement attachment. Explicit play/pause intent survives delayed
+readiness, terminal failures release pending restoration, and optional rendition
+expansion waits for restoration to finish. Native HLS remains the fallback where
+MSE playback is unavailable. The distributed player includes the dependency notices.
+
+Transient signing-poll transport and server errors preserve an already usable
+attachment until a later poll reconciles it. Access refusal, initial failures and
+fatal media-loader errors remain terminal. The reconnection check is scoped to a
+paused signing poll; recovery from running progress or control failures remains
+unqualified.
+
+The final backend evidence covers 994 distinct tests and 18,476 assertions across
+the CI runtime lanes and focused reruns. The retained combined receipt selects the
+latest result for each current test; it excludes the failed diagnostic for an
+interrupted full live DASH decode, whose limitation remains recorded below. Full
+PHPStan, Deptrac and OpenAPI consistency passed. Deptrac reports zero violations,
+warnings and errors with 484 existing skipped violations. Frontend checks passed
+71 tests across four player and attachment suites, typechecking, targeted ESLint,
+the production build and asset verification. Backend receipts are under
+`var/test-runs/20261022-201553-d32eead5`,
+`var/test-runs/20261022-203203-a96a00d6`,
+`var/test-runs/20261022-204449-64d13932`,
+`var/test-runs/20261022-205311-8dd1d1ad` and
+`var/test-runs/20261022-211108-94be1e85`. The final delivery rerun passed all 261
+selected tests after the telemetry-race repair.
+
+Native publication acceptance passed with FFmpeg 5.1.9. Full progressive HLS reached
+natural EOF with 481 video frames and 3,846,144 PCM bytes, matching its completed
+baseline exactly. Full static DASH decoded 481 frames and 3,842,048 PCM bytes. Live
+DASH decoded an explicitly limited 13-second prefix of the 20-second source:
+312 frames and 2,496,000 PCM bytes matched the identically limited static baseline.
+Packet records match and decode timestamps increase within each qualified interval.
+Both readers consumed newly published media during encoding; all 74 HTTP requests
+returned closed resources, and the live DASH reader made 11 dynamic MPD requests.
+The native receipt records the prefix limit and leaves full live DASH content and
+EOF unqualified.
+
+The reference DASH browser test reached natural EOF through the dynamic-to-static
+transition with dash.js 5.2.1 and Chromium 148.0.7778.96. It started before final
+fragments existed, fetched every audio and video fragment, decoded 480 frames with
+positive audio evidence, and ended at 20.010666 seconds against the independently
+measured 20-second source. No forced seek, source replacement or explicit
+end-of-stream signal completed the test. This is browser playback evidence rather
+than a byte comparison of decoded browser audio. Evidence and verified cleanup are
+under `var/test-runs/demux-reference-browser-first`; CI runs the same fixture.
+
+Full live FFmpeg DASH tail decoding and EOF remain open. The checked readers keep
+polling after the manifest becomes static. Interrupting FFmpeg 5.1.9 produced only
+479 video frames against the completed baseline's 481 and interrupted trailer
+writes, although PCM matched. The failed probe and its source remain under
+`var/test-runs/20261022-204449-64d13932`. Passing prefix and browser tests do not
+qualify that native reader behavior. Formal CMAF conformance, DASH subtitles,
+native-only caption rendering, Safari/Firefox coverage, GPU/HDR/VFR inputs,
+derived-URL expiry policy and cache/performance qualification also remain open.
+
+Production acceptance passed all seven Chromium 148.0.7778.96 checkpoints in the
+rebuilt worker image. Signed HLS and DASH decoded video and audio initially, after
+seeking and after recovery. The one-second checks produced 30 video frames each;
+initial PCM output was 192,000 bytes for both formats, and recovered output was
+192,032 bytes for HLS and 192,000 for DASH. These short decode checks are separate
+from the full HLS and reference-browser DASH completion tests above.
+
+The movie page sought beyond its published window to source position 96 seconds,
+sought forward while paused to 120 seconds, returned to zero while paused and
+resumed. Four subtitle observations retained all three independently identified
+tracks and activated the expected Dialogue cues through MSE. The offline check
+started with decoded, seekable, paused media: attachment 5, generation 6, position
+1.110073 seconds and 20 decoded frames remained unchanged through a failed signing
+poll and reconnection. Resumed playback advanced to 2.567306 seconds and 23 frames.
+Web replacement and worker containment/recovery also passed. Restoring retired
+video/audio init and media files plus all three subtitle files still returned 404
+for all seven resources. Evidence and verified cleanup are under
+`var/test-runs/demux-production-final`.
+
+Production testing exposed two additional regressions before acceptance: retired
+attachment failure could reuse the old source origin during a backward seek, and
+position telemetry could make a published fragment return 503 during validation.
+Both have failing-before-fix unit regressions and passed the final production run.
+Earlier diagnostic evidence remains under
+`var/test-runs/demux-production-browser-mse` and
+`var/test-runs/demux-production-browser-mse-final`. The separate instrumented
+rapid-scrub/remount drill remains unrun in this phase.
+
+Final independent review found no remaining blocker within this scope. Full static
+gates were rerun after the telemetry repair and integration of the merged master.
+Gate logs and the combined test receipt are retained under
+`var/test-runs/demux-delivery-final-gates`. Prose checks preserve the merged roadmap
+history byte-for-byte; all 21 local document links resolve and whitespace checks
+pass. All run-owned services were removed. Existing application databases, Redis
+and media storage were not reused or reset.

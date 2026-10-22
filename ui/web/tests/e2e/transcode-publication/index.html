@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>DASH publication qualification</title>
+<script src="/__publication/dash.all.min.js"></script>
+<button id="play" type="button">Play publication</button>
+<video id="video" controls width="640" height="360"></video>
+<script>
+  const video = document.querySelector('video')
+  const player = dashjs.MediaPlayer().create()
+  // These disposable containers share a clock and provide no external UTC service.
+  player.updateSettings({ streaming: { utcSynchronization: { enabled: false } } })
+  const errors = []
+  const events = []
+  let peakAudioRms = 0
+  let audioSamples = 0
+  let analyser
+  let audioContext
+  let firstPlayingTime = null
+  let endedAt = null
+  player.on(dashjs.MediaPlayer.events.ERROR, event => {
+    errors.push({ code: event.error?.code ?? null, message: event.error?.message ?? String(event.error ?? event) })
+  })
+  for (const name of ['loadedmetadata', 'playing', 'waiting', 'ended', 'error', 'seeking']) {
+    video.addEventListener(name, () => {
+      events.push({ event: name, time: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : null })
+      if (events.length > 200) events.shift()
+      if (name === 'playing' && firstPlayingTime === null) firstPlayingTime = video.currentTime
+      if (name === 'ended') endedAt = performance.now()
+    })
+  }
+  setInterval(() => {
+    if (!analyser || video.paused || video.ended) return
+    const samples = new Float32Array(analyser.fftSize)
+    analyser.getFloatTimeDomainData(samples)
+    const energy = samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length
+    peakAudioRms = Math.max(peakAudioRms, Math.sqrt(energy))
+    audioSamples++
+  }, 100)
+  document.querySelector('#play').addEventListener('click', async () => {
+    try {
+      audioContext = new AudioContext()
+      analyser = audioContext.createAnalyser()
+      analyser.fftSize = 2048
+      const source = audioContext.createMediaElementSource(video)
+      const silence = audioContext.createGain()
+      silence.gain.value = 0
+      source.connect(analyser)
+      analyser.connect(silence)
+      silence.connect(audioContext.destination)
+      await audioContext.resume()
+      player.initialize(video, window.publicationManifest, true, 0)
+    } catch (error) {
+      errors.push({ message: error.message })
+    }
+  }, { once: true })
+  window.publicationState = () => ({
+    version: player.getVersion(), time: video.currentTime, duration: Number.isFinite(video.duration) ? video.duration : null,
+    ended: video.ended, endedAt, paused: video.paused, ready: video.readyState, width: video.videoWidth, height: video.videoHeight,
+    decodedFrames: video.getVideoPlaybackQuality().totalVideoFrames,
+    decodedAudioBytes: typeof video.webkitAudioDecodedByteCount === 'number' ? video.webkitAudioDecodedByteCount : null,
+    peakAudioRms, audioSamples, audioContextState: audioContext?.state ?? null, firstPlayingTime,
+    mediaError: video.error ? { code: video.error.code, message: video.error.message } : null, errors, events,
+  })
+</script>
+</html>

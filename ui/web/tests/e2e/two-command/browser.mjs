@@ -6,7 +6,7 @@ import { chromium } from 'playwright-core'
 
 const evidence = '/work/evidence'
 await mkdir(evidence, { recursive: true })
-const browser = await chromium.launch({ channel: 'chromium', headless: true })
+const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--mute-audio'] })
 const browserInfo = { engine: 'chromium', version: browser.version() }
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 await context.addInitScript(() => {
@@ -45,21 +45,45 @@ const clientControls = []
 const subtitleObservations = []
 const previousMediaEvents = []
 const networkInterruptions = []
+const manifestEvidence = []
+const mediaRequestOrder = []
+const requestAttachments = new WeakMap()
+let attachmentNumber = 0
+let attachedRenditionSet = null
+function currentSource(state) {
+  return state.source?.startsWith('blob:')
+    ? attachedRenditionSet === snapshot.renditionSet
+    : new URL(state.source).searchParams.get('set') === snapshot.renditionSet
+}
+function sanitizedManifest(body, base) {
+  const clean = value => {
+    const parsed = new URL(value, base)
+    const query = new URLSearchParams()
+    for (const key of ['generation', 'index', 'tier']) {
+      if (parsed.searchParams.has(key)) query.set(key, parsed.searchParams.get(key))
+    }
+    return parsed.pathname + (query.size ? `?${query}` : '')
+  }
+  return body.split('\n').map(line => line.startsWith('#')
+    ? line.replace(/URI="([^"]+)"/g, (_match, value) => `URI="${clean(value)}"`)
+    : line.trim() ? clean(line.trim()) : line).join('\n')
+}
 let savingTimeline = false
 const nativeResponseEvidence = []
 const nativeResponseKeys = new Set()
 const nativeBodyLimit = 32 * 1024 * 1024
 let nativeBodyReads = 0
 async function captureNativeResponse(response, url) {
-  const match = /^\/api\/transcode\/([^/]+)\/(init|segment)$/.exec(url.pathname)
+  const match = /^\/api\/transcode\/([^/]+)\/tracks\/(video|audio)\/(init\.mp4|segment\.m4s)$/.exec(url.pathname)
   const generation = url.searchParams.get('generation')
   const index = url.searchParams.get('index')
-  if (!match || !snapshot?.ready || match[1] !== snapshot.jobId || generation !== String(snapshot.generation)
-    || response.status() !== 200 || (match[2] === 'segment' && !['0', '1', '2'].includes(index))) return
-  const key = `${match[1]}:${generation}:${match[2]}:${index ?? ''}`
-  if (nativeResponseKeys.has(key) || nativeResponseEvidence.length >= 16) return
+  if (!match || !snapshot?.ready || !snapshot.renditionSet.split(',').includes(`${match[1]}.${generation}`)
+    || response.status() !== 200 || (match[3] === 'segment.m4s' && !['0', '1', '2'].includes(index))) return
+  const resource = match[3] === 'init.mp4' ? 'init' : 'segment'
+  const key = `${match[1]}:${generation}:${match[2]}:${resource}:${index ?? ''}`
+  if (nativeResponseKeys.has(key) || nativeResponseEvidence.length >= 32) return
   nativeResponseKeys.add(key)
-  const item = { at: Date.now(), jobId: match[1], generation, resource: match[2], index, status: 200, state: 'pending' }
+  const item = { at: Date.now(), jobId: match[1], generation, track: match[2], resource, index, status: 200, state: 'pending' }
   nativeResponseEvidence.push(item)
   let stage = 'headers'
   let timer
@@ -73,8 +97,8 @@ async function captureNativeResponse(response, url) {
           .filter(name => headers[name] !== undefined).map(name => [name, headers[name]]))
         item.requestHeaders = Object.fromEntries(['accept-encoding', 'range']
           .filter(name => requestHeaders[name] !== undefined).map(name => [name, requestHeaders[name]]))
-        // Four bounded fixture assets (init plus the first three fragments), at most 32 MiB hashed.
-        if (nativeBodyReads >= 4 || Number(headers['content-length'] ?? 0) > nativeBodyLimit / 4) {
+        // Each track's init plus its first three fragments, at most 32 MiB hashed.
+        if (nativeBodyReads >= 8 || Number(headers['content-length'] ?? 0) > nativeBodyLimit / 8) {
           item.state = 'body-budget-unavailable'
           return
         }
@@ -88,7 +112,7 @@ async function captureNativeResponse(response, url) {
         stage = 'body'
         const body = await response.body()
         if (item.state !== 'pending') return
-        if (body.length > nativeBodyLimit / 4) {
+        if (body.length > nativeBodyLimit / 8) {
           item.state = 'body-limit-unavailable'
           return
         }
@@ -117,7 +141,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -131,6 +155,16 @@ page.on('requestfailed', request => {
 })
 page.on('request', request => {
   const url = new URL(request.url())
+  if (url.pathname.startsWith('/api/transcode/') && /(?:\.m3u8|\/init\.mp4|\/segment\.m4s|\.vtt)$/.test(url.pathname)) {
+    if (url.pathname.endsWith('/master.m3u8')) {
+      attachmentNumber++
+      attachedRenditionSet = url.searchParams.get('set')
+    }
+    requestAttachments.set(request, attachmentNumber)
+    mediaRequestOrder.push({ at: Date.now(), attachment: attachmentNumber, renditionSet: attachedRenditionSet, path: url.pathname,
+      track: /\/tracks\/(video|audio)\//.exec(url.pathname)?.[1] ?? null,
+      generation: url.searchParams.get('generation'), index: url.searchParams.get('index') })
+  }
   if (request.method() !== 'POST' || !/^\/api\/transcode\/sessions\/[^/]+\/position$/.test(url.pathname)) return
   try {
     const value = request.postDataJSON()
@@ -156,8 +190,16 @@ page.on('response', async response => {
       await savePlaybackTimeline()
     } catch { /* A web restart may abort an already received response. */ }
   }
-  if (url.pathname.startsWith('/api/transcode/') && /(?:\.m3u8|\/init|\/segment)$/.test(url.pathname)) {
-    appendBounded(mediaResponses, { at: Date.now(), path: url.pathname, generation: url.searchParams.get('generation'), index: url.searchParams.get('index'), status: response.status() })
+  if (url.pathname.startsWith('/api/transcode/') && url.pathname.endsWith('.m3u8') && response.ok()) {
+    const attachment = requestAttachments.get(response.request()) ?? null
+    try {
+      manifestEvidence.push({ at: Date.now(), attachment, path: url.pathname,
+        generation: url.searchParams.get('generation'), body: sanitizedManifest(await response.text(), response.url()) })
+    } catch { /* An execution replacement can cancel a manifest response body. */ }
+  }
+  if (url.pathname.startsWith('/api/transcode/') && /(?:\.m3u8|\/init\.mp4|\/segment\.m4s)$/.test(url.pathname)) {
+    const track = /\/tracks\/(video|audio)\//.exec(url.pathname)?.[1] ?? null
+    appendBounded(mediaResponses, { at: Date.now(), path: url.pathname, track, generation: url.searchParams.get('generation'), index: url.searchParams.get('index'), status: response.status() })
     await captureNativeResponse(response, url)
   }
 })
@@ -206,38 +248,39 @@ async function observeSubtitles(phase, expectedText) {
   // Native HLS capability does not establish native subtitle support. Retain
   // that distinction explicitly instead of treating an empty track list as a pass.
   let state = await subtitleState(true)
+  const engine = (await mediaState()).source.startsWith('blob:') ? 'mse-hls' : 'native-hls'
   const deadline = Date.now() + 5000
   while (state.tracks.length < 3 && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 100))
     state = await subtitleState(true)
   }
-  if (state.tracks.length === 0) {
-    if (subtitleObservations.some(observation => observation.status === 'native-active-cue')) {
-      subtitleObservations.push({ phase, status: 'failed', expectedText, ...state })
+  if (state.tracks.length === 0 && engine === 'native-hls') {
+    if (subtitleObservations.some(observation => observation.status === 'active-cue')) {
+      subtitleObservations.push({ phase, engine, status: 'failed', expectedText, ...state })
       await savePlaybackTimeline()
       assert.fail('Previously available native subtitle tracks disappeared after the generation changed')
     }
     const limitation = 'The native HLS engine exposed no TextTracks; subtitle cue activation and visible rendering remain unverified.'
-    subtitleObservations.push({ phase, status: 'native-tracks-unavailable', limitation, ...state })
+    subtitleObservations.push({ phase, engine, status: 'native-tracks-unavailable', limitation, ...state })
     console.warn(`${phase}: ${limitation}`)
     await savePlaybackTimeline()
     return
   }
   try {
-    assert.equal(state.tracks.length, 3, 'Native HLS must retain all three independently identified subtitle tracks')
+    assert.equal(state.tracks.length, 3, 'HLS playback must retain all three independently identified subtitle tracks')
     assert(state.tracks.some(track => track.label.includes('Forced')), 'The duplicate-language forced track must remain selectable')
     assert(state.tracks.some(track => track.label.includes('Unlabelled')), 'The track without language metadata must remain selectable')
     await until(async () => {
       state = await subtitleState(true)
       return state.tracks.some(track => track.label.includes('Dialogue') && track.mode === 'showing'
         && track.activeCues.some(cue => cue.text?.includes(expectedText)))
-    }, `the native Dialogue track to activate "${expectedText}"`, 10000)
-    subtitleObservations.push({ phase, status: 'native-active-cue', expectedText, ...state })
-    // The cue assertion establishes native activation; this screenshot supports
+    }, `the Dialogue track to activate "${expectedText}"`, 10000)
+    subtitleObservations.push({ phase, engine, status: 'active-cue', expectedText, ...state })
+    // The cue assertion establishes TextTrack activation; this screenshot supports
     // inspection of painted captions without claiming a pixel-level assertion.
     await page.screenshot({ path: `${evidence}/subtitles-${phase}.png` })
   } catch (error) {
-    subtitleObservations.push({ phase, status: 'failed', expectedText, ...state })
+    subtitleObservations.push({ phase, engine, status: 'failed', expectedText, ...state })
     throw error
   } finally {
     await savePlaybackTimeline()
@@ -250,8 +293,9 @@ async function pausedAt(position, minimumGeneration) {
     return state.connected && state.paused && state.ready >= 2
       && snapshot?.ready && snapshot.status === 'paused' && snapshot.generation >= minimumGeneration
       && Number.isFinite(snapshot.startTime)
+      && state.error === null && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
       && Math.abs(snapshot.startTime + state.time - position) < 2
-      && new URL(state.source).searchParams.get('set') === snapshot.renditionSet
+      && currentSource(state)
   }, 'the attached player to restore its paused global position')
 }
 
@@ -284,7 +328,7 @@ async function resumeAndDecode(owner, action) {
     return state.connected && !state.paused && state.ready >= 2 && state.error === null
       && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames
       && snapshot?.ready && snapshot.status === 'running'
-      && new URL(state.source).searchParams.get('set') === snapshot.renditionSet
+      && currentSource(state)
   }, `${action} to decode current signed HLS and advance`)
   samePlayback(owner)
   await recordClientControl(action, started)
@@ -296,6 +340,100 @@ async function pausePlayback(owner, action) {
   await until(async () => (await mediaState()).paused && snapshot?.status === 'paused', 'native pause to commit')
   samePlayback(owner)
   await recordClientControl(action, started)
+}
+
+async function reconnectPausedPlayback(owner, prefix) {
+  await pausePlayback(owner, `${prefix}-pause`)
+  let before
+  await until(async () => {
+    const state = await mediaState()
+    const usable = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+      && !state.seeking && state.error === null && currentSource(state)
+      && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+    if (usable) before = state
+    return usable
+  }, 'a decoded paused attachment matching the current signed rendition set')
+  samePlayback(owner)
+  const beforeAttachment = attachmentNumber
+  const networkStarted = Date.now()
+  await recordClientControl(`${prefix}-ready-paused`, networkStarted, { attachment: beforeAttachment })
+  const failureCount = networkInterruptions.length
+  const preserved = state => state.connected && state.paused && state.ready >= 2
+    && state.decodedFrames >= before.decodedFrames && !state.seeking && state.error === null
+    && state.source === before.source && attachmentNumber === beforeAttachment
+    && Math.abs(state.time - before.time) < 0.1
+    && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+  try {
+    await context.setOffline(true)
+    await until(() => networkInterruptions.length > failureCount, 'a real stream refresh failure while offline', 10000)
+    assert(preserved(await mediaState()), 'Offline refresh failure must retain the already decoded paused attachment and cursor')
+    await recordClientControl(`${prefix}-offline-paused`, networkStarted, { attachment: beforeAttachment })
+  } finally {
+    await context.setOffline(false)
+  }
+  const reconnected = Date.now()
+  await until(async () => {
+    const state = await mediaState()
+    return playbackSnapshots.some(item => item.accepted && item.at >= reconnected
+      && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+      && item.generation === owner.generation && item.status === 'paused')
+      && preserved(state) && currentSource(state)
+  }, 'the same decoded attachment, generation and paused cursor after network reconnection')
+  samePlayback(owner)
+  await recordClientControl(`${prefix}-reconnected-paused`, networkStarted, { attachment: beforeAttachment })
+  await resumeAndDecode(owner, `${prefix}-resume`)
+}
+
+async function seekSourceAndDecode(owner, position, action, paused = false) {
+  const started = Date.now()
+  const controlsBefore = playbackControls.length
+  const timeline = page.getByRole('slider', { name: 'Seek movie' })
+  assert.equal(Number(await timeline.getAttribute('max')), snapshot.duration, 'Source seeking must span the full source duration')
+  if (position === 0) {
+    await timeline.focus()
+    await timeline.press('Home')
+  } else {
+    const box = await timeline.boundingBox()
+    assert(box, 'The source timeline must be visible')
+    await timeline.click({ position: { x: box.width * position / snapshot.duration, y: box.height / 2 } })
+  }
+  await until(() => playbackControls.slice(controlsBefore).some(control => control.action === 'seek'), 'the source control to submit a generation seek')
+  const requested = playbackControls.slice(controlsBefore).find(control => control.action === 'seek').position
+  await until(async () => {
+    const state = await mediaState()
+    return snapshot?.ready && snapshot.generation === owner.generation + 1
+      && state.connected && state.paused === paused && state.ready >= 2 && state.error === null && state.decodedFrames > 0
+      && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+      && (paused ? Math.abs(snapshot.startTime + state.time - requested) < 2
+        : snapshot.startTime + state.time > requested + 1 && snapshot.startTime + state.time < requested + 8)
+      && currentSource(state)
+  }, `${action} to restore the source cursor and decode on its new generation`)
+  samePlayback(owner, owner.generation + 1)
+  const firstVideo = mediaRequestOrder.find(item => item.attachment === attachmentNumber && item.track === 'video' && item.index !== null)
+  const localTarget = requested - snapshot.startTime
+  const playlist = manifestEvidence.find(item => item.attachment === attachmentNumber
+    && item.path.includes('/tracks/video/') && item.generation === String(snapshot.generation))
+  assert(playlist, 'The current attachment must retain its actual published video playlist')
+  let elapsed = 0
+  let expectedIndex = null
+  const lines = playlist.body.split('\n')
+  for (let index = 0; index < lines.length; index++) {
+    if (!lines[index].startsWith('#EXTINF:')) continue
+    const duration = Number(lines[index].slice(8).split(',')[0])
+    if (localTarget >= elapsed && localTarget < elapsed + duration) {
+      expectedIndex = Number(new URL(lines[index + 1], 'https://media.baander.app').searchParams.get('index'))
+      break
+    }
+    elapsed += duration
+  }
+  assert(expectedIndex !== null && firstVideo && Number(firstVideo.index) <= expectedIndex
+    && Number(firstVideo.index) >= Math.max(0, expectedIndex - 1),
+  'The MSE attachment must load the requested fragment or its immediate preroll using actual published durations')
+  assert.equal(playbackControls.slice(controlsBefore).filter(control => control.action === 'seek').length, 1,
+    'Source restoration and native clamping must not create additional backend seeks')
+  owner.generation = snapshot.generation
+  await recordClientControl(action, started, { requested })
+  return requested
 }
 
 async function checkpoint({ phase, baseUrl, credentials }) {
@@ -317,6 +455,22 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       return state.connected && !state.paused && state.ready >= 2 && state.time > 1
         && state.decodedFrames > 0 && state.error === null && snapshot?.ready
     }, 'native HLS to decode and advance')
+    const owner = ownedPlayback()
+    const initial = await mediaState()
+    const publishedEnd = snapshot.startTime + Math.max(...initial.seekable.map(range => range[1]), 0)
+    const target = Math.min(snapshot.duration - 18, Math.max(90, publishedEnd + 24))
+    assert(target > publishedEnd + 6, 'The fixture must leave source media beyond the currently published native window')
+    assert(initial.source.startsWith('blob:'), 'Pinned Chromium must use the supported MSE HLS path')
+    assert(initial.seekable.length > 0, 'MSE must expose an actual published seekable window')
+    const requested = await seekSourceAndDecode(owner, target, 'source-seek-beyond-window')
+    assert(requested > publishedEnd, 'The movie source control must seek beyond the old native window')
+    await observeSubtitles('source-sought', 'Dialogue sought')
+    await pausePlayback(owner, 'source-pause')
+    await seekSourceAndDecode(owner, Math.min(snapshot.duration - 24, requested + 24), 'source-seek-forward-paused', true)
+    await observeSubtitles('source-sought-paused', 'Dialogue sought')
+    await seekSourceAndDecode(owner, 0, 'source-seek-return-to-start-paused', true)
+    await resumeAndDecode(owner, 'source-resume-after-return')
+    await reconnectPausedPlayback(owner, 'source-network')
     initialGeneration = snapshot.generation
     await observeSubtitles('attached', 'Dialogue early')
     await page.screenshot({ path: `${evidence}/desktop.png` })
@@ -401,23 +555,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await recordClientControl('seek-paused', started, { targets, acceptedGeneration: firstResponse.data.acceptedGeneration })
     owner.generation = snapshot.generation
     await resumeAndDecode(owner, 'resume-after-seek')
-    await pausePlayback(owner, 'pause-before-network-interruption')
-
-    const networkStarted = Date.now()
-    const failureCount = networkInterruptions.length
-    try {
-      await context.setOffline(true)
-      await until(() => networkInterruptions.length > failureCount, 'a real stream refresh failure while offline', 10000)
-    } finally {
-      await context.setOffline(false)
-    }
-    const reconnected = Date.now()
-    await until(() => playbackSnapshots.some(item => item.accepted && item.at >= reconnected
-      && item.jobId === owner.jobId && item.sessionId === owner.sessionId && item.status === 'paused'),
-    'a fresh paused signed snapshot after network reconnection')
-    samePlayback(owner)
-    await recordClientControl('network-reconnected-paused', networkStarted)
-    await resumeAndDecode(owner, 'resume-after-network-reconnection')
+    await reconnectPausedPlayback(owner, 'network')
     await pausePlayback(owner, 'pause-before-remount')
     const pausedPosition = snapshot.startTime + (await mediaState()).time
 
@@ -458,13 +596,17 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await video.evaluate(element => element.play())
     await until(async () => {
       const state = await mediaState()
-      return state.connected && !state.paused && state.time > before.time + 1
+      return state.connected && !state.paused && state.ready >= 2 && state.error === null
+        && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames
         && snapshot?.status === 'running'
     }, 'the same player to resume after worker recovery')
-    assert(mediaResponses.some(item => {
-      const job = /^\/api\/transcode\/([^/]+)\/segment$/.exec(item.path)?.[1]
-      return item.status === 200 && job && snapshot.renditionSet.split(',').includes(`${job}.${item.generation}`)
-    }), 'Recovered playback must receive media from the current signed rendition set')
+    for (const track of ['video', 'audio']) {
+      assert(mediaResponses.some(item => {
+        const match = /^\/api\/transcode\/([^/]+)\/tracks\/(video|audio)\/segment\.m4s$/.exec(item.path)
+        return item.status === 200 && match?.[2] === track
+          && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
+      }), `Recovered playback must receive ${track} from the current signed rendition set`)
+    }
   } else if (phase === 'complete') {
     assert.deepEqual(phases, ['authenticated', 'attached', ...(phases.includes('client-controls') ? ['client-controls'] : []), 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
   } else {
@@ -472,7 +614,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder }, null, 2))
   return { phase, passed: true }
 }
 
@@ -489,7 +631,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })
