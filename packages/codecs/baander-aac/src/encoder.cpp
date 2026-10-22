@@ -4,9 +4,12 @@
 #include <cmath>
 #include <cstring>
 
+#include "encoder_tools.h"
+
 /* AAC-LC encoder.  The structure follows the Fraunhofer FDK encoder and
  * 3GPP TS 26.403: block switching with one block of lookahead, the masking
- * model of psycho.cpp, per-band M/S stereo, a bitrate-dependent lowpass and
+ * model of psycho.cpp, TNS, perceptual noise substitution, intensity and
+ * per-band M/S stereo (encoder_tools.cpp), a bitrate-dependent lowpass and
  * minimum SNR per band, thresholds raised towards the bit budget in the
  * fourth-root domain so that quiet bands become holes before loud ones lose
  * precision, a bit reservoir driven by perceptual entropy, scalefactor
@@ -31,8 +34,13 @@ constexpr int kSearchIterations = 12;
 /* Noise-to-mask ratio the encoder may go down to when bits are plentiful. */
 constexpr float kImproveLimitLog2 = -8.0f;
 
+constexpr int kNumBooks = 16; /* section codebooks 0..15 */
+constexpr int kPnsFirstBits = 9;
+
 /* Codebook with the smallest alphabet per maximum magnitude, by index. */
 const int kCodebookMaxVal[12] = {0, 1, 1, 2, 2, 4, 4, 7, 7, 12, 12, AAC_ESC_MAX_MAG};
+
+bool is_tool_book(int cb) { return cb >= AAC_CB_NOISE; }
 
 float g_sf_gain[kMaxSf + 1];    /* 2^((sf - 100) / 4) */
 float g_sf_scale34[kMaxSf + 1]; /* 2^(-(sf - 100) * 3 / 16) */
@@ -219,31 +227,36 @@ int best_spectral_bits(const AacEncChannel* c, int g, int w0, int b) {
 /* Chooses the codebook of every band of group g below max_sfb so that the
  * section and spectral bits are minimal, and returns those bits.  A band
  * with nonzero values may use any book whose range covers its maximum; a
- * zero band may also use ZERO_HCB. */
+ * zero band may also use ZERO_HCB; a band of a coding tool keeps its
+ * book (noise or intensity) and carries no spectral data. */
 int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
   const AacIcsInfo* ics = &c->ics;
   const int run_bits = ics->num_windows == 8 ? 3 : 5;
   const int header = 4 + run_bits;
-  int cost[AAC_MAX_SFB_LONG][12];
-  int from[AAC_MAX_SFB_LONG][12];
+  int cost[AAC_MAX_SFB_LONG][kNumBooks];
+  int from[AAC_MAX_SFB_LONG][kNumBooks];
   int* cb_out = c->cb + g * ics->num_swb;
 
   for (int b = 0; b < max_sfb; b++) {
-    const int max_mag = band_max_mag(c, g, w0, b);
-    for (int cb = 0; cb <= AAC_NUM_CODEBOOKS; cb++) {
+    const int tool = c->tool[g * ics->num_swb + b];
+    const int max_mag = tool ? 0 : band_max_mag(c, g, w0, b);
+    for (int cb = 0; cb < kNumBooks; cb++) {
       cost[b][cb] = kInfBits;
       from[b][cb] = -1;
-      if (cb == 0 ? max_mag != 0 : kCodebookMaxVal[cb] < max_mag) {
+      if (tool ? cb != tool
+               : (cb > AAC_NUM_CODEBOOKS ||
+                  (cb == 0 ? max_mag != 0 : kCodebookMaxVal[cb] < max_mag))) {
         continue;
       }
       /* A zero band coded with a real book also carries a scalefactor
        * (a zero difference, one bit). */
-      const int band = cb == 0 ? 0 : spectral_bits(c, g, w0, b, cb) + (max_mag == 0 ? 1 : 0);
+      const int band =
+          cb == 0 || tool ? 0 : spectral_bits(c, g, w0, b, cb) + (max_mag == 0 ? 1 : 0);
       if (b == 0) {
         cost[b][cb] = header + band;
         continue;
       }
-      for (int prev = 0; prev <= AAC_NUM_CODEBOOKS; prev++) {
+      for (int prev = 0; prev < kNumBooks; prev++) {
         if (cost[b - 1][prev] >= kInfBits) {
           continue;
         }
@@ -259,7 +272,7 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
     return 0;
   }
   int best = 0;
-  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+  for (int cb = 1; cb < kNumBooks; cb++) {
     if (cost[max_sfb - 1][cb] < cost[max_sfb - 1][best]) {
       best = cb;
     }
@@ -286,7 +299,8 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
 
 /* Chooses a scalefactor per coded band (allowed[idx] >= 0) so that the
  * band's noise stays within its allowance, smooths the scalefactors where
- * that saves bits, and quantizes. */
+ * that saves bits, and quantizes.  Bands of a coding tool keep their book
+ * and value. */
 void quantize_channel(AacEncChannel* c) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
@@ -296,6 +310,11 @@ void quantize_channel(AacEncChannel* c) {
       const int idx = g * nswb + b;
       c->cb[idx] = 0;
       c->sf[idx] = -1;
+      if (c->tool[idx]) {
+        c->cb[idx] = c->tool[idx];
+        c->sf[idx] = c->tool_sf[idx];
+        continue;
+      }
       if (c->allowed[idx] < 0.0f) {
         continue;
       }
@@ -315,7 +334,7 @@ void quantize_channel(AacEncChannel* c) {
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < nswb; b++) {
       const int idx = g * nswb + b;
-      if (c->cb[idx] == 0) {
+      if (c->cb[idx] == 0 || is_tool_book(c->cb[idx])) {
         continue;
       }
       const int sf = c->sf[idx];
@@ -341,7 +360,7 @@ void quantize_channel(AacEncChannel* c) {
    * bits, the coarser one adds noise but keeps the stream valid. */
   int prev = -1;
   for (int idx = 0; idx < ics->num_window_groups * nswb; idx++) {
-    if (c->cb[idx] == 0) {
+    if (c->cb[idx] == 0 || is_tool_book(c->cb[idx])) {
       continue;
     }
     if (prev >= 0) {
@@ -357,7 +376,7 @@ void quantize_channel(AacEncChannel* c) {
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < nswb; b++) {
       const int idx = g * nswb + b;
-      if (c->cb[idx] == 0) {
+      if (c->cb[idx] == 0 || is_tool_book(c->cb[idx])) {
         continue;
       }
       if (quantize_band(c, g, w0, b, c->sf[idx]) == 0) {
@@ -388,9 +407,16 @@ int channel_max_sfb(const AacEncChannel* c) {
   return max_sfb;
 }
 
+/* First noise band of a channel: 9-bit PCM difference to the global gain
+ * (ISO/IEC 14496-3 4.6.2.3), kept within the field. */
+int pns_first_value(const AacEncChannel* c, int nrg) {
+  return std::clamp(nrg - (c->global_gain - 90) + 256, 0, 511);
+}
+
 /* Sections every group and assigns the scalefactors of zero bands that
  * ended up with a real book; returns the section, scalefactor and spectral
- * bits of the channel. */
+ * bits of the channel.  Scalefactors, noise energies and intensity
+ * positions form three separate DPCM chains. */
 int finish_channel(AacEncChannel* c, int max_sfb) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
@@ -404,10 +430,29 @@ int finish_channel(AacEncChannel* c, int max_sfb) {
     w0 += ics->group_len[g];
   }
   int prev = c->global_gain;
+  int prev_noise = 0;
+  int prev_is = 0;
+  bool first_noise = true;
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < max_sfb; b++) {
       const int idx = g * nswb + b;
-      if (c->cb[idx] == 0) {
+      const int cb = c->cb[idx];
+      if (cb == 0) {
+        continue;
+      }
+      if (cb == AAC_CB_NOISE) {
+        if (first_noise) {
+          bits += kPnsFirstBits;
+          first_noise = false;
+        } else {
+          bits += aac_scalefactor_bits[c->sf[idx] - prev_noise + AAC_SCALE_DIFF_ZERO];
+        }
+        prev_noise = c->sf[idx];
+        continue;
+      }
+      if (cb == AAC_CB_INTENSITY || cb == AAC_CB_INTENSITY2) {
+        bits += aac_scalefactor_bits[c->sf[idx] - prev_is + AAC_SCALE_DIFF_ZERO];
+        prev_is = c->sf[idx];
         continue;
       }
       if (c->sf[idx] < 0) {
@@ -420,141 +465,12 @@ int finish_channel(AacEncChannel* c, int max_sfb) {
   return bits;
 }
 
-/* ── TNS (ISO/IEC 14496-3 4.6.9, libfdk-aac aacenc_tns.cpp) ──────── */
-
-constexpr int kTnsMaxOrder = 12;
-constexpr float kTnsGainOn = 1.437f; /* prediction gain that switches TNS on */
-constexpr int kTnsStartHz = 1400;
-constexpr int kTnsCoefBits = 4;
-
-/* Levinson-Durbin on r[0 .. order]: reflection coefficients in the sign
- * convention of the decoder's step-up recursion, and the prediction gain. */
-float levinson(const double* r, int order, float* parcor) {
-  double a[kTnsMaxOrder + 1] = {0.0};
-  double tmp[kTnsMaxOrder + 1];
-  double err = r[0];
-  if (err <= 0.0) {
-    return 1.0f;
-  }
-  for (int m = 1; m <= order; m++) {
-    double acc = r[m];
-    for (int i = 1; i < m; i++) {
-      acc -= a[i] * r[m - i];
-    }
-    const double k = acc / err;
-    parcor[m - 1] = (float)-k;
-    for (int i = 1; i < m; i++) {
-      tmp[i] = a[i] - k * a[m - i];
-    }
-    for (int i = 1; i < m; i++) {
-      a[i] = tmp[i];
-    }
-    a[m] = k;
-    err *= 1.0 - k * k;
-    if (err <= 1e-9 * r[0]) {
-      err = 1e-9 * r[0];
-    }
-  }
-  return (float)(r[0] / err);
-}
-
-/* Quantizes a reflection coefficient the way the decoder inverts it. */
-int tns_quantize(float parcor) {
-  const double iqfac = ((1 << (kTnsCoefBits - 1)) - 0.5) / (M_PI / 2.0);
-  const double iqfac_m = ((1 << (kTnsCoefBits - 1)) + 0.5) / (M_PI / 2.0);
-  const double v = asin(std::clamp(parcor, -1.0f, 1.0f));
-  const int idx = (int)lrint(v * (v >= 0.0 ? iqfac : iqfac_m));
-  return std::clamp(idx, -(1 << (kTnsCoefBits - 1)), (1 << (kTnsCoefBits - 1)) - 1);
-}
-
-float tns_dequantize(int idx) {
-  const double iqfac = ((1 << (kTnsCoefBits - 1)) - 0.5) / (M_PI / 2.0);
-  const double iqfac_m = ((1 << (kTnsCoefBits - 1)) + 0.5) / (M_PI / 2.0);
-  return (float)sin(idx / (idx >= 0 ? iqfac : iqfac_m));
-}
-
-/* Decides on and applies a TNS filter to a long-window spectrum: when the
- * spectrum above kTnsStartHz is predictable (a transient-like temporal
- * envelope) the prediction residual is coded instead, and the decoder's
- * all-pole filter shapes the quantization noise under the envelope. */
-void apply_tns(const AacEncoderState* s, AacEncChannel* c) {
-  const AacIcsInfo* ics = &c->ics;
-  c->tns_present = 0;
-  c->tns_order = 0;
-  if (ics->num_windows == 8) {
-    return;
-  }
-  const int start = ics->swb_offset[s->tns_start_band];
-  const int end = ics->swb_offset[std::min(ics->tns_max_bands, ics->num_swb)];
-  if (end - start <= 2 * kTnsMaxOrder) {
-    return;
-  }
-  double r[kTnsMaxOrder + 1];
-  for (int lag = 0; lag <= kTnsMaxOrder; lag++) {
-    double acc = 0.0;
-    for (int i = start + lag; i < end; i++) {
-      acc += (double)c->coef[i] * (double)c->coef[i - lag];
-    }
-    r[lag] = acc;
-  }
-  if (r[0] <= 0.0) {
-    return;
-  }
-  float parcor[kTnsMaxOrder];
-  const float gain = levinson(r, kTnsMaxOrder, parcor);
-  int order = 0;
-  int sum_sq = 0;
-  for (int i = 0; i < kTnsMaxOrder; i++) {
-    c->tns_coef[i] = tns_quantize(parcor[i]);
-    if (c->tns_coef[i] != 0) {
-      order = i + 1;
-    }
-  }
-  for (int i = 0; i < order; i++) {
-    sum_sq += c->tns_coef[i] * c->tns_coef[i];
-  }
-  if (order == 0 || (gain <= kTnsGainOn && sum_sq <= kTnsMaxOrder / 2 + 2)) {
-    return;
-  }
-  /* Direct-form coefficients from the quantized reflection coefficients,
-   * exactly as the decoder derives them. */
-  float lpc[kTnsMaxOrder + 1] = {1.0f};
-  for (int m = 1; m <= order; m++) {
-    const float k = tns_dequantize(c->tns_coef[m - 1]);
-    float tmp[kTnsMaxOrder + 1];
-    for (int i = 1; i < m; i++) {
-      tmp[i] = lpc[i] + k * lpc[m - i];
-    }
-    for (int i = 1; i < m; i++) {
-      lpc[i] = tmp[i];
-    }
-    lpc[m] = k;
-  }
-  /* All-zero filter over the original spectrum, upward. */
-  float orig[AAC_FRAME_SIZE_LONG];
-  memcpy(orig + start, c->coef + start, (size_t)(end - start) * sizeof(float));
-  for (int n = start; n < end; n++) {
-    const int lim = std::min(n - start, order);
-    float acc = orig[n];
-    for (int i = 1; i <= lim; i++) {
-      acc += lpc[i] * orig[n - i];
-    }
-    c->coef[n] = acc;
-  }
-  c->tns_present = 1;
-  c->tns_order = order;
-}
-
-int tns_bits(const AacEncChannel* c) {
-  /* n_filt, coef_res, length, order, direction, coef_compress, coefficients */
-  return c->tns_present ? 2 + 1 + 6 + 5 + 1 + 1 + c->tns_order * kTnsCoefBits : 0;
-}
-
 /* ── stereo ────────────────────────────────────────────────────── */
 
 /* Per-band M/S decision (libfdk-aac ms_stereo.cpp): M/S wins when the
  * noise-to-energy product of mid and side at the smaller threshold beats
- * that of left and right.  M/S bands share the smaller threshold. */
+ * that of left and right.  M/S bands share the smaller threshold.
+ * Intensity bands stay as they are. */
 void decide_ms(AacEncoderState* s) {
   AacEncChannel* l = &s->ch[0];
   AacEncChannel* r = &s->ch[1];
@@ -565,6 +481,10 @@ void decide_ms(AacEncoderState* s) {
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < nswb; b++) {
       const int idx = g * nswb + b;
+      if (r->tool[idx] == AAC_CB_INTENSITY || r->tool[idx] == AAC_CB_INTENSITY2) {
+        s->ms_used[idx] = 0;
+        continue;
+      }
       float em = 0.0f;
       float es = 0.0f;
       for (int w = w0; w < w0 + ics->group_len[g]; w++) {
@@ -719,8 +639,7 @@ void write_ics_info(AacBitWriter* w, const AacIcsInfo* ics, int max_sfb) {
   }
 }
 
-void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, int common_window,
-                          int tns_start_band) {
+void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, int common_window) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
   aac_bitwriter_write(w, (uint32_t)c->global_gain, 8);
@@ -749,31 +668,41 @@ void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, 
     }
   }
 
-  /* scale_factor_data */
+  /* scale_factor_data: scalefactors, noise energies and intensity
+   * positions each continue their own chain. */
   int prev = c->global_gain;
+  int prev_noise = 0;
+  int prev_is = 0;
+  bool first_noise = true;
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < max_sfb; b++) {
       const int idx = g * nswb + b;
-      if (c->cb[idx] == 0) {
+      const int cb = c->cb[idx];
+      if (cb == 0) {
         continue;
       }
-      aac_bitwriter_write_scalefactor(w, c->sf[idx] - prev);
-      prev = c->sf[idx];
+      if (cb == AAC_CB_NOISE) {
+        if (first_noise) {
+          aac_bitwriter_write(w, (uint32_t)pns_first_value(c, c->sf[idx]), kPnsFirstBits);
+          first_noise = false;
+        } else {
+          aac_bitwriter_write_scalefactor(w, c->sf[idx] - prev_noise);
+        }
+        prev_noise = c->sf[idx];
+      } else if (cb == AAC_CB_INTENSITY || cb == AAC_CB_INTENSITY2) {
+        aac_bitwriter_write_scalefactor(w, c->sf[idx] - prev_is);
+        prev_is = c->sf[idx];
+      } else {
+        aac_bitwriter_write_scalefactor(w, c->sf[idx] - prev);
+        prev = c->sf[idx];
+      }
     }
   }
 
   aac_bitwriter_write(w, 0, 1); /* pulse_data_present */
   aac_bitwriter_write(w, (uint32_t)c->tns_present, 1);
   if (c->tns_present) {
-    aac_bitwriter_write(w, 1, 2);                                 /* n_filt */
-    aac_bitwriter_write(w, 1, 1);                                 /* coef_res: 4-bit coefficients */
-    aac_bitwriter_write(w, (uint32_t)(nswb - tns_start_band), 6); /* length */
-    aac_bitwriter_write(w, (uint32_t)c->tns_order, 5);
-    aac_bitwriter_write(w, 0, 1); /* direction: upward */
-    aac_bitwriter_write(w, 0, 1); /* coef_compress */
-    for (int i = 0; i < c->tns_order; i++) {
-      aac_bitwriter_write(w, (uint32_t)(c->tns_coef[i] & ((1 << kTnsCoefBits) - 1)), kTnsCoefBits);
-    }
+    aac_enc_tns_write(w, c);
   }
   aac_bitwriter_write(w, 0, 1); /* gain_control_data_present */
 
@@ -782,7 +711,7 @@ void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, 
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < max_sfb; b++) {
       const int cb = c->cb[g * nswb + b];
-      if (cb == 0) {
+      if (cb == 0 || is_tool_book(cb)) {
         continue;
       }
       const int dim = aac_codebook_info[cb].dim;
@@ -822,7 +751,7 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
   if (s->channels == 1) {
     aac_bitwriter_write(&w, AAC_ELEM_SCE, 3);
     aac_bitwriter_write(&w, 0, 4); /* element_instance_tag */
-    write_channel_stream(&w, &s->ch[0], max_sfb, 0, s->tns_start_band);
+    write_channel_stream(&w, &s->ch[0], max_sfb, 0);
   } else {
     const AacIcsInfo* ics = &s->ch[0].ics;
     aac_bitwriter_write(&w, AAC_ELEM_CPE, 3);
@@ -838,8 +767,8 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
         }
       }
     }
-    write_channel_stream(&w, &s->ch[0], max_sfb, 1, s->tns_start_band);
-    write_channel_stream(&w, &s->ch[1], max_sfb, 1, s->tns_start_band);
+    write_channel_stream(&w, &s->ch[0], max_sfb, 1);
+    write_channel_stream(&w, &s->ch[1], max_sfb, 1);
   }
   aac_bitwriter_write(&w, AAC_ELEM_END, 3);
   aac_bitwriter_byte_align(&w);
@@ -867,10 +796,10 @@ int frame_overhead_bits(const AacEncoderState* s) {
   const int ics_info = ics->num_windows == 8 ? 15 : 11;
   int bits = kAdtsBits + 3 + 7; /* header, END, worst-case byte alignment */
   if (s->channels == 1) {
-    bits += 7 + 8 + ics_info + 3 + tns_bits(&s->ch[0]);
+    bits += 7 + 8 + ics_info + 3 + aac_enc_tns_bits(&s->ch[0]);
   } else {
     bits += 7 + 1 + ics_info + 2 + ics->num_window_groups * s->max_sfb + 2 * (8 + 3) +
-            tns_bits(&s->ch[0]) + tns_bits(&s->ch[1]);
+            aac_enc_tns_bits(&s->ch[0]) + aac_enc_tns_bits(&s->ch[1]);
   }
   return bits;
 }
@@ -886,7 +815,7 @@ float frame_pe(const AacEncoderState* s) {
     for (int g = 0; g < ics->num_window_groups; g++) {
       for (int b = 0; b < active; b++) {
         const int idx = g * ics->num_swb + b;
-        if (ch->energy[idx] <= ch->thr[idx]) {
+        if (ch->tool[idx] || ch->energy[idx] <= ch->thr[idx]) {
           continue;
         }
         float band_pe = log2f(ch->energy[idx] / ch->thr[idx]);
@@ -994,7 +923,7 @@ int prepare_bands(AacEncoderState* s, ReleaseEntry* release) {
         ch->min_snr[idx] = min_snr;
         const float spread = ch->spread[idx] * (is_short ? 0.63f : 0.5f);
         ch->avoid_hole[idx] = !(spread > e);
-        if (b < active && e > ch->thr[idx] && ch->avoid_hole[idx]) {
+        if (b < active && e > ch->thr[idx] && ch->avoid_hole[idx] && !ch->tool[idx]) {
           release[n_release++] = {c, idx, b, e};
         }
       }
@@ -1024,7 +953,7 @@ void set_allowances(AacEncoderState* s, float reduction, float improve, const Re
         const float e = ch->energy[idx];
         const float thr = ch->thr[idx];
         float allowed = -1.0f;
-        if (b < active && e > thr) {
+        if (b < active && e > thr && !ch->tool[idx]) {
           if (improve != 1.0f) {
             allowed = thr * improve;
           } else {
@@ -1210,15 +1139,9 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
       break;
     }
   }
-  s->tns_start_band = aac_tns_max_bands_long[s->rate_index];
-  for (int b = 0; b < aac_num_sfb_long[s->rate_index]; b++) {
-    if ((float)lo[b] * (float)sr / (2.0f * kFrame) >= (float)kTnsStartHz) {
-      s->tns_start_band = b;
-      break;
-    }
-  }
   init_min_snr(s->min_snr_long, channel_bitrate, sr, 2 * kFrame, lo, s->active_bands_long);
   init_min_snr(s->min_snr_short, channel_bitrate, sr, 2 * kShort, so, s->active_bands_short);
+  aac_enc_tools_init(s);
   return s;
 }
 
@@ -1239,12 +1162,26 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   for (int c = 0; c < s->channels; c++) {
     AacEncChannel* ch = &s->ch[c];
     window_and_mdct(s, ch);
-    apply_tns(s, ch);
-    aac_psy_thresholds(&ch->psy, s->sample_rate, channel_bitrate, &ch->ics, ch->coef, ch->energy,
-                       ch->thr, ch->spread);
+    aac_enc_tns_decide(s, ch);
   }
   if (s->channels == 2) {
+    aac_enc_tns_sync(s, &s->ch[1], &s->ch[0]);
+  }
+  for (int c = 0; c < s->channels; c++) {
+    AacEncChannel* ch = &s->ch[c];
+    aac_enc_tns_apply(s, ch);
+    aac_psy_thresholds(&ch->psy, s->sample_rate, channel_bitrate, &ch->ics, ch->coef, ch->energy,
+                       ch->thr, ch->spread);
+    memset(ch->tool, 0, sizeof(ch->tool));
+    aac_enc_pns_detect(s, ch);
+  }
+  if (s->channels == 2) {
+    aac_enc_intensity(s);
     decide_ms(s);
+    aac_enc_pns_stereo_finish(s);
+  }
+  for (int c = 0; c < s->channels; c++) {
+    aac_enc_pns_code(s, &s->ch[c]);
   }
   for (int c = 0; c < s->channels; c++) {
     for (int i = 0; i < kFrame; i++) {

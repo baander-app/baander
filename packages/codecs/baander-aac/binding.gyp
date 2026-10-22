@@ -14,6 +14,7 @@
         "src/api.cpp",
         "src/decoder.cpp",
         "src/psycho.cpp",
+        "src/encoder_tools.cpp",
         "src/encoder.cpp"
       ],
       "include_dirs": [
