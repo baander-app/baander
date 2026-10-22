@@ -118,12 +118,17 @@ void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
 }
 
 void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_energy) {
+  /* The high-pass of libfdk-aac block_switch.cpp, run from rest at the
+   * start of the region. */
+  float y = 0.0f;
+  float prev = x[start - 1];
   for (int j = 0; j < count / 128; j++) {
     const float* s = x + start + j * 128;
     float e = 0.0f;
     for (int i = 0; i < 128; i++) {
-      const float d = s[i] - s[i - 1]; /* first-order high-pass */
-      e += d * d;
+      y = 0.7548f * (s[i] - prev) + 0.5095f * y;
+      prev = s[i];
+      e += y * y;
     }
     sub_energy[j] = e;
   }
