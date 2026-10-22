@@ -244,7 +244,7 @@ def verify(root, maximum):
     audio_identities = None
     for sample in execution_window:
         native = native_processes(sample)
-        videos = [p for p, args in native if '/media/source/video.mp4' in args]
+        videos = [p for p, args in native if '/media/source/video.mkv' in args]
         audio = [p for p, args in native if '/media/source/track.flac' in args]
         assert len(videos) >= 3 and len(audio) >= 1, 'Three video and one audio native slots did not stay occupied'
         identities = {(p['pid'], str(p['startTicks'])) for p in audio}

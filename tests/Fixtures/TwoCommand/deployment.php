@@ -31,7 +31,7 @@ const BASE = 'http://127.0.0.1:9501';
 const ROOT = '/var/www/html/storage/two-command';
 const STATE = ROOT . '/state.json';
 const EMAIL = 'two-command-admin@baander.app';
-const VIDEO = '/media/source/video.mp4';
+const VIDEO = '/media/source/video.mkv';
 const AUDIO = '/media/source/track.flac';
 
 function ensure(bool $condition, string $message): void
@@ -105,13 +105,16 @@ function acknowledged(Doctrine\DBAL\Connection $db, array $state, string $status
     try {
         return await(static function () use ($db, $state, $status, $position, &$last): array|false {
             $last = row($db, $state);
+            ensure(!in_array($last['outcome'], ['failed', 'refused', 'cancelled'], true),
+                'Worker cannot acknowledge playable controls after ' . $last['outcome'] . ': ' . ($last['error'] ?? '(no diagnostic)'));
             return $last['desired']['status'] === $status && (int) $last['observed_revision'] >= (int) $last['desired_revision']
+                && in_array($last['outcome'], ['ready', 'complete'], true)
                 && ($position === null || abs((float) $last['desired']['position'] - $position) < .01) ? $last : false;
         }, 'worker acknowledges ' . $status);
     } catch (RuntimeException $error) {
         $diagnostic = array_intersect_key($last, array_flip([
             'sampled_at', 'generation', 'desired_revision', 'observed_revision', 'outcome',
-            'worker_boot_id', 'worker_lease_epoch', 'lease_expires_at', 'job_status',
+            'worker_boot_id', 'worker_lease_epoch', 'lease_expires_at', 'job_status', 'error',
         ]));
         $diagnostic['desiredStatus'] = $last['desired']['status'] ?? null;
         $diagnostic['desiredPosition'] = $last['desired']['position'] ?? null;
@@ -136,6 +139,23 @@ function playback(StreamClient $client, array $state): array
 function url(string $path): string
 {
     return str_starts_with($path, '/') ? BASE . $path : $path;
+}
+/** @return array{decodedFrames: int, decodedPcmBytes: int} */
+function decodeMedia(string $input, string $name, ?float $duration = null): array
+{
+    $video = ROOT . '/' . $name . '.gray';
+    $audio = ROOT . '/' . $name . '.pcm';
+    $limit = $duration === null ? [] : ['-t', (string) $duration];
+    command(['ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-y', '-threads', '1', '-filter_threads', '1', '-i', $input,
+        ...$limit, '-map', '0:v:0', '-vf', 'scale=16:16', '-c:v', 'rawvideo', '-threads:v', '1', '-pix_fmt', 'gray', '-f', 'rawvideo', $video,
+        ...$limit, '-map', '0:a:0', '-c:a', 'pcm_s16le', '-ac', '2', '-ar', '48000', '-f', 's16le', $audio], 45);
+    clearstatcache(true, $video);
+    clearstatcache(true, $audio);
+    $videoBytes = is_file($video) ? (int) filesize($video) : 0;
+    $audioBytes = is_file($audio) ? (int) filesize($audio) : 0;
+    ensure($videoBytes > 0 && $videoBytes % 256 === 0, 'Media decode produced no complete video frames.');
+    ensure($audioBytes > 0 && $audioBytes % 4 === 0, 'Media decode produced no complete stereo PCM samples.');
+    return ['decodedFrames' => intdiv($videoBytes, 256), 'decodedPcmBytes' => $audioBytes];
 }
 /**
  * @param array<string, mixed> $state
@@ -162,8 +182,96 @@ function decodeVideo(StreamClient $client, array $state, float $readinessSeconds
     ensure($init->status() === 200 && $segment->status() === 200, 'Worker init or fragment is unavailable.');
     $path = ROOT . '/decoded-generation-' . $playback['generation'] . '.mp4';
     file_put_contents($path, $init->body . $segment->body);
-    command(['ffmpeg', '-nostdin', '-v', 'error', '-threads', '1', '-i', $path, '-map', '0:v:0', '-f', 'null', '-']);
-    return $playback + ['mediaUrl' => $mediaUrl, 'initUrl' => url($initMatch[1]), 'segmentUrl' => url($segmentMatch[1]), 'decodedBytes' => strlen($init->body) + strlen($segment->body)];
+    $decoded = decodeMedia($path, 'decoded-generation-' . $playback['generation']);
+    $subtitles = verifySubtitles($master->body, $playback);
+    return $playback + $decoded + ['mediaUrl' => $mediaUrl, 'initUrl' => url($initMatch[1]), 'segmentUrl' => url($segmentMatch[1]), 'decodedBytes' => strlen($init->body) + strlen($segment->body), 'subtitles' => $subtitles];
+}
+
+/**
+ * @param array<string,mixed> $playback
+ * @return array<string,array<string,mixed>>
+ */
+function verifySubtitles(string $master, array $playback): array
+{
+    preg_match_all('/^#EXT-X-MEDIA:TYPE=SUBTITLES,[^\r\n]+/m', $master, $matches);
+    ensure(count($matches[0]) === 3, 'Ready master must expose all three independent subtitle tracks.');
+    $evidence = [];
+    foreach ($matches[0] as $line) {
+        preg_match('/URI="([^"]+)"/', $line, $uri);
+        ensure(isset($uri[1]), 'Subtitle rendition omitted URI.');
+        preg_match('~/subtitles/(s[0-9]+)/~', $uri[1], $track);
+        ensure(isset($track[1]) && !isset($evidence[$track[1]]), 'Subtitle track identity is absent or duplicated.');
+        $key = $track[1];
+        $playlist = (new HttpExchange(url($uri[1]), []))->complete();
+        ensure($playlist->status() === 200, 'Ready subtitle playlist is unavailable.');
+        preg_match('/#EXTINF:([0-9.]+)/', $playlist->body, $duration);
+        $remaining = (float) $playback['duration'] - (float) $playback['startTime'];
+        ensure(isset($duration[1]) && abs((float) $duration[1] - $remaining) < .05, 'Full subtitle resource advertises the wrong timeline duration.');
+        preg_match('~^([^#\r\n][^\r\n]*)~m', $playlist->body, $resource);
+        ensure(isset($resource[1]), 'Subtitle playlist omitted its resource.');
+        $vtt = (new HttpExchange(url($resource[1]), []))->complete();
+        ensure($vtt->status() === 200 && str_starts_with($vtt->body, 'WEBVTT'), 'Published subtitle is not a complete WebVTT resource.');
+        $expected = ['s2' => 'Dialogue', 's3' => 'Forced', 's4' => 'Unlabelled'][$key] ?? null;
+        ensure($expected !== null && str_contains($vtt->body, $expected . ' late'), 'Duplicate or unlabelled subtitle stream was lost or misselected.');
+        preg_match('/((?:\d{2}:)?\d{2}:\d{2}\.\d{3}) --> ((?:\d{2}:)?\d{2}:\d{2}\.\d{3})\R' . preg_quote($expected, '/') . ' late/', $vtt->body, $cue);
+        ensure(isset($cue[1], $cue[2]), 'Expected late cue was not parsed.');
+        $seconds = static function (string $timestamp): float {
+            [$hours, $minutes, $seconds] = array_pad(explode(':', $timestamp), -3, '0');
+            return (int) $hours * 3600 + (int) $minutes * 60 + (float) $seconds;
+        };
+        ensure(abs($seconds($cue[1]) - max(0, 15 - (float) $playback['startTime'])) < .05
+            && abs($seconds($cue[2]) - (40 - (float) $playback['startTime'])) < .05,
+            'Subtitle cue timestamps do not follow the generation-local video timeline.');
+        ensure(str_contains($line, 'DEFAULT=' . ($key === 's2' ? 'YES' : 'NO')), 'Subtitle default disposition was lost.');
+        ensure(str_contains($line, 'FORCED=' . ($key === 's3' ? 'YES' : 'NO')), 'Subtitle forced disposition was lost.');
+        $tampered = (new HttpExchange(url($resource[1]) . '&generation=999999', []))->complete(5);
+        ensure(in_array($tampered->status(), [400, 403, 404], true), 'Altered subtitle signature was accepted.');
+        $evidence[$key] = ['url' => url($resource[1]), 'bytes' => strlen($vtt->body), 'duration' => (float) $duration[1],
+            'lateCueStart' => $seconds($cue[1]), 'lateCueEnd' => $seconds($cue[2]), 'tamperedStatus' => $tampered->status()];
+    }
+    return $evidence;
+}
+
+/**
+ * @param array<string,mixed> $state
+ * @return array<string,mixed>
+ */
+function verifyDash(StreamClient $client, array $state, bool $qualifyDemux = false): array
+{
+    $signed = twoCommandExchange($client, '/api/stream/sign', 'POST', [
+        'path' => '/api/transcode/' . $state['video'] . '/manifest.mpd', 'refresh' => true,
+    ])->complete();
+    ensure($signed->status() === 200, 'DASH signing failed: ' . $signed->body);
+    $snapshot = jsonBody($signed);
+    ensure(($snapshot['ready'] ?? false) && is_string($snapshot['url'] ?? null), 'DASH snapshot is not ready.');
+    $manifest = (new HttpExchange(url($snapshot['url']), []))->complete();
+    ensure($manifest->status() === 200, 'Signed DASH manifest is unavailable.');
+    $xml = new DOMDocument();
+    ensure($xml->loadXML($manifest->body, LIBXML_NONET), 'DASH manifest is invalid XML.');
+    ensure($xml->documentElement?->getAttribute('profiles') === 'urn:mpeg:dash:profile:full:2011', 'DASH profile does not describe SegmentList output.');
+    $xpath = new DOMXPath($xml); $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
+    $initializations = $xpath->query('//mpd:Initialization/@sourceURL');
+    $segments = $xpath->query('//mpd:SegmentURL/@media');
+    ensure($initializations !== false && $segments !== false, 'DASH addressing query failed.');
+    $init = $initializations->item(0)?->nodeValue;
+    $segment = $segments->item(0)?->nodeValue;
+    ensure(is_string($init) && is_string($segment), 'DASH omitted initialization or media addressing.');
+    $resources = [];
+    foreach (['init' => $init, 'segment' => $segment] as $kind => $resource) {
+        $response = (new HttpExchange(url($resource), []))->complete();
+        ensure($response->status() === 200 && strlen($response->body) > 0, 'Signed DASH ' . $kind . ' is unavailable.');
+        $resources[$kind] = ['status' => $response->status(), 'bytes' => strlen($response->body)];
+    }
+    $result = ['generation' => $snapshot['generation'], 'profile' => $xml->documentElement->getAttribute('profiles'),
+        'qualification' => 'manifest-http-only', 'demuxQualified' => false, 'resources' => $resources];
+    if ($qualifyDemux) {
+        // Strict qualification intentionally fails until the real DASH demuxer
+        // produces both decoded video frames and audio from the signed MPD.
+        $result += decodeMedia(url($snapshot['url']), 'decoded-dash-generation-' . $snapshot['generation'], 1.0);
+        $result['qualification'] = 'decoded-audio-and-video';
+        $result['demuxQualified'] = true;
+    }
+    return $result;
 }
 /**
  * @param array<string,mixed> $decoded
@@ -173,7 +281,7 @@ function videoEvidence(array $decoded): array
 {
     return array_intersect_key($decoded, array_flip([
         'jobId', 'sessionId', 'ready', 'generation', 'revision', 'status',
-        'position', 'startTime', 'duration', 'renditionSet', 'decodedBytes',
+        'position', 'startTime', 'duration', 'renditionSet', 'decodedBytes', 'decodedFrames', 'decodedPcmBytes', 'subtitles',
     ]));
 }
 /**
@@ -190,10 +298,14 @@ function retainVideoOutput(Doctrine\DBAL\Connection $db, array $state, array $de
     $fragments = glob($runtime['output_directory'] . '/*_' . $query['index'] . '.m4s') ?: [];
     ensure(count($fragments) === 1, 'Cannot identify exact retained fragment.');
     $files = [];
-    foreach (['init' => $runtime['output_directory'] . '/init.mp4', 'media' => $fragments[0]] as $kind => $path) {
+    $paths = ['init' => $runtime['output_directory'] . '/init.mp4', 'media' => $fragments[0]];
+    foreach ($decoded['subtitles'] as $key => $subtitle) {
+        $paths[$key] = $runtime['output_directory'] . '/subtitles/' . $key . '/full.vtt';
+    }
+    foreach ($paths as $kind => $path) {
         $copy = ROOT . '/retained-' . $name . '-' . $kind . '.bin';
         ensure(is_file($path) && filesize($path) > 0 && copy($path, $copy) && chmod($copy, 0600), 'Cannot retain closed native output.');
-        $files[$kind] = ['path' => $path, 'copy' => $copy, 'url' => $decoded[$kind === 'init' ? 'initUrl' : 'segmentUrl']];
+        $files[$kind] = ['path' => $path, 'copy' => $copy, 'url' => $decoded['subtitles'][$kind]['url'] ?? $decoded[$kind === 'init' ? 'initUrl' : 'segmentUrl']];
     }
     return ['generation' => (int) $decoded['generation'], 'files' => $files];
 }
@@ -230,7 +342,17 @@ $client = static fn (): StreamClient => new StreamClient($manager, EMAIL,
 $result = [];
 if ($mode === 'prepare') {
     ensure(is_dir(ROOT) || mkdir(ROOT, 0750, true), 'Cannot create scratch state.');
-    command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=180', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=180', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', VIDEO], 150);
+    foreach (['Dialogue', 'Forced', 'Unlabelled'] as $title) {
+        file_put_contents(ROOT . '/' . $title . '.srt', "1\n00:00:00,000 --> 00:00:15,000\n$title early\n\n2\n00:00:15,000 --> 00:00:40,000\n$title late\n\n3\n00:01:30,000 --> 00:02:30,000\n$title sought\n");
+    }
+    command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=180',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=180',
+        '-i', ROOT . '/Dialogue.srt', '-i', ROOT . '/Forced.srt', '-i', ROOT . '/Unlabelled.srt',
+        '-map', '0:v', '-map', '1:a', '-map', '2:s', '-map', '3:s', '-map', '4:s',
+        '-metadata:s:s:0', 'language=eng', '-metadata:s:s:0', 'title=Dialogue', '-disposition:s:0', 'default',
+        '-metadata:s:s:1', 'language=eng', '-metadata:s:s:1', 'title=Forced', '-disposition:s:1', 'forced',
+        '-metadata:s:s:2', 'language=', '-metadata:s:s:2', 'title=Unlabelled', '-disposition:s:2', '0',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-c:s', 'srt', '-t', '180', VIDEO], 150);
     command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1800', '-ac', '2', '-ar', '44100', '-threads', '1', '-c:a', 'flac', AUDIO], 60);
     $library = new LibraryEntity('Two command music', 'two-command-music', '/media/source', 'music', 'local');
     $movies = new LibraryEntity('Two command movies', 'two-command-movies', '/media/source', 'movie', 'local');
@@ -356,6 +478,7 @@ if ($mode === 'prepare') {
     $state['session'] = $sessions[0]; save($state);
     ensure((int) $db->fetchOne('SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id WHERE j.public_id=?', [$state['job']]) === 1, 'Duplicate durable video owner.');
     $decoded = decodeVideo($auth, $state);
+    $dash = verifyDash($auth, $state);
     $state['initialOutput'] = retainVideoOutput($db, $state, $decoded, 'initial'); save($state);
     $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000');
     ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Worker did not produce progressive audio.');
@@ -375,7 +498,9 @@ if ($mode === 'prepare') {
     ensure($recommendation->status() === 202 && (jsonBody($recommendation)['data']['execution'] ?? null) === 'async', 'Recommendation admission lost its typed asynchronous response.');
     $recommendationId = jsonBody($recommendation)['data']['public_id'];
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
-    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+} elseif ($mode === 'dash') {
+    $result = verifyDash($client(), state(), true);
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
     $state = state(); $auth = $client();
     if ($mode === 'seek-paused' || $mode === 'pause-absent') {

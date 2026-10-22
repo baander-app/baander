@@ -44,6 +44,13 @@ control_name=''
 web_name="$run_id-web"
 web_port=''
 two_command="${BAANDER_TEST_TWO_COMMAND:-0}"
+dash_qualification="${BAANDER_TEST_DASH_QUALIFICATION:-0}"
+[[ "$dash_qualification" = 0 || "$dash_qualification" = 1 ]] || {
+    echo 'BAANDER_TEST_DASH_QUALIFICATION must be 0 or 1.' >&2; exit 2;
+}
+if [ "$dash_qualification" = 1 ] && [ "$two_command" != 1 ]; then
+    echo 'DASH qualification requires the two-command deployment drill.' >&2; exit 2
+fi
 lifecycle_phase="${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}"
 case "$lifecycle_phase" in ''|redis|postgres) ;; *) echo 'Invalid worker lifecycle phase.' >&2; exit 2 ;; esac
 if [ -n "$lifecycle_phase" ] && { [ "$two_command" != 0 ] || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; }; then
@@ -93,6 +100,19 @@ cleanup() {
         cleanup_docker logs "$web_name" > "$artifacts/web.log" 2>&1 || true
         if [ -n "$worker_name" ]; then cleanup_docker logs "$worker_name" > "$artifacts/worker.log" 2>&1 || true; fi
         if [ -n "$control_name" ]; then cleanup_docker logs "$control_name" > "$artifacts/control.log" 2>&1 || true; fi
+        local diagnostic_role container_variable diagnostic_container
+        for diagnostic_role in web worker control; do
+            container_variable="${diagnostic_role}_name"
+            diagnostic_container="${!container_variable}"
+            if [ -n "$diagnostic_container" ]; then
+                cleanup_docker inspect --format '{{json .State}}' "$diagnostic_container" > "$artifacts/$diagnostic_role-state.json" 2>&1 || true
+                if mkdir -p "$artifacts/$diagnostic_role-logs"; then
+                    cleanup_docker cp "$diagnostic_container:/var/www/html/var/log/." "$artifacts/$diagnostic_role-logs" >/dev/null 2>&1 || true
+                fi
+            fi
+        done
+        cleanup_docker exec "$run_id-postgres" psql -U baander -d worker_operator_test -c \
+            'SELECT job_id, generation, outcome, error FROM transcode_runtime_state' > "$artifacts/transcode-runtime.txt" 2>&1 || true
     fi
     if [ "$two_command" = 1 ] && [ -n "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; then
         timeout 30s "$BAANDER_TEST_TWO_COMMAND_CHECKPOINT" cleanup "$artifacts" "${web_base:-}" || cleanup_status=1
@@ -663,12 +683,13 @@ assert all(isinstance(u['containerId'], str) and len(u['containerId']) == 64 for
 PY
 if [ "$two_command" = 1 ]; then
     combined_phase attach
+    if [ "$dash_qualification" = 1 ]; then combined_phase dash; fi
     snapshot web "$web_name" web-attached
     snapshot worker "$worker_name" worker-attached
     python3 - "$artifacts/worker-attached-processes.json" <<'PYOWNER'
 import json, sys
 snapshot = json.load(open(sys.argv[1]))
-video = [p for p in snapshot['encoders'] if p['arguments'][0].endswith('ffmpeg') and '/media/source/video.mp4' in p['arguments']]
+video = [p for p in snapshot['encoders'] if p['arguments'][0].endswith('ffmpeg') and '/media/source/video.mkv' in p['arguments']]
 assert len(video) == 1, 'Concurrent attachments must have exactly one actual video encoder'
 PYOWNER
     checkpoint attached

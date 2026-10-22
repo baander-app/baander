@@ -73,7 +73,7 @@ for name in ('control', 'execution'):
         for sample in window:
             stamp = sample['monotonic']
             processes = sample['nativeProcesses']
-            videos = sum('/media/source/video.mp4' in process['argv'] for process in processes)
+            videos = sum('/media/source/video.mkv' in process['argv'] for process in processes)
             audio = sum('/media/source/track.flac' in process['argv'] for process in processes)
             assert audio >= 1, 'Admitted audio slot disappeared during controls'
             # Seeking deliberately retires a generation; cancellation releases its slot.

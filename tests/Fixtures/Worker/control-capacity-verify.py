@@ -169,7 +169,7 @@ if phase == 'cpu':
     assert occupied and occupied[-1]['monotonic'] - occupied[0]['monotonic'] >= 59
     for sample in occupied:
         processes = sample['nativeProcesses']
-        assert sum('/media/source/video.mp4' in p['argv'] for p in processes) >= 3, 'Three video native slots did not stay occupied'
+        assert sum('/media/source/video.mkv' in p['argv'] for p in processes) >= 3, 'Three video native slots did not stay occupied'
         assert sum('/media/source/track.flac' in p['argv'] for p in processes) >= 1, 'Audio native slot did not stay occupied'
     report['occupiedSlotSamples'] = len(occupied)
     report['audioPressureMethod'] = 'Admitted FFmpeg process held with SIGSTOP; resumed after pressure'

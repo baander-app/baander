@@ -42,6 +42,7 @@ const apiResponses = []
 const playbackControls = []
 const playbackSnapshots = []
 const clientControls = []
+const subtitleObservations = []
 const previousMediaEvents = []
 const networkInterruptions = []
 let savingTimeline = false
@@ -116,7 +117,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -179,6 +180,68 @@ async function mediaState() {
     nativeHls: element.canPlayType('application/vnd.apple.mpegurl'),
     h264: element.canPlayType('video/mp4; codecs="avc1.42E01E"'),
   }))
+}
+
+async function subtitleState(selectDialogue = false) {
+  return video.evaluate((element, select) => {
+    const tracks = Array.from(element.textTracks)
+    const dialogue = tracks.find(track => track.label.includes('Dialogue'))
+    if (select && dialogue) {
+      for (const track of tracks) track.mode = track === dialogue ? 'showing' : 'disabled'
+    }
+    const cues = values => Array.from(values ?? [], cue => ({
+      start: cue.startTime, end: cue.endTime, text: 'text' in cue ? cue.text : null,
+    }))
+    return {
+      time: element.currentTime,
+      tracks: tracks.map(track => ({
+        label: track.label, language: track.language, kind: track.kind, mode: track.mode,
+        cueCount: track.cues?.length ?? null, activeCues: cues(track.activeCues),
+      })),
+    }
+  }, selectDialogue)
+}
+
+async function observeSubtitles(phase, expectedText) {
+  // Native HLS capability does not establish native subtitle support. Retain
+  // that distinction explicitly instead of treating an empty track list as a pass.
+  let state = await subtitleState(true)
+  const deadline = Date.now() + 5000
+  while (state.tracks.length < 3 && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 100))
+    state = await subtitleState(true)
+  }
+  if (state.tracks.length === 0) {
+    if (subtitleObservations.some(observation => observation.status === 'native-active-cue')) {
+      subtitleObservations.push({ phase, status: 'failed', expectedText, ...state })
+      await savePlaybackTimeline()
+      assert.fail('Previously available native subtitle tracks disappeared after the generation changed')
+    }
+    const limitation = 'The native HLS engine exposed no TextTracks; subtitle cue activation and visible rendering remain unverified.'
+    subtitleObservations.push({ phase, status: 'native-tracks-unavailable', limitation, ...state })
+    console.warn(`${phase}: ${limitation}`)
+    await savePlaybackTimeline()
+    return
+  }
+  try {
+    assert.equal(state.tracks.length, 3, 'Native HLS must retain all three independently identified subtitle tracks')
+    assert(state.tracks.some(track => track.label.includes('Forced')), 'The duplicate-language forced track must remain selectable')
+    assert(state.tracks.some(track => track.label.includes('Unlabelled')), 'The track without language metadata must remain selectable')
+    await until(async () => {
+      state = await subtitleState(true)
+      return state.tracks.some(track => track.label.includes('Dialogue') && track.mode === 'showing'
+        && track.activeCues.some(cue => cue.text?.includes(expectedText)))
+    }, `the native Dialogue track to activate "${expectedText}"`, 10000)
+    subtitleObservations.push({ phase, status: 'native-active-cue', expectedText, ...state })
+    // The cue assertion establishes native activation; this screenshot supports
+    // inspection of painted captions without claiming a pixel-level assertion.
+    await page.screenshot({ path: `${evidence}/subtitles-${phase}.png` })
+  } catch (error) {
+    subtitleObservations.push({ phase, status: 'failed', expectedText, ...state })
+    throw error
+  } finally {
+    await savePlaybackTimeline()
+  }
 }
 
 async function pausedAt(position, minimumGeneration) {
@@ -251,9 +314,11 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     assert(video, 'Movie playback must create a video element')
     await until(async () => {
       const state = await mediaState()
-      return state.connected && !state.paused && state.ready >= 2 && state.time > 1 && snapshot?.ready
+      return state.connected && !state.paused && state.ready >= 2 && state.time > 1
+        && state.decodedFrames > 0 && state.error === null && snapshot?.ready
     }, 'native HLS to decode and advance')
     initialGeneration = snapshot.generation
+    await observeSubtitles('attached', 'Dialogue early')
     await page.screenshot({ path: `${evidence}/desktop.png` })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${evidence}/mobile.png` })
@@ -382,6 +447,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   } else if (phase === 'sought-paused') {
     await pausedAt(credentials.expectedSeekPosition, initialGeneration + 1)
     soughtGeneration = snapshot.generation
+    await observeSubtitles('sought-paused', credentials.expectedSeekPosition >= 90 ? 'Dialogue sought' : 'Dialogue late')
   } else if (phase === 'web-restarted') {
     await pausedAt(credentials.expectedSeekPosition, soughtGeneration)
   } else if (phase === 'worker-contained') {
@@ -406,7 +472,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, networkInterruptions }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions }, null, 2))
   return { phase, passed: true }
 }
 
@@ -423,7 +489,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })

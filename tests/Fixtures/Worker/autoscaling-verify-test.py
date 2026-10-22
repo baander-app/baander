@@ -51,7 +51,7 @@ class QualificationTest(unittest.TestCase):
                 resource=dict(namespace='qualification', bootId='boot', epoch=1, observation=dict(state='known', sampledAt=at, cpuUtilization=.1, memoryRatio=.3, pidsRatio=.1)),
                 status=dict(state='known', authorityValid=True, controllerFresh=True, resourceFresh=True, controllerAgeSeconds=0, resources=dict(state='known')),
                 connections=10, **{'memory.current': '1234', 'pids.current': '4', 'cpu.stat': 'usage_usec ' + str(200 + at*2_000_000), 'processes': [dict(pid=i+1, startTicks='100', rssBytes=4096,
-                    cmdline='/usr/bin/ffmpeg\0-i\0/media/source/' + ('video.mp4' if i < 3 else 'track.flac') + '\0') for i in range(4)]}))
+                    cmdline='/usr/bin/ffmpeg\0-i\0/media/source/' + ('video.mkv' if i < 3 else 'track.flac') + '\0') for i in range(4)]}))
         (self.root / 'media.json').write_text(json.dumps(dict(evidence=dict(videoJobs=['one', 'two', 'three'], audioBytes=8192,
             desiredStateSamples=[dict(seconds=.5)], pressureStartedAt=300, pressureEndedAt=360,
             ordinaryBacklog=[dict(monotonic=300+i, receiverDepth=2000, acknowledged=i, relayedEvents=i) for i in range(61)],
@@ -182,7 +182,7 @@ class QualificationTest(unittest.TestCase):
         with self.assertRaises(AssertionError): qualification.verify(self.root, 2)
 
     def test_native_audio_only_disappearance_rejected(self):
-        self.values[320]['processes'] = [p for p in self.values[320]['processes'] if 'video.mp4' in p['cmdline']]
+        self.values[320]['processes'] = [p for p in self.values[320]['processes'] if 'video.mkv' in p['cmdline']]
         self.write()
         with self.assertRaises(AssertionError): qualification.verify(self.root, 2)
 

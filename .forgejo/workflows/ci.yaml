@@ -58,6 +58,13 @@ jobs:
             -   name: Docker build context contract
                 run: bash scripts/test-docker-context.sh
 
+            -   name: Build movie player for full-stack playback
+                working-directory: ui/web
+                run: |
+                    corepack yarn install --immutable
+                    corepack yarn build
+                    node scripts/verify-build.mjs
+
             -   name: Build CI image
                 run: |
                     docker buildx build \
@@ -95,6 +102,7 @@ jobs:
                 run: |
                     BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
                       bash scripts/test-two-command-deployment-container.sh
 
             -   name: Composer platform requirements
