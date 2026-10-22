@@ -35,9 +35,9 @@ enum AudioRenditionFormat: string
         };
     }
 
-    public function sourceSignature(int $bitrate, int $modified, int $size): string
+    public function sourceSignature(string $sourcePath, int $bitrate, int $modified, int $size): string
     {
-        return sprintf('%s-%dk-%s.%s', $this->value, intdiv($bitrate, 1000), hash('xxh64', sprintf('%d:%d', $modified, $size)), $this->extension());
+        return sprintf('%s-%dk-%s.%s', $this->value, intdiv($bitrate, 1000), hash('xxh64', sprintf('%d:%d:%s', $modified, $size, $sourcePath)), $this->extension());
     }
 
     /**

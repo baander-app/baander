@@ -30,7 +30,7 @@ final class AudioRenditionExecutorTest extends TestCase
         mkdir($this->root);
         $source = $this->root . '/source.flac';
         file_put_contents($source, 'source');
-        $signature = 'mp3-192k-' . hash('xxh64', filemtime($source) . ':' . filesize($source)) . '.mp3';
+        $signature = AudioRenditionFormat::Mp3->sourceSignature($source, 192000, (int) filemtime($source), (int) filesize($source));
         $input = new AudioRenditionInput('track', $signature, $source, AudioRenditionFormat::Mp3, 192000, $this->root . '/rendition');
         $this->claim = new AudioRenditionClaim(new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 1, null, null, null, true), new MediaWorkerIdentity('baander.app:worker', str_repeat('a', 32), 'media', 1), 'token');
         $this->encoder = $this->root . '/encoder';

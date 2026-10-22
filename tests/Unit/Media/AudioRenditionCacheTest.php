@@ -166,7 +166,7 @@ final class AudioRenditionCacheTest extends TestCase
         $size = filesize($this->source);
         self::assertIsInt($modified);
         self::assertIsInt($size);
-        $signature = AudioRenditionFormat::Mp3->sourceSignature(192000, $modified, $size);
+        $signature = AudioRenditionFormat::Mp3->sourceSignature($this->source, 192000, $modified, $size);
         $this->input = new AudioRenditionInput('track', $signature, $this->source, AudioRenditionFormat::Mp3, 192000, $this->root . '/audio-renditions/track/' . $signature);
         $this->write('original');
         $cache = $this->cache();

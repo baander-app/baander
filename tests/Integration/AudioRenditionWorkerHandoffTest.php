@@ -131,6 +131,49 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         self::assertSame('complete', $this->first->fetchOne('SELECT state FROM audio_rendition_runtime'));
     }
 
+    public function testRenamedSourceWithUnchangedMetadataGetsIndependentOutputAndReusesIt(): void
+    {
+        $cache = $this->cache();
+        $this->startWorker(.1);
+        $original = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        $encoded = $original->isComplete() ? file_get_contents($original->path) : implode('', iterator_to_array($original->chunks(), false));
+        self::assertIsString($encoded);
+        self::assertNotSame('', $encoded);
+        self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
+        $before = $this->first->fetchAssociative('SELECT * FROM audio_rendition_runtime');
+        self::assertIsArray($before);
+        $modified = filemtime($this->source);
+        $size = filesize($this->source);
+        $renamed = $this->root . '/renamed.flac';
+        self::assertTrue(rename($this->source, $renamed));
+        clearstatcache();
+        self::assertSame($modified, filemtime($renamed));
+        self::assertSame($size, filesize($renamed));
+
+        $this->startWorker(.1);
+        $next = $cache->open('track', $renamed, AudioRenditionFormat::Mp3, 192000);
+        self::assertSame($encoded, $next->isComplete() ? file_get_contents($next->path) : implode('', iterator_to_array($next->chunks(), false)));
+        self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
+        $after = $this->first->fetchAssociative('SELECT * FROM audio_rendition_runtime WHERE source_path = ?', [$renamed]);
+        self::assertIsArray($after);
+        self::assertNotSame($before['rendition_key'], $after['rendition_key']);
+        self::assertNotSame($before['output_directory'], $after['output_directory']);
+        self::assertNotSame($before['final_path'], $after['final_path']);
+        self::assertSame(1, (int) $before['generation']);
+        self::assertSame(1, (int) $after['generation']);
+        self::assertSame('complete', $before['state']);
+        self::assertSame('complete', $after['state']);
+        self::assertSame($encoded, file_get_contents($before['final_path']));
+        self::assertSame($before, $this->first->fetchAssociative('SELECT * FROM audio_rendition_runtime WHERE rendition_key = ?', [$before['rendition_key']]));
+
+        $cached = $cache->open('track', $renamed, AudioRenditionFormat::Mp3, 192000);
+        self::assertTrue($cached->isComplete());
+        self::assertSame($after['final_path'], $cached->path);
+        self::assertSame($encoded, file_get_contents($cached->path));
+        self::assertSame(2, (int) $this->first->fetchOne('SELECT count(*) FROM audio_rendition_runtime'));
+        self::assertSame($after, $this->first->fetchAssociative('SELECT * FROM audio_rendition_runtime WHERE rendition_key = ?', [$after['rendition_key']]));
+    }
+
     private function cache(): AudioRenditionCache
     {
         return new AudioRenditionCache(new SegmentFileResolver($this->root . '/cache'), new AudioRenditionRuntime($this->first), new NullLogger(), pollIntervalSeconds: .005, startTimeoutSeconds: 3);

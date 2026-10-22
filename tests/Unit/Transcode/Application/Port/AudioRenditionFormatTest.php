@@ -38,10 +38,19 @@ final class AudioRenditionFormatTest extends TestCase
 
     public function testSourceSignaturePreservesTheCanonicalFilename(): void
     {
-        self::assertSame('mp3-192k-d5a3a24db6ce8852.mp3', AudioRenditionFormat::Mp3->sourceSignature(192000, 123, 456));
-        self::assertSame('opus-96k-d5a3a24db6ce8852.opus', AudioRenditionFormat::Opus->sourceSignature(96000, 123, 456));
-        self::assertNotSame(AudioRenditionFormat::Aac->sourceSignature(128000, 123, 456), AudioRenditionFormat::Aac->sourceSignature(128000, 124, 456));
-        self::assertNotSame(AudioRenditionFormat::Aac->sourceSignature(128000, 123, 456), AudioRenditionFormat::Aac->sourceSignature(128000, 123, 457));
+        self::assertMatchesRegularExpression('/^mp3-192k-[a-f0-9]{16}\.mp3$/D', AudioRenditionFormat::Mp3->sourceSignature('/media/source.flac', 192000, 123, 456));
+        self::assertMatchesRegularExpression('/^opus-96k-[a-f0-9]{16}\.opus$/D', AudioRenditionFormat::Opus->sourceSignature('/media/source.flac', 96000, 123, 456));
+        $signature = AudioRenditionFormat::Aac->sourceSignature('/media/source.flac', 128000, 123, 456);
+        self::assertNotSame($signature, AudioRenditionFormat::Aac->sourceSignature('/media/source.flac', 128000, 124, 456));
+        self::assertNotSame($signature, AudioRenditionFormat::Aac->sourceSignature('/media/source.flac', 128000, 123, 457));
+    }
+
+    public function testSourcePathSeparatesRenditionsWithIdenticalMetadata(): void
+    {
+        $format = AudioRenditionFormat::Mp3;
+        $signature = $format->sourceSignature('/media/source.flac', 192000, 123, 456);
+        self::assertSame($signature, $format->sourceSignature('/media/source.flac', 192000, 123, 456));
+        self::assertNotSame($signature, $format->sourceSignature('/media/renamed.flac', 192000, 123, 456));
     }
 
     public function testEveryFormatHasAtMostSevenRenditionsPerTrack(): void

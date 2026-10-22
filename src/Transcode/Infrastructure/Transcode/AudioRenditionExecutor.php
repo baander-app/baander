@@ -36,7 +36,7 @@ final class AudioRenditionExecutor
             clearstatcache(true, $input->sourcePath);
             $modified = @filemtime($input->sourcePath);
             $size = @filesize($input->sourcePath);
-            if ($modified === false || $size === false || $input->format->sourceSignature($input->bitrate, $modified, $size) !== $input->sourceSignature) {
+            if ($modified === false || $size === false || $input->format->sourceSignature($input->sourcePath, $input->bitrate, $modified, $size) !== $input->sourceSignature) {
                 throw new RuntimeException('the admitted audio source changed before encoding');
             }
             $directory = $claim->runtime->generationDirectory();

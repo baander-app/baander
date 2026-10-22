@@ -33,7 +33,7 @@ final class HeldRendition
         clearstatcache(true, $sourcePath);
         $audioFormat = AudioRenditionFormat::from($format);
         $bitrate = $audioFormat->supportedBitrate($kbps * 1000);
-        $signature = $audioFormat->sourceSignature($bitrate, (int) filemtime($sourcePath), (int) filesize($sourcePath));
+        $signature = $audioFormat->sourceSignature($sourcePath, $bitrate, (int) filemtime($sourcePath), (int) filesize($sourcePath));
         $paths = new SegmentFileResolver($storageRoot);
         $input = new AudioRenditionInput($trackKey, $signature, $sourcePath, $audioFormat, $bitrate, $paths->resolveAudioRenditionPath($trackKey, $signature));
         $admitted = $runtime->admit($input);

@@ -39,7 +39,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         if ($modified === false || $size === false) {
             $this->fail('the source file cannot be read');
         }
-        $signature = $format->sourceSignature($bitrate, $modified, $size);
+        $signature = $format->sourceSignature($sourcePath, $bitrate, $modified, $size);
         try {
             $input = new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
             $admitted = $this->runtime->admit($input);
