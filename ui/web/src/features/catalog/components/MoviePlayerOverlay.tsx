@@ -1,7 +1,8 @@
 import styled from 'styled-components'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { Input } from '@/shared/components/ui/input'
 import { useBaanderPlayer } from '../hooks/useBaanderPlayer'
 
 const Overlay = styled.div`
@@ -26,26 +27,21 @@ const HeaderBar = styled.div`
 `
 
 const TitleBar = styled.div`
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 10;
+  flex-shrink: 0;
+  padding: 0 1rem;
 `
 
-const ProgressBar = styled.div`
-  height: 0.25rem;
-  background-color: rgba(255, 255, 255, 0.2);
-`
-
-const ProgressFill = styled.div`
-  height: 100%;
-  background-color: var(--color-primary);
-  transition: width 300ms;
+const SourceSeek = styled(Input)`
+  height: 2rem;
+  border: 0;
+  padding: 0;
+  accent-color: var(--color-primary);
 `
 
 const VideoContainer = styled.div`
   display: flex;
   flex: 1;
+  min-height: 0;
   align-items: center;
   justify-content: center;
 `
@@ -58,14 +54,20 @@ interface MoviePlayerOverlayProps {
 
 export function MoviePlayerOverlay({ title, videoId, onClose }: MoviePlayerOverlayProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [draft, setDraft] = useState<{ videoId: string, position: number } | null>(null)
+  const draftPosition = draft?.videoId === videoId ? draft.position : null
 
-  const { currentTime, duration } = useBaanderPlayer({
+  const { currentTime, duration, pendingSeekPosition, seekTo } = useBaanderPlayer({
     videoId,
     containerRef,
     autoPlay: true,
   })
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+  const displayedTime = draftPosition ?? pendingSeekPosition ?? currentTime
+  const commitSeek = (value: string) => {
+    setDraft(null)
+    seekTo(Number(value))
+  }
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
     const m = Math.floor((seconds % 3600) / 60)
@@ -84,18 +86,33 @@ export function MoviePlayerOverlay({ title, videoId, onClose }: MoviePlayerOverl
         </Button>
         <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'white' }}>{title}</span>
         <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)' }}>
-          {formatTime(currentTime)} / {formatTime(duration)}
+          {formatTime(displayedTime)} / {formatTime(duration)}
         </span>
       </HeaderBar>
 
       {/* Video container */}
       <VideoContainer ref={containerRef} />
 
-      {/* Progress bar */}
       <TitleBar>
-        <ProgressBar>
-          <ProgressFill style={{ width: `${progress}%` }} />
-        </ProgressBar>
+        <SourceSeek
+          type="range"
+          aria-label="Seek movie"
+          aria-valuetext={`${formatTime(displayedTime)} of ${formatTime(duration)}`}
+          min={0}
+          max={duration || 1}
+          step={1}
+          value={Math.max(0, Math.min(duration, displayedTime))}
+          disabled={duration <= 0}
+          onChange={event => setDraft({ videoId, position: Number(event.currentTarget.value) })}
+          onPointerUp={event => { if (draftPosition !== null) commitSeek(event.currentTarget.value) }}
+          onPointerCancel={() => setDraft(null)}
+          onKeyUp={event => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+              commitSeek(event.currentTarget.value)
+            }
+          }}
+          onBlur={event => { if (draftPosition !== null) commitSeek(event.currentTarget.value) }}
+        />
       </TitleBar>
     </Overlay>
   )

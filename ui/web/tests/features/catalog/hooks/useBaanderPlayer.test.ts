@@ -1,17 +1,33 @@
+import { createElement, StrictMode } from 'react'
+import { AxiosError } from 'axios'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBaanderPlayer } from '@/features/catalog/hooks/useBaanderPlayer'
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }))
+const { post, attachments, loader } = vi.hoisted(() => ({ post: vi.fn(), loader: { ready: true },
+  attachments: [] as Array<{ onError: () => void, onReady: () => void, position: number, dispose: ReturnType<typeof vi.fn> }> }))
+vi.mock('@/features/catalog/hooks/hls-playback', () => ({
+  attachHlsPlayback: ({ video, url, position, onReady, onError }: { video: HTMLVideoElement, url: string, position: number, onReady: () => void, onError: () => void }) => {
+    const dispose = vi.fn()
+    attachments.push({ onError, onReady, position, dispose })
+    video.src = url
+    if (loader.ready) onReady()
+    return dispose
+  },
+}))
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { post } }))
 
 describe('useBaanderPlayer authorization', () => {
   beforeEach(() => {
     post.mockReset()
+    attachments.length = 0
+    loader.ready = true
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {})
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {})
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue()
     vi.spyOn(HTMLMediaElement.prototype, 'duration', 'get').mockReturnValue(1200)
     vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(HTMLMediaElement.HAVE_METADATA)
+    vi.spyOn(HTMLMediaElement.prototype, 'seekable', 'get').mockReturnValue({ length: 1, start: () => 0, end: () => 1200 })
     window.__BAANDER_API_URL__ = 'https://media.baander.app'
   })
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
@@ -56,6 +72,155 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => resolve({ data: { url: '/api/transcode/video/master.m3u8?sig=proof&exp=100', ready: true, startTime: 0, duration: 100, generation: 1, revision: 1, jobId: 'job', renditionSet: 'set', sessionId: null, position: 0, status: 'running' } }))
     expect(video.src).toBe('https://media.baander.app/api/transcode/video/master.m3u8?sig=proof&exp=100')
     expect(video.play).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it('ignores stale attachment failures and rejected play promises after replacement', async () => {
+    vi.useFakeTimers()
+    let rejectPlay: (error: Error) => void = () => {}
+    vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectPlay = reject }))
+    const snapshot = (generation: number) => ({ data: { url: `/manifest?generation=${generation}`, jobId: 'job',
+      sessionId: 'owned', generation, revision: generation, renditionSet: `job.${generation}`,
+      ready: true, position: 0, startTime: 0, duration: 100, status: 'running' } })
+    post.mockResolvedValueOnce(snapshot(1)).mockResolvedValue(snapshot(2))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const oldAttachment = attachments[0]
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    await act(async () => {
+      oldAttachment.onError()
+      rejectPlay(new Error('Old source removed'))
+    })
+    expect(result.current.state).not.toBe('error')
+    expect(onError).not.toHaveBeenCalled()
+    await act(async () => attachments[1].onError())
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it('releases the active attachment through StrictMode replay and final cleanup', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'paused' } })
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }), {
+      wrapper: ({ children }) => createElement(StrictMode, null, children),
+    })
+    await act(async () => {})
+    expect(containerRef.current.querySelectorAll('video')).toHaveLength(1)
+    expect(attachments).toHaveLength(1)
+    unmount()
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(containerRef.current.querySelectorAll('video')).toHaveLength(0)
+  })
+
+  it('allows a same-generation expanded snapshot after a fatal error during restoration', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(HTMLMediaElement.prototype, 'seekable', 'get').mockReturnValue({ length: 0, start: () => 0, end: () => 0 })
+    const snapshot = (renditionSet: string) => ({ data: { url: `/manifest?set=${renditionSet}`, jobId: 'job',
+      generation: 1, revision: 1, renditionSet, ready: true, position: 18, startTime: 0, duration: 100, status: 'running' } })
+    post.mockResolvedValueOnce(snapshot('job.1')).mockResolvedValue(snapshot('job.1,sibling.1'))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    await act(async () => containerRef.current.querySelector('video')!.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => attachments[0].onError())
+    expect(result.current.state).toBe('error')
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(containerRef.current.querySelector('video')!.src).toContain('sibling.1')
+    unmount()
+  })
+
+  it('preserves play then pause before a delayed attachment is ready', async () => {
+    loader.ready = false
+    post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? { data: {
+      url: '/manifest', jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'running',
+    } } : { data: {} }))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    expect(video.paused).toBe(true)
+    await act(async () => { result.current.play(); result.current.pause() })
+    await act(async () => attachments[0].onReady())
+    expect(video.play).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1].action === 'pause')).toHaveLength(1)
+    unmount()
+  })
+
+  it('uses the new canonical origin after the retiring attachment fails during a backwards seek', async () => {
+    vi.useFakeTimers()
+    let generation = 1
+    let ready = true
+    post.mockImplementation((path: string) => {
+      if (path !== '/api/stream/sign') {
+        generation = 2
+        ready = false
+        return Promise.resolve({ data: { data: { acceptedGeneration: 2 } } })
+      }
+      return Promise.resolve({ data: { url: ready ? `/manifest?generation=${generation}` : null,
+        jobId: 'job', sessionId: 'owned', generation, revision: generation, renditionSet: ready ? `job.${generation}` : '',
+        ready, position: generation === 1 ? 120 : 0, startTime: ready ? generation === 1 ? 102 : 0 : null,
+        duration: ready ? 180 : null, status: 'paused' } })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(18)
+    await act(async () => result.current.seekTo(0))
+    expect(result.current.state).toBe('preparing')
+    await act(async () => attachments[0].onError())
+    video.currentTime = 0
+    ready = true
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments.at(-1)?.position).toBe(0)
+    unmount()
+  })
+
+  it.each([undefined, 503])('preserves an attached cursor across a transient sign poll failure (%s)', async status => {
+    vi.useFakeTimers()
+    const snapshot = { data: { url: '/manifest', jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'paused' } }
+    const outage = Object.assign(new AxiosError('Temporarily unavailable', 'ERR_NETWORK'), status ? { response: { status } } : {})
+    post.mockResolvedValueOnce(snapshot).mockRejectedValueOnce(outage).mockResolvedValue(snapshot)
+    const containerRef = { current: document.createElement('div') }
+    const onError = vi.fn()
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(18)
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    expect(video.currentTime).toBe(18)
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(1)
+    await act(async () => result.current.play())
+    expect(video.play).toHaveBeenCalled()
+    unmount()
+  })
+
+  it.each([403, 404])('disposes attached playback when sign polling refuses access (%s)', async status => {
+    vi.useFakeTimers()
+    const snapshot = { data: { url: '/manifest', jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'paused' } }
+    post.mockResolvedValueOnce(snapshot).mockRejectedValue(Object.assign(new AxiosError('Refused'), { response: { status } }))
+    const containerRef = { current: document.createElement('div') }
+    const onError = vi.fn()
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
     unmount()
   })
 
@@ -386,7 +551,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('keeps explicit seek intent independent of the attached generation', async () => {
+  it('fences explicit source seek intent with the attached generation', async () => {
     post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session', generation: 4, revision: 8, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
     const containerRef = { current: document.createElement('div') }
     const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
@@ -394,7 +559,7 @@ describe('useBaanderPlayer authorization', () => {
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => result.current.seekTo(60))
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek' }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
 
@@ -434,6 +599,7 @@ describe('useBaanderPlayer authorization', () => {
     const setTime = vi.fn((value: number) => { nativeTime = mediaAvailable ? value : 0 })
     Object.defineProperty(video, 'currentTime', { configurable: true, get: () => nativeTime, set: setTime })
     Object.defineProperty(video, 'duration', { configurable: true, get: () => availableDuration })
+    Object.defineProperty(video, 'seekable', { configurable: true, get: () => ({ length: availableDuration > 0 ? 1 : 0, start: () => 0, end: () => availableDuration }) })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => video.dispatchEvent(new Event('seeked')))
     expect(post.mock.calls.filter((call) => call[1].action)).toHaveLength(0)
@@ -477,9 +643,10 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     Object.defineProperty(video, 'duration', { configurable: true, value: 0 })
+    Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 0, start: () => 0, end: () => 0 } })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => result.current.seekTo(60))
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek' }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
 
@@ -495,6 +662,7 @@ describe('useBaanderPlayer authorization', () => {
     const setTime = vi.fn((value: number) => { nativeTime = value })
     Object.defineProperty(video, 'currentTime', { configurable: true, get: () => nativeTime, set: setTime })
     Object.defineProperty(video, 'duration', { configurable: true, get: () => duration })
+    Object.defineProperty(video, 'seekable', { configurable: true, get: () => ({ length: Number.isFinite(duration) ? 1 : 0, start: () => 0, end: () => duration }) })
     Object.defineProperty(video, 'readyState', { configurable: true, get: () => ready })
     await act(async () => video.dispatchEvent(new Event('progress')))
     expect(setTime).not.toHaveBeenCalled()
@@ -773,9 +941,11 @@ describe('useBaanderPlayer authorization', () => {
     expect(video.src).toContain('sibling.4')
     video.currentTime = 0
     await act(async () => vi.advanceTimersByTimeAsync(1000))
-    expect(video.src).toContain('third.7')
+    expect(video.src).not.toContain('third.7')
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(30)
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(video.src).toContain('third.7')
     expect(video.play).not.toHaveBeenCalled()
     unmount()
   })
@@ -859,5 +1029,191 @@ describe('useBaanderPlayer authorization', () => {
     expect(signal.aborted).toBe(true)
     expect(video.getAttribute('src')).toBe('')
     expect(video.play).not.toHaveBeenCalled()
+  })
+
+  it('seeks beyond a growing EVENT window without reporting clamped native feedback', async () => {
+    vi.useFakeTimers()
+    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
+    let snapshot: { data: Partial<typeof initial> } = { data: initial }
+    let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    post.mockImplementation((path: string) => path === '/api/stream/sign'
+      ? Promise.resolve(snapshot)
+      : new Promise(resolve => { accept = resolve }))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let publishedEnd = 6
+    Object.defineProperty(video, 'duration', { configurable: true, value: Infinity })
+    Object.defineProperty(video, 'seekable', { configurable: true, get: () => ({ length: 1, start: () => 0, end: () => publishedEnd }) })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => result.current.seekTo(120))
+    expect(video.currentTime).toBe(0)
+    expect(result.current.pendingSeekPosition).toBe(120)
+    video.currentTime = 3
+    await act(async () => {
+      video.dispatchEvent(new Event('seeking'))
+      video.dispatchEvent(new Event('timeupdate'))
+      video.dispatchEvent(new Event('loadedmetadata'))
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    expect(result.current.pendingSeekPosition).toBe(120)
+    expect(post.mock.calls.filter(call => call[1].action).map(call => call[1])).toEqual([
+      { action: 'seek', position: 120, generation: 4 },
+    ])
+    snapshot = { data: { ...initial, url: undefined, generation: 5, revision: 5, ready: false, position: 120 } }
+    await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
+    snapshot = { data: { ...initial, url: '/manifest?generation=5', renditionSet: 'job.5', generation: 5, revision: 5, position: 120, startTime: 102 } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(3)
+    expect(result.current.duration).toBe(180)
+    expect(result.current.pendingSeekPosition).toBe(120)
+    publishedEnd = 24
+    await act(async () => video.dispatchEvent(new Event('progress')))
+    expect(video.currentTime).toBe(18)
+    expect(result.current.currentTime).toBe(120)
+    expect(result.current.pendingSeekPosition).toBeNull()
+    expect(video.pause).toHaveBeenCalled()
+    await act(async () => {
+      video.dispatchEvent(new Event('seeking'))
+      video.dispatchEvent(new Event('seeked'))
+      video.dispatchEvent(new Event('durationchange'))
+    })
+    expect(result.current.duration).toBe(180)
+    expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(1)
+    unmount()
+  })
+
+  it('coalesces explicit source seeks and fences the latest with its predecessor acceptance', async () => {
+    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
+    let snapshot = initial
+    let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    let seeks = 0
+    post.mockImplementation((path: string) => {
+      if (path === '/api/stream/sign') return Promise.resolve({ data: snapshot })
+      if (++seeks === 1) return new Promise(resolve => { accept = resolve })
+      return Promise.resolve({ data: { data: { acceptedGeneration: 6 } } })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => {
+      result.current.seekTo(120)
+      result.current.seekTo(130)
+      result.current.seekTo(140)
+    })
+    expect(result.current.pendingSeekPosition).toBe(140)
+    snapshot = { ...initial, url: '/manifest?generation=6', renditionSet: 'job.6', generation: 6, revision: 6, position: 140, startTime: 122 }
+    await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
+    expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => call[1])).toEqual([
+      { action: 'seek', position: 120, generation: 4 },
+      { action: 'seek', position: 140, generation: 5 },
+    ])
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(18)
+    expect(result.current.pendingSeekPosition).toBeNull()
+    unmount()
+  })
+
+  it('releases explicit source seek intent when its request fails', async () => {
+    post.mockImplementation((path: string) => path === '/api/stream/sign' ? Promise.resolve({ data: {
+      url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180,
+    } }) : Promise.reject(new Error('Unavailable')))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    await act(async () => result.current.seekTo(120))
+    expect(result.current.state).toBe('error')
+    expect(result.current.pendingSeekPosition).toBeNull()
+    unmount()
+  })
+
+  it('destroys a pending source seek without attaching its late accepted generation', async () => {
+    let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    post.mockImplementation((path: string) => path === '/api/stream/sign' ? Promise.resolve({ data: {
+      url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180,
+    } }) : new Promise(resolve => { accept = resolve }))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    await act(async () => result.current.seekTo(120))
+    act(() => result.current.destroy())
+    expect(result.current.pendingSeekPosition).toBeNull()
+    await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
+    expect(containerRef.current.querySelector('video')).toBeNull()
+    expect(post.mock.calls.filter(call => call[0] === '/api/stream/sign')).toHaveLength(1)
+    unmount()
+  })
+
+  it('restores exact source EOF to a nearby finite seekable end without changing the global cursor', async () => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
+      generation: 5, revision: 5, ready: true, position: 180, status: 'paused', startTime: 162, duration: 180 } })
+    const onTimeUpdate = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onTimeUpdate }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    let nativeTime = 0
+    let seeking = false
+    Object.defineProperty(video, 'currentTime', { configurable: true, get: () => nativeTime,
+      set: (time: number) => { nativeTime = time; seeking = true } })
+    Object.defineProperty(video, 'seeking', { configurable: true, get: () => seeking })
+    Object.defineProperty(video, 'duration', { configurable: true, value: 17.92 })
+    Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => 17.92 } })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(nativeTime).toBe(17.92)
+    await act(async () => video.dispatchEvent(new Event('seeking')))
+    seeking = false
+    await act(async () => {
+      video.dispatchEvent(new Event('seeked'))
+      video.dispatchEvent(new Event('timeupdate'))
+      video.dispatchEvent(new Event('pause'))
+    })
+    expect(result.current.currentTime).toBe(180)
+    expect(result.current.duration).toBe(180)
+    expect(onTimeUpdate).toHaveBeenLastCalledWith(180, 180)
+    await act(async () => {
+      video.dispatchEvent(new Event('seeking'))
+      video.dispatchEvent(new Event('seeked'))
+    })
+    expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(0)
+    await act(async () => result.current.seekTo(180))
+    expect(result.current.pendingSeekPosition).toBeNull()
+    expect(result.current.currentTime).toBe(180)
+    expect(post.mock.calls.filter(call => call[1].action).map(call => call[1])).toEqual([
+      { action: 'seek', position: 180, generation: 5 },
+    ])
+    unmount()
+  })
+
+  it.each([
+    { position: 180, nativeEnd: 17.8, nativeDuration: 17.8 },
+    { position: 180, nativeEnd: 17.92, nativeDuration: Infinity },
+    { position: 179.95, nativeEnd: 17.92, nativeDuration: 17.92 },
+  ])('waits for unavailable source position $position when the native end is $nativeEnd and duration is $nativeDuration', async ({ position, nativeEnd, nativeDuration }) => {
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.5', sessionId: 'owned-session',
+      generation: 5, revision: 5, ready: true, position, status: 'paused', startTime: 162, duration: 180 } })
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    const setTime = vi.fn()
+    Object.defineProperty(video, 'currentTime', { configurable: true, get: () => 0, set: setTime })
+    Object.defineProperty(video, 'duration', { configurable: true, value: nativeDuration })
+    Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => nativeEnd } })
+    await act(async () => {
+      video.dispatchEvent(new Event('loadedmetadata'))
+      video.dispatchEvent(new Event('progress'))
+    })
+    expect(setTime).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(0)
+    unmount()
   })
 })

@@ -18,6 +18,9 @@ notices belonging to bundled or installed dependencies.
 - Composer, Yarn, native codec/DSP toolchains, and registry dependencies retain
   their upstream licenses. Preserve their license files and notices in distributed
   artifacts, including source/binary bundles and container images.
+- The web movie player bundles HLS.js 1.7.3. Its upstream attribution is retained
+  in [hls.js-LICENSE.txt](public/licenses/hls.js-LICENSE.txt), alongside the complete
+  [Apache-2.0 license](public/licenses/Apache-2.0.txt), in the public assets.
 
 The [application inventory procedure](dev-docs/application-packaged-inventory.md)
 collects installed Debian and Composer packages, native build evidence, copied
