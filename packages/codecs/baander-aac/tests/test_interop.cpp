@@ -84,6 +84,9 @@ int main() {
   our_encoded("noise 44.1k 256k abr", gen_noise(n, 2), 44100, 2, 256000, AAC_RC_ABR);
   our_encoded("tones 16k mono tvbr", gen_harmonics(16000 * 3, 16000, 1), 16000, 1, 48000,
               AAC_RC_TVBR);
+  our_encoded("harmonics 44.1k 48k intensity", gen_harmonics(n, 44100, 2), 44100, 2, 48000,
+              AAC_RC_CBR);
+  our_encoded("noise 44.1k 64k pns", gen_noise(n, 2), 44100, 2, 64000, AAC_RC_CBR);
   remove_temp_dir(g_dir);
   return test_summary("test_interop");
 }
