@@ -15,7 +15,7 @@ final readonly class AddSongCommand
     public function __construct(
         private Uuid $playlistId,
         private Uuid $songId,
-        private int $position,
+        private Uuid $actorUuid,
         private LibraryReadScope $scope,
     ) {
     }
@@ -30,9 +30,9 @@ final readonly class AddSongCommand
         return $this->songId;
     }
 
-    public function getPosition(): int
+    public function getActorUuid(): Uuid
     {
-        return $this->position;
+        return $this->actorUuid;
     }
 
     public function getScope(): LibraryReadScope

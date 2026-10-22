@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class PlaylistTest extends TestCase
 {
@@ -171,6 +172,31 @@ final class PlaylistTest extends TestCase
         $this->assertSame(0, $playlist->getSongs()[0]->getPosition());
         $this->assertSame(1, $playlist->getSongs()[1]->getPosition());
         $this->assertSame(2, $playlist->getSongs()[2]->getPosition());
+    }
+
+    /** @return iterable<string, array{list<int>, int}> */
+    public static function appendPositions(): iterable
+    {
+        yield 'empty playlist' => [[], 0];
+        yield 'contiguous positions' => [[0, 1], 2];
+        yield 'gap left by deletion' => [[0, 2], 3];
+        yield 'explicit positions remain unchanged' => [[7, 4], 8];
+    }
+
+    /** @param list<int> $positions */
+    #[DataProvider('appendPositions')]
+    public function testAppendFollowsTheHighestStoredPositionWithoutRenumbering(array $positions, int $expected): void
+    {
+        $playlist = Playlist::create('Append', $this->userId);
+        foreach ($positions as $position) {
+            $playlist->addSong(new Uuid(), $position);
+        }
+        $song = new Uuid();
+
+        $playlist->appendSong($song);
+
+        self::assertSame([...$positions, $expected], array_map(static fn ($entry): int => $entry->getPosition(), $playlist->getSongs()));
+        self::assertSame($song, $playlist->getSongs()[count($positions)]->getSongId());
     }
 
     public function testAddSongThrowsOnDuplicate(): void

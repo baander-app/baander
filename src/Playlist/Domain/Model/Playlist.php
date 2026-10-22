@@ -195,6 +195,12 @@ final class Playlist
         $this->updatedAt = new DateTimeImmutable();
     }
 
+    public function appendSong(Uuid $songId): void
+    {
+        $positions = array_map(static fn (PlaylistSong $song): int => $song->getPosition(), $this->songs);
+        $this->addSong($songId, $positions === [] ? 0 : max($positions) + 1);
+    }
+
     /**
      * Remove a song from the playlist.
      */

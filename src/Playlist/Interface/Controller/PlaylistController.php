@@ -37,6 +37,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -152,10 +153,7 @@ final class PlaylistController
             smartRules: $payload->smartRules,
         ));
 
-        $playlist = $envelope->last(HandledStamp::class)?->getResult();
-        if (!$playlist instanceof Playlist) {
-            throw new \LogicException('Playlist creation did not return a playlist.');
-        }
+        $playlist = $this->handledPlaylist($envelope, 'creation');
 
         return $this->created($this->readResource($playlist));
     }
@@ -321,10 +319,7 @@ final class PlaylistController
             isCollaborative: $isCollaborative,
         ));
 
-        $updatedPlaylist = $envelope->last(HandledStamp::class)?->getResult();
-        if (!$updatedPlaylist instanceof Playlist) {
-            throw new \LogicException('Playlist update did not return a playlist.');
-        }
+        $updatedPlaylist = $this->handledPlaylist($envelope, 'update');
 
         return $this->successResponse($this->readResource($updatedPlaylist));
     }
@@ -415,20 +410,29 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $position = count($playlist->getSongs());
+        $actor = $this->security->getUser();
+        if (!$actor instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized();
+        }
 
         // The handler answers not-found for a song the actor cannot see, and a
         // duplicate add returns success rather than an error.
-        $this->commandBus->dispatch(new AddSongCommand(
+        $envelope = $this->commandBus->dispatch(new AddSongCommand(
             playlistId: $playlist->getId(),
             songId: $songId,
-            position: $position,
+            actorUuid: Uuid::fromString($actor->getId()),
             scope: $this->libraryScopes->current(),
         ));
 
+        $updatedPlaylist = $this->handledPlaylist($envelope, 'append');
+        $membership = array_find($updatedPlaylist->getSongs(), static fn ($song): bool => $song->getSongId()->equals($songId));
+        if ($membership === null) {
+            throw new \LogicException('Playlist append did not return the requested song.');
+        }
+
         return $this->created([
             'songId' => $songPublicId->toString(),
-            'position' => $position,
+            'position' => $membership->getPosition(),
         ]);
     }
 
@@ -648,6 +652,16 @@ final class PlaylistController
         }
 
         return $this->successResponse(['message' => $this->trans('success.reordered', domain: 'playlist'), 'revision' => $revision]);
+    }
+
+    private function handledPlaylist(Envelope $envelope, string $operation): Playlist
+    {
+        $playlist = $envelope->last(HandledStamp::class)?->getResult();
+        if (!$playlist instanceof Playlist) {
+            throw new \LogicException(sprintf('Playlist %s did not return a playlist.', $operation));
+        }
+
+        return $playlist;
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class AddSongHandler
 {
@@ -26,10 +27,15 @@ final class AddSongHandler
     #[AsMessageHandler]
     public function __invoke(AddSongCommand $command): Playlist
     {
-        $playlist = $this->playlistRepository->findWithSongs($command->getPlaylistId());
+        $playlist = $this->playlistRepository->findByUuid($command->getPlaylistId());
 
         if ($playlist === null) {
             throw new RuntimeException(sprintf('Playlist %s not found.', $command->getPlaylistId()->toString()));
+        }
+
+        if (!$playlist->getUserId()->equals($command->getActorUuid())
+            && !($playlist->isCollaborative() && $playlist->isCollaborator($command->getActorUuid()))) {
+            throw new AccessDeniedException('Only the owner, or a collaborator while the playlist is collaborative, may change its songs.');
         }
 
         if (!$this->songVisibility->isVisible($command->getSongId(), $command->getScope())) {
@@ -41,7 +47,7 @@ final class AddSongHandler
             return $playlist;
         }
 
-        $playlist->addSong($command->getSongId(), $command->getPosition());
+        $playlist->appendSong($command->getSongId());
         $this->playlistRepository->save($playlist);
 
         return $playlist;

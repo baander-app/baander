@@ -8,6 +8,7 @@ use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddSongCommand;
+use App\Playlist\Application\CommandHandler\AddSongHandler;
 use App\Playlist\Application\Command\RemoveSongCommand;
 use App\Playlist\Application\Command\ReorderSongsCommand;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
@@ -15,6 +16,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Interface\Controller\PlaylistController;
 use App\Playlist\Interface\Request\AddSongRequest;
 use App\Playlist\Interface\Request\ReorderSongsRequest;
@@ -75,12 +77,95 @@ final class PlaylistSongIdentityTest extends TestCase
         $lookup->expects(self::once())->method('findVisibleSongId')->with($songPublicId, LibraryReadScope::none())->willReturn($songId);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')
-            ->with(self::callback(static fn (AddSongCommand $command): bool => $command->getSongId()->equals($songId)))
-            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+            ->with(self::callback(static fn (AddSongCommand $command): bool => $command->getSongId()->equals($songId)
+                && $command->getActorUuid()->equals($playlist->getUserId())))
+            ->willReturnCallback(static function (AddSongCommand $message) use ($playlist, $songId): Envelope {
+                $playlist->appendSong($songId);
+                return new Envelope($message, [new HandledStamp($playlist, 'add')]);
+            });
         $response = $this->mutate($this->controller($playlist, $lookup, $bus), $playlist, 'add', $songPublicId->toString());
 
         self::assertSame(201, $response->getStatusCode());
         self::assertSame(['songId' => $songPublicId->toString(), 'position' => 0], json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR));
+    }
+
+    public function testAppendUsesTheHandlersCurrentMembershipAndReportsItsPosition(): void
+    {
+        $initial = Playlist::create('Mix', new Uuid());
+        $first = new Uuid();
+        $initial->addSong($first, 0);
+        $current = clone $initial;
+        $current->addSong(new Uuid(), 1);
+        $requested = new Uuid();
+        $lookup = $this->createStub(PlaylistSongVisibilityInterface::class);
+        $lookup->method('findVisibleSongId')->willReturn($requested);
+        $lookup->method('isVisible')->willReturn(true);
+        $repository = $this->createMock(PlaylistRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturn($current);
+        $repository->expects(self::once())->method('save')->with(self::callback(
+            static fn (Playlist $playlist): bool => array_map(static fn ($song): int => $song->getPosition(), $playlist->getSongs()) === [0, 1, 2],
+        ));
+        $handler = new AddSongHandler($repository, $lookup);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(
+            static fn (AddSongCommand $command): Envelope => new Envelope($command, [new HandledStamp($handler($command), 'add')]),
+        );
+
+        $response = $this->mutate($this->controller($initial, $lookup, $bus), $initial, 'add', (new PublicId())->toString());
+
+        self::assertSame(201, $response->getStatusCode());
+        self::assertSame(2, json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR)['position']);
+    }
+
+    public function testDuplicateAppendReportsItsExistingPositionWithoutSaving(): void
+    {
+        $initial = Playlist::create('Mix', new Uuid());
+        $current = clone $initial;
+        $requested = new Uuid();
+        $current->addSong($requested, 7);
+        $lookup = $this->createStub(PlaylistSongVisibilityInterface::class);
+        $lookup->method('findVisibleSongId')->willReturn($requested);
+        $lookup->method('isVisible')->willReturn(true);
+        $repository = $this->createMock(PlaylistRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturn($current);
+        $repository->expects(self::never())->method('save');
+        $handler = new AddSongHandler($repository, $lookup);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(
+            static fn (AddSongCommand $command): Envelope => new Envelope($command, [new HandledStamp($handler($command), 'add')]),
+        );
+
+        $response = $this->mutate($this->controller($initial, $lookup, $bus), $initial, 'add', (new PublicId())->toString());
+
+        self::assertSame(201, $response->getStatusCode());
+        self::assertSame(7, json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR)['position']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidAppendResults(): iterable
+    {
+        yield 'missing result' => ['missing'];
+        yield 'wrong result type' => ['wrong_type'];
+        yield 'missing membership' => ['missing_membership'];
+    }
+
+    #[DataProvider('invalidAppendResults')]
+    public function testAppendRequiresTheHandledMembership(string $kind): void
+    {
+        $playlist = Playlist::create('Mix', new Uuid());
+        $lookup = $this->createStub(PlaylistSongVisibilityInterface::class);
+        $lookup->method('findVisibleSongId')->willReturn(new Uuid());
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(
+            static fn (AddSongCommand $command): Envelope => match ($kind) {
+                'missing' => new Envelope($command),
+                'wrong_type' => new Envelope($command, [new HandledStamp('invalid', 'add')]),
+                default => new Envelope($command, [new HandledStamp($playlist, 'add')]),
+            },
+        );
+        $this->expectException(\LogicException::class);
+
+        $this->mutate($this->controller($playlist, $lookup, $bus), $playlist, 'add', (new PublicId())->toString());
     }
 
     public function testRemoveResolvesPublicIdToInternalCommandIdentity(): void

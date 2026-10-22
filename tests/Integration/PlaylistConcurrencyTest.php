@@ -9,6 +9,9 @@ use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
+use App\Playlist\Application\Command\AddSongCommand;
+use App\Playlist\Application\CommandHandler\AddSongHandler;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Application\Command\ReorderSongsCommand;
 use App\Playlist\Application\CommandHandler\ReorderSongsHandler;
 use App\Playlist\Domain\Model\Playlist;
@@ -16,6 +19,7 @@ use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Tests\Support\FinalSchemaBootstrap;
 use App\Tests\Fixtures\Playlist\PlaylistWriteRace;
 use App\Playlist\Application\Exception\PlaylistWriteConflictException;
@@ -24,6 +28,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManager;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 require_once dirname(__DIR__) . '/Fixtures/Playlist/playlist-concurrent-write.php';
 
@@ -104,6 +109,126 @@ final class PlaylistConcurrencyTest extends TestCase
             $this->observer->executeStatement('DROP SCHEMA IF EXISTS ' . $this->schema . ' CASCADE');
             $this->observer->close();
         }
+    }
+
+    public function testAppendRefreshesTheControllerIdentityMapAfterAnIndependentCommit(): void
+    {
+        $repository = $this->repository($this->manager());
+        $initial = $repository->findByPublicId($this->load($repository)->getPublicId());
+        self::assertNotNull($initial);
+        $winnerRepository = $this->repository($this->manager());
+        $winner = $this->load($winnerRepository);
+        $winner->updateMetadata('Winner', 'Retain this description', true, true);
+        $winner->addCollaborator($this->collaboratorId);
+        $winner->addSong($this->songIds[1], 1);
+        $winnerRepository->save($winner);
+        $requested = $this->additionalSong();
+        $visibility = $this->createStub(PlaylistSongVisibilityInterface::class);
+        $visibility->method('isVisible')->willReturn(true);
+
+        $result = (new AddSongHandler($repository, $visibility))(new AddSongCommand(
+            $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+        ));
+
+        self::assertSame('Winner', $result->getName());
+        self::assertSame('Retain this description', $result->getDescription());
+        self::assertTrue($result->isCollaborator($this->collaboratorId));
+        self::assertSame([0, 1, 2], array_map(static fn ($song): int => $song->getPosition(), $result->getSongs()));
+        $fresh = $this->load($this->repository($this->manager()));
+        self::assertSame([$this->songIds[0]->toString(), $this->songIds[1]->toString(), $requested->toString()], array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame($result->getRevision(), $fresh->getRevision());
+    }
+
+    /** @return iterable<string, array{bool, bool}> */
+    public static function revokedAppendAuthority(): iterable
+    {
+        yield 'removed collaborator' => [false, false];
+        yield 'collaboration disabled' => [true, false];
+        yield 'removed collaborator repeats song' => [false, true];
+        yield 'disabled collaborator repeats song' => [true, true];
+    }
+
+    #[DataProvider('revokedAppendAuthority')]
+    public function testAppendRejectsAuthorityRevokedAfterTheControllerRead(bool $disableCollaboration, bool $duplicate): void
+    {
+        $repository = $this->repository($this->manager());
+        $seed = $this->load($repository);
+        $seed->addCollaborator($this->collaboratorId);
+        $repository->save($seed);
+        $initial = $repository->findByPublicId($seed->getPublicId());
+        self::assertNotNull($initial);
+        self::assertTrue($initial->isCollaborative() && $initial->isCollaborator($this->collaboratorId));
+        $winnerRepository = $this->repository($this->manager());
+        $winner = $this->load($winnerRepository);
+        if ($disableCollaboration) {
+            $winner->updateMetadata('Closed', null, false, false);
+        } else {
+            $winner->removeCollaborator($this->collaboratorId);
+        }
+        $winnerRepository->save($winner);
+        $before = $this->storedState();
+        $visibility = $this->createMock(PlaylistSongVisibilityInterface::class);
+        $visibility->expects(self::never())->method('isVisible');
+
+        try {
+            (new AddSongHandler($repository, $visibility))(new AddSongCommand(
+                $this->playlistId, $this->songIds[$duplicate ? 0 : 1], $this->collaboratorId, LibraryReadScope::unrestricted(),
+            ));
+            self::fail('The refreshed playlist must deny a former editor, including duplicate requests.');
+        } catch (AccessDeniedException) {
+            self::assertSame($before, $this->storedState());
+        }
+    }
+
+    public function testAppendStillConflictsWhenAnotherWriterCommitsAfterTheMutationRead(): void
+    {
+        $repository = $this->repository($this->manager());
+        $requested = $this->additionalSong();
+        $winnerState = null;
+        $visibility = $this->createMock(PlaylistSongVisibilityInterface::class);
+        $visibility->expects(self::once())->method('isVisible')->willReturnCallback(function () use (&$winnerState): bool {
+            $winnerRepository = $this->repository($this->manager());
+            $winner = $this->load($winnerRepository);
+            $winner->updateMetadata('Committed after mutation read', null, false, true);
+            $winner->addSong($this->songIds[1], 1);
+            $winnerRepository->save($winner);
+            $winnerState = $this->storedState();
+
+            return true;
+        });
+
+        try {
+            (new AddSongHandler($repository, $visibility))(new AddSongCommand(
+                $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+            ));
+            self::fail('An independent write after the mutation read must remain a conflict.');
+        } catch (PlaylistWriteConflictException) {
+            self::assertIsArray($winnerState);
+            self::assertSame($winnerState, $this->storedState());
+        }
+    }
+
+    public function testAppendFollowsTheLastPositionAfterACatalogDeletionCascade(): void
+    {
+        $repository = $this->repository($this->manager());
+        $playlist = $this->load($repository);
+        $survivor = $this->additionalSong();
+        $playlist->addSong($this->songIds[1], 1);
+        $playlist->addSong($survivor, 2);
+        $repository->save($playlist);
+        $this->observer->executeStatement('DELETE FROM songs WHERE id = ?', [$this->songIds[1]->toString()]);
+        $requested = $this->additionalSong();
+        $visibility = $this->createStub(PlaylistSongVisibilityInterface::class);
+        $visibility->method('isVisible')->willReturn(true);
+
+        $result = (new AddSongHandler($repository, $visibility))(new AddSongCommand(
+            $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+        ));
+
+        self::assertSame([0, 2, 3], array_map(static fn ($song): int => $song->getPosition(), $result->getSongs()));
+        $fresh = $this->load($this->repository($this->manager()));
+        self::assertSame([$this->songIds[0]->toString(), $survivor->toString(), $requested->toString()], array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame([0, 2, 3], array_map(static fn ($song): int => $song->getPosition(), $fresh->getSongs()));
     }
 
     public function testStaleFullyLoadedSaveCannotOverwriteNewerSongsAndCollaborators(): void
@@ -557,6 +682,18 @@ final class PlaylistConcurrencyTest extends TestCase
     private function connect(string $schema): Connection
     {
         return PlaylistWriteRace::connect($schema);
+    }
+
+    private function additionalSong(): Uuid
+    {
+        $manager = $this->manager();
+        $album = $manager->getRepository(AlbumEntity::class)->findOneBy([]);
+        self::assertInstanceOf(AlbumEntity::class, $album);
+        $song = new SongEntity(new PublicId(), $album, 'Additional', '/race/' . (new Uuid())->toString() . '.flac', 3, 'audio/flac');
+        $manager->persist($song);
+        $manager->flush();
+
+        return $song->getId();
     }
 
     private function manager(): EntityManager
