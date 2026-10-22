@@ -1,7 +1,7 @@
 ---
 title: Transcode format correctness and end-to-end validation
 date: 2026-10-22
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -20,7 +20,7 @@ skills are unavailable. This plan receives an independent review before code
 changes. Work lands as local commits on the branch named after this plan; no push
 is authorized. Existing local data and running development services are preserved.
 
-## Findings driving implementation
+## Initial findings driving implementation
 
 * The software HEVC builder produces 7.5-second fragments on a 24 fps source while
   serving code assumes six-second segments. Forced I pictures are not necessarily
@@ -40,7 +40,7 @@ is authorized. Existing local data and running development services are preserve
   while emitting SegmentList. The output contains muxed audio/video and has not
   established CMAF conformance or general DASH player interoperability.
 * The active browser hook uses native HLS. The installed Chromium reports native
-  HLS capability; this audit has not yet run its decoding checkpoint.
+  HLS capability; the initial audit had not yet run its decoding checkpoint.
   The separate player package is not wired into the application. An existing
   disposable full-stack browser checkpoint verifies decoded playback and controls,
   but the ordinary CI invocation does not enable it.
@@ -66,12 +66,17 @@ The track key is `s` followed by its absolute FFprobe stream index. It is carrie
 through helper identity, output directory and the existing subtitle URL slot;
 the slot's historical name does not turn language metadata into identity.
 Preserve language, title, default and forced dispositions as metadata. Extract
-supported text tracks by stream index into generation-local output, with seek
-timestamps aligned to that generation. Publish files atomically only after
+supported text tracks by stream index into generation-local output. Convert the
+complete track, then clip and rebase cues so an input seek cannot discard a cue
+that spans the generation start. Publish files atomically only after
 successful conversion. Start extraction with video generation and poll its
 results without blocking control handling or waiting for whole-video completion.
-Do not advertise missing, failed, or unsupported bitmap output. Bound helper
-waiting, keep generation fencing, and log extraction failures.
+Do not advertise missing, failed, or unsupported bitmap output. The whole subtitle
+batch has a 30-second startup budget with one helper per video job. The three video slots and one audio slot then
+use at most seven of the native service's eight commands. Settle the batch before
+initial readiness so the player's immutable master contains the available tracks.
+Rebasing is limited to 16 MiB per file, 1 MiB per cue block and 64 KiB per line.
+Keep generation fencing, retire unfinished helpers, and log extraction failures.
 
 Advertise the full remaining timeline for a full WebVTT resource. Sanitize HLS
 quoted metadata and preserve unique track names. Correct bandwidth declarations
@@ -142,4 +147,38 @@ serialized by the lead. No database schema change is planned.
 Independent review approved the plan on 2026-10-22. Its amendments specify track
 identity, the DASH profile, video-only and downmix cases, native capability versus
 decode evidence, and the distinction between the two browser gates. Implementation
-may begin; final acceptance depends on the recorded checks.
+review found that input seeking discards crossing subtitle cues. Full-track
+conversion followed by bounded clipping/rebasing fixed that reproduction and
+passed independent review. Final acceptance depends on the recorded checks.
+
+
+## Qualification finding
+
+Real signed-HTTP decoding found a DASH compatibility defect after the bounded
+repairs: both tested FFmpeg builds route muxed AAC packets into the video decoder.
+ContentComponent changes and duplicate adaptations do not repair it. The strict
+DASH qualification therefore remains failing and separate from the HLS/browser
+acceptance gate. The ordinary gate checks MPD structure and resource delivery and
+explicitly records that demuxing is unqualified. Decoder acceptance requires
+nonempty PCM and actual video frames; a successful exit can conceal absent audio.
+Separate audio/video fragments, signed delivery, readiness and per-track timing
+are follow-up work. This changes no claim into a pass and does not establish CMAF
+conformance.
+
+The full browser drill exposed another concurrency defect: three admitted video
+renditions each launched an encoder and two subtitle helpers, exceeding the native
+service's eight-command budget. Independent review verified all active native
+callers and approved one helper per video job. Three encoder/helper pairs plus one
+audio command use at most seven commands; probes and generation replacements
+release old work before starting new work. The global limit and 30-second subtitle
+batch deadline remain unchanged. The acknowledgement assertion also rejects failed
+runtimes even if their observed revision matches the request. Failure artifacts
+retain application logs and durable error details.
+
+
+The bounded repairs and HLS/browser acceptance are implemented and verified.
+Final backend verification passes 853 tests with 9,798 assertions; the production
+HLS drill passes all seven browser checkpoints and verified cleanup. DASH decoding
+and native subtitle rendering remain open acceptance items with explicit evidence
+in the investigation and roadmap. General DASH/CMAF redesign and the other listed
+qualification work are follow-up scope.

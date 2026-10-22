@@ -586,3 +586,96 @@ no actionable findings remain. Prose preservation checks retained historical
 checkpoints, fenced code and tables; all 13 local links and anchors resolved, and
 whitespace checks passed. The runners removed their disposable containers,
 networks and volumes.
+
+## Transcoding format investigation and playback evidence
+
+Checkpoint, 2026-10-22: the [investigation](docs/transcode-investigation-2026-10-22.md)
+and [reviewed plan](docs/plans/2026-10-22-transcode-format-validation-plan.md)
+cover the active FFmpeg worker, HLS/DASH delivery, subtitle extraction, fragmented
+MP4 output and production movie player. The missing compound-engineering skills
+were replaced with the equivalent planning, implementation and independent review
+workflow with the user's approval. No push is part of this checkpoint.
+
+Software HEVC now forces random-access IDR pictures at fragment boundaries;
+real-media tests reproduced missing six-second fragments before the fix. Probe
+handling recognizes interlaced field orders and preserves audio channel layouts,
+so both back and side surround channels survive stereo downmix. Video-only inputs
+omit audio mappings and codec declarations. Hardware device arguments use literal
+argv elements; this correction does not qualify physical accelerators.
+
+Subtitle identity uses the absolute source stream index, preserving duplicate and
+absent language metadata plus default/forced dispositions. One helper per video job
+runs alongside its encoder, inspects conversion results and publishes complete files
+atomically.
+Initial readiness waits for settlement or the 30-second batch deadline. Full-track
+conversion followed by bounded clipping/rebasing preserves crossing cues after a
+seek. Generation replacement, failures, cancellation and timeout retire helpers.
+Manifests advertise the remaining subtitle timeline, sanitize metadata, include
+muxed audio in bandwidth estimates and declare the DASH full profile.
+
+The disposable fixture now includes three real subtitle streams. HLS decoding
+requires actual video frames and nonempty PCM output; HTTP checks inspect subtitle
+identity, duration, dispositions, seek timing, tampering and retired-generation
+refusal even when old files are restored. CI builds the movie player and enables
+the production browser checkpoint. The separate instrumented control drill contains assertions for
+rapid scrubbing, offline/reconnect and paused remount; those cases are not implied
+by the ordinary checkpoint.
+
+Verification passed 853 backend tests with 9,798 assertions in the CI runtime,
+including native FFmpeg and isolated PostgreSQL integration lanes. Full PHPStan,
+Deptrac and the generated OpenAPI consistency check passed; Deptrac reports zero
+violations, warnings and errors with 484 existing skipped violations. Frontend
+typechecking, build verification and 43 player-hook tests passed, as did 46 worker
+verifier tests. Backend evidence is retained under
+`var/test-runs/20261022-191108-d1c3b386`.
+
+DASH playback acceptance failed through signed HTTP in the production image's
+FFmpeg 5.1.9. A narrow reproduction also fails with the host's FFmpeg 8.1.3:
+AAC packets in muxed fragments are assigned to the video stream. Metadata-only
+variants do not fix it. A short decode initially exited zero without audio, which
+is why qualification now requires positive frame and PCM counts. The explicit
+`BAANDER_TEST_DASH_QUALIFICATION=1` drill remains a failing acceptance check;
+the ordinary HLS drill records DASH as `manifest-http-only` with
+`demuxQualified=false`. Evidence is retained under
+`var/test-runs/transcode-formats-production` and
+`var/test-runs/transcode-dash-demux-reproduction`.
+
+Separate audio/video fragments, signed audio delivery, readiness coordination and
+actual per-track timing are the next DASH repair. CMAF conformance, DASH subtitles,
+browser-specific subtitle rendering, Safari/Firefox coverage, GPU/HDR/VFR inputs,
+codec profile declarations, derived-URL expiry semantics and cache/performance
+qualification remain open. Existing tests and successful resource delivery do not
+certify those behaviors. Independent reviews found and corrected crossing-cue loss
+and the false-positive decode criterion; no passing DASH claim is made.
+
+
+The full browser run exposed a subtitle scheduling error before acceptance: three
+renditions with two helpers each submitted nine native commands against a global
+limit of eight. Independent review verified one helper per video job keeps all
+current native callers within seven commands, including audio. The global limit
+was preserved. Control acknowledgement now rejects terminal failures even when
+observed revisions match; failure artifacts retain kernel logs, container state
+and durable runtime errors. Reproduction evidence is under
+`var/test-runs/transcode-formats-hls-browser` and
+`var/test-runs/transcode-formats-hls-diagnostics-2`.
+
+
+Final HLS acceptance passed in the rebuilt production image: all seven Chromium
+148.0.7778.96 checkpoints completed through decoded playback, paused seek, web
+replacement, worker containment/recovery and retirement. Retrieved fragments
+produced 181 video frames and 1,146,880 PCM bytes initially and after recovery.
+All three subtitle resources passed HTTP checks; restoring old files still yielded
+404 for retired init, media and each subtitle resource. Initial and sought browser
+observations both record `native-tracks-unavailable`; native caption rendering
+remains open. The instrumented client-controls drill was not run. Artifacts and
+verified cleanup are under `var/test-runs/transcode-formats-hls-final`.
+
+
+The final standalone DASH qualification exited 1 with the reproduced invalid-NAL
+error in the rebuilt image; cleanup verified successfully. Its evidence is under
+`var/test-runs/transcode-formats-dash-final`. It remains an open failing acceptance
+check, separate from the passing HLS gate. Final independent code and document
+reviews found no remaining blocker in the delivered repairs and harness. Prose
+checks preserve historical roadmap content byte-for-byte; local links resolve and
+whitespace checks pass. All run-owned services were removed; existing application
+databases, Redis and media storage were not reused or reset.
