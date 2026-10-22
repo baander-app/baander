@@ -216,6 +216,28 @@ does not provision the app. Follow the test-domain and isolation requirements in
 [AGENTS.md](../../AGENTS.md). Browser tests are separate from the CI web step's
 lint, Vitest, build, and build-verification checks.
 
+## Desktop native codec
+
+The Electron app ships the AAC codec from `packages/codecs/baander-aac` as a
+native Node-API module, `@baander/aac-native`, declared as a `file:`
+dependency in `ui/electron/package.json`. `yarn install` builds it with
+node-gyp from the C++ sources; `yarn electron-rebuild` rebuilds it for the
+Electron ABI, and electron-builder bundles only its ESM entry, types and
+compiled binding. The package is ESM-only and targets Node 26; the desktop
+toolchain is Electron 45. A Node-API module is ABI-stable, so a binding built
+against Node headers loads in Electron unchanged.
+
+The main process loads the binding lazily in `AacService`
+(`src/main/services/aac.service.ts`); when the binding is missing the service
+reports itself unavailable instead of failing startup. The renderer reaches it
+through `window.electron.aac`: one-shot `decode(adts)` and `encode(pcm, options)`
+calls, and chunked decoder and encoder sessions (`openDecoder`, `decodeChunk`,
+`closeDecoder`, `openEncoder`, `encodeChunk`, `flushEncoder`, `closeEncoder`).
+PCM is interleaved `Float32Array` at full scale; AAC data is an ADTS stream. The
+IPC module validates every payload before the service runs. See the codec's
+[README](../../packages/codecs/baander-aac/docs/README.md) for the C API, the
+command-line tool and the measured interoperability with FFmpeg.
+
 ## Component Library
 
 Shared UI components live in `src/shared/components/ui/`. Their current styling uses styled-components; components such as dialogs and menus retain Radix behavior. They include:

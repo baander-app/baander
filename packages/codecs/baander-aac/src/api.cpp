@@ -4,8 +4,12 @@
 #include "aac_cpu.h"
 #include "aac_dsp.h"
 #include "bitstream.h"
+#if defined(BAAC_AAC_HAVE_DECODER)
 #include "decoder.h"
+#endif
+#if defined(BAAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
+#endif
 
 /* Global DSP context — initialized once */
 static AacDSP g_dsp;
@@ -18,6 +22,7 @@ static void ensure_dsp_init() {
   }
 }
 
+#if defined(BAAC_AAC_HAVE_ENCODER)
 /* ── Encoder API ───────────────────────────────────────────────── */
 
 AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, AacObjectType aot,
@@ -25,9 +30,11 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
   if (sample_rate <= 0 || channels <= 0 || channels > 2 || bitrate <= 0) {
     return nullptr;
   }
-
-  /* Validate AOT */
-  if (aot != AAC_AOT_LC && aot != AAC_AOT_SBR && aot != AAC_AOT_PS) {
+  /* Only AAC-LC is implemented; HE-AAC v1/v2 need an SBR/PS encoder. */
+  if (aot != AAC_AOT_LC) {
+    return nullptr;
+  }
+  if (rc_mode < AAC_RC_TVBR || rc_mode > AAC_RC_CBR) {
     return nullptr;
   }
 
@@ -44,26 +51,29 @@ void aac_encoder_destroy(AacEncoderHandle ctx) {
   aac_encoder_state_destroy(s);
 }
 
+static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int out_size) {
+  const int frame_len = aac_encode_frame_internal(s, pcm);
+  if (frame_len < 0) {
+    return frame_len;
+  }
+  if (frame_len > out_size) {
+    return AAC_ERR_OVERFLOW;
+  }
+  memcpy(out, s->output_buf, frame_len);
+  return frame_len;
+}
+
 int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, uint8_t* out,
                        int out_size) {
   if (!ctx || !pcm || !out || out_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
   auto* s = static_cast<AacEncoderState*>(ctx);
-  if (n_samples != 1024) {
+  if (n_samples != s->frame_size) {
     return AAC_ERR_INVALID_ARG;
   }
-
-  int frame_len = aac_encode_frame_internal(s, pcm, n_samples);
-  if (frame_len <= 0) {
-    return AAC_ERR_ENCODE;
-  }
-  if (frame_len > out_size) {
-    return AAC_ERR_OVERFLOW;
-  }
-
-  memcpy(out, s->output_buf, frame_len);
-  return frame_len;
+  s->pending_flush = AAC_ENCODER_DELAY / s->frame_size;
+  return encode_block(s, pcm, out, out_size);
 }
 
 int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
@@ -90,26 +100,31 @@ int aac_encoder_delay(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  /* AAC-LC encoder delay = 1024 samples (one frame of lookahead).
-   * HE-AAC adds SBR delay (~960 samples) on top. */
-  auto* s = static_cast<AacEncoderState*>(ctx);
-  int delay = 1024; /* AAC-LC core delay */
-  if (s->aot == AAC_AOT_SBR || s->aot == AAC_AOT_PS) {
-    delay += 960; /* SBR analysis delay */
-  }
-  return delay;
+  return AAC_ENCODER_DELAY;
 }
 
 int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
   if (!ctx || !out || out_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
-  /* Produce a final frame with silence to drain the MDCT overlap */
+  /* Drain the lookahead and transform overlap with silent blocks; the
+   * frames are written back to back as a continuation of the ADTS stream. */
   auto* s = static_cast<AacEncoderState*>(ctx);
-  float silence[1024] = {0};
-  return aac_encoder_encode(ctx, silence, 1024, out, out_size);
+  int total = 0;
+  while (s->pending_flush > 0) {
+    const int len = encode_block(s, nullptr, out + total, out_size - total);
+    if (len < 0) {
+      return len;
+    }
+    total += len;
+    s->pending_flush--;
+  }
+  return total;
 }
 
+#endif /* BAAC_AAC_HAVE_ENCODER */
+
+#if defined(BAAC_AAC_HAVE_DECODER)
 /* ── Decoder API ───────────────────────────────────────────────── */
 
 AacDecoderHandle aac_decoder_create(int sample_rate, int channels) {
@@ -135,101 +150,62 @@ int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, floa
   if (!ctx || !data || !pcm || size <= 0 || pcm_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
-
   auto* s = static_cast<AacDecoderState*>(ctx);
-
-  /* Parse ADTS header if present */
-  AacAdtsHeader hdr;
-  int data_offset = 0;
-  if (size >= 7 && data[0] == 0xFF && (data[1] & 0xF0) == 0xF0) {
-    if (aac_adts_parse(&hdr, data, size) != 0) {
-      return AAC_ERR_DECODE;
-    }
-    data_offset = AAC_ADTS_HEADER_SIZE;
-    /* When protection_absent == 0, a 16-bit CRC check follows the header
-     * (ISO 13818-7 §8.1.1). Skip it; we do not verify the CRC itself. */
-    if (!hdr.protection_absent) {
-      data_offset += 2;
-    }
-    if (hdr.frame_length > size || data_offset > hdr.frame_length) {
-      return AAC_ERR_DECODE;
-    }
+  const int frame = s->frame_size;
+  if (pcm_size < frame * s->channels) {
+    return AAC_ERR_OVERFLOW;
   }
 
-  /* Parse raw data block */
+  /* ADTS-wrapped frames carry their own stream parameters; raw frames use the
+   * sample rate given at creation. */
+  int begin = 0;
+  int end = size;
+  if (size >= 2 && data[0] == 0xFF && (data[1] & 0xF6) == 0xF0) {
+    AacAdtsHeader hdr;
+    if (aac_adts_parse(&hdr, data, size) != 0 || hdr.frame_length > size) {
+      return AAC_ERR_DECODE;
+    }
+    if (hdr.object_type != AAC_AOT_LC || hdr.num_raw_blocks != 1 || hdr.channel_config > 2) {
+      return AAC_ERR_UNSUPPORTED;
+    }
+    if (hdr.sample_rate_index != s->rate_index &&
+        aac_decoder_set_rate_index(s, hdr.sample_rate_index) != 0) {
+      return AAC_ERR_UNSUPPORTED;
+    }
+    /* With protection_absent == 0 a 16-bit CRC follows the header; it is not
+     * verified. */
+    begin = AAC_ADTS_HEADER_SIZE + (hdr.protection_absent ? 0 : 2);
+    end = hdr.frame_length;
+  }
+
   AacBitReader reader;
-  aac_bitreader_init(&reader, data + data_offset, size - data_offset);
-
-  int total_samples = 0;
-  int max_elements = 16; /* safety limit to prevent infinite loops on malformed data */
-  while (aac_bitreader_bits_left(&reader) > 3 && max_elements-- > 0) {
-    int elem_type = aac_bitreader_read(&reader, 3);
-    if (elem_type == AAC_ELEM_END) {
-      break;
-    }
-
-    switch (elem_type) {
-      case AAC_ELEM_SCE: {
-        int tag = aac_bitreader_read(&reader, 4);
-        int ch = (tag == 0) ? 0 : 1;
-        int ret = aac_decode_sce(s, &reader, ch);
-        if (ret) {
-          return ret;
-        }
-        /* Copy decoded output to PCM */
-        int n = (pcm_size - total_samples >= 1024) ? 1024 : pcm_size - total_samples;
-        if (n > 0) {
-          if (s->channels == 1) {
-            memcpy(pcm + total_samples, s->ch[ch].output, n * sizeof(float));
-          } else {
-            /* Interleave for stereo output */
-            for (int i = 0; i < n && (total_samples + i) * 2 + 1 < pcm_size; i++) {
-              pcm[static_cast<ptrdiff_t>(total_samples + i) * 2] = s->ch[ch].output[i];
-              pcm[static_cast<ptrdiff_t>(total_samples + i) * 2 + 1] = s->ch[ch].output[i];
-            }
-          }
-          total_samples += n;
-        }
-        break;
-      }
-      case AAC_ELEM_CPE: {
-        int ret = aac_decode_cpe(s, &reader);
-        if (ret) {
-          return ret;
-        }
-        int n =
-            (pcm_size - total_samples * 2 >= 1024 * 2) ? 1024 : (pcm_size - total_samples * 2) / 2;
-        if (n > 0) {
-          for (int i = 0; i < n; i++) {
-            pcm[static_cast<ptrdiff_t>(total_samples + i) * 2] = s->ch[0].output[i];
-            pcm[static_cast<ptrdiff_t>(total_samples + i) * 2 + 1] = s->ch[1].output[i];
-          }
-          total_samples += n;
-        }
-        break;
-      }
-      case AAC_ELEM_FIL: {
-        int cnt = aac_bitreader_read(&reader, 4);
-        if (cnt == 15) {
-          cnt += aac_bitreader_read(&reader, 8) - 1;
-        }
-        aac_bitreader_skip(&reader, cnt * 8);
-        break;
-      }
-      default:
-        aac_bitreader_byte_align(&reader);
-        break;
-    }
+  aac_bitreader_init(&reader, data + begin, end - begin);
+  const int decoded = aac_decode_raw_data_block(s, &reader);
+  if (decoded < 0) {
+    return decoded;
   }
 
-  return total_samples;
+  /* Map the stream's channels onto the requested output layout. */
+  const float* l = s->ch[0].output;
+  const float* r = decoded == 2 ? s->ch[1].output : s->ch[0].output;
+  if (s->channels == 1) {
+    for (int i = 0; i < frame; i++) {
+      pcm[i] = decoded == 2 ? 0.5f * (l[i] + r[i]) : l[i];
+    }
+  } else {
+    for (int i = 0; i < frame; i++) {
+      pcm[2 * i] = l[i];
+      pcm[2 * i + 1] = r[i];
+    }
+  }
+  return frame;
 }
 
 int aac_decoder_frame_size(AacDecoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return 1024;
+  return static_cast<AacDecoderState*>(ctx)->frame_size;
 }
 
 int aac_decoder_sample_rate(AacDecoderHandle ctx) {
@@ -259,3 +235,4 @@ int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps) {
   }
   return AAC_OK;
 }
+#endif /* BAAC_AAC_HAVE_DECODER */
