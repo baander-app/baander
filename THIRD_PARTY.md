@@ -9,6 +9,12 @@ notices belonging to bundled or installed dependencies.
 - `packages/tsduck-php-ffi` retains its declared BSD-2-Clause license and Martin
   Christiansen’s copyright attribution in its [LICENSE](packages/tsduck-php-ffi/LICENSE).
   TSDuck binaries and libraries have their own distribution notices.
+- `packages/codecs/baander-aac` is Apache-2.0. Its ISO/IEC 14496-3 tables
+  (Huffman codebooks and scalefactor bands) were transcribed from FFmpeg's
+  `libavcodec/aactab.c` (LGPL 2.1 or later) and verified against it; the
+  encoder's allocation design follows the Fraunhofer FDK AAC encoder and
+  3GPP TS 26.403 as published references without copying their code. The
+  Node-API binding depends on `node-addon-api` (MIT) and `node-gyp` (MIT).
 - Composer, Yarn, native codec/DSP toolchains, and registry dependencies retain
   their upstream licenses. Preserve their license files and notices in distributed
   artifacts, including source/binary bundles and container images.

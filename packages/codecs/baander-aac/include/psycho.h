@@ -1,33 +1,44 @@
 #ifndef BAANDER_AAC_PSYCHO_H
 #define BAANDER_AAC_PSYCHO_H
-#include <cstdint>
+
+#include "ics.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-using AacPsychoBand = struct AacPsychoBand_ {
-  float energy, threshold, pe, tonality, spreaded_energy;
+
+/* Per-channel state of the psychoacoustic model. */
+using AacPsyChannel = struct AacPsyChannel_ {
+  float prev_thr[AAC_MAX_SFB_LONG]; /* thresholds of the previous long frame */
+  int prev_long;                    /* previous frame used a long window */
 };
-using AacPsychoState = struct AacPsychoState_ {
-  int sample_rate, rate_index, frame_size, num_bands;
-  float prev_energy[49];
-  float spreading[49][49];
-  AacPsychoBand bands[49];
-  float thresholds[49]; /* dedicated threshold array for encoder */
-  float total_pe;
-  float threshold_previous[49];
-  float preecho_factor;
-  /* Multiplier applied to the initial -29 dB SNR threshold.  Values < 1
-   * demand lower quantization noise (finer coding, more bits); > 1 allows
-   * more noise (coarser coding, fewer bits).  The encoder sets this from the
-   * target bitrate so quality scales with the available bit budget, like the
-   * "reduction of psychoacoustic requirements" in 3GPP TS 26.403 §5.6.1. */
-  float threshold_scale;
-};
-void aac_psycho_init(AacPsychoState* s, int sr, int fs);
-void aac_psycho_analyze(AacPsychoState* s, const float* mdct, int nb, const int* sfb);
-float aac_psycho_get_pe(const AacPsychoState* s);
-const float* aac_psycho_get_thresholds(const AacPsychoState* s);
+
+void aac_psy_init(AacPsyChannel* p);
+
+/* Masking analysis of one channel's MDCT coefficients (full scale 32768,
+ * short windows stored as [window * 128 + k]).  Per group band, indexed
+ * group * num_swb + sfb, the outputs are the band energy, the allowed
+ * quantization-noise energy and the energy spread into the band from its
+ * neighbours (3GPP TS 26.403 5.4.3), which the encoder compares with the
+ * band energy to decide whether the band may be left out.  channel_bitrate
+ * selects the energy spreading slope. */
+void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
+                        const AacIcsInfo* ics, const float* coef, float* energy, float* thr,
+                        float* spread_energy);
+
+/* Energies of the 128-sample sub-blocks of a high-passed signal, for the
+ * blocks covering x[start .. start + count); sub_energy needs count / 128
+ * entries. */
+void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_energy);
+
+/* Looks for an attack in x[start .. start + count): a sub-block whose
+ * high-passed energy jumps well above the smoothed energy of the preceding
+ * ones.  Returns the index of the last attacking sub-block plus one, or 0
+ * when there is none.  x must have 384 samples of history before start. */
+int aac_psy_attack(const float* x, int start, int count);
+
 #ifdef __cplusplus
 }
 #endif
+
 #endif /* BAANDER_AAC_PSYCHO_H */
