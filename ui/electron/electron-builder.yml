@@ -4,8 +4,6 @@ productName: "Baander"
 # Displayed in app metadata and installers
 copyright: "© 2025-2026 Martin Christiansen"
 
-afterPack: "build/afterPack.cjs"
-
 directories:
     output: dist/release
     buildResources: build
@@ -20,6 +18,13 @@ files:
     -   from: "dist/preload"
         to: "."
     - package.json
+    # The native AAC codec ships as its ESM entry, types and compiled binding
+    # only; the C++ sources it was built from stay out of the bundle.
+    - "!node_modules/@baander/aac-native/**"
+    - "node_modules/@baander/aac-native/package.json"
+    - "node_modules/@baander/aac-native/node/index.js"
+    - "node_modules/@baander/aac-native/node/index.d.ts"
+    - "node_modules/@baander/aac-native/build/Release/*.node"
 
 extraResources:
     -   from: "public/dsp"
@@ -32,7 +37,7 @@ win:
     target:
         - nsis
         - zip
-    icon: build/app-icons/icon.ico
+    icon: build/app-icons/icon.png
 
 nsis:
     oneClick: false                       # show wizard UI
@@ -48,7 +53,7 @@ mac:
     target:
         - dmg
         - zip
-    icon: build/app-icons/icon.icns
+    icon: build/app-icons/icon.png
 
 linux:
     target:
