@@ -222,10 +222,13 @@ The Electron app ships the AAC codec from `packages/codecs/baander-aac` as a
 native Node-API module, `@baander/aac-native`, declared as a `file:`
 dependency in `ui/electron/package.json`. `yarn install` builds it with
 node-gyp from the C++ sources; `yarn electron-rebuild` rebuilds it for the
-Electron ABI, and electron-builder bundles only its ESM entry, types and
-compiled binding. The package is ESM-only and targets Node 26; the desktop
-toolchain is Electron 45. A Node-API module is ABI-stable, so a binding built
-against Node headers loads in Electron unchanged.
+Electron ABI, and electron-builder (`ui/electron/electron-builder.yml`, the
+only packaging configuration) bundles only its ESM entry, types and compiled
+binding. The package is ESM-only and targets Node 26; the desktop toolchain is
+Electron 45. A Node-API module is ABI-stable, so a binding built against Node
+headers loads in Electron unchanged. The application icon is
+`ui/electron/build/app-icons/icon.png`, rendered from the web app's
+`icon.svg`; electron-builder derives the platform formats from it.
 
 The main process loads the binding lazily in `AacService`
 (`src/main/services/aac.service.ts`); when the binding is missing the service
