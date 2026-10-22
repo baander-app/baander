@@ -539,6 +539,61 @@ was checked in the same review. Prose preservation checks retained tables, fence
 code and historical checkpoints; all 13 local links and anchors resolved, and
 whitespace checks passed. The runners removed their disposable services.
 
+## AAC codec rewrite and desktop binding
+
+Checkpoint, 2026-10-22: `packages/codecs/baander-aac` produced streams no
+other decoder accepted and misdecoded every external stream. Its Huffman
+codebooks 6, 7, 9 and 11, every scalefactor band table and the TNS limits
+differed from ISO/IEC 14496-3; the MDCT and windows did not satisfy time-domain
+aliasing cancellation; the decoder ignored short windows, grouping, KBD windows,
+TNS, intensity stereo and noise substitution; and the encoder inverted the
+scalefactor convention. The tables were regenerated and verified entry by entry
+against FFmpeg's, and the decoder, MDCT and encoder were rewritten. The decoder
+now implements every AAC-LC tool and follows the ADTS stream parameters; the
+encoder implements block switching with lookahead, M/S, TNS and the
+threshold-adjustment and reservoir design of the Fraunhofer FDK encoder, with
+an encoder delay of 2048 samples and a flush that drains it. HE-AAC decoding
+remains out of scope: SBR streams decode as their AAC-LC core and the API
+reports the SBR presence; HE-AAC encoding is refused at creation. The
+placeholder SBR/PS/spectral sources and the stale scratch programs were removed.
+
+The Electron app ships the codec natively as `@baander/aac-native`, an
+ESM-only Node-API package rooted in the codec directory, built by node-gyp
+during `yarn install` and rebuilt for Electron by `electron-rebuild`.
+`AacService` loads it lazily in the main process; an IPC module with payload
+validation and a preload bridge expose one-shot and chunked decoding and
+encoding to the renderer. Node 26 and Electron 45 are the baseline for the
+desktop toolchain. The decoder-only WebAssembly build under
+`packages/dsp/baander-aac` was removed instead of repaired: its loader handed
+linear-memory pointers and `malloc`/`free` to JavaScript, so a host bug could
+free or reuse codec memory, and no browser code consumed it. The Emscripten
+platform and SIMD128 paths left the codec with it.
+
+Verification: the codec's seven CTest suites pass (table consistency, MDCT,
+bitstream, decoder compliance, roundtrips at all twelve sample rates and four
+rate-control modes, rate control, FFmpeg interoperability). Against FFmpeg 6.1.1
+our decoder reproduces FFmpeg's decode of FFmpeg-encoded streams to 135 dB
+difference SNR at 8 to 96 kHz, mono and stereo, 32 to 320 kbit/s, including
+short windows, TNS, intensity stereo, noise substitution and CRC-protected
+ADTS; FFmpeg decodes our streams identically to our decoder in every case.
+At equal bitrate the encoder's SNR matches or exceeds FFmpeg's native encoder
+on tonal, harmonic, transient and mono material and trails it only on pink
+noise at 32 and 64 kbit/s stereo; CBR and ABR land within 1 percent of the
+target. The binding's smoke test passes on Node 22, 24 and 26 and inside the
+Electron 45.0.0 runtime (Node 24.22, Node-API 10); the Electron suite passes
+66 tests under Node 26.12 with the binding built; `yarn install` builds the
+binding through node-gyp; the app type-checks and bundles; and an
+electron-builder `dir` package for Linux carries only the binding's entry,
+manifest and compiled module in `app.asar.unpacked`, from which the packaged
+app encodes and decodes. The Electron header host is unreachable from the
+build environment, so the Electron-ABI rebuild ran against Node headers; a
+Node-API module is ABI-stable across both, which the in-Electron runs
+confirm. Not possible here: listening tests; the encoder's quality claims
+rest on SNR and the FDK-derived allocation design. electron-builder's checked-in
+configurations still reference `ui/electron/build/afterPack.cjs` and
+application icons that are not in the repository; packaging needs those
+before a release build.
+
 ## Concurrent playlist appends
 
 Checkpoint, 2026-10-22: playlist additions carry append intent and the actor's

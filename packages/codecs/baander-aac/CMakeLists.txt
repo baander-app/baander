@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 
-# Enforce out-of-source builds — all artifacts under build/
+# Enforce out-of-source builds.  build/ belongs to node-gyp (the Node-API
+# binding), so CMake builds go to cmake-build/.
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR)
     message(FATAL_ERROR
-        "In-source builds are disabled. Use a build/ subdirectory:\n"
-        "  mkdir -p build && cd build && cmake .. && make"
+        "In-source builds are disabled. Use a cmake-build/ subdirectory:\n"
+        "  mkdir -p cmake-build && cd cmake-build && cmake .. && make"
     )
 endif()
 
@@ -13,9 +14,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(BAAC_AAC_BUILD_ENCODER "Build AAC encoder (OFF for WASM)" ON)
+option(BAAC_AAC_BUILD_ENCODER "Build AAC encoder" ON)
 option(BAAC_AAC_BUILD_DECODER "Build AAC decoder" ON)
 option(BAAC_AAC_BUILD_TESTS   "Build test suite" ON)
+option(BAAC_AAC_BUILD_TOOLS   "Build the baac command-line tool" ON)
 option(BAAC_AAC_SHARED        "Build shared lib" OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -23,10 +25,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(CMAKE_OSX_ARCHITECTURES "arm64")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(BAAC_AAC_PLATFORM "android")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    set(BAAC_AAC_PLATFORM "wasm")
-    set(BAAC_AAC_BUILD_ENCODER OFF)
-    set(BAAC_AAC_BUILD_TESTS OFF)
 elseif(APPLE)
     set(BAAC_AAC_PLATFORM "macos")
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
@@ -37,15 +35,13 @@ else()
 endif()
 
 set(BAAC_AAC_SOURCES
-    src/tables.cpp src/aac_cpu.cpp src/fft.cpp src/mdct.cpp
-    src/bitstream.cpp src/spectral.cpp src/api.cpp)
-set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/sbr.cpp src/sbr_dec.cpp src/ps.cpp)
-set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder.cpp src/sbr_enc.cpp)
+    src/tables.cpp src/aac_cpu.cpp src/dsp.cpp src/fft.cpp src/mdct.cpp
+    src/ics.cpp src/bitstream.cpp src/api.cpp)
+set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp)
+set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder.cpp)
 
 set(BAAC_AAC_SIMD_SOURCES)
-if(BAAC_AAC_PLATFORM STREQUAL "wasm")
-    list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/wasm.cpp)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
     list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/sse2.cpp src/simd/avx2.cpp)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
     list(APPEND BAAC_AAC_SIMD_SOURCES src/simd/neon.cpp)
@@ -64,30 +60,28 @@ add_compile_options(
     $<$<CONFIG:Release>:-ffast-math>
     $<$<CONFIG:Release>:-fno-math-errno>)
 
-if(NOT BAAC_AAC_PLATFORM STREQUAL "wasm")
-    include(CheckCXXCompilerFlag)
-    check_cxx_compiler_flag("-msse2" HAS_SSE2)
-    if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-        add_compile_options(-msse2)
-        add_compile_definitions(BAAC_AAC_SSE2)
-    endif()
-    check_cxx_compiler_flag("-mavx2" HAS_AVX2)
-    if(HAS_AVX2)
-        add_compile_options($<$<CONFIG:Release>:-mavx2>)
-        add_compile_definitions(BAAC_AAC_AVX2)
-    endif()
-    check_cxx_compiler_flag("-mfma" HAS_FMA)
-    if(HAS_FMA)
-        add_compile_options($<$<CONFIG:Release>:-mfma>)
-    endif()
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-        add_compile_definitions(BAAC_AAC_NEON)
-    endif()
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-msse2" HAS_SSE2)
+if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+    add_compile_options(-msse2)
+    add_compile_definitions(BAAC_AAC_SSE2)
+endif()
+# AVX2 is enabled only for src/simd/avx2.cpp (below) and selected at
+# runtime; compiling everything with -mavx2 would make the library fault on
+# CPUs without it.
+check_cxx_compiler_flag("-mavx2" HAS_AVX2)
+if(HAS_AVX2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+    add_compile_definitions(BAAC_AAC_AVX2)
+endif()
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    add_compile_definitions(BAAC_AAC_NEON)
 endif()
 
-if(BAAC_AAC_PLATFORM STREQUAL "wasm")
-    add_compile_options(-msimd128 -fno-exceptions -fno-rtti)
-    add_compile_definitions(BAAC_AAC_WASM BAAC_AAC_WASM_SIMD128)
+if(BAAC_AAC_BUILD_DECODER)
+    add_compile_definitions(BAAC_AAC_HAVE_DECODER)
+endif()
+if(BAAC_AAC_BUILD_ENCODER)
+    add_compile_definitions(BAAC_AAC_HAVE_ENCODER)
 endif()
 
 # Per-file compile flags for SIMD sources — must compile with ISA enabled
@@ -103,49 +97,29 @@ set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 
-# ── WASM: executable (emcc produces .wasm + .js) ──────────────────
-# ── Native: static/shared library ─────────────────────────────────
-if(BAAC_AAC_PLATFORM STREQUAL "wasm")
-    add_executable(baander-aac ${ALL_SOURCES})
-    target_include_directories(baander-aac PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include)
-    target_link_options(baander-aac PRIVATE
-        -s STANDALONE_WASM=1 --no-entry -s ENVIRONMENT=web -s STRICT=1
-        -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1
-        -s EXPORTED_FUNCTIONS='["_aac_decoder_create","_aac_decoder_destroy","_aac_decoder_decode","_aac_decoder_frame_size","_aac_decoder_sample_rate","_aac_decoder_channels","_aac_decoder_get_sbr_ps"]'
-        -s DISABLE_EXCEPTION_CATCHING=1)
-    # emcc outputs baander-aac.js + baander-aac.wasm
-    set_target_properties(baander-aac PROPERTIES
-        SUFFIX ".js"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-else()
-    set(LIB_TYPE STATIC)
-    if(BAAC_AAC_SHARED)
-        set(LIB_TYPE SHARED)
-    endif()
-    add_library(baander-aac ${LIB_TYPE} ${ALL_SOURCES})
-    target_include_directories(baander-aac PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>)
-    if(UNIX)
-        target_link_libraries(baander-aac PRIVATE m)
-    endif()
+set(LIB_TYPE STATIC)
+if(BAAC_AAC_SHARED)
+    set(LIB_TYPE SHARED)
+endif()
+add_library(baander-aac ${LIB_TYPE} ${ALL_SOURCES})
+target_include_directories(baander-aac PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>)
+if(UNIX)
+    target_link_libraries(baander-aac PRIVATE m)
 endif()
 
 # ── IDE helper: index all SIMD sources regardless of platform ────
-# neon.cpp / wasm.cpp are excluded from the build on x86, so CLion
-# won't index them. This STATIC library with EXCLUDE_FROM_ALL makes
-# every source visible to the IDE without affecting the real build.
-if(NOT BAAC_AAC_PLATFORM STREQUAL "wasm")
-    add_library(baander-aac-simdeps STATIC
-        EXCLUDE_FROM_ALL
-        src/simd/sse2.cpp
-        src/simd/avx2.cpp
-        src/simd/neon.cpp
-        src/simd/wasm.cpp)
-    target_include_directories(baander-aac-simdeps PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include)
-endif()
+# neon.cpp is excluded from the build on x86, so CLion won't index it.
+# This STATIC library with EXCLUDE_FROM_ALL makes every source visible
+# to the IDE without affecting the real build.
+add_library(baander-aac-simdeps STATIC
+    EXCLUDE_FROM_ALL
+    src/simd/sse2.cpp
+    src/simd/avx2.cpp
+    src/simd/neon.cpp)
+target_include_directories(baander-aac-simdeps PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 include(GNUInstallDirs)
 install(TARGETS baander-aac
@@ -153,6 +127,12 @@ install(TARGETS baander-aac
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING PATTERN "*.h")
+
+if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
+    add_executable(baac tools/baac.cpp)
+    target_link_libraries(baac PRIVATE baander-aac)
+    install(TARGETS baac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 if(BAAC_AAC_BUILD_TESTS)
     enable_testing()
