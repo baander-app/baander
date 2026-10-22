@@ -60,9 +60,38 @@ This context defines the following port interfaces, among others:
 
 ## Audio Renditions
 
-Media's `GET /api/stream/track` streams a track transcoded to Opus, AAC or MP3 when the request names a `format`. Media checks library access and reads the system settings `transcode.enabled` (off by default) and `transcode.max_bitrate` (kbps, default `320`) on every request; `TranscodeSettingDefinitions` contributes both. With transcoding off, a request with a format is `403` and no encode starts. Otherwise Media caps the requested bitrate at the maximum, or uses the maximum when none is requested, and calls `AudioRenditionPortInterface::open()`. `AudioRenditionFormat::supportedBitrate()` then snaps the bitrate down to the highest step of `BITRATE_LADDER` that the format supports (seven steps from 64 to 320 kbps; Opus at most 256 kbps), so a track has at most seven renditions per format.
+Media's `GET /api/stream/track` streams a track transcoded to Opus, AAC or MP3 when the request names a `format`. Media checks library access and reads the system settings `transcode.enabled` (off by default) and `transcode.max_bitrate` (kbps, default `320`) on every request; `TranscodeSettingDefinitions` contributes both. With transcoding off, a request with a format is `403` and no encode starts. Otherwise Media caps the requested bitrate at the maximum, or uses the maximum when none is requested, and calls `AudioRenditionPortInterface::open()`. `AudioRenditionFormat::supportedBitrate()` then snaps the bitrate down to the highest step of `BITRATE_LADDER` that the format supports (seven steps from 64 to 320 kbps; Opus at most 256 kbps), limiting each format to at most seven bitrate choices.
 
-`AudioRenditionCache` keeps one rendition per track, format and bitrate in `audio-renditions/<track>/` under the transcode storage root, named with a fingerprint of the source file. A complete rendition is served as a file with Range support. Otherwise the call starts the encode, or joins the one already running, and returns a progressive stream that Media sends with `Accept-Ranges: none`. Coordination goes through the filesystem, so it holds across HTTP workers: `AudioRenditionPoolWorker` holds an exclusive lock on the rendition's lock file for the whole encode, FFmpeg writes a `.part` file that listeners read while it grows, and the encode renames it to the final file under the lock. A pool job that finds the lock held returns at once, and its request follows the running encode instead, so a duplicate job never holds a pool worker. Before `open()` starts an encode, it removes any `.part` left by an encoder that died, so listeners read only bytes from the encode they wait for. Encodes run in the CPU process pool through `CpuProcessPoolInterface::dispatchWithinLimit()`. The pool counts queued and running rendition jobs in a `Swoole\Table` shared by every HTTP worker. When a dispatch would exceed `$maxConcurrentEncodes`, `open()` throws `AudioRenditionBusyException` instead, and Media answers `503` with `Retry-After`. Outside the Swoole server (CLI, tests) the encode runs in the calling process before streaming. `SweepTranscodeCacheHandler` treats each track's rendition directory as one cache unit (`audio-renditions/<track>`) under the same TTL and size budget as video directories.
+`AudioRenditionCache` admits durable work through `AudioRenditionRuntimePort`.
+The runtime key includes the track, format, bitrate and source signature. The
+signature fingerprints the resolved source path, modification time and size, so
+a repaired source rename selects a separate rendition even when the track ID and
+file metadata stay unchanged. The output root is
+`audio-renditions/<track>/<signature>/` under the transcode storage root. Repeated
+requests for the unchanged source reuse that identity. This is a path and metadata
+fingerprint; it does not detect a same-path replacement that preserves both size
+and modification time.
+
+The media worker discovers committed pending admissions and claims an execution
+generation. `AudioRenditionExecutor` verifies the source signature before encoding,
+holds the rendition's filesystem lock and delegates FFmpeg to native execution.
+Each generation writes its own `.part` file, then renames it to the final file while
+holding durable ownership. A busy filesystem lock defers the attempt. An expired
+claim can be recovered in a new generation; stale workers cannot publish its
+output. Encoding requires the separately deployed media worker, including for
+requests made outside Swoole.
+
+A complete rendition is served as a file with Range support. Otherwise the request
+waits for its accepted generation to produce bytes and returns a progressive stream
+with `Accept-Ranges: none`. The reader remains pinned to that generation and rejects
+ownership loss. A failed encode or startup timeout raises
+`AudioRenditionFailedException`, which Media maps to HTTP `500`.
+
+`SweepTranscodeCacheHandler` treats `audio-renditions/<track>` as one cache unit
+under the same TTL and size budget as video directories. A rename can leave the
+previous completed output until that sweep removes it. If a completed file has
+been evicted, the next request resets the observed completed generation and waits
+for a worker to rebuild it from the same source.
 
 ## Domain Events
 

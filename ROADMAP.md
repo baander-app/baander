@@ -503,15 +503,46 @@ independently verified, with no open findings. Documentation preservation and
 local-link checks passed, as did whitespace checks. Disposable test containers,
 networks and volumes were removed.
 
+## Audio renditions after a source rename
+
+Checkpoint, 2026-10-22: audio rendition signatures include the resolved source
+path alongside modification time, size, format and bitrate. A repaired track
+keeps its ID while its renamed source receives an independent durable runtime
+key and output directory. Cache admission and worker validation share that
+signature. Repeated requests for the unchanged source reuse its completed output;
+older output remains intact until the existing cache sweep removes it. No schema,
+HTTP contract or compatibility fallback changed. A same-path replacement that
+preserves both size and modification time remains outside this fingerprint.
+
+The real PostgreSQL/FFmpeg regression first failed at immutable-input admission
+after a physical rename that preserved file metadata. It now verifies two
+completed first-generation renditions with distinct keys and output paths, intact
+original output and repeated-request reuse without another generation.
+
+Verification in the CI image passed 994 distinct tests with 4,280 assertions
+across rendition and surrounding Media/Transcode units, durable runtime
+integration and audio-stream functional coverage. Changed PHP files pass PHPStan;
+full Deptrac reports zero violations, warnings and errors, with 484 existing
+skipped violations. Three simplification reviews found no changes needed.
+Tests generate media without playing audio and use disposable services; existing
+application databases, Redis and media storage were not reused or reset.
+
+The real Swoole WebRuntime drill passed progressive delivery, completed byte
+ranges, the Safari request baseline, PostgreSQL outage/reload alerts and Redis
+outage/session recovery. Its first run exposed an older fixture storing a relative
+song path, which playback rejected with HTTP 404 before rendition admission. The
+fixture now stores its generated file's absolute path, matching the existing
+resolver contract. PHPStan also passes for that correction.
+
+The reviewed plan and final code review returned no findings; the fixture repair
+was checked in the same review. Prose preservation checks retained tables, fenced
+code and historical checkpoints; all 13 local links and anchors resolved, and
+whitespace checks passed. The runners removed their disposable services.
+
 ## Observed PHP follow-ups
 
-These source-traced failures need their own regression before implementation:
+This source-traced failure needs its own regression before implementation:
 
-- **Transcoding after a source rename:** a repaired track retains its ID while its
-  canonical source path changes. If size and modification time stay equal, the
-  audio rendition key still names the previous immutable input, so the transcode
-  request fails with HTTP 500. Verify this sequence through the rendition cache
-  and executor before changing their shared source signature.
 - **Concurrent playlist append:** the controller computes the append position
   before the handler reloads the playlist. An intervening committed addition can
   make that position stale, leaving two entries with the same position and an
