@@ -92,7 +92,7 @@ if ($mode === 'prepare') {
 
     $library = new LibraryEntity('Web runtime', 'web-runtime', dirname($sourceFile), 'music', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Web runtime album', 'album');
-    $song = new SongEntity(new PublicId(), $album, 'Web runtime song', SOURCE_PATH, (int) filesize($sourceFile), 'audio/flac');
+    $song = new SongEntity(new PublicId(), $album, 'Web runtime song', $sourceFile, (int) filesize($sourceFile), 'audio/flac');
     foreach ([$library, $album, $song] as $entity) {
         $manager->persist($entity);
     }
