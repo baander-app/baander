@@ -1809,9 +1809,10 @@ cd .. && npm install && npm test
 
 The CTest suites check the standard tables, the MDCT, bitstream coding,
 decoder behaviour on hand-built and damaged streams, encode/decode roundtrips
-at every sample rate and rate-control mode, rate control, and interoperability
-with FFmpeg's encoder and decoder when `ffmpeg` is on `PATH`; the interop
-suite skips otherwise.
+at every sample rate and rate-control mode, rate control, the coding tools
+(noise substitution, intensity stereo, TNS) in the encoder's streams, and
+interoperability with FFmpeg's encoder and decoder when `ffmpeg` is on
+`PATH`; the interop suite skips otherwise.
 
 The native audio graph suite also runs normalization against the shipped loudness
 WASM without mounting Equalizer. It checks output attenuation, independent volume

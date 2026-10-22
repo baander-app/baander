@@ -594,6 +594,42 @@ configurations still reference `ui/electron/build/afterPack.cjs` and
 application icons that are not in the repository; packaging needs those
 before a release build.
 
+Checkpoint, 2026-10-22, encoder tools: the encoder gained the coding tools
+of the FDK encoder as kept in AOSP `external/aac` (read from the
+`android17-release` state of the `mstorsjo/fdk-aac` mirror; the AOSP host
+itself is unreachable from the build environment). TNS now follows
+`aacenc_tns.cpp`: lag-windowed, energy-normalized autocorrelation over
+quarters of the range, an upper and a lower filter on long windows that
+merge when they agree, one filter per short window with 3-bit
+coefficients, and filters shared across a channel pair when they nearly
+coincide; the filter lengths count down from `num_swb` as the decoder
+expects. Perceptual noise substitution uses the AAC-LC tuning rows
+(28 to 48 kbit/s per channel, constant-rate modes, bands above 4.1 kHz,
+quarter-power and unpredictability tests, TNS gating, gap and isolation
+rules) and never signals correlated noise, because FFmpeg's decoder draws
+independent noise regardless and would then run ahead of a conforming
+decoder's random sequence. Intensity stereo follows `intensity.cpp`
+(correlation above 0.95, regions of at least six bands, direction and
+loudness limits, left-channel replacement at the left level) and is
+allowed when the bitrate is below five times the lowpass. The AOSP
+history's own quality commits (VBR bandwidths, reduced bit reservoir for
+low-delay, dead-zone quantization) apply to configurations this encoder
+does not have and were not ported.
+
+Verification: eight CTest suites pass, including the new tools suite
+(noise substitution in 130 of 132 frames of white noise at 40 kbit/s mono
+with the substituted region within 0.1 dB of the source; intensity stereo
+in 131 of 132 frames of a panned harmonic series at 48 kbit/s with the
+balance within 0.1 dB and 30.8 dB SNR; TNS on short windows and with two
+filters on the transient signal) and the interop suite's new intensity and
+noise-substitution cases, where FFmpeg decodes our streams identically to
+our decoder (134.8 and 136.3 dB). Against FFmpeg 6.1.1 the pink-noise case
+at 64 kbit/s stereo moved from 12.9/11.0 dB to 14.0/13.5 dB, now above
+FFmpeg's 13.6/13.2 dB; the two-tone signal at 48 kHz gained 0.8/1.3 dB;
+the click signal at 96 kbit/s lost 0.5 dB, where substitution now covers
+the noise bursts; the other rows of the reference comparison are unchanged
+within 0.2 dB. The binding's smoke test passes after the rebuild.
+
 ## Concurrent playlist appends
 
 Checkpoint, 2026-10-22: playlist additions carry append intent and the actor's
