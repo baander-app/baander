@@ -107,7 +107,9 @@ final class MovieScanner
 
             $this->transaction->run(function () use ($library, $dir, $discoveredFiles, $publishDirectory, $lease): void {
                 $lease?->guardWrite();
-                foreach ($discoveredFiles as $discoveredFile) {
+                $orderedFiles = $discoveredFiles;
+                usort($orderedFiles, static fn (DiscoveredFile $a, DiscoveredFile $b): int => strcmp($a->absolutePath, $b->absolutePath));
+                foreach ($orderedFiles as $discoveredFile) {
                     $this->fileIndexRepository->upsert(
                         $library->getId(),
                         $discoveredFile->absolutePath,

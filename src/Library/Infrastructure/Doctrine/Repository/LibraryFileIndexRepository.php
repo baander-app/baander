@@ -8,11 +8,12 @@ use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use LogicException;
 
 /**
- * Writes the file index with single statements, outside the unit of work: each write is stored
- * when it returns, with no flush that a scan must remember. Concurrent upserts of one path
- * resolve on the (library_id, path) unique index instead of inserting it twice.
+ * Writes the file index outside the unit of work, without requiring a flush. Bulk mutations
+ * lock existing target rows in path order and hold them through the mutation transaction.
+ * Concurrent upserts of one path resolve on the (library_id, path) unique index.
  */
 final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInterface
 {
@@ -58,16 +59,41 @@ final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInte
         return $availability;
     }
 
-    public function markUnavailableByPaths(Uuid $libraryId, array $paths): void
+    public function findAvailableHashesByPaths(Uuid $libraryId, array $paths): array
     {
+        return $this->availableHashes($libraryId, $paths, false);
+    }
+
+    public function lockAvailableHashesByPathsForImport(Uuid $libraryId, array $paths): array
+    {
+        if (!$this->entityManager->getConnection()->isTransactionActive()) {
+            throw new LogicException('Import observation locks require an active transaction.');
+        }
+
+        return $this->availableHashes($libraryId, $paths, true);
+    }
+
+    /** @param list<string> $paths
+     * @return array<string, string>
+     */
+    private function availableHashes(Uuid $libraryId, array $paths, bool $lock): array
+    {
+        $hashes = [];
         $connection = $this->entityManager->getConnection();
-        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
-            $connection->executeStatement(
-                'UPDATE library_file_index SET available = false WHERE library_id = :library_id AND path IN (:paths) AND available = true',
+        foreach (array_chunk($this->orderedPaths($paths), self::PATHS_PER_STATEMENT) as $chunk) {
+            $hashes += $connection->executeQuery(
+                'SELECT path, hash FROM library_file_index WHERE library_id = :library_id AND path IN (:paths) AND available = true ORDER BY path COLLATE "C"' . ($lock ? ' FOR SHARE' : ''),
                 ['library_id' => $libraryId->toString(), 'paths' => $chunk],
                 ['paths' => ArrayParameterType::STRING],
-            );
+            )->fetchAllKeyValue();
         }
+
+        return $hashes;
+    }
+
+    public function markUnavailableByPaths(Uuid $libraryId, array $paths): void
+    {
+        $this->mutateExistingPaths($libraryId, $paths, 'UPDATE library_file_index SET available = false WHERE library_id = :library_id AND path IN (:paths) AND available = true');
     }
 
     public function upsert(Uuid $libraryId, string $path, string $hash, int $size, string $extension, int $modifiedAt): void
@@ -99,13 +125,39 @@ final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInte
 
     public function removeByPaths(Uuid $libraryId, array $paths): void
     {
+        $this->mutateExistingPaths($libraryId, $paths, 'DELETE FROM library_file_index WHERE library_id = :library_id AND path IN (:paths)');
+    }
+
+    /** @param list<string> $paths */
+    private function mutateExistingPaths(Uuid $libraryId, array $paths, string $sql): void
+    {
         $connection = $this->entityManager->getConnection();
-        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
-            $connection->executeStatement(
-                'DELETE FROM library_file_index WHERE library_id = :library_id AND path IN (:paths)',
-                ['library_id' => $libraryId->toString(), 'paths' => $chunk],
-                ['paths' => ArrayParameterType::STRING],
-            );
-        }
+        $connection->transactional(function () use ($connection, $libraryId, $paths, $sql): void {
+            $locked = [];
+            foreach (array_chunk($this->orderedPaths($paths), self::PATHS_PER_STATEMENT) as $chunk) {
+                array_push($locked, ...$connection->fetchFirstColumn(
+                    'SELECT path FROM library_file_index WHERE library_id = :library_id AND path IN (:paths) ORDER BY path COLLATE "C" FOR NO KEY UPDATE',
+                    ['library_id' => $libraryId->toString(), 'paths' => $chunk],
+                    ['paths' => ArrayParameterType::STRING],
+                ));
+            }
+            foreach (array_chunk($locked, self::PATHS_PER_STATEMENT) as $chunk) {
+                $connection->executeStatement($sql,
+                    ['library_id' => $libraryId->toString(), 'paths' => $chunk],
+                    ['paths' => ArrayParameterType::STRING],
+                );
+            }
+        });
+    }
+
+    /** @param list<string> $paths
+     * @return list<string>
+     */
+    private function orderedPaths(array $paths): array
+    {
+        $paths = array_values(array_unique($paths));
+        sort($paths, SORT_STRING);
+
+        return $paths;
     }
 }

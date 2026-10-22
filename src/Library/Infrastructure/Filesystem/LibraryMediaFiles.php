@@ -62,6 +62,16 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
         return $this->libraries->liveClaimKindForImport($libraryId) === LibraryClaimKind::Delete;
     }
 
+    public function findAvailableHashesByPaths(Uuid $libraryId, array $paths): array
+    {
+        return $this->fileIndex->findAvailableHashesByPaths($libraryId, $paths);
+    }
+
+    public function lockAvailableHashesByPathsForImport(Uuid $libraryId, array $paths): array
+    {
+        return $this->fileIndex->lockAvailableHashesByPathsForImport($libraryId, $paths);
+    }
+
     public function markMissingUnavailable(Uuid $libraryId, array $paths): array
     {
         // PHP caches file status; a file deleted since an earlier check must count.

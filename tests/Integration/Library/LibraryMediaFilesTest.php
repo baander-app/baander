@@ -100,6 +100,18 @@ final class LibraryMediaFilesTest extends TestCase
         $this->harnessTearDown();
     }
 
+    public function testImportObservationsExposeOnlyAvailableCurrentHashes(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        $this->fileIndex->markUnavailableByPaths($library->getId(), [$second]);
+        $paths = [$second, $first, $first, $this->album . '/absent.flac'];
+        $expected = [$first => hash_file('xxh3', $first)];
+
+        self::assertSame($expected, $this->files->findAvailableHashesByPaths($library->getId(), $paths));
+        self::assertSame($expected, $this->files->lockAvailableHashesByPathsForImport($library->getId(), $paths));
+        self::assertSame([], $this->files->findAvailableHashesByPaths(Uuid::v7(), $paths));
+    }
+
     public function testMissingRootRetainsItsIndexedFilesAndQueuesThemWhenItReturns(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();

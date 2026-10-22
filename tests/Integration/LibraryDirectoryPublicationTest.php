@@ -322,6 +322,68 @@ final class LibraryDirectoryPublicationTest extends TestCase
         self::assertNotNull($this->observer->fetchOne("SELECT relayed_at FROM domain_event_outbox WHERE event_name = 'library.directory_indexed'"));
     }
 
+    public function testImportObservationLockRequiresAnActiveTransactionEvenForAnEmptyBatch(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->index->lockAvailableHashesByPathsForImport(Uuid::v7(), []);
+    }
+
+    public function testHashReversionKeepsTheOriginalQueuedDiscoveryEligibleAndIdempotent(): void
+    {
+        $library = $this->library(LibraryType::Music);
+        $path = $this->audioFile(title: 'Original source', frequency: 440);
+        $originalBytes = file_get_contents($path);
+        self::assertIsString($originalBytes);
+        $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
+        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        $original = $this->discovery(0, $library, $path);
+        $this->audioFile(title: 'Replacement source', frequency: 880);
+        $this->scanner(LibraryType::Music)->scan($library, rescan: true);
+        self::assertNotSame($original->files[0]->hash, hash_file('xxh3', $path));
+        self::assertNotFalse(file_put_contents($path, $originalBytes));
+        clearstatcache(true, $path);
+        $this->scanner(LibraryType::Music)->scan($library, rescan: true);
+        self::assertSame($original->files[0]->hash, hash_file('xxh3', $path));
+
+        $consumer = $this->kernel->getContainer()->get('test.service_container')->get(FilesDiscoveredHandler::class);
+        $consumer($original);
+        $consumer($original);
+
+        self::assertSame(1, $this->rowCount($this->observer, 'songs'));
+        self::assertSame('Original source', $this->observer->fetchOne('SELECT title FROM songs'));
+        self::assertSame($original->files[0]->hash, $this->observer->fetchOne('SELECT hash FROM songs'));
+    }
+
+    public function testOlderDiscoveryCannotImportReplacementBytesAfterNewerDiscoveryImports(): void
+    {
+        $library = $this->library(LibraryType::Music);
+        $path = $this->audioFile(title: 'Original source', frequency: 440);
+        $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
+        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        $older = $this->discovery(0, $library, $path);
+
+        $this->audioFile(title: 'Replacement source', frequency: 880);
+        clearstatcache(true, $path);
+        $this->scanner(LibraryType::Music)->scan($library, rescan: true, publishDirectory: $this->capture($library));
+        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        $newer = $this->discovery(1, $library, $path);
+        self::assertNotSame($older->files[0]->hash, $newer->files[0]->hash);
+        self::assertSame(hash_file('xxh3', $path), $newer->files[0]->hash);
+
+        $consumer = $this->kernel->getContainer()->get('test.service_container')->get(FilesDiscoveredHandler::class);
+        $consumer($newer);
+        self::assertSame(1, $this->rowCount($this->observer, 'songs'));
+        self::assertSame('Replacement source', $this->observer->fetchOne('SELECT title FROM songs'));
+        $outboxBeforeReplay = $this->observer->fetchAllAssociative('SELECT * FROM domain_event_outbox ORDER BY id');
+
+        $consumer($older);
+
+        self::assertSame(1, $this->rowCount($this->observer, 'songs'), 'Replaying an older hash must not create a second song from the replacement bytes.');
+        self::assertSame($newer->files[0]->hash, $this->observer->fetchOne('SELECT hash FROM songs'));
+        self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM songs WHERE hash = :hash', ['hash' => $older->files[0]->hash]));
+        self::assertSame($outboxBeforeReplay, $this->observer->fetchAllAssociative('SELECT * FROM domain_event_outbox ORDER BY id'), 'Stale delivery must not publish further catalog or enrichment work.');
+    }
+
 
     /** @return iterable<string, array{LibraryType, bool, string}> */
     public static function lostOwners(): iterable
@@ -498,11 +560,11 @@ final class LibraryDirectoryPublicationTest extends TestCase
         return $path;
     }
 
-    private function audioFile(): string
+    private function audioFile(string $title = 'Directory publication', int $frequency = 440): string
     {
         $path = $this->root . '/Album/01.flac';
         (new Filesystem())->mkdir(dirname($path));
-        $fixture = new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.1', '-c:a', 'flac', $path]);
+        $fixture = new Process(['/usr/bin/ffmpeg', '-y', '-nostdin', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', sprintf('sine=frequency=%d:duration=0.1', $frequency), '-c:a', 'flac', '-metadata', 'title=' . $title, $path]);
         $fixture->mustRun();
         return $path;
     }

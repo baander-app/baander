@@ -26,6 +26,26 @@ final class LibraryFileIndexPersistenceTest extends TestCase
 
     private const FOREIGN_KEY = 'fk_library_file_index_library_id';
 
+    public function testAvailableHashReadsOmitUnavailableAndAbsentPathsAndScopeTheLibrary(): void
+    {
+        $library = $this->createLibrary();
+        $other = $this->createLibrary();
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $path = '/media/current.flac';
+        $unavailable = '/media/unavailable.flac';
+        $repository->upsert($library->getId(), $path, 'current', 1, 'flac', 1);
+        $repository->upsert($other->getId(), $path, 'other-library', 1, 'flac', 1);
+        $repository->upsert($library->getId(), $unavailable, 'unavailable', 1, 'flac', 1);
+        $repository->markUnavailableByPaths($library->getId(), [$unavailable]);
+        $paths = [$unavailable, '/media/absent.flac', $path, $path];
+
+        self::assertSame([$path => 'current'], $repository->findAvailableHashesByPaths($library->getId(), $paths));
+        self::assertSame([$path => 'current'], $repository->lockAvailableHashesByPathsForImport($library->getId(), $paths));
+        self::assertSame([$path => 'other-library'], $repository->findAvailableHashesByPaths($other->getId(), $paths));
+        self::assertSame([], $repository->findAvailableHashesByPaths($library->getId(), []));
+        self::assertSame([], $repository->lockAvailableHashesByPathsForImport($library->getId(), []));
+    }
+
     public function testDeclaredForeignKeyMatchesTheCatalog(): void
     {
         $expected = (new SchemaTool($this->manager))

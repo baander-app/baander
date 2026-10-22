@@ -369,6 +369,16 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not ask whether a delete holds the library.');
             }
 
+            public function findAvailableHashesByPaths(Uuid $libraryId, array $paths): array
+            {
+                throw new \LogicException('A delete does not read import observations.');
+            }
+
+            public function lockAvailableHashesByPathsForImport(Uuid $libraryId, array $paths): array
+            {
+                throw new \LogicException('A delete does not lock import observations.');
+            }
+
             public function markMissingUnavailable(Uuid $libraryId, array $paths): array
             {
                 throw new \LogicException('A delete does not look for missing paths.');

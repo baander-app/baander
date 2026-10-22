@@ -24,6 +24,7 @@ use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -35,6 +36,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class FilesDiscoveredRenameTest extends TestCase
 {
+    use DiscoveredFileObservations;
+
     #[DataProvider('renameCases')]
     public function testOnlyEligibleSourcesAreReconciled(string $case, bool $expectedWrite): void
     {
@@ -57,11 +60,17 @@ final class FilesDiscoveredRenameTest extends TestCase
             $fresh->moveToAlbum(Uuid::v7());
         }
         $songs = $this->createMock(SongPortInterface::class);
-        $songs->method('findByHash')->willReturn($song);
+        $songs->method('findByHash')->willReturnCallback(function () use ($song, $case): Song {
+            if ($case === 'superseded during lookup') {
+                $this->availableHashes['/music/Album/new.flac'] = 'replacement';
+            }
+
+            return $song;
+        });
         $songs->method('findFreshByUuid')->willReturn($case === 'deleted song' ? null : $fresh);
         $songs->expects($expectedWrite ? $this->once() : $this->never())->method('persist')->with($fresh);
         $songs->expects($this->never())->method('linkArtistToSong');
-        $media = $this->createStub(LibraryMediaFilesInterface::class);
+        $media = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $media->method('inspect')->willReturn(new LibraryMediaFileInspection($libraryId, '/music', [
             new LibraryMediaFileCheck($oldPath, $case === 'old present' ? LibraryMediaFileVerdict::Deletable : LibraryMediaFileVerdict::Missing),
             new LibraryMediaFileCheck('/music/Album/new.flac', match ($case) {
@@ -73,6 +82,9 @@ final class FilesDiscoveredRenameTest extends TestCase
         ], $case === 'active scan', $case !== 'root unavailable'));
         $handler = $this->handler($album, $songs, $media);
         $message = $this->message($libraryId);
+        if ($case === 'superseded observation') {
+            $this->availableHashes['/music/Album/new.flac'] = 'replacement';
+        }
 
         $handler($message);
         $handler($message);
@@ -88,7 +100,7 @@ final class FilesDiscoveredRenameTest extends TestCase
     /** @return iterable<string, array{string, bool}> */
     public static function renameCases(): iterable
     {
-        foreach (['eligible', 'read only', 'same path', 'different parent', 'different album', 'old present', 'new missing', 'outside root', 'root unavailable', 'active scan', 'changed path', 'changed hash', 'changed album', 'deleted song'] as $case) {
+        foreach (['eligible', 'read only', 'same path', 'different parent', 'different album', 'old present', 'new missing', 'outside root', 'root unavailable', 'active scan', 'changed path', 'changed hash', 'changed album', 'deleted song', 'superseded observation', 'superseded during lookup'] as $case) {
             yield $case => [$case, in_array($case, ['eligible', 'read only', 'active scan'], true)];
         }
     }
@@ -103,7 +115,7 @@ final class FilesDiscoveredRenameTest extends TestCase
         $songs->method('findByHash')->willReturn($song);
         $songs->method('findFreshByUuid')->willReturn($song);
         $songs->expects($this->exactly(2))->method('persist')->with($song);
-        $media = $this->createStub(LibraryMediaFilesInterface::class);
+        $media = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $media->method('inspect')->willReturnCallback(static fn (Uuid $id, array $paths): LibraryMediaFileInspection => new LibraryMediaFileInspection($id, '/music', [
             new LibraryMediaFileCheck($paths[0], LibraryMediaFileVerdict::Missing),
             new LibraryMediaFileCheck($paths[1], LibraryMediaFileVerdict::Deletable),
@@ -112,7 +124,7 @@ final class FilesDiscoveredRenameTest extends TestCase
 
         $handler($this->message($libraryId));
         $handler(new FilesDiscovered($libraryId, 'music', '/music/Album', [
-            new DiscoveredFile('/music/Album/again.flac', 'Album/again.flac', 'flac', 100, 1_700_000_000, 'hash'),
+            $this->observedFile(new DiscoveredFile('/music/Album/again.flac', 'Album/again.flac', 'flac', 100, 1_700_000_000, 'hash')),
         ]));
 
         self::assertSame('/music/Album/again.flac', $song->getPath());
@@ -128,7 +140,7 @@ final class FilesDiscoveredRenameTest extends TestCase
         $songs->method('findByHash')->willReturn($song);
         $songs->expects($this->never())->method('persist');
         $songs->expects($this->never())->method('findFreshByUuid');
-        $media = $this->createMock(LibraryMediaFilesInterface::class);
+        $media = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
         $media->method('isHeldByDeleteForImport')->willReturn(true);
         $media->expects($this->never())->method('inspect');
         $bus = $this->createMock(MessageBusInterface::class);
@@ -155,7 +167,7 @@ final class FilesDiscoveredRenameTest extends TestCase
             }
             $song->getState()->path = $fresh->getPath();
         });
-        $media = $this->createStub(LibraryMediaFilesInterface::class);
+        $media = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $media->method('inspect')->willReturn(new LibraryMediaFileInspection($libraryId, '/music', [
             new LibraryMediaFileCheck($song->getPath(), LibraryMediaFileVerdict::Missing),
             new LibraryMediaFileCheck('/music/Album/new.flac', LibraryMediaFileVerdict::Deletable),
@@ -174,7 +186,7 @@ final class FilesDiscoveredRenameTest extends TestCase
     private function message(Uuid $libraryId): FilesDiscovered
     {
         return new FilesDiscovered($libraryId, 'music', '/music/Album', [
-            new DiscoveredFile('/music/Album/new.flac', 'Album/new.flac', 'flac', 100, 1_700_000_000, 'hash'),
+            $this->observedFile(new DiscoveredFile('/music/Album/new.flac', 'Album/new.flac', 'flac', 100, 1_700_000_000, 'hash')),
         ]);
     }
 

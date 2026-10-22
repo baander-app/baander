@@ -100,7 +100,13 @@ final class FilesDiscoveredHandler
         $committedPaths = [];
 
         // Resolve album from directory
-        [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $files);
+        $resolved = $this->resolveAlbum($libraryId, $message->directory, $files);
+        if ($resolved === null) {
+            $this->requeueWhileHeld($message);
+
+            return;
+        }
+        [$album, $wasCreated] = $resolved;
         if ($album === null) {
             return;
         }
@@ -113,7 +119,7 @@ final class FilesDiscoveredHandler
         $audioFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
         foreach (array_chunk($audioFiles, self::BATCH_SIZE) as $batch) {
             $songs = [];
-            foreach ($batch as $file) {
+            foreach ($this->currentFiles($libraryId, $batch) as $file) {
                 try {
                     $song = $this->readSong($album, $file);
                     if ($song !== null) {
@@ -248,8 +254,15 @@ final class FilesDiscoveredHandler
                 return null;
             }
 
+            $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($libraryId, array_map(
+                static fn (array $song): string => $song['file']->absolutePath,
+                $songs,
+            ));
             $written = [];
             foreach ($songs as $song) {
+                if (($hashes[$song['file']->absolutePath] ?? null) !== $song['file']->hash) {
+                    continue;
+                }
                 try {
                     if (isset($song['previousPath'], $song['expectedAlbum'])) {
                         $fresh = $this->reconcileSource($libraryId, $song['song']->getId(), $song['expectedAlbum'], $song['previousPath'], $song['file']);
@@ -335,68 +348,79 @@ final class FilesDiscoveredHandler
     /** @param list<DiscoveredFile> $files the message's files that still exist */
     private function processMovieFiles(FilesDiscovered $message, array $files): void
     {
-        $libraryId = $message->libraryId;
-        $movieTitle = basename($message->directory);
-
-        [$movie, $wasCreated] = $this->resolveMovie($libraryId, $movieTitle);
-        if ($movie === null) {
-            return;
-        }
-
-        $batchCount = 0;
         $failures = [];
-        foreach ($files as $file) {
-            if (!$file->isVideo()) {
+        $committedPaths = [];
+        $videoFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isVideo()));
+        foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
+            $prepared = [];
+            foreach ($this->currentFiles($message->libraryId, $batch) as $file) {
+                try {
+                    $video = $this->videoRepository->findByHash($file->hash);
+                    $isNew = $video === null;
+                    if ($video === null) {
+                        $probe = $this->ffprobeAdapter->probeVideo($file->absolutePath);
+                        $video = Video::create(
+                            path: $file->absolutePath,
+                            hash: $file->hash,
+                            duration: (int) $probe->duration,
+                            height: $probe->height,
+                            width: $probe->width,
+                            videoBitrate: $probe->videoBitrate,
+                            framerate: (int) $probe->framerate,
+                        );
+                        $video->updateProbe($probe->jsonSerialize());
+                    }
+                    $prepared[] = ['file' => $file, 'video' => $video, 'isNew' => $isNew];
+                } catch (\Throwable $error) {
+                    $failures[] = $this->fileFailed($file, $error);
+                }
+            }
+            if ($prepared === []) {
                 continue;
             }
-
-            try {
-                $existing = $this->videoRepository->findByHash($file->hash);
-                if ($existing !== null) {
-                    if (!in_array($existing->getId()->toString(), $movie->getVideoIds(), true)) {
-                        $movie->addVideo($existing->getId());
-                        $this->movieService->persist($movie);
+            $written = $this->transaction->run(function () use ($message, $prepared, &$failures): ?array {
+                if ($this->mediaFiles->isHeldByDeleteForImport($message->libraryId)) {
+                    return null;
+                }
+                $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($message->libraryId, array_map(
+                    static fn (array $entry): string => $entry['file']->absolutePath,
+                    $prepared,
+                ));
+                $current = array_filter($prepared, static fn (array $entry): bool => ($hashes[$entry['file']->absolutePath] ?? null) === $entry['file']->hash);
+                if ($current === []) {
+                    return [];
+                }
+                [$movie] = $this->resolveMovie($message->libraryId, basename($message->directory));
+                $written = [];
+                foreach ($current as $entry) {
+                    try {
+                        if ($entry['isNew']) {
+                            $this->videoRepository->save($entry['video']);
+                        }
+                        if (!in_array($entry['video']->getId()->toString(), $movie->getVideoIds(), true)) {
+                            $movie->addVideo($entry['video']->getId());
+                            $this->movieService->persist($movie);
+                        }
+                        $written[] = $entry['file']->absolutePath;
+                    } catch (\Throwable $error) {
+                        $failures[] = $this->fileFailed($entry['file'], $error);
                     }
-                    continue;
                 }
+                $this->movieService->flush();
 
-                $probeResult = $this->ffprobeAdapter->probeVideo($file->absolutePath);
+                return $written;
+            });
+            if ($written === null) {
+                $this->requeueWhileHeld(new FilesDiscovered($message->libraryId, $message->libraryType, $message->directory,
+                    array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]))),
+                ));
 
-                $video = Video::create(
-                    path: $file->absolutePath,
-                    hash: $file->hash,
-                    duration: (int) $probeResult->duration,
-                    height: $probeResult->height,
-                    width: $probeResult->width,
-                    videoBitrate: $probeResult->videoBitrate,
-                    framerate: (int) $probeResult->framerate,
-                );
-                $video->updateProbe($probeResult->jsonSerialize());
-                $this->videoRepository->save($video);
-
-                $movie->addVideo($video->getId());
-                $this->movieService->persist($movie);
-
-                $batchCount++;
-                if ($batchCount >= self::BATCH_SIZE) {
-                    $this->movieService->flush();
-                    $batchCount = 0;
-                }
-            } catch (\Throwable $e) {
-                $failures[] = [
-                    'path' => $file->absolutePath,
-                    'error' => $e->getMessage(),
-                ];
-
-                $this->logger->warning('Failed to process video file', [
-                    'file' => $file->absolutePath,
-                    'error' => $e->getMessage(),
-                ]);
+                return;
+            }
+            foreach ($written as $path) {
+                $committedPaths[$path] = true;
             }
         }
-
-        $this->movieService->flush();
-
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
@@ -404,53 +428,65 @@ final class FilesDiscoveredHandler
 
     /**
      * @param list<DiscoveredFile> $files
-     * @return array{Album|null, bool}
+     * @return array{Album|null, bool}|null Null means a delete holds the library.
      */
-    private function resolveAlbum(Uuid $libraryId, string $directory, array $files): array
+    private function resolveAlbum(Uuid $libraryId, string $directory, array &$files): ?array
     {
-        $directoryName = basename($directory);
-        $metadataTitle = null;
-        $metadataYear = null;
-        $metadataAlbumArtist = null;
-
-        foreach ($files as $file) {
-            if (!$file->isAudio()) {
-                continue;
+        $candidates = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
+        while ($candidates !== []) {
+            $anchor = $candidates[0];
+            $metadata = null;
+            foreach ($candidates as $candidate) {
+                $metadata = $this->metadataReader->readMetadata($candidate->absolutePath);
+                if ($metadata !== null) {
+                    $anchor = $candidate;
+                    break;
+                }
             }
-            $metadata = $this->metadataReader->readMetadata($file->absolutePath);
-            if ($metadata !== null) {
-                $metadataTitle = $metadata->getAlbum();
-                $metadataYear = $metadata->getYear();
-                $metadataAlbumArtist = $metadata->getAlbumArtist();
-                break;
+            $title = $metadata?->getAlbum() ?? basename($directory);
+            if (trim($title) === '' || trim($title) === '.') {
+                return [null, false];
             }
-        }
-
-        $title = $metadataTitle ?? $directoryName;
-        if (trim($title) === '' || trim($title) === '.') {
-            return [null, false];
-        }
-
-        $album = $this->albumService->findByTitleAndLibrary($title, $libraryId);
-        if ($album === null) {
-            $album = Album::create(
-                $libraryId,
-                $title,
-                AlbumType::Studio->value,
-                year: $metadataYear,
-            );
-            $this->albumService->persist($album);
-            $this->albumService->flush();
-
-            if ($metadataAlbumArtist !== null && trim($metadataAlbumArtist) !== '') {
-                $this->albumService->linkArtistToAlbum($album->getId(), trim($metadataAlbumArtist), ArtistRole::Primary->value);
+            $current = [];
+            $resolved = $this->transaction->run(function () use ($libraryId, $candidates, $anchor, $metadata, $title, &$current): ?array {
+                if ($this->mediaFiles->isHeldByDeleteForImport($libraryId)) {
+                    return null;
+                }
+                $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($libraryId, array_map(
+                    static fn (DiscoveredFile $file): string => $file->absolutePath,
+                    $candidates,
+                ));
+                $current = array_values(array_filter($candidates, static fn (DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash));
+                if (($hashes[$anchor->absolutePath] ?? null) !== $anchor->hash) {
+                    return [null, false];
+                }
+                $album = $this->albumService->findByTitleAndLibrary($title, $libraryId);
+                if ($album !== null) {
+                    return [$album, false];
+                }
+                $album = Album::create($libraryId, $title, AlbumType::Studio->value, year: $metadata?->getYear());
+                $this->albumService->persist($album);
                 $this->albumService->flush();
-            }
+                $artist = $metadata?->getAlbumArtist();
+                if ($artist !== null && trim($artist) !== '') {
+                    $this->albumService->linkArtistToAlbum($album->getId(), trim($artist), ArtistRole::Primary->value);
+                    $this->albumService->flush();
+                }
 
-            return [$album, true];
+                return [$album, true];
+            });
+            if ($resolved === null || $resolved[0] !== null) {
+                if ($resolved !== null) {
+                    $files = $current;
+                }
+
+                return $resolved;
+            }
+            // An ineligible anchor is absent from this next, strictly smaller candidate set.
+            $candidates = $current;
         }
 
-        return [$album, false];
+        return [null, false];
     }
 
     /**
@@ -495,7 +531,10 @@ final class FilesDiscoveredHandler
      */
     private function presentFiles(FilesDiscovered $message): array
     {
-        $files = array_values($message->files);
+        $files = $this->currentFiles($message->libraryId, array_values($message->files));
+        if ($files === []) {
+            return [];
+        }
         $missing = $this->mediaFiles->markMissingUnavailable(
             $message->libraryId,
             array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files),
@@ -512,6 +551,19 @@ final class FilesDiscoveredHandler
         $missingByPath = array_flip($missing);
 
         return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($missingByPath[$file->absolutePath])));
+    }
+
+    /** @param list<DiscoveredFile> $files
+     * @return list<DiscoveredFile>
+     */
+    private function currentFiles(Uuid $libraryId, array $files): array
+    {
+        $hashes = $this->mediaFiles->findAvailableHashesByPaths($libraryId, array_map(
+            static fn (DiscoveredFile $file): string => $file->absolutePath,
+            $files,
+        ));
+
+        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash));
     }
 
     private function detectMimeType(string $extension): string

@@ -34,6 +34,20 @@ use App\Shared\Domain\Model\Uuid;
 interface LibraryMediaFilesInterface
 {
     /**
+     * @param list<string> $paths
+     * @return array<string, string> Available path-to-hash observations; missing rows are omitted.
+     */
+    public function findAvailableHashesByPaths(Uuid $libraryId, array $paths): array;
+
+    /**
+     * Requires an active transaction and holds available observations through its end.
+     *
+     * @param list<string> $paths
+     * @return array<string, string>
+     */
+    public function lockAvailableHashesByPathsForImport(Uuid $libraryId, array $paths): array;
+
+    /**
      * Checks each path and whether a scan or another delete with files holds the library, and
      * changes nothing; a preview shows the verdicts, and a delete refuses what this reports.
      *

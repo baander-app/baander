@@ -23,6 +23,7 @@ use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -41,19 +42,21 @@ use Symfony\Component\Messenger\Envelope;
 #[AllowMockObjectsWithoutExpectations]
 final class FilesDiscoveredHandlerReliabilityTest extends TestCase
 {
+    use DiscoveredFileObservations;
+
     public function testFileProcessingFailureIsCollectedAndReported(): void
     {
         $libraryId = Uuid::v4();
         $directory = '/music/Test Album';
 
-        $file = new DiscoveredFile(
+        $file = $this->observedFile(new DiscoveredFile(
             absolutePath: '/music/Test Album/01-track.mp3',
             relativePath: 'Test Album/01-track.mp3',
             extension: 'mp3',
             size: 1_000_000,
             modifiedAt: time(),
             hash: 'deadbeef',
-        );
+        ));
 
         $album = Album::create($libraryId, 'Test Album', 'Studio');
         $metadata = (new ExtractedMetadata())
@@ -91,7 +94,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
-            $this->createStub(LibraryMediaFilesInterface::class),
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
         );
 
@@ -110,23 +113,23 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $libraryId = Uuid::v4();
         $directory = '/music/Test Album';
 
-        $fileOne = new DiscoveredFile(
+        $fileOne = $this->observedFile(new DiscoveredFile(
             absolutePath: '/music/Test Album/01-track.mp3',
             relativePath: 'Test Album/01-track.mp3',
             extension: 'mp3',
             size: 1_000_000,
             modifiedAt: time(),
             hash: 'deadbeef',
-        );
+        ));
 
-        $fileTwo = new DiscoveredFile(
+        $fileTwo = $this->observedFile(new DiscoveredFile(
             absolutePath: '/music/Test Album/02-track.mp3',
             relativePath: 'Test Album/02-track.mp3',
             extension: 'mp3',
             size: 1_000_000,
             modifiedAt: time(),
             hash: 'cafebabe',
-        );
+        ));
 
         $album = Album::create($libraryId, 'Test Album', 'Studio');
         $metadata = (new ExtractedMetadata())
@@ -164,7 +167,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
-            $this->createStub(LibraryMediaFilesInterface::class),
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
         );
 
@@ -335,10 +338,10 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
-            $this->createStub(LibraryMediaFilesInterface::class),
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
         );
-        $file = new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash');
+        $file = $this->observedFile(new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash'));
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);
 
         return [$handler, $message, $songPort, $bus, $state];

@@ -22,6 +22,7 @@ use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -37,6 +38,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  */
 final class FilesDiscoveredLyricsRequestTest extends TestCase
 {
+    use DiscoveredFileObservations;
+
     private string $directory;
 
     protected function setUp(): void
@@ -248,7 +251,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $lyrics,
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
-            $this->createStub(LibraryMediaFilesInterface::class),
+            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
             new PassThroughTransaction(),
         );
     }
@@ -288,7 +291,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
 
     private function file(string $name, string $hash): DiscoveredFile
     {
-        return new DiscoveredFile($this->directory . '/' . $name, 'Test Album/' . $name, 'mp3', 1_000_000, 1_700_000_000, $hash);
+        return $this->observedFile(new DiscoveredFile($this->directory . '/' . $name, 'Test Album/' . $name, 'mp3', 1_000_000, 1_700_000_000, $hash));
     }
 
     private function message(DiscoveredFile ...$files): FilesDiscovered

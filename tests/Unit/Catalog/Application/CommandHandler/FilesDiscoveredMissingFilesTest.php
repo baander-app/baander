@@ -22,6 +22,7 @@ use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use App\Tests\Fixtures\Catalog\DiscoveredFileObservations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
@@ -37,10 +38,12 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  */
 final class FilesDiscoveredMissingFilesTest extends TestCase
 {
+    use DiscoveredFileObservations;
+
     public function testAnImportForALibraryHeldByADeleteIsRequeuedAndImportsNothingUntilTheClaimEnds(): void
     {
         $message = $this->music($this->file('/music/Album/01 One.mp3', 'hash-one'));
-        $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
+        $mediaFiles = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
         $mediaFiles->expects($this->exactly(2))->method('isHeldByDelete')
             ->with($message->libraryId)
             ->willReturnOnConsecutiveCalls(true, false);
@@ -83,7 +86,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/01 One.mp3', 'hash-one'),
             $this->file('/music/Album/02 Two.mp3', 'hash-two'),
         );
-        $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
+        $mediaFiles = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $mediaFiles->method('markMissingUnavailable')->willReturn(['/music/Album/01 One.mp3', '/music/Album/02 Two.mp3']);
         $albums = $this->createMock(AlbumPortInterface::class);
         $albums->expects($this->never())->method('findByTitleAndLibrary');
@@ -102,7 +105,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/01 Gone.mp3', 'hash-gone'),
             $this->file('/music/Album/02 Here.mp3', 'hash-here'),
         );
-        $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
+        $mediaFiles = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $mediaFiles->method('markMissingUnavailable')->willReturnCallback(
             static fn (Uuid $libraryId, array $paths): array => array_values(array_intersect($paths, ['/music/Album/01 Gone.mp3'])),
         );
@@ -128,9 +131,9 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
     public function testAMovieImportWithItsFileGoneDoesNotThrow(): void
     {
         $message = new FilesDiscovered(Uuid::v7(), 'movie', '/movies/Gone Movie', [
-            new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie'),
+            $this->observedFile(new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie')),
         ]);
-        $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
+        $mediaFiles = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $mediaFiles->method('markMissingUnavailable')->willReturn(['/movies/Gone Movie/movie.mkv']);
         $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects($this->never())->method('persist');
@@ -150,13 +153,13 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         $messages = [
             $this->music($this->file('/music/Album/01 Gone.mp3', 'hash-gone'), $this->file('/music/Album/02 Here.mp3', 'hash-here')),
             new FilesDiscovered(Uuid::v7(), 'movie', '/movies/Gone Movie', [
-                new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie'),
+                $this->observedFile(new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie')),
             ]),
         ];
 
         foreach ($messages as $message) {
             $paths = array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $message->files);
-            $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
+            $mediaFiles = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
             $mediaFiles->expects($this->once())->method('markMissingUnavailable')
                 ->with($message->libraryId, $paths)
                 ->willReturn([$paths[0]]);
@@ -178,16 +181,16 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         }
         $message = $this->music(...$files);
         $transaction = new PassThroughTransaction();
-        $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
+        $mediaFiles = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
         $mediaFiles->method('markMissingUnavailable')->willReturn([]);
-        // Free when the import starts and at its first write; claimed before its second.
+        // Free during album resolution and the first song batch; claimed before the second batch.
         $mediaFiles->expects($this->once())->method('isHeldByDelete')->willReturn(false);
-        $mediaFiles->expects($this->exactly(2))->method('isHeldByDeleteForImport')
+        $mediaFiles->expects($this->exactly(3))->method('isHeldByDeleteForImport')
             ->with($message->libraryId)
             ->willReturnCallback(static function () use ($transaction): bool {
                 self::assertTrue($transaction->active, 'The write checks the claim inside its own transaction.');
 
-                return $transaction->runs === 2;
+                return $transaction->runs === 3;
             });
         $persisted = [];
         $songs = $this->createStub(SongPortInterface::class);
@@ -263,7 +266,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
 
     private function file(string $path, string $hash): DiscoveredFile
     {
-        return new DiscoveredFile($path, 'Album/' . basename($path), 'mp3', 1_000_000, 1_700_000_000, $hash);
+        return $this->observedFile(new DiscoveredFile($path, 'Album/' . basename($path), 'mp3', 1_000_000, 1_700_000_000, $hash));
     }
 
     /**

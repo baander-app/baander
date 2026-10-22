@@ -9,6 +9,20 @@ use App\Shared\Domain\Model\Uuid;
 interface LibraryFileIndexRepositoryInterface
 {
     /**
+     * @param list<string> $paths
+     * @return array<string, string> Available path-to-hash observations; missing rows are omitted.
+     */
+    public function findAvailableHashesByPaths(Uuid $libraryId, array $paths): array;
+
+    /**
+     * Requires an active transaction and holds available observations through its end.
+     *
+     * @param list<string> $paths
+     * @return array<string, string>
+     */
+    public function lockAvailableHashesByPathsForImport(Uuid $libraryId, array $paths): array;
+
+    /**
      * @return array<string, string> path => hash map for available indexed files in the library
      */
     public function findAvailableIndexPathMapByLibrary(Uuid $libraryId): array;
