@@ -14,13 +14,17 @@
         "src/channel_map.cpp",
         "src/qmf.cpp",
         "src/sbr_tables.cpp",
+        "src/sbr_freq.cpp",
+        "src/ps_hybrid.cpp",
         "src/api.cpp",
         "src/decoder.cpp",
         "src/sbr_dec.cpp",
         "src/ps_dec.cpp",
         "src/psycho.cpp",
         "src/encoder_tools.cpp",
-        "src/encoder.cpp"
+        "src/encoder.cpp",
+        "src/sbr_enc.cpp",
+        "src/ps_enc.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

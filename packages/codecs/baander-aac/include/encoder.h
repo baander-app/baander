@@ -10,13 +10,18 @@
 #include "ics.h"
 #include "mdct.h"
 #include "psycho.h"
+#include "sbr_enc.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Samples of lookahead and transform overlap before the first input sample
- * appears in the decoded output. */
+ * appears in the decoded output of an AAC-LC stream. */
 #define AAC_ENCODER_DELAY 2048
+/* The same for an HE-AAC stream, in samples at the full rate: the core
+ * delay at half rate, the encoder's QMF analysis and synthesis and the
+ * decoder's QMF chain, measured against the FFmpeg decoder. */
+#define AAC_ENCODER_SBR_DELAY 5635
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
 
@@ -77,7 +82,12 @@ using AacEncElement = struct AacEncElement_ {
 };
 
 using AacEncoderState = struct AacEncoderState_ {
+  /* sample_rate and channels are those of the core coder; with SBR the
+   * input runs at twice the rate, and with parametric stereo a stereo
+   * input is coded as one channel. */
   int sample_rate, channels, bitrate, quality, frame_size, rate_index;
+  int input_rate, input_channels;
+  int delay; /* input samples before the first one is decoded */
   AacObjectType aot;
   AacRateControl rc_mode;
   AacEncChannel ch[AAC_MAX_CHANNELS];
@@ -107,11 +117,17 @@ using AacEncoderState = struct AacEncoderState_ {
   int reservoir_max;
   float pe_min, pe_max; /* running range of the frames' perceptual entropy */
   int pending_flush;    /* frames the flush still has to emit */
+  /* HE-AAC: the SBR encoder of each SCE or CPE, NULL for LFE and AAC-LC */
+  AacSbrEncoder* sbr[AAC_MAX_ELEMENTS];
+  AacSbrDownsampler* lfe_down[AAC_MAX_ELEMENTS]; /* HE-AAC: the LFE's half-rate signal */
+  float sbr_in[AAC_MAX_CHANNELS][2 * AAC_FRAME_SIZE_LONG]; /* full-rate input */
+  float core_in[AAC_MAX_CHANNELS][AAC_FRAME_SIZE_LONG];    /* half-rate core signal */
   AacMdct mdct_long, mdct_short;
   const AacDSP* dsp;
   uint8_t output_buf[AAC_ENCODER_MAX_FRAME_BYTES];
 };
 
+/* `sr` and `ch` are the input's; HE-AAC v2 takes a stereo input only. */
 AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType aot,
                                           AacRateControl rc, const AacDSP* dsp);
 void aac_encoder_state_destroy(AacEncoderState* s);
@@ -127,7 +143,7 @@ void aac_encoder_state_reset(AacEncoderState* s);
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
 
-/* Consumes one block of frame_size interleaved samples (NULL for silence)
+/* Consumes one block of frame_size interleaved input samples (NULL for silence)
  * and writes the next ADTS frame to s->output_buf.  Returns its length in
  * bytes or a negative AacError. */
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm);

@@ -60,6 +60,46 @@ static void our_encoded(const char* name, const std::vector<float>& pcm, int sr,
   CHECK(d > 90.0, "%s: decoders disagree on our stream (%.1f dB)", name, d);
 }
 
+/* We encode HE-AAC; FFmpeg's decode of the stream must match ours.
+ * FFmpeg widens a mono SBR stream to stereo, so only the channels our
+ * decoder produces are compared (two of them with parametric stereo). */
+static void our_he_encoded(const char* name, AacObjectType aot, int sr, int channels,
+                           int bitrate) {
+  const std::vector<float> pcm = gen_wideband(sr * 3, sr, channels);
+  int err = 0;
+  const std::vector<uint8_t> stream =
+      encode_stream(pcm, sr, channels, bitrate, AAC_RC_CBR, 0, &err, aot);
+  CHECK(err == 0 && !stream.empty(), "%s: encode", name);
+  CHECK(write_file(path("ours.aac"), stream.data(), stream.size()), "write stream");
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "-i %s -f f32le %s", path("ours.aac").c_str(),
+           path("ours.ff.f32").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg refused our stream", name);
+  int errors = 0;
+  const std::vector<float> ours = decode_stream(stream, sr, 0, &errors);
+  const std::vector<float> theirs = read_f32(path("ours.ff.f32"));
+  CHECK(errors == 0, "%s: %d frames failed in our decoder", name, errors);
+  const int their_channels = channels == 1 ? 2 : channels;
+  const size_t frames = std::min(theirs.size() / their_channels, ours.size() / channels);
+  CHECK(frames > 0 && theirs.size() / their_channels == ours.size() / channels,
+        "%s: %zu vs %zu frames", name, theirs.size() / their_channels, ours.size() / channels);
+  std::vector<float> a(frames * channels), b(frames * channels);
+  for (size_t i = 0; i < frames; i++) {
+    for (int c = 0; c < channels; c++) {
+      a[i * channels + c] = theirs[i * their_channels + c];
+      b[i * channels + c] = ours[i * channels + c];
+    }
+  }
+  const double d = snr_db(a.data(), b.data(), a.size());
+  const std::vector<float> ref = lowpass_channel(pcm, channels, 0, 3500.0f, sr);
+  const std::vector<float> got = lowpass_channel(a, channels, 0, 3500.0f, sr);
+  const size_t m = std::min(ref.size(), got.size() - 5635);
+  const double q = snr_db(ref.data(), got.data() + 5635, m);
+  printf("%-28s ours->ffmpeg vs ours->ours: %.1f dB (low band %.1f dB)\n", name, d, q);
+  CHECK(d > 90.0, "%s: decoders disagree on our stream (%.1f dB)", name, d);
+  CHECK(q > 12.0, "%s: low band %.1f dB", name, q);
+}
+
 /* FFmpeg encodes `channels` channels with a named layout; both decoders
  * then produce `out_channels` channels (the stream's own channels, or a
  * stereo or mono downmix) from the same stream. */
@@ -168,6 +208,10 @@ int main() {
               AAC_RC_CBR);
   our_encoded("7.1 48k 512k", gen_multichannel(48000 * 3, 48000, 8), 48000, 8, 512000,
               AAC_RC_CBR);
+  our_he_encoded("he 44.1k mono 32k", AAC_AOT_SBR, 44100, 1, 32000);
+  our_he_encoded("he 48k stereo 64k", AAC_AOT_SBR, 48000, 2, 64000);
+  our_he_encoded("he 48k 5.1 192k", AAC_AOT_SBR, 48000, 6, 192000);
+  our_he_encoded("hev2 44.1k 32k", AAC_AOT_PS, 44100, 2, 32000);
   he_stream("he_mono_24k.aac", 1, 70.0);
   he_stream("he_stereo_40k.aac", 2, 70.0);
   he_stream("he_stereo_96k.aac", 2, 70.0);
