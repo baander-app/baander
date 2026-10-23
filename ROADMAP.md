@@ -1039,3 +1039,65 @@ DASH subtitles and the separate native pressure observer remain unqualified.
 Running progress and control outages were not qualified by these signing and
 media-delivery checks. Existing application databases, Redis and media storage
 were not reused or reset. This checkpoint includes no push or feature merge.
+
+### Playback during progress and publication outages — 2026-10-23
+
+Temporary network, timeout and server failures from automatic progress reports now
+preserve the media attachment, cursor, playback intent and pending seek or
+restoration state. The next eligible timer report sends the latest position;
+failed positions are not queued for replay. Explicit pause, resume and seek
+failures retain their existing handling. An authenticated unavailable-publication
+report for a ready attachment whose position restoration has finished also permits
+one replacement after a media network failure. A fresh attachment consumes that
+allowance; same-execution recovery needs a newer nonexpired capability, while a
+new generation restores its canonical position and intent. The operator guide
+records both behaviors.
+
+Final CI verification passed 143 tests across four suites: 128 hook, nine adapter,
+two import and four overlay tests. Seven progress regressions failed on unchanged
+source, alongside 113 passing tests. The availability amendment first produced
+three failures with 125 passing tests; its restoration guard separately failed
+with 127 tests skipped. Typechecking, the production build and asset verification
+passed; full lint reported zero errors and eight warnings outside the changed
+files. Final receipts and `*-final.log` logs are under
+`var/test-runs/player-progress-outage-gates`; `verification-summary.json` records
+source revision `3feeb5c0`.
+
+The first production run passed both progress-outage observations and six phases.
+A media network failure then stopped browser polling despite an authenticated
+report of unavailable media. The backend recovered paused in a new generation.
+The bounded recovery above fixes that failure; the original recovery assertion
+remains.
+The failed receipt and verified cleanup remain under
+`var/test-runs/player-progress-outage-production`.
+
+Production acceptance passed all eight phases in Chromium 148.0.7778.96 against
+application and worker revision `3feeb5c0`, with browser fixture `03d3079e`.
+Both progress-outage observations passed on their first attempt, preserving
+attachment 10, generation 6 and the exact rendition set without a seek, teardown
+or playback error. After the request aborted before forwarding, playback advanced
+from 19.754150 to 20.009999 seconds and from 59 to 67 decoded frames. For the lost
+response, an authenticated snapshot proved cursor 21.718532 and revision 22 before
+the response was dropped after a 1,034-millisecond hold. The next genuine write
+used cursor 23.718520 and advanced revision 22 to 23. Playback continued from
+22.882511 to 23.138656 seconds and from 153 to 161 frames after that failure;
+a final observation on the same attachment advanced from 181 to 189 frames.
+
+Worker recovery restored generation 12 paused at source position 30 seconds;
+resuming decoded further video. Paused and running capability renewal also passed.
+The retained expiry check refused all 31 HLS and 27 DASH URLs for tampering and
+after expiry, giving 58 responses of 403 in each check; authenticated renewal
+returned 200 for 62 resources. Final evidence and verified cleanup are under
+`var/test-runs/player-progress-outage-production-accepted`, including
+`acceptance-summary.json`. The runner exited zero and removed its resources.
+
+The second failed receipt remains under
+`var/test-runs/player-progress-outage-production-final`: rendition-set changes
+superseded its lost-response observations and led to a fixture publication
+refinement. The deliberately interrupted review run under
+`var/test-runs/player-progress-outage-production-qualified` exited 143 with
+verified cleanup; it is not passing qualification. Explicit control-request
+outages, native HLS and other browsers, full live FFmpeg DASH EOF, formal CMAF
+conformance, DASH subtitles and the separate native pressure observer remain
+unqualified. Existing application databases, Redis and media storage were not
+reused or reset. This checkpoint includes no push or feature merge.
