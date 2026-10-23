@@ -14,11 +14,13 @@ final readonly class SignedStreamRequest
     {
     }
 
-    public function validate(Request $request): void
+    public function validate(Request $request): int
     {
         if (!$this->isValid($request)) {
             throw new AccessDeniedHttpException('Invalid or expired signature.');
         }
+
+        return $request->query->getInt('exp');
     }
 
     public function isValid(Request $request): bool

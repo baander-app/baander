@@ -48,7 +48,16 @@ final class StreamManifestSecurityTest extends TestCase
             'masterManifest' => 'getMasterManifest', 'dashManifest' => 'getDashManifest',
             'mediaManifest' => 'getMediaManifest', default => 'getSubtitleManifest',
         };
-        $streaming->expects($valid ? $this->once() : $this->never())->method($serviceMethod)->willReturn('#EXTINF:10');
+        $expectation = $streaming->expects($valid ? $this->once() : $this->never())->method($serviceMethod);
+        if ($valid) {
+            $expiresAt = Request::create($url)->query->getInt('exp');
+            match ($method) {
+                'masterManifest', 'dashManifest' => $expectation->with($video->getId(), [['jobId' => $jobId, 'generation' => 3]], $expiresAt),
+                'mediaManifest' => $expectation->with(PublicId::fromString($jobId), MediaTrack::Video, 3, $expiresAt),
+                default => $expectation->with(PublicId::fromString($jobId), 'en', 0, $expiresAt),
+            };
+        }
+        $expectation->willReturn('#EXTINF:10');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
         $videos = $this->createMock(TranscodePublicViewInterface::class);
@@ -72,7 +81,7 @@ final class StreamManifestSecurityTest extends TestCase
         $jobId = (new PublicId())->toString();
         $signer = new HmacStreamAuthAdapter('test-secret');
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects($this->once())->method('getMediaManifest')->with(self::anything(), MediaTrack::Video, 3)->willReturn('#EXTM3U');
+        $streaming->expects($this->once())->method('getMediaManifest')->with(self::anything(), MediaTrack::Video, 3, self::callback(is_int(...)))->willReturn('#EXTM3U');
         $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $this->createStub(TranscodePublicViewInterface::class), $this->createStub(SleeperInterface::class));
         $response = $controller->mediaManifest($jobId, MediaTrack::Video, Request::create($signer->signUrl("/api/transcode/$jobId/tracks/video/media.m3u8?generation=3")['url']));
         self::assertSame(503, $response->getStatusCode());
@@ -87,7 +96,7 @@ final class StreamManifestSecurityTest extends TestCase
         $signer = new HmacStreamAuthAdapter('test-secret');
         $state = new class { public bool $advanced = false; };
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects(self::exactly(2))->method('getDashManifest')->with($video->getId(), $renditions)
+        $streaming->expects(self::exactly(2))->method('getDashManifest')->with($video->getId(), $renditions, 2000000000)
             ->willReturnCallback(static function () use ($state, $retired): string {
                 if (!$state->advanced) {
                     return '<MPD type="dynamic"><Representation id="before"/></MPD>';
@@ -101,7 +110,7 @@ final class StreamManifestSecurityTest extends TestCase
         $videos->method('videoId')->willReturn($video->getId());
         $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper);
 
-        $response = $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrl('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3')['url']));
+        $response = $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrlUntil('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3', 2000000000)['url']));
 
         self::assertSame($retired ? 503 : 200, $response->getStatusCode());
         ob_start();
@@ -126,9 +135,9 @@ final class StreamManifestSecurityTest extends TestCase
         $jobId = (new PublicId())->toString();
         $state = new class { public bool $afterWait = false; };
         $auth = $this->createMock(StreamAuthPortInterface::class);
-        $auth->expects(self::exactly(2))->method('validateUrl')->willReturnCallback(static function () use ($state): bool { return !$state->afterWait; });
+        $auth->expects(self::exactly(2))->method('validateUrl')->with('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3', 'valid', 2000000000)->willReturnCallback(static function () use ($state): bool { return !$state->afterWait; });
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects(self::once())->method('getDashManifest')->willReturn('<MPD type="dynamic"><Representation/></MPD>');
+        $streaming->expects(self::once())->method('getDashManifest')->with($video->getId(), [['jobId' => $jobId, 'generation' => 3]], 2000000000)->willReturn('<MPD type="dynamic"><Representation/></MPD>');
         $sleeper = $this->createMock(SleeperInterface::class);
         $sleeper->expects(self::once())->method('sleep')->with(1.0)
             ->willReturnCallback(static function () use ($state): void { $state->afterWait = true; });

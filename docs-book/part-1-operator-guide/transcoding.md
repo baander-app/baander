@@ -22,6 +22,14 @@ share one generation.
 
 Encoder selection belongs to the worker. Manifest codec declarations come from the worker's published metadata; web does not probe devices or choose a different encoder while serving a request.
 
+Every resource URL in an HLS or DASH manifest inherits the requested manifest's
+absolute expiry. HLS subtitle playlists and their VTT files inherit the same
+deadline. Repeated playlist reads keep that deadline. Continuing delivery after
+it requires a fresh top-level URL from the authenticated signing endpoint.
+Requests remain valid during the integer second named by the expiry and are
+refused from the following second. Expiry does not interrupt a response admitted
+before the deadline or remove bytes already buffered by the player.
+
 ## Quality Tiers
 
 The quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth.

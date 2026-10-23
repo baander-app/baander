@@ -36,9 +36,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->inner->getPlaybackState($videoId, $allowedJobPublicIds);
     }
 
-    public function getMasterManifest(Uuid $videoId, array $renditions): string
+    public function getMasterManifest(Uuid $videoId, array $renditions, int $expiresAt): string
     {
-        $manifest = $this->inner->getMasterManifest($videoId, $renditions);
+        $manifest = $this->inner->getMasterManifest($videoId, $renditions, $expiresAt);
 
         return $this->filterHlsManifest($manifest);
     }
@@ -98,9 +98,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return implode("\n", $filtered);
     }
 
-    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation): string
+    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation, int $expiresAt): string
     {
-        return $this->inner->getMediaManifest($jobPublicId, $track, $generation);
+        return $this->inner->getMediaManifest($jobPublicId, $track, $generation, $expiresAt);
     }
 
     public function getSegment(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string
@@ -128,9 +128,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->inner->getInitSegmentPath($jobPublicId, $track, $generation);
     }
 
-    public function getDashManifest(Uuid $videoId, array $renditions): string
+    public function getDashManifest(Uuid $videoId, array $renditions, int $expiresAt): string
     {
-        $manifest = $this->inner->getDashManifest($videoId, $renditions);
+        $manifest = $this->inner->getDashManifest($videoId, $renditions, $expiresAt);
 
         return $this->filterDashManifest($manifest);
     }
@@ -173,9 +173,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->inner->getQualityLadderForVideo($videoId, $allowedJobPublicIds);
     }
 
-    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation): string
+    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation, int $expiresAt): string
     {
-        return $this->inner->getSubtitleManifest($jobPublicId, $language, $generation);
+        return $this->inner->getSubtitleManifest($jobPublicId, $language, $generation, $expiresAt);
     }
 
     public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string

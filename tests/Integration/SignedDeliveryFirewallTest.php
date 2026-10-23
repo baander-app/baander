@@ -227,6 +227,33 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
+    public function testManifestControllersReceiveTheVerifiedCapabilityExpiryThroughTheFirewall(): void
+    {
+        $this->bus->expects($this->never())->method('dispatch');
+        $expiresAt = 2000000000;
+        $methods = [
+            'stream_master_manifest' => 'getMasterManifest',
+            'stream_dash_manifest' => 'getDashManifest',
+            'stream_media_manifest' => 'getMediaManifest',
+            'stream_subtitle_manifest' => 'getSubtitleManifest',
+        ];
+        foreach ($methods as $route => $method) {
+            $expectation = $this->streaming->expects($this->once())->method($method);
+            if (in_array($route, ['stream_master_manifest', 'stream_dash_manifest'], true)) {
+                $expectation->with(self::anything(), [['jobId' => $this->jobId->toString(), 'generation' => 3]], $expiresAt);
+            } else {
+                $expectation->with($this->jobId, self::anything(), 3, $expiresAt);
+            }
+            $path = $this->deliveryPaths()[$route];
+            $path .= '?'.(in_array($route, ['stream_master_manifest', 'stream_dash_manifest'], true) ? 'set='.$this->jobId.'.3' : 'generation=3');
+            $signed = $this->signer->signUrlUntil($path, $expiresAt);
+            $this->signatures[] = $signed['sig'];
+            $response = $this->request('GET', $signed['url']);
+            self::assertSame(200, $response->getStatusCode(), $route.': '.$this->responseDetails($response));
+        }
+        $this->assertNoCredentialInResponsesOrLogs();
+    }
+
     public function testPublicAccessPatternOverMatchStillValidatesTheSignature(): void
     {
         $this->bus->expects($this->never())->method('dispatch');
@@ -240,7 +267,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function invalidSignatures(): iterable
     {
-        foreach (['missing', 'expired', 'wrong-key', 'tampered-path', 'tampered-query', 'substituted-index', 'substituted-track'] as $kind) {
+        foreach (['missing', 'expired', 'wrong-key', 'tampered-path', 'tampered-query', 'tampered-expiry', 'substituted-index', 'substituted-track'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -263,6 +290,7 @@ final class SignedDeliveryFirewallTest extends TestCase
                 'substituted-track' => str_replace('/tracks/video/', '/tracks/audio/', $this->signedUrl($path)),
                 'missing' => 'https://baander.app' . $path,
                 'expired' => $this->signedUrl($path, -10),
+                'tampered-expiry' => preg_replace('/exp=[0-9]+/', 'exp=2000000000', $this->signedUrl($path)),
                 'wrong-key' => $this->signedUrl($path, signer: new HmacStreamAuthAdapter('other-secret', 'https://baander.app')),
                 'tampered-path' => str_replace($this->jobId->toString(), (new PublicId())->toString(), str_replace($this->videoId->toString(), (new PublicId())->toString(), $this->signedUrl($path))),
                 'substituted-index' => str_replace('index=0', 'index=1', $this->signedUrl($path)),

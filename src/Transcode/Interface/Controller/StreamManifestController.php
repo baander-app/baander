@@ -50,10 +50,10 @@ final class StreamManifestController
     #[Route('/{videoId}/master.m3u8', name: 'master_manifest', methods: ['GET'])]
     public function masterManifest(string $videoId, Request $request): StreamedResponse
     {
-        $this->signedRequest->validate($request);
+        $expiresAt = $this->signedRequest->validate($request);
         $videoUuid = $this->requireVideo($videoId);
 
-        $manifest = $this->streamingService->getMasterManifest($videoUuid, $this->renditionSet($request));
+        $manifest = $this->streamingService->getMasterManifest($videoUuid, $this->renditionSet($request), $expiresAt);
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -77,10 +77,10 @@ final class StreamManifestController
     #[Route('/{jobPublicId}/tracks/{track}/media.m3u8', name: 'media_manifest', requirements: ['track' => 'video|audio'], methods: ['GET'])]
     public function mediaManifest(string $jobPublicId, MediaTrack $track, Request $request): StreamedResponse
     {
-        $this->signedRequest->validate($request);
+        $expiresAt = $this->signedRequest->validate($request);
         $publicId = PublicId::fromString($jobPublicId);
 
-        $manifest = $this->streamingService->getMediaManifest($publicId, $track, $request->query->getInt('generation'));
+        $manifest = $this->streamingService->getMediaManifest($publicId, $track, $request->query->getInt('generation'), $expiresAt);
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -103,15 +103,15 @@ final class StreamManifestController
     #[Route('/{videoId}/manifest.mpd', name: 'dash_manifest', methods: ['GET'])]
     public function dashManifest(string $videoId, Request $request): StreamedResponse
     {
-        $this->signedRequest->validate($request);
+        $expiresAt = $this->signedRequest->validate($request);
         $video = $this->requireVideo($videoId);
         $renditions = $this->renditionSet($request);
-        $manifest = $this->streamingService->getDashManifest($video, $renditions);
+        $manifest = $this->streamingService->getDashManifest($video, $renditions, $expiresAt);
         if (str_contains($manifest, 'type="dynamic"')) {
             // Some readers ignore the update interval when a growing SegmentList is exhausted.
             $this->sleeper->sleep(1.0);
             $this->signedRequest->validate($request);
-            $manifest = $this->streamingService->getDashManifest($video, $renditions);
+            $manifest = $this->streamingService->getDashManifest($video, $renditions, $expiresAt);
         }
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store', 'Retry-After' => '2', 'Content-Type' => 'application/dash+xml',
@@ -153,8 +153,8 @@ final class StreamManifestController
     #[Route('/{jobPublicId}/subtitles/{language}/media.m3u8', name: 'subtitle_manifest', methods: ['GET'])]
     public function subtitleManifest(string $jobPublicId, string $language, Request $request): StreamedResponse
     {
-        $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language, $request->query->getInt('generation'));
+        $expiresAt = $this->signedRequest->validate($request);
+        $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language, $request->query->getInt('generation'), $expiresAt);
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',

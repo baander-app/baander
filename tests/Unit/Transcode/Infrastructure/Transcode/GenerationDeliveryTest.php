@@ -81,11 +81,11 @@ final class GenerationDeliveryTest extends TestCase
 
     public function testManifestsPinGenerationBeforeSigningAndUsePublishedEncoder(): void
     {
-        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]]);
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]], 2000000000);
         self::assertStringContainsString('CODECS="avc1.64001f,mp4a.40.2"', $master);
         self::assertStringNotContainsString('hvc1.', $master);
         self::assertStringContainsString('generation=3', $master);
-        $media = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3);
+        $media = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3, 2000000000);
         preg_match_all('~(/api/transcode/[^"\s]+)~', $media, $matches);
         self::assertCount(3, $matches[1]);
         $auth = new HmacStreamAuthAdapter('generation-secret');
@@ -174,14 +174,14 @@ final class GenerationDeliveryTest extends TestCase
         $subtitles = $this->directory.'/subtitles/s2';
         mkdir($subtitles, 0700, true);
         file_put_contents($subtitles.'/full.vtt', 'WEBVTT');
-        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3);
+        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3, 2000000000);
         self::assertSame(1, substr_count($manifest, 'generation=3'));
         self::assertStringContainsString('#EXTINF:10.000000,', $manifest);
         self::assertStringContainsString('#EXT-X-TARGETDURATION:10', $manifest);
         self::assertSame(1, substr_count($manifest, '&sig='));
         $this->runtimeReads = 0;
         $this->retireAfterFirstRead = true;
-        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3);
+        $manifest = $this->service->getSubtitleManifest($this->job->getPublicId(), 's2', 3, 2000000000);
         self::assertStringNotContainsString('#EXTINF:', $manifest);
     }
 
@@ -192,7 +192,7 @@ final class GenerationDeliveryTest extends TestCase
         $metadata['duration'] = 600.0;
         $metadata['startTime'] = 162.0;
         file_put_contents($metadataPath, json_encode($metadata, JSON_THROW_ON_ERROR));
-        $manifest = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3);
+        $manifest = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3, 2000000000);
         self::assertStringContainsString('#EXT-X-MEDIA-SEQUENCE:0', $manifest);
         self::assertStringContainsString('/tracks/video/segment.m4s?index=0&', $manifest);
         self::assertStringNotContainsString('index=27&', $manifest);
@@ -215,7 +215,7 @@ final class GenerationDeliveryTest extends TestCase
             mkdir($this->directory.'/subtitles/'.$key, 0700, true);
             file_put_contents($this->directory.'/subtitles/'.$key.'/full.vtt', 'WEBVTT');
         }
-        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]]);
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]], 2000000000);
         self::assertSame(2, substr_count($master, 'TYPE=SUBTITLES'));
         self::assertStringContainsString('NAME="Dialogue (s2)",DEFAULT=YES', $master);
         self::assertStringContainsString('NAME="Commentary (s3)",DEFAULT=NO,AUTOSELECT=YES,FORCED=YES', $master);
@@ -231,10 +231,10 @@ final class GenerationDeliveryTest extends TestCase
         PublishedPresentationFixture::write($this->directory, 2, audio: false);
         file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
         $set = [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]];
-        $master = $this->service->getMasterManifest($this->job->getVideoId(), $set);
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), $set, 2000000000);
         self::assertStringNotContainsString('mp4a.', $master);
         self::assertStringContainsString('BANDWIDTH='.(int) ceil(QualityTier::p720()->maxBitrate * 1.05), $master);
-        $dash = $this->service->getDashManifest($this->job->getVideoId(), $set);
+        $dash = $this->service->getDashManifest($this->job->getVideoId(), $set, 2000000000);
         self::assertStringNotContainsString('mp4a.', $dash);
         self::assertStringContainsString('urn:mpeg:dash:profile:full:2011', $dash);
     }
@@ -246,7 +246,7 @@ final class GenerationDeliveryTest extends TestCase
             self::assertSame($this->directory.'/init-'.$id.'.mp4', $this->service->getInitSegmentPath($this->job->getPublicId(), $track, 3));
             self::assertSame($this->directory.'/track-'.$id.'-seg-00027.m4s', $this->service->getSegmentPath($this->job->getPublicId(), $track, 0, 3));
             self::assertNull($this->service->getSegmentPath($this->job->getPublicId(), $track, 27, 3));
-            $manifest = $this->service->getMediaManifest($this->job->getPublicId(), $track, 3);
+            $manifest = $this->service->getMediaManifest($this->job->getPublicId(), $track, 3, 2000000000);
             self::assertStringContainsString('/tracks/'.$track->value.'/segment.m4s?index=0&generation=3', $manifest);
         }
     }
@@ -267,7 +267,7 @@ final class GenerationDeliveryTest extends TestCase
         $native->load($index);
         $native->getElementsByTagName('S')->item(1)->setAttribute('d', '5990');
         $native->save($index);
-        self::assertStringContainsString('#EXTINF:5.990000,', $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Audio, 3));
+        self::assertStringContainsString('#EXTINF:5.990000,', $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Audio, 3, 2000000000));
         self::assertTrue($this->service->getPlaybackState($this->job->getVideoId(), $ids)['ready']);
     }
 

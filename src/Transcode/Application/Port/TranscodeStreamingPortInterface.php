@@ -17,9 +17,9 @@ interface TranscodeStreamingPortInterface
     public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array;
 
     /** @param list<array{jobId: string, generation: int}> $renditions */
-    public function getMasterManifest(Uuid $videoId, array $renditions): string;
+    public function getMasterManifest(Uuid $videoId, array $renditions, int $expiresAt): string;
 
-    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation): string;
+    public function getMediaManifest(PublicId $jobPublicId, MediaTrack $track, int $generation, int $expiresAt): string;
 
     public function getSegment(PublicId $jobPublicId, MediaTrack $track, int $segmentIndex, int $generation): ?string;
 
@@ -41,7 +41,7 @@ interface TranscodeStreamingPortInterface
     public function getInitSegmentPath(PublicId $jobPublicId, MediaTrack $track, int $generation): ?string;
 
     /** @param list<array{jobId: string, generation: int}> $renditions */
-    public function getDashManifest(Uuid $videoId, array $renditions): string;
+    public function getDashManifest(Uuid $videoId, array $renditions, int $expiresAt): string;
 
     /**
      * @param list<string> $allowedJobPublicIds
@@ -51,7 +51,7 @@ interface TranscodeStreamingPortInterface
 
     // --- Subtitle Delivery ---
 
-    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation): string;
+    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation, int $expiresAt): string;
 
     public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string;
 

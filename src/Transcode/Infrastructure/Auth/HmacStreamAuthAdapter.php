@@ -23,7 +23,11 @@ final readonly class HmacStreamAuthAdapter implements StreamAuthPortInterface
 
     public function signUrl(string $path, int $expiresInSeconds = 86400): array
     {
-        $expiresAt = time() + $expiresInSeconds;
+        return $this->signUrlUntil($path, time() + $expiresInSeconds);
+    }
+
+    public function signUrlUntil(string $path, int $expiresAt): array
+    {
         $payload = $this->buildPayload($path, $expiresAt);
         $signature = $this->computeSignature($payload);
 

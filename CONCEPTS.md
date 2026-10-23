@@ -81,6 +81,8 @@ The periodic check inside the web server that closes every WebSocket connection 
 
 A video manifest or segment URL that carries an HMAC signature and an expiry instead of requiring a token. It is a bearer capability: whoever holds a valid one is served, with or without a session, until it expires or the signature fails; the signing endpoint issues one only to a signed-in member of the video's library. A token presented with it must still be valid, and the DPoP proof is not read on delivery routes.
 
+Every child playlist, initialization file, media fragment and subtitle URL inherits the manifest's absolute expiry. Reading a playlist cannot extend it; an authenticated signing refresh can issue a new top-level URL. Expiry refuses new delivery requests after the deadline without revoking bytes already admitted or buffered by the player.
+
 ## Playlists
 
 ### Playlist collaborator

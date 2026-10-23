@@ -29,16 +29,17 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
     public function testManifestsKeepOnlyAllowedTiers(): void
     {
         $videoId = Uuid::generate();
-        $inner = $this->createStub(TranscodeStreamingPortInterface::class);
-        $inner->method('getMasterManifest')->willReturn(self::HLS);
-        $inner->method('getDashManifest')->willReturn(self::DASH);
+        $renditions = [['jobId' => (new PublicId())->toString(), 'generation' => 3]];
+        $inner = $this->createMock(TranscodeStreamingPortInterface::class);
+        $inner->expects(self::once())->method('getMasterManifest')->with($videoId, $renditions, 2000000000)->willReturn(self::HLS);
+        $inner->expects(self::once())->method('getDashManifest')->with($videoId, $renditions, 2000000000)->willReturn(self::DASH);
         $decorator = $this->decorator($inner, restricted: true);
 
         self::assertSame(
             "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720\n/api/stream/abc/media.m3u8?tier=720p\n",
-            $decorator->getMasterManifest($videoId, [['jobId' => (new PublicId())->toString(), 'generation' => 3]]),
+            $decorator->getMasterManifest($videoId, $renditions, 2000000000),
         );
-        $manifest = $decorator->getDashManifest($videoId, [['jobId' => (new PublicId())->toString(), 'generation' => 3]]);
+        $manifest = $decorator->getDashManifest($videoId, $renditions, 2000000000);
         $xml = new \DOMDocument();
         self::assertTrue($xml->loadXML($manifest));
         $xpath = new \DOMXPath($xml);
@@ -61,7 +62,7 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
         $allowedTiers->method('allowedTierNames')->willReturn(['720p']);
         $decorator = new QualityFilteringStreamingDecorator($inner, $allowedTiers, new NullLogger());
 
-        $manifest = $decorator->getDashManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]]);
+        $manifest = $decorator->getDashManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]], 2000000000);
 
         self::assertStringNotContainsString('<Representation', $manifest);
         self::assertStringNotContainsString('<AdaptationSet', $manifest);
@@ -74,22 +75,22 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
         $inner->method('getDashManifest')->willReturn(self::DASH);
         $decorator = $this->decorator($inner, restricted: false);
 
-        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]]));
-        self::assertXmlStringEqualsXmlString(self::DASH, $decorator->getDashManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]]));
+        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]], 2000000000));
+        self::assertXmlStringEqualsXmlString(self::DASH, $decorator->getDashManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]], 2000000000));
     }
 
     public function testStreamReadsPassThroughUnchanged(): void
     {
         $jobId = new PublicId();
         $inner = $this->createMock(TranscodeStreamingPortInterface::class);
-        $inner->expects(self::once())->method('getMediaManifest')->with($jobId, MediaTrack::Audio, 3)->willReturn('media');
+        $inner->expects(self::once())->method('getMediaManifest')->with($jobId, MediaTrack::Audio, 3, 2000000000)->willReturn('media');
         $inner->expects(self::once())->method('getSegment')->with($jobId, MediaTrack::Video, 3, 3)->willReturn('segment');
-        $inner->expects(self::once())->method('getSubtitleManifest')->with($jobId, 'en', 3)->willReturn('subtitles');
+        $inner->expects(self::once())->method('getSubtitleManifest')->with($jobId, 'en', 3, 2000000000)->willReturn('subtitles');
         $decorator = $this->decorator($inner, restricted: true);
 
-        self::assertSame('media', $decorator->getMediaManifest($jobId, MediaTrack::Audio, 3));
+        self::assertSame('media', $decorator->getMediaManifest($jobId, MediaTrack::Audio, 3, 2000000000));
         self::assertSame('segment', $decorator->getSegment($jobId, MediaTrack::Video, 3, 3));
-        self::assertSame('subtitles', $decorator->getSubtitleManifest($jobId, 'en', 3));
+        self::assertSame('subtitles', $decorator->getSubtitleManifest($jobId, 'en', 3, 2000000000));
     }
 
     private function decorator(TranscodeStreamingPortInterface $inner, bool $restricted): QualityFilteringStreamingDecorator

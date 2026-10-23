@@ -11,6 +11,7 @@ use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -119,6 +120,80 @@ final class AdaptiveDeliveryTest extends TestCase
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($files as $file) { $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname()); }
         rmdir($this->root);
+    }
+
+    public function testEveryManifestDescendantRetainsTheAuthenticatedParentExpiry(): void
+    {
+        $primary = array_values($this->jobs)[0];
+        $primary->updateProbeData(['subtitleStreams' => [
+            ['index' => 2, 'language' => 'eng', 'codec' => 'subrip', 'title' => 'Dialogue', 'isDefault' => true],
+        ]]);
+        $directory = $this->runtimes[$primary->getId()->toString()]->outputDirectory;
+        mkdir($directory.'/subtitles/s2', 0700, true);
+        file_put_contents($directory.'/subtitles/s2/full.vtt', 'WEBVTT');
+        $expiresAt = time() + 120;
+        foreach (['master.m3u8', 'manifest.mpd'] as $name) {
+            $signed = $this->sign(true, $name, 120);
+            parse_str((string) parse_url($signed['url'], PHP_URL_QUERY), $query);
+            unset($query['sig'], $query['exp']);
+            $path = parse_url($signed['url'], PHP_URL_PATH).'?'.http_build_query($query);
+            $url = $path.'&sig='.hash_hmac('sha256', $path.':'.$expiresAt, 'adaptive-secret').'&exp='.$expiresAt;
+            $this->assertSignedExpiry($url, $expiresAt);
+            foreach ([1, 2] as $read) {
+                $manifest = $name === 'master.m3u8' ? $this->master($url) : $this->dash($url);
+                $children = $this->manifestUrls($manifest);
+                self::assertCount($name === 'master.m3u8' ? 5 : 12, $children);
+                if ($name === 'master.m3u8') {
+                    self::assertStringContainsString('/subtitles/s2/media.m3u8?', $manifest);
+                    self::assertStringContainsString('/tracks/audio/media.m3u8?', $manifest);
+                } else {
+                    self::assertStringContainsString('/tracks/audio/init.mp4?', $manifest);
+                    self::assertStringContainsString('/tracks/video/segment.m4s?', $manifest);
+                }
+                foreach ($children as $child) {
+                    $this->assertSignedExpiry($child, $expiresAt);
+                    if (!str_contains($child, 'media.m3u8')) {
+                        continue;
+                    }
+                    $request = Request::create($child);
+                    $path = $request->getPathInfo();
+                    preg_match('~/api/transcode/([^/]+)/(tracks|subtitles)/([^/]+)/media\.m3u8$~D', $path, $parts);
+                    self::assertCount(4, $parts);
+                    $response = $parts[2] === 'subtitles'
+                        ? $this->manifests->subtitleManifest($parts[1], $parts[3], $request)
+                        : $this->manifests->mediaManifest($parts[1], MediaTrack::from($parts[3]), $request);
+                    self::assertSame(200, $response->getStatusCode());
+                    ob_start(); $response->sendContent(); $media = (string) ob_get_clean();
+                    $resources = $this->manifestUrls($media);
+                    self::assertCount($parts[2] === 'subtitles' ? 1 : 3, $resources);
+                    self::assertStringContainsString($parts[2] === 'subtitles' ? '/full.vtt?' : '/init.mp4?', $media);
+                    if ($parts[2] === 'tracks') {
+                        self::assertStringContainsString('/segment.m4s?index=0', $media);
+                        self::assertStringContainsString('/segment.m4s?index=1', $media);
+                    }
+                    foreach ($resources as $resource) {
+                        $this->assertSignedExpiry($resource, $expiresAt);
+                    }
+                }
+            }
+        }
+    }
+
+    /** @return list<string> */
+    private function manifestUrls(string $manifest): array
+    {
+        preg_match_all('~/api/transcode/[^"\s<>]+~', html_entity_decode($manifest, ENT_QUOTES | ENT_XML1), $matches);
+        return $matches[0];
+    }
+
+    private function assertSignedExpiry(string $url, int $expiresAt): void
+    {
+        $request = Request::create($url);
+        self::assertSame($expiresAt, $request->query->getInt('exp'), $url);
+        $signedRequest = new SignedStreamRequest(new HmacStreamAuthAdapter('adaptive-secret'));
+        self::assertTrue($signedRequest->isValid($request), $url);
+        $request->query->set('exp', (string) ($expiresAt + 1));
+        self::assertFalse($signedRequest->isValid($request));
     }
 
     public function testBothActorsReceiveOnlyTheirOwnCursorAndSignedAdaptiveLadder(): void
@@ -256,9 +331,9 @@ final class AdaptiveDeliveryTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function sign(bool $refresh, string $name = 'master.m3u8'): array
+    private function sign(bool $refresh, string $name = 'master.m3u8', int $expiresInSeconds = 86400): array
     {
-        $response = $this->signing->sign(Request::create('/api/stream/sign', 'POST', content: json_encode(['path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh], JSON_THROW_ON_ERROR)));
+        $response = $this->signing->sign(Request::create('/api/stream/sign', 'POST', content: json_encode(['path' => '/api/transcode/'.$this->videoPublic.'/'.$name, 'refresh' => $refresh, 'expiresInSeconds' => $expiresInSeconds], JSON_THROW_ON_ERROR)));
         self::assertSame(200, $response->getStatusCode());
         return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
     }

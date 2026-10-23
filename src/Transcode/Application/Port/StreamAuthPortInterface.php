@@ -16,6 +16,13 @@ interface StreamAuthPortInterface
     public function signUrl(string $path, int $expiresInSeconds = 86400): array;
 
     /**
+     * Sign a resource without extending its parent capability's expiry.
+     *
+     * @return array{url: string, sig: string, exp: int}
+     */
+    public function signUrlUntil(string $path, int $expiresAt): array;
+
+    /**
      * Validate a signed URL's signature and expiry.
      *
      * @param string $path The original resource path
