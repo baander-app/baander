@@ -89,3 +89,36 @@ for the documentation and commit the completed phase locally.
 
 Independent plan review approved this scope with the stable-rendition observation
 and genuine post-failure progress acknowledgement requirements included above.
+
+## Worker availability amendment
+
+The first production run passed both progress failure observations and six
+lifecycle phases, then failed browser recovery after worker retirement. The
+backend recovered paused at position 30 in generation 12, but the browser stopped
+polling at generation 10. Before stopping, authenticated signing responses
+reported unavailable media while current playlists returned 503 and a segment
+returned 404. The network failure entered the terminal media path because signing
+itself had succeeded and the capability had not expired. No late browser control
+overwrote the backend pause. The existing recovery assertion remains valid.
+
+An authenticated unavailable-publication observation for an attached running or
+paused execution now also permits one replacement after a classified media network
+failure. Preserve the cursor before teardown and continue signing polls. A later
+successful poll does not erase this observation before a delayed media failure;
+every fresh attachment consumes it. Recovery of the same execution still requires
+a newer nonexpired capability. A new execution restores its canonical position
+and intent. Decoder errors, explicit refusal, initial failures and network failure
+without expiry or an observed interruption retain their existing behavior.
+Only an accepted snapshot explicitly reporting `ready: false` for the attached
+execution earns this allowance. Initial preparation without an attachment, stale
+responses, cancelled state and malformed ready responses do not establish it.
+
+Reproduce this integration failure deterministically before changing source.
+Cover same-execution recovery, delayed failure after readiness returns, consumption
+by a fresh attachment, and restoration of a new generation's paused position.
+Review the amendment independently, rebuild the production image after the fix,
+and repeat the complete lifecycle. Preserve the failed production receipt under
+`var/test-runs/player-progress-outage-production`.
+
+Independent review approved this amendment with the explicit readiness and
+attachment-ownership boundaries above.
