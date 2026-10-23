@@ -989,7 +989,7 @@ void aac_ps_conceal(AacPsState* ps) {
   ps->num_env = 1;
   ps->frame_class = 0;
   ps->border_position[0] = -1;
-  ps->border_position[1] = kSlots - 1;
+  ps->border_position[1] = ps->slots - 1;
   ps->is34bands_old = ps->is34bands;
   ps->unreliable = 1;
 }

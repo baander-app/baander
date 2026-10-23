@@ -1466,7 +1466,6 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   s->reservoir = s->reservoir_max / 2;
   s->started = 0;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
-  s->started = 0;
   const float mean_pe = (float)s->avg_frame_bits;
   s->pe_min = 0.4f * mean_pe;
   s->pe_max = 0.6f * mean_pe;

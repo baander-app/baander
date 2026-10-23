@@ -258,6 +258,7 @@ int aac_decoder_reset(AacDecoderHandle ctx) {
   }
   auto* s = static_cast<AacDecoderState*>(ctx);
   aac_decoder_reset_state(s);
+  aac_decoder_transport_reset(s->transport);
   aac_decoder_transport_reapply(s, s->transport);
   return AAC_OK;
 }
@@ -381,10 +382,10 @@ int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, in
     return AAC_ERR_INVALID_ARG;
   }
   auto* s = static_cast<AacDecoderState*>(ctx);
-  /* The attack window must fit the limiter at the doubled rate SBR may
-   * bring. */
+  /* The attack window must fit the limiter at any output rate the stream
+   * may bring, up to 96 kHz doubled by SBR. */
   if (attack_ms < 0 || release_ms < 0 ||
-      (long long)attack_ms * 2 * s->sample_rate / 1000 > AAC_LIMITER_MAX_LOOKAHEAD) {
+      aac_limiter_lookahead(192000, attack_ms) > AAC_LIMITER_MAX_LOOKAHEAD) {
     return AAC_ERR_INVALID_ARG;
   }
   s->limiter_enabled = enabled ? 1 : 0;

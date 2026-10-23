@@ -60,6 +60,9 @@ void aac_limiter_reset(AacLimiter* l);
 
 /* Delay of the output in frames: the attack window. */
 int aac_limiter_delay(const AacLimiter* l);
+/* Frames of lookahead an attack time needs at a sample rate (at least
+ * one once initialised). */
+long long aac_limiter_lookahead(int sample_rate, int attack_ms);
 
 #ifdef __cplusplus
 }

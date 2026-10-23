@@ -29,7 +29,7 @@ int aac_limiter_init(AacLimiter* l, int channels, int sample_rate, int attack_ms
       attack_ms < 0 || release_ms < 0) {
     return AAC_ERR_INVALID_ARG;
   }
-  const long long lookahead = (long long)attack_ms * sample_rate / 1000;
+  const long long lookahead = aac_limiter_lookahead(sample_rate, attack_ms);
   if (lookahead > AAC_LIMITER_MAX_LOOKAHEAD) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -61,6 +61,10 @@ void aac_limiter_reset(AacLimiter* l) {
 }
 
 int aac_limiter_delay(const AacLimiter* l) { return l ? l->lookahead : 0; }
+
+long long aac_limiter_lookahead(int sample_rate, int attack_ms) {
+  return (long long)attack_ms * sample_rate / 1000;
+}
 
 void aac_limiter_process(AacLimiter* l, float* pcm, int frames) {
   const int nc = l->channels;

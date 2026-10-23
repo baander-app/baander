@@ -34,6 +34,6 @@ int aac_decoder_limiter_delay(const AacDecoderState* s) {
   if (s->limiter_ready) {
     return aac_limiter_delay(&s->limiter);
   }
-  const long long frames = (long long)s->limiter_attack_ms * output_rate(s) / 1000;
+  const long long frames = aac_limiter_lookahead(output_rate(s), s->limiter_attack_ms);
   return frames < 1 ? 1 : (int)frames;
 }

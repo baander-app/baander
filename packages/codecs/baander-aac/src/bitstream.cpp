@@ -43,12 +43,15 @@ uint32_t aac_bitreader_read(AacBitReader* r, int n) {
   return v;
 }
 
+/* A negative or overlong skip counts as reading past the end. */
 void aac_bitreader_skip(AacBitReader* r, int n) {
-  r->pos += n;
-  if (r->pos > r->size * 8) {
+  const int end = r->size * 8;
+  if (n < 0 || n > end - r->pos) {
     r->overread = 1;
-    r->pos = r->size * 8;
+    r->pos = end;
+    return;
   }
+  r->pos += n;
 }
 
 void aac_bitreader_byte_align(AacBitReader* r) { aac_bitreader_skip(r, (8 - (r->pos & 7)) & 7); }

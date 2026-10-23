@@ -21,7 +21,7 @@ extern "C" {
 #define AAC_LOAS_SYNC 0x2B7
 #define AAC_LOAS_HEADER_BYTES 3
 #define AAC_LOAS_MAX_PAYLOAD 8191 /* 13-bit audioMuxLengthBytes */
-#define AAC_LATM_MAX_SUBFRAMES 64 /* numSubFrames + 1 */
+#define AAC_LATM_MAX_SUBFRAMES 4 /* numSubFrames + 1: four SBR blocks fill AAC_DECODER_MAX_OUTPUT */
 /* Bytes an AudioMuxElement adds to one access unit of `payload_bytes`:
  * the LOAS header, the StreamMuxConfig with the longest config, the
  * 255-byte length chunks and the final alignment. */

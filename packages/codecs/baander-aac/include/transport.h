@@ -29,6 +29,9 @@ void aac_decoder_transport_destroy(AacDecoderTransport* t);
 
 /* Selects the transport and empties the FIFO. */
 int aac_decoder_transport_set(AacDecoderTransport* t, AacTransport transport);
+/* Empties the FIFO and restarts synchronisation and detection; the
+ * configuration in use stays. */
+void aac_decoder_transport_reset(AacDecoderTransport* t);
 /* Applies an AudioSpecificConfig to the decoder state and keeps it for raw
  * access units and LATM without in-band configuration. */
 int aac_decoder_transport_set_config(struct AacDecoderState_* s, AacDecoderTransport* t,

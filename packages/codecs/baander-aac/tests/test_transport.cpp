@@ -277,6 +277,18 @@ static void test_adts_chunks() {
   const int taken = aac_decoder_feed(dec, big.data(), (int)big.size());
   CHECK(taken > 65536 && taken < 80000, "FIFO cap: %d", taken);
   CHECK(aac_decoder_feed(dec, big.data(), 10) == 0, "full FIFO takes nothing");
+  /* A reset empties the FIFO. */
+  CHECK(aac_decoder_reset(dec) == AAC_OK, "reset");
+  CHECK(aac_decoder_pending_bytes(dec) == 0, "reset leaves %d bytes",
+        aac_decoder_pending_bytes(dec));
+  /* A frame that does not fit the output buffer waits for a larger one. */
+  CHECK(aac_decoder_feed(dec, stream.data(), (int)stream.size()) == (int)stream.size(), "feed");
+  std::vector<float> out(AAC_DECODER_MAX_OUTPUT * 2);
+  CHECK(aac_decoder_decode_next(dec, out.data(), (int)out.size()) == 1024, "first frame");
+  const int before = aac_decoder_pending_bytes(dec);
+  CHECK(aac_decoder_decode_next(dec, out.data(), 1024) == AAC_ERR_OVERFLOW, "too small refused");
+  CHECK(aac_decoder_pending_bytes(dec) == before, "the frame is kept");
+  CHECK(aac_decoder_decode_next(dec, out.data(), (int)out.size()) == 1024, "then decodes");
   aac_decoder_destroy(dec);
 }
 
@@ -623,6 +635,16 @@ static void test_stream_mux_config() {
           "version %d: fields", version);
     CHECK(back.asc.sample_rate == 48000 && back.asc.channel_config == 2, "version %d: asc",
           version);
+    /* More access units per element than one output buffer holds. */
+    cfg.num_sub_frames = AAC_LATM_MAX_SUBFRAMES;
+    aac_bitwriter_init(&w, buf, sizeof(buf));
+    aac_bitwriter_write(&w, 1, 1);
+    CHECK(aac_latm_write_stream_mux_config(&w, &cfg) == 0, "version %d: write many", version);
+    aac_bitreader_init(&r, buf, aac_bitwriter_bytes_written(&w));
+    aac_bitreader_skip(&r, 1);
+    CHECK(aac_latm_read_stream_mux_config(&r, &back) == AAC_ERR_UNSUPPORTED,
+          "version %d: %d sub frames refused", version, AAC_LATM_MAX_SUBFRAMES + 1);
+    cfg.num_sub_frames = 0;
   }
   /* An element with the payload, with and without the in-band config,
    * at any payload size (the 255-byte length chunks). */

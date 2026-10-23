@@ -620,13 +620,16 @@ void lf_gen(const AacSbrState* s, float X_low[32][40][2], const float W[2][kSlot
   }
 }
 
-void autocorrelate(const float x[40][2], float phi[3][2][2]) {
+/* Covariance of one subband over its `n` columns of X_low (the history
+ * and the frame's slots), 4.6.18.6.2. */
+void autocorrelate(const float x[40][2], int n, float phi[3][2][2]) {
+  const int last = n - 1;
   float real_sum2 = x[0][0] * x[2][0] + x[0][1] * x[2][1];
   float imag_sum2 = x[0][0] * x[2][1] - x[0][1] * x[2][0];
   float real_sum1 = 0.0f;
   float imag_sum1 = 0.0f;
   float real_sum0 = 0.0f;
-  for (int i = 1; i < 38; i++) {
+  for (int i = 1; i < last - 1; i++) {
     real_sum0 += x[i][0] * x[i][0] + x[i][1] * x[i][1];
     real_sum1 += x[i][0] * x[i + 1][0] + x[i][1] * x[i + 1][1];
     imag_sum1 += x[i][0] * x[i + 1][1] - x[i][1] * x[i + 1][0];
@@ -636,19 +639,19 @@ void autocorrelate(const float x[40][2], float phi[3][2][2]) {
   phi[0][1][0] = real_sum2;
   phi[0][1][1] = imag_sum2;
   phi[2][1][0] = real_sum0 + x[0][0] * x[0][0] + x[0][1] * x[0][1];
-  phi[1][0][0] = real_sum0 + x[38][0] * x[38][0] + x[38][1] * x[38][1];
+  phi[1][0][0] = real_sum0 + x[last - 1][0] * x[last - 1][0] + x[last - 1][1] * x[last - 1][1];
   phi[1][1][0] = real_sum1 + x[0][0] * x[1][0] + x[0][1] * x[1][1];
   phi[1][1][1] = imag_sum1 + x[0][0] * x[1][1] - x[0][1] * x[1][0];
-  phi[0][0][0] = real_sum1 + x[38][0] * x[39][0] + x[38][1] * x[39][1];
-  phi[0][0][1] = imag_sum1 + x[38][0] * x[39][1] - x[38][1] * x[39][0];
+  phi[0][0][0] = real_sum1 + x[last - 1][0] * x[last][0] + x[last - 1][1] * x[last][1];
+  phi[0][0][1] = imag_sum1 + x[last - 1][0] * x[last][1] - x[last - 1][1] * x[last][0];
 }
 
 /* Second-order linear prediction per subband (4.6.18.6.2). */
 void hf_inverse_filter(float (*alpha0)[2], float (*alpha1)[2], const float X_low[32][40][2],
-                       int k0) {
+                       int k0, int slots) {
   for (int k = 0; k < k0; k++) {
     float phi[3][2][2];
-    autocorrelate(X_low[k], phi);
+    autocorrelate(X_low[k], slots + kHistory, phi);
     const float dk = phi[2][1][0] * phi[1][0][0] -
                      (phi[1][1][0] * phi[1][1][0] + phi[1][1][1] * phi[1][1][1]) / 1.000001f;
     if (dk == 0.0f) {
@@ -1149,10 +1152,10 @@ void aac_sbr_conceal(AacSbrState* s) {
     ch->num_env = 1;
     ch->freq_res[1] = ch->freq_res[0];
     ch->t_env[0] = 0;
-    ch->t_env[1] = AAC_SBR_SLOTS;
+    ch->t_env[1] = s->time_slots;
     ch->num_noise = 1;
     ch->t_q[0] = 0;
-    ch->t_q[1] = AAC_SBR_SLOTS;
+    ch->t_q[1] = s->time_slots;
     ch->df_env[0] = 1;
     ch->df_noise[0] = 1;
     memcpy(ch->invf_mode[1], ch->invf_mode[0], sizeof(ch->invf_mode[0]));
@@ -1208,7 +1211,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
     lf_gen(s, s->X_low, ch->W, ch->Ypos);
     ch->Ypos ^= 1;
     if (s->start) {
-      hf_inverse_filter(s->alpha0, s->alpha1, s->X_low, s->k[0]);
+      hf_inverse_filter(s->alpha0, s->alpha1, s->X_low, s->k[0], slots);
       chirp(s, ch);
       if (hf_gen(s, ch) == 0 && mapping(s, ch, ch->e_a) == 0) {
         env_estimate(s, ch);

@@ -96,6 +96,9 @@ int aac_latm_read_stream_mux_config(AacBitReader* r, AacLatmConfig* cfg) {
     return AAC_ERR_UNSUPPORTED;
   }
   c.num_sub_frames = (int)aac_bitreader_read(r, 6);
+  if (c.num_sub_frames + 1 > AAC_LATM_MAX_SUBFRAMES) {
+    return AAC_ERR_UNSUPPORTED; /* more access units than one output buffer holds */
+  }
   if (aac_bitreader_read(r, 4) != 0 || aac_bitreader_read(r, 3) != 0) {
     return AAC_ERR_UNSUPPORTED; /* numProgram, numLayer: one stream only */
   }
@@ -105,17 +108,20 @@ int aac_latm_read_stream_mux_config(AacBitReader* r, AacLatmConfig* cfg) {
       return ret;
     }
   } else {
-    const int asc_len = (int)read_latm_value(r);
+    const uint32_t asc_len = read_latm_value(r);
+    if (asc_len > (uint32_t)aac_bitreader_bits_left(r)) {
+      return AAC_ERR_DECODE;
+    }
     const int start = r->pos;
     const int ret = aac_asc_read(r, &c.asc);
     if (ret) {
       return ret;
     }
     const int used = r->pos - start;
-    if (used > asc_len) {
+    if (used > (int)asc_len) {
       return AAC_ERR_DECODE;
     }
-    aac_bitreader_skip(r, asc_len - used); /* fillBits */
+    aac_bitreader_skip(r, (int)asc_len - used); /* fillBits */
   }
   c.frame_length_type = (int)aac_bitreader_read(r, 3);
   if (c.frame_length_type != 0) {
@@ -124,16 +130,24 @@ int aac_latm_read_stream_mux_config(AacBitReader* r, AacLatmConfig* cfg) {
   c.latm_buffer_fullness = (int)aac_bitreader_read(r, 8);
   c.other_data_present = (int)aac_bitreader_read(r, 1);
   if (c.other_data_present) {
+    uint32_t len = 0;
     if (c.audio_mux_version == 1) {
-      c.other_data_len_bits = (int)read_latm_value(r);
+      len = read_latm_value(r);
     } else {
       int esc;
+      int bytes = 0;
       do {
-        c.other_data_len_bits <<= 8;
+        len <<= 8;
         esc = (int)aac_bitreader_read(r, 1);
-        c.other_data_len_bits += (int)aac_bitreader_read(r, 8);
-      } while (esc && !r->overread);
+        len += aac_bitreader_read(r, 8);
+      } while (esc && !r->overread && ++bytes < 4);
     }
+    /* The other data follows the payload in every element, so it can
+     * never exceed the largest element. */
+    if (len > 8u * AAC_LOAS_MAX_PAYLOAD) {
+      return AAC_ERR_DECODE;
+    }
+    c.other_data_len_bits = (int)len;
   }
   c.crc_check_present = (int)aac_bitreader_read(r, 1);
   if (c.crc_check_present) {

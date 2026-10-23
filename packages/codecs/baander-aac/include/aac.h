@@ -120,7 +120,8 @@ int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling);
 /* 1024 (default) or 960 core samples per frame; aac_encoder_frame_size
  * follows (960, or 1920 with SBR). */
 int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length);
-/* Writes the ADTS CRC (protection_absent = 0) or the LATM CRC. */
+/* Writes the ADTS CRC (protection_absent = 0); the other transports carry
+ * no checksum. */
 int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 /* MPEG-2 AAC-LC/HE (ADTS id 1): no perceptual noise substitution. */
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);

@@ -18,7 +18,6 @@ extern "C" {
 
 /* The decoder conceals damaged and lost frames (aac_decoder_conceal_block,
  * conceal_mode). */
-#define BAAC_AAC_HAVE_CONCEAL 1
 
 using AacTnsData = struct AacTnsData_ {
   int n_filt[8];

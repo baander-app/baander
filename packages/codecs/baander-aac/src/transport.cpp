@@ -38,8 +38,7 @@ struct AacDecoderTransport_ {
   size_t head;             /* first unread byte of fifo */
   std::deque<int> packets; /* sizes of the fed packets from head */
   int has_asc;
-  AacAsc asc;         /* from aac_decoder_set_config */
-  AacLatmConfig latm; /* the LATM configuration in use (in-band or from asc) */
+  AacLatmConfig latm; /* the configuration in use: in-band, or from aac_decoder_set_config */
   std::vector<uint8_t> au_buf; /* byte-aligned access units of a LATM element */
   int synced;    /* a frame has been decoded since the last loss */
   AacAdtsHeader last_hdr; /* header of the last decoded ADTS frame, while synced */
@@ -116,6 +115,10 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
 /* Decodes one raw_data_block() from the reader and appends its PCM to
  * pcm[*written..]. */
 int decode_block(AacDecoderState* s, AacBitReader* r, float* pcm, int pcm_size, int* written) {
+  if (s->layout_source != 0 &&
+      (*written + s->frame_size) * aac_decoder_output_channels(s) > pcm_size) {
+    return AAC_ERR_OVERFLOW; /* known before the state advances, so the frame can be retried */
+  }
   const int decoded = aac_decode_raw_data_block(s, r);
   if (decoded < 0) {
     return decoded;
@@ -193,7 +196,17 @@ int decode_adts_frame(AacDecoderState* s, const uint8_t* data, int size, float* 
     const int block_start = written;
     ret = decode_block(s, &reader, pcm, pcm_size, &written);
     if (ret) {
-      return ret;
+      if (!conceal || ret == AAC_ERR_OVERFLOW || ret == AAC_ERR_STATE) {
+        return ret;
+      }
+      /* The blocks decoded so far stay; this one and the rest, whose
+       * positions are lost with it, are concealed. */
+      header_bad = true;
+      written = block_start;
+      if ((ret = conceal_block(s, pcm, pcm_size, &written)) != 0) {
+        return ret;
+      }
+      continue;
     }
     if (crc) {
       uint16_t expect;
@@ -208,6 +221,12 @@ int decode_adts_frame(AacDecoderState* s, const uint8_t* data, int size, float* 
       if (actual != expect) {
         if (!conceal) {
           return AAC_ERR_DECODE;
+        }
+        /* The block's data is suspect: its output is replaced by a
+         * concealed block, counted once even when the decoder already
+         * concealed part of it. */
+        if (s->last_concealed) {
+          s->concealed_frames--;
         }
         written = block_start;
         if ((ret = conceal_block(s, pcm, pcm_size, &written)) != 0) {
@@ -237,7 +256,10 @@ int decode_latm_element(AacDecoderState* s, AacDecoderTransport* t, const uint8_
   if (t->au_buf.size() < (size_t)size) {
     t->au_buf.resize((size_t)size);
   }
-  const int count = aac_latm_read_mux_element(data, size, mux_config_present, &t->latm,
+  /* An in-band configuration replaces the one in use only once the whole
+   * element parses and the decoder accepts its AudioSpecificConfig. */
+  AacLatmConfig cfg = t->latm;
+  const int count = aac_latm_read_mux_element(data, size, mux_config_present, &cfg,
                                               t->au_buf.data(), size, payloads,
                                               AAC_LATM_MAX_SUBFRAMES, nullptr);
   if (count < 0) {
@@ -245,11 +267,12 @@ int decode_latm_element(AacDecoderState* s, AacDecoderTransport* t, const uint8_
   }
   const bool carried_config = mux_config_present && (data[0] & 0x80) == 0;
   if (carried_config) {
-    const int ret = apply_asc(s, &t->latm.asc);
+    const int ret = apply_asc(s, &cfg.asc);
     if (ret) {
       return ret;
     }
   }
+  t->latm = cfg;
   int written = 0;
   for (int i = 0; i < count; i++) {
     AacBitReader reader;
@@ -504,17 +527,24 @@ AacDecoderTransport* aac_decoder_transport_create(void) {
 
 void aac_decoder_transport_destroy(AacDecoderTransport* t) { delete t; }
 
-int aac_decoder_transport_set(AacDecoderTransport* t, AacTransport transport) {
-  if (transport < AAC_TRANSPORT_DETECT || transport > AAC_TRANSPORT_RAW) {
-    return AAC_ERR_INVALID_ARG;
+void aac_decoder_transport_reset(AacDecoderTransport* t) {
+  t->active = t->requested;
+  if (t->active == AAC_TRANSPORT_DETECT && t->has_asc) {
+    t->active = AAC_TRANSPORT_RAW;
   }
-  t->requested = transport;
-  t->active = transport;
   t->fifo.clear();
   t->head = 0;
   t->packets.clear();
   t->synced = 0;
   t->discarded = 0;
+}
+
+int aac_decoder_transport_set(AacDecoderTransport* t, AacTransport transport) {
+  if (transport < AAC_TRANSPORT_DETECT || transport > AAC_TRANSPORT_RAW) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  t->requested = transport;
+  aac_decoder_transport_reset(t);
   return AAC_OK;
 }
 
@@ -528,7 +558,6 @@ int aac_decoder_transport_set_config(AacDecoderState* s, AacDecoderTransport* t,
   if ((ret = apply_asc(s, &parsed)) != 0) {
     return ret;
   }
-  t->asc = parsed;
   t->has_asc = 1;
   aac_latm_config_init(&t->latm, &parsed, 0);
   if (t->requested == AAC_TRANSPORT_DETECT) {
@@ -540,8 +569,6 @@ int aac_decoder_transport_set_config(AacDecoderState* s, AacDecoderTransport* t,
 void aac_decoder_transport_reapply(AacDecoderState* s, const AacDecoderTransport* t) {
   if (t->latm.valid) {
     preset_extension(s, &t->latm.asc);
-  } else if (t->has_asc) {
-    preset_extension(s, &t->asc);
   }
 }
 
@@ -626,6 +653,9 @@ int aac_decoder_transport_decode_next(AacDecoderState* s, AacDecoderTransport* t
     if (is_packet_transport(t->active)) {
       const int size = first_packet(t);
       const int ret = decode_frame_or_conceal(s, t, t->active, fifo_data(t), size, pcm, pcm_size);
+      if (ret == AAC_ERR_OVERFLOW) {
+        return ret; /* the packet waits for a larger buffer */
+      }
       consume(t, size);
       if (ret == AAC_ERR_STATE) {
         continue; /* a LATM element before any configuration */
@@ -657,7 +687,10 @@ int aac_decoder_transport_decode_next(AacDecoderState* s, AacDecoderTransport* t
       aac_adts_parse(&hdr, fifo_data(t), length);
     }
     const int ret = decode_frame_or_conceal(s, t, t->active, fifo_data(t), length, pcm, pcm_size);
-    if (ret < 0 && ret != AAC_ERR_OVERFLOW && !confirmed) {
+    if (ret == AAC_ERR_OVERFLOW) {
+      return ret; /* the frame waits for a larger buffer */
+    }
+    if (ret < 0 && !confirmed) {
       /* A frame taken on trust that does not decode may have been cut
        * short: only its sync word goes, so that a real frame inside its
        * claimed extent is found by the next scan. */
