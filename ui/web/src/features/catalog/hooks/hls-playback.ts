@@ -21,8 +21,16 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
   }
   const fail = (failure?: 'network') => {
     if (!active()) return
-    dispose()
-    onError(failure)
+    disposed = true
+    const instance = player
+    player = null
+    try {
+      onError(failure)
+    } finally {
+      // Destruction may reset the native clock. Let the owner retain its cursor
+      // first, with callbacks already fenced against reentry.
+      instance?.destroy()
+    }
   }
   import('hls.js').then(({ default: HlsPlayer }) => {
     if (!active()) return

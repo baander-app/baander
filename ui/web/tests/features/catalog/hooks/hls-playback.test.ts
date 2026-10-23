@@ -81,6 +81,31 @@ describe('HLS attachment ownership', () => {
     expect(mock.instances[0].destroy).toHaveBeenCalledOnce()
   })
 
+  it.each([false, true])('reports the retained cursor before destruction and tears down once if the callback throws: %s', async throws => {
+    const { options, dispose } = setup()
+    await settle()
+    const instance = mock.instances[0]
+    options.video.currentTime = 18
+    instance.destroy.mockImplementation(() => { options.video.currentTime = 0 })
+    const observed: number[] = []
+    options.onError.mockImplementation(() => {
+      observed.push(options.video.currentTime)
+      dispose()
+      instance.listeners.error('error', { fatal: true, type: 'networkError' })
+      instance.listeners.parsed()
+      if (throws) throw new Error('Observer failed')
+    })
+    const fail = () => instance.listeners.error('error', { fatal: true, type: 'networkError' })
+    if (throws) expect(fail).toThrow('Observer failed')
+    else fail()
+    expect(observed).toEqual([18])
+    expect(options.onReady).not.toHaveBeenCalled()
+    expect(instance.destroy).toHaveBeenCalledOnce()
+    expect(options.video.currentTime).toBe(0)
+    dispose()
+    expect(instance.destroy).toHaveBeenCalledOnce()
+  })
+
   it.each(['maybe', ''])('uses native HLS only with its capability (%s)', async capability => {
     mock.supported = false
     vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue(capability as CanPlayTypeResult)

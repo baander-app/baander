@@ -348,6 +348,204 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
+  it.each([false, true])('recovers an unexpired attachment after a signing outage, including delayed media failure after a successful poll: %s', async successfulPoll => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(18)
+    post.mockRejectedValueOnce(new AxiosError('Web unavailable', 'ERR_NETWORK'))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    if (successfulPoll) await act(async () => vi.advanceTimersByTimeAsync(1000))
+    await act(async () => attachments[0].onError('network'))
+    expect(result.current.state).toBe('preparing')
+    expect(onError).not.toHaveBeenCalled()
+    video.currentTime = 0
+    post.mockRejectedValueOnce(new AxiosError('Still unavailable', 'ERR_NETWORK'))
+      .mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}`, position: 90 } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(onError).not.toHaveBeenCalled()
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(18)
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(result.current.currentTime).toBe(30)
+    expect(video.play).not.toHaveBeenCalled()
+    await act(async () => attachments[1].onError('network'))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    expect(post.mock.calls.filter(call => call[1]?.action === 'seek')).toHaveLength(0)
+    unmount()
+  })
+
+  it.each(['older', 'same', 'expired', 'malformed', 'expired original'])('waits for a newer valid capability when outage recovery expands renditions: %s', async candidate => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const seconds = Math.floor(Date.now() / 1000)
+    const expiry = seconds + 3600
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    post.mockRejectedValueOnce(new AxiosError('Web unavailable', 'ERR_NETWORK'))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    if (candidate === 'expired original') vi.setSystemTime((expiry + 2) * 1000)
+    await act(async () => attachments[0].onError('network'))
+    video.currentTime = 0
+    const invalidExpiry = candidate === 'older' || candidate === 'expired original' ? expiry - 1 : candidate === 'same' ? expiry
+      : candidate === 'expired' ? seconds - 1 : 'invalid'
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${invalidExpiry}`,
+      position: 90, renditionSet: 'job.1,sibling.1' } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(1)
+    expect(result.current.state).toBe('preparing')
+    expect(onError).not.toHaveBeenCalled()
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}`,
+      position: 90, renditionSet: 'job.1,sibling.1' } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(18)
+    await act(async () => attachments[1].onError('network'))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it.each(['preparing', 'attachment loading'])('preserves accepted %s intent across transient signing failures', async phase => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    loader.ready = false
+    post.mockResolvedValueOnce({ data: phase === 'preparing'
+      ? { ...snapshot, url: null, ready: false, startTime: null, duration: null, renditionSet: '' } : snapshot })
+      .mockRejectedValueOnce(new AxiosError('Network unavailable', 'ERR_NETWORK'))
+      .mockRejectedValueOnce(Object.assign(new AxiosError('Server unavailable'), { response: { status: 503 } }))
+      .mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    await act(async () => { result.current.play(); result.current.pause() })
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(onError).not.toHaveBeenCalled()
+    expect(attachments).toHaveLength(phase === 'preparing' ? 0 : 1)
+    if (attachments[0]) expect(attachments[0].dispose).not.toHaveBeenCalled()
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => { attachments[0].onReady(); video.dispatchEvent(new Event('loadedmetadata')) })
+    expect(video.currentTime).toBe(18)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it.each(['decoder', 'play rejection', 'signing refusal'])('keeps %s terminal after an observed signing outage', async failure => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    post.mockRejectedValueOnce(new AxiosError('Web unavailable', 'ERR_NETWORK'))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    if (failure === 'play rejection') {
+      vi.mocked(video.play).mockRejectedValueOnce(new Error('Playback refused'))
+      await act(async () => result.current.play())
+    } else if (failure === 'decoder') await act(async () => attachments[0].onError())
+    else {
+      await act(async () => attachments[0].onError('network'))
+      post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+    }
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}` } })
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(result.current.state).toBe('error')
+    expect(attachments).toHaveLength(1)
+    expect(onError).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it('consumes an observed outage when a committed generation gets a fresh attachment', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    post.mockRejectedValueOnce(new AxiosError('Web unavailable', 'ERR_NETWORK'))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    post.mockResolvedValue({ data: { ...snapshot, generation: 2, revision: 2, renditionSet: 'job.2' } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    await act(async () => attachments[1].onError('network'))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it.each([false, true])('restores an acknowledged same-generation source seek submitted while outage recovery owns the released attachment (later expanded set: %s)', async laterExpandedSet => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 3600
+    let snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign'
+      ? { data: snapshot } : { data: { data: { acceptedGeneration: 1 } } }))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    post.mockRejectedValueOnce(new AxiosError('Web unavailable', 'ERR_NETWORK'))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    await act(async () => attachments[0].onError('network'))
+    video.currentTime = 0
+    snapshot = { ...snapshot, url: `/manifest?exp=${expiry + (laterExpandedSet ? 0 : 60)}`, position: 60, revision: 2 }
+    await act(async () => result.current.seekTo(60))
+    if (laterExpandedSet) {
+      expect(attachments).toHaveLength(1)
+      snapshot = { ...snapshot, url: `/manifest?exp=${expiry + 60}`, renditionSet: 'job.1,sibling.1' }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+    }
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(48)
+    expect(result.current.pendingSeekPosition).toBe(60)
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(result.current.currentTime).toBe(60)
+    expect(result.current.pendingSeekPosition).toBeNull()
+    expect(onError).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1]?.action === 'seek')).toHaveLength(1)
+    unmount()
+  })
+
   it('waits for authorization and uses the signed manifest', async () => {
     let resolve!: (value: { data: { url: string, ready?: boolean, generation?: number, revision?: number, jobId?: string, sessionId?: string | null, position?: number, status?: string, startTime?: number, duration?: number, renditionSet?: string } }) => void
     post.mockReturnValue(new Promise((done) => { resolve = done }))

@@ -110,6 +110,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let attachedCapability: PlaybackCapability | null = null
     let recoveryPosition: number | null = null
     let terminal = false
+    let observedSigningOutage = false
     const playbackPosition = () => restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.1
       ? sourceDuration : mediaStart + video.currentTime
     const clearSourceSeek = () => {
@@ -151,7 +152,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         || (snapshot && loadedIdentity && !loadedIdentity.startsWith(`${snapshot.jobId}:${snapshot.generation}:`))) {
         releaseAttachment()
         changeState('preparing')
-      } else if (failure === 'network' && attachedCapability && Date.now() >= attachedCapability.expiresAt) {
+      } else if (failure === 'network' && attachedCapability
+        && (observedSigningOutage || Date.now() >= attachedCapability.expiresAt)) {
         recoveryPosition = pendingLoad ? mediaStart + pendingLoad.position : playbackPosition()
         releaseAttachment()
         changeState('preparing')
@@ -193,12 +195,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           else if (seekChain.started) seekChain = null
           else if (seekChain.attachment !== identity) seekChain = null
         }
+        const recoverAcceptedSeek = recoveryPosition !== null && sourceSeekPosition !== null && !seekChain
         // Let an active native seek finish before replacing its source to add
         // renditions. Committed execution changes still apply immediately.
         if (previous?.jobId === data.jobId && previous.generation === data.generation
           && previous.revision === data.revision && identity !== loadedIdentity
           && loadedIdentity?.startsWith(`${data.jobId}:${data.generation}:`)
-          && (sourceSeekPosition !== null || pendingLoad || video.seeking)) return
+          && ((sourceSeekPosition !== null && !recoverAcceptedSeek) || pendingLoad || video.seeking)) return
         appliedRequest = revision
         snapshot = data
         if (data.duration !== null && Number.isFinite(data.duration) && data.duration > 0) {
@@ -225,15 +228,22 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           return
         }
         const capability = playbackCapability(data.url)
-        const renewCapability = identity === loadedIdentity && attachedCapability !== null && capability !== null
+        const newerCapability = attachedCapability !== null && capability !== null
           && capability.expiresAt > attachedCapability.expiresAt && capability.expiresAt > Date.now()
+        // Recovery of the attached execution needs renewed authority even when
+        // newly published renditions would otherwise replace its identity.
+        if (recoveryPosition !== null && !executionChanged && !newerCapability) return
+        const renewCapability = identity === loadedIdentity && newerCapability && attachedCapability !== null
           && (recoveryPosition !== null || Date.now() >= attachedCapability.renewAt)
-          && !seekChain && sourceSeekPosition === null && !pendingLoad && !video.seeking
+          && !seekChain && (sourceSeekPosition === null || recoverAcceptedSeek) && !pendingLoad && !video.seeking
         if (identity !== loadedIdentity || renewCapability) {
           const preserveAttachedPosition = renewCapability || (recoveryPosition !== null && !executionChanged)
-          const renewalPosition = recoveryPosition ?? playbackPosition()
+          // An acknowledged seek submitted after release owns the replacement
+          // cursor; its response fence keeps older polling intent out.
+          const renewalPosition = recoverAcceptedSeek ? data.position : recoveryPosition ?? playbackPosition()
           recoveryPosition = null
           attachedCapability = capability
+          observedSigningOutage = false
           restoredSourceEnd = null
           progressPosition = data.position
           const attachedPosition = mediaStart + (pendingLoad?.position ?? video.currentTime)
@@ -275,9 +285,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         const status = isAxiosError(error) ? error.response?.status : undefined
         const transient = isAxiosError(error) && !isCancel(error)
           && (error.response === undefined || (status !== undefined && status >= 500 && status <= 599))
-        // A failed control-plane poll does not invalidate usable media. The
-        // next scheduled poll can reconcile its generation and cursor normally.
-        if (!initial && (attachmentReady || recoveryPosition !== null) && transient) return
+        // Once signing accepted ownership, transport failures preserve its
+        // preparation and cursor. A delayed media failure can still belong to
+        // this outage after polling resumes; the next attachment consumes it.
+        if (!initial && snapshot && transient) {
+          observedSigningOutage = true
+          return
+        }
         fail()
       }
     }
