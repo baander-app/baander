@@ -43,6 +43,13 @@ interface PlaybackSeekTarget {
   first: boolean
 }
 
+interface StatusReconciliation {
+  sessionId: string
+  jobId: string
+  statusRevision: number
+  minimumReadRequest: number
+}
+
 interface PlaybackCapability {
   expiresAt: number
   renewAt: number
@@ -92,8 +99,10 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let pendingLoad: { identity: string, position: number } | null = null
     let reloadCursor: number | null = null
     let localStatus: 'running' | 'paused' | null = null
+    let localStatusOwner: { sessionId: string, jobId: string } | null = null
     let localStatusRevision = 0
     let deferredStatusRevision: number | null = null
+    let statusReconciliation: StatusReconciliation | null = null
     let playbackStarted = autoPlay
     let controls = Promise.resolve()
     let pendingControls = 0
@@ -138,6 +147,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     const fail = (terminalFailure = true) => {
       if (!active() || terminal) return
       terminal = terminalFailure
+      statusReconciliation = null
       recoveryPosition = null
       clearSourceSeek()
       seekChain = null
@@ -170,6 +180,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       })
     }
     const desiredStatus = () => localStatus ?? snapshot?.status
+    const canControlStatus = () => snapshot?.ready || (localStatus !== null
+      && localStatusOwner?.sessionId === snapshot?.sessionId && localStatusOwner?.jobId === snapshot?.jobId)
     const applyPlayback = () => {
       if (!active() || terminal) return
       if (!playbackStarted || desiredStatus() !== 'running') video.pause()
@@ -210,7 +222,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           sourceDuration = data.duration
           setDuration(data.duration)
         }
-        const settledStatus = !seekChain && deferredStatusRevision === localStatusRevision
+        let reconciledStatus = false
+        const reconciliation = statusReconciliation
+        if (reconciliation) {
+          if (data.sessionId !== reconciliation.sessionId || data.jobId !== reconciliation.jobId
+            || reconciliation.statusRevision !== localStatusRevision || data.status === 'cancelled') {
+            statusReconciliation = null
+            if (reconciliation.statusRevision === localStatusRevision) localStatus = null
+          } else if (revision >= reconciliation.minimumReadRequest && (data.status === 'running' || data.status === 'paused')) {
+            statusReconciliation = null
+            if (data.status === 'running') playbackStarted = true
+            reconciledStatus = true
+          }
+        }
+        const settledStatus = reconciledStatus || (!seekChain && deferredStatusRevision === localStatusRevision)
         if (settledStatus) {
           localStatus = null
           deferredStatusRevision = null
@@ -229,7 +254,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (!data.ready || data.url === null || data.startTime === null || data.duration === null) {
           pendingLoad = null
           if (data.status === 'cancelled') { clearSourceSeek(); video.pause(); video.src = ''; changeState('ended'); return }
-          if (desiredStatus() !== 'running') applyPlayback()
+          if (reconciledStatus || desiredStatus() !== 'running') applyPlayback()
           changeState('preparing')
           return
         }
@@ -314,12 +339,15 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       const position = globalPosition
       const statusRevision = action === 'pause' || action === 'resume' ? ++localStatusRevision : null
       if (statusRevision !== null) {
+        statusReconciliation = null
         localStatus = action === 'pause' ? 'paused' : 'running'
+        localStatusOwner = { sessionId, jobId: current.jobId }
         if (seekChain) seekChain.pendingTarget = null
       }
       pendingControls++
       controls = controls.then(async () => {
         if (!active() || terminal) return
+        if (statusRevision !== null && (snapshot?.sessionId !== sessionId || snapshot.jobId !== current.jobId)) return
         if (action === 'progress' && (recoveryPosition !== null || sourceSeekPosition !== null || snapshot?.sessionId !== sessionId
           || snapshot.generation !== current.generation || snapshot.revision !== current.revision
           || snapshot.status !== 'running' || video.paused || video.seeking)) return
@@ -354,19 +382,27 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         }
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
         if (!chain) await refresh()
-      }).catch(error => {
-        if (action === 'progress' && isAxiosError(error) && !isCancel(error)) {
+      }).catch(async error => {
+        if ((action === 'progress' || statusRevision !== null) && isAxiosError(error) && !isCancel(error)) {
           const status = error.response?.status
           const transient = error.response === undefined
             ? ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(error.code ?? '')
             : status !== undefined && status >= 500 && status <= 599
-          if (transient) return
+          if (transient) {
+            if (statusRevision === null) return
+            if (!active() || terminal || snapshot?.sessionId !== sessionId || snapshot.jobId !== current.jobId
+              || statusRevision !== localStatusRevision) return
+            statusReconciliation = { sessionId, jobId: current.jobId, statusRevision, minimumReadRequest: requestRevision + 1 }
+            await refresh()
+            return
+          }
         }
         // A failed control belongs to the session that submitted it.
         if (snapshot?.sessionId === sessionId && snapshot.jobId === current.jobId) fail(false)
       }).finally(() => {
         pendingControls--
-        if (statusRevision !== null && statusRevision === localStatusRevision) {
+        if (statusRevision !== null && statusRevision === localStatusRevision
+          && statusReconciliation?.statusRevision !== statusRevision) {
           if (seekChain?.started) deferredStatusRevision = statusRevision
           else {
             localStatus = null
@@ -458,7 +494,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       if (video.paused) return
       playbackStarted = true
       changeState('playing')
-      if (attachmentReady && snapshot?.ready && desiredStatus() === 'paused') control('resume')
+      if (attachmentReady && canControlStatus() && desiredStatus() === 'paused') control('resume')
     })
     video.addEventListener('pause', () => {
       if (!video.paused) return
@@ -467,7 +503,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         return
       }
       changeState('paused')
-      if (attachmentReady && snapshot?.ready && desiredStatus() === 'running') control('pause')
+      if (attachmentReady && canControlStatus() && desiredStatus() === 'running') control('pause')
     })
     video.addEventListener('seeked', () => {
       if (!snapshot?.ready || loadedIdentity !== `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}`) return
@@ -500,13 +536,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     const requestPlay = () => {
       if (!active() || terminal) return
       playbackStarted = true
-      if (snapshot?.ready && desiredStatus() === 'paused') control('resume')
+      if (canControlStatus() && desiredStatus() === 'paused') control('resume')
       if (attachmentReady) playVideo()
     }
     const requestPause = () => {
       if (!active() || terminal) return
       playbackStarted = false
-      if (snapshot?.ready && desiredStatus() === 'running') control('pause')
+      if (canControlStatus() && desiredStatus() === 'running') control('pause')
       video.pause()
     }
     seekRef.current = seek
@@ -524,6 +560,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     const cleanup = () => {
       if (abort.signal.aborted) return
       window.clearInterval(timer)
+      statusReconciliation = null
       seekChain = null
       clearSourceSeek()
       abort.abort()
