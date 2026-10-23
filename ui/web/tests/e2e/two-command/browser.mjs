@@ -290,7 +290,7 @@ async function observeSubtitles(phase, expectedText) {
 async function pausedAt(position, minimumGeneration) {
   await until(async () => {
     const state = await mediaState()
-    return state.connected && state.paused && state.ready >= 2
+    return state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking
       && snapshot?.ready && snapshot.status === 'paused' && snapshot.generation >= minimumGeneration
       && Number.isFinite(snapshot.startTime)
       && state.error === null && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
@@ -384,21 +384,34 @@ async function reconnectPausedPlayback(owner, prefix) {
   await resumeAndDecode(owner, `${prefix}-resume`)
 }
 
-async function seekSourceAndDecode(owner, position, action, paused = false) {
-  const started = Date.now()
-  const controlsBefore = playbackControls.length
+async function commitSourceSeek(position) {
   const timeline = page.getByRole('slider', { name: 'Seek movie' })
   assert.equal(Number(await timeline.getAttribute('max')), snapshot.duration, 'Source seeking must span the full source duration')
+  assert(position >= 0 && position < snapshot.duration, 'The source target must fit the source duration')
   if (position === 0) {
     await timeline.focus()
     await timeline.press('Home')
-  } else {
-    const box = await timeline.boundingBox()
-    assert(box, 'The source timeline must be visible')
-    await timeline.click({ position: { x: box.width * position / snapshot.duration, y: box.height / 2 } })
+    return 0
   }
+  const box = await timeline.boundingBox()
+  assert(box, 'The source timeline must be visible')
+  await page.mouse.move(box.x + box.width * position / snapshot.duration, box.y + box.height / 2)
+  await page.mouse.down()
+  try {
+    // Read the browser's actual range value before pointer-up commits the draft.
+    return Number(await timeline.inputValue())
+  } finally {
+    await page.mouse.up()
+  }
+}
+
+async function seekSourceAndDecode(owner, position, action, paused = false) {
+  const started = Date.now()
+  const controlsBefore = playbackControls.length
+  const committed = await commitSourceSeek(position)
   await until(() => playbackControls.slice(controlsBefore).some(control => control.action === 'seek'), 'the source control to submit a generation seek')
   const requested = playbackControls.slice(controlsBefore).find(control => control.action === 'seek').position
+  assert.equal(requested, committed, 'The backend seek must use the committed source slider position')
   await until(async () => {
     const state = await mediaState()
     return snapshot?.ready && snapshot.generation === owner.generation + 1
@@ -481,16 +494,17 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     const owner = ownedPlayback()
     await pausePlayback(owner, 'pause')
     const started = Date.now()
-    // Polling may update the observer snapshot while the player keeps its original attachment.
-    const timelineStart = snapshot.startTime
     const targets = [credentials.expectedSeekPosition - 8, credentials.expectedSeekPosition - 4, credentials.expectedSeekPosition]
-    assert(targets.every(position => position >= timelineStart && position < snapshot.duration),
-      'All rapid seek targets must fit the original native timeline')
+    assert(targets.every(position => position >= 0 && position < snapshot.duration),
+      'All rapid seek targets must fit the source duration')
+    const committedTargets = []
     const controlsBeforeSeek = playbackControls.length
-    const originalSource = (await mediaState()).source
     const positionRoute = `**/api/transcode/sessions/${owner.sessionId}/position`
     let firstResponse
     let firstRouteTask
+    let firstRouteError
+    let responseHeldAt
+    let responseHoldMs
     let responseReleased = false
     let releaseResponse
     let releaseTimer
@@ -504,38 +518,34 @@ async function checkpoint({ phase, baseUrl, credentials }) {
         await route.continue()
         return
       }
-      // Forward the real command, withholding only its response within the client's timeout.
+      // Start the deadline before forwarding: backend latency consumes the same budget.
+      responseHeldAt = Date.now()
       releaseTimer = setTimeout(release, 3500)
       firstRouteTask = (async () => {
         const response = await route.fetch({ timeout: 3500 })
         firstResponse = await response.json()
         await heldResponse
         await route.fulfill({ response })
-      })()
+        responseHoldMs = Date.now() - responseHeldAt
+        assert(responseHoldMs < 4500, 'Forwarding and response hold must finish below the five-second client timeout')
+      })().catch(async error => {
+        firstRouteError = error
+        await route.abort().catch(() => {})
+      })
       await firstRouteTask
     }
     await page.route(positionRoute, holdFirstSeek)
     try {
       for (const [index, position] of targets.entries()) {
-        // Each evaluation waits for a genuine native event before the next browser task.
-        await video.evaluate((element, localPosition) => new Promise((resolve, reject) => {
-          const timer = setTimeout(() => {
-            element.removeEventListener('seeking', onSeeking)
-            reject(new Error('Native rapid seek did not emit seeking'))
-          }, 1000)
-          const onSeeking = () => {
-            clearTimeout(timer)
-            resolve()
-          }
-          element.addEventListener('seeking', onSeeking, { once: true })
-          element.currentTime = localPosition
-        }), position - timelineStart)
+        committedTargets.push(await commitSourceSeek(position))
         if (index === 0) {
-          await until(() => firstResponse, 'the first real seek acceptance to be held', 1500)
+          await until(() => {
+            if (firstRouteError) throw firstRouteError
+            return firstResponse
+          }, 'the first real seek acceptance to be held', 2000)
           assert(Number.isInteger(firstResponse?.data?.acceptedGeneration), 'The real seek must acknowledge its accepted generation')
         }
-        assert(!responseReleased, 'Every rapid target must be observed while the first response is pending')
-        assert.equal((await mediaState()).source, originalSource, 'The active seek chain must retain its native attachment')
+        assert(!responseReleased, 'Every rapid target must be committed while the first response is pending')
       }
     } finally {
       clearTimeout(releaseTimer)
@@ -546,18 +556,29 @@ async function checkpoint({ phase, baseUrl, credentials }) {
         await page.unroute(positionRoute, holdFirstSeek)
       }
     }
-    await pausedAt(credentials.expectedSeekPosition, owner.generation + 2)
+    if (firstRouteError) throw firstRouteError
+    assert.equal(new Set(committedTargets).size, 3, 'Rapid scrubbing must commit three distinct source positions')
+    await pausedAt(committedTargets[2], owner.generation + 2)
     samePlayback(owner, owner.generation + 2)
     const rapidSeeks = playbackControls.slice(controlsBeforeSeek).filter(control => control.action === 'seek')
-    assert.deepEqual(rapidSeeks.map(control => control.position), [targets[0], targets[2]], 'Rapid scrubbing must send only the first and latest targets')
-    assert.equal(rapidSeeks[0].generation, owner.generation, 'The first native seek must use its attached generation')
+    assert.deepEqual(rapidSeeks.map(control => control.position), [committedTargets[0], committedTargets[2]], 'Rapid scrubbing must send only the first and latest targets')
+    assert.equal(rapidSeeks[0].generation, owner.generation, 'The first source seek must use its attached generation')
     assert.equal(rapidSeeks[1].generation, firstResponse.data.acceptedGeneration, 'The latest target must use its predecessor acceptance')
-    await recordClientControl('seek-paused', started, { targets, acceptedGeneration: firstResponse.data.acceptedGeneration })
+    await recordClientControl('seek-paused', started, { targets, committedTargets, responseHoldMs, acceptedGeneration: firstResponse.data.acceptedGeneration })
     owner.generation = snapshot.generation
     await resumeAndDecode(owner, 'resume-after-seek')
     await reconnectPausedPlayback(owner, 'network')
     await pausePlayback(owner, 'pause-before-remount')
-    const pausedPosition = snapshot.startTime + (await mediaState()).time
+    let pausedPosition
+    await until(async () => {
+      const state = await mediaState()
+      const usable = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+        && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
+        && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+      if (usable) pausedPosition = snapshot.startTime + state.time
+      return usable
+    }, 'decoded seekable paused media matching the signed rendition set before reload')
+    samePlayback(owner)
 
     const remountStarted = Date.now()
     previousMediaEvents.push(...await page.evaluate(() => window.__twoCommandMediaEvents ?? []))
@@ -570,18 +591,11 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await previousVideo.dispose()
     await pausedAt(pausedPosition, owner.generation)
     samePlayback(owner)
-    await recordClientControl('remounted-paused', remountStarted)
+    await recordClientControl('remounted-paused', remountStarted, { pausedPosition })
     await resumeAndDecode(owner, 'resume-after-remount')
     await pausePlayback(owner, 'final-pause')
     // Leave a different paused cursor so the following operator seek changes position.
-    const finalSeekStarted = Date.now()
-    const finalPosition = credentials.expectedSeekPosition + 5
-    const finalLocalPosition = finalPosition - snapshot.startTime
-    assert(finalLocalPosition >= 0 && finalPosition < snapshot.duration, 'The final seek must fit the current native timeline')
-    await video.evaluate((element, position) => { element.currentTime = position }, finalLocalPosition)
-    await pausedAt(finalPosition, owner.generation + 1)
-    samePlayback(owner, owner.generation + 1)
-    await recordClientControl('final-seek-paused', finalSeekStarted)
+    await seekSourceAndDecode(owner, credentials.expectedSeekPosition + 5, 'final-seek-paused', true)
   } else if (phase === 'sought-paused') {
     await pausedAt(credentials.expectedSeekPosition, initialGeneration + 1)
     soughtGeneration = snapshot.generation

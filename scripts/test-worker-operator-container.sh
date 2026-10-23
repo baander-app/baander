@@ -2,7 +2,7 @@
 set -euo pipefail
 if [ "${BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     timeout_seconds=240
-    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-}" ]; then timeout_seconds=600; fi
+    if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-}" ] || [ "${BAANDER_TEST_BROWSER_CLIENT_CONTROLS:-0}" = 1 ]; then timeout_seconds=600; fi
     exec env BAANDER_WORKER_OPERATOR_TIMEOUT_ACTIVE=1 timeout "${timeout_seconds}s" bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
@@ -17,6 +17,13 @@ media_observation="${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-0}"
 [[ "$media_observation" = 0 || "$media_observation" = 1 ]] || {
     echo 'BAANDER_TEST_MEDIA_CONTROL_OBSERVATION must be 0 or 1.' >&2; exit 2;
 }
+browser_client_controls="${BAANDER_TEST_BROWSER_CLIENT_CONTROLS:-0}"
+[[ "$browser_client_controls" = 0 || "$browser_client_controls" = 1 ]] || {
+    echo 'BAANDER_TEST_BROWSER_CLIENT_CONTROLS must be 0 or 1.' >&2; exit 2;
+}
+if [ "$browser_client_controls" = 1 ] && { [ "${BAANDER_TEST_TWO_COMMAND:-0}" != 1 ] || [ ! -x "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; }; then
+    echo 'Browser client controls require two-command mode and an executable browser checkpoint.' >&2; exit 2
+fi
 use_image="${BAANDER_TEST_USE_IMAGE:-0}"
 [[ "$use_image" = 0 || "$use_image" = 1 ]] || {
     echo 'BAANDER_TEST_USE_IMAGE must be 0 or 1.' >&2; exit 1;
@@ -685,7 +692,7 @@ video = [p for p in snapshot['encoders'] if p['arguments'][0].endswith('ffmpeg')
 assert len(video) == 1, 'Concurrent attachments must have exactly one actual video encoder'
 PYOWNER
     checkpoint attached
-    if [ "$media_observation" = 1 ] && [ -n "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ]; then
+    if [ "$browser_client_controls" = 1 ]; then
         checkpoint client-controls
     fi
     combined_phase seek-paused

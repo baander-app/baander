@@ -852,14 +852,18 @@ The runner selects ordinary maximum two, the combined web/worker fixture and
 `BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1`. It inherits the operator runner's
 600-second deadline, resource preflight and cleanup. Set `BAANDER_TEST_ARTIFACTS`
 to retain evidence at a chosen path; the default is
-`var/test-runs/media-control-*`. Recorded pressure, browser and cleanup evidence
-covers single-intention pause/seek/reconnect and reattachment. Rapid native
-scrubbing also retains the latest queued target across an in-flight seek, with
-pause/resume ordering and generation authority preserved; see
+`var/test-runs/media-control-*`. Previously recorded pressure, browser and cleanup
+evidence covers single-intention pause/seek/reconnect and reattachment with the
+earlier encoder output. Rapid native scrubbing also retains the latest queued
+target across an in-flight seek, with pause/resume ordering and generation
+authority preserved; see
 [Playback controls and generations](../part-1-operator-guide/transcoding.md#playback-controls-and-generations).
 That interaction contract has focused backend and player-hook regressions; the
 recorded single-intention drill does not establish browser pressure coverage of
-rapid scrubbing.
+rapid scrubbing. The launch observer still requires the HLS muxer and
+`stream.m3u8` output; the current demultiplexed encoder output needs a separate
+fixture update and qualification before this pressure drill can establish a new
+result.
 
 Observation mode builds a disposable fixture derived from the production image.
 Its test-only FFmpeg wrapper records each video encoder launch before executing
@@ -891,29 +895,44 @@ counts alone cannot prove those properties. Keep the container inspections, nati
 control/execution samples, backlog observations, operator log and cleanup receipts
 with these results, including failed runs.
 
-Run instrumented browser controls through the operator runner's combined fixture:
+Run browser controls against the immutable production worker image through the
+combined deployment runner:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
-BAANDER_TEST_TWO_COMMAND=1 BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1 \
+BAANDER_TEST_IMAGE=baander-worker:test \
+BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
 BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
-  bash scripts/test-worker-operator-container.sh
+  bash scripts/test-two-command-deployment-container.sh
 ```
 
-The separate `scripts/test-two-command-deployment-container.sh` gate uses the
-immutable production worker through `scripts/test-worker-production-container.sh`;
-its image contract forbids observation mode's fixture rebuild. Keep that gate
-separate from this instrumented browser run.
+`BAANDER_TEST_BROWSER_CLIENT_CONTROLS` accepts `0` or `1` and defaults to `0`.
+Enabling it selects `client-controls` independently of native launch observation.
+It requires `BAANDER_TEST_TWO_COMMAND=1` and an executable browser checkpoint;
+the deployment wrapper supplies two-command mode. Invalid values or missing
+prerequisites fail before services start. The production runner selects
+`BAANDER_TEST_USE_IMAGE=1`, preserving the immutable worker-image contract.
+Forgejo enables client controls in its production browser job; the configuration
+alone does not establish a passing run.
 
-With both observation and the browser hook enabled, `client-controls` exercises
-native pause, seek and resume, an offline refresh failure followed by recovery,
-and reload while paused. It checks the canonical session, job and generation,
-then requires decoded frames and the playback clock to advance from the current
-signed rendition set. Individual playback waits have a 45-second watchdog;
-`client-controls` has a 360-second checkpoint request budget. Inspect
-`playback-timeline.json` and the browser's `result.json` or `failure.json` for
-snapshots, control timings, network failures and media events. This browser run
-covers client behavior separately from the dedicated saturated-control drill.
+The browser pauses playback and commits three positions through the movie
+player's full-source slider while holding the first real seek response below the
+five-second client timeout. It requires exactly the first and latest seek
+commands, with the latest using the generation accepted by its predecessor,
+and checks the final source cursor, paused state and unchanged job/session
+ownership. Slider targets can extend beyond the published seekable window.
+
+The paused-remount check captures its cursor only after decoded, seekable media
+is paused, no longer seeking and attached to the current signed rendition set.
+It reloads the movie page, reopens the player and requires the same session, job,
+generation and source cursor. Resuming must advance both decoded frames and the
+playback clock.
+The run also retains offline refresh recovery, web restart, worker recovery,
+subtitle and retired-resource checks. Individual playback waits have a
+45-second watchdog; `client-controls` has a 360-second checkpoint request budget.
+Inspect `playback-timeline.json` and the browser's `result.json` or `failure.json`
+for committed slider positions, snapshots, control timings, network failures and
+media events. These client checks remain separate from the saturated-control
+drill; a production browser result does not qualify that pressure fixture.
 Hardware acceleration, ABR switching, cache-sweep policy and measured FLAC DSP CPU
 cost remain separate qualification work.
 

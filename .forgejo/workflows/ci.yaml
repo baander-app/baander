@@ -107,6 +107,7 @@ jobs:
                 run: |
                     BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
                     BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
                       bash scripts/test-two-command-deployment-container.sh
 
