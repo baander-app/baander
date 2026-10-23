@@ -93,3 +93,38 @@ browser platforms remain open separate items.
 Independent plan review approved the scope before implementation. Fixed explicit
 deadlines and the existing fake auth/sleeper cover deterministic expiry and DASH
 wait behavior without a new production clock abstraction.
+
+## Verification-discovered DASH duration repair
+
+The reference browser rerun exposed a pre-existing completion race. Its final
+native MPD declares a 20-second presentation, while the published audio timeline
+ends at 20.010666667 seconds. A dash.js completion timer can fire in that gap,
+seek to the declared end and pause; its end clamp then moves playback to 19.5
+seconds without a native `ended` event. The failed and previously passing MPDs
+have identical timing after signatures and dates are normalized. The failed run
+and trace remain under `var/test-runs/signed-expiry-reference-browser`.
+
+An isolated probe will reconcile completed Period duration with the last
+sample boundary of the selected tracks. The
+[DASH-IF timing model](https://dashif.org/Guidelines-TimingModel/) maps sample time
+to presentation time using the Period start, presentation-time offset and track
+timescale. For this full-published-tail policy, the completed Period covers the
+maximum selected video/audio end. Remove the redundant MPD presentation-duration
+attribute; clients derive the total from the preserved Period start and explicit
+Period duration. This avoids a new duration parser. Calculate from the supplied
+renditions and canonical audio, not only the primary presentation's tracks.
+Preserve dynamic timing, empty output and media samples. Round the published
+duration upward to microsecond precision so decimal formatting cannot truncate
+the final sample boundary. This is a delivery policy correction, not a claim that
+DASH forbids intentionally clipped periods or that this phase establishes formal
+timing-model conformance.
+
+If the probe confirms natural completion, apply this bounded generator correction
+with failing-before-fix tests for unequal audio/video ends, video-only output,
+presentation-time offsets and Period offsets. Keep the browser's unforced natural
+EOF assertions intact. Rerun affected native comparisons, browser completion and
+static gates, then qualify the final production image. This repair does not claim
+to resolve the separate FFmpeg live DASH demuxer EOF limitation.
+
+Independent review approved this bounded amendment before implementation, subject
+to the isolated probe establishing natural completion.
