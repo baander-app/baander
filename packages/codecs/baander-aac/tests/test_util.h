@@ -3,6 +3,7 @@
 #ifndef BAANDER_AAC_TEST_UTIL_H
 #define BAANDER_AAC_TEST_UTIL_H
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -61,6 +62,27 @@ static std::vector<float> gen_harmonics(int n, int sr, int channels) {
   return pcm;
 }
 
+/* Harmonics of 220 Hz up to 15.4 kHz over a noise bed, so that the band
+ * an SBR encoder describes carries signal; the second channel is quieter
+ * and offset in phase. */
+static std::vector<float> gen_wideband(int n, int sr, int channels) {
+  std::vector<float> pcm((size_t)n * channels);
+  unsigned seed = 777u;
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    for (int c = 0; c < channels; c++) {
+      float v = 0.0f;
+      for (int h = 1; h <= 70; h++) {
+        v += (0.12f / (float)h) * sinf(2.0f * (float)M_PI * 220.0f * (float)h * t + 0.3f * (float)c);
+      }
+      seed = seed * 1664525u + 1013904223u;
+      v += 0.03f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+      pcm[(size_t)i * channels + c] = c ? 0.7f * v : v;
+    }
+  }
+  return pcm;
+}
+
 static std::vector<float> gen_noise(int n, int channels, unsigned seed = 12345u) {
   std::vector<float> pcm((size_t)n * channels);
   for (size_t i = 0; i < pcm.size(); i++) {
@@ -84,6 +106,67 @@ static std::vector<float> gen_transients(int n, int sr, int channels) {
         pcm[(size_t)(start + i) * channels + c] = c ? 0.8f * v : v;
       }
     }
+  }
+  return pcm;
+}
+
+/* A distinct tone and noise bed per channel, so that a channel landing
+ * in the wrong output slot is heard as a large error. */
+static std::vector<float> gen_multichannel(int n, int sr, int channels) {
+  std::vector<float> pcm((size_t)n * channels);
+  unsigned seed = 4242u;
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    for (int c = 0; c < channels; c++) {
+      seed = seed * 1664525u + 1013904223u;
+      const float noise = 0.02f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+      /* Channel 3 is the LFE of the 5.1 and 7.1 layouts: a low tone. */
+      const float f0 = c == 3 ? 60.0f : 220.0f * (float)(c + 1);
+      pcm[(size_t)i * channels + c] = 0.25f * sinf(2.0f * (float)M_PI * f0 * t) +
+                                      0.1f * sinf(2.0f * (float)M_PI * (f0 * 2.5f + 50.0f) * t) +
+                                      noise;
+    }
+  }
+  return pcm;
+}
+
+
+/* The signal behind the committed HE-AAC streams in tests/data: one second
+ * at 48 kHz of tones, a slowly swelling noise bed with energy up to the
+ * top of the band, and a few clicks that make the SBR encoder switch
+ * between its frame classes.  Keep it stable: the streams were encoded
+ * from exactly this signal. */
+static std::vector<float> gen_he_signal(int channels) {
+  const int sr = 48000;
+  const int n = sr;
+  std::vector<float> pcm((size_t)n * channels);
+  unsigned seed = 99u;
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    const float swell = sinf(2.0f * (float)M_PI * 0.7f * t);
+    for (int c = 0; c < channels; c++) {
+      seed = seed * 1664525u + 1013904223u;
+      const float noise = 0.05f * ((float)(seed >> 8) / 8388608.0f - 1.0f) * swell * swell;
+      const float f0 = c == 0 ? 220.0f : 330.0f;
+      float v = 0.3f * sinf(2.0f * (float)M_PI * f0 * t) +
+                0.15f * sinf(2.0f * (float)M_PI * 3.0f * f0 * t + (float)c) +
+                0.08f * sinf(2.0f * (float)M_PI * (2500.0f + 800.0f * (float)c) * t) + noise;
+      pcm[(size_t)i * channels + c] = v;
+    }
+  }
+  const float clicks[3] = {0.21f, 0.52f, 0.83f};
+  for (float at : clicks) {
+    const int start = (int)(at * (float)sr);
+    for (int i = 0; i < 40; i++) {
+      const float w = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / 39.0f));
+      const float v = 0.6f * w * (sinf((float)i) >= 0.0f ? 1.0f : -1.0f);
+      for (int c = 0; c < channels; c++) {
+        pcm[(size_t)(start + i) * channels + c] += c ? -v : v;
+      }
+    }
+  }
+  for (float& v : pcm) {
+    v = std::max(-0.95f, std::min(0.95f, v));
   }
   return pcm;
 }
@@ -116,6 +199,86 @@ static double aligned_snr_db(const std::vector<float>& ref, const std::vector<fl
   return snr_db(ref.data(), out.data() + skip, n);
 }
 
+/* ── filters ────────────────────────────────────────────────────── */
+
+/* Windowed-sinc lowpass of one channel of an interleaved signal. */
+static std::vector<float> lowpass_channel(const std::vector<float>& pcm, int channels, int channel,
+                                          float cutoff, int sr) {
+  const int taps = 255;
+  std::vector<float> h(taps);
+  double sum = 0.0;
+  for (int i = 0; i < taps; i++) {
+    const double k = i - taps / 2;
+    const double x = 2.0 * cutoff / sr * k;
+    const double sinc = k == 0 ? 1.0 : sin(M_PI * x) / (M_PI * x);
+    h[i] = (float)(sinc * (0.5 - 0.5 * cos(2.0 * M_PI * i / (taps - 1))));
+    sum += h[i];
+  }
+  for (float& v : h) {
+    v = (float)(v / sum);
+  }
+  const size_t n = pcm.size() / channels;
+  std::vector<float> out(n, 0.0f);
+  for (size_t i = 0; i < n; i++) {
+    float acc = 0.0f;
+    for (int j = 0; j < taps; j++) {
+      const long k = (long)i + j - taps / 2;
+      if (k >= 0 && (size_t)k < n) {
+        acc += h[j] * pcm[(size_t)k * channels + channel];
+      }
+    }
+    out[i] = acc;
+  }
+  return out;
+}
+
+/* Energy in dB of one channel between `lo` and `hi` Hz, over samples
+ * [from, to). */
+static double band_db(const std::vector<float>& pcm, int channels, int channel, float lo, float hi,
+                      int sr, size_t from, size_t to) {
+  const std::vector<float> a = lowpass_channel(pcm, channels, channel, hi, sr);
+  const std::vector<float> b = lowpass_channel(pcm, channels, channel, lo, sr);
+  double e = 0.0;
+  for (size_t i = from; i < to && i < a.size(); i++) {
+    const double v = (double)a[i] - b[i];
+    e += v * v;
+  }
+  return 10.0 * log10(e + 1e-20);
+}
+
+/* Best SNR of `out` against `ref` over a range of lead-in delays. */
+static double best_aligned_snr_db(const std::vector<float>& ref, const std::vector<float>& out,
+                                  int min_delay, int max_delay, int* delay) {
+  double best = -100.0;
+  for (int d = min_delay; d <= max_delay; d++) {
+    if (out.size() <= (size_t)d + 1024) {
+      break;
+    }
+    const size_t n = std::min(ref.size(), out.size() - d) - 512;
+    const double v = snr_db(ref.data(), out.data() + d, n);
+    if (v > best) {
+      best = v;
+      if (delay) {
+        *delay = d;
+      }
+    }
+  }
+  return best;
+}
+
+static double energy_db(const float* x, size_t n) {
+  double e = 0.0;
+  for (size_t i = 0; i < n; i++) {
+    e += (double)x[i] * x[i];
+  }
+  return 10.0 * log10(e + 1e-20);
+}
+
+/* Committed reference streams. */
+static std::string data_path(const char* name) {
+  return std::string(BAAC_TEST_DATA_DIR) + "/" + name;
+}
+
 /* ── ADTS streams ──────────────────────────────────────────────── */
 
 struct AdtsFrame {
@@ -142,9 +305,9 @@ static std::vector<AdtsFrame> split_adts(const std::vector<uint8_t>& s) {
 /* Encodes a whole signal (including the flush) into one ADTS stream. */
 static std::vector<uint8_t> encode_stream(const std::vector<float>& pcm, int sr, int channels,
                                           int bitrate, AacRateControl rc, int quality = 0,
-                                          int* error = nullptr) {
+                                          int* error = nullptr, AacObjectType aot = AAC_AOT_LC) {
   std::vector<uint8_t> out;
-  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, AAC_AOT_LC, rc);
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {
     if (error) {
       *error = AAC_ERR_INIT;
@@ -192,7 +355,7 @@ static std::vector<float> decode_stream(const std::vector<uint8_t>& stream, int 
     }
     return out;
   }
-  std::vector<float> pcm((size_t)aac_decoder_frame_size(dec) * channels);
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
   int bad = 0;
   for (const AdtsFrame& f : split_adts(stream)) {
     const int n =
@@ -201,7 +364,7 @@ static std::vector<float> decode_stream(const std::vector<uint8_t>& stream, int 
       bad++;
       continue;
     }
-    out.insert(out.end(), pcm.begin(), pcm.begin() + (size_t)n * channels);
+    out.insert(out.end(), pcm.begin(), pcm.begin() + (size_t)n * aac_decoder_channels(dec));
   }
   if (errors) {
     *errors = bad;

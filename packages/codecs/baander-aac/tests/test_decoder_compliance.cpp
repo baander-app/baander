@@ -163,10 +163,10 @@ static void test_stream_parameters() {
   for (size_t i = 0; i + 1 < out.size(); i += 2) {
     diff = std::max(diff, (double)fabs(out[i] - out[i + 1]));
   }
-  CHECK(diff == 0.0, "mono stream duplicated into both channels");
+  CHECK(diff == 0.0, "mono stream goes to both channels");
   std::vector<float> mono(out.size() / 2);
   for (size_t i = 0; i < mono.size(); i++) {
-    mono[i] = out[2 * i];
+    mono[i] = out[2 * i] / 0.70710678f;
   }
   CHECK(aligned_snr_db(pcm, mono, 1, 2048) > 20.0, "32 kHz roundtrip SNR %.1f dB",
         aligned_snr_db(pcm, mono, 1, 2048));
@@ -179,13 +179,151 @@ static void test_stream_parameters() {
   CHECK(errors == 0 && down.size() == split_adts(st_stream).size() * 1024, "downmix length");
   std::vector<float> ref(st.size() / 2);
   for (size_t i = 0; i < ref.size(); i++) {
-    ref[i] = 0.5f * (st[2 * i] + st[2 * i + 1]);
+    ref[i] = 0.70710678f * (st[2 * i] + st[2 * i + 1]);
   }
   CHECK(aligned_snr_db(ref, down, 1, 2048) > 20.0, "downmix SNR %.1f dB",
         aligned_snr_db(ref, down, 1, 2048));
 
   CHECK(aac_decoder_create(37000, 2) == nullptr, "unsupported sample rate refused");
-  CHECK(aac_decoder_create(44100, 3) == nullptr, "three channels refused");
+  CHECK(aac_decoder_create(44100, 9) == nullptr, "nine channels refused");
+}
+
+/* Decodes one of the committed HE-AAC streams (FDK-encoded from
+ * gen_he_signal at 48 kHz, core at 24 kHz, every SBR frame class present)
+ * and checks the stream parameters and the output against the source: the
+ * low band must match it through the core decoder and the filterbanks,
+ * and the high band must come back at about the source's energy. */
+static std::vector<float> check_he_stream(const char* name, int channels, double min_low_db,
+                                          AacDecoderHandle dec) {
+  const std::vector<uint8_t> stream = read_file(data_path(name));
+  CHECK(!stream.empty(), "%s: stream missing", name);
+  int errors = 0;
+  const std::vector<float> out = decode_stream(stream, 48000, 0, &errors, dec);
+  CHECK(errors == 0, "%s: %d frames failed", name, errors);
+  CHECK(aac_decoder_frame_size(dec) == 2048, "%s: frame size %d", name,
+        aac_decoder_frame_size(dec));
+  CHECK(aac_decoder_sample_rate(dec) == 24000, "%s: core rate %d", name,
+        aac_decoder_sample_rate(dec));
+  CHECK(aac_decoder_output_sample_rate(dec) == 48000, "%s: output rate %d", name,
+        aac_decoder_output_sample_rate(dec));
+  CHECK(aac_decoder_channels(dec) == channels, "%s: %d channels", name,
+        aac_decoder_channels(dec));
+  CHECK(out.size() == split_adts(stream).size() * 2048 * channels, "%s: output length %zu", name,
+        out.size());
+  int has_sbr = 0;
+  aac_decoder_get_sbr_ps(dec, &has_sbr, nullptr);
+  CHECK(has_sbr == 1, "%s: SBR not reported", name);
+
+  const std::vector<float> src = gen_he_signal(channels);
+  const std::vector<float> low_src = lowpass_channel(src, channels, 0, 3000.0f, 48000);
+  const std::vector<float> low_out = lowpass_channel(out, channels, 0, 3000.0f, 48000);
+  int delay = 0;
+  const double low = best_aligned_snr_db(low_src, low_out, 4000, 6000, &delay);
+  CHECK(low > min_low_db, "%s: low band %.1f dB against the source (delay %d)", name, low, delay);
+  /* The high band of the source against the decoder's reconstruction. */
+  std::vector<float> high_src(low_src.size()), high_out(low_src.size());
+  for (size_t i = 0; i < low_src.size(); i++) {
+    high_src[i] = src[i * channels] - low_src[i];
+    high_out[i] = out[(i + delay) * channels] - low_out[i + delay];
+  }
+  const double diff = energy_db(high_out.data(), high_out.size() - 2048) -
+                      energy_db(high_src.data(), high_src.size() - 2048);
+  CHECK(fabs(diff) < 4.0, "%s: high band energy off by %.1f dB", name, diff);
+  return out;
+}
+
+static void test_sbr_streams() {
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  check_he_stream("he_mono_24k.aac", 1, 20.0, dec);
+  aac_decoder_reset(dec);
+  check_he_stream("he_stereo_96k.aac", 2, 25.0, dec);
+
+  /* A header change mid-stream resets the SBR tables: the 40 kbit/s and
+   * 96 kbit/s streams use different crossover frequencies, and the second
+   * decodes as well after the first as on its own. */
+  aac_decoder_reset(dec);
+  const std::vector<uint8_t> a = read_file(data_path("he_stereo_40k.aac"));
+  const std::vector<uint8_t> b = read_file(data_path("he_stereo_96k.aac"));
+  std::vector<uint8_t> both(a);
+  both.insert(both.end(), b.begin(), b.end());
+  int errors = 0;
+  const std::vector<float> out = decode_stream(both, 48000, 0, &errors, dec);
+  CHECK(errors == 0, "concatenated streams: %d frames failed", errors);
+  const size_t first = split_adts(a).size() * 2048 * 2;
+  CHECK(out.size() == first + split_adts(b).size() * 2048 * 2, "concatenated length %zu",
+        out.size());
+  const std::vector<float> second(out.begin() + first, out.end());
+  const std::vector<float> src = gen_he_signal(2);
+  const std::vector<float> low_src = lowpass_channel(src, 2, 1, 3000.0f, 48000);
+  const std::vector<float> low_out = lowpass_channel(second, 2, 1, 3000.0f, 48000);
+  int delay = 0;
+  const double low = best_aligned_snr_db(low_src, low_out, 4000, 6000, &delay);
+  CHECK(low > 25.0, "after the header reset: low band %.1f dB", low);
+
+  /* After a reset the decoder is back at the core rate for a plain
+   * LC stream. */
+  aac_decoder_reset(dec);
+  const std::vector<float> lc = gen_tones(48000, 48000, 2);
+  const std::vector<uint8_t> lc_stream = encode_stream(lc, 48000, 2, 128000, AAC_RC_CBR);
+  const std::vector<float> lc_out = decode_stream(lc_stream, 48000, 0, &errors, dec);
+  CHECK(errors == 0 && aac_decoder_frame_size(dec) == 1024 &&
+            aac_decoder_output_sample_rate(dec) == 48000 &&
+            lc_out.size() == split_adts(lc_stream).size() * 1024 * 2,
+        "LC stream after SBR: frame size %d, rate %d", aac_decoder_frame_size(dec),
+        aac_decoder_output_sample_rate(dec));
+  int has_sbr = 1;
+  aac_decoder_get_sbr_ps(dec, &has_sbr, nullptr);
+  CHECK(has_sbr == 0, "LC frames report no SBR");
+
+  /* An HE-AAC v2 stream: the mono element with parametric stereo decodes
+   * to a stereo pair of about the source's level in each channel, and the
+   * two channels are distinct (the source channels are uncorrelated, so
+   * the pair is compared to FFmpeg's decode in the interop suite rather
+   * than to the source). */
+  aac_decoder_reset(dec);
+  const std::vector<uint8_t> ps = read_file(data_path("hev2_stereo_32k.aac"));
+  const std::vector<float> ps_out = decode_stream(ps, 48000, 0, &errors, dec);
+  int has_ps = 0;
+  aac_decoder_get_sbr_ps(dec, &has_sbr, &has_ps);
+  CHECK(errors == 0 && has_sbr == 1 && has_ps == 1, "HE-AAC v2 stream: sbr %d ps %d", has_sbr,
+        has_ps);
+  CHECK(aac_decoder_channels(dec) == 2 && aac_decoder_stream_channels(dec) == 1,
+        "HE-AAC v2 stream: %d output channels from %d stream channels",
+        aac_decoder_channels(dec), aac_decoder_stream_channels(dec));
+  CHECK(ps_out.size() == split_adts(ps).size() * 2048 * 2, "HE-AAC v2 output length %zu",
+        ps_out.size());
+  const std::vector<float> ps_src = gen_he_signal(2);
+  const size_t n = ps_src.size() / 2;
+  std::vector<float> left(n), right(n), src_left(n), src_right(n);
+  for (size_t i = 0; i < n; i++) {
+    left[i] = ps_out[(i + 5000) * 2];
+    right[i] = ps_out[(i + 5000) * 2 + 1];
+    src_left[i] = ps_src[i * 2];
+    src_right[i] = ps_src[i * 2 + 1];
+  }
+  const double left_db = energy_db(left.data(), n - 5000) - energy_db(src_left.data(), n - 5000);
+  const double right_db =
+      energy_db(right.data(), n - 5000) - energy_db(src_right.data(), n - 5000);
+  CHECK(fabs(left_db) < 3.0 && fabs(right_db) < 3.0, "HE-AAC v2 levels off by %.1f / %.1f dB",
+        left_db, right_db);
+  double lr = 0.0, ll = 0.0, rr = 0.0;
+  for (size_t i = 0; i < n; i++) {
+    lr += (double)left[i] * right[i];
+    ll += (double)left[i] * left[i];
+    rr += (double)right[i] * right[i];
+  }
+  CHECK(fabs(lr) / sqrt(ll * rr) < 0.5, "HE-AAC v2 channels correlate at %.2f",
+        lr / sqrt(ll * rr));
+
+  /* With a mono request the pair is downmixed; after a reset the stream
+   * is mono again until PS data is seen. */
+  AacDecoderHandle mono = aac_decoder_create(48000, 1);
+  const std::vector<float> mono_out = decode_stream(ps, 48000, 1, &errors, mono);
+  CHECK(errors == 0 && mono_out.size() == split_adts(ps).size() * 2048, "HE-AAC v2 mono request");
+  aac_decoder_destroy(mono);
+  aac_decoder_reset(dec);
+  CHECK(aac_decoder_channels(dec) == 1, "after reset: %d channels", aac_decoder_channels(dec));
+  aac_decoder_destroy(dec);
 }
 
 int main() {
@@ -193,5 +331,6 @@ int main() {
   test_crc_and_truncation();
   test_random_input();
   test_stream_parameters();
+  test_sbr_streams();
   return test_summary("test_decoder_compliance");
 }

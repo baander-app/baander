@@ -73,9 +73,12 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
         env, "AacDecoder",
         {InstanceMethod("decode", &Decoder::Decode), InstanceMethod("reset", &Decoder::Reset),
          InstanceAccessor("sampleRate", &Decoder::SampleRate, nullptr),
+         InstanceAccessor("coreSampleRate", &Decoder::CoreSampleRate, nullptr),
          InstanceAccessor("channels", &Decoder::Channels, nullptr),
+         InstanceAccessor("streamChannels", &Decoder::StreamChannels, nullptr),
          InstanceAccessor("frameSize", &Decoder::FrameSize, nullptr),
          InstanceAccessor("hasSbr", &Decoder::HasSbr, nullptr),
+         InstanceAccessor("hasPs", &Decoder::HasPs, nullptr),
          InstanceAccessor("errors", &Decoder::Errors, nullptr)});
   }
 
@@ -93,8 +96,8 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
       throw_error(env, "AacDecoder: unsupported sample rate or channel count");
       return;
     }
-    channels_ = channels;
-    pcm_.resize(static_cast<size_t>(aac_decoder_frame_size(handle_)) * channels);
+    /* room for the largest frame at any layout, with SBR */
+    pcm_.resize(static_cast<size_t>(AAC_DECODER_MAX_OUTPUT) * 8);
   }
 
   ~Decoder() override { aac_decoder_destroy(handle_); }
@@ -135,7 +138,8 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
       if (n < 0) {
         errors_++;
       } else {
-        out.insert(out.end(), pcm_.begin(), pcm_.begin() + static_cast<size_t>(n) * channels_);
+        const size_t floats = static_cast<size_t>(n) * aac_decoder_channels(handle_);
+        out.insert(out.end(), pcm_.begin(), pcm_.begin() + floats);
       }
       pos += len;
     }
@@ -148,17 +152,28 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     return result;
   }
 
+  /* Drops pending bytes and the error count and returns the decoder to
+   * its state after creation, so that a new stream can follow. */
   Napi::Value Reset(const Napi::CallbackInfo& info) {
     pending_.clear();
     errors_ = 0;
+    if (handle_) {
+      aac_decoder_reset(handle_);
+    }
     return info.Env().Undefined();
   }
 
   Napi::Value SampleRate(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_output_sample_rate(handle_) : 0);
+  }
+  Napi::Value CoreSampleRate(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_decoder_sample_rate(handle_) : 0);
   }
   Napi::Value Channels(const Napi::CallbackInfo& info) {
-    return Napi::Number::New(info.Env(), channels_);
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_channels(handle_) : 0);
+  }
+  Napi::Value StreamChannels(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_stream_channels(handle_) : 0);
   }
   Napi::Value FrameSize(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_decoder_frame_size(handle_) : 0);
@@ -170,12 +185,18 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     }
     return Napi::Boolean::New(info.Env(), sbr != 0);
   }
+  Napi::Value HasPs(const Napi::CallbackInfo& info) {
+    int ps = 0;
+    if (handle_) {
+      aac_decoder_get_sbr_ps(handle_, nullptr, &ps);
+    }
+    return Napi::Boolean::New(info.Env(), ps != 0);
+  }
   Napi::Value Errors(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), errors_);
   }
 
   AacDecoderHandle handle_ = nullptr;
-  int channels_ = 0;
   int errors_ = 0;
   std::vector<uint8_t> pending_;
   std::vector<float> pcm_;
@@ -192,7 +213,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
          InstanceAccessor("sampleRate", &Encoder::SampleRate, nullptr),
          InstanceAccessor("channels", &Encoder::Channels, nullptr),
          InstanceAccessor("frameSize", &Encoder::FrameSize, nullptr),
-         InstanceAccessor("delay", &Encoder::Delay, nullptr)});
+         InstanceAccessor("delay", &Encoder::Delay, nullptr),
+         InstanceAccessor("profile", &Encoder::Profile, nullptr)});
   }
 
   explicit Encoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Encoder>(info) {
@@ -200,6 +222,7 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     int bitrate = 128000;
     int quality = 0;
     AacRateControl rc = AAC_RC_CBR;
+    AacObjectType aot = AAC_AOT_LC;
     sample_rate_ = 44100;
     channels_ = 2;
     if (info.Length() > 0 && info[0].IsObject()) {
@@ -223,10 +246,24 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
           return;
         }
       }
+      if (o.Has("profile") && o.Get("profile").IsString()) {
+        const std::string profile = o.Get("profile").As<Napi::String>();
+        if (profile == "lc") {
+          aot = AAC_AOT_LC;
+        } else if (profile == "he") {
+          aot = AAC_AOT_SBR;
+        } else if (profile == "hev2") {
+          aot = AAC_AOT_PS;
+        } else {
+          throw_error(env, "AacEncoder: profile must be lc, he or hev2");
+          return;
+        }
+      }
     }
-    handle_ = aac_encoder_create(sample_rate_, channels_, bitrate, AAC_AOT_LC, rc);
+    profile_ = aot == AAC_AOT_LC ? "lc" : aot == AAC_AOT_SBR ? "he" : "hev2";
+    handle_ = aac_encoder_create(sample_rate_, channels_, bitrate, aot, rc);
     if (!handle_) {
-      throw_error(env, "AacEncoder: unsupported sample rate, channel count or bitrate");
+      throw_error(env, "AacEncoder: unsupported sample rate, channel count, bitrate or profile");
       return;
     }
     if (quality && aac_encoder_set_quality(handle_, quality) != AAC_OK) {
@@ -237,7 +274,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     }
     frame_size_ = aac_encoder_frame_size(handle_);
     block_.resize(static_cast<size_t>(frame_size_) * channels_);
-    out_.resize(16384);
+    /* the flush writes up to three frames back to back */
+    out_.resize(static_cast<size_t>(aac_encoder_max_frame_bytes(handle_)) * 3);
   }
 
   ~Encoder() override { aac_encoder_destroy(handle_); }
@@ -318,11 +356,15 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   Napi::Value Delay(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_encoder_delay(handle_) : 0);
   }
+  Napi::Value Profile(const Napi::CallbackInfo& info) {
+    return Napi::String::New(info.Env(), profile_);
+  }
 
   AacEncoderHandle handle_ = nullptr;
   int sample_rate_ = 0;
   int channels_ = 0;
   int frame_size_ = 0;
+  std::string profile_;
   std::vector<float> pending_;
   std::vector<float> block_;
   std::vector<uint8_t> out_;

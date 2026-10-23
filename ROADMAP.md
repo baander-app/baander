@@ -646,6 +646,58 @@ remaining FDK elements were compared and not ported: the rate loop here
 bisects on bits where FDK estimates from perceptual entropy, and FDK's
 scalefactor assimilation is a broader form of the smoothing here.
 
+Checkpoint, 2026-10-23, feature completion: the codec now covers the
+[plan](docs/plans/2026-10-23-001-feat-aac-codec-feature-complete-plan.md)
+in full. Decoder: every raw data block element (SCE, CPE, LFE, coupling
+channel elements in both modes, program config elements), channel
+configurations 1 to 7, 11 and 12 with their standard layouts, PCE and
+sniffed layouts, multi-block ADTS frames, state reset on a parameter
+change, stereo and mono downmixes with FFmpeg's coefficients, spectral
+band replication (every frame class, the header reset, elements without
+SBR data kept in step) and parametric stereo (10, 20 and 34 bands, IPD
+and OPD parsed and applied; the 34-band and phase paths are ported from
+the standard but no reference stream exercises them). Encoder: one to
+eight channels as the standard layouts (6.1 through a PCE), the trace's
+fixes (scalefactor difference clamp on empty bands, refused small output
+buffers, quality re-derivation, full reset on flush, the ADTS shift), and
+HE-AAC v1 and v2 through an SBR encoder (FDK's tuning table, transient
+detection with parity-consistent envelope borders, envelope and noise
+floor estimation, inverse filtering, delta coding, implicit signalling in
+a fill element per element) and a parametric stereo encoder (IID and ICC
+on the coarse grids, energy-preserving downmix, no phase parameters). The
+core lowpass of each SBR element is its own crossover; a shared lowpass
+left holes in the upper bands of multichannel streams. The binding gains
+the profile option and the stream, PS and output-rate properties; the
+Electron service, IPC validation and bridge types follow. The reference
+comparison records the HE-AAC measurements.
+
+Deviations from the plan, by design: the SBR encoder has no joint rate
+loop with the core; the fill element's bits are part of the frame budget
+and the core's bandwidth and noise targets are set from the bitrate left
+after an estimate of the SBR bits. The 6.1 layout is signalled with a PCE
+in every frame rather than configuration 11, which the ADTS header cannot
+carry. The PS encoder sends no IPD or OPD.
+
+Verification: CTest 10/10 in the release build and in the address and
+undefined-behaviour sanitizer build (a leak in the bitstream test's own
+code was fixed on the way). The HE-AAC round trips decode at the input
+rate with SBR and PS, land the declared delay of 5635 samples, keep the
+low band above the floors (18 dB mono at 32 kbit/s, 14 dB stereo and 5.0,
+10 and 7 dB for HE v2 at 32 and 24 kbit/s) and the 9 to 12 kHz band within
+3 dB of the source, and hold CBR within 6 percent; FFmpeg 6.1.1 decodes
+our HE-AAC v1 (mono, stereo, 5.1) and v2 streams identically to our
+decoder (129 to 134 dB). Against the FDK encoder at equal settings the
+decoded band levels agree within 0.5 dB, transients land in the same
+64-sample slot, and the low band is within 1 dB on mono and HE v2 and
+2 to 3 dB behind on stereo HE v1 at 64 kbit/s, where our stream is also
+2 percent smaller. The binding's smoke test (AAC-LC, HE v1, HE v2, the
+refused configurations) passes on Node 22 with the rebuilt module; the
+Electron service suite passes with the binding (5 tests, including the
+new HE v2 session case). The Electron IPC and bridge suites were not run
+here: the app's dependencies could not be installed (the Yarn 4 download
+is refused by the build environment's proxy) and the IPC suite's module
+mocks need the Node 26 API. Not possible here: listening tests.
+
 ## Concurrent playlist appends
 
 Checkpoint, 2026-10-22: playlist additions carry append intent and the actor's

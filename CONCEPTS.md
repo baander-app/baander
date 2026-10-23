@@ -278,3 +278,23 @@ A comparison of one recorded synchronous action with the current registered pure
 transition, calculated from detached captured data. It reports match, mismatch or
 unavailable and leaves live application state and recorder history unchanged. Its
 initial scope is the catalog selection store's `select` and `clear` actions.
+
+## Audio codec
+
+### HE-AAC profile
+
+The object type an AAC stream or encoder session uses: AAC-LC codes the whole spectrum; HE-AAC v1 adds spectral band replication, HE-AAC v2 adds parametric stereo on top. The native binding and the Electron service name them `lc`, `he` and `hev2`. The ADTS header of an HE-AAC stream still names the AAC-LC profile and the core rate; a decoder recognises the profile from the data it carries.
+
+### Spectral band replication
+
+The HE-AAC tool that codes only the lower half of the spectrum with AAC-LC at half the sample rate and reconstructs the upper half from it, guided by per-frame envelope energies, noise floors and inverse filtering levels carried in a fill element after each channel element. A stream's output rate is twice its core rate once it carries SBR data, and a frame is 2048 samples.
+*Avoid: SBR as a separate stream or codec.*
+
+### Parametric stereo
+
+The HE-AAC v2 tool that codes a stereo pair as one SBR channel plus per-band intensity differences and coherence; the decoder widens the mono core to two channels. A stream carrying it has one stream channel and two output channels.
+
+### Codec delay
+
+Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles. The encoder reports it and its flush drains it.
+

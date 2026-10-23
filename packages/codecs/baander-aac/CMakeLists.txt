@@ -36,9 +36,10 @@ endif()
 
 set(BAAC_AAC_SOURCES
     src/tables.cpp src/aac_cpu.cpp src/dsp.cpp src/fft.cpp src/mdct.cpp
-    src/ics.cpp src/bitstream.cpp src/api.cpp)
-set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp)
-set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/encoder.cpp)
+    src/ics.cpp src/bitstream.cpp src/channel_map.cpp src/qmf.cpp src/sbr_tables.cpp src/sbr_freq.cpp src/ps_hybrid.cpp
+    src/api.cpp)
+set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/sbr_dec.cpp src/ps_dec.cpp)
+set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp)
 
 set(BAAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")

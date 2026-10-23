@@ -11,12 +11,16 @@ set(TEST_SOURCES
     test_ratecontrol.cpp
     test_tools.cpp
     test_interop.cpp
+    test_layouts.cpp
+    test_qmf.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src})
     target_link_libraries(${test_name} PRIVATE baander-aac)
+    target_compile_definitions(${test_name} PRIVATE
+        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
     if(UNIX)
         target_link_libraries(${test_name} PRIVATE m)
     endif()

@@ -5,7 +5,8 @@
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream.
  * mode: cbr (default), abr, cvbr, tvbr.  The decoder follows the ADTS
- * headers, so rate and channels only set the output layout. */
+ * headers, so rate and channels only set the output layout (0 keeps the
+ * stream's channels). */
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -44,8 +45,8 @@ static FILE* open_out(const char* path) {
 static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
-          "[quality]\n"
-          "       baac dec <in.aac> <out.f32le> [rate] [channels]\n");
+          "[quality] [lc|he|hev2]\n"
+          "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n");
   return 2;
 }
 
@@ -64,12 +65,17 @@ static int encode(int argc, char** argv) {
          : mode == "tvbr" ? AAC_RC_TVBR
                           : AAC_RC_CBR;
   }
-  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, AAC_AOT_LC, rc);
+  AacObjectType aot = AAC_AOT_LC;
+  if (argc > 9) {
+    const std::string profile = argv[9];
+    aot = profile == "he" ? AAC_AOT_SBR : profile == "hev2" ? AAC_AOT_PS : AAC_AOT_LC;
+  }
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {
     fprintf(stderr, "baac: unsupported encoder configuration\n");
     return 1;
   }
-  if (argc > 8) {
+  if (argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
   const std::vector<uint8_t> in = read_all(argv[2]);
@@ -122,7 +128,7 @@ static int decode(int argc, char** argv) {
   }
   const std::vector<uint8_t> in = read_all(argv[2]);
   FILE* out = open_out(argv[3]);
-  std::vector<float> pcm((size_t)aac_decoder_frame_size(dec) * channels);
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
   size_t pos = 0;
   int frames = 0;
   int errors = 0;
@@ -139,7 +145,7 @@ static int decode(int argc, char** argv) {
     if (n < 0) {
       errors++;
     } else {
-      fwrite(pcm.data(), sizeof(float), (size_t)n * channels, out);
+      fwrite(pcm.data(), sizeof(float), (size_t)n * aac_decoder_channels(dec), out);
     }
     pos += len;
     frames++;
@@ -147,8 +153,9 @@ static int decode(int argc, char** argv) {
   if (out != stdout) {
     fclose(out);
   }
-  fprintf(stderr, "baac: %d frames, %d errors, %d Hz\n", frames, errors,
-          aac_decoder_sample_rate(dec));
+  fprintf(stderr, "baac: %d frames, %d errors, %d Hz, %d channels (stream %d)\n", frames, errors,
+          aac_decoder_output_sample_rate(dec), aac_decoder_channels(dec),
+          aac_decoder_stream_channels(dec));
   aac_decoder_destroy(dec);
   return errors ? 1 : 0;
 }
