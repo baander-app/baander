@@ -45,12 +45,23 @@ twice the core rate until a reset: `aac_decoder_frame_size` becomes 2048,
 `aac_decoder_output_sample_rate` twice `aac_decoder_sample_rate`, and
 elements without SBR data (an LFE, say) pass through the same filterbanks
 so that all channels keep the same delay. `aac_decoder_get_sbr_ps` reports
-SBR and parametric stereo data in the last frame; parametric stereo is
-parsed but not yet applied, so an HE-AAC v2 stream decodes as its mono
-SBR channel. Against FFmpeg's decoder the SBR output agrees to floating
-point precision (100 to 134 dB difference SNR) on FDK-encoded HE-AAC v1
-streams at 44.1 and 48 kHz, mono, stereo and 5.1, constant and variable
-bitrate.
+SBR and parametric stereo data in the last frame.
+
+An HE-AAC v2 stream (a mono element whose SBR extension carries
+parametric stereo, ISO/IEC 14496-3 8.6.4) decodes to a stereo pair: the
+PS data (IID, ICC and, when present, IPD and OPD parameters in 10, 20 or
+34 bands) is parsed from the SBR extension, and the 64-band QMF signal
+goes through the hybrid filterbank, the decorrelator with its
+fractional-delay all-pass links and transient attenuation, and the
+interpolated mixing matrices before both channels are synthesized. Once
+the element has carried PS data `aac_decoder_channels` reports 2 for a
+stream request of 0 until a reset, while `aac_decoder_stream_channels`
+stays 1. Against FFmpeg's decoder the SBR and PS output agrees to
+floating point precision (100 to 134 dB difference SNR on HE-AAC v1,
+125 to 128 dB on HE-AAC v2) on FDK-encoded streams at 44.1 and 48 kHz,
+mono, stereo and 5.1, constant and variable bitrate. The 34-band and
+IPD/OPD paths follow the standard but are not covered by the test
+streams, which FDK encodes with 20 bands and without phase parameters.
 
 ### Encoder
 
@@ -262,7 +273,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR decoder, psychoacoustics, encoder, coding tools, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR and PS decoders, psychoacoustics, encoder, coding tools, SIMD
 tools/        baac command-line tool
 tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
@@ -284,5 +295,10 @@ structure of FFmpeg's `libavcodec/aacsbr_template.c` as the reference
 for the processing order and buffer layout; its Huffman trees, the
 noise table and the QMF prototype are ISO/IEC 14496-3 data (Tables
 4.A.87 and 4.A.90 and the SBR codebooks), and the filterbank
-conventions were pinned against FFmpeg's and FAAD2's banks. The
-HE-AAC test streams were encoded with the Fraunhofer FDK encoder.
+conventions were pinned against FFmpeg's and FAAD2's banks. The PS
+decoder is written from ISO/IEC 14496-3 8.6.4 with the structure of
+FFmpeg's `libavcodec/aacps.c` as the reference for the buffer layout and
+the hybrid filter alignment; its Huffman codebooks, band mappings,
+quantization tables and filter prototypes are ISO/IEC 14496-3 data
+(Tables 8.20 to 8.49). The HE-AAC test streams were encoded with the
+Fraunhofer FDK encoder.

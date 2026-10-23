@@ -96,7 +96,8 @@ int aac_decoder_frame_size(AacDecoderHandle ctx);
 int aac_decoder_sample_rate(AacDecoderHandle ctx);
 /* Sample rate of the output: twice the core rate while SBR is decoded. */
 int aac_decoder_output_sample_rate(AacDecoderHandle ctx);
-/* Channels of the output (the requested count, or the stream's with 0). */
+/* Channels of the output: the requested count, or with 0 the stream's,
+ * which is 2 for a mono stream once it has carried parametric stereo. */
 int aac_decoder_channels(AacDecoderHandle ctx);
 /* Channels the last decoded frame carried. */
 int aac_decoder_stream_channels(AacDecoderHandle ctx);

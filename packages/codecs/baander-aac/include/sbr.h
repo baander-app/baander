@@ -5,6 +5,7 @@
 
 #include "aac_tables.h"
 #include "bitstream.h"
+#include "ps.h"
 #include "qmf.h"
 
 #ifdef __cplusplus
@@ -20,7 +21,9 @@ extern "C" {
  * envelope and noise-floor adjustment with gain limiting and sinusoid
  * insertion, and 64-band synthesis.  An element whose stream carries no
  * SBR data is upsampled through the same filterbanks so that every
- * channel of a frame keeps the same delay. */
+ * channel of a frame keeps the same delay.  A single channel element
+ * that carries parametric stereo data can be asked for a stereo pair:
+ * the PS decoder then builds the right channel from the left one. */
 
 #define AAC_SBR_SLOTS 16          /* envelope time slots per frame */
 #define AAC_SBR_QMF_SLOTS 32      /* QMF slots per frame */
@@ -107,6 +110,7 @@ using AacSbrState = struct AacSbrState_ {
   float s_m[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   float gain[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   int ps_present; /* the frame carried parametric stereo data */
+  AacPsState ps;  /* parametric stereo of a single channel element */
 };
 
 /* Prepares the state for a core sample rate; the SBR rate is twice it. */
@@ -122,8 +126,10 @@ int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count
 
 /* Upsamples and, when SBR data is active, reconstructs the high band of
  * the element's channels in place: each buffer holds 1024 core samples at
- * full scale 1.0 on entry and 2048 output samples on return.  `right` is
- * NULL for a single channel. */
+ * full scale 1.0 on entry and 2048 output samples on return.  For a CPE
+ * `right` is the second channel; for an SCE a non-NULL `right` requests
+ * parametric stereo output, which is a copy of the left channel while no
+ * PS data is active. */
 void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right);
 
 /* Tables (sbr_tables.cpp). */

@@ -681,11 +681,13 @@ int read_channel_pair(AacSbrState* s, AacBitReader* r) {
   return 0;
 }
 
-/* sbr_extension(): parametric stereo is noted and skipped until the PS
- * decoder consumes it; anything else is padding. */
+/* sbr_extension(): parametric stereo data of a single channel element
+ * goes to the PS decoder; anything else is padding. */
 void read_extension(AacSbrState* s, AacBitReader* r, int id, int* bits_left) {
-  if (id == kExtensionPs) {
+  if (id == kExtensionPs && s->elem_type == AAC_ELEM_SCE) {
     s->ps_present = 1;
+    *bits_left -= aac_ps_read_data(&s->ps, r, *bits_left);
+    return;
   }
   aac_bitreader_skip(r, *bits_left);
   *bits_left = 0;
@@ -1244,6 +1246,7 @@ void aac_sbr_init(AacSbrState* s, int core_sample_rate) {
     aac_qmf_analysis_init(&s->data[c].analysis, 32);
     aac_qmf_synthesis_init(&s->data[c].synthesis, 64);
   }
+  aac_ps_init(&s->ps);
 }
 
 int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count, int elem_type) {
@@ -1280,7 +1283,8 @@ int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count
 }
 
 void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
-  const int nch = right ? 2 : 1;
+  const int nch = elem_type == AAC_ELEM_CPE && right ? 2 : 1;
+  const bool ps_output = elem_type == AAC_ELEM_SCE && right;
   if (elem_type != s->elem_type) {
     aac_sbr_turnoff(s);
   }
@@ -1320,7 +1324,14 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
     }
     x_gen(s, s->X[c], ch->Y[1 - ch->Ypos], ch->Y[ch->Ypos], s->X_low, c);
   }
-  for (int c = 0; c < nch; c++) {
+  if (ps_output) {
+    if (s->ps.start) {
+      aac_ps_apply(&s->ps, s->X[0], s->X[1], s->kx[1] + s->m[1]);
+    } else {
+      memcpy(s->X[1], s->X[0], sizeof(s->X[0]));
+    }
+  }
+  for (int c = 0; c < (ps_output ? 2 : nch); c++) {
     AacSbrChannel* ch = &s->data[c];
     float* pcm = c ? right : left;
     for (int i = 0; i < kSlots; i++) {
