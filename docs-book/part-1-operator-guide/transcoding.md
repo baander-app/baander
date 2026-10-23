@@ -34,6 +34,15 @@ Requests remain valid during the integer second named by the expiry and are
 refused from the following second. Expiry does not interrupt a response admitted
 before the deadline or remove bytes already buffered by the player.
 
+The web video player obtains a newer signed URL near expiry while preserving its
+local position and play or pause intent. Renewal waits for an active seek or
+position restoration to finish and does not start a new execution. A media network
+failure after expiry or an observed signing outage permits one replacement of
+the affected attachment, preserving its position when signing succeeds again.
+Temporary signing failures preserve accepted playback state, including pending
+restoration. Decoder errors, failed play requests and explicit signing refusals
+remain playback failures.
+
 ## Quality Tiers
 
 The quality ladder defines six HEVC tiers. The client selects a tier at session creation time based on its capabilities and available bandwidth.
@@ -118,8 +127,8 @@ Signing returns the current job, generation, revision, readiness, position and d
 
 Readiness requires a closed, available fragment at the desired playback cursor,
 for running and paused sessions alike. Resuming a still-encoding rendition does
-not bypass this check. A native media error remains a playback error; the pause
-event it causes does not persist a new user pause.
+not bypass this check. A pause event caused by a media error does not persist a
+new user pause.
 
 ### Worker learning state
 

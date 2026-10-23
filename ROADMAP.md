@@ -991,3 +991,51 @@ additional browser platforms and the separate native pressure observer remain
 open. The production runner exited zero and verified removal of its resources.
 Existing application databases, Redis and media storage were not reused or reset.
 This checkpoint includes no push or feature merge.
+
+### Automatic browser capability renewal — 2026-10-23
+
+The web video player now uses a newer signed URL near the attached capability's
+expiry, preserving its local cursor and play or pause intent. Renewal waits for
+seek and restoration ownership to settle without creating another execution.
+An observed signing outage or expired capability permits one fresh attachment
+following a media network failure. Capturing the cursor before HLS teardown
+preserves recovery position; temporary signing failures retain accepted playback
+state. Decoder errors, failed play requests and explicit signing refusals remain
+terminal.
+
+Verification in the CI runner passed 116 tests across four suites: 101 hook,
+nine adapter, two import and four overlay tests. The initial two renewal
+regressions failed on unchanged source. Typechecking, the production build and
+asset verification passed. Full lint reported zero errors and eight warnings
+outside the changed files. Final receipts and `*-complete.log` logs are under
+`var/test-runs/browser-capability-renewal-gates`; `verification-summary.json`
+records application and worker-image revision `4bb4ca27`. Earlier failed and
+intermediate logs remain available.
+
+Production acceptance passed all eight phases in Chromium 148.0.7778.96. The
+paused renewal retained cursor 1.492748 seconds through the original deadline
+and its URL's 403 response at the following second. Running renewal advanced the
+replacement attachment from 10.179827 to 11.191456 seconds and from 34 to 64
+decoded frames. Both intervals fetched a new master and audio/video resources
+while retaining exactly the same job, generation and rendition set, without a
+seek. Web restart also recovered an unexpired capability with the same set:
+attachment 13 became 14 after a signing connection failure and media teardown,
+restoring local cursor 18 seconds with four decoded frames.
+
+The browser checks treat rendition sets as current published coverage: they may
+grow or shrink. Each successful renewal observation requires a stable set; a
+failed signing poll must preserve the existing attachment, while a fresh accepted
+snapshot with a changed set may replace it with decoded media at the saved
+cursor. Rapid-seek gestures must change the actual slider value. The same run
+retained the backend expiry check: 31 HLS and 27 DASH URLs each refused tampered
+and expired access, giving 58 responses of 403 in each check; authenticated
+renewal delivered 62 resources with status 200. Browser and expiry summaries are
+under `var/test-runs/browser-capability-renewal-production-run-7`, alongside the
+verified cleanup receipt. The runner exited zero and removed its resources.
+
+Real-browser renewal qualification covers Chromium with HLS.js. Native HLS,
+additional browser platforms, full live FFmpeg DASH EOF, formal CMAF conformance,
+DASH subtitles and the separate native pressure observer remain unqualified.
+Running progress and control outages were not qualified by these signing and
+media-delivery checks. Existing application databases, Redis and media storage
+were not reused or reset. This checkpoint includes no push or feature merge.

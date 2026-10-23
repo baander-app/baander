@@ -1,7 +1,7 @@
 ---
 title: Renew attached browser playback capabilities
 date: 2026-10-23
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -53,6 +53,10 @@ remain terminal even after an outage, as does an initial signing failure.
 The capability requirement also applies when recovery expands the rendition set
 within the same execution. Every fresh attachment consumes the outage marker,
 including replacements for changed renditions or generations.
+An explicit seek accepted during recovery supersedes the saved pre-failure cursor.
+After its acknowledgement chain settles, a same-generation acceptance must restore
+the canonical accepted position on a fresh attachment; it cannot wait for the
+released attachment to become ready.
 
 The adapter fences callbacks before reporting failure, but destroys its captured
 HLS instance only after the hook has retained the cursor. Destruction can reset the
@@ -124,3 +128,35 @@ production image before repeating complete acceptance.
 Independent review accepted the amendment with the explicit capability guard for
 same-execution recovery when the rendition set changes; that guard is included
 above.
+
+## Delivered verification
+
+Application revision `4bb4ca27` implements renewal and observed-outage recovery.
+Independent review accepted the final changes after the capability and accepted
+seek guards were applied. Failing regressions cover renewal, outage recovery,
+teardown ordering and the combined recovery/seek/rendition-change case.
+
+The CI runner passed 116 tests across four suites: 101 hook, nine adapter, two
+import and four overlay tests. Typechecking, the production build and asset
+verification passed. Full lint reported zero errors and eight warnings outside
+the changed files. Final logs end in `-complete.log` under
+`var/test-runs/browser-capability-renewal-gates`; its `verification-summary.json`
+records the tested application revision and production image.
+
+The complete production lifecycle passed all eight phases in Chromium
+148.0.7778.96, including web restart, worker containment and recovery. Paused and
+running renewal each crossed the original capability's deadline, observed its
+403 refusal and delivered newly signed media without a seek or execution change.
+The paused cursor remained at 1.492748 seconds; running playback advanced from
+34 to 64 decoded frames within the replacement attachment. Web restart exercised
+recovery of an unexpired capability with the same rendition set and restored the
+native cursor at 18 seconds. The runner exited zero and verified cleanup.
+Receipts are under `var/test-runs/browser-capability-renewal-production-run-7`.
+
+Backend expiry acceptance remained intact: 58 tampered and 58 expired requests
+returned 403, and authenticated renewal delivered 62 resources with status 200.
+This phase changes no backend, API or schema and claims no new full backend-suite
+run. Real native-HLS browsers, additional browser platforms, full live FFmpeg
+DASH EOF, formal CMAF conformance, DASH subtitles, the separate native pressure
+observer and running progress/control outages remain unqualified. ROADMAP.md
+records this checkpoint; all changes remain local pending a push request.
