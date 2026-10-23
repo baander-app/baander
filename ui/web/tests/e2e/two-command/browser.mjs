@@ -32,6 +32,18 @@ await context.addInitScript(() => {
   }
 })
 const page = await context.newPage()
+let shortSigningLifetime = true
+await page.route('**/api/stream/sign', async route => {
+  if (!shortSigningLifetime || route.request().method() !== 'POST') {
+    await route.continue()
+    return
+  }
+  const response = await route.fetch({
+    postData: { ...route.request().postDataJSON(), expiresInSeconds: 12 },
+    timeout: 4500,
+  })
+  await route.fulfill({ response })
+})
 let video
 let snapshot
 let initialGeneration
@@ -47,6 +59,15 @@ const previousMediaEvents = []
 const networkInterruptions = []
 const manifestEvidence = []
 const mediaRequestOrder = []
+const capabilityRenewals = []
+const attachedCapabilities = new Map()
+function capabilityEvidence(url) {
+  const expires = Number(url.searchParams.get('exp'))
+  return {
+    expires: Number.isSafeInteger(expires) && expires > 0 ? expires : null,
+    capability: createHash('sha256').update(url.href).digest('hex'),
+  }
+}
 const requestAttachments = new WeakMap()
 let attachmentNumber = 0
 let attachedRenditionSet = null
@@ -141,7 +162,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -159,11 +180,12 @@ page.on('request', request => {
     if (url.pathname.endsWith('/master.m3u8')) {
       attachmentNumber++
       attachedRenditionSet = url.searchParams.get('set')
+      attachedCapabilities.set(attachmentNumber, { url: url.href, at: Date.now(), attachment: attachmentNumber, ...capabilityEvidence(url) })
     }
     requestAttachments.set(request, attachmentNumber)
     mediaRequestOrder.push({ at: Date.now(), attachment: attachmentNumber, renditionSet: attachedRenditionSet, path: url.pathname,
       track: /\/tracks\/(video|audio)\//.exec(url.pathname)?.[1] ?? null,
-      generation: url.searchParams.get('generation'), index: url.searchParams.get('index') })
+      generation: url.searchParams.get('generation'), index: url.searchParams.get('index'), ...capabilityEvidence(url) })
   }
   if (request.method() !== 'POST' || !/^\/api\/transcode\/sessions\/[^/]+\/position$/.test(url.pathname)) return
   try {
@@ -183,7 +205,8 @@ page.on('response', async response => {
       const next = await response.json()
       const accepted = !snapshot || next.jobId !== snapshot.jobId
         || (next.generation >= snapshot.generation && next.revision >= snapshot.revision)
-      appendBounded(playbackSnapshots, { at: Date.now(), accepted, ...safePlayback(next) }, 100)
+      appendBounded(playbackSnapshots, { at: Date.now(), accepted, ...safePlayback(next),
+        ...(typeof next.url === 'string' ? capabilityEvidence(new URL(next.url, response.url())) : {}) }, 100)
       if (accepted) {
         snapshot = next
       }
@@ -199,7 +222,7 @@ page.on('response', async response => {
   }
   if (url.pathname.startsWith('/api/transcode/') && /(?:\.m3u8|\/init\.mp4|\/segment\.m4s)$/.test(url.pathname)) {
     const track = /\/tracks\/(video|audio)\//.exec(url.pathname)?.[1] ?? null
-    appendBounded(mediaResponses, { at: Date.now(), path: url.pathname, track, generation: url.searchParams.get('generation'), index: url.searchParams.get('index'), status: response.status() })
+    appendBounded(mediaResponses, { at: Date.now(), attachment: requestAttachments.get(response.request()) ?? null, path: url.pathname, track, generation: url.searchParams.get('generation'), index: url.searchParams.get('index'), status: response.status(), ...capabilityEvidence(url) })
     await captureNativeResponse(response, url)
   }
 })
@@ -340,6 +363,95 @@ async function pausePlayback(owner, action) {
   await until(async () => (await mediaState()).paused && snapshot?.status === 'paused', 'native pause to commit')
   samePlayback(owner)
   await recordClientControl(action, started)
+}
+
+async function renewPlaybackCapabilities(owner) {
+  const seekCount = () => playbackControls.filter(control => control.action === 'seek').length
+  const seeksBefore = seekCount()
+  const renditionSet = snapshot.renditionSet
+  const unchangedExecution = () => {
+    samePlayback(owner)
+    assert.equal(snapshot.renditionSet, renditionSet, 'Capability renewal must retain the published rendition set')
+    assert.equal(seekCount(), seeksBefore, 'Capability renewal must not submit source seeks')
+  }
+  const hasDelivery = capability => mediaResponses.some(item => item.attachment === capability.attachment
+    && item.status === 200 && item.path.endsWith('/master.m3u8'))
+    && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === capability.attachment
+      && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')
+      && item.expires === capability.expires))
+  const readyCapability = async () => {
+    let selected
+    await until(async () => {
+      const candidate = attachedCapabilities.get(attachmentNumber)
+      const state = await mediaState()
+      if (candidate?.expires && hasDelivery(candidate) && state.ready >= 2 && state.decodedFrames > 0
+        && !state.seeking && state.error === null && currentSource(state)) selected = candidate
+      return Boolean(selected)
+    }, 'a decoded attachment with genuine short-lived signed delivery', 15000)
+    return selected
+  }
+  const crossDeadline = async mode => {
+    const original = await readyCapability()
+    const before = await mediaState()
+    assert.equal(before.paused, mode === 'paused')
+    assert(original.expires * 1000 - Date.now() <= 12000, 'Renewal must observe an actually attached short-lived capability')
+    const proof = { mode, startedAt: Date.now(), original: {
+      attachment: original.attachment, expires: original.expires, capability: original.capability,
+    }, before: { time: before.time, decodedFrames: before.decodedFrames, paused: before.paused } }
+    capabilityRenewals.push(proof)
+    await until(() => Date.now() >= (original.expires + 1) * 1000,
+      `the ${mode} attachment deadline to pass its final valid integer second`, 14000)
+    unchangedExecution()
+    const refusal = await context.request.get(original.url, { timeout: 5000 })
+    proof.refusal = { at: Date.now(), status: refusal.status() }
+    await refusal.dispose()
+    assert.equal(proof.refusal.status, 403, 'The original attached capability must be refused after expiry')
+    let renewed
+    let runningBaseline
+    await until(async () => {
+      unchangedExecution()
+      const candidate = attachedCapabilities.get(attachmentNumber)
+      const state = await mediaState()
+      if (mode === 'running' && candidate?.expires > original.expires && hasDelivery(candidate)
+        && state.ready >= 2 && !state.seeking && state.error === null
+        && runningBaseline?.attachment !== candidate.attachment) {
+        runningBaseline = { attachment: candidate.attachment, at: Date.now(),
+          time: state.time, decodedFrames: state.decodedFrames }
+      }
+      const valid = candidate?.expires > original.expires && candidate.expires * 1000 > Date.now() && hasDelivery(candidate)
+        && state.connected && state.ready >= 2 && state.error === null && !state.seeking
+        && currentSource(state) && state.paused === before.paused
+        && (mode === 'paused' ? Math.abs(state.time - before.time) < 0.1
+          : runningBaseline && state.time > before.time + 1 && state.time > runningBaseline.time + 1
+            && state.decodedFrames > runningBaseline.decodedFrames)
+      if (valid) renewed = { candidate, state }
+      return valid
+    }, `${mode} playback to use renewed signed media across the old deadline`, 15000)
+    if (runningBaseline) proof.runningBaseline = runningBaseline
+    proof.renewed = { attachment: renewed.candidate.attachment, expires: renewed.candidate.expires,
+      capability: renewed.candidate.capability, requestedAt: renewed.candidate.at }
+    proof.after = { at: Date.now(), time: renewed.state.time,
+      decodedFrames: renewed.state.decodedFrames, paused: renewed.state.paused }
+    await recordClientControl(`capability-renewal-${mode}`, proof.startedAt)
+  }
+  await pausePlayback(owner, 'capability-renewal-pause')
+  await crossDeadline('paused')
+  await resumeAndDecode(owner, 'capability-renewal-resume')
+  await crossDeadline('running')
+  shortSigningLifetime = false
+  let normalBaseline
+  await until(async () => {
+    unchangedExecution()
+    const capability = attachedCapabilities.get(attachmentNumber)
+    const state = await mediaState()
+    if (!(capability?.expires * 1000 > Date.now() + 60000 && hasDelivery(capability))
+      || !state.connected || state.paused || state.ready < 2 || state.seeking || state.error !== null) return false
+    if (normalBaseline?.attachment !== capability.attachment) {
+      normalBaseline = { attachment: capability.attachment, time: state.time, decodedFrames: state.decodedFrames }
+    }
+    return state.time > normalBaseline.time + 1 && state.decodedFrames > normalBaseline.decodedFrames
+  }, 'a real attachment using the restored normal signing lifetime', 20000)
+  await recordClientControl('capability-renewal-normal-lifetime', Date.now())
 }
 
 async function reconnectPausedPlayback(owner, prefix) {
@@ -483,9 +595,16 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await observeSubtitles('source-sought-paused', 'Dialogue sought')
     await seekSourceAndDecode(owner, 0, 'source-seek-return-to-start-paused', true)
     await resumeAndDecode(owner, 'source-resume-after-return')
+    await observeSubtitles('attached', 'Dialogue early')
+    await renewPlaybackCapabilities(owner)
     await reconnectPausedPlayback(owner, 'source-network')
     initialGeneration = snapshot.generation
-    await observeSubtitles('attached', 'Dialogue early')
+    await until(async () => {
+      const subtitlePosition = snapshot.startTime + (await mediaState()).time
+      assert(subtitlePosition < 39, `Post-renewal playback missed the late subtitle cue at ${subtitlePosition}s`)
+      return subtitlePosition >= 16
+    }, 'advancing post-renewal playback to enter the late subtitle cue', 10000)
+    await observeSubtitles('renewed-reconnected', 'Dialogue late')
     await page.screenshot({ path: `${evidence}/desktop.png` })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${evidence}/mobile.png` })
@@ -628,7 +747,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals }, null, 2))
   return { phase, passed: true }
 }
 
@@ -645,7 +764,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })
