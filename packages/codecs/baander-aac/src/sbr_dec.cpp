@@ -139,7 +139,7 @@ const int8_t kCeilLog2[] = {0, 1, 2, 2, 3, 3};
 
 int read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   int bs_pointer = 0;
-  int abs_bord_trail = AAC_SBR_SLOTS;
+  int abs_bord_trail = s->time_slots;
   const int num_env_old = ch->num_env;
   ch->freq_res[0] = ch->freq_res[ch->num_env];
   ch->amp_res = s->amp_res_header;
@@ -603,9 +603,10 @@ void dequant(AacSbrState* s) {
  * frame's. */
 void lf_gen(const AacSbrState* s, float X_low[32][40][2], const float W[2][kSlots][32][2],
             int buf_idx) {
+  const int slots = s->slots;
   memset(X_low, 0, 32 * sizeof(*X_low));
   for (int k = 0; k < s->kx[1]; k++) {
-    for (int i = kHistory; i < kSlots + kHistory; i++) {
+    for (int i = kHistory; i < slots + kHistory; i++) {
       X_low[k][i][0] = W[buf_idx][i - kHistory][k][0];
       X_low[k][i][1] = W[buf_idx][i - kHistory][k][1];
     }
@@ -613,8 +614,8 @@ void lf_gen(const AacSbrState* s, float X_low[32][40][2], const float W[2][kSlot
   buf_idx = 1 - buf_idx;
   for (int k = 0; k < s->kx[0]; k++) {
     for (int i = 0; i < kHistory; i++) {
-      X_low[k][i][0] = W[buf_idx][i + kSlots - kHistory][k][0];
-      X_low[k][i][1] = W[buf_idx][i + kSlots - kHistory][k][1];
+      X_low[k][i][0] = W[buf_idx][i + slots - kHistory][k][0];
+      X_low[k][i][1] = W[buf_idx][i + slots - kHistory][k][1];
     }
   }
 }
@@ -738,10 +739,12 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch) {
 
 /* Assembles the synthesis input from the low band and the two adjusted
  * high-band buffers (the previous frame's for slots its last envelope
- * still covers). */
+ * still covers).  The low band is filled six slots past the frame for
+ * the parametric stereo hybrid filters' lookahead. */
 void x_gen(const AacSbrState* s, float X[2][38][64], const float Y0[38][64][2],
            const float Y1[38][64][2], const float X_low[32][40][2], int c) {
-  const int i_temp = std::max(2 * s->data[c].t_env_num_env_old - kSlots, 0);
+  const int slots = s->slots;
+  const int i_temp = std::max(2 * s->data[c].t_env_num_env_old - slots, 0);
   memset(X, 0, 2 * sizeof(*X));
   int k;
   for (k = 0; k < s->kx[0]; k++) {
@@ -752,18 +755,18 @@ void x_gen(const AacSbrState* s, float X[2][38][64], const float Y0[38][64][2],
   }
   for (; k < s->kx[0] + s->m[0]; k++) {
     for (int i = 0; i < i_temp; i++) {
-      X[0][i][k] = Y0[i + kSlots][k][0];
-      X[1][i][k] = Y0[i + kSlots][k][1];
+      X[0][i][k] = Y0[i + slots][k][0];
+      X[1][i][k] = Y0[i + slots][k][1];
     }
   }
   for (k = 0; k < s->kx[1]; k++) {
-    for (int i = i_temp; i < 38; i++) {
+    for (int i = i_temp; i < slots + 6; i++) {
       X[0][i][k] = X_low[k][i + kAdj][0];
       X[1][i][k] = X_low[k][i + kAdj][1];
     }
   }
   for (; k < s->kx[1] + s->m[1]; k++) {
-    for (int i = i_temp; i < kSlots; i++) {
+    for (int i = i_temp; i < slots; i++) {
       X[0][i][k] = Y1[i][k][0];
       X[1][i][k] = Y1[i][k][1];
     }
@@ -1035,16 +1038,18 @@ void aac_sbr_turnoff(AacSbrState* s) {
   s->freq_scale = s->alter_scale = s->noise_bands = -1;
 }
 
-void aac_sbr_init(AacSbrState* s, int core_sample_rate) {
+void aac_sbr_init(AacSbrState* s, int core_sample_rate, int frame_length) {
   memset(s, 0, sizeof(*s));
   s->sample_rate = 2 * core_sample_rate;
+  s->slots = frame_length / 32;
+  s->time_slots = s->slots / 2;
   aac_sbr_turnoff(s);
   s->kx[0] = s->kx[1];
   for (int c = 0; c < 2; c++) {
     aac_qmf_analysis_init(&s->data[c].analysis, 32);
     aac_qmf_synthesis_init(&s->data[c].synthesis, 64);
   }
-  aac_ps_init(&s->ps);
+  aac_ps_init(&s->ps, s->slots);
 }
 
 namespace {
@@ -1188,14 +1193,16 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
     dequant(s);
     s->ready_for_dequant = 0;
   }
+  const int slots = s->slots;
+  const int core_samples = 32 * slots;
   for (int c = 0; c < nch; c++) {
     AacSbrChannel* ch = &s->data[c];
     float* pcm = c ? right : left;
     float core[AAC_FRAME_SIZE_LONG];
-    for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
+    for (int i = 0; i < core_samples; i++) {
       core[i] = pcm[i] * 32768.0f;
     }
-    for (int i = 0; i < kSlots; i++) {
+    for (int i = 0; i < slots; i++) {
       aac_qmf_analyze(&ch->analysis, core + 32 * i, ch->W[ch->Ypos][i]);
     }
     lf_gen(s, s->X_low, ch->W, ch->Ypos);
@@ -1221,7 +1228,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
   for (int c = 0; c < (ps_output ? 2 : nch); c++) {
     AacSbrChannel* ch = &s->data[c];
     float* pcm = c ? right : left;
-    for (int i = 0; i < kSlots; i++) {
+    for (int i = 0; i < slots; i++) {
       float X[64][2];
       for (int k = 0; k < 64; k++) {
         X[k][0] = s->X[c][0][i][k];
@@ -1229,7 +1236,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
       }
       aac_qmf_synthesize(&ch->synthesis, X, pcm + 64 * i);
     }
-    for (int i = 0; i < 2 * AAC_FRAME_SIZE_LONG; i++) {
+    for (int i = 0; i < 2 * core_samples; i++) {
       pcm[i] *= 1.0f / 32768.0f;
     }
   }

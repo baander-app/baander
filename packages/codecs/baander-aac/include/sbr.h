@@ -14,8 +14,8 @@ extern "C" {
 
 /* Spectral band replication decoder (ISO/IEC 14496-3 4.6.18) for one SCE
  * or CPE: parses the sbr_extension_data of the element's FIL element,
- * and turns the element's 1024 core samples per channel into 2048 samples
- * at twice the core rate.  The design follows the standard and the
+ * and turns the element's 1024 (or 960) core samples per channel into
+ * 2048 (1920) samples at twice the core rate.  The design follows the standard and the
  * structure of FFmpeg's decoder: 32-band QMF analysis of the core, the
  * LPC-based high-frequency generator with inverse filtering per patch,
  * envelope and noise-floor adjustment with gain limiting and sinusoid
@@ -25,6 +25,8 @@ extern "C" {
  * that carries parametric stereo data can be asked for a stereo pair:
  * the PS decoder then builds the right channel from the left one. */
 
+/* Slots of a 1024-sample frame; a 960-sample frame has 15 envelope time
+ * slots and 30 QMF slots, and every buffer is sized for the larger. */
 #define AAC_SBR_SLOTS 16          /* envelope time slots per frame */
 #define AAC_SBR_QMF_SLOTS 32      /* QMF slots per frame */
 #define AAC_SBR_HF_HISTORY 8      /* QMF slots of the previous frame kept for the generator */
@@ -105,6 +107,8 @@ using AacSbrChannel = struct AacSbrChannel_ {
 
 using AacSbrState = struct AacSbrState_ {
   int sample_rate; /* the SBR rate, twice the core rate */
+  int slots;       /* QMF slots per frame: 32, or 30 for 960-sample frames */
+  int time_slots;  /* envelope time slots per frame: 16 or 15 */
   int start;       /* a header has been seen: the high band is generated */
   int ready_for_dequant;
   int elem_type;
@@ -152,8 +156,9 @@ using AacSbrState = struct AacSbrState_ {
   AacPsState ps; /* parametric stereo of a single channel element */
 };
 
-/* Prepares the state for a core sample rate; the SBR rate is twice it. */
-void aac_sbr_init(AacSbrState* s, int core_sample_rate);
+/* Prepares the state for a core sample rate and frame length (1024 or
+ * 960 core samples); the SBR rate is twice the core rate. */
+void aac_sbr_init(AacSbrState* s, int core_sample_rate, int frame_length);
 
 /* Places the element in pure upsampling mode until the next header. */
 void aac_sbr_turnoff(AacSbrState* s);
@@ -182,8 +187,9 @@ void aac_sbr_conceal(AacSbrState* s);
 void aac_sbr_mark_lost(AacSbrState* s);
 
 /* Upsamples and, when SBR data is active, reconstructs the high band of
- * the element's channels in place: each buffer holds 1024 core samples at
- * full scale 1.0 on entry and 2048 output samples on return.  For a CPE
+ * the element's channels in place: each buffer holds one frame of core
+ * samples (1024 or 960) at full scale 1.0 on entry and twice as many
+ * output samples on return.  For a CPE
  * `right` is the second channel; for an SCE a non-NULL `right` requests
  * parametric stereo output, which is a copy of the left channel while no
  * PS data is active. */

@@ -72,6 +72,46 @@ static void test_band_tables() {
   }
 }
 
+/* The 960 and 120 line columns: the same band layout as the 1024 and 128
+ * tables below the cut, the last band ending at 960 or 120, and the band
+ * counts of ISO/IEC 14496-3 Tables 4.129 to 4.140. */
+static void test_band_tables_960() {
+  static const int kNumLong[AAC_NUM_SAMPLE_RATES] = {40, 40, 46, 49, 49, 49, 46, 46, 42, 42, 42, 40};
+  static const int kNumShort[AAC_NUM_SAMPLE_RATES] = {12, 12, 12, 14, 14, 14, 15, 15, 15, 15, 15, 15};
+  for (int ri = 0; ri < AAC_NUM_SAMPLE_RATES; ri++) {
+    const int nl = aac_num_sfb_long_960[ri];
+    const int ns = aac_num_sfb_short_960[ri];
+    CHECK(nl == kNumLong[ri], "rate %d: %d long bands for 960, expected %d", ri, nl, kNumLong[ri]);
+    CHECK(ns == kNumShort[ri], "rate %d: %d short bands for 120, expected %d", ri, ns,
+          kNumShort[ri]);
+    CHECK(aac_sfb_offset_long_960[ri][0] == 0 && aac_sfb_offset_long_960[ri][nl] == 960,
+          "rate %d: 960 long bands do not span 0..960", ri);
+    CHECK(aac_sfb_offset_short_960[ri][0] == 0 && aac_sfb_offset_short_960[ri][ns] == 120,
+          "rate %d: 120 short bands do not span 0..120", ri);
+    for (int b = 0; b < nl; b++) {
+      const int w = aac_sfb_offset_long_960[ri][b + 1] - aac_sfb_offset_long_960[ri][b];
+      CHECK(w > 0 && w % 4 == 0, "rate %d 960 long band %d width %d", ri, b, w);
+      CHECK(aac_sfb_offset_long_960[ri][b] == aac_sfb_offset_long[ri][b],
+            "rate %d 960 long band %d starts at %d, the 1024 table at %d", ri, b,
+            aac_sfb_offset_long_960[ri][b], aac_sfb_offset_long[ri][b]);
+    }
+    for (int b = 0; b < ns; b++) {
+      const int w = aac_sfb_offset_short_960[ri][b + 1] - aac_sfb_offset_short_960[ri][b];
+      CHECK(w > 0 && w % 4 == 0, "rate %d 120 short band %d width %d", ri, b, w);
+      CHECK(aac_sfb_offset_short_960[ri][b] == aac_sfb_offset_short[ri][b],
+            "rate %d 120 short band %d starts at %d, the 128 table at %d", ri, b,
+            aac_sfb_offset_short_960[ri][b], aac_sfb_offset_short[ri][b]);
+    }
+    CHECK(aac_num_sfb(960, ri, 0) == nl && aac_num_sfb(960, ri, 1) == ns &&
+              aac_sfb_offset(960, ri, 0) == aac_sfb_offset_long_960[ri] &&
+              aac_sfb_offset(960, ri, 1) == aac_sfb_offset_short_960[ri],
+          "rate %d: 960 table lookup", ri);
+    CHECK(aac_num_sfb(1024, ri, 0) == aac_num_sfb_long[ri] &&
+              aac_sfb_offset(1024, ri, 1) == aac_sfb_offset_short[ri],
+          "rate %d: 1024 table lookup", ri);
+  }
+}
+
 static void test_windows_and_pow43() {
   aac_tables_init();
   for (int shape = 0; shape < 2; shape++) {
@@ -87,6 +127,21 @@ static void test_windows_and_pow43() {
     }
     CHECK(aac_window_long[shape][0] < aac_window_long[shape][AAC_FRAME_SIZE_LONG - 1],
           "long window shape %d is not rising", shape);
+    for (int i = 0; i < AAC_FRAME_SIZE_LONG_960; i++) {
+      const double a = aac_window_long_960[shape][i];
+      const double b = aac_window_long_960[shape][AAC_FRAME_SIZE_LONG_960 - 1 - i];
+      CHECK(fabs(a * a + b * b - 1.0) < 1e-5, "960 window shape %d sample %d", shape, i);
+    }
+    for (int i = 0; i < AAC_FRAME_SIZE_SHORT_120; i++) {
+      const double a = aac_window_short_120[shape][i];
+      const double b = aac_window_short_120[shape][AAC_FRAME_SIZE_SHORT_120 - 1 - i];
+      CHECK(fabs(a * a + b * b - 1.0) < 1e-5, "120 window shape %d sample %d", shape, i);
+    }
+    CHECK(aac_window_long_for(960, shape) == aac_window_long_960[shape] &&
+              aac_window_short_for(960, shape) == aac_window_short_120[shape] &&
+              aac_window_long_for(1024, shape) == aac_window_long[shape] &&
+              aac_window_short_for(1024, shape) == aac_window_short[shape],
+          "window lookup shape %d", shape);
   }
   CHECK(aac_pow43[0] == 0.0f && aac_pow43[1] == 1.0f, "pow43 origin");
   CHECK(fabs(aac_pow43[8] - 16.0f) < 1e-4, "8^(4/3) = 16, got %f", aac_pow43[8]);
@@ -96,6 +151,7 @@ static void test_windows_and_pow43() {
 int main() {
   test_huffman_tables();
   test_band_tables();
+  test_band_tables_960();
   test_windows_and_pow43();
   return test_summary("test_tables");
 }

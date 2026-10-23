@@ -6,8 +6,8 @@
 
 namespace {
 
-constexpr int kFrame = AAC_FRAME_SIZE_LONG;
-constexpr int kShort = AAC_FRAME_SIZE_SHORT;
+constexpr int kFrame = AAC_FRAME_SIZE_LONG;  /* largest spectrum */
+constexpr int kShort = AAC_FRAME_SIZE_SHORT; /* lines per short window slot */
 
 /* ── TNS (libfdk-aac aacenc_tns.cpp) ────────────────────────────── */
 
@@ -285,8 +285,8 @@ constexpr float kIsBlocked = 1.0f;   /* error that keeps a band out of a region 
 void aac_enc_tools_init(AacEncoderState* s) {
   const int sr = s->sample_rate;
   const int channel_bitrate = s->bitrate / s->channels;
-  const int* lo = aac_sfb_offset_long[s->rate_index];
-  const int* so = aac_sfb_offset_short[s->rate_index];
+  const int* lo = aac_sfb_offset(s->frame_length, s->rate_index, 0);
+  const int* so = aac_sfb_offset(s->frame_length, s->rate_index, 1);
 
   s->tns_order_long = channel_bitrate < 16000 ? 10 : 12;
   s->tns_order_short = channel_bitrate < 16000 ? 3 : 5;
@@ -331,7 +331,7 @@ void aac_enc_tools_init(AacEncoderState* s) {
       s->use_pns = 1;
       s->pns_ref_tonality = 0.10f;
       s->pns_min_width = 16;
-      const int nswb = aac_num_sfb_long[s->rate_index];
+      const int nswb = aac_num_sfb(s->frame_length, s->rate_index, 0);
       s->pns_start_band = band_at_frequency(4100, sr, nswb, lo);
       /* A constant dB/Hz slope within a band widens the allowed ratio
        * between its quarters with the band width. */

@@ -14,9 +14,10 @@ extern "C" {
 
 /* Spectral band replication encoder (ISO/IEC 14496-3 4.6.18, with the
  * structure of 3GPP TS 26.404) for one SCE or CPE of an HE-AAC stream.
- * The element's channels arrive as 2048 samples per frame at the full
- * rate; the encoder analyses them with the 64-band QMF bank, hands the
- * core encoder the lower half of the spectrum resampled to half rate,
+ * The element's channels arrive as 2048 (or 1920, for 960-sample core
+ * frames) samples per frame at the full rate; the encoder analyses them
+ * with the 64-band QMF bank, hands the core encoder the lower half of
+ * the spectrum resampled to half rate,
  * and describes the upper half as envelope energies, noise floors and
  * inverse filtering levels per frame.  For HE-AAC v2 the stereo pair is
  * downmixed to one channel and its parametric stereo data is added to
@@ -29,7 +30,7 @@ extern "C" {
 using AacSbrGrid = struct AacSbrGrid_ {
   int frame_class;
   int num_env;
-  int t_env[AAC_SBR_MAX_ENV + 1]; /* borders in envelope slots, 0..19 */
+  int t_env[AAC_SBR_MAX_ENV + 1]; /* borders in envelope slots, 0..19 (0..18 with 15 slots) */
   int freq_res[AAC_SBR_MAX_ENV + 1];
   int abs_bord_0, abs_bord_1;
   int num_rel_lead, rel_lead[3];
@@ -69,7 +70,11 @@ using AacSbrEncChannel = struct AacSbrEncChannel_ {
 using AacSbrEncoder = struct AacSbrEncoder_ {
   int sample_rate; /* full rate */
   int channels;    /* of the element: 1 or 2 */
+  int bitrate;     /* of the element */
   int ps;          /* parametric stereo: two inputs, one coded channel */
+  int frame_length; /* core samples per frame: 1024 or 960 */
+  int slots;        /* QMF slots per frame: 32 or 30 */
+  int time_slots;   /* envelope time slots per frame: 16 or 15 */
   AacSbrFreq freq;
   int amp_res_header;
   int limiter_gains, interpol_freq, smoothing_mode;
@@ -89,18 +94,20 @@ using AacSbrEncoder = struct AacSbrEncoder_ {
 
 /* Chooses the SBR configuration for the full sample rate, the element's
  * channel count and bitrate (bits per second for the element) and
- * prepares the state; `ps` codes a stereo pair as one channel with
- * parametric stereo.  Returns 0 or AAC_ERR_UNSUPPORTED. */
-int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrate, int ps);
+ * prepares the state for core frames of frame_length samples (1024 or
+ * 960); `ps` codes a stereo pair as one channel with parametric stereo.
+ * Returns 0 or AAC_ERR_UNSUPPORTED. */
+int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrate, int ps,
+                     int frame_length);
 
 /* Returns the state to that after creation. */
 void aac_sbr_enc_reset(AacSbrEncoder* s);
 
-/* Analyses one frame of 2048 full-rate samples per input channel at full
- * scale 32768, writes the half-rate core signal (1024 samples per coded
- * channel; one channel with PS) and prepares the extension payload of
- * the frame the core encoder emits for this input.  `in` may be NULL for
- * silence. */
+/* Analyses one frame of 2 * frame_length full-rate samples per input
+ * channel at full scale 32768, writes the half-rate core signal
+ * (frame_length samples per coded channel; one channel with PS) and
+ * prepares the extension payload of the frame the core encoder emits for
+ * this input.  `in` may be NULL for silence. */
 void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const* core);
 
 /* The QMF chain of a channel without SBR data (an LFE): its lower half
@@ -108,9 +115,11 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
 using AacSbrDownsampler = struct AacSbrDownsampler_ {
   AacQmfAnalysis analysis;
   AacQmfSynthesis synthesis;
+  int slots; /* QMF slots per frame: 32 or 30 */
 };
-void aac_sbr_downsampler_init(AacSbrDownsampler* d);
-/* 2048 full-rate samples (NULL for silence) to 1024 at half rate. */
+void aac_sbr_downsampler_init(AacSbrDownsampler* d, int frame_length);
+/* One frame of full-rate samples (NULL for silence) to half as many at
+ * half rate. */
 void aac_sbr_downsample(AacSbrDownsampler* d, const float* in, float* out);
 
 /* Bits the fill element of this frame takes, including its header. */

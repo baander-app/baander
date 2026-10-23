@@ -75,7 +75,8 @@ using AacDecoderState = struct AacDecoderState_ {
   int sample_rate;    /* sample rate of the stream */
   int channels;       /* output channels requested by the caller, 0 for the stream's */
   int rate_index;     /* sampling_frequency_index of the stream */
-  int frame_size;     /* 1024, or 2048 while SBR is decoded */
+  int frame_size;     /* samples per block in the output: frame_length, or twice it while SBR is decoded */
+  int frame_length;   /* 1024 or 960 samples per raw data block of the core */
   AacLayout layout;   /* element to channel assignment */
   int layout_source;  /* 0 none yet, 1 channel configuration, 2 PCE, 3 taken from the elements */
   int elem_base[AAC_MAX_ELEMENTS]; /* first channel of each layout element in ch[] */
@@ -142,6 +143,11 @@ void aac_decoder_note_lost_block(AacDecoderState* s);
  * filterbank state when it changes; returns AAC_ERR_UNSUPPORTED for an
  * index without tables. */
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index);
+
+/* Selects the frame length (1024 or 960 samples per raw data block),
+ * resetting the filterbank state when it changes; returns
+ * AAC_ERR_INVALID_ARG for any other length. */
+int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length);
 
 /* Selects the layout of a channel configuration (1..7, 11, 12), resetting
  * state when it differs from the current one; 0 keeps a PCE-defined or

@@ -116,10 +116,10 @@ void hybrid4_8_12_cx(const float (*in)[2], float (*out)[kSlots][2], const float 
 }  // namespace
 
 void aac_ps_hybrid_analysis(float out[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], float in[5][44][2],
-                            const float L[2][38][64], int is34) {
-  const int len = kSlots;
+                            const float L[2][38][64], int is34, int slots) {
+  const int len = slots;
   for (int i = 0; i < 5; i++) {
-    for (int j = 0; j < 38; j++) {
+    for (int j = 0; j < slots + 6; j++) {
       in[i][j + 6][0] = L[0][j][i];
       in[i][j + 6][1] = L[1][j][i];
     }
@@ -146,13 +146,14 @@ void aac_ps_hybrid_analysis(float out[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], flo
     }
   }
   for (int i = 0; i < 5; i++) {
-    memcpy(in[i], in[i] + 32, 6 * sizeof(in[i][0]));
+    memcpy(in[i], in[i] + slots, 6 * sizeof(in[i][0]));
   }
 }
 
 void aac_ps_hybrid_synthesis(float out[2][38][64],
-                             const float in[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], int is34) {
-  const int len = kSlots;
+                             const float in[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], int is34,
+                             int slots) {
+  const int len = slots;
   int first_plain;
   if (is34) {
     for (int n = 0; n < len; n++) {

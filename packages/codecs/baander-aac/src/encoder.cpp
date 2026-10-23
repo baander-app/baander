@@ -19,10 +19,10 @@
 namespace {
 
 constexpr float kInputScale = 32768.0f;
-constexpr int kFrame = AAC_FRAME_SIZE_LONG;
+/* Spectra are stored with this stride per short window whatever the frame
+ * length (the 120-line windows of a 960 frame leave eight lines unused). */
 constexpr int kShort = AAC_FRAME_SIZE_SHORT;
 constexpr int kAdtsBits = 8 * AAC_ADTS_HEADER_SIZE;
-constexpr int kMaxBitsPerChannel = 6144; /* ISO/IEC 14496-3 4.5.3.1 */
 constexpr float kQuantRound = 0.4054f;
 constexpr int kMaxSf = 255;
 constexpr int kMaxSfDelta = 60;
@@ -94,12 +94,12 @@ int bandwidth_for(int channel_bitrate, int channels, int sample_rate, AacRateCon
  * 5.6.1.1, libfdk-aac psy_configuration.cpp): a band that is coded at all
  * is coded no worse than this. */
 void init_min_snr(float* min_snr, int channel_bitrate, int sample_rate, int window_len,
-                  const int* off, int active_bands) {
+                  int is_short, const int* off, int active_bands) {
   const int lines = window_len / 2;
   const float line_hz = (float)sample_rate / (float)window_len;
   float pe_per_window =
       (float)channel_bitrate / (float)sample_rate * kBitsToPe * 0.024f * (float)lines;
-  if (lines == kShort) {
+  if (is_short) {
     pe_per_window *= 1.5f; /* short blocks are assumed to get more bits */
   }
   const float bark_factor = std::min(bark((float)off[active_bands] * line_hz), 24.0f) / 25.0f;
@@ -535,10 +535,13 @@ void decide_ms(AacEncoderState* s, AacEncElement* el) {
 
 /* ── block switching and filterbank ────────────────────────────── */
 
-/* Short windows of a frame cover samples 448 .. 1600 of its 2048-sample
- * window; the frame being coded starts at pcm[0], the next at pcm[1024]. */
-constexpr int kShortRegionStart = 448;
-constexpr int kShortRegionLen = 9 * kShort;
+/* The eight short windows of a frame of fl samples (1024 or 960) and
+ * short length sl (128 or 120) cover samples (fl - sl) / 2 .. (fl - sl) /
+ * 2 + 9 sl (448 .. 1600, or 420 .. 1500) of its 2 fl window; the frame
+ * being coded starts at pcm[0], the next at pcm[fl]. */
+int short_region_start(int frame_length) {
+  return (frame_length - aac_short_length(frame_length)) / 2;
+}
 
 /* Window groups per attack window (libfdk-aac block_switch.cpp). */
 const int kGrouping[8][4] = {{1, 3, 3, 1}, {1, 1, 3, 3}, {2, 1, 3, 2}, {3, 1, 3, 1},
@@ -547,13 +550,17 @@ const int kGrouping[8][4] = {{1, 3, 3, 1}, {1, 1, 3, 3}, {2, 1, 3, 2}, {3, 1, 3,
 void choose_window_sequence(AacEncoderState* s, const AacEncElement* el) {
   int attack_now = 0;
   int attack_next = 0;
+  const int fl = s->frame_length;
+  const int sl = aac_short_length(fl);
+  const int region_start = short_region_start(fl);
+  const int region_len = 9 * sl;
   /* An LFE element codes long windows only. */
   if (el->type != AAC_ELEM_LFE) {
     for (int k = 0; k < el->num_ch; k++) {
       const float* pcm = s->ch[el->ch[k]].pcm;
-      attack_now = std::max(attack_now, aac_psy_attack(pcm, kShortRegionStart, kShortRegionLen));
+      attack_now = std::max(attack_now, aac_psy_attack(pcm, region_start, region_len, sl));
       attack_next =
-          std::max(attack_next, aac_psy_attack(pcm, kFrame + kShortRegionStart, kShortRegionLen));
+          std::max(attack_next, aac_psy_attack(pcm, fl + region_start, region_len, sl));
     }
   }
   const int prev = s->ch[el->ch[0]].ics.window_sequence;
@@ -582,50 +589,59 @@ void choose_window_sequence(AacEncoderState* s, const AacEncElement* el) {
       (seq == AAC_WIN_ONLY_LONG || seq == AAC_WIN_LONG_STOP) ? AAC_WIN_KBD : AAC_WIN_SINE;
   for (int k = 0; k < el->num_ch; k++) {
     AacEncChannel* c = &s->ch[el->ch[k]];
-    aac_ics_layout(&c->ics, s->rate_index, seq, grouping);
+    aac_ics_layout(&c->ics, s->rate_index, fl, seq, grouping);
     c->ics.window_shape = shape;
   }
 }
 
-/* Windows pcm[0 .. 2048) as ISO/IEC 14496-3 4.6.11.3.2 and transforms it. */
+/* Windows pcm[0 .. 2 fl) as ISO/IEC 14496-3 4.6.11.3.2 and transforms it. */
 void window_and_mdct(AacEncoderState* s, AacEncChannel* c) {
   const AacIcsInfo* ics = &c->ics;
-  const float* lw_prev = aac_window_long[c->prev_window_shape];
-  const float* sw_prev = aac_window_short[c->prev_window_shape];
-  const float* lw = aac_window_long[ics->window_shape];
-  const float* sw = aac_window_short[ics->window_shape];
-  float buf[2 * kFrame];
+  const int fl = s->frame_length;
+  const int sl = aac_short_length(fl);
+  const int start = short_region_start(fl);
+  const float* lw_prev = aac_window_long_for(fl, c->prev_window_shape);
+  const float* sw_prev = aac_window_short_for(fl, c->prev_window_shape);
+  const float* lw = aac_window_long_for(fl, ics->window_shape);
+  const float* sw = aac_window_short_for(fl, ics->window_shape);
+  float buf[2 * AAC_FRAME_SIZE_LONG];
   const int seq = ics->window_sequence;
 
   if (seq != AAC_WIN_EIGHT_SHORT) {
     if (seq == AAC_WIN_LONG_STOP) {
-      memset(buf, 0, 448 * sizeof(float));
-      for (int i = 0; i < kShort; i++) {
-        buf[448 + i] = c->pcm[448 + i] * sw_prev[i];
+      memset(buf, 0, (size_t)start * sizeof(float));
+      for (int i = 0; i < sl; i++) {
+        buf[start + i] = c->pcm[start + i] * sw_prev[i];
       }
-      memcpy(buf + 576, c->pcm + 576, 448 * sizeof(float));
+      memcpy(buf + start + sl, c->pcm + start + sl, (size_t)start * sizeof(float));
     } else {
-      s->dsp->vector_fmul(buf, c->pcm, lw_prev, kFrame);
+      s->dsp->vector_fmul(buf, c->pcm, lw_prev, fl);
     }
     if (seq == AAC_WIN_LONG_START) {
-      memcpy(buf + kFrame, c->pcm + kFrame, 448 * sizeof(float));
-      for (int i = 0; i < kShort; i++) {
-        buf[1472 + i] = c->pcm[1472 + i] * sw[kShort - 1 - i];
+      memcpy(buf + fl, c->pcm + fl, (size_t)start * sizeof(float));
+      for (int i = 0; i < sl; i++) {
+        buf[fl + start + i] = c->pcm[fl + start + i] * sw[sl - 1 - i];
       }
-      memset(buf + 1600, 0, 448 * sizeof(float));
+      memset(buf + fl + start + sl, 0, (size_t)start * sizeof(float));
     } else {
-      s->dsp->vector_fmul_reverse(buf + kFrame, c->pcm + kFrame, lw, kFrame);
+      s->dsp->vector_fmul_reverse(buf + fl, c->pcm + fl, lw, fl);
     }
     aac_mdct_forward(&s->mdct_long, buf, c->coef);
+    if (fl < AAC_FRAME_SIZE_LONG) {
+      memset(c->coef + fl, 0, (size_t)(AAC_FRAME_SIZE_LONG - fl) * sizeof(float));
+    }
   } else {
     for (int w = 0; w < 8; w++) {
-      const float* src = c->pcm + kShortRegionStart + w * kShort;
+      const float* src = c->pcm + start + w * sl;
       const float* left = w == 0 ? sw_prev : sw;
-      for (int i = 0; i < kShort; i++) {
+      for (int i = 0; i < sl; i++) {
         buf[i] = src[i] * left[i];
-        buf[kShort + i] = src[kShort + i] * sw[kShort - 1 - i];
+        buf[sl + i] = src[sl + i] * sw[sl - 1 - i];
       }
       aac_mdct_forward(&s->mdct_short, buf, c->coef + w * kShort);
+      if (sl < kShort) {
+        memset(c->coef + w * kShort + sl, 0, (size_t)(kShort - sl) * sizeof(float));
+      }
     }
   }
   c->prev_window_shape = ics->window_shape;
@@ -1275,20 +1291,46 @@ int create_sbr_encoders(AacEncoderState* s) {
     const int el_bitrate =
         ps ? s->bitrate : (int)((long long)s->bitrate * el->num_ch / s->channels);
     s->sbr[e] = new AacSbrEncoder();
-    if (aac_sbr_enc_init(s->sbr[e], s->input_rate, in_ch, el_bitrate, ps)) {
+    if (aac_sbr_enc_init(s->sbr[e], s->input_rate, in_ch, el_bitrate, ps, s->frame_length)) {
       return AAC_ERR_INIT;
     }
   }
   return AAC_OK;
 }
 
-/* Lines of an LFE channel that are coded: the lowest twelve, as FFmpeg and
- * FDK limit it. */
-constexpr int kLfeLines = 12;
+/* Lines of an LFE channel that are coded: the lowest twelve of a
+ * 1024-line spectrum, as FFmpeg and FDK limit it, scaled with the frame
+ * length. */
+int lfe_lines(int frame_length) { return 12 * frame_length / AAC_FRAME_SIZE_LONG; }
 
 /* Bits per second one SBR channel is expected to take from the bitrate
  * when the core's bandwidth and noise targets are chosen. */
 constexpr int kSbrBitrateEstimate = 1500;
+
+/* Everything that follows from the frame length: the input block size,
+ * the delay, the transforms, the LFE downsamplers and the bit budget per
+ * frame (ISO/IEC 14496-3 4.5.3.1 allows 6144 bits per channel for 1024
+ * samples, scaled with the frame length). */
+void apply_frame_length(AacEncoderState* s) {
+  const bool sbr = s->aot != AAC_AOT_LC;
+  const int fl = s->frame_length;
+  const bool is960 = fl == AAC_FRAME_SIZE_LONG_960;
+  s->frame_size = sbr ? 2 * fl : fl;
+  s->delay = sbr ? (is960 ? AAC_ENCODER_SBR_DELAY_960 : AAC_ENCODER_SBR_DELAY)
+                 : (is960 ? AAC_ENCODER_DELAY_960 : AAC_ENCODER_DELAY);
+  aac_mdct_init(&s->mdct_long, 2 * fl);
+  aac_mdct_init(&s->mdct_short, 2 * aac_short_length(fl));
+  for (int e = 0; e < s->num_elements; e++) {
+    if (s->lfe_down[e]) {
+      aac_sbr_downsampler_init(s->lfe_down[e], fl);
+    }
+  }
+  s->avg_frame_bits = (int)((long long)s->bitrate * fl / s->sample_rate);
+  /* The reservoir of a parametric stereo stream keeps the input's channel
+   * count; the hard limit per frame still counts the coded channels. */
+  s->reservoir_max =
+      std::max(0, aac_max_bits_per_channel(fl) * s->input_channels - s->avg_frame_bits);
+}
 
 }  // namespace
 
@@ -1314,8 +1356,7 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
   s->aot = aot;
   s->rc_mode = rc;
   s->quality = 70;
-  s->frame_size = sbr ? 2 * kFrame : kFrame;
-  s->delay = sbr ? AAC_ENCODER_SBR_DELAY : AAC_ENCODER_DELAY;
+  s->frame_length = AAC_FRAME_SIZE_LONG;
   s->dsp = dsp;
   sr = s->sample_rate;
   s->rate_index = -1;
@@ -1333,33 +1374,56 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
     aac_encoder_state_destroy(s);
     return nullptr;
   }
-  aac_mdct_init(&s->mdct_long, 2 * kFrame);
-  aac_mdct_init(&s->mdct_short, 2 * kShort);
-
-  s->avg_frame_bits = (int)((long long)br * kFrame / sr);
-  s->reservoir_max = std::max(0, kMaxBitsPerChannel * ch - s->avg_frame_bits);
+  apply_frame_length(s);
   aac_encoder_state_configure(s);
   aac_encoder_state_reset(s);
   return s;
 }
 
+int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length) {
+  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (frame_length == s->frame_length) {
+    return AAC_OK;
+  }
+  s->frame_length = frame_length;
+  for (int e = 0; e < s->num_elements; e++) {
+    AacSbrEncoder* sbr = s->sbr[e];
+    if (sbr) {
+      const int ret = aac_sbr_enc_init(sbr, sbr->sample_rate, sbr->channels, sbr->bitrate, sbr->ps,
+                                       frame_length);
+      if (ret) {
+        return ret;
+      }
+    }
+  }
+  apply_frame_length(s);
+  aac_encoder_state_configure(s);
+  aac_encoder_state_reset(s);
+  return AAC_OK;
+}
+
 namespace {
 
 /* Bands below a lowpass cutoff in Hz, for long and short windows. */
-void active_bands(int rate_index, int sample_rate, int cutoff, int* num_long, int* num_short) {
-  const int* lo = aac_sfb_offset_long[rate_index];
-  const int* so = aac_sfb_offset_short[rate_index];
-  const int lowpass_line_long = 2 * cutoff * kFrame / sample_rate;
-  const int lowpass_line_short = 2 * cutoff * kShort / sample_rate;
-  *num_long = aac_num_sfb_long[rate_index];
-  *num_short = aac_num_sfb_short[rate_index];
-  for (int b = 0; b < aac_num_sfb_long[rate_index]; b++) {
+void active_bands(int rate_index, int frame_length, int sample_rate, int cutoff, int* num_long,
+                  int* num_short) {
+  const int* lo = aac_sfb_offset(frame_length, rate_index, 0);
+  const int* so = aac_sfb_offset(frame_length, rate_index, 1);
+  const int num_sfb_long = aac_num_sfb(frame_length, rate_index, 0);
+  const int num_sfb_short = aac_num_sfb(frame_length, rate_index, 1);
+  const int lowpass_line_long = 2 * cutoff * frame_length / sample_rate;
+  const int lowpass_line_short = 2 * cutoff * aac_short_length(frame_length) / sample_rate;
+  *num_long = num_sfb_long;
+  *num_short = num_sfb_short;
+  for (int b = 0; b < num_sfb_long; b++) {
     if (lo[b] >= lowpass_line_long) {
       *num_long = std::max(b, 1);
       break;
     }
   }
-  for (int b = 0; b < aac_num_sfb_short[rate_index]; b++) {
+  for (int b = 0; b < num_sfb_short; b++) {
     if (so[b] >= lowpass_line_short) {
       *num_short = std::max(b, 1);
       break;
@@ -1377,13 +1441,14 @@ void aac_encoder_state_configure(AacEncoderState* s) {
     }
   }
   const int channel_bitrate = std::max(core_bitrate, 8000) / s->channels;
+  const int fl = s->frame_length;
   s->bandwidth = bandwidth_for(channel_bitrate, s->channels, s->sample_rate, s->rc_mode, s->quality);
-  const int* lo = aac_sfb_offset_long[s->rate_index];
-  const int* so = aac_sfb_offset_short[s->rate_index];
-  active_bands(s->rate_index, s->sample_rate, s->bandwidth, &s->active_bands_long,
+  const int* lo = aac_sfb_offset(fl, s->rate_index, 0);
+  const int* so = aac_sfb_offset(fl, s->rate_index, 1);
+  active_bands(s->rate_index, fl, s->sample_rate, s->bandwidth, &s->active_bands_long,
                &s->active_bands_short);
   int lfe_bands = 1;
-  for (int b = 1; b < aac_num_sfb_long[s->rate_index] && lo[b] < kLfeLines; b++) {
+  for (int b = 1; b < aac_num_sfb(fl, s->rate_index, 0) && lo[b] < lfe_lines(fl); b++) {
     lfe_bands = b + 1;
   }
   for (int c = 0; c < s->channels; c++) {
@@ -1401,15 +1466,15 @@ void aac_encoder_state_configure(AacEncoderState* s) {
     const AacEncElement* el = &s->elem[e];
     for (int k = 0; k < el->num_ch; k++) {
       AacEncChannel* ch = &s->ch[el->ch[k]];
-      active_bands(s->rate_index, s->sample_rate, cutoff, &ch->active_long, &ch->active_short);
+      active_bands(s->rate_index, fl, s->sample_rate, cutoff, &ch->active_long, &ch->active_short);
       s->active_bands_long = std::max(s->active_bands_long, ch->active_long);
       s->active_bands_short = std::max(s->active_bands_short, ch->active_short);
       s->bandwidth = std::max(s->bandwidth, cutoff);
     }
   }
-  init_min_snr(s->min_snr_long, channel_bitrate, s->sample_rate, 2 * kFrame, lo,
+  init_min_snr(s->min_snr_long, channel_bitrate, s->sample_rate, 2 * fl, 0, lo,
                s->active_bands_long);
-  init_min_snr(s->min_snr_short, channel_bitrate, s->sample_rate, 2 * kShort, so,
+  init_min_snr(s->min_snr_short, channel_bitrate, s->sample_rate, 2 * aac_short_length(fl), 1, so,
                s->active_bands_short);
   aac_enc_tools_init(s);
   if (s->mpeg2) {
@@ -1422,7 +1487,7 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   for (int c = 0; c < s->channels; c++) {
     AacEncChannel* ch = &s->ch[c];
     memset(ch->pcm, 0, sizeof(ch->pcm));
-    aac_ics_layout(&ch->ics, s->rate_index, AAC_WIN_ONLY_LONG, 0);
+    aac_ics_layout(&ch->ics, s->rate_index, s->frame_length, AAC_WIN_ONLY_LONG, 0);
     ch->ics.window_shape = AAC_WIN_KBD;
     ch->prev_window_shape = AAC_WIN_KBD;
     ch->tns_present = 0;
@@ -1438,12 +1503,13 @@ void aac_encoder_state_reset(AacEncoderState* s) {
       aac_sbr_enc_reset(s->sbr[e]);
     }
     if (s->lfe_down[e]) {
-      aac_sbr_downsampler_init(s->lfe_down[e]);
+      aac_sbr_downsampler_init(s->lfe_down[e], s->frame_length);
     }
   }
   memset(s->sbr_in, 0, sizeof(s->sbr_in));
   memset(s->core_in, 0, sizeof(s->core_in));
   s->reservoir = s->reservoir_max / 2;
+  s->started = 0;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
   s->started = 0;
   const float mean_pe = (float)s->avg_frame_bits;
@@ -1452,7 +1518,7 @@ void aac_encoder_state_reset(AacEncoderState* s) {
 }
 
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s) {
-  int bytes = (kMaxBitsPerChannel * s->channels + kAdtsBits + 7) / 8;
+  int bytes = (aac_max_bits_per_channel(s->frame_length) * s->channels + kAdtsBits + 7) / 8;
   for (int e = 0; e < s->num_elements; e++) {
     if (s->sbr[e]) {
       bytes += AAC_SBR_ENC_MAX_BYTES + 2;
@@ -1527,19 +1593,20 @@ void sbr_process(AacEncoderState* s, const float* pcm) {
 }  // namespace
 
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
+  const bool sbr = s->aot != AAC_AOT_LC;
+  const int fl = s->frame_length;
   s->started = 1;
-  const bool sbr = s->frame_size != kFrame;
   if (sbr) {
     sbr_process(s, pcm);
   }
-  /* Shift in the new block; the frame to code spans pcm[0 .. 2048). */
+  /* Shift in the new block; the frame to code spans pcm[0 .. 2 fl). */
   for (int c = 0; c < s->channels; c++) {
     float* buf = s->ch[c].pcm;
-    memmove(buf, buf + kFrame, 2 * kFrame * sizeof(float));
-    for (int i = 0; i < kFrame; i++) {
-      buf[2 * kFrame + i] = sbr   ? s->core_in[c][i]
-                            : pcm ? pcm[i * s->channels + c] * kInputScale
-                                  : 0.0f;
+    memmove(buf, buf + fl, (size_t)(2 * fl) * sizeof(float));
+    for (int i = 0; i < fl; i++) {
+      buf[2 * fl + i] = sbr   ? s->core_in[c][i]
+                        : pcm ? pcm[i * s->channels + c] * kInputScale
+                              : 0.0f;
     }
   }
 
@@ -1573,15 +1640,16 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
     }
   }
   for (int c = 0; c < s->channels; c++) {
-    for (int i = 0; i < kFrame; i++) {
+    for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
       s->ch[c].x34[i] = powf(fabsf(s->ch[c].coef[i]), 0.75f);
     }
   }
 
-  /* Bit budget.  raw_data_block() may not exceed 6144 bits per channel;
-   * the budget counts the ADTS header as well. */
+  /* Bit budget.  raw_data_block() may not exceed 6144 bits per channel
+   * (5760 with 960-sample frames); the budget counts the ADTS header as
+   * well. */
   const int avg = s->avg_frame_bits;
-  const int hard_max = kMaxBitsPerChannel * s->channels + kAdtsBits;
+  const int hard_max = aac_max_bits_per_channel(fl) * s->channels + kAdtsBits;
   int target = hard_max;
   int max_bits = hard_max;
   float improve = 1.0f;

@@ -5,9 +5,10 @@
 #include <cstring>
 
 /* Parametric stereo encoder (ISO/IEC 14496-3 8.6.4, 3GPP TS 26.405).
- * The parameters of a frame are estimated over the same 32 output slots
- * the decoder applies them to: the SBR encoder hands over the 38 slots
- * its grid covers (32 plus six of lookahead for the hybrid filters). */
+ * The parameters of a frame are estimated over the same output slots the
+ * decoder applies them to (32, or 30 for 960-sample frames): the SBR
+ * encoder hands over the slots its grid covers plus six of lookahead for
+ * the hybrid filters. */
 
 namespace {
 
@@ -152,14 +153,14 @@ void aac_ps_enc_downmix(AacPsEncoder* ps, const float L[64][2], const float R[64
 }
 
 void aac_ps_enc_analyze(AacPsEncoder* ps, const float L[2][38][64], const float R[2][38][64],
-                        int header) {
-  aac_ps_hybrid_analysis(ps->hyb[0], ps->in_buf[0], L, 0);
-  aac_ps_hybrid_analysis(ps->hyb[1], ps->in_buf[1], R, 0);
+                        int header, int slots) {
+  aac_ps_hybrid_analysis(ps->hyb[0], ps->in_buf[0], L, 0, slots);
+  aac_ps_hybrid_analysis(ps->hyb[1], ps->in_buf[1], R, 0, slots);
   const int num_env = ps->num_env;
   const int log2_env = num_env == 4 ? 2 : (num_env == 2 ? 1 : 0);
   for (int e = 0; e < num_env; e++) {
-    const int t0 = (e * kSlots) >> log2_env;
-    const int t1 = ((e + 1) * kSlots) >> log2_env;
+    const int t0 = (e * slots) >> log2_env;
+    const int t1 = ((e + 1) * slots) >> log2_env;
     double el[kBands] = {}, er[kBands] = {}, cr[kBands] = {}, ci[kBands] = {};
     for (int k = 0; k < kSubbands; k++) {
       const int b = aac_ps_k_to_i_20[k];

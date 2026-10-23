@@ -14,8 +14,7 @@
 
 namespace {
 
-constexpr int kSlots = AAC_SBR_QMF_SLOTS;
-constexpr int kEnvSlots = 16;
+constexpr int kSlots = AAC_SBR_QMF_SLOTS; /* largest frame, for buffers */
 constexpr int kRing = AAC_SBR_ENC_RING;
 constexpr int kRingMask = kRing - 1;
 /* Blocks between an input block and the frame that decodes it. */
@@ -161,13 +160,13 @@ inline const float (*slot(const AacSbrEncChannel* ch, int t))[2] { return ch->W[
 
 /* ── transient detection ───────────────────────────────────────── */
 
-/* The slot of the strongest transient in [t0, t0 + 32), or -1: a slot
+/* The slot of the strongest transient in [t0, t0 + slots), or -1: a slot
  * whose high-band energy exceeds the mean of the eight before it by far
  * and is not negligible against the recent peak. */
-int detect_transient(const AacSbrEncChannel* ch, int t0) {
+int detect_transient(const AacSbrEncChannel* ch, int t0, int slots) {
   const float* E = ch->hf_energy;
   float peak = 0.0f;
-  for (int t = t0 - 32; t < t0 + kSlots; t++) {
+  for (int t = t0 - slots; t < t0 + slots; t++) {
     peak = std::max(peak, E[t & kRingMask]);
   }
   if (peak <= 1e-6f) {
@@ -175,7 +174,7 @@ int detect_transient(const AacSbrEncChannel* ch, int t0) {
   }
   int best = -1;
   float best_ratio = 0.0f;
-  for (int t = t0; t < t0 + kSlots; t++) {
+  for (int t = t0; t < t0 + slots; t++) {
     float past = 0.0f;
     for (int j = 1; j <= 8; j++) {
       past += E[(t - j) & kRingMask];
@@ -206,21 +205,21 @@ int split_rels(int length, int* rels, int max_rels) {
   return n;
 }
 
-/* Builds the grid of a frame that starts at envelope slot `start`
- * (carried over from the previous frame), with a transient at envelope
- * slot `tran` (or -1).  The envelope of a transient spans four slots
- * from it; a transient near the frame end stretches the envelope into
- * the next frame. */
-void make_grid(AacSbrGrid* g, int start, int tran, int amp_res_header) {
+/* Builds the grid of a frame of `slots` envelope time slots (16 or 15)
+ * that starts at envelope slot `start` (carried over from the previous
+ * frame), with a transient at envelope slot `tran` (or -1).  The
+ * envelope of a transient spans four slots from it; a transient near the
+ * frame end stretches the envelope into the next frame. */
+void make_grid(AacSbrGrid* g, int start, int tran, int amp_res_header, int slots) {
   memset(g, 0, sizeof(*g));
   g->tran_env = -1;
   g->short_env = -1;
   g->bs_pointer = 0;
   /* Relative borders are even, so the end border takes the parity of
    * the transient slot the borders are counted back from. */
-  int end = kEnvSlots;
+  int end = slots;
   if (tran >= 0) {
-    end = std::max(tran + 4, kEnvSlots + (tran & 1)); /* 16..19 */
+    end = std::max(tran + 4, slots + ((tran + slots) & 1)); /* slots .. slots + 3 */
   }
   if (tran >= 0) {
     /* trailing part after the transient envelope */
@@ -256,17 +255,17 @@ void make_grid(AacSbrGrid* g, int start, int tran, int amp_res_header) {
     if (g->tran_env > 0) {
       g->short_env = g->tran_env - 1;
     }
-  } else if (start == 0 && end == kEnvSlots) {
+  } else if (start == 0 && end == slots) {
     g->frame_class = 0; /* FIXFIX, one envelope */
     g->num_env = 1;
     g->t_env[0] = 0;
-    g->t_env[1] = kEnvSlots;
-  } else if (end == kEnvSlots) {
+    g->t_env[1] = slots;
+  } else if (end == slots) {
     g->frame_class = 2; /* VARFIX */
     g->abs_bord_0 = start;
     g->num_env = 1;
     g->t_env[0] = start;
-    g->t_env[1] = kEnvSlots;
+    g->t_env[1] = slots;
   } else {
     g->frame_class = start ? 3 : 1;
     g->abs_bord_0 = start;
@@ -301,7 +300,7 @@ void make_grid(AacSbrGrid* g, int start, int tran, int amp_res_header) {
   }
 }
 
-void write_grid(AacBitWriter* w, const AacSbrGrid* g) {
+void write_grid(AacBitWriter* w, const AacSbrGrid* g, int slots) {
   aac_bitwriter_write(w, (uint32_t)g->frame_class, 2);
   switch (g->frame_class) {
     case 0:
@@ -309,7 +308,7 @@ void write_grid(AacBitWriter* w, const AacSbrGrid* g) {
       aac_bitwriter_write(w, (uint32_t)g->freq_res[0], 1);
       return;
     case 1:
-      aac_bitwriter_write(w, (uint32_t)(g->abs_bord_1 - kEnvSlots), 2);
+      aac_bitwriter_write(w, (uint32_t)(g->abs_bord_1 - slots), 2);
       aac_bitwriter_write(w, (uint32_t)g->num_rel_trail, 2);
       for (int i = 0; i < g->num_rel_trail; i++) {
         aac_bitwriter_write(w, (uint32_t)(g->rel_trail[i] / 2 - 1), 2);
@@ -332,7 +331,7 @@ void write_grid(AacBitWriter* w, const AacSbrGrid* g) {
       return;
     default:
       aac_bitwriter_write(w, (uint32_t)g->abs_bord_0, 2);
-      aac_bitwriter_write(w, (uint32_t)(g->abs_bord_1 - kEnvSlots), 2);
+      aac_bitwriter_write(w, (uint32_t)(g->abs_bord_1 - slots), 2);
       aac_bitwriter_write(w, (uint32_t)g->num_rel_lead, 2);
       aac_bitwriter_write(w, (uint32_t)g->num_rel_trail, 2);
       for (int i = 0; i < g->num_rel_lead; i++) {
@@ -494,8 +493,8 @@ void decide_invf(const AacSbrEncoder* s, AacSbrEncChannel* ch, int base) {
   for (int j = 0; j < f->n_q; j++) {
     const int k0 = f->f_tablenoise[j];
     const int k1 = f->f_tablenoise[j + 1];
-    const float orig = band_tonality(s, ch, k0, k1, base, base + kSlots, false);
-    const float sbr = band_tonality(s, ch, k0, k1, base, base + kSlots, true);
+    const float orig = band_tonality(s, ch, k0, k1, base, base + s->slots, false);
+    const float sbr = band_tonality(s, ch, k0, k1, base, base + s->slots, true);
     const float ratio = sbr / std::max(orig, 1e-3f);
     static const float kUp[3] = {1.5f, 4.0f, 16.0f};
     int level = 0;
@@ -718,7 +717,7 @@ void write_channel_data(const AacSbrEncoder* s, AacBitWriter* w, int nch,
     aac_bitwriter_write(w, 0, 1); /* bs_coupling */
   }
   for (int c = 0; c < nch; c++) {
-    write_grid(w, &s->ch[c].grid);
+    write_grid(w, &s->ch[c].grid, s->time_slots);
   }
   for (int c = 0; c < nch; c++) {
     write_dtdf(w, &s->ch[c]);
@@ -744,10 +743,14 @@ void write_channel_data(const AacSbrEncoder* s, AacBitWriter* w, int nch,
 
 /* ── public ────────────────────────────────────────────────────── */
 
-int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrate, int ps) {
+int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrate, int ps,
+                     int frame_length) {
   build_codes();
   memset(s, 0, sizeof(*s));
   if (sample_rate % 2 || (channels != 1 && channels != 2) || (ps && channels != 2)) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
     return AAC_ERR_UNSUPPORTED;
   }
   const int coded = ps ? 1 : channels;
@@ -757,7 +760,11 @@ int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrat
   }
   s->sample_rate = sample_rate;
   s->channels = channels;
+  s->bitrate = bitrate;
   s->ps = ps;
+  s->frame_length = frame_length;
+  s->slots = frame_length / 32;
+  s->time_slots = s->slots / 2;
   AacSbrFreq* f = &s->freq;
   f->sample_rate = sample_rate;
   f->start_freq = t->start_freq;
@@ -775,7 +782,8 @@ int aac_sbr_enc_init(AacSbrEncoder* s, int sample_rate, int channels, int bitrat
   s->interpol_freq = 1;
   s->smoothing_mode = 0;
   s->noise_max = t->noise_max == 6 ? 64.0f : (t->noise_max == 3 ? 2.0f : 0.5f);
-  s->header_interval = std::max(1, (sample_rate + 2047) / 2048); /* about once a second */
+  /* about once a second */
+  s->header_interval = std::max(1, (sample_rate + 2 * frame_length - 1) / (2 * frame_length));
   /* the band each SBR band is copied from (4.6.18.6.3) */
   int target = f->kx;
   for (int p = 0; p < f->num_patches; p++) {
@@ -830,7 +838,7 @@ namespace {
 /* Analyses one block of a channel into the ring at `pos`. */
 void analyze_block(AacSbrEncoder* s, AacSbrEncChannel* ch, const float* in, int pos) {
   float silence[64] = {};
-  for (int i = 0; i < kSlots; i++) {
+  for (int i = 0; i < s->slots; i++) {
     float (*W)[2] = ch->W[(pos + i) & kRingMask];
     aac_qmf_analyze(&ch->analysis, in ? in + 64 * i : silence, W);
   }
@@ -838,7 +846,7 @@ void analyze_block(AacSbrEncoder* s, AacSbrEncChannel* ch, const float* in, int 
 
 void slot_energy(AacSbrEncoder* s, AacSbrEncChannel* ch, int pos) {
   const AacSbrFreq* f = &s->freq;
-  for (int i = 0; i < kSlots; i++) {
+  for (int i = 0; i < s->slots; i++) {
     const float (*W)[2] = ch->W[(pos + i) & kRingMask];
     float e = 0.0f;
     for (int k = f->kx; k < f->kx + f->m; k++) {
@@ -850,8 +858,8 @@ void slot_energy(AacSbrEncoder* s, AacSbrEncChannel* ch, int pos) {
 
 /* The core signal of a block: the lower 32 bands through the half-rate
  * synthesis bank. */
-void synthesize_core(AacSbrEncChannel* ch, int pos, float* core) {
-  for (int i = 0; i < kSlots; i++) {
+void synthesize_core(AacSbrEncChannel* ch, int pos, float* core, int slots) {
+  for (int i = 0; i < slots; i++) {
     aac_qmf_synthesize(&ch->synthesis, ch->W[(pos + i) & kRingMask], core + 32 * i);
   }
 }
@@ -859,12 +867,12 @@ void synthesize_core(AacSbrEncChannel* ch, int pos, float* core) {
 void frame_data(AacSbrEncoder* s, AacSbrEncChannel* ch, int base, bool header) {
   /* transient slots relative to the frame's first slot */
   const int tran = ch->tran_next;
-  const int found = detect_transient(ch, base + kSlots);
-  const int tran_next = found >= 0 ? found - base - kSlots : -1;
+  const int found = detect_transient(ch, base + s->slots, s->slots);
+  const int tran_next = found >= 0 ? found - base - s->slots : -1;
   ch->tran_next = tran_next;
   const int tran_env = tran >= 0 ? tran >> 1 : -1;
-  make_grid(&ch->grid, ch->start_bord, tran_env, s->amp_res_header);
-  ch->start_bord = std::max(0, ch->grid.t_env[ch->grid.num_env] - kEnvSlots);
+  make_grid(&ch->grid, ch->start_bord, tran_env, s->amp_res_header, s->time_slots);
+  ch->start_bord = std::max(0, ch->grid.t_env[ch->grid.num_env] - s->time_slots);
   estimate_envelopes(s, ch, base);
   estimate_noise(s, ch, base);
   decide_invf(s, ch, base);
@@ -877,6 +885,7 @@ void frame_data(AacSbrEncoder* s, AacSbrEncChannel* ch, int base, bool header) {
 void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const* core) {
   const int pos = s->pos;
   const int nch = s->channels;
+  const int slots = s->slots;
   if (s->ps) {
     /* both channels are analysed for the parameters; their downmix is
      * coded as channel 0, the left channel kept aside */
@@ -884,24 +893,24 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
     AacSbrEncChannel* r = &s->ch[1];
     analyze_block(s, l, in ? in[0] : nullptr, pos);
     analyze_block(s, r, in ? in[1] : nullptr, pos);
-    for (int i = 0; i < kSlots; i++) {
+    for (int i = 0; i < slots; i++) {
       const int idx = (pos + i) & kRingMask;
       memcpy(s->ps_left[idx], l->W[idx], sizeof(s->ps_left[idx]));
       aac_ps_enc_downmix(&s->ps_enc, s->ps_left[idx], r->W[idx], l->W[idx]);
     }
     slot_energy(s, l, pos);
-    synthesize_core(l, pos, core[0]);
+    synthesize_core(l, pos, core[0], slots);
   } else {
     for (int c = 0; c < nch; c++) {
       analyze_block(s, &s->ch[c], in ? in[c] : nullptr, pos);
       slot_energy(s, &s->ch[c], pos);
-      synthesize_core(&s->ch[c], pos, core[c]);
+      synthesize_core(&s->ch[c], pos, core[c], slots);
     }
   }
-  s->pos = (pos + kSlots) & kRingMask;
+  s->pos = (pos + slots) & kRingMask;
 
   /* the extension of the frame emitted now */
-  const int base = (pos - kCoreDelayBlocks * kSlots + kGridOffset) & kRingMask;
+  const int base = (pos - kCoreDelayBlocks * slots + kGridOffset) & kRingMask;
   const bool header = s->frames_since_header >= s->header_interval;
   s->frames_since_header = header ? 1 : s->frames_since_header + 1;
   const int coded = s->ps ? 1 : nch;
@@ -916,7 +925,7 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
   }
   if (s->ps) {
     float L[2][38][64], R[2][38][64];
-    for (int i = 0; i < 38; i++) {
+    for (int i = 0; i < slots + 6; i++) {
       const int idx = (base + i) & kRingMask;
       for (int k = 0; k < 64; k++) {
         L[0][i][k] = s->ps_left[idx][k][0];
@@ -925,7 +934,7 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
         R[1][i][k] = s->ch[1].W[idx][k][1];
       }
     }
-    aac_ps_enc_analyze(&s->ps_enc, L, R, header);
+    aac_ps_enc_analyze(&s->ps_enc, L, R, header, slots);
   }
 
   AacBitWriter w;
@@ -959,15 +968,16 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
   s->frame_count++;
 }
 
-void aac_sbr_downsampler_init(AacSbrDownsampler* d) {
+void aac_sbr_downsampler_init(AacSbrDownsampler* d, int frame_length) {
   aac_qmf_tables_init();
   aac_qmf_analysis_init(&d->analysis, 64);
   aac_qmf_synthesis_init(&d->synthesis, 32);
+  d->slots = frame_length / 32;
 }
 
 void aac_sbr_downsample(AacSbrDownsampler* d, const float* in, float* out) {
   const float silence[64] = {};
-  for (int i = 0; i < kSlots; i++) {
+  for (int i = 0; i < d->slots; i++) {
     float W[64][2];
     aac_qmf_analyze(&d->analysis, in ? in + 64 * i : silence, W);
     aac_qmf_synthesize(&d->synthesis, W, out + 32 * i);

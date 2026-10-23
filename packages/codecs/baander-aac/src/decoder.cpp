@@ -32,10 +32,10 @@ int decode_ics_info(const AacDecoderState* s, AacBitReader* r, AacIcsInfo* ics) 
   ics->window_shape = (int)aac_bitreader_read(r, 1);
   if (seq == AAC_WIN_EIGHT_SHORT) {
     ics->max_sfb = (int)aac_bitreader_read(r, 4);
-    aac_ics_layout(ics, s->rate_index, seq, (int)aac_bitreader_read(r, 7));
+    aac_ics_layout(ics, s->rate_index, s->frame_length, seq, (int)aac_bitreader_read(r, 7));
   } else {
     ics->max_sfb = (int)aac_bitreader_read(r, 6);
-    aac_ics_layout(ics, s->rate_index, seq, 0);
+    aac_ics_layout(ics, s->rate_index, s->frame_length, seq, 0);
     if (aac_bitreader_read(r, 1)) {
       /* predictor_data_present: only AAC Main and LTP carry predictors. */
       return AAC_ERR_UNSUPPORTED;
@@ -136,7 +136,7 @@ int decode_pulse_data(AacBitReader* r, const AacIcsInfo* ics, PulseData* p) {
   int pos = ics->swb_offset[start_sfb];
   for (int i = 0; i < p->num_pulse; i++) {
     pos += (int)aac_bitreader_read(r, 5);
-    if (pos >= 1024) {
+    if (pos >= ics->frame_length) {
       return AAC_ERR_DECODE;
     }
     p->pos[i] = pos;
@@ -380,50 +380,56 @@ void apply_tns(AacChannelStream* cs) {
 
 /* ── filterbank (4.6.11) ───────────────────────────────────────── */
 
+/* The window of a frame spans two blocks of `fl` samples (1024 or 960);
+ * the eight short windows of `sl` lines sit in the middle, starting at
+ * (fl - sl) / 2 (448 or 420). */
 void imdct_and_window(AacDecoderState* s, AacDecoderChannel* ch) {
   const AacIcsInfo* ics = &ch->cs.ics;
   const int seq = ics->window_sequence;
-  const float* lw_prev = aac_window_long[ch->prev_window_shape];
-  const float* lw = aac_window_long[ics->window_shape];
-  const float* sw_prev = aac_window_short[ch->prev_window_shape];
-  const float* sw = aac_window_short[ics->window_shape];
-  float buf[2048];
+  const int fl = s->frame_length;
+  const int sl = aac_short_length(fl);
+  const int start = (fl - sl) / 2;
+  const float* lw_prev = aac_window_long_for(fl, ch->prev_window_shape);
+  const float* lw = aac_window_long_for(fl, ics->window_shape);
+  const float* sw_prev = aac_window_short_for(fl, ch->prev_window_shape);
+  const float* sw = aac_window_short_for(fl, ics->window_shape);
+  float buf[2 * AAC_FRAME_SIZE_LONG];
 
   if (seq != AAC_WIN_EIGHT_SHORT) {
     aac_imdct(&s->mdct_long, ch->cs.coef, buf);
     if (seq == AAC_WIN_LONG_STOP) {
-      memset(buf, 0, 448 * sizeof(float));
-      for (int i = 0; i < 128; i++) {
-        buf[448 + i] *= sw_prev[i];
+      memset(buf, 0, (size_t)start * sizeof(float));
+      for (int i = 0; i < sl; i++) {
+        buf[start + i] *= sw_prev[i];
       }
     } else {
-      s->dsp->vector_fmul(buf, buf, lw_prev, 1024);
+      s->dsp->vector_fmul(buf, buf, lw_prev, fl);
     }
     if (seq == AAC_WIN_LONG_START) {
-      for (int i = 0; i < 128; i++) {
-        buf[1472 + i] *= sw[127 - i];
+      for (int i = 0; i < sl; i++) {
+        buf[fl + start + i] *= sw[sl - 1 - i];
       }
-      memset(buf + 1600, 0, 448 * sizeof(float));
+      memset(buf + fl + start + sl, 0, (size_t)start * sizeof(float));
     } else {
-      s->dsp->vector_fmul_reverse(buf + 1024, buf + 1024, lw, 1024);
+      s->dsp->vector_fmul_reverse(buf + fl, buf + fl, lw, fl);
     }
   } else {
     memset(buf, 0, sizeof(buf));
-    float sb[256];
+    float sb[2 * AAC_FRAME_SIZE_SHORT];
     for (int w = 0; w < 8; w++) {
-      aac_imdct(&s->mdct_short, ch->cs.coef + w * 128, sb);
+      aac_imdct(&s->mdct_short, ch->cs.coef + w * AAC_FRAME_SIZE_SHORT, sb);
       const float* left = w == 0 ? sw_prev : sw;
-      float* dst = buf + 448 + w * 128;
-      for (int i = 0; i < 128; i++) {
+      float* dst = buf + start + w * sl;
+      for (int i = 0; i < sl; i++) {
         dst[i] += sb[i] * left[i];
-        dst[128 + i] += sb[128 + i] * sw[127 - i];
+        dst[sl + i] += sb[sl + i] * sw[sl - 1 - i];
       }
     }
   }
-  for (int i = 0; i < 1024; i++) {
+  for (int i = 0; i < fl; i++) {
     ch->output[i] = (ch->overlap[i] + buf[i]) * kOutputScale;
   }
-  memcpy(ch->overlap, buf + 1024, 1024 * sizeof(float));
+  memcpy(ch->overlap, buf + fl, (size_t)fl * sizeof(float));
   ch->prev_window_shape = ics->window_shape;
 }
 
@@ -654,9 +660,10 @@ void apply_dependent_coupling(const AacDecoderCce* cce, int gain_index, AacChann
   }
 }
 
-void apply_independent_coupling(const AacDecoderCce* cce, int gain_index, AacDecoderChannel* target) {
+void apply_independent_coupling(const AacDecoderCce* cce, int gain_index, AacDecoderChannel* target,
+                                int n) {
   const float gain = cce->coup.gain[gain_index][0];
-  for (int i = 0; i < 1024; i++) {
+  for (int i = 0; i < n; i++) {
     target->output[i] += gain * cce->ch.output[i];
   }
 }
@@ -682,7 +689,7 @@ void apply_couplings(AacDecoderState* s, int elem_index, int domain) {
       if (c->target_type[t] == e->type && c->target_tag[t] == e->tag) {
         if (c->ch_select[t] != 1) {
           if (independent) {
-            apply_independent_coupling(cce, index, &chans[0]);
+            apply_independent_coupling(cce, index, &chans[0], s->frame_length);
           } else {
             apply_dependent_coupling(cce, index, &chans[0].cs);
           }
@@ -692,7 +699,7 @@ void apply_couplings(AacDecoderState* s, int elem_index, int domain) {
         }
         if (c->ch_select[t] != 2 && e->type == AAC_ELEM_CPE) {
           if (independent) {
-            apply_independent_coupling(cce, index, &chans[1]);
+            apply_independent_coupling(cce, index, &chans[1], s->frame_length);
           } else {
             apply_dependent_coupling(cce, index, &chans[1].cs);
           }
@@ -723,7 +730,7 @@ int skip_dse(AacBitReader* r) {
 AacSbrState* sbr_state(AacDecoderState* s, int elem) {
   if (!s->sbr[elem]) {
     s->sbr[elem] = new AacSbrState();
-    aac_sbr_init(s->sbr[elem], s->sample_rate);
+    aac_sbr_init(s->sbr[elem], s->sample_rate, s->frame_length);
   }
   return s->sbr[elem];
 }
@@ -900,7 +907,8 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   s->sample_rate = sr;
   s->channels = ch;
   s->stream_channels = 0;
-  s->frame_size = 1024;
+  s->frame_length = AAC_FRAME_SIZE_LONG;
+  s->frame_size = s->frame_length;
   s->dsp = dsp;
   s->rate_index = -1;
   for (int i = 0; i < AAC_NUM_SAMPLE_RATES; i++) {
@@ -913,8 +921,8 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
     delete s;
     return nullptr;
   }
-  aac_mdct_init(&s->mdct_long, 2048);
-  aac_mdct_init(&s->mdct_short, 256);
+  aac_mdct_init(&s->mdct_long, 2 * s->frame_length);
+  aac_mdct_init(&s->mdct_short, 2 * aac_short_length(s->frame_length));
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
@@ -958,15 +966,29 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
   s->ps_output = 0;
-  s->frame_size = AAC_FRAME_SIZE_LONG;
+  s->frame_size = s->frame_length;
   if (s->limiter_ready) {
     aac_limiter_reset(&s->limiter);
   }
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     if (s->sbr[i]) {
-      aac_sbr_init(s->sbr[i], s->sample_rate);
+      aac_sbr_init(s->sbr[i], s->sample_rate, s->frame_length);
     }
   }
+}
+
+int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length) {
+  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (frame_length == s->frame_length) {
+    return 0;
+  }
+  s->frame_length = frame_length;
+  aac_mdct_init(&s->mdct_long, 2 * frame_length);
+  aac_mdct_init(&s->mdct_short, 2 * aac_short_length(frame_length));
+  aac_decoder_reset_state(s);
+  return 0;
 }
 
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index) {
@@ -1201,7 +1223,8 @@ int effective_conceal_mode(const AacDecoderState* s) {
 
 /* Replaces a lost channel's frame by its concealed continuation. */
 void conceal_channel(AacDecoderState* s, AacDecoderChannel* ch) {
-  aac_conceal_spectrum(&ch->conceal, effective_conceal_mode(s), &s->conceal_random, &ch->cs.ics,
+  aac_conceal_spectrum(&ch->conceal, effective_conceal_mode(s), s->frame_length,
+                       &s->conceal_random, &ch->cs.ics,
                        ch->cs.coef);
   ch->cs.tns_present = 0;
   imdct_and_window(s, ch);
@@ -1216,7 +1239,8 @@ void prepare_recovery(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
   }
   AacDecoderChannel* alt = &s->recover[slot];
   AacConcealChannel fade = ch->conceal;
-  aac_conceal_spectrum(&fade, effective_conceal_mode(s), &s->conceal_random, &alt->cs.ics,
+  aac_conceal_spectrum(&fade, effective_conceal_mode(s), s->frame_length, &s->conceal_random,
+                       &alt->cs.ics,
                        alt->cs.coef);
   alt->cs.tns_present = 0;
 }
@@ -1233,8 +1257,9 @@ void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
   alt->prev_window_shape = ch->prev_window_shape;
   imdct_and_window(s, alt);
   imdct_and_window(s, ch);
-  for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
-    const float w = ((float)i + 0.5f) / (float)AAC_FRAME_SIZE_LONG;
+  const int fl = s->frame_length;
+  for (int i = 0; i < fl; i++) {
+    const float w = ((float)i + 0.5f) / (float)fl;
     ch->output[i] = alt->output[i] + (ch->output[i] - alt->output[i]) * w;
   }
   aac_conceal_recovered(&ch->conceal);
@@ -1247,7 +1272,7 @@ void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
  * previous frame's envelope instead of dropping to upsampling. */
 void sbr_stage(AacDecoderState* s, bool conceal) {
   const AacLayout* l = &s->layout;
-  s->frame_size = s->sbr_mode ? 2 * AAC_FRAME_SIZE_LONG : AAC_FRAME_SIZE_LONG;
+  s->frame_size = s->sbr_mode ? 2 * s->frame_length : s->frame_length;
   if (!s->sbr_mode) {
     return;
   }

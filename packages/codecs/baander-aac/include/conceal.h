@@ -39,8 +39,8 @@ void aac_conceal_recovered(AacConcealChannel* c);
  * ics_info it must be windowed with (TNS off) and advances the fade;
  * `mode` is AAC_CONCEAL_NOISE or AAC_CONCEAL_INTERPOLATE.  Without a
  * stored frame the spectrum is silent. */
-void aac_conceal_spectrum(AacConcealChannel* c, int mode, unsigned* random_state,
-                          AacIcsInfo* ics, float* coef);
+void aac_conceal_spectrum(AacConcealChannel* c, int mode, int frame_length,
+                          unsigned* random_state, AacIcsInfo* ics, float* coef);
 
 #ifdef __cplusplus
 }

@@ -13,8 +13,12 @@ extern "C" {
 
 /* ics_info() of ISO/IEC 14496-3 Table 4.6 plus the layout it implies.
  * Band-indexed arrays of a channel use index group * max_sfb + sfb in the
- * decoder and group * num_swb + sfb in the encoder. */
+ * decoder and group * num_swb + sfb in the encoder.  Spectra are stored
+ * with a stride of AAC_FRAME_SIZE_SHORT lines per short window whatever
+ * the frame length: the 120-line windows of a 960 frame leave the last
+ * eight lines of each window unused. */
 using AacIcsInfo = struct AacIcsInfo_ {
+  int frame_length; /* 1024 or 960 lines per long window */
   int window_sequence;
   int window_shape;
   int max_sfb;
@@ -27,10 +31,16 @@ using AacIcsInfo = struct AacIcsInfo_ {
 };
 
 /* Fills the layout fields (everything but window_shape and max_sfb) for a
- * window sequence; scale_factor_grouping is the 7-bit field of short
- * windows, bit 6 - w set when window w + 1 joins window w's group. */
-void aac_ics_layout(AacIcsInfo* ics, int rate_index, int window_sequence,
+ * window sequence of a frame length (1024 or 960); scale_factor_grouping
+ * is the 7-bit field of short windows, bit 6 - w set when window w + 1
+ * joins window w's group. */
+void aac_ics_layout(AacIcsInfo* ics, int rate_index, int frame_length, int window_sequence,
                     int scale_factor_grouping);
+
+/* Lines of one short window of a frame length: 128 or 120. */
+static inline int aac_short_length(int frame_length) {
+  return frame_length / AAC_NUM_WINDOWS_SHORT;
+}
 
 #ifdef __cplusplus
 }

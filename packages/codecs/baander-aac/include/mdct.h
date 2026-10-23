@@ -22,7 +22,8 @@ using AacWindowShape = enum AacWindowShape_ {
   AAC_WIN_KBD = 1,
 };
 
-/* MDCT of window length n (2048 or 256), producing n/2 coefficients, with
+/* MDCT of window length n (2048 or 256; 1920 or 240 for 960-sample
+ * frames), producing n/2 coefficients, with
  * the scaling of ISO/IEC 14496-3 4.6.11.3.1 / 4.6.11.3.2:
  *   forward  X[k] = 2 * sum_{j<n} z[j] cos(2 pi / n (j + n0)(k + 1/2))
  *   inverse  x[j] = 2/n * sum_{k<n/2} X[k] cos(2 pi / n (j + n0)(k + 1/2))

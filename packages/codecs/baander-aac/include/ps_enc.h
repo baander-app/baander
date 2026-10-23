@@ -47,11 +47,12 @@ void aac_ps_enc_reset(AacPsEncoder* ps);
  * that keeps the pair's energy. */
 void aac_ps_enc_downmix(AacPsEncoder* ps, const float L[64][2], const float R[64][2], float M[64][2]);
 
-/* Estimates and codes the parameters of one frame from the 38 slots
- * ([re/im][slot][band]) of both channels that the decoder's grid covers,
+/* Estimates and codes the parameters of one frame from the `slots` + 6
+ * slots ([re/im][slot][band]) of both channels that the decoder's grid
+ * covers (32 or 30 slots per frame plus the hybrid filters' lookahead),
  * with `header` set when the PS header is to be sent. */
 void aac_ps_enc_analyze(AacPsEncoder* ps, const float L[2][38][64], const float R[2][38][64],
-                        int header);
+                        int header, int slots);
 
 /* Writes ps_data() of the frame. */
 void aac_ps_enc_write(const AacPsEncoder* ps, AacBitWriter* w);

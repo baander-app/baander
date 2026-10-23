@@ -81,12 +81,12 @@ void aac_conceal_recovered(AacConcealChannel* c) {
   c->gain = kStepGain;
 }
 
-void aac_conceal_spectrum(AacConcealChannel* c, int mode, unsigned* random_state,
-                          AacIcsInfo* ics, float* coef) {
+void aac_conceal_spectrum(AacConcealChannel* c, int mode, int frame_length,
+                          unsigned* random_state, AacIcsInfo* ics, float* coef) {
   if (!c->valid) {
     /* Nothing to continue: silence through the filterbank, so that the
      * overlap stays in step. */
-    aac_ics_layout(ics, 0, AAC_WIN_ONLY_LONG, 0);
+    aac_ics_layout(ics, 0, frame_length, AAC_WIN_ONLY_LONG, 0);
     ics->window_shape = AAC_WIN_SINE;
     ics->max_sfb = 0;
     memset(coef, 0, 1024 * sizeof(float));

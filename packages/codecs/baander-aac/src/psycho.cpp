@@ -55,7 +55,7 @@ void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
   const int is_short = ics->num_windows == 8;
   const int nswb = ics->num_swb;
   const int* off = ics->swb_offset;
-  const int window_len = is_short ? 256 : 2048;
+  const int window_len = 2 * (is_short ? aac_short_length(ics->frame_length) : ics->frame_length);
   const float line_hz = (float)sample_rate / (float)window_len;
   const float en_high = is_short                   ? kEnSpreadHighShort
                         : channel_bitrate <= 22000 ? kEnSpreadHighLowRate
@@ -117,15 +117,16 @@ void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
   p->prev_long = !is_short;
 }
 
-void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_energy) {
+void aac_psy_subblock_energies(const float* x, int start, int count, int sub_len,
+                               float* sub_energy) {
   /* The high-pass of libfdk-aac block_switch.cpp, run from rest at the
    * start of the region. */
   float y = 0.0f;
   float prev = x[start - 1];
-  for (int j = 0; j < count / 128; j++) {
-    const float* s = x + start + j * 128;
+  for (int j = 0; j < count / sub_len; j++) {
+    const float* s = x + start + j * sub_len;
     float e = 0.0f;
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < sub_len; i++) {
       y = 0.7548f * (s[i] - prev) + 0.5095f * y;
       prev = s[i];
       e += y * y;
@@ -134,16 +135,16 @@ void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_
   }
 }
 
-int aac_psy_attack(const float* x, int start, int count) {
+int aac_psy_attack(const float* x, int start, int count, int sub_len) {
   /* Sub-blocks below about -51 dBFS RMS never count as attacks, and an
    * attack must exceed ten times the smoothed energy of what came before
    * (libfdk-aac block_switch.cpp). */
-  const float min_energy = 128.0f * (kInputScale * 0.0028f) * (kInputScale * 0.0028f);
+  const float min_energy = (float)sub_len * (kInputScale * 0.0028f) * (kInputScale * 0.0028f);
   const float ratio = 10.0f;
   float e[64];
   const int history = 3;
-  const int n = count / 128 + history;
-  aac_psy_subblock_energies(x, start - history * 128, n * 128, e);
+  const int n = count / sub_len + history;
+  aac_psy_subblock_energies(x, start - history * sub_len, n * sub_len, sub_len, e);
   float acc = (e[0] + e[1] + e[2]) / 3.0f;
   int attack = 0;
   for (int j = history; j < n; j++) {

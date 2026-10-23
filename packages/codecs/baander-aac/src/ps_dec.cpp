@@ -315,7 +315,7 @@ int read_data(AacPsState* ps, AacBitReader* r) {
     }
   } else {
     for (int e = 1; e <= ps->num_env; e++) {
-      ps->border_position[e] = (e * kSlots >> log2_int(ps->num_env)) - 1;
+      ps->border_position[e] = (e * ps->slots >> log2_int(ps->num_env)) - 1;
     }
   }
 
@@ -368,7 +368,7 @@ int read_data(AacPsState* ps, AacBitReader* r) {
 
   /* An incomplete last envelope is completed by a copy of the previous
    * one, so that the interpolation always ends at the frame border. */
-  if (!ps->num_env || ps->border_position[ps->num_env] < kSlots - 1) {
+  if (!ps->num_env || ps->border_position[ps->num_env] < ps->slots - 1) {
     const int source = ps->num_env ? ps->num_env - 1 : ps->num_env_old - 1;
     if (source >= 0 && source != ps->num_env) {
       if (ps->enable_iid) {
@@ -397,7 +397,7 @@ int read_data(AacPsState* ps, AacBitReader* r) {
       }
     }
     ps->num_env++;
-    ps->border_position[ps->num_env] = kSlots - 1;
+    ps->border_position[ps->num_env] = ps->slots - 1;
   }
 
   ps->is34bands_old = ps->is34bands;
@@ -683,7 +683,7 @@ void decorrelation(AacPsState* ps, float (*out)[kSlots][2], const float (*s)[kSl
   const float a_smooth = 0.25f;
   const int8_t* const k_to_i = is34 ? aac_ps_k_to_i_34 : aac_ps_k_to_i_20;
   const int n0 = 0;
-  const int nL = kSlots;
+  const int nL = ps->slots;
   const float peak_decay_factor = 0.76592833836465f;
 
   memset(power, 0, sizeof(power));
@@ -722,9 +722,9 @@ void decorrelation(AacPsState* ps, float (*out)[kSlots][2], const float (*s)[kSl
     float g_decay_slope = 1.0f - kDecaySlope * (float)(k - kDecayCutoff[is34]);
     g_decay_slope = std::min(std::max(g_decay_slope, 0.0f), 1.0f);
     memcpy(ps->delay[k], ps->delay[k] + nL, kMaxDelay * sizeof(ps->delay[k][0]));
-    memcpy(ps->delay[k] + kMaxDelay, s[k], kSlots * sizeof(ps->delay[k][0]));
+    memcpy(ps->delay[k] + kMaxDelay, s[k], (size_t)nL * sizeof(ps->delay[k][0]));
     for (int m = 0; m < kLinks; m++) {
-      memcpy(ps->ap_delay[k][m], ps->ap_delay[k][m] + kSlots, 5 * sizeof(ps->ap_delay[k][m][0]));
+      memcpy(ps->ap_delay[k][m], ps->ap_delay[k][m] + nL, 5 * sizeof(ps->ap_delay[k][m][0]));
     }
     decorrelate_band(out[k], ps->delay[k] + kMaxDelay - 2, ps->ap_delay[k], g_phi_fract[is34][k],
                      g_Q_fract_allpass[is34][k], transient_gain[b], g_decay_slope, nL - n0);
@@ -732,7 +732,7 @@ void decorrelation(AacPsState* ps, float (*out)[kSlots][2], const float (*s)[kSl
   for (; k < kShortDelayBand[is34]; k++) {
     const int i = k_to_i[k];
     memcpy(ps->delay[k], ps->delay[k] + nL, kMaxDelay * sizeof(ps->delay[k][0]));
-    memcpy(ps->delay[k] + kMaxDelay, s[k], kSlots * sizeof(ps->delay[k][0]));
+    memcpy(ps->delay[k] + kMaxDelay, s[k], (size_t)nL * sizeof(ps->delay[k][0]));
     const float (*d)[2] = ps->delay[k] + kMaxDelay - 14;
     for (int n = 0; n < nL - n0; n++) {
       out[k][n][0] = d[n][0] * transient_gain[i][n];
@@ -742,7 +742,7 @@ void decorrelation(AacPsState* ps, float (*out)[kSlots][2], const float (*s)[kSl
   for (; k < kNrBands[is34]; k++) {
     const int i = k_to_i[k];
     memcpy(ps->delay[k], ps->delay[k] + nL, kMaxDelay * sizeof(ps->delay[k][0]));
-    memcpy(ps->delay[k] + kMaxDelay, s[k], kSlots * sizeof(ps->delay[k][0]));
+    memcpy(ps->delay[k] + kMaxDelay, s[k], (size_t)nL * sizeof(ps->delay[k][0]));
     const float (*d)[2] = ps->delay[k] + kMaxDelay - 1;
     for (int n = 0; n < nL - n0; n++) {
       out[k][n][0] = d[n][0] * transient_gain[i][n];
@@ -956,9 +956,10 @@ void stereo_processing(AacPsState* ps, float (*l)[kSlots][2], float (*r)[kSlots]
 
 /* ── public ────────────────────────────────────────────────────── */
 
-void aac_ps_init(AacPsState* ps) {
+void aac_ps_init(AacPsState* ps, int slots) {
   init_tables();
   memset(ps, 0, sizeof(*ps));
+  ps->slots = slots;
 }
 
 int aac_ps_read_data(AacPsState* ps, AacBitReader* r, int bits_left) {
@@ -1000,9 +1001,9 @@ void aac_ps_apply(AacPsState* ps, float L[2][38][64], float R[2][38][64], int to
   if (top < kNrAllpassBands[is34]) {
     memset(ps->ap_delay + top, 0, (size_t)(kNrAllpassBands[is34] - top) * sizeof(ps->ap_delay[0]));
   }
-  aac_ps_hybrid_analysis(ps->Lbuf, ps->in_buf, L, is34);
+  aac_ps_hybrid_analysis(ps->Lbuf, ps->in_buf, L, is34, ps->slots);
   decorrelation(ps, ps->Rbuf, ps->Lbuf, is34);
   stereo_processing(ps, ps->Lbuf, ps->Rbuf, is34);
-  aac_ps_hybrid_synthesis(L, ps->Lbuf, is34);
-  aac_ps_hybrid_synthesis(R, ps->Rbuf, is34);
+  aac_ps_hybrid_synthesis(L, ps->Lbuf, is34, ps->slots);
+  aac_ps_hybrid_synthesis(R, ps->Rbuf, is34, ps->slots);
 }

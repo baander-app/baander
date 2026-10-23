@@ -100,6 +100,128 @@ static void our_he_encoded(const char* name, AacObjectType aot, int sr, int chan
   CHECK(q > 12.0, "%s: low band %.1f dB", name, q);
 }
 
+/* ── 960-sample frames over LATM/LOAS ──────────────────────────── */
+
+/* FFmpeg decodes 960-sample frames only when an AudioSpecificConfig says
+ * so (ADTS cannot), so our ADTS stream is rewrapped into a LOAS
+ * AudioSyncStream of AudioMuxElements (ISO/IEC 14496-3 1.7.3): one
+ * program, one layer, audioMuxVersion 0, frameLengthType 0, the
+ * StreamMuxConfig in band with every frame. */
+struct LatmWriter {
+  std::vector<uint8_t> bytes;
+  uint32_t acc = 0;
+  int nbits = 0;
+  void put(uint32_t v, int n) {
+    for (int i = n - 1; i >= 0; i--) {
+      acc = (acc << 1) | ((v >> i) & 1);
+      if (++nbits == 8) {
+        bytes.push_back((uint8_t)acc);
+        acc = 0;
+        nbits = 0;
+      }
+    }
+  }
+  void align() {
+    while (nbits) {
+      put(0, 1);
+    }
+  }
+};
+
+static std::vector<uint8_t> adts_to_loas_960(const std::vector<uint8_t>& adts) {
+  std::vector<uint8_t> out;
+  for (const AdtsFrame& f : split_adts(adts)) {
+    const uint8_t* h = adts.data() + f.offset;
+    const int rate_index = (h[2] >> 2) & 0xF;
+    const int channel_config = ((h[2] & 1) << 2) | (h[3] >> 6);
+    const int header = (h[1] & 1) ? 7 : 9;
+    LatmWriter w;
+    w.put(0, 1); /* useSameStreamMux: the StreamMuxConfig follows */
+    w.put(0, 1); /* audioMuxVersion */
+    w.put(1, 1); /* allStreamsSameTimeFraming */
+    w.put(0, 6); /* numSubFrames */
+    w.put(0, 4); /* numProgram */
+    w.put(0, 3); /* numLayer */
+    /* AudioSpecificConfig: AAC-LC, GASpecificConfig with frameLengthFlag */
+    w.put(AAC_AOT_LC, 5);
+    w.put((uint32_t)rate_index, 4);
+    w.put((uint32_t)channel_config, 4);
+    w.put(1, 1); /* frameLengthFlag: 960 */
+    w.put(0, 1); /* dependsOnCoreCoder */
+    w.put(0, 1); /* extensionFlag */
+    w.put(0, 3);    /* frameLengthType */
+    w.put(0xFF, 8); /* latmBufferFullness */
+    w.put(0, 1);    /* otherDataPresent */
+    w.put(0, 1);    /* crcCheckPresent */
+    /* PayloadLengthInfo and PayloadMux */
+    size_t n = f.size - header;
+    while (n >= 255) {
+      w.put(255, 8);
+      n -= 255;
+    }
+    w.put((uint32_t)n, 8);
+    for (size_t i = header; i < f.size; i++) {
+      w.put(h[i], 8);
+    }
+    w.align();
+    /* AudioSyncStream: sync word and the element's length */
+    const uint32_t len = (uint32_t)w.bytes.size();
+    out.push_back(0x56);
+    out.push_back((uint8_t)(0xE0 | (len >> 8)));
+    out.push_back((uint8_t)len);
+    out.insert(out.end(), w.bytes.begin(), w.bytes.end());
+  }
+  return out;
+}
+
+/* We encode with 960-sample frames; FFmpeg's decode of the LOAS-wrapped
+ * stream must match our decode of the ADTS stream. */
+static void our_encoded_960(const char* name, const std::vector<float>& pcm, int sr, int channels,
+                            int bitrate, AacRateControl rc) {
+  std::vector<uint8_t> stream;
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, AAC_AOT_LC, rc);
+  CHECK(enc != nullptr, "%s: create", name);
+  CHECK(aac_encoder_set_frame_length(enc, 960) == AAC_OK, "%s: frame length", name);
+  std::vector<float> block((size_t)960 * channels);
+  std::vector<uint8_t> buf(8192);
+  for (size_t pos = 0; pos < pcm.size(); pos += block.size()) {
+    std::fill(block.begin(), block.end(), 0.0f);
+    const size_t n = std::min(block.size(), pcm.size() - pos);
+    memcpy(block.data(), pcm.data() + pos, n * sizeof(float));
+    const int len = aac_encoder_encode(enc, block.data(), 960, buf.data(), (int)buf.size());
+    CHECK(len > 0, "%s: encode %d", name, len);
+    if (len > 0) {
+      stream.insert(stream.end(), buf.begin(), buf.begin() + len);
+    }
+  }
+  const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+  CHECK(len > 0, "%s: flush %d", name, len);
+  if (len > 0) {
+    stream.insert(stream.end(), buf.begin(), buf.begin() + len);
+  }
+  aac_encoder_destroy(enc);
+  const std::vector<uint8_t> loas = adts_to_loas_960(stream);
+  CHECK(write_file(path("ours.loas"), loas.data(), loas.size()), "write stream");
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "-f loas -i %s -f f32le -ar %d %s", path("ours.loas").c_str(), sr,
+           path("ours.ff.f32").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg refused our 960 stream", name);
+  AacDecoderHandle dec = aac_decoder_create(sr, channels);
+  CHECK(aac_decoder_set_frame_length(dec, 960) == AAC_OK, "%s: decoder frame length", name);
+  int errors = 0;
+  const std::vector<float> ours = decode_stream(stream, sr, channels, &errors, dec);
+  aac_decoder_destroy(dec);
+  const std::vector<float> theirs = read_f32(path("ours.ff.f32"));
+  CHECK(errors == 0, "%s: %d frames failed in our decoder", name, errors);
+  const size_t n = std::min(ours.size(), theirs.size());
+  CHECK(n > 0 && ours.size() == theirs.size(), "%s: %zu vs %zu samples", name, ours.size(),
+        theirs.size());
+  const double d = snr_db(theirs.data(), ours.data(), n);
+  const double q = aligned_snr_db(pcm, theirs, channels, 1920);
+  printf("%-28s ours->ffmpeg vs ours->ours (960): %.1f dB (quality %.1f dB)\n", name, d, q);
+  CHECK(d > 90.0, "%s: decoders disagree on our 960 stream (%.1f dB)", name, d);
+}
+
 /* FFmpeg encodes `channels` channels with a named layout; both decoders
  * then produce `out_channels` channels (the stream's own channels, or a
  * stereo or mono downmix) from the same stream. */
@@ -208,6 +330,17 @@ int main() {
               AAC_RC_CBR);
   our_encoded("7.1 48k 512k", gen_multichannel(48000 * 3, 48000, 8), 48000, 8, 512000,
               AAC_RC_CBR);
+  our_encoded_960("960 transients 44.1k 96k", gen_transients(n, 44100, 2), 44100, 2, 96000,
+                  AAC_RC_CBR);
+  our_encoded_960("960 harmonics 48k mono 64k", gen_harmonics(n, 48000, 1), 48000, 1, 64000,
+                  AAC_RC_CBR);
+  our_encoded_960("960 noise 44.1k 64k pns", gen_noise(n, 2), 44100, 2, 64000, AAC_RC_CBR);
+  our_encoded_960("960 harmonics 44.1k 48k is", gen_harmonics(n, 44100, 2), 44100, 2, 48000,
+                  AAC_RC_CBR);
+  our_encoded_960("960 tones 16k mono tvbr", gen_harmonics(16000 * 3, 16000, 1), 16000, 1, 48000,
+                  AAC_RC_TVBR);
+  our_encoded_960("960 5.1 48k 384k", gen_multichannel(48000 * 3, 48000, 6), 48000, 6, 384000,
+                  AAC_RC_CBR);
   our_he_encoded("he 44.1k mono 32k", AAC_AOT_SBR, 44100, 1, 32000);
   our_he_encoded("he 48k stereo 64k", AAC_AOT_SBR, 48000, 2, 64000);
   our_he_encoded("he 48k 5.1 192k", AAC_AOT_SBR, 48000, 6, 192000);

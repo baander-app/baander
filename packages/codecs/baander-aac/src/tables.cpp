@@ -69,6 +69,84 @@ const int aac_sfb_offset_short[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_SHORT + 1] = {
     /*  8000 */ {0, 4, 8, 12, 16, 20, 24, 28, 36, 44, 52, 60, 72, 88, 108, 128},
 };
 
+/* The 960 and 120 line columns of the same tables: the band layout of the
+ * 1024 tables with the last bands cut at 960, and the short windows'
+ * last band ending at 120. */
+const int aac_num_sfb_long_960[AAC_NUM_SAMPLE_RATES] = {40, 40, 46, 49, 49, 49,
+                                                        46, 46, 42, 42, 42, 40};
+const int aac_num_sfb_short_960[AAC_NUM_SAMPLE_RATES] = {12, 12, 12, 14, 14, 14,
+                                                         15, 15, 15, 15, 15, 15};
+
+const int aac_sfb_offset_long_960[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_LONG + 1] = {
+    /* 96000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,  52,
+                 56,  64,  72,  80,  88,  96,  108, 120, 132, 144, 156, 172, 188, 212,
+                 240, 276, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960},
+    /* 88200 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,  52,
+                 56,  64,  72,  80,  88,  96,  108, 120, 132, 144, 156, 172, 188, 212,
+                 240, 276, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960},
+    /* 64000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,  52,  56,  64,
+                 72,  80,  88,  100, 112, 124, 140, 156, 172, 192, 216, 240, 268, 304, 344, 384,
+                 424, 464, 504, 544, 584, 624, 664, 704, 744, 784, 824, 864, 904, 944, 960},
+    /* 48000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  48,  56,
+                 64,  72,  80,  88,  96,  108, 120, 132, 144, 160, 176, 196, 216,
+                 240, 264, 292, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608,
+                 640, 672, 704, 736, 768, 800, 832, 864, 896, 928, 960},
+    /* 44100 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  48,  56,
+                 64,  72,  80,  88,  96,  108, 120, 132, 144, 160, 176, 196, 216,
+                 240, 264, 292, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608,
+                 640, 672, 704, 736, 768, 800, 832, 864, 896, 928, 960},
+    /* 32000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  48,  56,
+                 64,  72,  80,  88,  96,  108, 120, 132, 144, 160, 176, 196, 216,
+                 240, 264, 292, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608,
+                 640, 672, 704, 736, 768, 800, 832, 864, 896, 928, 960},
+    /* 24000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68,  76,
+                 84,  92,  100, 108, 116, 124, 136, 148, 160, 172, 188, 204, 220, 240, 260, 284,
+                 308, 336, 364, 396, 432, 468, 508, 552, 600, 652, 704, 768, 832, 896, 960},
+    /* 22050 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68,  76,
+                 84,  92,  100, 108, 116, 124, 136, 148, 160, 172, 188, 204, 220, 240, 260, 284,
+                 308, 336, 364, 396, 432, 468, 508, 552, 600, 652, 704, 768, 832, 896, 960},
+    /* 16000 */ {0,   8,   16,  24,  32,  40,  48,  56,  64,  72,  80,  88,  100, 112, 124,
+                 136, 148, 160, 172, 184, 196, 212, 228, 244, 260, 280, 300, 320, 344, 368,
+                 396, 424, 456, 492, 532, 572, 616, 664, 716, 772, 832, 896, 960},
+    /* 12000 */ {0,   8,   16,  24,  32,  40,  48,  56,  64,  72,  80,  88,  100, 112, 124,
+                 136, 148, 160, 172, 184, 196, 212, 228, 244, 260, 280, 300, 320, 344, 368,
+                 396, 424, 456, 492, 532, 572, 616, 664, 716, 772, 832, 896, 960},
+    /* 11025 */ {0,   8,   16,  24,  32,  40,  48,  56,  64,  72,  80,  88,  100, 112, 124,
+                 136, 148, 160, 172, 184, 196, 212, 228, 244, 260, 280, 300, 320, 344, 368,
+                 396, 424, 456, 492, 532, 572, 616, 664, 716, 772, 832, 896, 960},
+    /*  8000 */ {0,   12,  24,  36,  48,  60,  72,  84,  96,  108, 120, 132, 144, 156,
+                 172, 188, 204, 220, 236, 252, 268, 288, 308, 328, 348, 372, 396, 420,
+                 448, 476, 508, 544, 580, 620, 664, 712, 764, 820, 880, 944, 960},
+};
+const int aac_sfb_offset_short_960[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_SHORT + 1] = {
+    /* 96000 */ {0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 92, 120},
+    /* 88200 */ {0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 92, 120},
+    /* 64000 */ {0, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 92, 120},
+    /* 48000 */ {0, 4, 8, 12, 16, 20, 28, 36, 44, 56, 68, 80, 96, 112, 120},
+    /* 44100 */ {0, 4, 8, 12, 16, 20, 28, 36, 44, 56, 68, 80, 96, 112, 120},
+    /* 32000 */ {0, 4, 8, 12, 16, 20, 28, 36, 44, 56, 68, 80, 96, 112, 120},
+    /* 24000 */ {0, 4, 8, 12, 16, 20, 24, 28, 36, 44, 52, 64, 76, 92, 108, 120},
+    /* 22050 */ {0, 4, 8, 12, 16, 20, 24, 28, 36, 44, 52, 64, 76, 92, 108, 120},
+    /* 16000 */ {0, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 60, 72, 88, 108, 120},
+    /* 12000 */ {0, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 60, 72, 88, 108, 120},
+    /* 11025 */ {0, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 60, 72, 88, 108, 120},
+    /*  8000 */ {0, 4, 8, 12, 16, 20, 24, 28, 36, 44, 52, 60, 72, 88, 108, 120},
+};
+
+int aac_num_sfb(int frame_length, int rate_index, int is_short) {
+  if (frame_length == AAC_FRAME_SIZE_LONG_960) {
+    return is_short ? aac_num_sfb_short_960[rate_index] : aac_num_sfb_long_960[rate_index];
+  }
+  return is_short ? aac_num_sfb_short[rate_index] : aac_num_sfb_long[rate_index];
+}
+
+const int* aac_sfb_offset(int frame_length, int rate_index, int is_short) {
+  if (frame_length == AAC_FRAME_SIZE_LONG_960) {
+    return is_short ? aac_sfb_offset_short_960[rate_index] : aac_sfb_offset_long_960[rate_index];
+  }
+  return is_short ? aac_sfb_offset_short[rate_index] : aac_sfb_offset_long[rate_index];
+}
+
 /* Huffman codebook metadata, ISO/IEC 14496-3 Table 4.152. */
 const AacCodebookInfo aac_codebook_info[AAC_NUM_CODEBOOKS + 1] = {
     {0, 0, 0, 0, 0, 0},      /* 0: ZERO_HCB */
@@ -168,7 +246,19 @@ void aac_kbd_window(float* out, int n, float alpha) {
 
 float aac_window_long[2][AAC_FRAME_SIZE_LONG];
 float aac_window_short[2][AAC_FRAME_SIZE_SHORT];
+float aac_window_long_960[2][AAC_FRAME_SIZE_LONG_960];
+float aac_window_short_120[2][AAC_FRAME_SIZE_SHORT_120];
 float aac_pow43[AAC_POW43_SIZE];
+
+const float* aac_window_long_for(int frame_length, int shape) {
+  return frame_length == AAC_FRAME_SIZE_LONG_960 ? aac_window_long_960[shape]
+                                                 : aac_window_long[shape];
+}
+
+const float* aac_window_short_for(int frame_length, int shape) {
+  return frame_length == AAC_FRAME_SIZE_LONG_960 ? aac_window_short_120[shape]
+                                                 : aac_window_short[shape];
+}
 
 /* TNS, Channel Config */
 const int aac_tns_max_bands_long[AAC_NUM_SAMPLE_RATES] = {31, 31, 34, 40, 42, 51,
@@ -834,24 +924,27 @@ void aac_tables_init(void) {
     aac_huff_code[cb] = huff_code_ptrs[cb];
     aac_huff_len[cb] = huff_len_ptrs[cb];
   }
-  /* Rising halves of the long and short windows; index 0 is sine, 1 KBD. */
-  float full_long[2 * AAC_FRAME_SIZE_LONG];
-  float full_short[2 * AAC_FRAME_SIZE_SHORT];
-  aac_sine_window(full_long, 2 * AAC_FRAME_SIZE_LONG);
-  aac_sine_window(full_short, 2 * AAC_FRAME_SIZE_SHORT);
-  for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
-    aac_window_long[0][i] = full_long[i];
-  }
-  for (int i = 0; i < AAC_FRAME_SIZE_SHORT; i++) {
-    aac_window_short[0][i] = full_short[i];
-  }
-  aac_kbd_window(full_long, 2 * AAC_FRAME_SIZE_LONG, AAC_KBD_ALPHA_LONG);
-  aac_kbd_window(full_short, 2 * AAC_FRAME_SIZE_SHORT, AAC_KBD_ALPHA_SHORT);
-  for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
-    aac_window_long[1][i] = full_long[i];
-  }
-  for (int i = 0; i < AAC_FRAME_SIZE_SHORT; i++) {
-    aac_window_short[1][i] = full_short[i];
+  /* Rising halves of the long and short windows of both frame lengths;
+   * index 0 is sine, 1 KBD. */
+  float full[2 * AAC_FRAME_SIZE_LONG];
+  struct Window {
+    float* out;
+    int half;
+    float alpha;
+  };
+  const Window windows[4] = {{aac_window_long[0], AAC_FRAME_SIZE_LONG, AAC_KBD_ALPHA_LONG},
+                             {aac_window_short[0], AAC_FRAME_SIZE_SHORT, AAC_KBD_ALPHA_SHORT},
+                             {aac_window_long_960[0], AAC_FRAME_SIZE_LONG_960, AAC_KBD_ALPHA_LONG},
+                             {aac_window_short_120[0], AAC_FRAME_SIZE_SHORT_120, AAC_KBD_ALPHA_SHORT}};
+  for (const Window& w : windows) {
+    aac_sine_window(full, 2 * w.half);
+    for (int i = 0; i < w.half; i++) {
+      w.out[i] = full[i];
+    }
+    aac_kbd_window(full, 2 * w.half, w.alpha);
+    for (int i = 0; i < w.half; i++) {
+      w.out[w.half + i] = full[i];
+    }
   }
   for (int i = 0; i < AAC_POW43_SIZE; i++) {
     aac_pow43[i] = (float)pow((double)i, 4.0 / 3.0);

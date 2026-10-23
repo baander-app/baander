@@ -9,26 +9,46 @@ extern "C" {
 
 /* Constants */
 #define AAC_MAX_CHANNELS 8
+/* Frame lengths: 1024 lines per long window (128 per short window) or,
+ * with the frameLengthFlag of ISO/IEC 14496-3 1.6.2.1, 960 (120).  The
+ * 1024 values size every buffer; a 960 stream uses the lower part. */
 #define AAC_FRAME_SIZE_LONG 1024
 #define AAC_FRAME_SIZE_SHORT 128
+#define AAC_FRAME_SIZE_LONG_960 960
+#define AAC_FRAME_SIZE_SHORT_120 120
 #define AAC_NUM_WINDOWS_SHORT 8
 #define AAC_MAX_SFB_LONG 51
 #define AAC_MAX_SFB_SHORT 15
 #define AAC_MAX_WINDOW_GROUPS 8
 #define AAC_NUM_SAMPLE_RATES 12
 #define AAC_NUM_CODEBOOKS 11
+/* Largest raw_data_block per channel (4.5.3.1): 6144 bits per 1024
+ * samples, scaled with the frame length (5760 bits for 960). */
 #define AAC_BITS_PER_FRAME_LONG 6144
 #define AAC_BITS_PER_FRAME_SHORT 768
+static inline int aac_max_bits_per_channel(int frame_length) {
+  return AAC_BITS_PER_FRAME_LONG * frame_length / AAC_FRAME_SIZE_LONG;
+}
 
 /* Sample Rate Table */
 extern const int aac_sample_rates[AAC_NUM_SAMPLE_RATES];
 extern const int aac_num_sample_rates;
 
-/* Scalefactor band tables, ISO/IEC 14496-3 Tables 4.128-4.140 */
+/* Scalefactor band tables, ISO/IEC 14496-3 Tables 4.128-4.140: the 1024
+ * and 128 line transforms, and the 960 and 120 line columns. */
 extern const int aac_num_sfb_long[AAC_NUM_SAMPLE_RATES];
 extern const int aac_sfb_offset_long[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_LONG + 1];
 extern const int aac_num_sfb_short[AAC_NUM_SAMPLE_RATES];
 extern const int aac_sfb_offset_short[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_SHORT + 1];
+extern const int aac_num_sfb_long_960[AAC_NUM_SAMPLE_RATES];
+extern const int aac_sfb_offset_long_960[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_LONG + 1];
+extern const int aac_num_sfb_short_960[AAC_NUM_SAMPLE_RATES];
+extern const int aac_sfb_offset_short_960[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_SHORT + 1];
+
+/* The band count and offsets of a frame length (1024 or 960) and window
+ * type (is_short: the 128 or 120 line windows). */
+int aac_num_sfb(int frame_length, int rate_index, int is_short);
+const int* aac_sfb_offset(int frame_length, int rate_index, int is_short);
 
 /* Huffman Codebook Metadata */
 using AacCodebookInfo = struct AacCodebookInfo_ {
@@ -55,15 +75,21 @@ void aac_kbd_window(float* out, int n, float alpha);
 
 /* Rising window halves, filled by aac_tables_init(): index 0 is the sine
  * window, index 1 the KBD window (the window_shape bit).  The falling half
- * is the mirror image. */
+ * is the mirror image.  The 960-frame windows are 960 and 120 long. */
 extern float aac_window_long[2][AAC_FRAME_SIZE_LONG];
 extern float aac_window_short[2][AAC_FRAME_SIZE_SHORT];
+extern float aac_window_long_960[2][AAC_FRAME_SIZE_LONG_960];
+extern float aac_window_short_120[2][AAC_FRAME_SIZE_SHORT_120];
+/* The rising half for a frame length (1024 or 960) and window shape. */
+const float* aac_window_long_for(int frame_length, int shape);
+const float* aac_window_short_for(int frame_length, int shape);
 
 /* |q|^(4/3) for every magnitude the escape codebook can carry. */
 #define AAC_POW43_SIZE 8192
 extern float aac_pow43[AAC_POW43_SIZE];
 
-/* TNS Parameters */
+/* TNS Parameters (Table 4.139).  TNS_MAX_BANDS is the same for the 1024
+ * and 960 frame lengths; the decoder clips it to the band count. */
 extern const int aac_tns_max_bands_long[AAC_NUM_SAMPLE_RATES];
 extern const int aac_tns_max_bands_short[AAC_NUM_SAMPLE_RATES];
 extern const int aac_tns_max_order_long;

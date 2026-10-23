@@ -122,6 +122,17 @@ int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
   return AAC_OK;
 }
 
+int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->started) {
+    return AAC_ERR_STATE;
+  }
+  return aac_encoder_state_set_frame_length(s, frame_length);
+}
+
 int aac_encoder_frame_size(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
@@ -198,6 +209,13 @@ int aac_decoder_reset(AacDecoderHandle ctx) {
   }
   aac_decoder_reset_state(static_cast<AacDecoderState*>(ctx));
   return AAC_OK;
+}
+
+int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_decoder_set_frame_length_internal(static_cast<AacDecoderState*>(ctx), frame_length);
 }
 
 /* Decodes one raw_data_block() and appends its PCM to out[*written..]. */

@@ -26,16 +26,18 @@ void aac_psy_thresholds(AacPsyChannel* p, int sample_rate, int channel_bitrate,
                         const AacIcsInfo* ics, const float* coef, float* energy, float* thr,
                         float* spread_energy);
 
-/* Energies of the 128-sample sub-blocks of a high-passed signal, for the
- * blocks covering x[start .. start + count); sub_energy needs count / 128
- * entries. */
-void aac_psy_subblock_energies(const float* x, int start, int count, float* sub_energy);
+/* Energies of the sub-blocks of sub_len samples (one short window: 128 or
+ * 120) of a high-passed signal, for the blocks covering
+ * x[start .. start + count); sub_energy needs count / sub_len entries. */
+void aac_psy_subblock_energies(const float* x, int start, int count, int sub_len,
+                               float* sub_energy);
 
 /* Looks for an attack in x[start .. start + count): a sub-block whose
  * high-passed energy jumps well above the smoothed energy of the preceding
  * ones.  Returns the index of the last attacking sub-block plus one, or 0
- * when there is none.  x must have 384 samples of history before start. */
-int aac_psy_attack(const float* x, int start, int count);
+ * when there is none.  x must have three sub-blocks of history before
+ * start. */
+int aac_psy_attack(const float* x, int start, int count, int sub_len);
 
 #ifdef __cplusplus
 }

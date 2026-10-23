@@ -16,12 +16,17 @@ extern "C" {
 #endif
 
 /* Samples of lookahead and transform overlap before the first input sample
- * appears in the decoded output of an AAC-LC stream. */
+ * appears in the decoded output of an AAC-LC stream: two frames, 2048 for
+ * 1024-sample frames and 1920 for 960-sample frames. */
 #define AAC_ENCODER_DELAY 2048
+#define AAC_ENCODER_DELAY_960 1920
 /* The same for an HE-AAC stream, in samples at the full rate: the core
  * delay at half rate, the encoder's QMF analysis and synthesis and the
- * decoder's QMF chain, measured against the FFmpeg decoder. */
+ * decoder's QMF chain, measured against the FFmpeg decoder for 1024
+ * frames; the QMF chains add the same 1539 samples to the core delay of
+ * 960 frames, measured against our decoder. */
 #define AAC_ENCODER_SBR_DELAY 5635
+#define AAC_ENCODER_SBR_DELAY_960 5379
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
 
@@ -29,8 +34,9 @@ extern "C" {
 #define AAC_ENC_TNS_MAX_FILTERS 2
 
 using AacEncChannel = struct AacEncChannel_ {
-  /* Three blocks of input at full scale 32768: the frame being coded spans
-   * the first two, the third is lookahead for block switching. */
+  /* Three blocks of frame_length input samples at full scale 32768: the
+   * frame being coded spans the first two, the third is lookahead for
+   * block switching. */
   float pcm[3 * AAC_FRAME_SIZE_LONG];
   AacIcsInfo ics;
   int prev_window_shape;
@@ -86,8 +92,10 @@ using AacEncoderState = struct AacEncoderState_ {
    * input runs at twice the rate, and with parametric stereo a stereo
    * input is coded as one channel. */
   int sample_rate, channels, bitrate, quality, frame_size, rate_index;
+  int frame_length; /* core samples per frame: 1024 or 960 */
   int input_rate, input_channels;
-  int delay; /* input samples before the first one is decoded */
+  int delay;   /* input samples before the first one is decoded */
+  int started; /* a frame has been encoded since creation or the last flush */
   AacObjectType aot;
   AacRateControl rc_mode;
   AacEncChannel ch[AAC_MAX_CHANNELS];
@@ -119,7 +127,6 @@ using AacEncoderState = struct AacEncoderState_ {
   int reservoir_max;
   float pe_min, pe_max; /* running range of the frames' perceptual entropy */
   int pending_flush;    /* frames the flush still has to emit */
-  int started;          /* a frame has been coded since the last reset: the format is fixed */
   /* HE-AAC: the SBR encoder of each SCE or CPE, NULL for LFE and AAC-LC */
   AacSbrEncoder* sbr[AAC_MAX_ELEMENTS];
   AacSbrDownsampler* lfe_down[AAC_MAX_ELEMENTS]; /* HE-AAC: the LFE's half-rate signal */
@@ -147,6 +154,11 @@ void aac_encoder_state_configure(AacEncoderState* s);
 /* Returns the encoder to its state after creation: history, filterbank
  * overlap, reservoir and psychoacoustic memory. */
 void aac_encoder_state_reset(AacEncoderState* s);
+
+/* Switches to 1024 or 960 core samples per frame (frame_size and delay
+ * follow) and resets the encoder; AAC_ERR_INVALID_ARG for any other
+ * length. */
+int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length);
 
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
