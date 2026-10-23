@@ -39,6 +39,12 @@ playback gate. Existing execution replacement still restores its canonical curso
 Newer local pause/resume intent takes precedence, and queued source seeks retain
 their existing acknowledgement and cursor ownership.
 
+While an owned pause/resume intent is pending or uncertain, an opposite user
+gesture remains a new command even if signing reports unavailable media. Media
+readiness is not a backend prerequisite for this status control. Submit that new
+intent once and retire the older reconciliation ticket; do not replay the failed
+command. This exception does not change initial controls without pending intent.
+
 Use an owned reconciliation ticket carrying the session, job, local status revision
 and minimum signing-request revision. Keep it distinct from successful controls
 deferred behind a seek acknowledgement. Accepted fresh state may settle it only
