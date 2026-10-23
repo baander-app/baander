@@ -216,10 +216,13 @@ int read_par_data(AacBitReader* r, const AacPsState* ps, int8_t (*par)[AAC_PS_MA
       if (mask) {
         val &= mask;
       }
-      par[e][b] = (int8_t)val;
       if (limit && (is_icc ? (unsigned)val > (unsigned)limit : std::abs(val) > limit)) {
-        return AAC_ERR_DECODE;
+        if (!ps->unreliable) {
+          return AAC_ERR_DECODE;
+        }
+        val = is_icc ? (val < 0 ? 0 : limit) : (val < 0 ? -limit : limit);
       }
+      par[e][b] = (int8_t)val;
     }
   } else {
     int val = 0;
@@ -316,26 +319,33 @@ int read_data(AacPsState* ps, AacBitReader* r) {
     }
   }
 
+  bool anchored = true;
   if (ps->enable_iid) {
+    bool df = false;
     for (int e = 0; e < ps->num_env; e++) {
       const int dt = (int)aac_bitreader_read(r, 1);
+      df = df || !dt;
       if (read_par_data(r, ps, ps->iid_par, ps->nr_iid_par, kHuffIid[2 * dt + ps->iid_quant], e,
                         dt, 0, 7 + 8 * ps->iid_quant, 0)) {
         return AAC_ERR_DECODE;
       }
     }
+    anchored = anchored && df;
   } else {
     memset(ps->iid_par, 0, sizeof(ps->iid_par));
   }
 
   if (ps->enable_icc) {
+    bool df = false;
     for (int e = 0; e < ps->num_env; e++) {
       const int dt = (int)aac_bitreader_read(r, 1);
+      df = df || !dt;
       if (read_par_data(r, ps, ps->icc_par, ps->nr_icc_par, dt ? AAC_PS_HUFF_ICC_DT : AAC_PS_HUFF_ICC_DF, e, dt,
                         0, 7, 1)) {
         return AAC_ERR_DECODE;
       }
     }
+    anchored = anchored && df;
   } else {
     memset(ps->icc_par, 0, sizeof(ps->icc_par));
   }
@@ -403,6 +413,9 @@ int read_data(AacPsState* ps, AacBitReader* r) {
 
   if (header) {
     ps->start = 1;
+  }
+  if (anchored) {
+    ps->unreliable = 0;
   }
   return r->overread ? AAC_ERR_DECODE : 0;
 }
@@ -961,6 +974,23 @@ int aac_ps_read_data(AacPsState* ps, AacBitReader* r, int bits_left) {
   aac_bitreader_skip(r, bits_left);
   clear_parameters(ps);
   return bits_left;
+}
+
+void aac_ps_conceal(AacPsState* ps) {
+  const int last = ps->num_env > 0 ? ps->num_env - 1 : 0;
+  if (last != 0) {
+    memcpy(ps->iid_par[0], ps->iid_par[last], sizeof(ps->iid_par[0]));
+    memcpy(ps->icc_par[0], ps->icc_par[last], sizeof(ps->icc_par[0]));
+    memcpy(ps->ipd_par[0], ps->ipd_par[last], sizeof(ps->ipd_par[0]));
+    memcpy(ps->opd_par[0], ps->opd_par[last], sizeof(ps->opd_par[0]));
+  }
+  ps->num_env_old = ps->num_env;
+  ps->num_env = 1;
+  ps->frame_class = 0;
+  ps->border_position[0] = -1;
+  ps->border_position[1] = kSlots - 1;
+  ps->is34bands_old = ps->is34bands;
+  ps->unreliable = 1;
 }
 
 void aac_ps_apply(AacPsState* ps, float L[2][38][64], float R[2][38][64], int top) {

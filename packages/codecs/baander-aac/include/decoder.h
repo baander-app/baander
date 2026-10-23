@@ -5,6 +5,7 @@
 #include "aac_tables.h"
 #include "bitstream.h"
 #include "channel_map.h"
+#include "conceal.h"
 #include "ics.h"
 #include "limiter.h"
 #include "mdct.h"
@@ -14,6 +15,10 @@ extern "C" {
 #endif
 
 #define AAC_TNS_MAX_ORDER 20
+
+/* The decoder conceals damaged and lost frames (aac_decoder_conceal_block,
+ * conceal_mode). */
+#define BAAC_AAC_HAVE_CONCEAL 1
 
 using AacTnsData = struct AacTnsData_ {
   int n_filt[8];
@@ -40,6 +45,7 @@ using AacDecoderChannel = struct AacDecoderChannel_ {
   int prev_window_shape; /* window_shape of the previous frame */
   float output[2048];    /* decoded PCM of the current frame, full scale = 1.0;
                             2048 samples while SBR is decoded */
+  AacConcealChannel conceal; /* the last good spectrum and the state of a fade */
 };
 
 /* coupling_channel_element() (Table 4.8): the coupling channel and the
@@ -98,6 +104,16 @@ using AacDecoderState = struct AacDecoderState_ {
   int limiter_ready; /* the limiter state matches limiter_channels and limiter_rate */
   int limiter_channels, limiter_rate;
   AacLimiter limiter;
+  /* Error concealment (AacConcealment): a block that fails to parse, or
+   * a lost one (aac_decoder_conceal_block), is replaced by concealed
+   * audio and counted instead of returning an error. */
+  int conceal_mode;
+  int last_concealed;      /* the last block was concealed */
+  int concealed_frames;    /* concealed blocks since creation or reset */
+  unsigned conceal_random; /* noise generator of the concealment, apart from PNS */
+  /* Scratch for the recovery crossfade: the concealed continuation that
+   * the first good frame after a fade is blended from. */
+  AacDecoderChannel recover[2];
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);
@@ -109,6 +125,19 @@ void aac_decoder_state_destroy(AacDecoderState* s);
  * channels of the layout or a negative AacError. */
 int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r);
 
+/* Produces one frame of concealed output in ch[].output for a lost block,
+ * as aac_decode_raw_data_block leaves it (SBR and PS included, so that
+ * the frame size and rate stay consistent), and counts it.  Returns the
+ * number of channels of the layout, or AAC_ERR_STATE while no layout is
+ * known. */
+int aac_decoder_conceal_block(AacDecoderState* s);
+
+/* Notes a lost or failed block without producing output (concealment
+ * off): the SBR and PS states then clamp the delta-time coded values of
+ * the next frames, which refer to the lost data, instead of refusing
+ * them. */
+void aac_decoder_note_lost_block(AacDecoderState* s);
+
 /* Selects the sampling_frequency_index used for band tables, resetting the
  * filterbank state when it changes; returns AAC_ERR_UNSUPPORTED for an
  * index without tables. */
@@ -119,7 +148,8 @@ int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index);
  * element-defined layout. */
 int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config);
 
-/* Clears the filterbank overlap and window-shape history of every channel. */
+/* Clears the filterbank overlap, window-shape history and concealment
+ * state of every channel and the concealment counters. */
 void aac_decoder_reset_state(AacDecoderState* s);
 
 /* Mixes the decoded frame (ch[].output) into `out` with the requested

@@ -20,6 +20,7 @@
         "src/decoder.cpp",
         "src/decoder_output.cpp",
         "src/limiter.cpp",
+        "src/conceal.cpp",
         "src/sbr_dec.cpp",
         "src/ps_dec.cpp",
         "src/psycho.cpp",

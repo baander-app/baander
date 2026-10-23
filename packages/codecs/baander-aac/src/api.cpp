@@ -216,13 +216,9 @@ static int decode_block(AacDecoderState* s, AacBitReader* reader, float* pcm, in
   return 0;
 }
 
-int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, float* pcm,
-                       int pcm_size) {
-  if (!ctx || !data || !pcm || size <= 0 || pcm_size <= 0) {
-    return AAC_ERR_INVALID_ARG;
-  }
-  auto* s = static_cast<AacDecoderState*>(ctx);
-
+/* One ADTS frame or raw data block as the stream carries it. */
+static int decode_frame(AacDecoderState* s, const uint8_t* data, int size, float* pcm,
+                        int pcm_size) {
   /* ADTS-wrapped frames carry their own stream parameters; raw frames use the
    * sample rate given at creation and the layout of their elements. */
   int begin = 0;
@@ -267,6 +263,60 @@ int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, floa
     }
   }
   return written;
+}
+
+int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, float* pcm,
+                       int pcm_size) {
+  if (!ctx || !data || !pcm || size <= 0 || pcm_size <= 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  s->last_concealed = 0;
+  const int ret = decode_frame(s, data, size, pcm, pcm_size);
+  if (ret >= 0 || ret == AAC_ERR_OVERFLOW) {
+    return ret;
+  }
+  if (s->conceal_mode == AAC_CONCEAL_OFF) {
+    aac_decoder_note_lost_block(s);
+    return ret;
+  }
+  /* A frame the decoder could not take apart (a damaged header, a
+   * truncated or unparseable frame): one concealed block in its place,
+   * once the stream's layout is known. */
+  if (aac_decoder_conceal_block(s) < 0) {
+    return ret;
+  }
+  const int out_channels = aac_decoder_output_channels(s);
+  if (s->frame_size * out_channels > pcm_size) {
+    return AAC_ERR_OVERFLOW;
+  }
+  aac_decoder_output(s, pcm);
+  return s->frame_size;
+}
+
+int aac_decoder_set_concealment(AacDecoderHandle ctx, AacConcealment mode) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (mode != AAC_CONCEAL_OFF && mode != AAC_CONCEAL_NOISE && mode != AAC_CONCEAL_INTERPOLATE) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  static_cast<AacDecoderState*>(ctx)->conceal_mode = mode;
+  return AAC_OK;
+}
+
+int aac_decoder_last_frame_concealed(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->last_concealed;
+}
+
+int aac_decoder_concealed_frames(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->concealed_frames;
 }
 
 int aac_decoder_frame_size(AacDecoderHandle ctx) {

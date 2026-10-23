@@ -731,8 +731,10 @@ AacSbrState* sbr_state(AacDecoderState* s, int elem) {
 /* fill_element() (Table 4.11).  An SBR extension (extension_type 13 or
  * 14, Table 4.56) belongs to the SCE or CPE just before it (`elem`, or -1
  * after any other element) and is parsed into that element's SBR state;
- * every other payload is skipped. */
-int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type) {
+ * every other payload is skipped.  A damaged SBR payload fails the block
+ * with concealment off; otherwise it is left for the SBR stage to conceal
+ * and `*damaged_sbr` is set. */
+int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type, bool* damaged_sbr) {
   int count = (int)aac_bitreader_read(r, 4);
   if (count == 15) {
     count += (int)aac_bitreader_read(r, 8) - 1;
@@ -746,7 +748,12 @@ int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type) {
         s->sbr_mode = 1;
         AacSbrState* sbr = sbr_state(s, elem);
         const int ret = aac_sbr_decode_extension(sbr, r, ext_type == 14, count, elem_type);
-        if (ret == 0 && sbr->ps_present) {
+        if (ret) {
+          if (s->conceal_mode == AAC_CONCEAL_OFF) {
+            return ret;
+          }
+          *damaged_sbr = true;
+        } else if (sbr->ps_present) {
           s->has_ps = 1;
         }
         return r->overread ? AAC_ERR_DECODE : 0;
@@ -913,6 +920,13 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     s->sbr[i] = nullptr;
   }
+  s->conceal_mode = AAC_CONCEAL_INTERPOLATE;
+  s->last_concealed = 0;
+  s->concealed_frames = 0;
+  s->conceal_random = kRandomSeed;
+  for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
+    aac_conceal_reset(&s->ch[c].conceal);
+  }
   return s;
 }
 
@@ -931,7 +945,11 @@ void aac_decoder_reset_state(AacDecoderState* s) {
     memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
     memset(s->ch[c].output, 0, sizeof(s->ch[c].output));
     s->ch[c].prev_window_shape = 0;
+    aac_conceal_reset(&s->ch[c].conceal);
   }
+  s->last_concealed = 0;
+  s->concealed_frames = 0;
+  s->conceal_random = kRandomSeed;
   for (int k = 0; k < AAC_MAX_CCE; k++) {
     memset(s->cce[k].ch.overlap, 0, sizeof(s->cce[k].ch.overlap));
     s->cce[k].ch.prev_window_shape = 0;
@@ -1013,146 +1031,314 @@ int aac_decoder_output(const AacDecoderState* s, float* out) {
   return out_channels;
 }
 
+namespace {
+
+/* The parsing context of one raw data block. */
+struct BlockParse {
+  AacLayoutElement sniffed[AAC_MAX_ELEMENTS]; /* elements of a stream without configuration */
+  int num_sniffed;
+  bool sniffing;
+  int next_channel;
+  bool pce_seen;
+  int last_elem; /* layout index of the element just decoded, for its FIL */
+  int last_type;
+  bool damaged_sbr; /* an SBR extension was damaged and awaits concealment */
+};
+
+/* Parses one syntactic element of the block.  On an error the element
+ * stays absent (its channels or coupling are not marked present) and the
+ * reader is left where parsing stopped. */
+int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem) {
+  int ret = 0;
+  const int fil_elem = elem == AAC_ELEM_FIL ? p->last_elem : -1;
+  const int fil_type = p->last_type;
+  p->last_elem = -1;
+  p->last_type = elem;
+  switch (elem) {
+    case AAC_ELEM_SCE:
+    case AAC_ELEM_LFE:
+    case AAC_ELEM_CPE: {
+      const int tag = (int)aac_bitreader_read(r, 4);
+      const int nch = elem == AAC_ELEM_CPE ? 2 : 1;
+      AacDecoderChannel* chans = nullptr;
+      int idx = -1;
+      if (p->sniffing) {
+        if (p->num_sniffed >= AAC_MAX_ELEMENTS || p->next_channel + nch > AAC_MAX_CHANNELS) {
+          return AAC_ERR_UNSUPPORTED;
+        }
+        idx = p->num_sniffed;
+        p->sniffed[idx].type = elem;
+        p->sniffed[idx].tag = tag;
+        p->sniffed[idx].position = sniffed_position(p->sniffed, idx, elem);
+        s->elem_base[idx] = p->next_channel;
+        chans = &s->ch[p->next_channel];
+      } else {
+        idx = aac_layout_find(&s->layout, elem, tag);
+        if (idx < 0 || s->elem_present[idx]) {
+          return AAC_ERR_DECODE;
+        }
+        chans = &s->ch[s->elem_base[idx]];
+      }
+      ret = elem == AAC_ELEM_CPE ? decode_cpe(s, r, &chans[0], &chans[1])
+                                 : decode_sce(s, r, &chans[0]);
+      if (ret) {
+        return ret;
+      }
+      if (p->sniffing) {
+        p->num_sniffed++;
+        p->next_channel += nch;
+      } else {
+        s->elem_present[idx] = 1;
+      }
+      p->last_elem = idx;
+      break;
+    }
+    case AAC_ELEM_CCE: {
+      const int tag = (int)aac_bitreader_read(r, 4);
+      AacDecoderCce* cce = nullptr;
+      for (int k = 0; k < AAC_MAX_CCE && !cce; k++) {
+        if (!s->cce[k].present) {
+          cce = &s->cce[k];
+        }
+      }
+      if (!cce) {
+        return AAC_ERR_UNSUPPORTED;
+      }
+      cce->tag = tag;
+      ret = decode_cce(s, r, cce);
+      if (ret) {
+        return ret;
+      }
+      cce->present = 1;
+      break;
+    }
+    case AAC_ELEM_DSE:
+      ret = skip_dse(r);
+      break;
+    case AAC_ELEM_PCE: {
+      AacLayout l = {};
+      ret = decode_pce(s, r, &l);
+      if (ret == 0 && !p->pce_seen) {
+        if (p->num_sniffed > 0 || !p->sniffing) {
+          /* A PCE after channel elements, or over an ADTS configuration:
+           * the elements already decoded keep their layout. */
+          if (!p->sniffing && !same_layout(&s->layout, &l)) {
+            ret = AAC_ERR_DECODE;
+          }
+        } else {
+          install_layout(s, &l, 2);
+          p->sniffing = false;
+        }
+        p->pce_seen = true;
+      }
+      break;
+    }
+    case AAC_ELEM_FIL:
+      ret = decode_fil(s, r, fil_elem, fil_type, &p->damaged_sbr);
+      break;
+    default:
+      return AAC_ERR_UNSUPPORTED;
+  }
+  return ret;
+}
+
+/* Installs the layout a stream without configuration defines through the
+ * elements of this block. */
+int install_sniffed_layout(AacDecoderState* s, const BlockParse* p) {
+  if (p->num_sniffed == 0) {
+    return AAC_ERR_DECODE;
+  }
+  AacLayout l = {};
+  const int ret = aac_layout_from_elements(&l, p->sniffed, p->num_sniffed);
+  if (ret) {
+    return ret;
+  }
+  l.channel_config = aac_layout_config_for_elements(p->sniffed, p->num_sniffed);
+  const bool changed = s->layout_source == 0 || !same_layout(&s->layout, &l);
+  s->layout = l;
+  s->layout_source = 3;
+  if (changed) {
+    /* The overlap and concealment history of a different layout is
+     * meaningless; the channels decoded in this block keep their spectra. */
+    for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
+      memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
+      s->ch[c].prev_window_shape = 0;
+      aac_conceal_reset(&s->ch[c].conceal);
+    }
+  }
+  for (int i = 0; i < p->num_sniffed; i++) {
+    s->elem_present[i] = 1;
+  }
+  return 0;
+}
+
+/* A damaged block of a stream without configuration: the elements parsed
+ * before the damage count when they are the start of the layout the
+ * earlier blocks defined; the rest of that layout is concealed. */
+int keep_sniffed_prefix(AacDecoderState* s, const BlockParse* p) {
+  if (s->layout_source != 3) {
+    return AAC_ERR_DECODE;
+  }
+  const AacLayout* l = &s->layout;
+  int keep = 0;
+  while (keep < p->num_sniffed && keep < l->num_elements &&
+         p->sniffed[keep].type == l->elems[keep].type &&
+         p->sniffed[keep].tag == l->elems[keep].tag) {
+    keep++;
+  }
+  int base = 0;
+  for (int i = 0; i < l->num_elements; i++) {
+    s->elem_base[i] = base;
+    base += l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    s->elem_present[i] = i < keep;
+  }
+  return 0;
+}
+
+int effective_conceal_mode(const AacDecoderState* s) {
+  return s->conceal_mode == AAC_CONCEAL_OFF ? AAC_CONCEAL_INTERPOLATE : s->conceal_mode;
+}
+
+/* Replaces a lost channel's frame by its concealed continuation. */
+void conceal_channel(AacDecoderState* s, AacDecoderChannel* ch) {
+  aac_conceal_spectrum(&ch->conceal, effective_conceal_mode(s), &s->conceal_random, &ch->cs.ics,
+                       ch->cs.coef);
+  ch->cs.tns_present = 0;
+  imdct_and_window(s, ch);
+}
+
+/* The first good frame after concealed ones is crossfaded from the
+ * concealed continuation; that continuation's spectrum is built here,
+ * before the good spectrum replaces the stored one. */
+void prepare_recovery(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
+  if (ch->conceal.count == 0) {
+    return;
+  }
+  AacDecoderChannel* alt = &s->recover[slot];
+  AacConcealChannel fade = ch->conceal;
+  aac_conceal_spectrum(&fade, effective_conceal_mode(s), &s->conceal_random, &alt->cs.ics,
+                       alt->cs.coef);
+  alt->cs.tns_present = 0;
+}
+
+/* The filterbank of a good frame, blended over the frame from the
+ * concealed continuation when the previous frame was concealed. */
+void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
+  if (ch->conceal.count == 0) {
+    imdct_and_window(s, ch);
+    return;
+  }
+  AacDecoderChannel* alt = &s->recover[slot];
+  memcpy(alt->overlap, ch->overlap, sizeof(alt->overlap));
+  alt->prev_window_shape = ch->prev_window_shape;
+  imdct_and_window(s, alt);
+  imdct_and_window(s, ch);
+  for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
+    const float w = ((float)i + 0.5f) / (float)AAC_FRAME_SIZE_LONG;
+    ch->output[i] = alt->output[i] + (ch->output[i] - alt->output[i]) * w;
+  }
+  aac_conceal_recovered(&ch->conceal);
+}
+
+/* SBR last: the stream stays at twice the core rate once an element has
+ * carried SBR data, and every element goes through its filterbanks so
+ * that all channels keep the same delay.  With `conceal` an element
+ * whose SBR is active but got no data in this frame continues on the
+ * previous frame's envelope instead of dropping to upsampling. */
+void sbr_stage(AacDecoderState* s, bool conceal) {
+  const AacLayout* l = &s->layout;
+  s->frame_size = s->sbr_mode ? 2 * AAC_FRAME_SIZE_LONG : AAC_FRAME_SIZE_LONG;
+  if (!s->sbr_mode) {
+    return;
+  }
+  /* A mono stream whose element carries parametric stereo becomes a
+   * stereo pair, with the right channel in the spare slot ch[1]. */
+  const bool mono = l->num_elements == 1 && l->elems[0].type == AAC_ELEM_SCE;
+  if (mono && sbr_state(s, 0)->ps_present) {
+    s->ps_output = 1;
+  }
+  for (int i = 0; i < l->num_elements; i++) {
+    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+    float* right = nullptr;
+    if (l->elems[i].type == AAC_ELEM_CPE || (mono && s->ps_output)) {
+      right = chans[1].output;
+    }
+    AacSbrState* sbr = sbr_state(s, i);
+    if (conceal && sbr->start && !sbr->ready_for_dequant && sbr->elem_type == l->elems[i].type) {
+      aac_sbr_conceal(sbr);
+    }
+    aac_sbr_apply(sbr, l->elems[i].type, chans[0].output, right);
+  }
+}
+
+}  // namespace
+
 int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
-  /* Elements of a stream without configuration, collected as they arrive. */
-  AacLayoutElement sniffed[AAC_MAX_ELEMENTS] = {};
-  int num_sniffed = 0;
-  bool sniffing = s->layout_source == 0 || s->layout_source == 3;
-  if (sniffing) {
+  BlockParse p = {};
+  p.sniffing = s->layout_source == 0 || s->layout_source == 3;
+  p.last_elem = -1;
+  p.last_type = -1;
+  if (p.sniffing) {
     /* Decode into channel order of arrival; the layout follows at END. */
     for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
       s->elem_base[i] = 0;
     }
   }
-  int next_channel = 0;
   memset(s->elem_present, 0, sizeof(s->elem_present));
   for (int k = 0; k < AAC_MAX_CCE; k++) {
     s->cce[k].present = 0;
   }
   s->has_sbr = 0;
   s->has_ps = 0;
-  bool pce_seen = false;
-  int last_elem = -1; /* layout index of the element just decoded */
-  int last_type = -1;
+  s->last_concealed = 0;
+  const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
+  bool damaged = false;
   for (;;) {
     const int elem = (int)aac_bitreader_read(r, 3);
-    if (r->overread) {
-      return AAC_ERR_DECODE;
-    }
-    if (elem == AAC_ELEM_END) {
+    int ret = r->overread ? AAC_ERR_DECODE : 0;
+    if (ret == 0 && elem == AAC_ELEM_END) {
       aac_bitreader_byte_align(r);
       break;
     }
-    int ret = 0;
-    const int fil_elem = elem == AAC_ELEM_FIL ? last_elem : -1;
-    const int fil_type = last_type;
-    last_elem = -1;
-    last_type = elem;
-    switch (elem) {
-      case AAC_ELEM_SCE:
-      case AAC_ELEM_LFE:
-      case AAC_ELEM_CPE: {
-        const int tag = (int)aac_bitreader_read(r, 4);
-        const int nch = elem == AAC_ELEM_CPE ? 2 : 1;
-        AacDecoderChannel* chans = nullptr;
-        if (sniffing) {
-          if (num_sniffed >= AAC_MAX_ELEMENTS || next_channel + nch > AAC_MAX_CHANNELS) {
-            return AAC_ERR_UNSUPPORTED;
-          }
-          sniffed[num_sniffed].type = elem;
-          sniffed[num_sniffed].tag = tag;
-          sniffed[num_sniffed].position = sniffed_position(sniffed, num_sniffed, elem);
-          s->elem_base[num_sniffed] = next_channel;
-          last_elem = num_sniffed;
-          num_sniffed++;
-          chans = &s->ch[next_channel];
-          next_channel += nch;
-        } else {
-          const int idx = aac_layout_find(&s->layout, elem, tag);
-          if (idx < 0 || s->elem_present[idx]) {
-            return AAC_ERR_DECODE;
-          }
-          s->elem_present[idx] = 1;
-          last_elem = idx;
-          chans = &s->ch[s->elem_base[idx]];
-        }
-        ret = elem == AAC_ELEM_CPE ? decode_cpe(s, r, &chans[0], &chans[1])
-                                   : decode_sce(s, r, &chans[0]);
-        break;
-      }
-      case AAC_ELEM_CCE: {
-        const int tag = (int)aac_bitreader_read(r, 4);
-        AacDecoderCce* cce = nullptr;
-        for (int k = 0; k < AAC_MAX_CCE && !cce; k++) {
-          if (!s->cce[k].present) {
-            cce = &s->cce[k];
-          }
-        }
-        if (!cce) {
-          return AAC_ERR_UNSUPPORTED;
-        }
-        cce->present = 1;
-        cce->tag = tag;
-        ret = decode_cce(s, r, cce);
-        break;
-      }
-      case AAC_ELEM_DSE:
-        ret = skip_dse(r);
-        break;
-      case AAC_ELEM_PCE: {
-        AacLayout l = {};
-        ret = decode_pce(s, r, &l);
-        if (ret == 0 && !pce_seen) {
-          if (num_sniffed > 0 || !sniffing) {
-            /* A PCE after channel elements, or over an ADTS configuration:
-             * the elements already decoded keep their layout. */
-            if (!sniffing && !same_layout(&s->layout, &l)) {
-              ret = AAC_ERR_DECODE;
-            }
-          } else {
-            install_layout(s, &l, 2);
-            sniffing = false;
-          }
-          pce_seen = true;
-        }
-        break;
-      }
-      case AAC_ELEM_FIL:
-        ret = decode_fil(s, r, fil_elem, fil_type);
-        break;
-      default:
-        return AAC_ERR_UNSUPPORTED;
+    if (ret == 0) {
+      ret = decode_element(s, r, &p, elem);
     }
     if (ret) {
-      return ret;
+      if (!conceal) {
+        aac_decoder_note_lost_block(s);
+        return ret;
+      }
+      /* The elements decoded so far keep their data, the rest of the
+       * layout is concealed, and nothing more of the block is read. */
+      damaged = true;
+      break;
     }
   }
-  if (sniffing) {
-    if (num_sniffed == 0) {
-      return AAC_ERR_DECODE;
+  if (p.sniffing) {
+    if (!damaged && p.num_sniffed == 0 && conceal && s->layout_source == 3) {
+      /* No channel element at all: no frame of the layout seen so far. */
+      damaged = true;
     }
-    AacLayout l = {};
-    const int ret = aac_layout_from_elements(&l, sniffed, num_sniffed);
+    const int ret = damaged ? keep_sniffed_prefix(s, &p) : install_sniffed_layout(s, &p);
     if (ret) {
       return ret;
-    }
-    l.channel_config = aac_layout_config_for_elements(sniffed, num_sniffed);
-    const bool changed = s->layout_source == 0 || !same_layout(&s->layout, &l);
-    s->layout = l;
-    s->layout_source = 3;
-    if (changed) {
-      /* The overlap of a different layout is meaningless; the channels
-       * decoded in this block keep their spectra. */
-      for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
-        memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
-        s->ch[c].prev_window_shape = 0;
-      }
-    }
-    for (int i = 0; i < num_sniffed; i++) {
-      s->elem_present[i] = 1;
     }
   } else if (s->layout_source == 0) {
     return AAC_ERR_DECODE;
+  }
+  const AacLayout* l = &s->layout;
+  if (conceal && !damaged) {
+    /* A block without any of the layout's channel elements is no frame
+     * of the stream. */
+    bool any = false;
+    for (int i = 0; i < l->num_elements; i++) {
+      any = any || s->elem_present[i];
+    }
+    damaged = !any;
+  }
+  if (damaged || p.damaged_sbr) {
+    s->last_concealed = 1;
+    s->concealed_frames++;
   }
 
   /* Coupling channels first: independently switched ones need their time
@@ -1164,46 +1350,63 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       imdct_and_window(s, &cce->ch);
     }
   }
-  const AacLayout* l = &s->layout;
   for (int i = 0; i < l->num_elements; i++) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
     AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
     if (!s->elem_present[i]) {
       for (int c = 0; c < nch; c++) {
-        memset(chans[c].output, 0, sizeof(chans[c].output));
+        if (damaged) {
+          conceal_channel(s, &chans[c]);
+        } else {
+          memset(chans[c].output, 0, sizeof(chans[c].output));
+        }
       }
       continue;
     }
     apply_couplings(s, i, 0);
     for (int c = 0; c < nch; c++) {
+      prepare_recovery(s, &chans[c], c);
+      aac_conceal_store(&chans[c].conceal, &chans[c].cs.ics, chans[c].cs.coef);
       apply_tns(&chans[c].cs);
     }
     apply_couplings(s, i, 1);
     for (int c = 0; c < nch; c++) {
-      imdct_and_window(s, &chans[c]);
+      filterbank(s, &chans[c], c);
     }
     apply_couplings(s, i, -1);
   }
-  /* SBR last: the stream stays at twice the core rate once an element has
-   * carried SBR data, and every element goes through its filterbanks so
-   * that all channels keep the same delay. */
-  s->frame_size = s->sbr_mode ? 2 * AAC_FRAME_SIZE_LONG : AAC_FRAME_SIZE_LONG;
-  if (s->sbr_mode) {
-    /* A mono stream whose element carries parametric stereo becomes a
-     * stereo pair, with the right channel in the spare slot ch[1]. */
-    const bool mono = l->num_elements == 1 && l->elems[0].type == AAC_ELEM_SCE;
-    if (mono && sbr_state(s, 0)->ps_present) {
-      s->ps_output = 1;
-    }
-    for (int i = 0; i < l->num_elements; i++) {
-      AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
-      float* right = nullptr;
-      if (l->elems[i].type == AAC_ELEM_CPE || (mono && s->ps_output)) {
-        right = chans[1].output;
-      }
-      aac_sbr_apply(sbr_state(s, i), l->elems[i].type, chans[0].output, right);
+  sbr_stage(s, conceal);
+  s->stream_channels = l->num_channels;
+  return l->num_channels;
+}
+
+void aac_decoder_note_lost_block(AacDecoderState* s) {
+  for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+    if (s->sbr[i]) {
+      aac_sbr_mark_lost(s->sbr[i]);
     }
   }
+}
+
+int aac_decoder_conceal_block(AacDecoderState* s) {
+  if (s->layout_source == 0 || s->rate_index < 0) {
+    return AAC_ERR_STATE;
+  }
+  memset(s->elem_present, 0, sizeof(s->elem_present));
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    s->cce[k].present = 0;
+  }
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+    for (int c = 0; c < nch; c++) {
+      conceal_channel(s, &chans[c]);
+    }
+  }
+  sbr_stage(s, true);
+  s->last_concealed = 1;
+  s->concealed_frames++;
   s->stream_channels = l->num_channels;
   return l->num_channels;
 }

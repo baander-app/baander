@@ -83,6 +83,7 @@ static void test_ms_signalling() {
     aac_decoder_destroy(dec);
   }
   AacDecoderHandle dec = aac_decoder_create(48000, 2);
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF); /* errors are reported, not concealed */
   const int len = build_cpe_frame(frame, sizeof(frame), 3, 0);
   CHECK(aac_decoder_decode(dec, frame, len, pcm, 2048) < 0, "reserved ms_mask_present accepted");
   aac_decoder_destroy(dec);
@@ -100,6 +101,7 @@ static void test_crc_and_truncation() {
   CHECK(aac_decoder_decode(dec2, crc, len_crc, b, 2048) == 1024, "CRC-protected frame");
   CHECK(memcmp(a, b, sizeof(a)) == 0, "CRC-protected frame decodes identically");
 
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF); /* errors are reported, not concealed */
   CHECK(aac_decoder_decode(dec, plain, 7, a, 2048) < 0, "header-only input");
   CHECK(aac_decoder_decode(dec, plain, len / 2, a, 2048) < 0, "truncated frame");
   CHECK(aac_decoder_decode(dec, plain, len, a, 100) == AAC_ERR_OVERFLOW, "small output buffer");

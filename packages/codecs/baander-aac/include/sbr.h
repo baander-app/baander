@@ -65,6 +65,10 @@ int aac_sbr_freq_tables(AacSbrFreq* f);
 /* Rebuilds the limiter table alone after limiter_bands changed. */
 void aac_sbr_freq_limiter(AacSbrFreq* f);
 
+/* The fields up to `analysis` are what the bitstream of a frame sets (or
+ * a header change derives); the decoder snapshots that prefix before
+ * parsing an extension so that a damaged one leaves the previous frame's
+ * parameters for concealment. */
 using AacSbrChannel = struct AacSbrChannel_ {
   /* bitstream data of the frame */
   int frame_class;
@@ -77,10 +81,16 @@ using AacSbrChannel = struct AacSbrChannel_ {
   int invf_mode[2][AAC_SBR_MAX_NOISE_BANDS]; /* [0] this frame, [1] previous */
   int add_harmonic[AAC_SBR_MAX_BANDS];
   int amp_res;
+  int e_a[2]; /* envelope of the transient: [0] previous frame, [1] this one, or -1 */
+  int env_facs_q[AAC_SBR_MAX_ENV + 1][AAC_SBR_MAX_BANDS]; /* [0] the last envelope of the previous frame */
+  int noise_facs_q[3][AAC_SBR_MAX_NOISE_BANDS];
+  int t_env[AAC_SBR_MAX_ENV + 1];
+  int t_env_num_env_old;
+  int t_q[3];
+  unsigned f_indexnoise;
   /* state */
   AacQmfAnalysis analysis;
   AacQmfSynthesis synthesis;
-  int e_a[2]; /* envelope of the transient: [0] previous frame, [1] this one, or -1 */
   float bw_array[AAC_SBR_MAX_NOISE_BANDS];
   float W[2][AAC_SBR_QMF_SLOTS][32][2]; /* analysis output of this and the previous frame */
   int Ypos;
@@ -88,14 +98,8 @@ using AacSbrChannel = struct AacSbrChannel_ {
   float g_temp[42][AAC_SBR_MAX_BANDS];
   float q_temp[42][AAC_SBR_MAX_BANDS];
   uint8_t s_indexmapped[AAC_SBR_MAX_ENV + 1][AAC_SBR_MAX_BANDS];
-  int env_facs_q[AAC_SBR_MAX_ENV + 1][AAC_SBR_MAX_BANDS];
   float env_facs[AAC_SBR_MAX_ENV + 1][AAC_SBR_MAX_BANDS];
-  int noise_facs_q[3][AAC_SBR_MAX_NOISE_BANDS];
   float noise_facs[3][AAC_SBR_MAX_NOISE_BANDS];
-  int t_env[AAC_SBR_MAX_ENV + 1];
-  int t_env_num_env_old;
-  int t_q[3];
-  unsigned f_indexnoise;
   unsigned f_indexsine;
 };
 
@@ -115,7 +119,6 @@ using AacSbrState = struct AacSbrState_ {
   int m[2];
   int kx_and_m_pushed;
   int n_master;
-  AacSbrChannel data[2];
   int n[2]; /* bands at low and high resolution */
   int n_q;
   int n_lim;
@@ -127,6 +130,13 @@ using AacSbrState = struct AacSbrState_ {
   int num_patches;
   int patch_num_subbands[AAC_SBR_MAX_PATCHES];
   int patch_start_subband[AAC_SBR_MAX_PATCHES];
+  int ps_present; /* the frame carried parametric stereo data */
+  int unreliable; /* a frame's data was lost and no frequency-coded envelope has anchored the
+                     delta-time chain since: out-of-range values are clamped, not refused */
+  /* Everything above is set by the bitstream (header, tables, frame
+   * flags) and snapshotted around the parsing of an extension; the
+   * channel data and the signal buffers follow. */
+  AacSbrChannel data[2];
   float X_low[32][40][2];
   float X_high[64][40][2];
   float X[2][2][38][64]; /* [channel][re/im][slot][band] */
@@ -139,8 +149,7 @@ using AacSbrState = struct AacSbrState_ {
   float q_m[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   float s_m[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   float gain[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
-  int ps_present; /* the frame carried parametric stereo data */
-  AacPsState ps;  /* parametric stereo of a single channel element */
+  AacPsState ps; /* parametric stereo of a single channel element */
 };
 
 /* Prepares the state for a core sample rate; the SBR rate is twice it. */
@@ -151,8 +160,26 @@ void aac_sbr_turnoff(AacSbrState* s);
 
 /* Parses sbr_extension_data() (Table 4.55) of `count` payload bytes after
  * the extension_type field, with `crc` set for extension type 14.  The
- * reader is left just past the payload. */
+ * reader is left just past the payload.  On a damaged payload the
+ * parameters of the previous frame are restored and AAC_ERR_DECODE is
+ * returned: the element then has no data for this frame, which
+ * aac_sbr_apply answers by switching to upsampling unless
+ * aac_sbr_conceal is called first. */
 int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count, int elem_type);
+
+/* Supplies the frame data of a lost or damaged extension while SBR is
+ * active: one envelope over the whole frame at the previous frame's last
+ * envelope less 3 dB (each further concealed frame takes another 3 dB
+ * off), the previous noise floor, inverse filtering modes and frequency
+ * tables, and the previous parametric stereo parameters.  Without an
+ * active header nothing changes (the element is upsampled only). */
+void aac_sbr_conceal(AacSbrState* s);
+
+/* Notes that a frame of the element was lost without concealment (the
+ * decoder returned an error): the next frames' delta-time coded
+ * envelopes, noise floors and PS parameters refer to data the decoder
+ * never had and are clamped into range instead of refused. */
+void aac_sbr_mark_lost(AacSbrState* s);
 
 /* Upsamples and, when SBR data is active, reconstructs the high band of
  * the element's channels in place: each buffer holds 1024 core samples at

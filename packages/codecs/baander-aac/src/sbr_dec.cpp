@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 
 /* SBR decoder (ISO/IEC 14496-3 4.6.18).  Buffers and their offsets follow
@@ -348,8 +349,12 @@ int read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int 
       }
     }
     for (int j = 0; j < n; j++) {
-      if (ch->env_facs_q[i + 1][j] < 0 || ch->env_facs_q[i + 1][j] > 127) {
-        return AAC_ERR_DECODE;
+      int* v = &ch->env_facs_q[i + 1][j];
+      if (*v < 0 || *v > 127) {
+        if (!s->unreliable) {
+          return AAC_ERR_DECODE;
+        }
+        *v = *v < 0 ? 0 : 127;
       }
     }
   }
@@ -380,8 +385,12 @@ int read_noise(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int cha
       }
     }
     for (int j = 0; j < s->n_q; j++) {
-      if (ch->noise_facs_q[i + 1][j] < 0 || ch->noise_facs_q[i + 1][j] > 30) {
-        return AAC_ERR_DECODE;
+      int* v = &ch->noise_facs_q[i + 1][j];
+      if (*v < 0 || *v > 30) {
+        if (!s->unreliable) {
+          return AAC_ERR_DECODE;
+        }
+        *v = *v < 0 ? 0 : 30;
       }
     }
   }
@@ -482,6 +491,24 @@ int read_data(AacSbrState* s, AacBitReader* r, int elem_type) {
   if (ret) {
     aac_sbr_turnoff(s);
     return ret;
+  }
+  /* A frequency-coded envelope and noise floor in every channel anchor
+   * the delta-time chain again. */
+  bool anchored = true;
+  for (int c = 0; c < (elem_type == AAC_ELEM_CPE) + 1; c++) {
+    const AacSbrChannel* ch = &s->data[c];
+    bool env = false;
+    bool noise = false;
+    for (int i = 0; i < ch->num_env; i++) {
+      env = env || !ch->df_env[i];
+    }
+    for (int i = 0; i < ch->num_noise; i++) {
+      noise = noise || !ch->df_noise[i];
+    }
+    anchored = anchored && env && noise;
+  }
+  if (anchored) {
+    s->unreliable = 0;
   }
   if (aac_bitreader_read(r, 1)) { /* bs_extended_data */
     int bits_left = (int)aac_bitreader_read(r, 4);
@@ -1020,9 +1047,41 @@ void aac_sbr_init(AacSbrState* s, int core_sample_rate) {
   aac_ps_init(&s->ps);
 }
 
+namespace {
+
+/* The parameters a frame's bitstream sets: the state's leading fields
+ * (header, tables, frame flags), each channel's leading fields and the PS
+ * parameters.  Saved before an extension is parsed and put back when the
+ * extension turns out to be damaged, so that the previous frame's data
+ * stays available for concealment. */
+struct SbrParams {
+  uint8_t state[offsetof(AacSbrState_, data)];
+  uint8_t channel[2][offsetof(AacSbrChannel_, analysis)];
+  uint8_t ps[offsetof(AacPsState_, in_buf)];
+};
+
+void save_params(const AacSbrState* s, SbrParams* p) {
+  memcpy(p->state, s, sizeof(p->state));
+  memcpy(p->channel[0], &s->data[0], sizeof(p->channel[0]));
+  memcpy(p->channel[1], &s->data[1], sizeof(p->channel[1]));
+  memcpy(p->ps, &s->ps, sizeof(p->ps));
+}
+
+void restore_params(AacSbrState* s, const SbrParams* p) {
+  memcpy(s, p->state, sizeof(p->state));
+  memcpy(&s->data[0], p->channel[0], sizeof(p->channel[0]));
+  memcpy(&s->data[1], p->channel[1], sizeof(p->channel[1]));
+  memcpy(&s->ps, p->ps, sizeof(p->ps));
+}
+
+}  // namespace
+
 int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count, int elem_type) {
   AacBitReader local = *r;
   aac_bitreader_skip(r, count * 8 - 4);
+  SbrParams saved;
+  save_params(s, &saved);
+  const int ps_was_on = s->ps.start;
   s->reset = 0;
   s->ps_present = 0;
   unsigned num_sbr_bits = 0;
@@ -1040,17 +1099,74 @@ int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count
   if (s->reset) {
     sbr_reset(s);
   }
+  int ret = 0;
   if (s->start) {
-    read_data(s, &local, elem_type);
+    ret = read_data(s, &local, elem_type);
   }
   num_sbr_bits += (unsigned)(local.pos - start_pos);
   const unsigned align = ((unsigned)(count << 3) - 4 - num_sbr_bits) & 7;
   const unsigned bytes_read = (num_sbr_bits + align + 4) >> 3;
-  if (local.overread || bytes_read > (unsigned)count) {
-    aac_sbr_turnoff(s);
+  if (ret || local.overread || bytes_read > (unsigned)count || (ps_was_on && !s->ps.start)) {
+    /* Damaged: the previous frame's parameters stand, with no data for
+     * this frame. */
+    restore_params(s, &saved);
+    s->unreliable = 1;
+    s->ps.unreliable = 1;
     return AAC_ERR_DECODE;
   }
   return 0;
+}
+
+void aac_sbr_mark_lost(AacSbrState* s) {
+  s->unreliable = 1;
+  s->ps.unreliable = 1;
+}
+
+void aac_sbr_conceal(AacSbrState* s) {
+  if (!s->start) {
+    return;
+  }
+  s->kx[0] = s->kx[1];
+  s->m[0] = s->m[1];
+  s->kx_and_m_pushed = 1;
+  s->reset = 0;
+  const int nch = s->elem_type == AAC_ELEM_CPE ? 2 : 1;
+  for (int c = 0; c < nch; c++) {
+    AacSbrChannel* ch = &s->data[c];
+    const int num_env_old = ch->num_env;
+    /* One fixed envelope over the frame at the resolution of the previous
+     * frame's last one, whose values env_facs_q[0] holds. */
+    ch->freq_res[0] = ch->freq_res[num_env_old];
+    ch->t_env_num_env_old = ch->t_env[num_env_old];
+    ch->e_a[0] = -(ch->e_a[1] != num_env_old);
+    ch->e_a[1] = -1;
+    ch->frame_class = kFixFix;
+    ch->num_env = 1;
+    ch->freq_res[1] = ch->freq_res[0];
+    ch->t_env[0] = 0;
+    ch->t_env[1] = AAC_SBR_SLOTS;
+    ch->num_noise = 1;
+    ch->t_q[0] = 0;
+    ch->t_q[1] = AAC_SBR_SLOTS;
+    ch->df_env[0] = 1;
+    ch->df_noise[0] = 1;
+    memcpy(ch->invf_mode[1], ch->invf_mode[0], sizeof(ch->invf_mode[0]));
+    /* The level channel drops 3 dB (one step at amp_res 1, two at 0); the
+     * balance channel of a coupled pair keeps its panning. */
+    const int step = (s->coupling && c == 1) ? 0 : (ch->amp_res ? 1 : 2);
+    const int n = s->n[ch->freq_res[1]];
+    for (int k = 0; k < n; k++) {
+      const int q = ch->env_facs_q[0][k] - step;
+      ch->env_facs_q[1][k] = q < 0 ? 0 : q;
+    }
+    memcpy(ch->env_facs_q[0], ch->env_facs_q[1], sizeof(ch->env_facs_q[0]));
+    memcpy(ch->noise_facs_q[1], ch->noise_facs_q[0], sizeof(ch->noise_facs_q[0]));
+  }
+  if (s->ps.start) {
+    aac_ps_conceal(&s->ps);
+  }
+  s->unreliable = 1;
+  s->ready_for_dequant = 1;
 }
 
 void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {

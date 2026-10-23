@@ -274,6 +274,7 @@ static void test_pce_stream() {
   write_cpe(&w, 3, 170, 150);
   end_block(&w);
   const int len3 = finish_frame(&w, frame, 0, 1);
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF); /* a refused frame is concealed otherwise */
   CHECK(aac_decoder_decode(dec, frame, len3, pcm, (int)(sizeof(pcm) / sizeof(float))) < 0,
         "unknown element refused");
   aac_decoder_destroy(dec);

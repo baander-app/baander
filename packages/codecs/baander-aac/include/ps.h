@@ -43,7 +43,10 @@ using AacPsState = struct AacPsState_ {
   int8_t ipd_par[AAC_PS_MAX_ENV][AAC_PS_MAX_PAR];
   int8_t opd_par[AAC_PS_MAX_ENV][AAC_PS_MAX_PAR];
   int is34bands, is34bands_old;
-  /* processing state */
+  int unreliable; /* a frame's parameters were lost and no frequency-coded envelope has anchored
+                     the delta-time chain since: out-of-range values are clamped, not refused */
+  /* processing state (the fields above are the bitstream parameters, kept
+   * across a damaged frame for concealment) */
   float in_buf[5][44][2]; /* hybrid analysis input with six slots of history */
   float delay[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS + AAC_PS_MAX_DELAY][2];
   float ap_delay[AAC_PS_MAX_ALLPASS][AAC_PS_LINKS][AAC_PS_SLOTS + AAC_PS_MAX_LINK_DELAY][2];
@@ -103,6 +106,10 @@ void aac_ps_init(AacPsState* ps);
  * parameters are cleared, PS is switched off until the next header and
  * the whole payload is skipped. */
 int aac_ps_read_data(AacPsState* ps, AacBitReader* r, int bits_left);
+
+/* Replaces the parameters of a lost or damaged frame by one envelope that
+ * carries the previous frame's last parameters. */
+void aac_ps_conceal(AacPsState* ps);
 
 /* Turns the QMF signal L ([re/im][slot][band]) of a mono channel into the
  * stereo pair L and R in place; `top` is the highest QMF band carrying
