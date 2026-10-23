@@ -1,7 +1,7 @@
 ---
 title: Preserve signed delivery expiry through manifest descendants
 date: 2026-10-23
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -128,3 +128,33 @@ to resolve the separate FFmpeg live DASH demuxer EOF limitation.
 
 Independent review approved this bounded amendment before implementation, subject
 to the isolated probe establishing natural completion.
+
+## Verification checkpoint
+
+Final backend evidence covers 281 distinct tests and 9,189 assertions. The combined
+receipt selects the latest passing result for each case across the application,
+firewall and native lanes. It includes the focused duration rerun. Full PHPStan,
+Deptrac and OpenAPI consistency passed after the final code change; Deptrac retains
+484 existing skipped violations with no new violations, warnings or errors.
+Receipts and static logs are under `var/test-runs/signed-expiry-gates`.
+
+The final production run passed all eight Chromium 148.0.7778.96 checkpoints in
+`var/test-runs/signed-expiry-production-final`. Every one of 31 retained HLS URLs
+and 27 DASH URLs preserved its parent expiry, rejected a changed expiry, and
+returned 403 after the original deadline. Fresh authenticated signing restored
+35 HLS and 27 DASH resources. The run also passed decoded video/audio delivery,
+subtitles, rapid seeking, paused remount, web restart, worker containment/recovery
+and retired-resource refusal. Exit status was zero and cleanup was verified.
+
+The completed DASH duration repair passed its deterministic regressions and the
+final reference browser run under `var/test-runs/signed-expiry-reference-browser-final`.
+The browser decoded 480 frames with positive audio evidence and reached natural
+EOF at 20.010666 seconds through the dynamic-to-static transition. The failed
+pre-repair trace and successful isolated probe remain available. Final native
+comparisons still match full HLS and the explicit 13-second live DASH prefix to
+their completed baselines; full static DASH also decodes. Full live FFmpeg DASH
+EOF remains unqualified.
+
+Independent reviews approved the expiry implementation and the bounded duration
+repair, including simplification and negative coverage. Documentation audits
+preserve the previous roadmap history. No push or merge is included in this phase.

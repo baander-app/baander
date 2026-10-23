@@ -946,3 +946,48 @@ The separate native pressure observer still requires the HLS muxer and
 The preceding live DASH EOF, CMAF, signed-URL expiry and additional-browser limits
 remain open. Existing application databases, Redis and media storage were not
 reused or reset. This checkpoint includes no push or feature merge.
+
+### Signed delivery expiry and completed DASH duration — 2026-10-23
+
+Signed HLS and DASH descendants now inherit the requested manifest's absolute
+expiry, including HLS subtitle playlists and VTT files. Repeated playlist reads
+cannot renew access; the authenticated signing endpoint can issue a fresh
+top-level URL. New delivery requests are refused after the expiry's integer
+second. Responses already admitted and bytes buffered by the player are outside
+this expiry policy. The concepts glossary and operator guide document that
+contract.
+
+The reference-browser rerun exposed a completed DASH timing race: the declared
+20-second presentation ended before its published audio at 20.010666667 seconds.
+Completed manifests now set the Period duration to the latest selected video/audio
+sample boundary, rounded upward to microsecond precision, and omit the redundant
+MPD duration.
+Seven duration regressions produced four failures before the fix and pass with
+55 assertions afterward. The failed browser evidence remains under
+`var/test-runs/signed-expiry-reference-browser`. The final reference run decoded
+480 frames with positive audio and reached natural EOF at 20.010666 seconds
+through the dynamic-to-static transition. Cleanup was verified under
+`var/test-runs/signed-expiry-reference-browser-final`.
+
+Verification in the CI image passed 281 distinct backend tests with 9,189
+assertions, using the latest passing receipt for each case across the selected
+ordinary, native and firewall lanes. Full progressive HLS and the explicit
+13-second live DASH prefix matched their completed baselines. Full PHPStan, Deptrac
+and generated OpenAPI consistency passed; Deptrac reports zero violations,
+warnings and errors with 484 existing skipped violations. Combined backend
+receipts and gate logs are under `var/test-runs/signed-expiry-gates`.
+
+Production acceptance passed all eight phases in Chromium 148.0.7778.96,
+including client controls, paused seeking, web replacement and worker
+containment/recovery. The 30-second capability check retained 31 HLS and 27 DASH
+resource URLs. Every retained URL returned 403 for a
+tampered expiry and again after expiry: 58 refusals in each check. Authenticated
+renewal returned 200 for 35 HLS and 27 DASH resources. Evidence is under
+`var/test-runs/signed-expiry-production-final`, including `expiry-summary.json`.
+
+Automatic expiry rotation for an already attached browser capability was not
+exercised. Full live FFmpeg DASH EOF, formal CMAF conformance, DASH subtitles,
+additional browser platforms and the separate native pressure observer remain
+open. The production runner exited zero and verified removal of its resources.
+Existing application databases, Redis and media storage were not reused or reset.
+This checkpoint includes no push or feature merge.
