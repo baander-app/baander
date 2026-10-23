@@ -1,7 +1,8 @@
-/* Node-API binding for baander-aac: streaming ADTS decoder and PCM encoder
+/* Node-API binding for baander-aac: streaming decoder and PCM encoder
  * objects over the public C API.  PCM is interleaved 32-bit float at full
- * scale 1.0; AAC data is an ADTS stream.  Both classes accept input in
- * arbitrary chunk sizes and keep partial frames between calls. */
+ * scale 1.0; AAC data is an ADTS or LOAS stream, LATM elements or raw
+ * access units.  Both classes accept input in arbitrary chunk sizes and
+ * keep partial frames between calls. */
 #include <napi.h>
 
 #include <cstring>
@@ -64,6 +65,72 @@ int option_int(const Napi::Object& o, const char* key, int fallback) {
   return o.Get(key).ToNumber().Int32Value();
 }
 
+std::string option_string(const Napi::Object& o, const char* key, const char* fallback) {
+  if (!o.Has(key) || !o.Get(key).IsString()) {
+    return fallback;
+  }
+  return o.Get(key).As<Napi::String>();
+}
+
+bool option_bool(const Napi::Object& o, const char* key, bool fallback) {
+  if (!o.Has(key) || o.Get(key).IsUndefined()) {
+    return fallback;
+  }
+  return o.Get(key).ToBoolean().Value();
+}
+
+/* Transport names shared by both classes; "detect" is the decoder's only. */
+bool transport_of(const std::string& name, AacTransport* out) {
+  if (name == "detect") {
+    *out = AAC_TRANSPORT_DETECT;
+  } else if (name == "adts") {
+    *out = AAC_TRANSPORT_ADTS;
+  } else if (name == "loas") {
+    *out = AAC_TRANSPORT_LOAS;
+  } else if (name == "latm") {
+    *out = AAC_TRANSPORT_LATM_MCP1;
+  } else if (name == "latm-raw") {
+    *out = AAC_TRANSPORT_LATM_MCP0;
+  } else if (name == "raw") {
+    *out = AAC_TRANSPORT_RAW;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+bool channel_mode_of(const std::string& name, AacChannelMode* out) {
+  if (name == "default") {
+    *out = AAC_MODE_DEFAULT;
+  } else if (name == "7.1") {
+    *out = AAC_MODE_7_1_BACK;
+  } else if (name == "7.1-front") {
+    *out = AAC_MODE_7_1_FRONT_CENTER;
+  } else if (name == "7.1-top") {
+    *out = AAC_MODE_7_1_TOP_FRONT;
+  } else if (name == "7.1-rear") {
+    *out = AAC_MODE_7_1_REAR_SURROUND;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+const char* channel_mode_name(int mode) {
+  switch (mode) {
+    case AAC_MODE_7_1_BACK:
+      return "7.1";
+    case AAC_MODE_7_1_FRONT_CENTER:
+      return "7.1-front";
+    case AAC_MODE_7_1_TOP_FRONT:
+      return "7.1-top";
+    case AAC_MODE_7_1_REAR_SURROUND:
+      return "7.1-rear";
+    default:
+      return "default";
+  }
+}
+
 /* ── decoder ───────────────────────────────────────────────────── */
 
 class Decoder : public Napi::ObjectWrap<Decoder> {
@@ -76,24 +143,75 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
          InstanceAccessor("coreSampleRate", &Decoder::CoreSampleRate, nullptr),
          InstanceAccessor("channels", &Decoder::Channels, nullptr),
          InstanceAccessor("streamChannels", &Decoder::StreamChannels, nullptr),
+         InstanceAccessor("channelMode", &Decoder::ChannelMode, nullptr),
          InstanceAccessor("frameSize", &Decoder::FrameSize, nullptr),
          InstanceAccessor("hasSbr", &Decoder::HasSbr, nullptr),
          InstanceAccessor("hasPs", &Decoder::HasPs, nullptr),
-         InstanceAccessor("errors", &Decoder::Errors, nullptr)});
+         InstanceAccessor("errors", &Decoder::Errors, nullptr),
+         InstanceAccessor("concealedFrames", &Decoder::ConcealedFrames, nullptr),
+         InstanceAccessor("delay", &Decoder::Delay, nullptr)});
   }
 
   explicit Decoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Decoder>(info) {
     const Napi::Env env = info.Env();
     int sample_rate = 44100;
     int channels = 2;
+    AacTransport transport = AAC_TRANSPORT_DETECT;
+    AacConcealment concealment = AAC_CONCEAL_INTERPOLATE;
+    int frame_length = 0;
+    bool limiter = false;
+    int attack_ms = 15;
+    int release_ms = 50;
+    const uint8_t* config = nullptr;
+    size_t config_size = 0;
     if (info.Length() > 0 && info[0].IsObject()) {
       const Napi::Object o = info[0].As<Napi::Object>();
       sample_rate = option_int(o, "sampleRate", sample_rate);
       channels = option_int(o, "channels", channels);
+      frame_length = option_int(o, "frameLength", 0);
+      if (!transport_of(option_string(o, "transport", "detect"), &transport)) {
+        throw_error(env, "AacDecoder: transport must be detect, adts, loas, latm, latm-raw or raw");
+        return;
+      }
+      const std::string conceal = option_string(o, "concealment", "interpolate");
+      if (conceal == "off") {
+        concealment = AAC_CONCEAL_OFF;
+      } else if (conceal == "noise") {
+        concealment = AAC_CONCEAL_NOISE;
+      } else if (conceal == "interpolate") {
+        concealment = AAC_CONCEAL_INTERPOLATE;
+      } else {
+        throw_error(env, "AacDecoder: concealment must be off, noise or interpolate");
+        return;
+      }
+      if (o.Has("limiter") && o.Get("limiter").IsObject()) {
+        const Napi::Object l = o.Get("limiter").As<Napi::Object>();
+        limiter = true;
+        attack_ms = option_int(l, "attackMs", attack_ms);
+        release_ms = option_int(l, "releaseMs", release_ms);
+      } else {
+        limiter = option_bool(o, "limiter", false);
+      }
+      if (o.Has("config") && !o.Get("config").IsUndefined() &&
+          !bytes_of(o.Get("config"), &config, &config_size)) {
+        throw_error(env, "AacDecoder: config must be a Buffer, Uint8Array or ArrayBuffer");
+        return;
+      }
     }
     handle_ = aac_decoder_create(sample_rate, channels);
     if (!handle_) {
       throw_error(env, "AacDecoder: unsupported sample rate or channel count");
+      return;
+    }
+    int ret = 0;
+    if ((ret = aac_decoder_set_transport(handle_, transport)) < 0 ||
+        (ret = aac_decoder_set_concealment(handle_, concealment)) < 0 ||
+        (frame_length && (ret = aac_decoder_set_frame_length(handle_, frame_length)) < 0) ||
+        (limiter && (ret = aac_decoder_set_limiter(handle_, 1, attack_ms, release_ms)) < 0) ||
+        (config && (ret = aac_decoder_set_config(handle_, config, static_cast<int>(config_size))) < 0)) {
+      aac_decoder_destroy(handle_);
+      handle_ = nullptr;
+      throw_error(env, std::string("AacDecoder: ") + error_name(ret));
       return;
     }
     /* room for the largest frame at any layout, with SBR */
@@ -103,8 +221,10 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   ~Decoder() override { aac_decoder_destroy(handle_); }
 
  private:
-  /* Decodes every complete ADTS frame in the pending bytes plus the new
-   * chunk; a trailing partial frame waits for the next call. */
+  /* Feeds the chunk to the decoder and decodes every frame that becomes
+   * complete; a trailing partial frame waits for the next call.  With a
+   * packet transport (LATM elements, raw access units) each call is one
+   * packet. */
   Napi::Value Decode(const Napi::CallbackInfo& info) {
     const Napi::Env env = info.Env();
     if (!handle_) {
@@ -115,35 +235,36 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     if (info.Length() < 1 || !bytes_of(info[0], &data, &size)) {
       return throw_error(env, "AacDecoder.decode: expected a Buffer, Uint8Array or ArrayBuffer");
     }
-    pending_.insert(pending_.end(), data, data + size);
 
     std::vector<float> out;
     size_t pos = 0;
-    while (pos + 7 <= pending_.size()) {
-      if (pending_[pos] != 0xFF || (pending_[pos + 1] & 0xF6) != 0xF0) {
-        pos++; /* resynchronize on the next syncword */
-        continue;
+    bool more = true;
+    while (more) {
+      const int taken = aac_decoder_feed(handle_, data + pos, static_cast<int>(size - pos));
+      if (taken < 0) {
+        return throw_error(env, std::string("AacDecoder.decode: ") + error_name(taken));
       }
-      const size_t len =
-          ((pending_[pos + 3] & 3) << 11) | (pending_[pos + 4] << 3) | (pending_[pos + 5] >> 5);
-      if (len < 7) {
-        pos++;
-        continue;
-      }
-      if (pos + len > pending_.size()) {
-        break; /* partial frame */
-      }
-      const int n = aac_decoder_decode(handle_, pending_.data() + pos, static_cast<int>(len),
-                                       pcm_.data(), static_cast<int>(pcm_.size()));
-      if (n < 0) {
-        errors_++;
-      } else {
+      pos += static_cast<size_t>(taken);
+      more = pos < size;
+      for (;;) {
+        const int n = aac_decoder_decode_next(handle_, pcm_.data(), static_cast<int>(pcm_.size()));
+        if (n == 0) {
+          break;
+        }
+        if (n < 0) {
+          if (n == AAC_ERR_UNSUPPORTED && !more) {
+            return throw_error(env, std::string("AacDecoder.decode: ") + error_name(n));
+          }
+          errors_++;
+          continue;
+        }
         const size_t floats = static_cast<size_t>(n) * aac_decoder_channels(handle_);
         out.insert(out.end(), pcm_.begin(), pcm_.begin() + floats);
       }
-      pos += len;
+      if (more && taken == 0) {
+        return throw_error(env, "AacDecoder.decode: input buffer full");
+      }
     }
-    pending_.erase(pending_.begin(), pending_.begin() + static_cast<ptrdiff_t>(pos));
 
     Napi::Float32Array result = Napi::Float32Array::New(env, out.size());
     if (!out.empty()) {
@@ -155,7 +276,6 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   /* Drops pending bytes and the error count and returns the decoder to
    * its state after creation, so that a new stream can follow. */
   Napi::Value Reset(const Napi::CallbackInfo& info) {
-    pending_.clear();
     errors_ = 0;
     if (handle_) {
       aac_decoder_reset(handle_);
@@ -174,6 +294,10 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   }
   Napi::Value StreamChannels(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_decoder_stream_channels(handle_) : 0);
+  }
+  Napi::Value ChannelMode(const Napi::CallbackInfo& info) {
+    return Napi::String::New(info.Env(),
+                             channel_mode_name(handle_ ? aac_decoder_channel_mode(handle_) : 0));
   }
   Napi::Value FrameSize(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_decoder_frame_size(handle_) : 0);
@@ -195,10 +319,15 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   Napi::Value Errors(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), errors_);
   }
+  Napi::Value ConcealedFrames(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_concealed_frames(handle_) : 0);
+  }
+  Napi::Value Delay(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_delay(handle_) : 0);
+  }
 
   AacDecoderHandle handle_ = nullptr;
   int errors_ = 0;
-  std::vector<uint8_t> pending_;
   std::vector<float> pcm_;
 };
 
@@ -214,7 +343,9 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
          InstanceAccessor("channels", &Encoder::Channels, nullptr),
          InstanceAccessor("frameSize", &Encoder::FrameSize, nullptr),
          InstanceAccessor("delay", &Encoder::Delay, nullptr),
-         InstanceAccessor("profile", &Encoder::Profile, nullptr)});
+         InstanceAccessor("profile", &Encoder::Profile, nullptr),
+         InstanceAccessor("config", &Encoder::Config, nullptr),
+         InstanceAccessor("unitSizes", &Encoder::UnitSizes, nullptr)});
   }
 
   explicit Encoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Encoder>(info) {
@@ -272,6 +403,11 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       throw_error(env, "AacEncoder: quality must be 1..100");
       return;
     }
+    if (!apply_stream_options(env, info)) {
+      aac_encoder_destroy(handle_);
+      handle_ = nullptr;
+      return;
+    }
     frame_size_ = aac_encoder_frame_size(handle_);
     block_.resize(static_cast<size_t>(frame_size_) * channels_);
     /* the flush writes up to three frames back to back */
@@ -281,7 +417,52 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   ~Encoder() override { aac_encoder_destroy(handle_); }
 
  private:
-  /* Encodes a block held in block_ and appends the ADTS frame to result. */
+  /* Stream format options: transport, signalling, frame length, CRC, the
+   * MPEG-2 header and the 7.1 channel mode.  Throws and returns false on
+   * an invalid one. */
+  bool apply_stream_options(const Napi::Env& env, const Napi::CallbackInfo& info) {
+    if (info.Length() == 0 || !info[0].IsObject()) {
+      return true;
+    }
+    const Napi::Object o = info[0].As<Napi::Object>();
+    AacTransport transport = AAC_TRANSPORT_ADTS;
+    if (!transport_of(option_string(o, "transport", "adts"), &transport) ||
+        transport == AAC_TRANSPORT_DETECT) {
+      throw_error(env, "AacEncoder: transport must be adts, loas, latm, latm-raw or raw");
+      return false;
+    }
+    AacSignaling signaling = AAC_SIGNAL_IMPLICIT;
+    const std::string sig = option_string(o, "signaling", "implicit");
+    if (sig == "implicit") {
+      signaling = AAC_SIGNAL_IMPLICIT;
+    } else if (sig == "explicit") {
+      signaling = AAC_SIGNAL_EXPLICIT_BC;
+    } else if (sig == "hierarchical") {
+      signaling = AAC_SIGNAL_EXPLICIT_HIER;
+    } else {
+      throw_error(env, "AacEncoder: signaling must be implicit, explicit or hierarchical");
+      return false;
+    }
+    AacChannelMode mode = AAC_MODE_DEFAULT;
+    if (!channel_mode_of(option_string(o, "channelMode", "default"), &mode)) {
+      throw_error(env, "AacEncoder: channelMode must be default, 7.1, 7.1-front, 7.1-top or 7.1-rear");
+      return false;
+    }
+    const int frame_length = option_int(o, "frameLength", 0);
+    int ret = 0;
+    if ((ret = aac_encoder_set_transport(handle_, transport)) < 0 ||
+        (ret = aac_encoder_set_signaling(handle_, signaling)) < 0 ||
+        (frame_length && (ret = aac_encoder_set_frame_length(handle_, frame_length)) < 0) ||
+        (ret = aac_encoder_set_crc(handle_, option_bool(o, "crc", false) ? 1 : 0)) < 0 ||
+        (ret = aac_encoder_set_mpeg2(handle_, option_bool(o, "mpeg2", false) ? 1 : 0)) < 0 ||
+        (mode != AAC_MODE_DEFAULT && (ret = aac_encoder_set_channel_mode(handle_, mode)) < 0)) {
+      throw_error(env, std::string("AacEncoder: ") + error_name(ret));
+      return false;
+    }
+    return true;
+  }
+
+  /* Encodes a block held in block_ and appends the frame to result. */
   bool encode_block(const Napi::Env& env, std::vector<uint8_t>& result) {
     const int len = aac_encoder_encode(handle_, block_.data(), frame_size_, out_.data(),
                                        static_cast<int>(out_.size()));
@@ -290,6 +471,7 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       return false;
     }
     result.insert(result.end(), out_.begin(), out_.begin() + len);
+    unit_sizes_.push_back(len);
     return true;
   }
 
@@ -307,6 +489,7 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     const Napi::Float32Array in = info[0].As<Napi::Float32Array>();
     pending_.insert(pending_.end(), in.Data(), in.Data() + in.ElementLength());
 
+    unit_sizes_.clear();
     std::vector<uint8_t> result;
     size_t pos = 0;
     while (pending_.size() - pos >= block_.size()) {
@@ -327,6 +510,7 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     if (!handle_) {
       return throw_error(env, "AacEncoder: not initialized");
     }
+    unit_sizes_.clear();
     std::vector<uint8_t> result;
     if (!pending_.empty()) {
       std::fill(block_.begin(), block_.end(), 0.0f);
@@ -336,11 +520,19 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         return env.Undefined();
       }
     }
-    const int len = aac_encoder_flush(handle_, out_.data(), static_cast<int>(out_.size()));
-    if (len < 0) {
-      return throw_error(env, std::string("AacEncoder.flush: ") + error_name(len));
+    /* A packet transport yields one unit per call; a stream transport
+     * writes the rest at once and returns 0 next. */
+    for (;;) {
+      const int len = aac_encoder_flush(handle_, out_.data(), static_cast<int>(out_.size()));
+      if (len < 0) {
+        return throw_error(env, std::string("AacEncoder.flush: ") + error_name(len));
+      }
+      if (len == 0) {
+        break;
+      }
+      result.insert(result.end(), out_.begin(), out_.begin() + len);
+      unit_sizes_.push_back(len);
     }
-    result.insert(result.end(), out_.begin(), out_.begin() + len);
     return Napi::Buffer<uint8_t>::Copy(env, result.data(), result.size());
   }
 
@@ -359,6 +551,27 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   Napi::Value Profile(const Napi::CallbackInfo& info) {
     return Napi::String::New(info.Env(), profile_);
   }
+  /* Lengths of the units in the last encode or flush result: one per
+   * frame for ADTS and LOAS, one per LATM element or access unit. */
+  Napi::Value UnitSizes(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    Napi::Array sizes = Napi::Array::New(env, unit_sizes_.size());
+    for (size_t i = 0; i < unit_sizes_.size(); i++) {
+      sizes.Set(static_cast<uint32_t>(i), Napi::Number::New(env, unit_sizes_[i]));
+    }
+    return sizes;
+  }
+  /* The AudioSpecificConfig of the stream, for an MP4 esds box or an
+   * out-of-band StreamMuxConfig. */
+  Napi::Value Config(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    uint8_t asc[64];
+    const int len = handle_ ? aac_encoder_config(handle_, asc, static_cast<int>(sizeof asc)) : 0;
+    if (len < 0) {
+      return throw_error(env, std::string("AacEncoder.config: ") + error_name(len));
+    }
+    return Napi::Buffer<uint8_t>::Copy(env, asc, static_cast<size_t>(len));
+  }
 
   AacEncoderHandle handle_ = nullptr;
   int sample_rate_ = 0;
@@ -368,6 +581,7 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   std::vector<float> pending_;
   std::vector<float> block_;
   std::vector<uint8_t> out_;
+  std::vector<int> unit_sizes_;
 };
 
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {

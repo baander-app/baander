@@ -1,12 +1,55 @@
 import { handleTrusted } from '../guard';
 import { IPC_CHANNELS } from '../channels';
 import { getAacService } from '../../main/services/aac.service';
-import type { AacDecoderOptions, AacEncoderOptions, AacProfile, AacRateControlMode } from '@baander/aac-native';
+import type {
+  AacChannelMode,
+  AacConcealment,
+  AacDecoderOptions,
+  AacEncoderOptions,
+  AacProfile,
+  AacRateControlMode,
+  AacSignaling,
+  AacTransport,
+} from '@baander/aac-native';
 
 const SAMPLE_RATES = new Set([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000, 88200, 96000]);
 const MODES = new Set<AacRateControlMode>(['cbr', 'abr', 'cvbr', 'tvbr']);
 const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2']);
 const MAX_CHANNELS = 8;
+const TRANSPORTS = new Set<AacTransport>(['detect', 'adts', 'loas', 'latm', 'latm-raw', 'raw']);
+const SIGNALINGS = new Set<AacSignaling>(['implicit', 'explicit', 'hierarchical']);
+const CONCEALMENTS = new Set<AacConcealment>(['off', 'noise', 'interpolate']);
+const CHANNEL_MODES = new Set<AacChannelMode>(['default', '7.1', '7.1-front', '7.1-top', '7.1-rear']);
+const FRAME_LENGTHS = new Set([960, 1024]);
+const MAX_CONFIG_BYTES = 64;
+
+function oneOf<T extends string>(value: unknown, allowed: Set<T>, what: string): T | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !allowed.has(value as T)) invalid(what);
+  return value as T;
+}
+
+function frameLength(value: unknown): 960 | 1024 | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !FRAME_LENGTHS.has(value)) invalid('frameLength');
+  return value as 960 | 1024;
+}
+
+function flag(value: unknown, what: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') invalid(what);
+  return value;
+}
+
+function limiterOption(value: unknown): AacDecoderOptions['limiter'] {
+  if (value === undefined || typeof value === 'boolean') return value;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('limiter');
+  const { attackMs, releaseMs } = value as Record<string, unknown>;
+  for (const [name, ms] of [['attackMs', attackMs], ['releaseMs', releaseMs]] as const) {
+    if (ms !== undefined && !(typeof ms === 'number' && Number.isInteger(ms) && ms >= 1 && ms <= 1000)) invalid(name);
+  }
+  return { attackMs: attackMs as number | undefined, releaseMs: releaseMs as number | undefined };
+}
 
 function channelCount(value: unknown, min: number): boolean {
   return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= MAX_CHANNELS;
@@ -35,16 +78,26 @@ function sessionId(value: unknown): number {
 function decoderOptions(value: unknown): AacDecoderOptions {
   const options = (value ?? {}) as Record<string, unknown>;
   if (typeof options !== 'object' || Array.isArray(options)) invalid('decoder options');
-  const { sampleRate, channels } = options;
+  const { sampleRate, channels, transport, config, concealment, limiter } = options;
   if (sampleRate !== undefined && !(typeof sampleRate === 'number' && SAMPLE_RATES.has(sampleRate))) invalid('sampleRate');
   if (channels !== undefined && !channelCount(channels, 0)) invalid('channels');
-  return { sampleRate: sampleRate as number | undefined, channels: channels as number | undefined };
+  if (config !== undefined && !(config instanceof Uint8Array && config.length <= MAX_CONFIG_BYTES)) invalid('config');
+  return {
+    sampleRate: sampleRate as number | undefined,
+    channels: channels as number | undefined,
+    transport: oneOf(transport, TRANSPORTS, 'transport'),
+    config: config as Uint8Array | undefined,
+    frameLength: frameLength(options.frameLength),
+    concealment: oneOf(concealment, CONCEALMENTS, 'concealment'),
+    limiter: limiterOption(limiter),
+  };
 }
 
 function encoderOptions(value: unknown): AacEncoderOptions {
   const options = (value ?? {}) as Record<string, unknown>;
   if (typeof options !== 'object' || Array.isArray(options)) invalid('encoder options');
-  const { sampleRate, channels, bitrate, mode, quality, profile } = options;
+  const { sampleRate, channels, bitrate, mode, quality, profile, transport, signaling, channelMode } = options;
+  if (transport === 'detect') invalid('transport');
   if (sampleRate !== undefined && !(typeof sampleRate === 'number' && SAMPLE_RATES.has(sampleRate))) invalid('sampleRate');
   if (channels !== undefined && !channelCount(channels, 1)) invalid('channels');
   if (profile !== undefined && !(typeof profile === 'string' && PROFILES.has(profile as AacProfile))) invalid('profile');
@@ -58,6 +111,12 @@ function encoderOptions(value: unknown): AacEncoderOptions {
     mode: mode as AacRateControlMode | undefined,
     quality: quality as number | undefined,
     profile: profile as AacProfile | undefined,
+    transport: oneOf(transport, TRANSPORTS, 'transport') as Exclude<AacTransport, 'detect'> | undefined,
+    signaling: oneOf(signaling, SIGNALINGS, 'signaling'),
+    frameLength: frameLength(options.frameLength),
+    crc: flag(options.crc, 'crc'),
+    mpeg2: flag(options.mpeg2, 'mpeg2'),
+    channelMode: oneOf(channelMode, CHANNEL_MODES, 'channelMode'),
   };
 }
 

@@ -6,7 +6,14 @@
  * every operation rejects with a descriptive error instead of crashing
  * the app.
  */
-import type { AacDecoder, AacDecoderOptions, AacEncoder, AacEncoderOptions, AacProfile } from '@baander/aac-native';
+import type {
+  AacChannelMode,
+  AacDecoder,
+  AacDecoderOptions,
+  AacEncoder,
+  AacEncoderOptions,
+  AacProfile,
+} from '@baander/aac-native';
 
 type Native = {
   AacDecoder: typeof AacDecoder;
@@ -27,8 +34,15 @@ export interface AacDecodeResult {
   channels: number;
   /** Channels coded in the stream. */
   streamChannels: number;
+  /** The stream's 7.1 layout, or 'default'. */
+  channelMode: AacChannelMode;
   frameSize: number;
+  /** Frames that failed (concealment off). */
   errors: number;
+  /** Frames concealed so far. */
+  concealedFrames: number;
+  /** Output samples of delay added by the limiter. */
+  delay: number;
   hasSbr: boolean;
   hasPs: boolean;
   pcm: Float32Array;
@@ -39,6 +53,8 @@ export interface AacEncoderSession {
   profile: AacProfile;
   frameSize: number;
   delay: number;
+  /** The AudioSpecificConfig of the stream. */
+  config: Uint8Array;
 }
 
 const MAX_SESSIONS = 64;
@@ -88,13 +104,13 @@ export class AacService {
     return native;
   }
 
-  /** Decodes a complete ADTS stream. */
+  /** Decodes a complete stream (ADTS, LOAS, or one LATM element or access unit). */
   async decode(data: Uint8Array, options: AacDecoderOptions = {}): Promise<AacDecodeResult> {
     const decoder = new (await this.native()).AacDecoder(options);
     return describe(decoder, decoder.decode(data));
   }
 
-  /** Encodes interleaved PCM into a complete ADTS stream. */
+  /** Encodes interleaved PCM into a complete stream in the chosen transport. */
   async encode(pcm: Float32Array, options: AacEncoderOptions): Promise<Uint8Array> {
     const encoder = new (await this.native()).AacEncoder(options);
     const body = encoder.encode(pcm);
@@ -128,7 +144,13 @@ export class AacService {
     const encoder = new (await this.native()).AacEncoder(options);
     const id = this.nextId++;
     this.encoders.set(id, encoder);
-    return { id, profile: encoder.profile, frameSize: encoder.frameSize, delay: encoder.delay };
+    return {
+      id,
+      profile: encoder.profile,
+      frameSize: encoder.frameSize,
+      delay: encoder.delay,
+      config: toBytes(encoder.config),
+    };
   }
 
   async encodeChunk(id: number, pcm: Float32Array): Promise<Uint8Array> {
@@ -168,8 +190,11 @@ function describe(decoder: AacDecoder, pcm: Float32Array): AacDecodeResult {
     sampleRate: decoder.sampleRate,
     channels: decoder.channels,
     streamChannels: decoder.streamChannels,
+    channelMode: decoder.channelMode,
     frameSize: decoder.frameSize,
     errors: decoder.errors,
+    concealedFrames: decoder.concealedFrames,
+    delay: decoder.delay,
     hasSbr: decoder.hasSbr,
     hasPs: decoder.hasPs,
     pcm,

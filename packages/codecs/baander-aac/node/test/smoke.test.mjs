@@ -116,3 +116,102 @@ test('rejects unsupported configurations', () => {
   const encoder = new AacEncoder();
   assert.throws(() => encoder.encode(new Int16Array(10)));
 });
+
+test('carries a stream over LOAS, raw access units and 960-sample frames', () => {
+  const sampleRate = 48000;
+  const pcm = tones(sampleRate, sampleRate, 2);
+  const reference = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000 });
+  const adts = Buffer.concat([reference.encode(pcm), reference.flush()]);
+  const expected = decodeAll(new AacDecoder({ sampleRate, channels: 2 }), adts, adts.length);
+
+  const loasEncoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000, transport: 'loas', crc: true });
+  const loas = Buffer.concat([loasEncoder.encode(pcm), loasEncoder.flush()]);
+  assert.equal(loas[0], 0x56, 'LOAS sync');
+  const loasDecoder = new AacDecoder({ channels: 2 });
+  const fromLoas = decodeAll(loasDecoder, loas, 333);
+  assert.equal(loasDecoder.errors, 0);
+  assert.equal(loasDecoder.concealedFrames, 0);
+  assert.deepEqual(fromLoas, expected, 'LOAS decodes as the ADTS stream');
+
+  const rawEncoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000, transport: 'raw' });
+  const config = rawEncoder.config;
+  assert.ok(config.length >= 2, 'AudioSpecificConfig');
+  const rawDecoder = new AacDecoder({ channels: 2, transport: 'raw', config });
+  const units = [];
+  for (let pos = 0; pos + 2048 <= pcm.length; pos += 2048) {
+    units.push(rawEncoder.encode(pcm.subarray(pos, pos + 2048)));
+  }
+  const tail = rawEncoder.flush();
+  assert.equal(rawEncoder.unitSizes.length, 2, 'the flush yields two access units');
+  let at = 0;
+  for (const size of rawEncoder.unitSizes) {
+    units.push(tail.subarray(at, at + size));
+    at += size;
+  }
+  let decodedUnits = 0;
+  for (const unit of units) {
+    if (unit.length) decodedUnits += rawDecoder.decode(unit).length / 2 / 1024;
+  }
+  assert.equal(rawDecoder.errors, 0);
+  assert.equal(decodedUnits, Math.floor(pcm.length / 2 / 1024) + 2, 'one block per access unit');
+
+  const shortEncoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000, frameLength: 960 });
+  assert.equal(shortEncoder.frameSize, 960);
+  assert.equal(shortEncoder.delay, 1920);
+  const short = Buffer.concat([shortEncoder.encode(pcm), shortEncoder.flush()]);
+  const shortDecoder = new AacDecoder({ channels: 2, frameLength: 960 });
+  const fromShort = decodeAll(shortDecoder, short, short.length);
+  assert.equal(shortDecoder.frameSize, 960);
+  assert.equal(shortDecoder.errors, 0);
+  const snr = snrDb(pcm, fromShort, shortEncoder.delay * 2);
+  assert.ok(snr > 30, `960-frame reconstruction SNR ${snr.toFixed(1)} dB`);
+});
+
+test('conceals damaged frames and limits the output', () => {
+  const sampleRate = 44100;
+  const pcm = tones(sampleRate, sampleRate, 2);
+  const encoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000 });
+  const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+  const damaged = Buffer.from(stream);
+  for (let i = 400; i < 420; i++) damaged[i] ^= 0x5a;
+
+  const concealing = new AacDecoder({ channels: 2 });
+  const out = decodeAll(concealing, damaged, damaged.length);
+  assert.equal(concealing.errors, 0);
+  assert.ok(concealing.concealedFrames >= 1, 'damaged frame concealed');
+  assert.equal(out.length, decodeAll(new AacDecoder({ channels: 2 }), stream, stream.length).length);
+
+  const strict = new AacDecoder({ channels: 2, concealment: 'off' });
+  decodeAll(strict, damaged, damaged.length);
+  assert.ok(strict.errors >= 1, 'damaged frame reported with concealment off');
+  assert.equal(strict.concealedFrames, 0);
+
+  const limited = new AacDecoder({ channels: 2, limiter: { attackMs: 5, releaseMs: 50 } });
+  assert.equal(limited.delay, Math.floor(sampleRate * 5 / 1000));
+  const loud = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) loud[i] = pcm[i] * 4;
+  const loudEncoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 256000 });
+  const loudStream = Buffer.concat([loudEncoder.encode(loud), loudEncoder.flush()]);
+  const limitedOut = decodeAll(limited, loudStream, loudStream.length);
+  let peak = 0;
+  for (const v of limitedOut) peak = Math.max(peak, Math.abs(v));
+  assert.ok(peak <= 1.0, `limited peak ${peak}`);
+  assert.equal(limited.channelMode, 'default');
+});
+
+test('names the 7.1 layout of an eight-channel stream', () => {
+  const sampleRate = 48000;
+  const pcm = tones(sampleRate / 2, sampleRate, 8);
+  for (const mode of ['7.1', '7.1-front', '7.1-top', '7.1-rear']) {
+    const encoder = new AacEncoder({ sampleRate, channels: 8, bitrate: 512000, channelMode: mode });
+    const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+    const decoder = new AacDecoder({ channels: 0 });
+    decodeAll(decoder, stream, stream.length);
+    assert.equal(decoder.errors, 0);
+    assert.equal(decoder.channels, 8);
+    assert.equal(decoder.channelMode, mode, `mode ${mode}`);
+  }
+  assert.throws(() => new AacEncoder({ channels: 6, channelMode: '7.1-top' }));
+  assert.throws(() => new AacEncoder({ transport: 'detect' }));
+  assert.throws(() => new AacDecoder({ concealment: 'maybe' }));
+});

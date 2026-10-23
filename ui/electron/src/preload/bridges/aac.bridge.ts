@@ -1,10 +1,28 @@
 import { ipcRenderer } from 'electron';
 
+export type AacTransport = 'detect' | 'adts' | 'loas' | 'latm' | 'latm-raw' | 'raw';
+export type AacSignaling = 'implicit' | 'explicit' | 'hierarchical';
+export type AacConcealment = 'off' | 'noise' | 'interpolate';
+export type AacChannelMode = 'default' | '7.1' | '7.1-front' | '7.1-top' | '7.1-rear';
+
+export interface AacLimiterOptions {
+  attackMs?: number;
+  releaseMs?: number;
+}
+
 /** Options of the native AAC decoder; see @baander/aac-native. */
 export interface AacDecoderOptions {
   sampleRate?: number;
   /** 0 for the stream's own channels, 1 or 2 for a downmix, up to 8. */
   channels?: number;
+  /** 'detect' (default) picks ADTS or LOAS; 'latm-raw' and 'raw' need `config`. */
+  transport?: AacTransport;
+  /** AudioSpecificConfig bytes. */
+  config?: Uint8Array;
+  frameLength?: 960 | 1024;
+  /** Default 'interpolate'. */
+  concealment?: AacConcealment;
+  limiter?: boolean | AacLimiterOptions;
 }
 
 export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
@@ -20,6 +38,12 @@ export interface AacEncoderOptions {
   mode?: AacRateControlMode;
   quality?: number;
   profile?: AacProfile;
+  transport?: Exclude<AacTransport, 'detect'>;
+  signaling?: AacSignaling;
+  frameLength?: 960 | 1024;
+  crc?: boolean;
+  mpeg2?: boolean;
+  channelMode?: AacChannelMode;
 }
 
 export interface AacInfo {
@@ -35,8 +59,14 @@ export interface AacDecodeResult {
   channels: number;
   /** Channels coded in the stream. */
   streamChannels: number;
+  channelMode: AacChannelMode;
   frameSize: number;
+  /** Frames that failed (concealment off). */
   errors: number;
+  /** Frames concealed so far. */
+  concealedFrames: number;
+  /** Output samples of delay added by the limiter. */
+  delay: number;
   hasSbr: boolean;
   hasPs: boolean;
   /** Interleaved float PCM, full scale 1.0. */
@@ -50,6 +80,8 @@ export interface AacEncoderSession {
   frameSize: number;
   /** Samples of lead-in before the first input sample in the decoded output. */
   delay: number;
+  /** The AudioSpecificConfig of the stream. */
+  config: Uint8Array;
 }
 
 /**

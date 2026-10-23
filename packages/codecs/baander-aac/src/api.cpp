@@ -199,10 +199,12 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
     return AAC_ERR_INVALID_ARG;
   }
   /* Drain the lookahead and transform overlap with silent blocks; the
-   * frames are written back to back as a continuation of the ADTS stream.
-   * Once drained the encoder starts over, so the next input opens a clean
-   * stream. */
+   * frames of a stream transport are written back to back as a
+   * continuation of the stream, a packet transport delivers one unit per
+   * call.  Once drained the encoder starts over, so the next input opens
+   * a clean stream. */
   auto* s = static_cast<AacEncoderState*>(ctx);
+  const bool one_unit = aac_encoder_transport_is_packet(s->transport);
   int total = 0;
   while (s->pending_flush > 0) {
     const int len = encode_block(s, nullptr, out + total, out_size - total);
@@ -211,8 +213,11 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
     }
     total += len;
     s->pending_flush--;
+    if (one_unit) {
+      break;
+    }
   }
-  if (total > 0) {
+  if (total > 0 && s->pending_flush == 0) {
     aac_encoder_state_reset(s);
     s->pending_flush = 0;
     aac_encoder_transport_flushed(s->transport);

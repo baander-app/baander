@@ -104,6 +104,10 @@ int aac_encoder_delay(AacEncoderHandle ctx);
  * output buffer is refused with AAC_ERR_OVERFLOW before it consumes any
  * input. */
 int aac_encoder_max_frame_bytes(AacEncoderHandle ctx);
+/* Drains the encoder delay: with a stream transport (ADTS, LOAS) the
+ * remaining frames are written back to back and their total length is
+ * returned; with a packet transport (LATM, raw access units) one unit per
+ * call, so callers loop until 0.  The encoder then starts a new stream. */
 int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size);
 
 /* Stream format settings.  Each must be called before the first

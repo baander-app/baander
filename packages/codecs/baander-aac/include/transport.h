@@ -63,6 +63,9 @@ int aac_encoder_transport_set(AacEncoderTransport* t, AacTransport transport);
 int aac_encoder_transport_set_signaling(AacEncoderTransport* t, AacSignaling signaling);
 int aac_encoder_transport_set_crc(AacEncoderTransport* t, int enabled);
 void aac_encoder_transport_flushed(AacEncoderTransport* t);
+/* Whether the transport delivers packets (LATM elements, raw access
+ * units) rather than a self-synchronising stream. */
+int aac_encoder_transport_is_packet(const AacEncoderTransport* t);
 
 /* The AudioSpecificConfig of the encoder's stream. */
 int aac_encoder_transport_asc(const struct AacEncoderState_* s, const AacEncoderTransport* t,

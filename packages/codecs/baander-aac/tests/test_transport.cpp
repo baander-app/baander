@@ -110,15 +110,19 @@ static std::vector<uint8_t> encode_transport(const std::vector<float>& pcm, int 
       packets->emplace_back(buf.begin(), buf.begin() + len);
     }
   }
-  /* The flush writes its frames back to back; split them again. */
+  /* A stream transport flushes its frames back to back, which are split
+   * again here; a packet transport yields one unit per call. */
   std::vector<uint8_t> tail(buf.size() * 4);
-  const int len = aac_encoder_flush(enc, tail.data(), (int)tail.size());
-  CHECK(len > 0, "flush: %d", len);
-  if (len > 0) {
+  int flushed = 0;
+  for (;;) {
+    const int len = aac_encoder_flush(enc, tail.data(), (int)tail.size());
+    CHECK(len >= 0, "flush: %d", len);
+    if (len <= 0) {
+      break;
+    }
+    flushed += len;
     out.insert(out.end(), tail.begin(), tail.begin() + len);
     if (packets) {
-      /* Only the framed transports can be split here; the packet ones
-       * are re-encoded frame by frame in the tests that need them. */
       size_t pos = 0;
       while (pos < (size_t)len) {
         size_t n = 0;
@@ -134,6 +138,7 @@ static std::vector<uint8_t> encode_transport(const std::vector<float>& pcm, int 
       }
     }
   }
+  CHECK(flushed > 0, "flush wrote the delay");
   CHECK(aac_encoder_set_transport(enc, transport) == AAC_OK, "transport settable after flush");
   aac_encoder_destroy(enc);
   return out;

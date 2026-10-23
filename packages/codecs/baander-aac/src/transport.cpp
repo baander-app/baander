@@ -745,6 +745,10 @@ int aac_encoder_transport_set_crc(AacEncoderTransport* t, int enabled) {
   return AAC_OK;
 }
 
+int aac_encoder_transport_is_packet(const AacEncoderTransport* t) {
+  return is_packet_transport(t->transport);
+}
+
 void aac_encoder_transport_flushed(AacEncoderTransport* t) { t->frames = 0; }
 
 int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTransport* t,
