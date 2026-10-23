@@ -202,11 +202,12 @@ page.on('response', async response => {
     appendBounded(apiResponses, { at: Date.now(), path: url.pathname, status: response.status() })
   }
   if (url.pathname === '/api/stream/sign' && response.ok()) {
+    const receivedAt = Date.now()
     try {
       const next = await response.json()
       const accepted = !snapshot || next.jobId !== snapshot.jobId
         || (next.generation >= snapshot.generation && next.revision >= snapshot.revision)
-      appendBounded(playbackSnapshots, { at: Date.now(), accepted, ...safePlayback(next),
+      appendBounded(playbackSnapshots, { at: Date.now(), receivedAt, accepted, ...safePlayback(next),
         ...(typeof next.url === 'string' ? capabilityEvidence(new URL(next.url, response.url())) : {}) }, 100)
       if (accepted) {
         snapshot = next
@@ -526,6 +527,7 @@ async function proveProgressOutages(owner) {
       let routeError
       let failedRequest
       let failureObserved = false
+      let finalBaseline
       const pendingRoutes = new Set()
       const requestFailed = request => {
         if (request === failedRequest) {
@@ -588,12 +590,23 @@ async function proveProgressOutages(owner) {
         task.finally(() => pendingRoutes.delete(task))
         return task
       }
+      const freshPublications = () => playbackSnapshots.filter(item => item.accepted && item.ready
+        && item.at >= proof.startedAt && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+        && item.generation === owner.generation)
+      const publicationChange = () => freshPublications().find(item => item.renditionSet !== renditionSet)
+      const checkMediaEvents = async () => {
+        const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
+        const changed = publicationChange()
+        const boundary = changed ? changed.receivedAt ?? changed.at : Infinity
+        assert(!mediaEvents.some(event => !event.probe && event.at >= proof.startedAt
+          && event.at < boundary && ['emptied', 'error'].includes(event.event)),
+        'A progress failure must not tear down decoded media before a fresh publication change')
+      }
       const superseded = () => {
         unchangedExecution()
         if (routeError) throw routeError
-        const changed = playbackSnapshots.find(item => item.accepted && item.at >= proof.startedAt
-          && item.jobId === owner.jobId && item.sessionId === owner.sessionId
-          && item.generation === owner.generation && item.renditionSet !== renditionSet)
+        if (proof.preserved) return false
+        const changed = publicationChange()
         if (!changed) return false
         proof.status = 'superseded-by-publication'
         proof.publication = { at: changed.at, renditionSet: changed.renditionSet }
@@ -603,23 +616,60 @@ async function proveProgressOutages(owner) {
       await page.route(positionRoute, interceptProgress)
       try {
         await waitFor(async () => {
+          await checkMediaEvents()
           if (superseded()) return true
-          if (!failureObserved || !proof.success || proof.success.position <= proof.fault.position) return false
+          if (!failureObserved) return false
+          const sampledAttachment = attachmentNumber
           const state = await mediaState()
-          assert.equal(attachmentNumber, originalAttachment, 'A stable-set progress failure must retain its attachment')
-          assert.equal(state.source, before.source, 'A progress failure must not rebuild its media source')
+          if (superseded()) {
+            await checkMediaEvents()
+            return true
+          }
+          if (sampledAttachment !== attachmentNumber) return false
           assert.equal(state.error, null, 'A progress failure must not report a media error')
-          const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
-          assert(!mediaEvents.some(event => !event.probe && event.at >= proof.startedAt
-            && ['emptied', 'error'].includes(event.event)), 'A progress failure must not tear down decoded media')
-          const canonical = playbackSnapshots.find(item => item.accepted && item.at >= proof.success.responseAt
-            && item.jobId === owner.jobId && item.sessionId === owner.sessionId
-            && item.generation === owner.generation && item.status === 'running'
-            && item.renditionSet === renditionSet && item.position >= proof.success.position)
+          if (!proof.preserved) {
+            assert.equal(attachmentNumber, originalAttachment, 'A progress failure must initially retain its attachment')
+            assert.equal(state.source, before.source, 'A progress failure must initially retain its media source')
+            assert(state.connected && !state.paused && state.ready >= 2 && !state.seeking,
+              'A failed progress request must leave decoded running media usable')
+            proof.faultBaseline ??= { at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
+            if (!(state.time > proof.faultBaseline.time + 0.2
+              && state.decodedFrames > proof.faultBaseline.decodedFrames)) return false
+            proof.preserved = { at: Date.now(), attachment: originalAttachment, renditionSet,
+              time: state.time, decodedFrames: state.decodedFrames }
+          }
+          const publications = freshPublications()
+          let previousSet = renditionSet
+          for (const [number, capability] of attachedCapabilities) {
+            if (number <= originalAttachment) continue
+            const set = new URL(capability.url).searchParams.get('set')
+            assert(set !== previousSet && publications.some(item => item.renditionSet === set
+              && (item.receivedAt ?? item.at) <= capability.at),
+            'Every post-failure replacement must follow an authenticated rendition change')
+            previousSet = set
+          }
+          if (attachmentNumber === originalAttachment) assert.equal(state.source, before.source,
+            'An unchanged attachment must retain its decoded media source')
+          if (!proof.success || proof.success.position <= proof.fault.position) return false
+          const capability = attachedCapabilities.get(attachmentNumber)
+          const delivered = capability && new URL(capability.url).searchParams.get('set') === snapshot.renditionSet
+            && mediaResponses.some(item => item.attachment === attachmentNumber && item.status === 200
+              && item.path.endsWith('/master.m3u8'))
+            && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
+              && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
           if (!(state.connected && !state.paused && state.ready >= 2 && !state.seeking && currentSource(state)
-            && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames && canonical)) return false
+            && snapshot?.ready && snapshot.status === 'running' && delivered)) return false
+          if (finalBaseline?.attachment !== attachmentNumber) finalBaseline = { at: Date.now(),
+            attachment: attachmentNumber, time: state.time, decodedFrames: state.decodedFrames }
+          const canonical = publications.find(item => item.at >= proof.success.responseAt
+            && item.status === 'running' && item.renditionSet === snapshot.renditionSet
+            && item.position >= proof.success.position)
+          if (!(state.time > finalBaseline.time + 0.2 && state.decodedFrames > finalBaseline.decodedFrames
+            && state.time > before.time + 1 && canonical)) return false
           proof.canonical = { at: canonical.at, position: canonical.position, revision: canonical.revision }
-          proof.after = { at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
+          proof.finalBaseline = finalBaseline
+          proof.after = { at: Date.now(), attachment: attachmentNumber, renditionSet: snapshot.renditionSet,
+            time: state.time, decodedFrames: state.decodedFrames }
           proof.status = 'passed'
           passed = true
           return true
@@ -629,6 +679,7 @@ async function proveProgressOutages(owner) {
         await Promise.all([...pendingRoutes])
         page.off('requestfailed', requestFailed)
       }
+      await checkMediaEvents()
       if (routeError) throw routeError
       await recordClientControl(`progress-outage-${mode}-${proof.status}`, proof.startedAt, { attempt })
     }
