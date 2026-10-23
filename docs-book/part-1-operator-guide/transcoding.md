@@ -38,7 +38,11 @@ The web video player obtains a newer signed URL near expiry while preserving its
 local position and play or pause intent. Renewal waits for an active seek or
 position restoration to finish and does not start a new execution. A media network
 failure after expiry or an observed signing outage permits one replacement of
-the affected attachment, preserving its position when signing succeeds again.
+the affected attachment. An authenticated report of unavailable media also
+permits one replacement after a media network failure, provided the attachment
+was ready and its position restoration had finished. Recovery preserves the
+cursor for the same execution; a new generation restores its canonical position
+and play or pause intent.
 Temporary signing failures preserve accepted playback state, including pending
 restoration. Decoder errors, failed play requests and explicit signing refusals
 remain playback failures.
@@ -120,6 +124,12 @@ cannot continue that chain. Same-session polling leaves the attachment in place
 until the chain settles. Replacing the source, session or player component
 invalidates pending intent; generation checks and the latest pause/resume intent
 still apply.
+
+Temporary network, timeout or server failures while the player reports progress
+automatically leave the media attachment, local position and play or pause intent
+in place. The next eligible report sends the current position rather than
+replaying the failed update. This recovery does not change how failures of
+explicit pause, resume or seek requests are handled.
 
 A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
 
