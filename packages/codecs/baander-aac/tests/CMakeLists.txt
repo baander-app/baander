@@ -11,6 +11,7 @@ set(TEST_SOURCES
     test_ratecontrol.cpp
     test_tools.cpp
     test_interop.cpp
+    test_layouts.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

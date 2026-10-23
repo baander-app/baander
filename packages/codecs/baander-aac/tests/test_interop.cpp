@@ -60,6 +60,42 @@ static void our_encoded(const char* name, const std::vector<float>& pcm, int sr,
   CHECK(d > 90.0, "%s: decoders disagree on our stream (%.1f dB)", name, d);
 }
 
+/* FFmpeg encodes `channels` channels with a named layout; both decoders
+ * then produce `out_channels` channels (the stream's own channels, or a
+ * stereo or mono downmix) from the same stream. */
+static void ffmpeg_layout(const char* name, const char* layout, int channels, int out_channels,
+                          double min_db) {
+  const int sr = 48000;
+  const std::vector<float> pcm = gen_multichannel(sr * 3, sr, channels);
+  CHECK(write_file(path("in.f32"), pcm.data(), pcm.size() * sizeof(float)), "write input");
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd),
+           "-f f32le -ar %d -ac %d -channel_layout %s -i %s -c:a aac -b:a %dk -f adts %s", sr,
+           channels, layout, path("in.f32").c_str(), 64 * channels, path("ff.aac").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg encode", name);
+  /* Without -ac FFmpeg keeps the stream's own layout; with it, FFmpeg
+   * picks a default layout for the count (2.1 for three channels). */
+  char ac[32] = "";
+  if (out_channels != channels) {
+    snprintf(ac, sizeof(ac), "-ac %d ", out_channels);
+  }
+  snprintf(cmd, sizeof(cmd), "-i %s -f f32le %s-ar %d %s", path("ff.aac").c_str(), ac, sr,
+           path("ff.f32").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg decode", name);
+  const std::vector<uint8_t> stream = read_file(path("ff.aac"));
+  int errors = 0;
+  const std::vector<float> ours =
+      decode_stream(stream, sr, out_channels == channels ? 0 : out_channels, &errors);
+  const std::vector<float> theirs = read_f32(path("ff.f32"));
+  CHECK(errors == 0, "%s: %d frames failed in our decoder", name, errors);
+  const size_t n = std::min(ours.size(), theirs.size());
+  CHECK(n > 0 && ours.size() == theirs.size(), "%s: %zu vs %zu samples", name, ours.size(),
+        theirs.size());
+  const double d = snr_db(theirs.data(), ours.data(), n);
+  printf("%-28s ffmpeg->ours vs ffmpeg->ffmpeg (%d ch): %.1f dB\n", name, out_channels, d);
+  CHECK(d > min_db, "%s: decoders disagree (%.1f dB)", name, d);
+}
+
 int main() {
   if (!have_ffmpeg()) {
     printf("SKIP: ffmpeg not found\n");
@@ -78,6 +114,18 @@ int main() {
   ffmpeg_encoded("transients fast coder", gen_transients(n, 44100, 2), 44100, 2,
                  "-b:a 128k -aac_coder fast");
   ffmpeg_encoded("noise 96k stereo", gen_noise(96000 * 2, 2), 96000, 2, "-b:a 192k");
+
+
+  ffmpeg_layout("3.0 native", "3.0", 3, 3, 90.0);
+  ffmpeg_layout("4.0 native", "4.0", 4, 4, 90.0);
+  ffmpeg_layout("5.0 native", "5.0", 5, 5, 90.0);
+  ffmpeg_layout("5.1 native", "5.1", 6, 6, 90.0);
+  ffmpeg_layout("6.1 pce native", "6.1", 7, 7, 90.0);
+  ffmpeg_layout("7.1 native", "7.1", 8, 8, 90.0);
+  ffmpeg_layout("5.1 stereo downmix", "5.1", 6, 2, 60.0);
+  ffmpeg_layout("5.1 mono downmix", "5.1", 6, 1, 60.0);
+  ffmpeg_layout("mono to stereo", "mono", 1, 2, 60.0);
+  ffmpeg_layout("stereo to mono", "stereo", 2, 1, 60.0);
 
   our_encoded("transients 44.1k 96k cbr", gen_transients(n, 44100, 2), 44100, 2, 96000, AAC_RC_CBR);
   our_encoded("harmonics 48k mono 64k", gen_harmonics(n, 48000, 1), 48000, 1, 64000, AAC_RC_CBR);

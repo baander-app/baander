@@ -163,10 +163,10 @@ static void test_stream_parameters() {
   for (size_t i = 0; i + 1 < out.size(); i += 2) {
     diff = std::max(diff, (double)fabs(out[i] - out[i + 1]));
   }
-  CHECK(diff == 0.0, "mono stream duplicated into both channels");
+  CHECK(diff == 0.0, "mono stream goes to both channels");
   std::vector<float> mono(out.size() / 2);
   for (size_t i = 0; i < mono.size(); i++) {
-    mono[i] = out[2 * i];
+    mono[i] = out[2 * i] / 0.70710678f;
   }
   CHECK(aligned_snr_db(pcm, mono, 1, 2048) > 20.0, "32 kHz roundtrip SNR %.1f dB",
         aligned_snr_db(pcm, mono, 1, 2048));
@@ -179,13 +179,13 @@ static void test_stream_parameters() {
   CHECK(errors == 0 && down.size() == split_adts(st_stream).size() * 1024, "downmix length");
   std::vector<float> ref(st.size() / 2);
   for (size_t i = 0; i < ref.size(); i++) {
-    ref[i] = 0.5f * (st[2 * i] + st[2 * i + 1]);
+    ref[i] = 0.70710678f * (st[2 * i] + st[2 * i + 1]);
   }
   CHECK(aligned_snr_db(ref, down, 1, 2048) > 20.0, "downmix SNR %.1f dB",
         aligned_snr_db(ref, down, 1, 2048));
 
   CHECK(aac_decoder_create(37000, 2) == nullptr, "unsupported sample rate refused");
-  CHECK(aac_decoder_create(44100, 3) == nullptr, "three channels refused");
+  CHECK(aac_decoder_create(44100, 9) == nullptr, "nine channels refused");
 }
 
 int main() {

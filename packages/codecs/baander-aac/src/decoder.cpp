@@ -1,5 +1,7 @@
 #include "decoder.h"
 
+#include "channel_map.h"
+
 #include <cmath>
 #include <cstring>
 
@@ -488,8 +490,8 @@ void apply_intensity(AacChannelStream* l, AacChannelStream* r, const MsMask* ms)
 
 /* ── elements ──────────────────────────────────────────────────── */
 
-int decode_sce(AacDecoderState* s, AacBitReader* r, int c) {
-  AacChannelStream* cs = &s->ch[c].cs;
+int decode_sce(AacDecoderState* s, AacBitReader* r, AacDecoderChannel* ch) {
+  AacChannelStream* cs = &ch->cs;
   int ret = decode_ics(s, r, cs, 0);
   if (ret) {
     return ret;
@@ -498,9 +500,10 @@ int decode_sce(AacDecoderState* s, AacBitReader* r, int c) {
   return 0;
 }
 
-int decode_cpe(AacDecoderState* s, AacBitReader* r) {
-  AacChannelStream* l = &s->ch[0].cs;
-  AacChannelStream* rc = &s->ch[1].cs;
+int decode_cpe(AacDecoderState* s, AacBitReader* r, AacDecoderChannel* left,
+               AacDecoderChannel* right) {
+  AacChannelStream* l = &left->cs;
+  AacChannelStream* rc = &right->cs;
   MsMask ms = {};
   const int common_window = (int)aac_bitreader_read(r, 1);
   int ret = 0;
@@ -543,6 +546,165 @@ int decode_cpe(AacDecoderState* s, AacBitReader* r) {
   return 0;
 }
 
+/* coupling_channel_element() (Table 4.8). */
+int decode_cce(AacDecoderState* s, AacBitReader* r, AacDecoderCce* cce) {
+  static const float kScale[4] = {1.0905077327f, 1.1892071150f, 1.4142135624f, 2.0f};
+  AacCoupling* c = &cce->coup;
+  c->ind_sw = (int)aac_bitreader_read(r, 1);
+  c->num_coupled = (int)aac_bitreader_read(r, 3) + 1;
+  c->num_gains = 0;
+  for (int i = 0; i < c->num_coupled; i++) {
+    c->num_gains++;
+    c->target_type[i] = aac_bitreader_read(r, 1) ? AAC_ELEM_CPE : AAC_ELEM_SCE;
+    c->target_tag[i] = (int)aac_bitreader_read(r, 4);
+    if (c->target_type[i] == AAC_ELEM_CPE) {
+      c->ch_select[i] = (int)aac_bitreader_read(r, 2);
+      if (c->ch_select[i] == 3) {
+        c->num_gains++;
+      }
+    } else {
+      c->ch_select[i] = 2;
+    }
+  }
+  c->domain = (int)aac_bitreader_read(r, 1);
+  const int sign = (int)aac_bitreader_read(r, 1);
+  const float scale = kScale[aac_bitreader_read(r, 2)];
+  if (r->overread) {
+    return AAC_ERR_DECODE;
+  }
+  AacChannelStream* cs = &cce->ch.cs;
+  int ret = decode_ics(s, r, cs, 0);
+  if (ret) {
+    return ret;
+  }
+  const AacIcsInfo* ics = &cs->ics;
+  for (int g = 0; g < c->num_gains; g++) {
+    float gain = 1.0f;
+    int cge = 1;
+    int acc = 0;
+    if (g > 0) {
+      cge = c->ind_sw ? 1 : (int)aac_bitreader_read(r, 1);
+      if (cge) {
+        acc = aac_bitreader_read_scalefactor(r);
+        if (acc == AAC_SF_INVALID) {
+          return AAC_ERR_DECODE;
+        }
+        gain = powf(scale, (float)-acc);
+      }
+    }
+    if (c->ind_sw) {
+      c->gain[g][0] = gain;
+      continue;
+    }
+    for (int grp = 0; grp < ics->num_window_groups; grp++) {
+      for (int b = 0; b < ics->max_sfb; b++) {
+        const int idx = grp * ics->max_sfb + b;
+        if (cs->band_type[idx] == 0) {
+          continue;
+        }
+        if (!cge) {
+          const int diff = aac_bitreader_read_scalefactor(r);
+          if (diff == AAC_SF_INVALID) {
+            return AAC_ERR_DECODE;
+          }
+          if (diff) {
+            acc += diff;
+            int t = acc;
+            float sgn = 1.0f;
+            if (sign) {
+              sgn = (t & 1) ? -1.0f : 1.0f;
+              t >>= 1;
+            }
+            gain = sgn * powf(scale, (float)-t);
+          }
+        }
+        c->gain[g][idx] = gain;
+      }
+    }
+  }
+  if (r->overread) {
+    return AAC_ERR_DECODE;
+  }
+  dequantize(s, cs, nullptr, nullptr);
+  return 0;
+}
+
+/* Adds the coupling channel's spectrum, scaled per band, to a target. */
+void apply_dependent_coupling(const AacDecoderCce* cce, int gain_index, AacChannelStream* target) {
+  const AacChannelStream* src = &cce->ch.cs;
+  const AacIcsInfo* ics = &src->ics;
+  const int* off = ics->swb_offset;
+  const float* gains = cce->coup.gain[gain_index];
+  int win = 0;
+  for (int g = 0; g < ics->num_window_groups; g++) {
+    for (int b = 0; b < ics->max_sfb; b++) {
+      const int idx = g * ics->max_sfb + b;
+      if (src->band_type[idx] == 0) {
+        continue;
+      }
+      const float gain = gains[idx];
+      for (int w = 0; w < ics->group_len[g]; w++) {
+        const int base = (win + w) * 128;
+        for (int k = off[b]; k < off[b + 1]; k++) {
+          target->coef[base + k] += gain * src->coef[base + k];
+        }
+      }
+    }
+    win += ics->group_len[g];
+  }
+}
+
+void apply_independent_coupling(const AacDecoderCce* cce, int gain_index, AacDecoderChannel* target) {
+  const float gain = cce->coup.gain[gain_index][0];
+  for (int i = 0; i < 1024; i++) {
+    target->output[i] += gain * cce->ch.output[i];
+  }
+}
+
+/* Runs every present coupling element of the given kind over the target
+ * element: dependent couplings of `domain` on the spectra, independent
+ * ones (domain < 0) on the time signal. */
+void apply_couplings(AacDecoderState* s, int elem_index, int domain) {
+  const AacLayoutElement* e = &s->layout.elems[elem_index];
+  AacDecoderChannel* chans = &s->ch[s->elem_base[elem_index]];
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    AacDecoderCce* cce = &s->cce[k];
+    if (!cce->present) {
+      continue;
+    }
+    const AacCoupling* c = &cce->coup;
+    const bool independent = domain < 0;
+    if (independent != (c->ind_sw != 0) || (!independent && c->domain != domain)) {
+      continue;
+    }
+    int index = 0;
+    for (int t = 0; t < c->num_coupled; t++) {
+      if (c->target_type[t] == e->type && c->target_tag[t] == e->tag) {
+        if (c->ch_select[t] != 1) {
+          if (independent) {
+            apply_independent_coupling(cce, index, &chans[0]);
+          } else {
+            apply_dependent_coupling(cce, index, &chans[0].cs);
+          }
+          if (c->ch_select[t] != 0) {
+            index++;
+          }
+        }
+        if (c->ch_select[t] != 2 && e->type == AAC_ELEM_CPE) {
+          if (independent) {
+            apply_independent_coupling(cce, index, &chans[1]);
+          } else {
+            apply_dependent_coupling(cce, index, &chans[1].cs);
+          }
+          index++;
+        }
+      } else {
+        index += 1 + (c->ch_select[t] == 3);
+      }
+    }
+  }
+}
+
 int skip_dse(AacBitReader* r) {
   aac_bitreader_skip(r, 4); /* element_instance_tag */
   const int align = (int)aac_bitreader_read(r, 1);
@@ -558,8 +720,7 @@ int skip_dse(AacBitReader* r) {
 }
 
 /* fill_element() (Table 4.11).  The payload is skipped; an SBR extension
- * (extension_type 13 or 14, Table 4.56) is only noted, so an HE-AAC stream
- * decodes as its AAC-LC core at the core sample rate. */
+ * (extension_type 13 or 14, Table 4.56) is noted for the frame. */
 int skip_fil(AacDecoderState* s, AacBitReader* r) {
   int count = (int)aac_bitreader_read(r, 4);
   if (count == 15) {
@@ -568,15 +729,16 @@ int skip_fil(AacDecoderState* s, AacBitReader* r) {
   if (count > 0) {
     const int ext_type = (int)aac_bitreader_peek(r, 4);
     if (ext_type == 13 || ext_type == 14) {
-      s->ch[0].has_sbr = s->ch[1].has_sbr = 1;
+      s->has_sbr = 1;
     }
   }
   aac_bitreader_skip(r, 8 * count);
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
-/* program_config_element() (Table 4.2): parsed only to stay in sync. */
-int skip_pce(AacBitReader* r) {
+/* program_config_element() (Table 4.2): the element lists define the
+ * layout; mixdown data, associated data and the comment are skipped. */
+int decode_pce(AacDecoderState* s, AacBitReader* r, AacLayout* layout) {
   aac_bitreader_skip(r, 4 + 2 + 4); /* tag, object_type, sampling_frequency_index */
   const int front = (int)aac_bitreader_read(r, 4);
   const int side = (int)aac_bitreader_read(r, 4);
@@ -593,11 +755,92 @@ int skip_pce(AacBitReader* r) {
   if (aac_bitreader_read(r, 1)) {
     aac_bitreader_skip(r, 3); /* matrix_mixdown_idx, pseudo_surround_enable */
   }
-  aac_bitreader_skip(r, 5 * (front + side + back) + 4 * (lfe + assoc) + 5 * cc);
+  AacLayoutElement elems[AAC_MAX_ELEMENTS];
+  int n = 0;
+  const int counts[4] = {front, side, back, lfe};
+  for (int pos = 0; pos < 4; pos++) {
+    for (int i = 0; i < counts[pos]; i++) {
+      const int is_cpe = pos == 3 ? 0 : (int)aac_bitreader_read(r, 1);
+      const int tag = (int)aac_bitreader_read(r, 4);
+      if (n >= AAC_MAX_ELEMENTS) {
+        return AAC_ERR_UNSUPPORTED;
+      }
+      elems[n].type = pos == 3 ? AAC_ELEM_LFE : (is_cpe ? AAC_ELEM_CPE : AAC_ELEM_SCE);
+      elems[n].tag = tag;
+      elems[n].position = pos + 1;
+      n++;
+    }
+  }
+  aac_bitreader_skip(r, 4 * assoc);
+  AacLayout l = {};
+  for (int i = 0; i < cc; i++) {
+    aac_bitreader_skip(r, 1); /* cc_element_is_ind_sw */
+    const int tag = (int)aac_bitreader_read(r, 4);
+    if (i < AAC_MAX_CCE) {
+      l.cce_tag[l.num_cce++] = tag;
+    }
+  }
   aac_bitreader_byte_align(r);
   const int comment = (int)aac_bitreader_read(r, 8);
   aac_bitreader_skip(r, 8 * comment);
-  return r->overread ? AAC_ERR_DECODE : 0;
+  if (r->overread) {
+    return AAC_ERR_DECODE;
+  }
+  if (n == 0) {
+    return AAC_ERR_DECODE;
+  }
+  const int ret = aac_layout_from_elements(&l, elems, n);
+  if (ret) {
+    return ret;
+  }
+  (void)s;
+  *layout = l;
+  return 0;
+}
+
+bool same_layout(const AacLayout* a, const AacLayout* b) {
+  if (a->num_elements != b->num_elements || a->num_channels != b->num_channels) {
+    return false;
+  }
+  for (int i = 0; i < a->num_elements; i++) {
+    if (a->elems[i].type != b->elems[i].type || a->elems[i].tag != b->elems[i].tag ||
+        a->elems[i].slot[0] != b->elems[i].slot[0] || a->elems[i].slot[1] != b->elems[i].slot[1]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void install_layout(AacDecoderState* s, const AacLayout* l, int source) {
+  const bool changed = s->layout_source == 0 || !same_layout(&s->layout, l);
+  s->layout = *l;
+  s->layout_source = source;
+  int base = 0;
+  for (int i = 0; i < l->num_elements; i++) {
+    s->elem_base[i] = base;
+    base += l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+  }
+  if (changed) {
+    aac_decoder_reset_state(s);
+  }
+}
+
+/* Position guessed for an element of a stream without configuration: the
+ * leading single channel and the first pair are front, later ones back. */
+int sniffed_position(const AacLayoutElement* elems, int n, int type) {
+  if (type == AAC_ELEM_LFE) {
+    return AAC_POS_LFE;
+  }
+  int front_channels = 0;
+  for (int i = 0; i < n; i++) {
+    if (elems[i].position == AAC_POS_FRONT) {
+      front_channels += elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    }
+  }
+  if (type == AAC_ELEM_CPE) {
+    return front_channels <= 1 ? AAC_POS_FRONT : AAC_POS_BACK;
+  }
+  return front_channels == 0 ? AAC_POS_FRONT : AAC_POS_BACK;
 }
 
 }  // namespace
@@ -607,7 +850,7 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   auto* s = new AacDecoderState();
   s->sample_rate = sr;
   s->channels = ch;
-  s->stream_channels = ch;
+  s->stream_channels = 0;
   s->frame_size = 1024;
   s->dsp = dsp;
   s->rate_index = -1;
@@ -629,71 +872,232 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
 
 void aac_decoder_state_destroy(AacDecoderState* s) { delete s; }
 
+void aac_decoder_reset_state(AacDecoderState* s) {
+  for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
+    memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
+    memset(s->ch[c].output, 0, sizeof(s->ch[c].output));
+    s->ch[c].prev_window_shape = 0;
+  }
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    memset(s->cce[k].ch.overlap, 0, sizeof(s->cce[k].ch.overlap));
+    s->cce[k].ch.prev_window_shape = 0;
+    s->cce[k].present = 0;
+  }
+  s->random_state = kRandomSeed;
+}
+
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index) {
   if (rate_index < 0 || rate_index >= AAC_NUM_SAMPLE_RATES) {
     return AAC_ERR_UNSUPPORTED;
+  }
+  if (rate_index != s->rate_index) {
+    aac_decoder_reset_state(s);
   }
   s->rate_index = rate_index;
   s->sample_rate = aac_sample_rates[rate_index];
   return 0;
 }
 
+int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config) {
+  if (channel_config == 0) {
+    return 0;
+  }
+  if (s->layout_source == 1 && s->layout.channel_config == channel_config) {
+    return 0;
+  }
+  AacLayout l = {};
+  const int ret = aac_layout_from_config(&l, channel_config);
+  if (ret) {
+    return ret;
+  }
+  install_layout(s, &l, 1);
+  return 0;
+}
+
+int aac_decoder_output_channels(const AacDecoderState* s) {
+  if (s->channels > 0) {
+    return s->channels;
+  }
+  return s->layout_source ? s->layout.num_channels : 0;
+}
+
+int aac_decoder_output(const AacDecoderState* s, float* out) {
+  const float* in[AAC_MAX_CHANNELS] = {};
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    for (int c = 0; c < nch; c++) {
+      in[l->elems[i].slot[c]] = s->ch[s->elem_base[i] + c].output;
+    }
+  }
+  const int out_channels = aac_decoder_output_channels(s);
+  aac_layout_mix(l, in, s->frame_size, out_channels, out);
+  return out_channels;
+}
+
 int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
-  int decoded = 0; /* channels decoded in this block */
+  /* Elements of a stream without configuration, collected as they arrive. */
+  AacLayoutElement sniffed[AAC_MAX_ELEMENTS];
+  int num_sniffed = 0;
+  bool sniffing = s->layout_source == 0 || s->layout_source == 3;
+  if (sniffing) {
+    /* Decode into channel order of arrival; the layout follows at END. */
+    for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+      s->elem_base[i] = 0;
+    }
+  }
+  int next_channel = 0;
+  memset(s->elem_present, 0, sizeof(s->elem_present));
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    s->cce[k].present = 0;
+  }
+  s->has_sbr = 0;
+  s->has_ps = 0;
+  bool pce_seen = false;
   for (;;) {
     const int elem = (int)aac_bitreader_read(r, 3);
     if (r->overread) {
       return AAC_ERR_DECODE;
     }
     if (elem == AAC_ELEM_END) {
+      aac_bitreader_byte_align(r);
       break;
     }
     int ret = 0;
     switch (elem) {
       case AAC_ELEM_SCE:
       case AAC_ELEM_LFE:
-        aac_bitreader_skip(r, 4); /* element_instance_tag */
-        if (elem == AAC_ELEM_LFE) {
-          /* An LFE channel only appears with more than two main channels. */
-          return AAC_ERR_UNSUPPORTED;
+      case AAC_ELEM_CPE: {
+        const int tag = (int)aac_bitreader_read(r, 4);
+        const int nch = elem == AAC_ELEM_CPE ? 2 : 1;
+        AacDecoderChannel* chans = nullptr;
+        if (sniffing) {
+          if (num_sniffed >= AAC_MAX_ELEMENTS || next_channel + nch > AAC_MAX_CHANNELS) {
+            return AAC_ERR_UNSUPPORTED;
+          }
+          sniffed[num_sniffed].type = elem;
+          sniffed[num_sniffed].tag = tag;
+          sniffed[num_sniffed].position = sniffed_position(sniffed, num_sniffed, elem);
+          s->elem_base[num_sniffed] = next_channel;
+          num_sniffed++;
+          chans = &s->ch[next_channel];
+          next_channel += nch;
+        } else {
+          const int idx = aac_layout_find(&s->layout, elem, tag);
+          if (idx < 0 || s->elem_present[idx]) {
+            return AAC_ERR_DECODE;
+          }
+          s->elem_present[idx] = 1;
+          chans = &s->ch[s->elem_base[idx]];
         }
-        if (decoded >= 2) {
-          return AAC_ERR_UNSUPPORTED;
-        }
-        ret = decode_sce(s, r, decoded);
-        decoded++;
+        ret = elem == AAC_ELEM_CPE ? decode_cpe(s, r, &chans[0], &chans[1])
+                                   : decode_sce(s, r, &chans[0]);
         break;
-      case AAC_ELEM_CPE:
-        aac_bitreader_skip(r, 4);
-        if (decoded != 0) {
+      }
+      case AAC_ELEM_CCE: {
+        const int tag = (int)aac_bitreader_read(r, 4);
+        AacDecoderCce* cce = nullptr;
+        for (int k = 0; k < AAC_MAX_CCE && !cce; k++) {
+          if (!s->cce[k].present) {
+            cce = &s->cce[k];
+          }
+        }
+        if (!cce) {
           return AAC_ERR_UNSUPPORTED;
         }
-        ret = decode_cpe(s, r);
-        decoded = 2;
+        cce->present = 1;
+        cce->tag = tag;
+        ret = decode_cce(s, r, cce);
         break;
+      }
       case AAC_ELEM_DSE:
         ret = skip_dse(r);
         break;
-      case AAC_ELEM_PCE:
-        ret = skip_pce(r);
+      case AAC_ELEM_PCE: {
+        AacLayout l = {};
+        ret = decode_pce(s, r, &l);
+        if (ret == 0 && !pce_seen) {
+          if (num_sniffed > 0 || !sniffing) {
+            /* A PCE after channel elements, or over an ADTS configuration:
+             * the elements already decoded keep their layout. */
+            if (!sniffing && !same_layout(&s->layout, &l)) {
+              ret = AAC_ERR_DECODE;
+            }
+          } else {
+            install_layout(s, &l, 2);
+            sniffing = false;
+          }
+          pce_seen = true;
+        }
         break;
+      }
       case AAC_ELEM_FIL:
         ret = skip_fil(s, r);
         break;
-      default: /* coupling channel elements */
+      default:
         return AAC_ERR_UNSUPPORTED;
     }
     if (ret) {
       return ret;
     }
   }
-  if (decoded == 0) {
+  if (sniffing) {
+    if (num_sniffed == 0) {
+      return AAC_ERR_DECODE;
+    }
+    AacLayout l = {};
+    const int ret = aac_layout_from_elements(&l, sniffed, num_sniffed);
+    if (ret) {
+      return ret;
+    }
+    l.channel_config = aac_layout_config_for_elements(sniffed, num_sniffed);
+    const bool changed = s->layout_source == 0 || !same_layout(&s->layout, &l);
+    s->layout = l;
+    s->layout_source = 3;
+    if (changed) {
+      /* The overlap of a different layout is meaningless; the channels
+       * decoded in this block keep their spectra. */
+      for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
+        memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
+        s->ch[c].prev_window_shape = 0;
+      }
+    }
+    for (int i = 0; i < num_sniffed; i++) {
+      s->elem_present[i] = 1;
+    }
+  } else if (s->layout_source == 0) {
     return AAC_ERR_DECODE;
   }
-  for (int c = 0; c < decoded; c++) {
-    apply_tns(&s->ch[c].cs);
-    imdct_and_window(s, &s->ch[c]);
+
+  /* Coupling channels first: independently switched ones need their time
+   * signal before the targets are mixed. */
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    AacDecoderCce* cce = &s->cce[k];
+    if (cce->present && cce->coup.ind_sw) {
+      apply_tns(&cce->ch.cs);
+      imdct_and_window(s, &cce->ch);
+    }
   }
-  s->stream_channels = decoded;
-  return decoded;
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+    if (!s->elem_present[i]) {
+      for (int c = 0; c < nch; c++) {
+        memset(chans[c].output, 0, sizeof(chans[c].output));
+      }
+      continue;
+    }
+    apply_couplings(s, i, 0);
+    for (int c = 0; c < nch; c++) {
+      apply_tns(&chans[c].cs);
+    }
+    apply_couplings(s, i, 1);
+    for (int c = 0; c < nch; c++) {
+      imdct_and_window(s, &chans[c]);
+    }
+    apply_couplings(s, i, -1);
+  }
+  s->stream_channels = l->num_channels;
+  return l->num_channels;
 }
