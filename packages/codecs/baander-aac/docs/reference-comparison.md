@@ -52,6 +52,45 @@ matches our own decoder to 135 dB in every case.
 | trans44 | 96 k | 44.8, 4.9 / 4.9 dB | 71.0, 5.9 / 5.8 dB |
 | noise44 | 64 k | 63.6, 0.0 / 0.0 dB | 66.9, 0.3 / 0.4 dB |
 
+## HE-AAC
+
+Measured on 2026-10-23 against the Fraunhofer FDK encoder (`aacenc`,
+`libfdk-aac` 2.0.3) at the same object type and bitrate, both streams
+decoded by FFmpeg 6.1.1. `wide44`/`wide48` is the test suite's wideband
+signal (harmonics of 220 Hz up to 15.4 kHz over a noise bed; right
+channel at 0.7, offset in phase), `music44` a 220 Hz harmonic series with
+vibrato under an enveloped 6 to 18 kHz noise band and clicks, `am44` two
+low tones under 8 to 14 kHz noise modulated at 1.5 Hz, `gate44` the same
+with the noise gated on and off. "Low band" is the SNR of the signal
+below 3.5 kHz (the AAC-LC core); "9–12 kHz" the level of that band in the
+decode relative to the source (inside the SBR range of every tuning).
+
+| Signal | Profile, rate | Ours: kbit/s, low band L/R, 9–12 kHz L/R | FDK: kbit/s, low band L/R, 9–12 kHz L/R |
+|--------|--------------|-------------------------------------------:|-----------------------------------------:|
+| wide44 mono | HE v1 32 k | 32.9, 21.7 dB, −1.4 dB | 33.8, 22.6 dB, −1.1 dB |
+| wide48 | HE v1 64 k | 65.9, 19.8 / 17.2 dB, −1.0 / −0.8 dB | 67.4, 22.0 / 20.2 dB, −1.1 / −0.8 dB |
+| wide44 | HE v2 32 k | 32.5, 16.6 / 13.4 dB, −1.5 / −1.4 dB | 34.3, 17.8 / 12.9 dB, −1.2 / −0.9 dB |
+| wide48 | HE v2 24 k | 24.3, 13.2 / 9.8 dB, −1.4 / −2.1 dB | 25.8, 14.3 / 8.0 dB, −1.1 / −1.8 dB |
+
+On `music44` at HE v1 40 kbit/s mono the decoded band levels from 6 to
+18 kHz sit between −0.8 and −2.4 dB of the source (FDK: −0.5 to −2.2 dB)
+with a spread of 0.6 to 1.6 dB over time (FDK: 0.4 to 2.2 dB), the five
+clicks land in the same 64-sample slot as the source, and the low band
+reaches 28.0 dB (FDK: 23.6 dB). The modulated noise of `am44` comes back
+within one QMF slot of the source in time at −3.3 dB (FDK: within one
+slot, −3.6 dB), and the gated noise at −5.2 dB (FDK: −6.5 dB) with the
+same ragged edges: in both encoders the limiter holds the gains down
+where the patched core bands carry almost nothing, which these
+synthetic signals provoke and music does not. With HE v2 on `music44`
+(right channel a delayed, attenuated copy of the left) both encoders
+reproduce the per-band level difference within 0.6 dB of each other and
+the same inter-channel correlation per band.
+
+Our HE-AAC streams decode identically in FFmpeg and in our decoder
+(129 to 134 dB difference SNR); FDK-encoded HE-AAC v1 streams decode
+within 100 to 134 dB of FFmpeg and HE-AAC v2 streams within 125 to
+128 dB.
+
 `harm44` is the test suite's harmonic series with the right channel at
 0.7 of the left, `trans44` its decaying noise bursts (right at 0.8) and
 `noise44` its white noise, all at 44.1 kHz stereo.

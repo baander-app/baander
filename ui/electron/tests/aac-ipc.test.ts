@@ -31,14 +31,22 @@ test('valid requests reach the service with validated arguments', async () => {
   assert.equal(await invoke('encoder-close', 8), 'closeEncoder-result');
   assert.deepEqual(calls.map(c => c[0]), ['info', 'decode', 'decode', 'encode', 'openDecoder', 'decodeChunk', 'closeDecoder', 'openEncoder', 'encodeChunk', 'flushEncoder', 'closeEncoder']);
   assert.deepEqual(calls[1], ['decode', data, { sampleRate: undefined, channels: 1 }]);
-  assert.deepEqual(calls[7], ['openEncoder', { sampleRate: undefined, channels: undefined, bitrate: undefined, mode: 'tvbr', quality: 90 }]);
+  assert.deepEqual(calls[7], ['openEncoder', { sampleRate: undefined, channels: undefined, bitrate: undefined, mode: 'tvbr', quality: 90, profile: undefined }]);
+  calls.length = 0;
+  assert.equal(await invoke('decode', data, { channels: 0 }), 'decode-result');
+  assert.equal(await invoke('encoder-open', { sampleRate: 48000, channels: 6, bitrate: 192000, profile: 'he' }), 'openEncoder-result');
+  assert.deepEqual(calls[0], ['decode', data, { sampleRate: undefined, channels: 0 }]);
+  assert.deepEqual(calls[1], ['openEncoder', { sampleRate: 48000, channels: 6, bitrate: 192000, mode: undefined, quality: undefined, profile: 'he' }]);
 });
 
 test('malformed payloads are rejected before the service is called', async () => {
   const pcm = new Float32Array(4);
   const bad: [string, unknown[]][] = [
     ['decode', ['not bytes']],
-    ['decode', [new Uint8Array(1), { channels: 3 }]],
+    ['decode', [new Uint8Array(1), { channels: 9 }]],
+    ['decode', [new Uint8Array(1), { channels: 1.5 }]],
+    ['encode', [pcm, { channels: 0 }]],
+    ['encode', [pcm, { profile: 'main' }]],
     ['decode', [new Uint8Array(1), { sampleRate: 37000 }]],
     ['encode', [new Int16Array(4), {}]],
     ['encode', [pcm, { mode: 'fast' }]],
