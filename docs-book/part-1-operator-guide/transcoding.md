@@ -22,6 +22,10 @@ share one generation.
 
 Encoder selection belongs to the worker. Manifest codec declarations come from the worker's published metadata; web does not probe devices or choose a different encoder while serving a request.
 
+For completed DASH output, the Period duration covers the latest published end
+across the selected video and audio tracks, keeping the final audio samples
+within the presentation.
+
 Every resource URL in an HLS or DASH manifest inherits the requested manifest's
 absolute expiry. HLS subtitle playlists and their VTT files inherit the same
 deadline. Repeated playlist reads keep that deadline. Continuing delivery after

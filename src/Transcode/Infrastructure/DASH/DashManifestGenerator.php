@@ -81,6 +81,14 @@ final class DashManifestGenerator
                 $period->appendChild($adaptation);
             }
         }
+        if (!$dynamic && $renditions !== []) {
+            $end = $audio === null ? 0.0 : $audio['track']->end();
+            foreach ($renditions as $rendition) {
+                $end = max($end, $rendition['track']->end());
+            }
+            $mpd->removeAttribute('mediaPresentationDuration');
+            $period->setAttribute('duration', sprintf('PT%.6FS', ceil($end * 1000000) / 1000000));
+        }
         $mpd->appendChild($period);
         $xml->appendChild($mpd);
         return $xml->saveXML();
