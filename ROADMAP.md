@@ -589,10 +589,20 @@ app encodes and decodes. The Electron header host is unreachable from the
 build environment, so the Electron-ABI rebuild ran against Node headers; a
 Node-API module is ABI-stable across both, which the in-Electron runs
 confirm. Not possible here: listening tests; the encoder's quality claims
-rest on SNR and the FDK-derived allocation design. electron-builder's checked-in
-configurations still reference `ui/electron/build/afterPack.cjs` and
-application icons that are not in the repository; packaging needs those
-before a release build.
+rest on SNR and the FDK-derived allocation design.
+
+Packaging prerequisites, 2026-10-22: electron-builder's configuration
+referenced an `afterPack.cjs` hook and application icons that had never
+been committed, and a second copy at the repository root pointed at output
+directories the Vite build does not produce. The hook reference is gone
+(nothing documents what it was to do), the root copy is removed, and
+`ui/electron/electron-builder.yml` is the single configuration: it carries
+the native codec filter and points every platform at
+`ui/electron/build/app-icons/icon.png`, a 512-pixel rendering of the web
+app's `icon.svg` from which electron-builder derives the Windows and macOS
+icons. Verification: `yarn electron-builder --linux dir` with that
+configuration packages the app with the local Electron 45 distribution,
+and the package carries the codec binding in `app.asar.unpacked`.
 
 Checkpoint, 2026-10-22, encoder tools: the encoder gained the coding tools
 of the FDK encoder as kept in AOSP `external/aac` (read from the
