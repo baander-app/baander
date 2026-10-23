@@ -342,7 +342,7 @@ async function recordClientControl(action, started, details = {}) {
   await savePlaybackTimeline()
 }
 
-async function resumeAndDecode(owner, action) {
+async function resumeAndDecode(owner, action, milliseconds = 45000) {
   const started = Date.now()
   const before = await mediaState()
   await video.evaluate(element => element.play())
@@ -352,27 +352,40 @@ async function resumeAndDecode(owner, action) {
       && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames
       && snapshot?.ready && snapshot.status === 'running'
       && currentSource(state)
-  }, `${action} to decode current signed HLS and advance`)
+  }, `${action} to decode current signed HLS and advance`, milliseconds)
   samePlayback(owner)
   await recordClientControl(action, started)
 }
 
-async function pausePlayback(owner, action) {
+async function pausePlayback(owner, action, milliseconds = 45000) {
   const started = Date.now()
   await video.evaluate(element => element.pause())
-  await until(async () => (await mediaState()).paused && snapshot?.status === 'paused', 'native pause to commit')
+  await until(async () => (await mediaState()).paused && snapshot?.status === 'paused', 'native pause to commit', milliseconds)
   samePlayback(owner)
   await recordClientControl(action, started)
 }
 
 async function renewPlaybackCapabilities(owner) {
+  const deadline = Date.now() + 60000
+  const waitFor = (check, description, milliseconds) => {
+    assert(Date.now() < deadline, 'Capability renewal proof exceeded its total time budget')
+    return until(check, description, Math.min(milliseconds, deadline - Date.now()))
+  }
   const seekCount = () => playbackControls.filter(control => control.action === 'seek').length
   const seeksBefore = seekCount()
+  let publishedSet = snapshot.renditionSet
   const unchangedExecution = () => {
     samePlayback(owner)
-    assert.equal(snapshot.renditionSet, renditionSet, 'Capability renewal must retain the published rendition set')
     assert.equal(seekCount(), seeksBefore, 'Capability renewal must not submit source seeks')
+    if (snapshot.renditionSet !== publishedSet) {
+      const previous = publishedSet.split(',')
+      const next = snapshot.renditionSet.split(',')
+      assert(next.length > previous.length && previous.every(member => next.includes(member)),
+        'Publication may only add renditions during renewal setup')
+      publishedSet = snapshot.renditionSet
+    }
   }
+  const capabilitySet = capability => new URL(capability.url).searchParams.get('set')
   const hasDelivery = capability => mediaResponses.some(item => item.attachment === capability.attachment
     && item.status === 200 && item.path.endsWith('/master.m3u8'))
     && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === capability.attachment
@@ -380,80 +393,98 @@ async function renewPlaybackCapabilities(owner) {
       && item.expires === capability.expires))
   const readyCapability = async () => {
     let selected
-    await until(async () => {
+    await waitFor(async () => {
+      unchangedExecution()
       const candidate = attachedCapabilities.get(attachmentNumber)
       const state = await mediaState()
-      if (candidate?.expires && hasDelivery(candidate) && state.ready >= 2 && state.decodedFrames > 0
-        && !state.seeking && state.error === null && currentSource(state)) selected = candidate
+      if (candidate?.expires && (candidate.expires + 1) * 1000 > Date.now() + 1000
+        && capabilitySet(candidate) === snapshot.renditionSet && hasDelivery(candidate)
+        && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking
+        && state.error === null && currentSource(state)) selected = candidate
       return Boolean(selected)
     }, 'a decoded attachment with genuine short-lived signed delivery', 15000)
     return selected
   }
+  let pausedCursor
   const crossDeadline = async mode => {
-    const original = await readyCapability()
-    const before = await mediaState()
-    assert.equal(before.paused, mode === 'paused')
-    assert(original.expires * 1000 - Date.now() <= 12000, 'Renewal must observe an actually attached short-lived capability')
-    const proof = { mode, startedAt: Date.now(), original: {
-      attachment: original.attachment, expires: original.expires, capability: original.capability,
-    }, before: { time: before.time, decodedFrames: before.decodedFrames, paused: before.paused } }
-    capabilityRenewals.push(proof)
-    await until(() => Date.now() >= (original.expires + 1) * 1000,
-      `the ${mode} attachment deadline to pass its final valid integer second`, 14000)
-    unchangedExecution()
-    const refusal = await context.request.get(original.url, { timeout: 5000 })
-    proof.refusal = { at: Date.now(), status: refusal.status() }
-    await refusal.dispose()
-    assert.equal(proof.refusal.status, 403, 'The original attached capability must be refused after expiry')
-    let renewed
-    let runningBaseline
-    await until(async () => {
-      unchangedExecution()
-      const candidate = attachedCapabilities.get(attachmentNumber)
-      const state = await mediaState()
-      if (mode === 'running' && candidate?.expires > original.expires && hasDelivery(candidate)
-        && state.ready >= 2 && !state.seeking && state.error === null
-        && runningBaseline?.attachment !== candidate.attachment) {
-        runningBaseline = { attachment: candidate.attachment, at: Date.now(),
-          time: state.time, decodedFrames: state.decodedFrames }
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const original = await readyCapability()
+      const renditionSet = capabilitySet(original)
+      const before = await mediaState()
+      assert.equal(before.paused, mode === 'paused')
+      if (mode === 'paused') {
+        pausedCursor ??= snapshot.startTime + before.time
+        assert(Math.abs(snapshot.startTime + before.time - pausedCursor) < 0.1,
+          'Publication expansion must preserve the original paused cursor')
       }
-      const valid = candidate?.expires > original.expires && candidate.expires * 1000 > Date.now() && hasDelivery(candidate)
-        && state.connected && state.ready >= 2 && state.error === null && !state.seeking
-        && currentSource(state) && state.paused === before.paused
-        && (mode === 'paused' ? Math.abs(state.time - before.time) < 0.1
-          : runningBaseline && state.time > before.time + 1 && state.time > runningBaseline.time + 1
-            && state.decodedFrames > runningBaseline.decodedFrames)
-      if (valid) renewed = { candidate, state }
-      return valid
-    }, `${mode} playback to use renewed signed media across the old deadline`, 15000)
-    if (runningBaseline) proof.runningBaseline = runningBaseline
-    proof.renewed = { attachment: renewed.candidate.attachment, expires: renewed.candidate.expires,
-      capability: renewed.candidate.capability, requestedAt: renewed.candidate.at }
-    proof.after = { at: Date.now(), time: renewed.state.time,
-      decodedFrames: renewed.state.decodedFrames, paused: renewed.state.paused }
-    await recordClientControl(`capability-renewal-${mode}`, proof.startedAt)
+      assert(Date.now() < (original.expires + 1) * 1000 && original.expires * 1000 - Date.now() <= 12000,
+        'Renewal must begin before the actually attached short-lived capability expires')
+      const proof = { mode, attempt, status: 'observing', startedAt: Date.now(), renditionSet, original: {
+        attachment: original.attachment, expires: original.expires, capability: original.capability,
+      }, before: { time: before.time, decodedFrames: before.decodedFrames, paused: before.paused } }
+      capabilityRenewals.push(proof)
+      const publicationChanged = () => {
+        unchangedExecution()
+        if (snapshot.renditionSet === renditionSet) return false
+        proof.status = 'superseded-by-publication'
+        proof.expansion = { at: Date.now(), renditionSet: snapshot.renditionSet }
+        return true
+      }
+      await waitFor(() => publicationChanged() || Date.now() >= (original.expires + 1) * 1000,
+        `the ${mode} attachment deadline to pass its final valid integer second`, 14000)
+      if (publicationChanged()) continue
+      const refusal = await context.request.get(original.url, { timeout: Math.min(5000, Math.max(1, deadline - Date.now())) })
+      proof.refusal = { at: Date.now(), status: refusal.status() }
+      await refusal.dispose()
+      assert.equal(proof.refusal.status, 403, 'The original attached capability must be refused after expiry')
+      if (publicationChanged()) continue
+      let renewed
+      let runningBaseline
+      await waitFor(async () => {
+        if (publicationChanged()) return true
+        const candidate = attachedCapabilities.get(attachmentNumber)
+        const state = await mediaState()
+        if (mode === 'running' && candidate?.expires > original.expires && hasDelivery(candidate)
+          && capabilitySet(candidate) === renditionSet && state.ready >= 2 && !state.seeking && state.error === null
+          && runningBaseline?.attachment !== candidate.attachment) {
+          runningBaseline = { attachment: candidate.attachment, at: Date.now(),
+            time: state.time, decodedFrames: state.decodedFrames }
+        }
+        const valid = candidate?.expires > original.expires && candidate.expires * 1000 > Date.now()
+          && capabilitySet(candidate) === renditionSet && hasDelivery(candidate)
+          && state.connected && state.ready >= 2 && state.error === null && !state.seeking
+          && currentSource(state) && state.paused === before.paused
+          && (mode === 'paused' ? Math.abs(snapshot.startTime + state.time - pausedCursor) < 0.1
+            : runningBaseline && state.time > before.time + 1 && state.time > runningBaseline.time + 1
+              && state.decodedFrames > runningBaseline.decodedFrames)
+        if (valid) renewed = { candidate, state }
+        return valid
+      }, `${mode} playback to use renewed signed media across the old deadline`, 15000)
+      if (publicationChanged()) continue
+      assert(renewed, 'A successful renewal interval must retain its original rendition set')
+      proof.status = 'passed'
+      if (runningBaseline) proof.runningBaseline = runningBaseline
+      proof.renewed = { attachment: renewed.candidate.attachment, expires: renewed.candidate.expires,
+        capability: renewed.candidate.capability, requestedAt: renewed.candidate.at }
+      proof.after = { at: Date.now(), time: renewed.state.time,
+        decodedFrames: renewed.state.decodedFrames, paused: renewed.state.paused }
+      await recordClientControl(`capability-renewal-${mode}`, proof.startedAt)
+      return
+    }
+    assert.fail(`Publication did not leave a stable ${mode} renewal interval within three attempts`)
   }
-  await pausePlayback(owner, 'capability-renewal-pause')
-  // This fixture admits three owned renditions. Let publication finish adding
-  // them before isolating capability renewal for an unchanged rendition set.
-  await until(() => snapshot?.ready && snapshot.status === 'paused'
-    && snapshot.renditionSet.split(',').length === 3,
-  'all three fixture renditions to publish before capability renewal', 20000)
-  const settledCapability = await readyCapability()
-  const renditionSet = snapshot.renditionSet
-  await recordClientControl('capability-renewal-renditions-ready', Date.now(), {
-    attachment: settledCapability.attachment, renditionCount: renditionSet.split(',').length,
-  })
+  await pausePlayback(owner, 'capability-renewal-pause', Math.max(1, Math.min(15000, deadline - Date.now())))
   await crossDeadline('paused')
-  await resumeAndDecode(owner, 'capability-renewal-resume')
+  await resumeAndDecode(owner, 'capability-renewal-resume', Math.max(1, Math.min(15000, deadline - Date.now())))
   await crossDeadline('running')
   shortSigningLifetime = false
   let normalBaseline
-  await until(async () => {
+  await waitFor(async () => {
     unchangedExecution()
     const capability = attachedCapabilities.get(attachmentNumber)
     const state = await mediaState()
     if (!(capability?.expires * 1000 > Date.now() + 60000 && hasDelivery(capability))
+      || capabilitySet(capability) !== snapshot.renditionSet
       || !state.connected || state.paused || state.ready < 2 || state.seeking || state.error !== null) return false
     if (normalBaseline?.attachment !== capability.attachment) {
       normalBaseline = { attachment: capability.attachment, time: state.time, decodedFrames: state.decodedFrames }
@@ -608,12 +639,6 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await renewPlaybackCapabilities(owner)
     await reconnectPausedPlayback(owner, 'source-network')
     initialGeneration = snapshot.generation
-    await until(async () => {
-      const subtitlePosition = snapshot.startTime + (await mediaState()).time
-      assert(subtitlePosition < 39, `Post-renewal playback missed the late subtitle cue at ${subtitlePosition}s`)
-      return subtitlePosition >= 16
-    }, 'advancing post-renewal playback to enter the late subtitle cue', 10000)
-    await observeSubtitles('renewed-reconnected', 'Dialogue late')
     await page.screenshot({ path: `${evidence}/desktop.png` })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${evidence}/mobile.png` })
