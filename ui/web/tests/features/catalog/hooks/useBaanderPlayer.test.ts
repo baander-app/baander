@@ -1086,7 +1086,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('coalesces explicit source seeks and fences the latest with its predecessor acceptance', async () => {
+  it.each([false, true])('coalesces explicit source seeks through predecessor acceptance when its attachment fails: %s', async attachmentFails => {
     const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
       generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
     let snapshot = initial
@@ -1108,6 +1108,12 @@ describe('useBaanderPlayer authorization', () => {
       result.current.seekTo(140)
     })
     expect(result.current.pendingSeekPosition).toBe(140)
+    if (attachmentFails) {
+      await act(async () => attachments[0].onError())
+      expect(attachments[0].dispose).toHaveBeenCalledOnce()
+      expect(result.current.pendingSeekPosition).toBe(140)
+      expect(result.current.state).toBe('preparing')
+    }
     snapshot = { ...initial, url: '/manifest?generation=6', renditionSet: 'job.6', generation: 6, revision: 6, position: 140, startTime: 122 }
     await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
     expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => call[1])).toEqual([
@@ -1116,7 +1122,91 @@ describe('useBaanderPlayer authorization', () => {
     ])
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(18)
+    expect(result.current.currentTime).toBe(140)
     expect(result.current.pendingSeekPosition).toBeNull()
+    expect(video.paused).toBe(true)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(attachments).toHaveLength(2)
+    unmount()
+  })
+
+  it.each(['rejected', 'unmounted', 'replaced', 'replaced-rejected'] as const)('abandons queued source seeks when the predecessor is %s after attachment failure', async outcome => {
+    vi.useFakeTimers()
+    const initial = { url: '/manifest?generation=4', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 }
+    let snapshot = initial
+    let accept!: (value: { data: { data: { acceptedGeneration: number } } }) => void
+    let reject!: (error: Error) => void
+    post.mockImplementation((path: string) => {
+      if (path === '/api/stream/sign') return Promise.resolve({ data: snapshot })
+      return new Promise((resolve, rejectRequest) => {
+        accept = resolve
+        reject = rejectRequest
+      })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const onError = vi.fn()
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => {
+      result.current.seekTo(120)
+      result.current.seekTo(130)
+      result.current.seekTo(140)
+    })
+    await act(async () => attachments[0].onError())
+    if (outcome === 'unmounted') unmount()
+    if (outcome === 'replaced' || outcome === 'replaced-rejected') {
+      snapshot = { ...initial, sessionId: 'replacement-session', jobId: 'replacement-job', renditionSet: 'replacement-job.4',
+        url: '/replacement-manifest', position: 30 }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      expect(video.currentTime).toBe(30)
+    }
+    if (outcome === 'rejected' || outcome === 'replaced-rejected') await act(async () => reject(new Error('Seek refused')))
+    else await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
+    expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => [call[0], call[1]])).toEqual([
+      ['/api/transcode/sessions/owned-session/position', { action: 'seek', position: 120, generation: 4 }],
+    ])
+    expect(video.play).not.toHaveBeenCalled()
+    if (outcome === 'rejected') {
+      expect(result.current.state).toBe('error')
+      expect(result.current.pendingSeekPosition).toBeNull()
+      expect(onError).toHaveBeenCalledOnce()
+      expect(attachments).toHaveLength(1)
+    } else if (outcome === 'unmounted') {
+      expect(containerRef.current.querySelector('video')).toBeNull()
+      expect(attachments).toHaveLength(1)
+    } else {
+      expect(result.current.state).not.toBe('error')
+      expect(onError).not.toHaveBeenCalled()
+      expect(attachments[1].dispose).not.toHaveBeenCalled()
+      expect(video.src).toContain('/replacement-manifest')
+      expect(video.currentTime).toBe(30)
+      expect(attachments).toHaveLength(2)
+    }
+    if (outcome !== 'unmounted') unmount()
+  })
+
+  it('keeps a current attachment failure terminal without a replacement seek', async () => {
+    vi.useFakeTimers()
+    post.mockResolvedValue({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.4', sessionId: 'owned-session',
+      generation: 4, revision: 4, ready: true, position: 0, status: 'paused', startTime: 0, duration: 180 } })
+    const containerRef = { current: document.createElement('div') }
+    const onError = vi.fn()
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => attachments[0].onError())
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(attachments).toHaveLength(1)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1].action === 'seek')).toHaveLength(0)
     unmount()
   })
 

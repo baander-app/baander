@@ -103,10 +103,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       setState(next)
       callbacks.current.onStateChange?.(next)
     }
-    const fail = () => {
-      if (!active()) return
-      clearSourceSeek()
-      seekChain = null
+    const releaseAttachment = () => {
       pendingLoad = null
       reloadCursor = null
       restoredPosition = null
@@ -115,14 +112,29 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       attachmentRevision++
       disposeAttachment?.()
       disposeAttachment = null
+    }
+    const fail = () => {
+      if (!active()) return
+      clearSourceSeek()
+      seekChain = null
+      releaseAttachment()
       changeState('error')
       callbacks.current.onError?.(video.error)
+    }
+    const failAttachment = () => {
+      if (!active()) return
+      // Retiring media can fail before its replacement seek is acknowledged.
+      // Keep the submitted controls and latest target owned until they settle.
+      if (seekChain?.started && seekChain.remaining > 0) {
+        releaseAttachment()
+        changeState('preparing')
+      } else fail()
     }
     const playVideo = () => {
       if (!attachmentReady) { playbackStarted = true; return }
       const revision = attachmentRevision
       video.play().catch(() => {
-        if (revision === attachmentRevision) fail()
+        if (revision === attachmentRevision) failAttachment()
       })
     }
     const desiredStatus = () => localStatus ?? snapshot?.status
@@ -209,7 +221,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
               }
             },
             onError: () => {
-              if (attachment === attachmentRevision) fail()
+              if (attachment === attachmentRevision) failAttachment()
             },
           })
           // Attachment readiness applies playback intent; metadata restoration
@@ -283,7 +295,10 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         }
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
         if (!chain) await refresh()
-      }).catch(fail).finally(() => {
+      }).catch(() => {
+        // A failed control belongs to the session that submitted it.
+        if (snapshot?.sessionId === sessionId && snapshot.jobId === current.jobId) fail()
+      }).finally(() => {
         pendingControls--
         if (statusRevision !== null && statusRevision === localStatusRevision) {
           if (seekChain?.started) deferredStatusRevision = statusRevision
@@ -381,7 +396,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     video.addEventListener('pause', () => {
       if (!video.paused) return
       if (video.error) {
-        fail()
+        failAttachment()
         return
       }
       changeState('paused')
@@ -431,7 +446,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     playRef.current = requestPlay
     pauseRef.current = requestPause
     video.addEventListener('ended', () => changeState('ended'))
-    video.addEventListener('error', () => { if (attachmentReady) fail() })
+    video.addEventListener('error', () => { if (attachmentReady) failAttachment() })
     refresh(true).catch(fail)
     const timer = window.setInterval(() => {
       control('progress')
