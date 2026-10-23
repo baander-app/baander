@@ -1,5 +1,6 @@
 #include "bitstream.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -184,13 +185,14 @@ void aac_bitwriter_init(AacBitWriter* w, uint8_t* d, int c) {
   memset(d, 0, c);
 }
 
+/* Fields wider than 32 bits are written with leading zero bits. */
 void aac_bitwriter_write(AacBitWriter* w, uint32_t v, int n) {
   for (int i = n - 1; i >= 0; i--) {
     if (w->byte_pos >= w->capacity) {
       w->overflow = 1;
       return;
     }
-    if ((v >> i) & 1) {
+    if (i < 32 && ((v >> i) & 1)) {
       w->data[w->byte_pos] |= (uint8_t)(1 << (7 - w->bit_pos));
     }
     if (++w->bit_pos == 8) {
@@ -367,4 +369,59 @@ int aac_adts_write(const AacAdtsHeader* h, uint8_t* o) {
   aac_bitwriter_write(&w, h->buffer_fullness, 11);
   aac_bitwriter_write(&w, h->num_raw_blocks - 1, 2);
   return aac_bitwriter_bytes_written(&w);
+}
+
+/* ── ADTS CRC ─────────────────────────────────────────────────────── */
+
+uint16_t aac_crc16_bits(uint16_t crc, const uint8_t* data, int bit_offset, int nbits) {
+  for (int i = 0; i < nbits; i++) {
+    const int pos = bit_offset + i;
+    const unsigned bit = (data[pos >> 3] >> (7 - (pos & 7))) & 1u;
+    const unsigned feedback = ((crc >> 15) & 1u) ^ bit;
+    crc = (uint16_t)((crc << 1) ^ (feedback ? 0x8005u : 0u));
+  }
+  return crc;
+}
+
+uint16_t aac_crc16_zero_bits(uint16_t crc, int nbits) {
+  for (int i = 0; i < nbits; i++) {
+    const unsigned feedback = (crc >> 15) & 1u;
+    crc = (uint16_t)((crc << 1) ^ (feedback ? 0x8005u : 0u));
+  }
+  return crc;
+}
+
+/* `nbits` bits of the block from `start`, with zero bits past `end`. */
+static uint16_t crc_region(uint16_t crc, const uint8_t* block, int start, int end, int nbits) {
+  const int present = std::max(0, std::min(nbits, end - start));
+  crc = aac_crc16_bits(crc, block, start, present);
+  return aac_crc16_zero_bits(crc, nbits - present);
+}
+
+uint16_t aac_adts_crc(const uint8_t* header, int header_bits, const uint8_t* block,
+                      const AacCrcRegion* regions, int num_regions) {
+  uint16_t crc = aac_crc16_bits(AAC_CRC16_INIT, header, 0, header_bits);
+  for (int i = 0; i < num_regions; i++) {
+    const AacCrcRegion* reg = &regions[i];
+    switch (reg->type) {
+      case AAC_ELEM_SCE:
+      case AAC_ELEM_LFE:
+      case AAC_ELEM_CCE:
+        crc = crc_region(crc, block, reg->start, reg->end, 192);
+        break;
+      case AAC_ELEM_CPE:
+        crc = crc_region(crc, block, reg->start, reg->end, 192);
+        if (reg->second >= 0) {
+          crc = crc_region(crc, block, reg->second, reg->end, 128);
+        }
+        break;
+      case AAC_ELEM_PCE:
+      case AAC_ELEM_DSE:
+        crc = aac_crc16_bits(crc, block, reg->start, reg->end - reg->start);
+        break;
+      default:
+        break;
+    }
+  }
+  return crc;
 }

@@ -81,6 +81,43 @@ using AacAdtsHeader = struct AacAdtsHeader_ {
 int aac_adts_parse(AacAdtsHeader* hdr, const uint8_t* data, int size);
 int aac_adts_write(const AacAdtsHeader* hdr, uint8_t* out);
 
+/* ── ADTS CRC (ISO/IEC 13818-7 6.2, ISO/IEC 14496-3 1.A.3) ───────── */
+
+/* CRC-16 with the generator polynomial x^16 + x^15 + x^2 + 1 (0x8005),
+ * initial value 0xFFFF, bits fed most significant first, no final
+ * inversion.  Continues `crc` over `nbits` bits of `data` starting at bit
+ * `bit_offset`, or over `nbits` zero bits. */
+#define AAC_CRC16_INIT 0xFFFFu
+uint16_t aac_crc16_bits(uint16_t crc, const uint8_t* data, int bit_offset, int nbits);
+uint16_t aac_crc16_zero_bits(uint16_t crc, int nbits);
+
+/* One syntactic element of a raw data block as the ADTS CRC sees it: bit
+ * offsets, from the start of the buffer the block lives in, of the
+ * element_instance_tag (just after the id_syn_ele), of the second
+ * channel's global_gain in a channel pair (-1 otherwise) and of the
+ * element's end. */
+using AacCrcRegion = struct AacCrcRegion_ {
+  int type; /* AacElementType */
+  int start;
+  int second;
+  int end;
+};
+#define AAC_CRC_MAX_REGIONS 32
+
+/* The crc_check of an ADTS frame: the CRC runs over `header_bits` bits of
+ * the header (the fixed and variable headers, 56 bits, plus the
+ * raw_data_block_position words of a frame with several blocks), then over
+ * the covered part of each element of the raw data block: the first 192
+ * bits of a single channel, LFE or coupling element from its
+ * element_instance_tag and, for a channel pair, 192 bits from its tag and
+ * 128 bits from the second channel's global_gain, each padded with zero
+ * bits when the element is shorter; every bit of a program config or data
+ * stream element; nothing of a fill element.  A frame with several raw
+ * data blocks checks the header alone and then each block alone (with
+ * header_bits 0). */
+uint16_t aac_adts_crc(const uint8_t* header, int header_bits, const uint8_t* block,
+                      const AacCrcRegion* regions, int num_regions);
+
 using AacElementType = enum AacElementType_ {
   AAC_ELEM_SCE = 0,
   AAC_ELEM_CPE = 1,

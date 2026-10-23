@@ -12,8 +12,10 @@ static int build_cpe_frame(uint8_t* out, int out_size, int ms_present, int crc) 
   aac_bitwriter_init(&w, out, out_size);
   aac_bitwriter_write(&w, 0, 56);
   if (crc) {
-    aac_bitwriter_write(&w, 0x1234, 16);
+    aac_bitwriter_write(&w, 0, 16); /* crc_check, filled in below */
   }
+  const int block_start = aac_bitwriter_bits_written(&w);
+  AacCrcRegion region = {AAC_ELEM_CPE, 3, -1, 0};
   aac_bitwriter_write(&w, AAC_ELEM_CPE, 3);
   aac_bitwriter_write(&w, 0, 4);
   aac_bitwriter_write(&w, 1, 1); /* common_window */
@@ -29,6 +31,9 @@ static int build_cpe_frame(uint8_t* out, int out_size, int ms_present, int crc) 
     }
   }
   for (int ch = 0; ch < 2; ch++) {
+    if (ch == 1) {
+      region.second = aac_bitwriter_bits_written(&w) - block_start;
+    }
     aac_bitwriter_write(&w, 180, 8); /* global_gain: a clearly audible level */
     aac_bitwriter_write(&w, 4, 4);   /* section: codebook 4, length 1 */
     aac_bitwriter_write(&w, 1, 5);
@@ -42,6 +47,7 @@ static int build_cpe_frame(uint8_t* out, int out_size, int ms_present, int crc) 
     const int quad[4] = {1, 0, 0, 0};
     aac_bitwriter_write_huffman(&w, 4, quad);
   }
+  region.end = aac_bitwriter_bits_written(&w) - block_start;
   aac_bitwriter_write(&w, AAC_ELEM_END, 3);
   aac_bitwriter_byte_align(&w);
   AacAdtsHeader hdr = {};
@@ -53,6 +59,11 @@ static int build_cpe_frame(uint8_t* out, int out_size, int ms_present, int crc) 
   hdr.buffer_fullness = 0x7FF;
   hdr.num_raw_blocks = 1;
   aac_adts_write(&hdr, out);
+  if (crc) {
+    const uint16_t sum = aac_adts_crc(out, 56, out + block_start / 8, &region, 1);
+    out[AAC_ADTS_HEADER_SIZE] = (uint8_t)(sum >> 8);
+    out[AAC_ADTS_HEADER_SIZE + 1] = (uint8_t)(sum & 0xFF);
+  }
   return hdr.frame_length;
 }
 
@@ -100,6 +111,13 @@ static void test_crc_and_truncation() {
   AacDecoderHandle dec2 = aac_decoder_create(48000, 2);
   CHECK(aac_decoder_decode(dec2, crc, len_crc, b, 2048) == 1024, "CRC-protected frame");
   CHECK(memcmp(a, b, sizeof(a)) == 0, "CRC-protected frame decodes identically");
+  crc[AAC_ADTS_HEADER_SIZE + 1] ^= 0x01;
+  CHECK(aac_decoder_decode(dec2, crc, len_crc, b, 2048) == 1024 &&
+            aac_decoder_last_frame_concealed(dec2) == 1,
+        "frame with a wrong CRC concealed");
+  aac_decoder_set_concealment(dec2, AAC_CONCEAL_OFF);
+  CHECK(aac_decoder_decode(dec2, crc, len_crc, b, 2048) == AAC_ERR_DECODE,
+        "frame with a wrong CRC refused with concealment off");
 
   aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF); /* errors are reported, not concealed */
   CHECK(aac_decoder_decode(dec, plain, 7, a, 2048) < 0, "header-only input");

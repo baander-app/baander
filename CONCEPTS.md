@@ -343,5 +343,26 @@ The HE-AAC v2 tool that codes a stereo pair as one SBR channel plus per-band int
 
 ### Codec delay
 
-Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles. The encoder reports it and its flush drains it.
+Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles (1920 and 5379 with 960-sample frames). The encoder reports it and its flush drains it. The decoder's limiter adds its own look-ahead, which the decoder reports separately.
+
+### AAC transport
+
+The framing an AAC stream travels in: ADTS (self-synchronising headers per frame, implicit HE-AAC signalling), LOAS (self-synchronising AudioSyncStream carrying LATM), LATM (an AudioMuxElement with its StreamMuxConfig in band or out of band) or raw access units with an AudioSpecificConfig (the MP4 form). The decoder detects ADTS and LOAS from their sync words; the other forms are told to it.
+*Avoid: container, which is the MP4 or Matroska file around the transport.*
+
+### AudioSpecificConfig
+
+The configuration record of ISO/IEC 14496-3 that names the object type, sample rate, channel layout and frame length of a stream and, with explicit signalling, its SBR and PS extension and output rate. Out-of-band in MP4 and LATM, in band in a StreamMuxConfig.
+
+### Error concealment
+
+What the decoder does with a frame it cannot parse, that fails its CRC or that never arrived: it continues the last good spectrum with a fade and then substitutes noise at its band energies, keeps the SBR envelope and PS parameters decaying, and crossfades into the next good frame. Concealed frames are counted; with concealment off the frame is an error.
+
+### Channel mode
+
+The 7.1 layout of an eight-channel stream, which the channel count alone does not fix: back pair behind the side pair (configuration 12, the default), front centre pair (configuration 7), top front pair (configuration 14) or the rear surround layout signalled by a PCE. The decoder reports the mode of the stream's layout; other channel counts have one layout each.
+
+### Peak limiter
+
+A look-ahead gain stage on the decoder's output that keeps every sample within full scale after a downmix or loud content, at the cost of its attack window as delay. Off by default.
 

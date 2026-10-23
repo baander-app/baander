@@ -16,6 +16,7 @@ set(TEST_SOURCES
     test_limiter.cpp
     test_conceal.cpp
     test_frame960.cpp
+    test_transport.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

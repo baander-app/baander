@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "asc.h"
 #include "encoder_tools.h"
 
 /* AAC-LC encoder.  The structure follows the Fraunhofer FDK encoder and
@@ -771,69 +772,8 @@ int ms_present_mode(const AacEncoderState* s, const AacEncElement* el) {
   return used == 0 ? 0 : (used == nbands ? 2 : 1);
 }
 
-/* program_config_element (ISO/IEC 14496-3 4.4.1.1) for the layout: the
- * elements by position, no mixdowns, no associated data, no comment.  The
- * ADTS raw data block starts byte aligned, so the element's alignment is
- * the writer's. */
-void write_pce(AacBitWriter* w, const AacLayout* l, int rate_index) {
-  aac_bitwriter_write(w, 0, 4); /* element_instance_tag */
-  aac_bitwriter_write(w, AAC_AOT_LC - 1, 2);
-  aac_bitwriter_write(w, (uint32_t)rate_index, 4);
-  static const int kPositions[4] = {AAC_POS_FRONT, AAC_POS_SIDE, AAC_POS_BACK, AAC_POS_LFE};
-  for (int p = 0; p < 4; p++) {
-    int n = 0;
-    for (int e = 0; e < l->num_elements; e++) {
-      n += l->elems[e].position == kPositions[p];
-    }
-    aac_bitwriter_write(w, (uint32_t)n, p == 3 ? 2 : 4);
-  }
-  aac_bitwriter_write(w, 0, 3); /* num_assoc_data_elements */
-  aac_bitwriter_write(w, 0, 4); /* num_valid_cc_elements */
-  aac_bitwriter_write(w, 0, 3); /* mono, stereo and matrix mixdown absent */
-  for (int p = 0; p < 4; p++) {
-    for (int e = 0; e < l->num_elements; e++) {
-      const AacLayoutElement* el = &l->elems[e];
-      if (el->position != kPositions[p]) {
-        continue;
-      }
-      if (p < 3) {
-        aac_bitwriter_write(w, el->type == AAC_ELEM_CPE ? 1 : 0, 1);
-      }
-      aac_bitwriter_write(w, (uint32_t)el->tag, 4);
-    }
-  }
-  aac_bitwriter_byte_align(w);
-  /* A layout with an element outside the normal layer carries the height
-   * extension in the comment field: the sync byte, two bits per front,
-   * side and back element in that order, alignment and the CRC. */
-  bool height = false;
-  for (int e = 0; e < l->num_elements; e++) {
-    height = height || l->elems[e].height != AAC_HEIGHT_NORMAL;
-  }
-  if (!height) {
-    aac_bitwriter_write(w, 0, 8); /* comment_field_bytes */
-    return;
-  }
-  uint8_t bytes[1 + (2 * AAC_MAX_ELEMENTS + 7) / 8] = {AAC_PCE_HEIGHT_EXTENSION_SYNC};
-  int n = 0;
-  for (int p = 0; p < 3; p++) {
-    for (int e = 0; e < l->num_elements; e++) {
-      const AacLayoutElement* el = &l->elems[e];
-      if (el->position == kPositions[p]) {
-        bytes[1 + n / 4] |= (uint8_t)(el->height << (6 - 2 * (n % 4)));
-        n++;
-      }
-    }
-  }
-  const int len = 1 + (2 * n + 7) / 8;
-  aac_bitwriter_write(w, (uint32_t)(len + 1), 8); /* comment_field_bytes */
-  for (int i = 0; i < len; i++) {
-    aac_bitwriter_write(w, bytes[i], 8);
-  }
-  aac_bitwriter_write(w, aac_pce_height_crc(bytes, len), 8);
-}
-
-/* Bits of the program config element for the layout. */
+/* Bits of the program config element for the layout, with the height
+ * extension when an element is outside the normal layer. */
 int pce_bits(const AacLayout* l) {
   const int bits = 3 + 34 + 5 * l->num_elements + 7 + 8;
   for (int e = 0; e < l->num_elements; e++) {
@@ -860,17 +800,30 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
   aac_bitwriter_write(&w, 0, 32);
   aac_bitwriter_write(&w, 0, kAdtsBits - 32);
 
+  /* The element boundaries are kept for the ADTS CRC, as offsets from
+   * the start of the raw data block. */
+  s->num_crc_regions = 0;
   if (s->channel_config == 0) {
     aac_bitwriter_write(&w, AAC_ELEM_PCE, 3);
-    write_pce(&w, &s->layout, s->rate_index);
+    AacCrcRegion* region = &s->crc_region[s->num_crc_regions++];
+    region->type = AAC_ELEM_PCE;
+    region->start = aac_bitwriter_bits_written(&w) - kAdtsBits;
+    region->second = -1;
+    aac_pce_write(&w, &s->layout, s->rate_index, kAdtsBits);
+    region->end = aac_bitwriter_bits_written(&w) - kAdtsBits;
   }
   for (int e = 0; e < s->num_elements; e++) {
     const AacEncElement* el = &s->elem[e];
     const int max_sfb = el->max_sfb;
     aac_bitwriter_write(&w, (uint32_t)el->type, 3);
+    AacCrcRegion* region = &s->crc_region[s->num_crc_regions++];
+    region->type = el->type;
+    region->start = aac_bitwriter_bits_written(&w) - kAdtsBits;
+    region->second = -1;
     aac_bitwriter_write(&w, (uint32_t)el->tag, 4);
     if (el->type != AAC_ELEM_CPE) {
       write_channel_stream(&w, &s->ch[el->ch[0]], max_sfb, 0);
+      region->end = aac_bitwriter_bits_written(&w) - kAdtsBits;
       write_sbr(s, e, &w);
       continue;
     }
@@ -887,7 +840,9 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
       }
     }
     write_channel_stream(&w, &s->ch[el->ch[0]], max_sfb, 1);
+    region->second = aac_bitwriter_bits_written(&w) - kAdtsBits;
     write_channel_stream(&w, &s->ch[el->ch[1]], max_sfb, 1);
+    region->end = aac_bitwriter_bits_written(&w) - kAdtsBits;
     write_sbr(s, e, &w);
   }
   aac_bitwriter_write(&w, AAC_ELEM_END, 3);

@@ -1,5 +1,6 @@
 #include "decoder.h"
 
+#include "asc.h"
 #include "channel_map.h"
 
 #include <cmath>
@@ -530,6 +531,9 @@ int decode_cpe(AacDecoderState* s, AacBitReader* r, AacDecoderChannel* left,
   if ((ret = decode_ics(s, r, l, common_window)) != 0) {
     return ret;
   }
+  if (s->num_crc_regions > 0) {
+    s->crc_region[s->num_crc_regions - 1].second = r->pos;
+  }
   if ((ret = decode_ics(s, r, rc, common_window)) != 0) {
     return ret;
   }
@@ -771,88 +775,9 @@ int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type, boo
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
-/* program_config_element() (Table 4.2): the element lists define the
- * layout; mixdown data, associated data and the comment are skipped. */
-int decode_pce(AacDecoderState* s, AacBitReader* r, AacLayout* layout) {
-  aac_bitreader_skip(r, 4 + 2 + 4); /* tag, object_type, sampling_frequency_index */
-  const int front = (int)aac_bitreader_read(r, 4);
-  const int side = (int)aac_bitreader_read(r, 4);
-  const int back = (int)aac_bitreader_read(r, 4);
-  const int lfe = (int)aac_bitreader_read(r, 2);
-  const int assoc = (int)aac_bitreader_read(r, 3);
-  const int cc = (int)aac_bitreader_read(r, 4);
-  if (aac_bitreader_read(r, 1)) {
-    aac_bitreader_skip(r, 4); /* mono_mixdown_element_number */
-  }
-  if (aac_bitreader_read(r, 1)) {
-    aac_bitreader_skip(r, 4); /* stereo_mixdown_element_number */
-  }
-  if (aac_bitreader_read(r, 1)) {
-    aac_bitreader_skip(r, 3); /* matrix_mixdown_idx, pseudo_surround_enable */
-  }
-  AacLayoutElement elems[AAC_MAX_ELEMENTS] = {};
-  int n = 0;
-  const int counts[4] = {front, side, back, lfe};
-  for (int pos = 0; pos < 4; pos++) {
-    for (int i = 0; i < counts[pos]; i++) {
-      const int is_cpe = pos == 3 ? 0 : (int)aac_bitreader_read(r, 1);
-      const int tag = (int)aac_bitreader_read(r, 4);
-      if (n >= AAC_MAX_ELEMENTS) {
-        return AAC_ERR_UNSUPPORTED;
-      }
-      elems[n].type = pos == 3 ? AAC_ELEM_LFE : (is_cpe ? AAC_ELEM_CPE : AAC_ELEM_SCE);
-      elems[n].tag = tag;
-      elems[n].position = pos + 1;
-      n++;
-    }
-  }
-  aac_bitreader_skip(r, 4 * assoc);
-  AacLayout l = {};
-  for (int i = 0; i < cc; i++) {
-    aac_bitreader_skip(r, 1); /* cc_element_is_ind_sw */
-    const int tag = (int)aac_bitreader_read(r, 4);
-    if (i < AAC_MAX_CCE) {
-      l.cce_tag[l.num_cce++] = tag;
-    }
-  }
-  aac_bitreader_byte_align(r);
-  const int comment = (int)aac_bitreader_read(r, 8);
-  /* A comment that starts with the height extension's sync byte carries
-   * two bits of height per front, side and back element, byte alignment
-   * and a CRC over the bytes before it; a failing CRC leaves every
-   * element in the normal layer. */
-  const int height_elements = front + side + back;
-  const int height_bytes = 1 + (2 * height_elements + 7) / 8;
-  int skipped = 0;
-  if (comment >= height_bytes + 1 && aac_bitreader_peek(r, 8) == AAC_PCE_HEIGHT_EXTENSION_SYNC) {
-    uint8_t bytes[1 + (2 * AAC_MAX_ELEMENTS + 7) / 8];
-    for (int i = 0; i < height_bytes; i++) {
-      bytes[i] = (uint8_t)aac_bitreader_read(r, 8);
-    }
-    const int crc = (int)aac_bitreader_read(r, 8);
-    skipped = height_bytes + 1;
-    if (crc == aac_pce_height_crc(bytes, height_bytes)) {
-      for (int i = 0; i < height_elements; i++) {
-        const int shift = 6 - 2 * (i % 4);
-        elems[i].height = (bytes[1 + i / 4] >> shift) & 3;
-      }
-    }
-  }
-  aac_bitreader_skip(r, 8 * (comment - skipped));
-  if (r->overread) {
-    return AAC_ERR_DECODE;
-  }
-  if (n == 0) {
-    return AAC_ERR_DECODE;
-  }
-  const int ret = aac_layout_from_elements(&l, elems, n);
-  if (ret) {
-    return ret;
-  }
-  (void)s;
-  *layout = l;
-  return 0;
-}
+/* program_config_element() (Table 4.2) in a raw data block, which starts
+ * byte aligned. */
+int decode_pce(AacBitReader* r, AacLayout* layout) { return aac_pce_read(r, layout, 0); }
 
 bool same_layout(const AacLayout* a, const AacLayout* b) {
   if (a->num_elements != b->num_elements || a->num_channels != b->num_channels) {
@@ -1020,6 +945,14 @@ int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config) {
   return 0;
 }
 
+int aac_decoder_set_layout(AacDecoderState* s, const AacLayout* l) {
+  if (l->num_elements == 0 || l->num_channels > AAC_MAX_CHANNELS) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  install_layout(s, l, 2);
+  return 0;
+}
+
 int aac_decoder_output_channels(const AacDecoderState* s) {
   if (s->channels > 0) {
     return s->channels;
@@ -1139,7 +1072,7 @@ int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem)
       break;
     case AAC_ELEM_PCE: {
       AacLayout l = {};
-      ret = decode_pce(s, r, &l);
+      ret = decode_pce(r, &l);
       if (ret == 0 && !p->pce_seen) {
         if (p->num_sniffed > 0 || !p->sniffing) {
           /* A PCE after channel elements, or over an ADTS configuration:
@@ -1316,6 +1249,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->has_sbr = 0;
   s->has_ps = 0;
   s->last_concealed = 0;
+  s->num_crc_regions = 0;
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
   bool damaged = false;
   for (;;) {
@@ -1325,8 +1259,20 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       aac_bitreader_byte_align(r);
       break;
     }
+    /* The element's extent, for the ADTS CRC check of the transport layer. */
+    AacCrcRegion* region = nullptr;
+    if (ret == 0 && s->num_crc_regions < AAC_CRC_MAX_REGIONS) {
+      region = &s->crc_region[s->num_crc_regions++];
+      region->type = elem;
+      region->start = r->pos;
+      region->second = -1;
+      region->end = r->pos;
+    }
     if (ret == 0) {
       ret = decode_element(s, r, &p, elem);
+    }
+    if (region) {
+      region->end = r->pos;
     }
     if (ret) {
       if (!conceal) {

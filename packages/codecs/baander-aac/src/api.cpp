@@ -4,6 +4,7 @@
 #include "aac_cpu.h"
 #include "aac_dsp.h"
 #include "bitstream.h"
+#include "transport.h"
 #if defined(BAAC_AAC_HAVE_DECODER)
 #include "decoder.h"
 #endif
@@ -39,6 +40,9 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
 
   ensure_dsp_init();
   auto* s = aac_encoder_state_create(sample_rate, channels, bitrate, aot, rc_mode, &g_dsp);
+  if (s) {
+    s->transport = aac_encoder_transport_create();
+  }
   return (AacEncoderHandle)s;
 }
 
@@ -47,21 +51,22 @@ void aac_encoder_destroy(AacEncoderHandle ctx) {
     return;
   }
   auto* s = static_cast<AacEncoderState*>(ctx);
+  aac_encoder_transport_destroy(s->transport);
   aac_encoder_state_destroy(s);
 }
 
 /* The output must hold the largest frame before any input is consumed, so
- * that a refused call loses nothing. */
+ * that a refused call loses nothing.  The encoder writes an ADTS frame;
+ * the transport layer rewraps it. */
 static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int out_size) {
-  if (out_size < aac_encoder_state_max_frame_bytes(s)) {
+  if (out_size < aac_encoder_transport_max_bytes(s, s->transport)) {
     return AAC_ERR_OVERFLOW;
   }
   const int frame_len = aac_encode_frame_internal(s, pcm);
   if (frame_len < 0) {
     return frame_len;
   }
-  memcpy(out, s->output_buf, frame_len);
-  return frame_len;
+  return aac_encoder_transport_wrap(s, s->transport, frame_len, out, out_size);
 }
 
 int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, uint8_t* out,
@@ -77,8 +82,6 @@ int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, ui
   return encode_block(s, pcm, out, out_size);
 }
 
-/* The stream format settings apply to a stream that has not started:
- * before the first frame, or after a flush. */
 static int encoder_started(const AacEncoderState* s) { return s->started; }
 
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled) {
@@ -152,7 +155,43 @@ int aac_encoder_max_frame_bytes(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return aac_encoder_state_max_frame_bytes(static_cast<AacEncoderState*>(ctx));
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  return aac_encoder_transport_max_bytes(s, s->transport);
+}
+
+int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_encoder_transport_set(static_cast<AacEncoderState*>(ctx)->transport, transport);
+}
+
+int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_encoder_transport_set_signaling(static_cast<AacEncoderState*>(ctx)->transport,
+                                             signaling);
+}
+
+int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_encoder_transport_set_crc(static_cast<AacEncoderState*>(ctx)->transport, enabled);
+}
+
+int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size) {
+  if (!ctx || !out || out_size <= 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  AacAsc asc;
+  const int ret = aac_encoder_transport_asc(s, s->transport, &asc);
+  if (ret) {
+    return ret;
+  }
+  return aac_asc_write(&asc, out, out_size);
 }
 
 int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
@@ -176,6 +215,7 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
   if (total > 0) {
     aac_encoder_state_reset(s);
     s->pending_flush = 0;
+    aac_encoder_transport_flushed(s->transport);
   }
   return total;
 }
@@ -192,6 +232,9 @@ AacDecoderHandle aac_decoder_create(int sample_rate, int channels) {
 
   ensure_dsp_init();
   auto* s = aac_decoder_state_create(sample_rate, channels, &g_dsp);
+  if (s) {
+    s->transport = aac_decoder_transport_create();
+  }
   return (AacDecoderHandle)s;
 }
 
@@ -200,6 +243,7 @@ void aac_decoder_destroy(AacDecoderHandle ctx) {
     return;
   }
   auto* s = static_cast<AacDecoderState*>(ctx);
+  aac_decoder_transport_destroy(s->transport);
   aac_decoder_state_destroy(s);
 }
 
@@ -207,80 +251,10 @@ int aac_decoder_reset(AacDecoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  aac_decoder_reset_state(static_cast<AacDecoderState*>(ctx));
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  aac_decoder_reset_state(s);
+  aac_decoder_transport_reapply(s, s->transport);
   return AAC_OK;
-}
-
-int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {
-  if (!ctx) {
-    return AAC_ERR_INVALID_ARG;
-  }
-  return aac_decoder_set_frame_length_internal(static_cast<AacDecoderState*>(ctx), frame_length);
-}
-
-/* Decodes one raw_data_block() and appends its PCM to out[*written..]. */
-static int decode_block(AacDecoderState* s, AacBitReader* reader, float* pcm, int pcm_size,
-                        int* written) {
-  const int decoded = aac_decode_raw_data_block(s, reader);
-  if (decoded < 0) {
-    return decoded;
-  }
-  const int out_channels = aac_decoder_output_channels(s);
-  if ((*written + s->frame_size) * out_channels > pcm_size) {
-    return AAC_ERR_OVERFLOW;
-  }
-  aac_decoder_output(s, pcm + (size_t)*written * out_channels);
-  *written += s->frame_size;
-  return 0;
-}
-
-/* One ADTS frame or raw data block as the stream carries it. */
-static int decode_frame(AacDecoderState* s, const uint8_t* data, int size, float* pcm,
-                        int pcm_size) {
-  /* ADTS-wrapped frames carry their own stream parameters; raw frames use the
-   * sample rate given at creation and the layout of their elements. */
-  int begin = 0;
-  int end = size;
-  int blocks = 1;
-  int crc = 0;
-  if (size >= 2 && data[0] == 0xFF && (data[1] & 0xF6) == 0xF0) {
-    AacAdtsHeader hdr;
-    if (aac_adts_parse(&hdr, data, size) != 0 || hdr.frame_length > size) {
-      return AAC_ERR_DECODE;
-    }
-    if (hdr.object_type != AAC_AOT_LC) {
-      return AAC_ERR_UNSUPPORTED;
-    }
-    int ret = 0;
-    if ((ret = aac_decoder_set_rate_index(s, hdr.sample_rate_index)) != 0 ||
-        (ret = aac_decoder_set_channel_config(s, hdr.channel_config)) != 0) {
-      return ret;
-    }
-    blocks = hdr.num_raw_blocks;
-    crc = !hdr.protection_absent;
-    /* With protection a 16-bit CRC follows the header, preceded by the
-     * positions of the second and later raw data blocks; none of it is
-     * verified. */
-    begin = AAC_ADTS_HEADER_SIZE + (crc ? 2 * (blocks - 1) + 2 : 0);
-    end = hdr.frame_length;
-    if (begin > end) {
-      return AAC_ERR_DECODE;
-    }
-  }
-
-  AacBitReader reader;
-  aac_bitreader_init(&reader, data + begin, end - begin);
-  int written = 0;
-  for (int b = 0; b < blocks; b++) {
-    const int ret = decode_block(s, &reader, pcm, pcm_size, &written);
-    if (ret) {
-      return ret;
-    }
-    if (crc && blocks > 1) {
-      aac_bitreader_skip(&reader, 16); /* adts_raw_data_block_error_check */
-    }
-  }
-  return written;
 }
 
 int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, float* pcm,
@@ -289,27 +263,14 @@ int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, floa
     return AAC_ERR_INVALID_ARG;
   }
   auto* s = static_cast<AacDecoderState*>(ctx);
-  s->last_concealed = 0;
-  const int ret = decode_frame(s, data, size, pcm, pcm_size);
-  if (ret >= 0 || ret == AAC_ERR_OVERFLOW) {
-    return ret;
+  return aac_decoder_transport_decode(s, s->transport, data, size, pcm, pcm_size);
+}
+
+int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
   }
-  if (s->conceal_mode == AAC_CONCEAL_OFF) {
-    aac_decoder_note_lost_block(s);
-    return ret;
-  }
-  /* A frame the decoder could not take apart (a damaged header, a
-   * truncated or unparseable frame): one concealed block in its place,
-   * once the stream's layout is known. */
-  if (aac_decoder_conceal_block(s) < 0) {
-    return ret;
-  }
-  const int out_channels = aac_decoder_output_channels(s);
-  if (s->frame_size * out_channels > pcm_size) {
-    return AAC_ERR_OVERFLOW;
-  }
-  aac_decoder_output(s, pcm);
-  return s->frame_size;
+  return aac_decoder_set_frame_length_internal(static_cast<AacDecoderState*>(ctx), frame_length);
 }
 
 int aac_decoder_set_concealment(AacDecoderHandle ctx, AacConcealment mode) {
@@ -335,6 +296,43 @@ int aac_decoder_concealed_frames(AacDecoderHandle ctx) {
     return AAC_ERR_INVALID_ARG;
   }
   return static_cast<AacDecoderState*>(ctx)->concealed_frames;
+}
+
+int aac_decoder_set_transport(AacDecoderHandle ctx, AacTransport transport) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_decoder_transport_set(static_cast<AacDecoderState*>(ctx)->transport, transport);
+}
+
+int aac_decoder_set_config(AacDecoderHandle ctx, const uint8_t* asc, int size) {
+  if (!ctx || !asc || size <= 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  return aac_decoder_transport_set_config(s, s->transport, asc, size);
+}
+
+int aac_decoder_feed(AacDecoderHandle ctx, const uint8_t* data, int size) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_decoder_transport_feed(static_cast<AacDecoderState*>(ctx)->transport, data, size);
+}
+
+int aac_decoder_decode_next(AacDecoderHandle ctx, float* pcm, int pcm_size) {
+  if (!ctx || !pcm || pcm_size <= 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  return aac_decoder_transport_decode_next(s, s->transport, pcm, pcm_size);
+}
+
+int aac_decoder_pending_bytes(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_decoder_transport_pending(static_cast<AacDecoderState*>(ctx)->transport);
 }
 
 int aac_decoder_frame_size(AacDecoderHandle ctx) {

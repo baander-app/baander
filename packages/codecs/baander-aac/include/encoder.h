@@ -135,6 +135,12 @@ using AacEncoderState = struct AacEncoderState_ {
   AacMdct mdct_long, mdct_short;
   const AacDSP* dsp;
   uint8_t output_buf[AAC_ENCODER_MAX_FRAME_BYTES];
+  /* Element boundaries of the raw data block in output_buf (bit offsets
+   * from the block's start), for the ADTS CRC of the transport layer. */
+  AacCrcRegion crc_region[AAC_CRC_MAX_REGIONS];
+  int num_crc_regions;
+  /* Transport, signalling and CRC settings, owned by the transport layer. */
+  struct AacEncoderTransport_* transport;
 };
 
 /* `sr` and `ch` are the input's; HE-AAC v2 takes a stereo input only. */

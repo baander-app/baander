@@ -258,6 +258,131 @@ static void ffmpeg_layout(const char* name, const char* layout, int channels, in
   CHECK(d > min_db, "%s: decoders disagree (%.1f dB)", name, d);
 }
 
+/* Decodes a LOAS stream through the FIFO in chunks of `chunk` bytes. */
+static std::vector<float> decode_loas_stream(const std::vector<uint8_t>& stream, int channels,
+                                             size_t chunk, int* errors) {
+  std::vector<float> out;
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  AacDecoderHandle dec = aac_decoder_create(48000, channels);
+  *errors = 0;
+  for (size_t pos = 0; pos < stream.size();) {
+    const int taken = aac_decoder_feed(dec, stream.data() + pos, (int)std::min(chunk, stream.size() - pos));
+    if (taken <= 0) {
+      (*errors)++;
+      break;
+    }
+    pos += (size_t)taken;
+    for (;;) {
+      const int got = aac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+      if (got == 0) {
+        break;
+      }
+      if (got < 0) {
+        (*errors)++;
+        continue;
+      }
+      out.insert(out.end(), pcm.begin(), pcm.begin() + (size_t)got * aac_decoder_channels(dec));
+    }
+  }
+  aac_decoder_destroy(dec);
+  return out;
+}
+
+/* The sample rate and channel count ffprobe reports for a file. */
+static bool ffprobe_params(const std::string& file, int* rate, int* channels) {
+  const std::string cmd = "ffprobe -v error -show_entries stream=sample_rate,channels -of csv=p=0 '" +
+                          file + "' > '" + path("probe.txt") + "' 2>/dev/null";
+  if (system(cmd.c_str()) != 0) {
+    return false;
+  }
+  const std::vector<uint8_t> text = read_file(path("probe.txt"));
+  const std::string line(text.begin(), text.end());
+  return sscanf(line.c_str(), "%d,%d", rate, channels) == 2;
+}
+
+/* FFmpeg's LATM muxer (LOAS with an in-band StreamMuxConfig every 20
+ * frames) carries an FFmpeg-encoded stream; our streaming decoder must
+ * match FFmpeg's decode of it. */
+static void ffmpeg_latm(const char* name, const std::vector<float>& pcm, int sr, int channels,
+                        const char* layout, const char* options) {
+  CHECK(write_file(path("in.f32"), pcm.data(), pcm.size() * sizeof(float)), "write input");
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "-f f32le -ar %d -ac %d -channel_layout %s -i %s -c:a aac %s -f latm %s",
+           sr, channels, layout, path("in.f32").c_str(), options, path("ff.latm").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg latm mux", name);
+  snprintf(cmd, sizeof(cmd), "-i %s -f f32le %s", path("ff.latm").c_str(), path("ff.f32").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg decode", name);
+  const std::vector<uint8_t> stream = read_file(path("ff.latm"));
+  CHECK(stream.size() > 3 && stream[0] == 0x56 && (stream[1] & 0xE0) == 0xE0, "%s: LOAS sync",
+        name);
+  int errors = 0;
+  const std::vector<float> ours = decode_loas_stream(stream, 0, 4096, &errors);
+  const std::vector<float> theirs = read_f32(path("ff.f32"));
+  CHECK(errors == 0, "%s: %d errors in our decoder", name, errors);
+  const size_t n = std::min(ours.size(), theirs.size());
+  CHECK(n > 0 && ours.size() == theirs.size(), "%s: %zu vs %zu samples", name, ours.size(),
+        theirs.size());
+  const double d = snr_db(theirs.data(), ours.data(), n);
+  printf("%-28s ffmpeg latm -> ours vs ffmpeg: %.1f dB\n", name, d);
+  CHECK(d > 90.0, "%s: decoders disagree (%.1f dB)", name, d);
+}
+
+/* We mux LOAS with the chosen signalling; FFmpeg must take the stream's
+ * rate and channel count from the config and decode it as we do.  With
+ * SBR, FFmpeg widens a mono stream to stereo; only the channels our
+ * decoder produces are compared. */
+static void our_loas(const char* name, AacObjectType aot, int sr, int channels, int bitrate,
+                     AacSignaling signaling) {
+  const std::vector<float> pcm = aot == AAC_AOT_LC ? gen_multichannel(sr * 2, sr, channels)
+                                                   : gen_wideband(sr * 2, sr, channels);
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, AAC_RC_CBR);
+  CHECK(enc != nullptr, "%s: encoder", name);
+  CHECK(aac_encoder_set_transport(enc, AAC_TRANSPORT_LOAS) == AAC_OK, "%s: transport", name);
+  CHECK(aac_encoder_set_signaling(enc, signaling) == AAC_OK, "%s: signaling", name);
+  const int frame = aac_encoder_frame_size(enc);
+  std::vector<float> block((size_t)frame * channels);
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) * 4);
+  std::vector<uint8_t> stream;
+  for (size_t pos = 0; pos < pcm.size(); pos += block.size()) {
+    std::fill(block.begin(), block.end(), 0.0f);
+    memcpy(block.data(), pcm.data() + pos, std::min(block.size(), pcm.size() - pos) * sizeof(float));
+    const int len = aac_encoder_encode(enc, block.data(), frame, buf.data(), (int)buf.size());
+    CHECK(len > 0, "%s: encode %d", name, len);
+    stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(len, 0));
+  }
+  const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+  stream.insert(stream.end(), buf.begin(), buf.begin() + std::max(len, 0));
+  aac_encoder_destroy(enc);
+  CHECK(write_file(path("ours.loas"), stream.data(), stream.size()), "write stream");
+  int rate = 0;
+  int probed = 0;
+  CHECK(ffprobe_params(path("ours.loas"), &rate, &probed), "%s: ffprobe", name);
+  const int their_channels = aot != AAC_AOT_LC && channels == 1 ? 2 : channels;
+  CHECK(rate == sr && probed == their_channels, "%s: ffprobe sees %d Hz %d ch, expected %d Hz %d ch",
+        name, rate, probed, sr, their_channels);
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "-i %s -f f32le %s", path("ours.loas").c_str(),
+           path("ours.ff.f32").c_str());
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg refused our stream", name);
+  int errors = 0;
+  const std::vector<float> ours = decode_loas_stream(stream, 0, 1000, &errors);
+  const std::vector<float> theirs = read_f32(path("ours.ff.f32"));
+  CHECK(errors == 0, "%s: %d errors in our decoder", name, errors);
+  const size_t frames = std::min(theirs.size() / their_channels, ours.size() / channels);
+  CHECK(frames > 0 && theirs.size() / their_channels == ours.size() / channels,
+        "%s: %zu vs %zu frames", name, theirs.size() / their_channels, ours.size() / channels);
+  std::vector<float> a(frames * channels), b(frames * channels);
+  for (size_t i = 0; i < frames; i++) {
+    for (int c = 0; c < channels; c++) {
+      a[i * channels + c] = theirs[i * their_channels + c];
+      b[i * channels + c] = ours[i * channels + c];
+    }
+  }
+  const double d = snr_db(a.data(), b.data(), a.size());
+  printf("%-28s ours loas -> ffmpeg vs ours: %.1f dB\n", name, d);
+  CHECK(d > 90.0, "%s: decoders disagree on our LOAS stream (%.1f dB)", name, d);
+}
+
 /* One of the committed HE-AAC streams through ffmpeg and through our
  * decoder.  ffmpeg widens a mono HE-AAC stream to stereo (it assumes
  * parametric stereo may follow), so only its first channel is compared;
@@ -349,6 +474,21 @@ int main() {
   he_stream("he_stereo_40k.aac", 2, 70.0);
   he_stream("he_stereo_96k.aac", 2, 70.0);
   he_stream("hev2_stereo_32k.aac", 2, 70.0);
+
+  ffmpeg_latm("latm 48k stereo", gen_transients(48000 * 3, 48000, 2), 48000, 2, "stereo",
+              "-b:a 128k");
+  ffmpeg_latm("latm 44.1k mono", gen_harmonics(44100 * 2, 44100, 1), 44100, 1, "mono",
+              "-b:a 64k");
+  ffmpeg_latm("latm 48k 5.1", gen_multichannel(48000 * 2, 48000, 6), 48000, 6, "5.1",
+              "-b:a 384k");
+  ffmpeg_latm("latm 48k 6.1 pce", gen_multichannel(48000 * 2, 48000, 7), 48000, 7, "6.1",
+              "-b:a 448k");
+  our_loas("loas lc 44.1k stereo", AAC_AOT_LC, 44100, 2, 128000, AAC_SIGNAL_IMPLICIT);
+  our_loas("loas lc 48k 6.1 pce", AAC_AOT_LC, 48000, 7, 448000, AAC_SIGNAL_IMPLICIT);
+  our_loas("loas he 48k stereo hier", AAC_AOT_SBR, 48000, 2, 64000, AAC_SIGNAL_EXPLICIT_HIER);
+  our_loas("loas he 44.1k mono bc", AAC_AOT_SBR, 44100, 1, 32000, AAC_SIGNAL_EXPLICIT_BC);
+  our_loas("loas hev2 44.1k hier", AAC_AOT_PS, 44100, 2, 32000, AAC_SIGNAL_EXPLICIT_HIER);
+  our_loas("loas hev2 44.1k bc", AAC_AOT_PS, 44100, 2, 32000, AAC_SIGNAL_EXPLICIT_BC);
   remove_temp_dir(g_dir);
   return test_summary("test_interop");
 }

@@ -115,6 +115,12 @@ using AacDecoderState = struct AacDecoderState_ {
   /* Scratch for the recovery crossfade: the concealed continuation that
    * the first good frame after a fade is blended from. */
   AacDecoderChannel recover[2];
+  /* Element boundaries of the last parsed raw data block, for the ADTS
+   * CRC check of the transport layer. */
+  AacCrcRegion crc_region[AAC_CRC_MAX_REGIONS];
+  int num_crc_regions;
+  /* Input FIFO and stream configuration, owned by the transport layer. */
+  struct AacDecoderTransport_* transport;
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);
@@ -153,6 +159,10 @@ int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length);
  * state when it differs from the current one; 0 keeps a PCE-defined or
  * element-defined layout. */
 int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config);
+
+/* Installs a PCE-defined layout (from an AudioSpecificConfig), resetting
+ * state when it differs from the current one. */
+int aac_decoder_set_layout(AacDecoderState* s, const AacLayout* l);
 
 /* Clears the filterbank overlap, window-shape history and concealment
  * state of every channel and the concealment counters. */
