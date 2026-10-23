@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "afterburner.h"
 #include "asc.h"
 #include "encoder_tools.h"
 
@@ -1102,8 +1103,9 @@ float quality_factor(int quality) { return exp2f((70.0f - (float)quality) / 10.0
 /* Finds the working point whose frame fits in target_bits: first the
  * smallest threshold reduction, then, if the minimum-SNR floors still
  * overshoot, the fewest released bands.  With room to spare and a full
- * reservoir the thresholds are lowered instead. */
-void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_improve) {
+ * reservoir the thresholds are lowered instead.  Returns the frame's bits
+ * at the chosen working point. */
+int rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_improve) {
   ReleaseEntry release[2 * AAC_MAX_BANDS];
   const int n_release = prepare_bands(s, release);
 
@@ -1122,7 +1124,7 @@ void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_
   if (bits <= target_bits) {
     const bool reservoir_full = s->reservoir >= s->reservoir_max - s->reservoir_max / 10;
     if (base_improve < 1.0f || !reservoir_full || bits > target_bits - target_bits / 8) {
-      return;
+      return bits;
     }
     /* Spend the surplus on lower noise. */
     float lo = kImproveLimitLog2;
@@ -1137,8 +1139,7 @@ void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_
       }
     }
     set_allowances(s, 0.0f, exp2f(hi), release, 0);
-    quantize_frame(s);
-    return;
+    return quantize_frame(s);
   }
 
   float lo = 0.0f;
@@ -1156,8 +1157,7 @@ void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_
       }
     }
     set_allowances(s, hi, 1.0f, release, 0);
-    quantize_frame(s);
-    return;
+    return quantize_frame(s);
   }
 
   /* Even with every hole allowed the minimum-SNR bands do not fit: give
@@ -1174,8 +1174,8 @@ void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_
     }
   }
   set_allowances(s, max_root, 1.0f, release, k_hi);
-  bits = quantize_frame(s);
   (void)max_bits;
+  return quantize_frame(s);
 }
 
 
@@ -1631,7 +1631,13 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       improve = quality_factor(s->quality);
       break;
   }
-  rate_control(s, target, max_bits, improve);
+  const int bits = rate_control(s, target, max_bits, improve);
+  if (s->afterburner) {
+    /* The constant-rate modes may fill the frame's budget; the quality
+     * modes only redistribute the bits the frame already has. */
+    const bool fixed_rate = s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR;
+    aac_afterburner_run(s, bits, fixed_rate ? target : bits);
+  }
 
   int fullness = 0x7FF; /* variable bitrate marker */
   if (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) {

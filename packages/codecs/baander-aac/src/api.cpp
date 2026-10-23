@@ -125,6 +125,14 @@ int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
   return AAC_OK;
 }
 
+int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  static_cast<AacEncoderState*>(ctx)->afterburner = enabled ? 1 : 0;
+  return AAC_OK;
+}
+
 int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;

@@ -99,6 +99,7 @@ using AacEncoderState = struct AacEncoderState_ {
   int started; /* a frame has been encoded since creation or the last flush */
   AacObjectType aot;
   AacRateControl rc_mode;
+  int afterburner; /* second quantization pass after the rate loop (afterburner.cpp) */
   AacEncChannel ch[AAC_MAX_CHANNELS];
   AacLayout layout;
   AacEncElement elem[AAC_MAX_ELEMENTS];

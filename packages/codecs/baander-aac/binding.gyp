@@ -29,6 +29,7 @@
         "src/ps_dec.cpp",
         "src/psycho.cpp",
         "src/encoder_tools.cpp",
+        "src/afterburner.cpp",
         "src/encoder.cpp",
         "src/sbr_enc.cpp",
         "src/ps_enc.cpp"
