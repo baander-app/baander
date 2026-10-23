@@ -1,7 +1,7 @@
 ---
 title: Production browser acceptance for rapid source seeking and paused remount
 date: 2026-10-23
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -84,3 +84,20 @@ existing frontend rules and player ownership conventions when changing the hook.
 
 Independent plan review approved this scope with the response deadline and control
 ownership clarifications incorporated before implementation.
+
+## Verification checkpoint
+
+The production run passed all eight browser phases and verified cleanup under
+`var/test-runs/player-controls-production-first`. Actual slider commits were
+21, 25 and 29 seconds; only the first and latest reached the server. The latest
+used generation 7 from its predecessor's acceptance and settled at generation 8.
+Reload retained the same job, session, generation and paused source cursor
+31.097109 seconds; resumed playback advanced from 4 to 37 decoded frames.
+
+Both seek-ownership defects have failing-before-fix regressions. The final four
+player suites passed 77 tests, including 66 hook tests. Typechecking, targeted
+ESLint, production build, asset verification, shell/browser syntax, CI YAML and
+runner preflight/cleanup checks passed. Logs are retained under
+`var/test-runs/player-controls-gates`. Independent final review approved the
+implementation and found no further simplification necessary. The roadmap records
+this delivery and the remaining qualification boundaries.

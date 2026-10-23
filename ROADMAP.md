@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-22. This roadmap selects useful future work and records unresolved
+Updated: 2026-10-23. This roadmap selects useful future work and records unresolved
 release acceptance. Current behavior and operating contracts belong in the linked
 guides. Git history retains completed milestones and their verification evidence.
 
@@ -905,3 +905,44 @@ Gate logs and the combined test receipt are retained under
 history byte-for-byte; all 21 local document links resolve and whitespace checks
 pass. All run-owned services were removed. Existing application databases, Redis
 and media storage were not reused or reset.
+
+### Rapid source seeking and paused remount — 2026-10-23
+
+A fatal event from a retiring media attachment now preserves its pending seek
+chain, allowing the latest queued target to use the predecessor's accepted
+generation. Late control failures from an abandoned job or session cannot change
+the current playback. Both races failed before their fixes and pass afterward.
+`BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1` selects client controls independently of
+native launch observation, including in the production browser CI job.
+
+Verification passed 77 tests across four player suites, including 66 hook tests,
+plus typechecking, targeted ESLint, production build and asset verification,
+Node/Bash syntax, CI YAML parsing and three runner preflight cases. Cleanup
+regressions passed 16 cleanup, two final-drill and five receipt cases. Failing
+race reproductions and passing gate logs are retained under
+`var/test-runs/player-controls-gates`. Independent review, including simplification,
+approved the change. Backend PHP was unchanged; the preceding backend suite was
+not rerun.
+
+Production acceptance passed all eight Chromium 148.0.7778.96 phases against the
+immutable worker image. The real source slider committed positions 21, 25 and
+29 seconds while the first seek response was held; only 21 and 29 reached the
+backend. The first acceptance returned generation 7, the successor finished at
+generation 8, and the response hold including forwarding took 132 milliseconds.
+The same run required positive video-frame and PCM output from signed HLS and
+DASH, subtitle checks, offline signing-poll recovery, web replacement, worker
+containment/recovery and retired-resource refusal.
+
+Reloading the movie page and reopening the player retained the same job, session
+and generation 8, paused at source position 31.097109 seconds with four decoded
+frames. Resuming advanced the local clock from 25.097109 to 26.136082 seconds
+(source positions 31.097109 to 32.136082) and decoded frames from four to 37.
+Evidence is under `var/test-runs/player-controls-production-first`, including
+`operator.log`, `browser/result.json`, `browser/playback-timeline.json` and
+`cleanup.json`. The runner exited zero and verified removal of its resources.
+
+The separate native pressure observer still requires the HLS muxer and
+`stream.m3u8` output; it remains unqualified for the current demultiplexed encoder.
+The preceding live DASH EOF, CMAF, signed-URL expiry and additional-browser limits
+remain open. Existing application databases, Redis and media storage were not
+reused or reset. This checkpoint includes no push or feature merge.
