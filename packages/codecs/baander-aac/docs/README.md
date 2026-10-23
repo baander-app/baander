@@ -1,11 +1,12 @@
 # baander-aac
 
-A self-contained AAC-LC encoder and decoder in C++17 with a C API, a
-command-line tool and a Node-API binding for the Electron app.
+A self-contained AAC-LC and HE-AAC v1/v2 encoder and decoder in C++17
+with a C API, a command-line tool and a Node-API binding for the Electron
+app, over ADTS, LOAS/LATM and raw access units.
 
 **Version:** 0.1.0
 **License:** Apache-2.0 for Baander-authored code; see [Provenance](#provenance).
-**Standard:** ISO/IEC 14496-3 (MPEG-4 Audio), AAC-LC, 1024-sample frames, ADTS framing.
+**Standard:** ISO/IEC 14496-3 (MPEG-4 Audio), AAC-LC, HE-AAC v1 and v2, 1024- and 960-sample frames; ADTS, LATM/LOAS (ISO/IEC 14496-3 1.7) and raw access units with an AudioSpecificConfig.
 
 ## What it does
 
@@ -18,15 +19,56 @@ sequences, pulse data, TNS, M/S stereo, intensity stereo and perceptual
 noise substitution (including correlated noise in M/S bands). Every
 raw data block element is handled: SCE, CPE and LFE channels, coupling
 channel elements (dependent and independent, with their gain lists),
-program config elements and the channel configurations 1 to 7, 11 and 12
-of the standard; DSE and FIL elements are skipped. A stream without a
-channel configuration or PCE takes its layout from the elements it
-carries. The output is emitted in the canonical order left, right,
-centre, LFE, back left, back right, outer left, outer right, or
-downmixed to stereo or mono with FFmpeg's default coefficients. ADTS
-headers set the sample rate and channel configuration of the stream, and
-a header may carry several raw data blocks; CRC-protected frames are
-accepted (the CRC is not verified).
+program config elements (with the height extension of ETSI TS 101 154)
+and the channel configurations 1 to 7, 11, 12 and 14 of the standard; DSE
+elements are skipped. A stream without a channel configuration or PCE
+takes its layout from the elements it carries. The output is emitted in
+the canonical order left, right, centre, LFE, back left, back right, then
+the extra pair of a 7.1 layout (`aac_decoder_channel_mode` names it:
+front centre, back behind the side pair, top front or the PCE rear
+surround layout), or downmixed to stereo or mono with FFmpeg's default
+coefficients. ADTS headers set the sample rate and channel configuration
+of the stream, and a header may carry several raw data blocks; a
+CRC-protected frame is verified over the header and the covered bits of
+each element (ISO/IEC 13818-7 6.2) and a mismatch conceals the block.
+Frames of 960 samples (120 per short window) decode when an
+AudioSpecificConfig announces them or `aac_decoder_set_frame_length`
+says so.
+
+Transport: `aac_decoder_feed` and `aac_decoder_decode_next` take a byte
+stream of any chunking. ADTS and LOAS are detected from their sync words
+and resynchronised across damaged bytes (a frame is trusted once its
+successor's header agrees with it in rate, layer, profile and layout);
+LATM AudioMuxElements with the StreamMuxConfig in band (audioMuxVersion
+0 and 1) or out of band, and raw access units, are taken one packet per
+feed. An AudioSpecificConfig (`aac_decoder_set_config`) presets the rate,
+layout, frame length and, with explicit backward compatible or
+hierarchical signalling, the SBR output rate and the parametric stereo
+pair before any data arrives. The one-shot `aac_decoder_decode` takes
+one ADTS or LOAS frame, one LATM element or one access unit.
+
+Error concealment is on by default: a block that fails to parse, fails
+its CRC or never arrives is replaced. The elements decoded before the
+failure keep their data; each missing channel continues its last good
+spectrum with random signs and a fade of 3 dB per frame, then from the
+fifth frame substitutes noise at the stored band energies down to
+silence (`AAC_CONCEAL_NOISE` substitutes from the first frame); the
+window sequence follows the last good frame so the overlap stays
+consistent; SBR keeps the previous envelope and noise floor with the
+envelope stepping down 3 dB per frame, and parametric stereo keeps its
+parameters; the first good frame afterwards is crossfaded in over the
+frame. Delta-coded SBR and PS data after a loss is clamped rather than
+refused until a frequency-coded frame re-anchors it. Concealed frames are
+counted (`aac_decoder_concealed_frames`, `aac_decoder_last_frame_concealed`);
+with `AAC_CONCEAL_OFF` the frame returns `AAC_ERR_DECODE`.
+
+A look-ahead peak limiter (`aac_decoder_set_limiter`, off by default)
+keeps the output within full scale after a downmix: the gain ramps down
+over the attack window so that it has reached the needed value when the
+peak leaves the delay line, recovers at a constant rate in decibels over
+the release time, and passes samples that never needed a reduction
+unchanged; its delay is the attack window, reported by
+`aac_decoder_delay`.
 
 Against FFmpeg's decoder the output agrees to floating-point precision
 (135 dB difference SNR) on FFmpeg-encoded streams across all sample rates
@@ -93,9 +135,22 @@ The encoder follows the structure of the Fraunhofer FDK encoder and
   5.0, 5.1, 6.1, 7.1): each syntactic element (SCE, CPE, LFE) decides its
   own windows, TNS, stereo tools and noise substitution, the LFE element
   codes the lowest twelve lines in long windows only, and one rate loop
-  spends the frame's bits across all elements; the 6.1 layout, which the
-  ADTS header cannot name, carries a program config element in every
-  frame;
+  spends the frame's bits across all elements; the 6.1 layout and the 7.1
+  layouts other than configuration 7, which the ADTS header cannot name,
+  carry a program config element in every frame (`aac_encoder_set_channel_mode`
+  picks the 7.1 layout: back pair behind the side pair by default, front
+  centre pair, top front pair, or the rear surround layout with the
+  height extension);
+- 1024-sample frames, or 960 (`aac_encoder_set_frame_length`) with the
+  standard's 960-sample band tables, a 1920-point transform and SBR on
+  15 envelope slots;
+- ADTS with an optional CRC, LOAS, LATM with the StreamMuxConfig in band
+  or out of band, or raw access units (`aac_encoder_set_transport`),
+  with the AudioSpecificConfig from `aac_encoder_config` in implicit,
+  explicit backward compatible or hierarchical SBR/PS signalling
+  (`aac_encoder_set_signaling`; ADTS always signals implicitly); the
+  MPEG-2 ADTS variant (`aac_encoder_set_mpeg2`) sets the header's id and
+  disables noise substitution, which MPEG-2 AAC lacks;
 - thresholds raised towards the bit budget in the fourth-root domain so
   that quiet bands become holes before loud bands lose precision, with
   hole-avoidance flags from spread energy and top-down band release when
@@ -153,6 +208,14 @@ int aac_encoder_frame_size(AacEncoderHandle ctx);
 int aac_encoder_delay(AacEncoderHandle ctx);
 int aac_encoder_max_frame_bytes(AacEncoderHandle ctx);
 void aac_encoder_destroy(AacEncoderHandle ctx);
+/* stream format, before the first frame or after a flush */
+int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport);
+int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling);
+int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length);
+int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
+int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
+int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
+int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
 ```
 
 - `sample_rate` is one of the twelve AAC rates (8000 to 96000 Hz);
@@ -164,21 +227,28 @@ void aac_encoder_destroy(AacEncoderHandle ctx);
   rows span 8 to 160 kbit/s for a mono element and 16 to 256 kbit/s for a
   stereo one, and a bitrate outside them takes the nearest row. HE-AAC v2
   takes a stereo input only.
-- `aac_encoder_encode` takes exactly `frame_size()` (1024, or 2048 with
-  SBR) interleaved float samples per channel at full scale 1.0 and writes
-  one ADTS frame. The output buffer must hold
+- `aac_encoder_encode` takes exactly `frame_size()` (1024 or 960, twice
+  that with SBR) interleaved float samples per channel at full scale 1.0
+  and writes one frame of the transport: an ADTS frame, a LOAS frame, a
+  LATM AudioMuxElement or a raw access unit. The output buffer must hold
   `aac_encoder_max_frame_bytes` (768 bytes per channel plus the header,
-  plus 272 bytes per SBR element); a smaller one is refused with
-  `AAC_ERR_OVERFLOW` before any input is consumed.
+  plus 272 bytes per SBR element, plus the LATM overhead); a smaller one
+  is refused with `AAC_ERR_OVERFLOW` before any input is consumed.
 - The first `aac_encoder_delay` output samples of the decoded stream are
   silence: 2048 for AAC-LC (one block of lookahead for block switching
-  plus the transform overlap), 5635 at the input rate for HE-AAC (the
-  core delay at half rate plus the QMF chains of encoder and decoder).
-- `aac_encoder_flush` drains the delay: it writes the remaining ADTS
-  frames (two, or three with SBR) back to back and returns their total
-  length, then 0 until the next `aac_encoder_encode`. A flushed encoder
-  starts over, so the next input opens a stream identical to a fresh
-  encoder's.
+  plus the transform overlap; 1920 with 960-sample frames), 5635 at the
+  input rate for HE-AAC (the core delay at half rate plus the QMF chains
+  of encoder and decoder; 5379 with 960-sample frames).
+- `aac_encoder_flush` drains the delay: with ADTS or LOAS it writes the
+  remaining frames (two, or three with SBR) back to back and returns
+  their total length, then 0 until the next `aac_encoder_encode`; with a
+  packet transport it writes one unit per call until it returns 0. A
+  flushed encoder starts over, so the next input opens a stream identical
+  to a fresh encoder's, and the stream format may be changed again.
+- `aac_encoder_config` writes the AudioSpecificConfig of the stream (for
+  an MP4 `esds` box or an out-of-band StreamMuxConfig); a 6.1 or
+  PCE-signalled 7.1 layout is written as channel configuration 0 with the
+  PCE inside, 960-sample frames set the frame length flag.
 - `quality` is 1..100 for `AAC_RC_CVBR` and `AAC_RC_TVBR`; 70 codes at the
   masking threshold, 100 nine dB below it. In the VBR modes the quality
   also selects the lowpass (13 kHz at 1 to 19.3 kHz at 100), and a quality
@@ -198,6 +268,20 @@ int aac_decoder_channels(AacDecoderHandle ctx);
 int aac_decoder_stream_channels(AacDecoderHandle ctx);
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps);
 void aac_decoder_destroy(AacDecoderHandle ctx);
+/* stream settings */
+int aac_decoder_set_transport(AacDecoderHandle ctx, AacTransport transport);
+int aac_decoder_set_config(AacDecoderHandle ctx, const uint8_t* asc, int size);
+int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length);
+int aac_decoder_set_concealment(AacDecoderHandle ctx, AacConcealment mode);
+int aac_decoder_last_frame_concealed(AacDecoderHandle ctx);
+int aac_decoder_concealed_frames(AacDecoderHandle ctx);
+int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, int release_ms);
+int aac_decoder_delay(AacDecoderHandle ctx);
+int aac_decoder_channel_mode(AacDecoderHandle ctx);
+/* streaming input */
+int aac_decoder_feed(AacDecoderHandle ctx, const uint8_t* data, int size);
+int aac_decoder_decode_next(AacDecoderHandle ctx, float* pcm, int pcm_size);
+int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 ```
 
 - `aac_decoder_decode` takes one ADTS frame (every raw data block in it)
@@ -215,7 +299,18 @@ void aac_decoder_destroy(AacDecoderHandle ctx);
 - The ADTS header overrides the creation sample rate and channel
   configuration; `aac_decoder_sample_rate` reports the stream's rate. A
   change of rate or layout mid-stream resets the decoder state.
-  `aac_decoder_reset` clears the filterbank history for a seek.
+  `aac_decoder_reset` clears the filterbank history, the concealment
+  state and the input FIFO for a seek and re-applies the configuration.
+- `aac_decoder_feed` appends bytes to the input FIFO (64 KiB plus one
+  frame) and returns how many it took; a packet transport takes a packet
+  whole or not at all. `aac_decoder_decode_next` returns the samples per
+  channel of the next complete frame, 0 when none is pending, or a
+  negative error (an unsupported stream, or a damaged one with
+  concealment off). With `AAC_TRANSPORT_DETECT` the first bytes choose
+  ADTS or LOAS, else raw access units once a config was set.
+- `aac_decoder_set_limiter` takes the attack (look-ahead) and release
+  times in milliseconds; the look-ahead must fit 8192 frames at the
+  highest output rate, 96 kHz doubled by SBR (about 42 ms).
 
 ## Building
 
@@ -272,16 +367,25 @@ const samples = decoder.decode(stream); // Float32Array, interleaved
 ```
 
 Both classes accept input in arbitrary chunk sizes and keep partial frames
-between calls. `npm test` runs the binding's smoke test. In the Electron
-app the main-process `AacService` wraps the binding behind the
-`window.electron.aac` bridge (one-shot `decode`/`encode` and chunked
-decoder/encoder sessions).
+between calls. The decoder options add `transport` (`detect`, `adts`,
+`loas`, `latm`, `latm-raw`, `raw`), `config` (AudioSpecificConfig bytes),
+`frameLength`, `concealment` (`off`, `noise`, `interpolate`) and
+`limiter` (`true` or `{ attackMs, releaseMs }`), and the decoder reports
+`concealedFrames`, `channelMode` and `delay`; the encoder options add
+`transport`, `signaling`, `frameLength`, `crc`, `mpeg2` and `channelMode`
+(`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`), and the encoder exposes
+`config` and the `unitSizes` of its last result, which a packetiser needs
+with the LATM and raw transports. `npm test` runs the binding's smoke
+test. In the Electron app the main-process `AacService` wraps the binding
+behind the `window.electron.aac` bridge (one-shot `decode`/`encode` and
+chunked decoder/encoder sessions).
 
 ## Testing
 
-`ctest` runs ten suites: table consistency (prefix-free, complete
-Huffman codebooks; scalefactor bands; Princen-Bradley windows), MDCT
-against the direct definition and TDAC, the QMF banks (every analysis and
+`ctest` runs fourteen suites: table consistency (prefix-free, complete
+Huffman codebooks; scalefactor bands for 1024 and 960 frames;
+Princen-Bradley windows), MDCT against the direct definition and TDAC,
+the QMF banks (every analysis and
 synthesis pairing reconstructs its input at the accuracy of the
 prototype, and the full-rate and half-rate analyses agree on the low
 band), bit reader/writer, ADTS and Huffman coding, decoder compliance on
@@ -297,13 +401,26 @@ coder, the band between 9 and 12 kHz comes back within 3 dB of the
 source and the bitrate is held), rate control, the coding tools
 (noise substitution keeps the level of the substituted region, intensity
 stereo keeps the balance, TNS covers both window types), and
-interoperability with FFmpeg. The interop test skips when `ffmpeg` is not
-on PATH; otherwise it requires our decoder to match FFmpeg's decode of
-FFmpeg-encoded streams, and FFmpeg to decode our streams exactly as our
-decoder does, both at better than 90 dB difference SNR, and the committed
-HE-AAC streams to decode within 70 dB of FFmpeg; the streams of ours it
-checks use TNS, noise substitution and intensity stereo, and its HE-AAC
-v1 and v2 streams of ours decode identically in both decoders.
+interoperability with FFmpeg, the transport layer (CRC known answers
+and coverage, ADTS resync across inserted headers, truncation and
+garbage, byte-wise feeding reproducing the one-shot decode, ASC
+roundtrips over every signalling mode, layout and frame length,
+StreamMuxConfig and LATM element roundtrips, LOAS/LATM/raw roundtrips
+of LC and HE-AAC streams), concealment (transparency on undamaged
+streams, damaged and lost frames at 1 and 10 percent on LC and HE-AAC
+streams with no error, exact counts, bounded discontinuities and the
+fade), 960-sample frames (transforms, API, roundtrips at every rate,
+HE-AAC delay) and the limiter. The interop test skips when `ffmpeg` is
+not on PATH; otherwise it requires our decoder to match FFmpeg's decode
+of FFmpeg-encoded streams (ADTS and LATM), and FFmpeg to decode our
+streams (ADTS, LOAS with implicit, backward compatible and hierarchical
+signalling, 960-sample LC frames over LOAS, every 7.1 mode, MPEG-2 ADTS)
+exactly as our decoder does, both at better than 90 dB difference SNR,
+and the committed HE-AAC streams to decode within 70 dB of FFmpeg; the
+streams of ours it checks use TNS, noise substitution and intensity
+stereo, and its HE-AAC v1 and v2 streams of ours decode identically in
+both decoders. FFmpeg 6.1 rejects SBR with 960-sample frames, so HE-AAC
+at 960 is covered by roundtrips only.
 
 Noise substitution never signals correlated noise (an M/S flag on a noise
 band): FFmpeg's decoder draws independent noise regardless of the flag,
@@ -313,7 +430,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR and PS decoders, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, SBR and PS decoders, limiter, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool
 tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
@@ -345,4 +462,11 @@ published design of FDK's `libSBRenc` (its tuning table, transient
 detector, noise floor estimation and envelope coding decisions) with no
 code copied; the PS encoder is written from ISO/IEC 14496-3 8.6.4 and
 3GPP TS 26.405. The HE-AAC test streams were encoded with the Fraunhofer
-FDK encoder.
+FDK encoder. The transport layer, AudioSpecificConfig and LATM/LOAS code
+is written from ISO/IEC 14496-3 1.6 and 1.7 and ISO/IEC 13818-7 (the
+ADTS CRC coverage), the concealment from the decoder's own state with
+the standard's recommendations, the 960-sample tables are ISO/IEC
+14496-3 data, the limiter follows the description of the MPEG-D DRC
+peak limiter, and the 7.1 channel modes and PCE height extension follow
+ISO/IEC 14496-3 Table 1.19 and ETSI TS 101 154; FDK was consulted for
+its feature list and parameter ranges only.

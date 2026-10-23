@@ -1,7 +1,7 @@
 ---
 title: AAC codec transport and robustness: concealment, limiter, signalling, LATM/LOAS, 960 frames, layouts
 date: 2026-10-23
-status: draft
+status: delivered
 execution: code
 ---
 

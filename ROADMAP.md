@@ -789,6 +789,27 @@ verification; the historical contract remains in Git. Evidence remains under
 retains failed attempts and acceptance limits. This completed checkpoint does
 not select more outage work.
 
+### AAC codec gap closure against the fdk-aac upstream
+
+Checkpoint, 2026-10-23, transport and robustness: the first tier of the gap
+list against the AOSP fdk-aac upstream, per the
+[plan](docs/plans/2026-10-23-002-feat-aac-codec-transport-robustness-plan.md),
+is delivered in `packages/codecs/baander-aac`. Decoder: streaming input with
+ADTS and LOAS resync, ADTS CRC verification, an AudioSpecificConfig reader
+with implicit, backward compatible and hierarchical SBR/PS signalling, LATM
+and LOAS demux, raw access units, error concealment on by default with
+counters, a look-ahead peak limiter, 960-sample frames, channel configuration
+14 and the PCE height extension with the 7.1 modes. Encoder: ADTS with CRC,
+LOAS, LATM, raw access units, 960-sample frames, the four 7.1 layouts and the
+MPEG-2 ADTS variant. The binding decodes through the streaming API and takes
+every new option; the Electron service, IPC validation and bridge types
+follow. Code review found eleven defects, all corrected. Verification: CTest
+14/14 in the release and sanitizer builds, FFmpeg interop over LATM and LOAS
+in both directions (131 to 137 dB), the binding's smoke test (7 tests) and the
+Electron service suite (5 tests). Listening tests and the Electron IPC and
+bridge suites did not run in that environment. Deviations by design are
+recorded in the [codec README](packages/codecs/baander-aac/docs/README.md).
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

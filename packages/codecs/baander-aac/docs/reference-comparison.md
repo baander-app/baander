@@ -122,3 +122,36 @@ Notes:
   encoder does not pad.  FFmpeg spends its reservoir on the bursts.
 - Encoding runs at roughly 15–60 times real time for stereo 44.1 kHz on
   one core, depending on the material.
+
+## Transport and robustness
+
+Measured on 2026-10-23 with FFmpeg 6.1.1 (difference SNR between the two
+decoders; the 90 dB bound of the interop suite is far below every row).
+
+| Stream | Difference SNR |
+|--------|---------------:|
+| FFmpeg `latm` mux of its own streams (stereo, mono, 5.1, 6.1 PCE), decoded by us | 135.6–137.2 dB |
+| Our LOAS (LC stereo, LC 6.1 PCE, HE v1 and v2 with hierarchical and backward compatible signalling), decoded by FFmpeg | 131.4–135.9 dB |
+| Our 960-sample LC frames over LOAS (transients, mono harmonics, noise, intensity stereo, 16 kHz TVBR, 5.1), decoded by FFmpeg | above 130 dB |
+| Our 7.1 modes (configurations 7 and 12, PCE top front and rear surround, after reordering FFmpeg's channels), decoded by FFmpeg | 136 dB |
+| Our MPEG-2 ADTS stream, decoded by FFmpeg | 135.8 dB |
+
+`ffprobe` reports the SBR rate and channel count of the explicitly
+signalled LOAS streams, `7.1` for configurations 7 and 12, `7.1(wide)`
+for the top-front layout (FFmpeg ignores the height extension and swaps
+the two front pairs) and `unknown` for the rear surround PCE, whose
+channels it emits in element order. FFmpeg 6.1 rejects SBR with
+960-sample frames, so HE-AAC at 960 is verified by roundtrip only
+(delay 5379 samples, the same band bounds as at 1024).
+
+Concealment on the committed streams and our own: with 1 and 10 percent
+of the frames damaged (random bytes in the first payload bytes,
+truncation to half, header only) every damaged frame that the decoder
+can detect is concealed and counted, no intact frame fails, the output
+length and frame size are unchanged, the largest sample jump around a
+concealed frame stays within the bound of the clean decode, and an
+8-frame loss fades at 3 dB per frame on LC and HE-AAC v1 and v2 streams.
+One corruption in thirteen of a short-window LC stream parses as a valid
+frame and is not detected. The 1024-frame encoder output is byte for byte
+what it was before the 960-frame work on every profile and mode checked
+(LC mono, stereo, 5.1, TVBR; HE v1 stereo and mono; HE v2).
