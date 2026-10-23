@@ -719,9 +719,20 @@ int skip_dse(AacBitReader* r) {
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
-/* fill_element() (Table 4.11).  The payload is skipped; an SBR extension
- * (extension_type 13 or 14, Table 4.56) is noted for the frame. */
-int skip_fil(AacDecoderState* s, AacBitReader* r) {
+/* The SBR state of a layout element, created on first use. */
+AacSbrState* sbr_state(AacDecoderState* s, int elem) {
+  if (!s->sbr[elem]) {
+    s->sbr[elem] = new AacSbrState();
+    aac_sbr_init(s->sbr[elem], s->sample_rate);
+  }
+  return s->sbr[elem];
+}
+
+/* fill_element() (Table 4.11).  An SBR extension (extension_type 13 or
+ * 14, Table 4.56) belongs to the SCE or CPE just before it (`elem`, or -1
+ * after any other element) and is parsed into that element's SBR state;
+ * every other payload is skipped. */
+int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type) {
   int count = (int)aac_bitreader_read(r, 4);
   if (count == 15) {
     count += (int)aac_bitreader_read(r, 8) - 1;
@@ -730,6 +741,16 @@ int skip_fil(AacDecoderState* s, AacBitReader* r) {
     const int ext_type = (int)aac_bitreader_peek(r, 4);
     if (ext_type == 13 || ext_type == 14) {
       s->has_sbr = 1;
+      if (elem >= 0 && (elem_type == AAC_ELEM_SCE || elem_type == AAC_ELEM_CPE)) {
+        aac_bitreader_skip(r, 4);
+        s->sbr_mode = 1;
+        AacSbrState* sbr = sbr_state(s, elem);
+        const int ret = aac_sbr_decode_extension(sbr, r, ext_type == 14, count, elem_type);
+        if (ret == 0 && sbr->ps_present) {
+          s->has_ps = 1;
+        }
+        return r->overread ? AAC_ERR_DECODE : 0;
+      }
     }
   }
   aac_bitreader_skip(r, 8 * count);
@@ -867,10 +888,22 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   aac_mdct_init(&s->mdct_long, 2048);
   aac_mdct_init(&s->mdct_short, 256);
   s->random_state = kRandomSeed;
+  s->sbr_mode = 0;
+  for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+    s->sbr[i] = nullptr;
+  }
   return s;
 }
 
-void aac_decoder_state_destroy(AacDecoderState* s) { delete s; }
+void aac_decoder_state_destroy(AacDecoderState* s) {
+  if (!s) {
+    return;
+  }
+  for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+    delete s->sbr[i];
+  }
+  delete s;
+}
 
 void aac_decoder_reset_state(AacDecoderState* s) {
   for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
@@ -884,17 +917,25 @@ void aac_decoder_reset_state(AacDecoderState* s) {
     s->cce[k].present = 0;
   }
   s->random_state = kRandomSeed;
+  s->sbr_mode = 0;
+  s->frame_size = AAC_FRAME_SIZE_LONG;
+  for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+    if (s->sbr[i]) {
+      aac_sbr_init(s->sbr[i], s->sample_rate);
+    }
+  }
 }
 
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index) {
   if (rate_index < 0 || rate_index >= AAC_NUM_SAMPLE_RATES) {
     return AAC_ERR_UNSUPPORTED;
   }
-  if (rate_index != s->rate_index) {
-    aac_decoder_reset_state(s);
-  }
+  const bool changed = rate_index != s->rate_index;
   s->rate_index = rate_index;
   s->sample_rate = aac_sample_rates[rate_index];
+  if (changed) {
+    aac_decoder_reset_state(s);
+  }
   return 0;
 }
 
@@ -954,6 +995,8 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->has_sbr = 0;
   s->has_ps = 0;
   bool pce_seen = false;
+  int last_elem = -1; /* layout index of the element just decoded */
+  int last_type = -1;
   for (;;) {
     const int elem = (int)aac_bitreader_read(r, 3);
     if (r->overread) {
@@ -964,6 +1007,10 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       break;
     }
     int ret = 0;
+    const int fil_elem = elem == AAC_ELEM_FIL ? last_elem : -1;
+    const int fil_type = last_type;
+    last_elem = -1;
+    last_type = elem;
     switch (elem) {
       case AAC_ELEM_SCE:
       case AAC_ELEM_LFE:
@@ -979,6 +1026,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
           sniffed[num_sniffed].tag = tag;
           sniffed[num_sniffed].position = sniffed_position(sniffed, num_sniffed, elem);
           s->elem_base[num_sniffed] = next_channel;
+          last_elem = num_sniffed;
           num_sniffed++;
           chans = &s->ch[next_channel];
           next_channel += nch;
@@ -988,6 +1036,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
             return AAC_ERR_DECODE;
           }
           s->elem_present[idx] = 1;
+          last_elem = idx;
           chans = &s->ch[s->elem_base[idx]];
         }
         ret = elem == AAC_ELEM_CPE ? decode_cpe(s, r, &chans[0], &chans[1])
@@ -1032,7 +1081,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
         break;
       }
       case AAC_ELEM_FIL:
-        ret = skip_fil(s, r);
+        ret = decode_fil(s, r, fil_elem, fil_type);
         break;
       default:
         return AAC_ERR_UNSUPPORTED;
@@ -1097,6 +1146,17 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       imdct_and_window(s, &chans[c]);
     }
     apply_couplings(s, i, -1);
+  }
+  /* SBR last: the stream stays at twice the core rate once an element has
+   * carried SBR data, and every element goes through its filterbanks so
+   * that all channels keep the same delay. */
+  s->frame_size = s->sbr_mode ? 2 * AAC_FRAME_SIZE_LONG : AAC_FRAME_SIZE_LONG;
+  if (s->sbr_mode) {
+    for (int i = 0; i < l->num_elements; i++) {
+      AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+      aac_sbr_apply(sbr_state(s, i), l->elems[i].type, chans[0].output,
+                    l->elems[i].type == AAC_ELEM_CPE ? chans[1].output : nullptr);
+    }
   }
   s->stream_channels = l->num_channels;
   return l->num_channels;

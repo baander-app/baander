@@ -12,8 +12,11 @@
         "src/ics.cpp",
         "src/bitstream.cpp",
         "src/channel_map.cpp",
+        "src/qmf.cpp",
+        "src/sbr_tables.cpp",
         "src/api.cpp",
         "src/decoder.cpp",
+        "src/sbr_dec.cpp",
         "src/psycho.cpp",
         "src/encoder_tools.cpp",
         "src/encoder.cpp"

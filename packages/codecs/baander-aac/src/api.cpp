@@ -256,7 +256,8 @@ int aac_decoder_output_sample_rate(AacDecoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return static_cast<AacDecoderState*>(ctx)->sample_rate;
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  return s->sbr_mode ? 2 * s->sample_rate : s->sample_rate;
 }
 
 int aac_decoder_channels(AacDecoderHandle ctx) {
