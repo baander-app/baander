@@ -546,6 +546,122 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
+  it.each([false, true])('recovers delivery after an authenticated publication interruption, including delayed failure after readiness returns: %s', async lateFailure => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 86400
+    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+      revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
+    const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
+    let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: ready }
+    post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? snapshot : { data: {} }))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 31.652
+    snapshot = { data: { ...unavailable, revision: 46, position: 43.652 } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    if (lateFailure) {
+      snapshot = { data: { ...ready, revision: 46, position: 43.652 } }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(attachments).toHaveLength(1)
+    }
+    await act(async () => attachments[0].onError('network'))
+    expect(result.current.state).toBe('preparing')
+    expect(onError).not.toHaveBeenCalled()
+    video.currentTime = 0
+    snapshot = { data: { ...ready, revision: 46, position: 43.652, url: `/manifest?exp=${expiry + 60}` } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBeCloseTo(31.652, 6)
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(result.current.currentTime).toBeCloseTo(43.652, 6)
+    await act(async () => attachments[1].onError('network'))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    expect(post.mock.calls.filter(call => call[1].action && call[1].action !== 'progress')).toHaveLength(0)
+    unmount()
+  })
+
+  it('keeps polling through media retirement and restores a successor execution at its canonical paused cursor', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 86400
+    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+      revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'running' }
+    const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
+    let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: ready }
+    post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? snapshot : { data: {} }))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 31.652
+    snapshot = { data: { ...unavailable, revision: 46, position: 43.652 } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    await act(async () => attachments[0].onError('network'))
+    expect(result.current.state).toBe('preparing')
+    video.currentTime = 0
+    snapshot = { data: { ...snapshot.data, generation: 11, revision: 48, status: 'paused', position: 30 } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(1)
+    snapshot = { data: { ...ready, generation: 12, revision: 48, renditionSet: 'job.12', status: 'paused',
+      url: `/manifest?exp=${expiry + 60}` } }
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(18)
+    Object.defineProperty(video, 'paused', { value: true })
+    vi.mocked(video.play).mockClear()
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(result.current.currentTime).toBe(30)
+    expect(video.play).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1].action && call[1].action !== 'progress')).toHaveLength(0)
+    unmount()
+  })
+
+  it.each(['initial preparation', 'pending restoration', 'stale snapshot', 'cancelled', 'malformed ready'])('does not grant publication recovery for %s', async kind => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 86400
+    const ready = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned-session', generation: 10,
+      revision: 38, renditionSet: 'job.10', ready: true, position: 30, startTime: 12, duration: 180, status: 'paused' }
+    const unavailable = { ...ready, ready: false, url: null, startTime: null, duration: null, renditionSet: '' }
+    let snapshot: { data: Partial<typeof ready> | typeof unavailable } = { data: kind === 'initial preparation' ? unavailable : ready }
+    post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? snapshot : { data: {} }))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    if (kind === 'initial preparation') {
+      expect(attachments).toHaveLength(0)
+      snapshot = { data: ready }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    } else {
+      if (kind !== 'pending restoration') await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      snapshot = { data: kind === 'stale snapshot' ? { ...unavailable, generation: 9 }
+        : kind === 'cancelled' ? { ...unavailable, status: 'cancelled' }
+          : kind === 'malformed ready' ? { ...unavailable, ready: true }
+            : kind === 'pending restoration' ? { ...unavailable, revision: 39 } : unavailable }
+      await act(async () => vi.advanceTimersByTimeAsync(kind === 'pending restoration' ? 2000 : 1000))
+    }
+    await act(async () => attachments[0].onError('network'))
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    expect(attachments).toHaveLength(1)
+    unmount()
+  })
+
   it('waits for authorization and uses the signed manifest', async () => {
     let resolve!: (value: { data: { url: string, ready?: boolean, generation?: number, revision?: number, jobId?: string, sessionId?: string | null, position?: number, status?: string, startTime?: number, duration?: number, renditionSet?: string } }) => void
     post.mockReturnValue(new Promise((done) => { resolve = done }))

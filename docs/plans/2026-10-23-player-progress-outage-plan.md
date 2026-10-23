@@ -109,9 +109,10 @@ every fresh attachment consumes it. Recovery of the same execution still require
 a newer nonexpired capability. A new execution restores its canonical position
 and intent. Decoder errors, explicit refusal, initial failures and network failure
 without expiry or an observed interruption retain their existing behavior.
-Only an accepted snapshot explicitly reporting `ready: false` for the attached
-execution earns this allowance. Initial preparation without an attachment, stale
-responses, cancelled state and malformed ready responses do not establish it.
+Only an accepted snapshot explicitly reporting `ready: false` for an owned,
+ready attachment whose position restoration has finished earns this allowance.
+It must describe the attached execution. Initial preparation, pending restoration,
+stale responses, cancelled state and malformed ready responses do not establish it.
 
 Reproduce this integration failure deterministically before changing source.
 Cover same-execution recovery, delayed failure after readiness returns, consumption

@@ -107,10 +107,11 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let disposeAttachment: (() => void) | null = null
     let attachmentRevision = 0
     let attachmentReady = false
+    let attachmentRestored = false
     let attachedCapability: PlaybackCapability | null = null
     let recoveryPosition: number | null = null
     let terminal = false
-    let observedSigningOutage = false
+    let observedDeliveryInterruption = false
     const playbackPosition = () => restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.1
       ? sourceDuration : mediaStart + video.currentTime
     const clearSourceSeek = () => {
@@ -129,6 +130,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       restoredPosition = null
       restoredSourceEnd = null
       attachmentReady = false
+      attachmentRestored = false
       attachmentRevision++
       disposeAttachment?.()
       disposeAttachment = null
@@ -153,7 +155,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         releaseAttachment()
         changeState('preparing')
       } else if (failure === 'network' && attachedCapability
-        && (observedSigningOutage || Date.now() >= attachedCapability.expiresAt)) {
+        && (observedDeliveryInterruption || Date.now() >= attachedCapability.expiresAt)) {
         recoveryPosition = pendingLoad ? mediaStart + pendingLoad.position : playbackPosition()
         releaseAttachment()
         changeState('preparing')
@@ -220,6 +222,10 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (identity !== loadedIdentity && (executionChanged || reloadCursor !== null || previous?.position !== data.position)) {
           reloadCursor = data.position
         }
+        if (data.ready === false && !executionChanged && disposeAttachment !== null
+          && attachmentReady && attachmentRestored && pendingLoad === null && (data.status === 'running' || data.status === 'paused')) {
+          observedDeliveryInterruption = true
+        }
         if (!data.ready || data.url === null || data.startTime === null || data.duration === null) {
           pendingLoad = null
           if (data.status === 'cancelled') { clearSourceSeek(); video.pause(); video.src = ''; changeState('ended'); return }
@@ -243,13 +249,14 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           const renewalPosition = recoverAcceptedSeek ? data.position : recoveryPosition ?? playbackPosition()
           recoveryPosition = null
           attachedCapability = capability
-          observedSigningOutage = false
+          observedDeliveryInterruption = false
           restoredSourceEnd = null
           progressPosition = data.position
           const attachedPosition = mediaStart + (pendingLoad?.position ?? video.currentTime)
           const position = preserveAttachedPosition ? renewalPosition : reloadCursor ?? Math.max(data.position, attachedPosition)
           mediaStart = data.startTime
           setDuration(data.duration)
+          attachmentRestored = false
           pendingLoad = { identity, position: Math.max(0, position - mediaStart) }
           loadedIdentity = identity
           const attachment = ++attachmentRevision
@@ -277,6 +284,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           applyPlayback()
         }
         if (sourceSeekPosition !== null && !seekChain && !pendingLoad && identity === loadedIdentity) {
+          attachmentRestored = false
           pendingLoad = { identity, position: Math.max(0, data.position - mediaStart) }
           restorePendingLoad()
         }
@@ -289,7 +297,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         // preparation and cursor. A delayed media failure can still belong to
         // this outage after polling resumes; the next attachment consumes it.
         if (!initial && snapshot && transient) {
-          observedSigningOutage = true
+          observedDeliveryInterruption = true
           return
         }
         fail()
@@ -406,6 +414,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         applyPlayback()
         if (video.seeking || Math.abs(video.currentTime - nativeTarget) > 0.05) return
         pendingLoad = null
+        attachmentRestored = true
         reloadCursor = null
         clearSourceSeek()
         setCurrentTime(playbackPosition())
