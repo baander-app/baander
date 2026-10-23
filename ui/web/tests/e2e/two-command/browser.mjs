@@ -60,6 +60,7 @@ const networkInterruptions = []
 const manifestEvidence = []
 const mediaRequestOrder = []
 const capabilityRenewals = []
+const progressOutages = []
 const attachedCapabilities = new Map()
 function capabilityEvidence(url) {
   const expires = Number(url.searchParams.get('exp'))
@@ -162,7 +163,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -486,6 +487,155 @@ async function renewPlaybackCapabilities(owner) {
   await recordClientControl('capability-renewal-normal-lifetime', Date.now())
 }
 
+async function proveProgressOutages(owner) {
+  const deadline = Date.now() + 60000
+  const remaining = maximum => {
+    assert(Date.now() < deadline, 'Progress outage proof exceeded its total time budget')
+    return Math.max(1, Math.min(maximum, deadline - Date.now()))
+  }
+  const waitFor = (check, description) => until(check, description, remaining(15000))
+  const seekCount = () => playbackControls.filter(control => control.action === 'seek').length
+  const seeksBefore = seekCount()
+  const unchangedExecution = () => {
+    samePlayback(owner)
+    assert.equal(seekCount(), seeksBefore, 'A progress outage must not submit source seeks')
+  }
+  const positionRoute = `**/api/transcode/sessions/${owner.sessionId}/position`
+  for (const mode of ['before-forwarding', 'accepted-response-loss']) {
+    let passed = false
+    for (let attempt = 1; attempt <= 3 && !passed; attempt++) {
+      let baseline
+      let before
+      await waitFor(async () => {
+        unchangedExecution()
+        const state = await mediaState()
+        const capability = attachedCapabilities.get(attachmentNumber)
+        if (!state.connected || state.paused || state.ready < 2 || state.seeking || state.error !== null
+          || state.decodedFrames <= 0 || !snapshot?.ready || snapshot.status !== 'running'
+          || !capability || new URL(capability.url).searchParams.get('set') !== snapshot.renditionSet
+          || !currentSource(state)) return false
+        if (baseline?.attachment !== attachmentNumber) baseline = { attachment: attachmentNumber, ...state }
+        if (state.time > baseline.time + 0.2 && state.decodedFrames > baseline.decodedFrames) before = state
+        return Boolean(before)
+      }, 'decoded running media before a progress transport failure')
+      const originalAttachment = attachmentNumber
+      const renditionSet = snapshot.renditionSet
+      const proof = { mode, attempt, status: 'observing', startedAt: Date.now(), attachment: originalAttachment,
+        renditionSet, before: { time: before.time, decodedFrames: before.decodedFrames } }
+      progressOutages.push(proof)
+      let routeError
+      let failedRequest
+      let failureObserved = false
+      const pendingRoutes = new Set()
+      const requestFailed = request => {
+        if (request === failedRequest) {
+          failureObserved = true
+          proof.failureObservedAt = Date.now()
+        }
+      }
+      const interceptProgress = route => {
+        const task = (async () => {
+          const request = route.request()
+          const payload = request.method() === 'POST' ? request.postDataJSON() : null
+          if (payload?.action !== 'progress') {
+            await route.continue()
+            return
+          }
+          const submitted = { at: Date.now(), position: payload.position,
+            generation: payload.generation, revision: payload.revision }
+          if (!failedRequest) {
+            failedRequest = request
+            proof.fault = submitted
+            if (mode === 'accepted-response-loss') {
+              assert(snapshot.position < submitted.position,
+                'The lost-response progress cursor must advance the previously observed canonical position')
+              proof.canonicalBefore = { at: Date.now(), position: snapshot.position, revision: snapshot.revision }
+              const acceptanceDeadline = submitted.at + 4000
+              const response = await route.fetch({ timeout: remaining(3500) })
+              proof.accepted = { at: Date.now(), status: response.status() }
+              await response.dispose()
+              assert.equal(proof.accepted.status, 200, 'The lost progress response must come from the real server')
+              assert(Date.now() < acceptanceDeadline, 'Real progress forwarding must leave time to observe server acceptance')
+              await until(() => {
+                if (superseded()) return true
+                const canonical = playbackSnapshots.find(item => item.accepted && item.at >= proof.accepted.at
+                  && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+                  && item.generation === owner.generation && item.status === 'running'
+                  && item.renditionSet === renditionSet && item.position >= submitted.position
+                  && item.revision > submitted.revision)
+                if (canonical) proof.acceptedCanonical = { at: canonical.at,
+                  position: canonical.position, revision: canonical.revision }
+                return Boolean(canonical)
+              }, 'authenticated state to prove the lost-response progress write was applied',
+              remaining(acceptanceDeadline - Date.now()))
+            }
+            await route.abort('failed')
+            proof.abortedAt = Date.now()
+            if (mode === 'accepted-response-loss') assert(proof.abortedAt - submitted.at < 4500,
+              'Forwarding, canonical acceptance and response loss must finish below the client timeout')
+          } else {
+            const response = await route.fetch({ timeout: remaining(4500) })
+            if (response.status() === 200 && !proof.success) {
+              proof.success = { ...submitted, responseAt: Date.now(), status: response.status() }
+            }
+            await route.fulfill({ response })
+          }
+        })().catch(async error => {
+          routeError = error
+          await route.abort().catch(() => {})
+        })
+        pendingRoutes.add(task)
+        task.finally(() => pendingRoutes.delete(task))
+        return task
+      }
+      const superseded = () => {
+        unchangedExecution()
+        if (routeError) throw routeError
+        const changed = playbackSnapshots.find(item => item.accepted && item.at >= proof.startedAt
+          && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+          && item.generation === owner.generation && item.renditionSet !== renditionSet)
+        if (!changed) return false
+        proof.status = 'superseded-by-publication'
+        proof.publication = { at: changed.at, renditionSet: changed.renditionSet }
+        return true
+      }
+      page.on('requestfailed', requestFailed)
+      await page.route(positionRoute, interceptProgress)
+      try {
+        await waitFor(async () => {
+          if (superseded()) return true
+          if (!failureObserved || !proof.success || proof.success.position <= proof.fault.position) return false
+          const state = await mediaState()
+          assert.equal(attachmentNumber, originalAttachment, 'A stable-set progress failure must retain its attachment')
+          assert.equal(state.source, before.source, 'A progress failure must not rebuild its media source')
+          assert.equal(state.error, null, 'A progress failure must not report a media error')
+          const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
+          assert(!mediaEvents.some(event => !event.probe && event.at >= proof.startedAt
+            && ['emptied', 'error'].includes(event.event)), 'A progress failure must not tear down decoded media')
+          const canonical = playbackSnapshots.find(item => item.accepted && item.at >= proof.success.responseAt
+            && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+            && item.generation === owner.generation && item.status === 'running'
+            && item.renditionSet === renditionSet && item.position >= proof.success.position)
+          if (!(state.connected && !state.paused && state.ready >= 2 && !state.seeking && currentSource(state)
+            && state.time > before.time + 1 && state.decodedFrames > before.decodedFrames && canonical)) return false
+          proof.canonical = { at: canonical.at, position: canonical.position, revision: canonical.revision }
+          proof.after = { at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
+          proof.status = 'passed'
+          passed = true
+          return true
+        }, `${mode} progress failure to preserve decoding and recover genuine writes`)
+      } finally {
+        await page.unroute(positionRoute, interceptProgress)
+        await Promise.all([...pendingRoutes])
+        page.off('requestfailed', requestFailed)
+      }
+      if (routeError) throw routeError
+      await recordClientControl(`progress-outage-${mode}-${proof.status}`, proof.startedAt, { attempt })
+    }
+    assert(passed, `Progress outage ${mode} did not retain a stable rendition set within three attempts`)
+  }
+}
+
 async function reconnectPausedPlayback(owner, prefix) {
   await pausePlayback(owner, `${prefix}-pause`)
   let before
@@ -664,6 +814,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await page.setViewportSize({ width: 1280, height: 800 })
   } else if (phase === 'client-controls') {
     const owner = ownedPlayback()
+    await proveProgressOutages(owner)
     await pausePlayback(owner, 'pause')
     const started = Date.now()
     const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
@@ -806,7 +957,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages }, null, 2))
   return { phase, passed: true }
 }
 
@@ -823,7 +974,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })

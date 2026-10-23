@@ -74,6 +74,10 @@ record it and retry within three attempts per case and a shared 60-second budget
 Correlate the later real progress response with its submitted cursor and require a
 subsequent signing snapshot at or beyond that cursor. A successful signing request
 alone does not establish that progress writes recovered.
+For the lost-response case, observe the submitted position and a newer control
+revision in an authenticated snapshot before dropping the held response. HTTP 200
+alone can represent a fenced no-op. Keep forwarding and this observation together
+within the existing five-second client timeout.
 
 Run the four player suites in the CI runner, typecheck, full lint, production build
 and asset verification. Check browser JavaScript and runner shell syntax. Build
