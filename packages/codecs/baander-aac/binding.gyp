@@ -17,6 +17,7 @@
         "src/api.cpp",
         "src/decoder.cpp",
         "src/sbr_dec.cpp",
+        "src/ps_dec.cpp",
         "src/psycho.cpp",
         "src/encoder_tools.cpp",
         "src/encoder.cpp"

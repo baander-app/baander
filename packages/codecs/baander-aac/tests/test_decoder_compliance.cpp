@@ -275,14 +275,54 @@ static void test_sbr_streams() {
   aac_decoder_get_sbr_ps(dec, &has_sbr, nullptr);
   CHECK(has_sbr == 0, "LC frames report no SBR");
 
-  /* Parametric stereo data is recognised. */
+  /* An HE-AAC v2 stream: the mono element with parametric stereo decodes
+   * to a stereo pair of about the source's level in each channel, and the
+   * two channels are distinct (the source channels are uncorrelated, so
+   * the pair is compared to FFmpeg's decode in the interop suite rather
+   * than to the source). */
   aac_decoder_reset(dec);
   const std::vector<uint8_t> ps = read_file(data_path("hev2_stereo_32k.aac"));
-  decode_stream(ps, 48000, 0, &errors, dec);
+  const std::vector<float> ps_out = decode_stream(ps, 48000, 0, &errors, dec);
   int has_ps = 0;
   aac_decoder_get_sbr_ps(dec, &has_sbr, &has_ps);
   CHECK(errors == 0 && has_sbr == 1 && has_ps == 1, "HE-AAC v2 stream: sbr %d ps %d", has_sbr,
         has_ps);
+  CHECK(aac_decoder_channels(dec) == 2 && aac_decoder_stream_channels(dec) == 1,
+        "HE-AAC v2 stream: %d output channels from %d stream channels",
+        aac_decoder_channels(dec), aac_decoder_stream_channels(dec));
+  CHECK(ps_out.size() == split_adts(ps).size() * 2048 * 2, "HE-AAC v2 output length %zu",
+        ps_out.size());
+  const std::vector<float> ps_src = gen_he_signal(2);
+  const size_t n = ps_src.size() / 2;
+  std::vector<float> left(n), right(n), src_left(n), src_right(n);
+  for (size_t i = 0; i < n; i++) {
+    left[i] = ps_out[(i + 5000) * 2];
+    right[i] = ps_out[(i + 5000) * 2 + 1];
+    src_left[i] = ps_src[i * 2];
+    src_right[i] = ps_src[i * 2 + 1];
+  }
+  const double left_db = energy_db(left.data(), n - 5000) - energy_db(src_left.data(), n - 5000);
+  const double right_db =
+      energy_db(right.data(), n - 5000) - energy_db(src_right.data(), n - 5000);
+  CHECK(fabs(left_db) < 3.0 && fabs(right_db) < 3.0, "HE-AAC v2 levels off by %.1f / %.1f dB",
+        left_db, right_db);
+  double lr = 0.0, ll = 0.0, rr = 0.0;
+  for (size_t i = 0; i < n; i++) {
+    lr += (double)left[i] * right[i];
+    ll += (double)left[i] * left[i];
+    rr += (double)right[i] * right[i];
+  }
+  CHECK(fabs(lr) / sqrt(ll * rr) < 0.5, "HE-AAC v2 channels correlate at %.2f",
+        lr / sqrt(ll * rr));
+
+  /* With a mono request the pair is downmixed; after a reset the stream
+   * is mono again until PS data is seen. */
+  AacDecoderHandle mono = aac_decoder_create(48000, 1);
+  const std::vector<float> mono_out = decode_stream(ps, 48000, 1, &errors, mono);
+  CHECK(errors == 0 && mono_out.size() == split_adts(ps).size() * 2048, "HE-AAC v2 mono request");
+  aac_decoder_destroy(mono);
+  aac_decoder_reset(dec);
+  CHECK(aac_decoder_channels(dec) == 1, "after reset: %d channels", aac_decoder_channels(dec));
   aac_decoder_destroy(dec);
 }
 

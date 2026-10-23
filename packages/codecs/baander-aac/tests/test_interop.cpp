@@ -98,7 +98,8 @@ static void ffmpeg_layout(const char* name, const char* layout, int channels, in
 
 /* One of the committed HE-AAC streams through ffmpeg and through our
  * decoder.  ffmpeg widens a mono HE-AAC stream to stereo (it assumes
- * parametric stereo may follow), so only its first channel is compared. */
+ * parametric stereo may follow), so only its first channel is compared;
+ * an HE-AAC v2 stream is stereo in both decoders. */
 static void he_stream(const char* name, int channels, double min_db) {
   const std::vector<uint8_t> stream = read_file(data_path(name));
   CHECK(!stream.empty(), "%s: stream missing", name);
@@ -170,6 +171,7 @@ int main() {
   he_stream("he_mono_24k.aac", 1, 70.0);
   he_stream("he_stereo_40k.aac", 2, 70.0);
   he_stream("he_stereo_96k.aac", 2, 70.0);
+  he_stream("hev2_stereo_32k.aac", 2, 70.0);
   remove_temp_dir(g_dir);
   return test_summary("test_interop");
 }

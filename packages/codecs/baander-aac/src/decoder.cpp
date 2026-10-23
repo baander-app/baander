@@ -918,6 +918,7 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   }
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
+  s->ps_output = 0;
   s->frame_size = AAC_FRAME_SIZE_LONG;
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     if (s->sbr[i]) {
@@ -959,11 +960,24 @@ int aac_decoder_output_channels(const AacDecoderState* s) {
   if (s->channels > 0) {
     return s->channels;
   }
-  return s->layout_source ? s->layout.num_channels : 0;
+  if (!s->layout_source) {
+    return 0;
+  }
+  return s->ps_output ? 2 : s->layout.num_channels;
 }
 
 int aac_decoder_output(const AacDecoderState* s, float* out) {
   const float* in[AAC_MAX_CHANNELS] = {};
+  const int out_channels = aac_decoder_output_channels(s);
+  if (s->ps_output) {
+    /* The mono element decoded to a stereo pair: mix as a stereo stream. */
+    AacLayout stereo = {};
+    aac_layout_from_config(&stereo, 2);
+    in[0] = s->ch[0].output;
+    in[1] = s->ch[1].output;
+    aac_layout_mix(&stereo, in, s->frame_size, out_channels, out);
+    return out_channels;
+  }
   const AacLayout* l = &s->layout;
   for (int i = 0; i < l->num_elements; i++) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
@@ -971,7 +985,6 @@ int aac_decoder_output(const AacDecoderState* s, float* out) {
       in[l->elems[i].slot[c]] = s->ch[s->elem_base[i] + c].output;
     }
   }
-  const int out_channels = aac_decoder_output_channels(s);
   aac_layout_mix(l, in, s->frame_size, out_channels, out);
   return out_channels;
 }
@@ -1152,10 +1165,19 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
    * that all channels keep the same delay. */
   s->frame_size = s->sbr_mode ? 2 * AAC_FRAME_SIZE_LONG : AAC_FRAME_SIZE_LONG;
   if (s->sbr_mode) {
+    /* A mono stream whose element carries parametric stereo becomes a
+     * stereo pair, with the right channel in the spare slot ch[1]. */
+    const bool mono = l->num_elements == 1 && l->elems[0].type == AAC_ELEM_SCE;
+    if (mono && sbr_state(s, 0)->ps_present) {
+      s->ps_output = 1;
+    }
     for (int i = 0; i < l->num_elements; i++) {
       AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
-      aac_sbr_apply(sbr_state(s, i), l->elems[i].type, chans[0].output,
-                    l->elems[i].type == AAC_ELEM_CPE ? chans[1].output : nullptr);
+      float* right = nullptr;
+      if (l->elems[i].type == AAC_ELEM_CPE || (mono && s->ps_output)) {
+        right = chans[1].output;
+      }
+      aac_sbr_apply(sbr_state(s, i), l->elems[i].type, chans[0].output, right);
     }
   }
   s->stream_channels = l->num_channels;

@@ -82,6 +82,10 @@ using AacDecoderState = struct AacDecoderState_ {
    * element without SBR data is only upsampled). */
   int sbr_mode;
   AacSbrState* sbr[AAC_MAX_ELEMENTS]; /* allocated on first use */
+  /* PS: once the single channel element of a mono stream has carried
+   * parametric stereo data the output is a stereo pair (ch[1] holds the
+   * right channel) until a reset. */
+  int ps_output;
   AacMdct mdct_long, mdct_short;
   unsigned random_state; /* PNS noise generator */
   const AacDSP* dsp;
