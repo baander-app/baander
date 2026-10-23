@@ -368,7 +368,6 @@ async function pausePlayback(owner, action) {
 async function renewPlaybackCapabilities(owner) {
   const seekCount = () => playbackControls.filter(control => control.action === 'seek').length
   const seeksBefore = seekCount()
-  const renditionSet = snapshot.renditionSet
   const unchangedExecution = () => {
     samePlayback(owner)
     assert.equal(snapshot.renditionSet, renditionSet, 'Capability renewal must retain the published rendition set')
@@ -435,6 +434,16 @@ async function renewPlaybackCapabilities(owner) {
     await recordClientControl(`capability-renewal-${mode}`, proof.startedAt)
   }
   await pausePlayback(owner, 'capability-renewal-pause')
+  // This fixture admits three owned renditions. Let publication finish adding
+  // them before isolating capability renewal for an unchanged rendition set.
+  await until(() => snapshot?.ready && snapshot.status === 'paused'
+    && snapshot.renditionSet.split(',').length === 3,
+  'all three fixture renditions to publish before capability renewal', 20000)
+  const settledCapability = await readyCapability()
+  const renditionSet = snapshot.renditionSet
+  await recordClientControl('capability-renewal-renditions-ready', Date.now(), {
+    attachment: settledCapability.attachment, renditionCount: renditionSet.split(',').length,
+  })
   await crossDeadline('paused')
   await resumeAndDecode(owner, 'capability-renewal-resume')
   await crossDeadline('running')
