@@ -499,9 +499,13 @@ async function reconnectPausedPlayback(owner, prefix) {
   }, 'a decoded paused attachment matching the current signed rendition set')
   samePlayback(owner)
   const beforeAttachment = attachmentNumber
+  const beforeRenditionSet = snapshot.renditionSet
+  const beforePosition = snapshot.startTime + before.time
+  const seeksBefore = playbackControls.filter(control => control.action === 'seek').length
   const networkStarted = Date.now()
   await recordClientControl(`${prefix}-ready-paused`, networkStarted, { attachment: beforeAttachment })
   const failureCount = networkInterruptions.length
+  let reconnected
   const preserved = state => state.connected && state.paused && state.ready >= 2
     && state.decodedFrames >= before.decodedFrames && !state.seeking && state.error === null
     && state.source === before.source && attachmentNumber === beforeAttachment
@@ -513,18 +517,41 @@ async function reconnectPausedPlayback(owner, prefix) {
     assert(preserved(await mediaState()), 'Offline refresh failure must retain the already decoded paused attachment and cursor')
     await recordClientControl(`${prefix}-offline-paused`, networkStarted, { attachment: beforeAttachment })
   } finally {
+    reconnected = Date.now()
     await context.setOffline(false)
   }
-  const reconnected = Date.now()
+  let reconnectionEvidence
   await until(async () => {
-    const state = await mediaState()
-    return playbackSnapshots.some(item => item.accepted && item.at >= reconnected
-      && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+    samePlayback(owner)
+    assert.equal(playbackControls.filter(control => control.action === 'seek').length, seeksBefore,
+      'Network reconnection must not submit source seeks')
+    const fresh = playbackSnapshots.filter(item => item.accepted && item.at >= reconnected
+      && item.ready && item.jobId === owner.jobId && item.sessionId === owner.sessionId
       && item.generation === owner.generation && item.status === 'paused')
-      && preserved(state) && currentSource(state)
-  }, 'the same decoded attachment, generation and paused cursor after network reconnection')
+    if (fresh.length === 0) return false
+    const state = await mediaState()
+    const publicationChanged = fresh.some(item => item.renditionSet !== beforeRenditionSet)
+    const capability = attachedCapabilities.get(attachmentNumber)
+    const deliveredCurrentSet = capability && new URL(capability.url).searchParams.get('set') === snapshot.renditionSet
+      && mediaResponses.some(item => item.attachment === attachmentNumber && item.status === 200
+        && item.path.endsWith('/master.m3u8'))
+      && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
+        && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
+    const restored = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+      && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
+      && Math.abs(snapshot.startTime + state.time - beforePosition) < 0.1
+      && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+      && deliveredCurrentSet
+    if (!(snapshot?.ready && snapshot.status === 'paused'
+      && currentSource(state) && (publicationChanged ? restored : preserved(state)))) return false
+    reconnectionEvidence = { reason: publicationChanged ? 'fresh-rendition-set-change' : 'unchanged-rendition-set',
+      previousAttachment: beforeAttachment, attachment: attachmentNumber,
+      previousRenditionSet: beforeRenditionSet, renditionSet: snapshot.renditionSet,
+      acceptedRenditionSets: [...new Set(fresh.map(item => item.renditionSet))] }
+    return true
+  }, 'decoded current signed media at the preserved paused cursor after network reconnection')
   samePlayback(owner)
-  await recordClientControl(`${prefix}-reconnected-paused`, networkStarted, { attachment: beforeAttachment })
+  await recordClientControl(`${prefix}-reconnected-paused`, networkStarted, reconnectionEvidence)
   await resumeAndDecode(owner, `${prefix}-resume`)
 }
 
