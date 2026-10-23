@@ -34,7 +34,7 @@ if (!is_string($provided) || $expires === false || !$auth->validateUrl($unsigned
     http_response_code(403);
     return;
 }
-$playlistUrl = static fn (MediaTrack $kind): string => $auth->signUrl($jobBase . $kind->value . '/media.m3u8?generation=1')['url'];
+$playlistUrl = static fn (MediaTrack $kind): string => $auth->signUrlUntil($jobBase . $kind->value . '/media.m3u8?generation=1', $expires)['url'];
 $reader = new PublishedPresentationReader();
 $presentation = $reader->read($directory);
 if ($route === '/presentation.mpd' && $presentation !== null && !$presentation->complete) {
@@ -55,10 +55,10 @@ $video = $presentation->track(MediaTrack::Video);
 $audio = $presentation->track(MediaTrack::Audio);
 $complete = $presentation->complete;
 $segmentCount = count($presentation->tracks[MediaTrack::Video->value]->segments);
-$url = static function (MediaTrack $kind, string $resource) use ($auth, $jobBase): string {
+$url = static function (MediaTrack $kind, string $resource) use ($auth, $jobBase, $expires): string {
     $query = $resource === 'init.mp4' ? ['generation' => 1] : ['index' => (int) $resource, 'generation' => 1];
-    return $auth->signUrl($jobBase . $kind->value . '/' . ($resource === 'init.mp4' ? 'init.mp4' : 'segment.m4s')
-        . '?' . http_build_query($query))['url'];
+    return $auth->signUrlUntil($jobBase . $kind->value . '/' . ($resource === 'init.mp4' ? 'init.mp4' : 'segment.m4s')
+        . '?' . http_build_query($query), $expires)['url'];
 };
 $urls = static function (PublishedTrack $track) use ($url): array {
     $result = [];

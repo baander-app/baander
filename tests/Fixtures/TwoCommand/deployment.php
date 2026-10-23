@@ -327,6 +327,130 @@ function verifyDash(StreamClient $client, array $state): array
         + decodeMedia(url($snapshot['url']), 'decoded-dash-generation-' . $snapshot['generation'], 1.0);
 }
 /**
+ * @return array{urls: list<string>, counts: array<string,int>, completedAt: float}
+ */
+function traverseSignedDelivery(string $manifestUrl, int $expires): array
+{
+    $pending = [url($manifestUrl)];
+    $visited = [];
+    $counts = [];
+    while ($pending !== []) {
+        $resource = array_shift($pending);
+        if (isset($visited[$resource])) { continue; }
+        ensure(count($visited) < 512, 'Signed delivery traversal exceeded its resource bound.');
+        parse_str((string) parse_url($resource, PHP_URL_QUERY), $query);
+        ensure(($query['exp'] ?? null) === (string) $expires, 'A signed descendant changed its parent expiry: ' . $resource);
+        ensure(time() <= $expires, 'Signed delivery traversal missed its expiry deadline.');
+        $response = (new HttpExchange($resource, []))->complete(5);
+        ensure($response->status() === 200, 'Signed resource unavailable before expiry: ' . $resource . ' HTTP ' . $response->status());
+        $visited[$resource] = true;
+        $path = (string) parse_url($resource, PHP_URL_PATH);
+        $kind = str_contains($path, '/subtitles/') ? 'subtitle' : (str_contains($path, '/tracks/audio/') ? 'audio' : 'video');
+        $type = match (true) {
+            str_ends_with($path, '/master.m3u8') => 'master',
+            str_ends_with($path, '/manifest.mpd') => 'dash',
+            str_ends_with($path, '.m3u8') => $kind . 'Playlist',
+            str_ends_with($path, '/init.mp4') => $kind . 'Init',
+            str_ends_with($path, '/segment.m4s') => $kind . 'Media',
+            str_ends_with($path, '.vtt') => 'subtitleVtt',
+            default => throw new RuntimeException('Unexpected signed resource: ' . $path),
+        };
+        $counts[$type] = ($counts[$type] ?? 0) + 1;
+        $children = [];
+        if (str_ends_with($path, '.m3u8')) {
+            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $response->body, $matches, PREG_SET_ORDER);
+            foreach ($matches as $match) { $children[] = $match[1] !== '' ? $match[1] : $match[2]; }
+            ensure($children !== [], 'HLS playlist omitted signed children.');
+            // A second read must retain the same deadline.
+            $repeated = (new HttpExchange($resource, []))->complete(5);
+            ensure($repeated->status() === 200, 'Repeated signed playlist read failed before expiry.');
+            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $repeated->body, $repeatedMatches, PREG_SET_ORDER);
+            foreach ($repeatedMatches as $match) { $children[] = $match[1] !== '' ? $match[1] : $match[2]; }
+        } elseif (str_ends_with($path, '.mpd')) {
+            $xml = new DOMDocument();
+            ensure($xml->loadXML($response->body, LIBXML_NONET), 'Expiry probe DASH manifest is invalid XML.');
+            $xpath = new DOMXPath($xml);
+            $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
+            $nodes = $xpath->query('//mpd:Initialization/@sourceURL | //mpd:SegmentURL/@media');
+            ensure($nodes !== false && $nodes->length > 0, 'DASH omitted signed resources.');
+            foreach ($nodes as $node) { $children[] = $node->nodeValue; }
+        }
+        foreach ($children as $child) { $pending[] = url($child); }
+    }
+    ensure(time() <= $expires, 'Signed delivery traversal completed after its expiry deadline.');
+    foreach (['videoInit', 'videoMedia', 'audioInit', 'audioMedia'] as $type) {
+        ensure(($counts[$type] ?? 0) > 0, 'Expiry probe omitted ' . $type . '.');
+    }
+    if (isset($counts['master'])) {
+        foreach (['videoPlaylist', 'audioPlaylist', 'subtitlePlaylist', 'subtitleVtt'] as $type) {
+            ensure(($counts[$type] ?? 0) >= (str_starts_with($type, 'subtitle') ? 3 : 1), 'Expiry probe omitted ' . $type . '.');
+        }
+    }
+    return ['urls' => array_keys($visited), 'counts' => $counts, 'completedAt' => microtime(true)];
+}
+
+/**
+ * @param array<string,mixed> $state
+ * @return array<string,mixed>
+ */
+function verifySignedDeliveryExpiry(StreamClient $client, array $state): array
+{
+    $window = 30;
+    $evidence = [];
+    foreach (['hls' => 'master.m3u8', 'dash' => 'manifest.mpd'] as $protocol => $file) {
+        $signed = twoCommandExchange($client, '/api/stream/sign', 'POST', [
+            'path' => '/api/transcode/' . $state['video'] . '/' . $file,
+            'refresh' => true, 'expiresInSeconds' => $window,
+        ])->complete(5);
+        ensure($signed->status() === 200, 'Short-lived authenticated signing failed.');
+        $snapshot = jsonBody($signed);
+        ensure(($snapshot['ready'] ?? false) && is_string($snapshot['url'] ?? null), 'Expiry probe requires ready publication.');
+        parse_str((string) parse_url($snapshot['url'], PHP_URL_QUERY), $query);
+        $expires = filter_var($query['exp'] ?? '', FILTER_VALIDATE_INT);
+        ensure(is_int($expires) && $expires >= time() && $expires <= time() + $window, 'Short-lived signing returned an invalid deadline.');
+        $traversal = traverseSignedDelivery($snapshot['url'], $expires);
+        $tamperedCount = 0;
+        foreach ($traversal['urls'] as $resource) {
+            $tampered = preg_replace('/([?&]exp=)[0-9]+(?=&|$)/', '${1}' . ($expires + 3600), $resource);
+            ensure(is_string($tampered) && $tampered !== $resource, 'Cannot alter signed resource expiry.');
+            ensure((new HttpExchange($tampered, []))->complete(5)->status() === 403, 'Altering signed expiry was accepted.');
+            ++$tamperedCount;
+        }
+        ensure(time() <= $expires, 'Expiry tampering checks missed the short-lived deadline.');
+        $evidence[$protocol] = ['expires' => $expires, 'windowSeconds' => $window,
+            'resourceCount' => count($traversal['urls']), 'tamperedRefusals' => $tamperedCount] + $traversal;
+    }
+    $refusalAt = max(array_column($evidence, 'expires')) + 1;
+    ensure($refusalAt - time() <= $window + 1, 'Expiry refusal wait exceeds its bound.');
+    await(static fn (): bool => time() >= $refusalAt, 'first integer second after signed expiry', $window + 2);
+    foreach ($evidence as &$proof) {
+        $proof['refusalStartedAt'] = microtime(true);
+        $refused = 0;
+        foreach ($proof['urls'] as $resource) {
+            ensure((new HttpExchange($resource, []))->complete(5)->status() === 403, 'Expired signed resource remained accessible: ' . $resource);
+            ++$refused;
+        }
+        $proof['expiredRefusals'] = $refused;
+    }
+    unset($proof);
+    foreach (['hls' => 'master.m3u8', 'dash' => 'manifest.mpd'] as $protocol => $file) {
+        $fresh = twoCommandExchange($client, '/api/stream/sign', 'POST', [
+            'path' => '/api/transcode/' . $state['video'] . '/' . $file,
+            'refresh' => true, 'expiresInSeconds' => $window,
+        ])->complete(5);
+        ensure($fresh->status() === 200, 'Authenticated signing refresh failed after expiry.');
+        $snapshot = jsonBody($fresh);
+        ensure(($snapshot['ready'] ?? false) && is_string($snapshot['url'] ?? null), 'Authenticated refresh lost ready publication.');
+        parse_str((string) parse_url($snapshot['url'], PHP_URL_QUERY), $query);
+        $expires = filter_var($query['exp'] ?? '', FILTER_VALIDATE_INT);
+        ensure(is_int($expires) && $expires > $evidence[$protocol]['expires'], 'Authenticated refresh did not advance expiry.');
+        $resumed = traverseSignedDelivery($snapshot['url'], $expires);
+        $evidence[$protocol]['refresh'] = ['expires' => $expires, 'resourceCount' => count($resumed['urls'])] + $resumed;
+    }
+    return $evidence;
+}
+
+/**
  * @param array<string,mixed> $decoded
  * @return array<string,mixed>
  */
@@ -548,6 +672,7 @@ if ($mode === 'prepare') {
     ensure((int) $db->fetchOne('SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id WHERE j.public_id=?', [$state['job']]) === 1, 'Duplicate durable video owner.');
     $decoded = decodeVideo($auth, $state);
     $dash = verifyDash($auth, $state);
+    $expiry = verifySignedDeliveryExpiry($auth, $state);
     $state['initialOutput'] = retainVideoOutput($db, $state, $decoded, 'initial'); save($state);
     $audio = $auth->open('id=' . $state['track'] . '&format=mp3&bitrate=192000');
     ensure($audio->until(static fn (HttpExchange $value): bool => strlen($value->body) >= 8192, 30), 'Worker did not produce progressive audio.');
@@ -567,7 +692,7 @@ if ($mode === 'prepare') {
     ensure($recommendation->status() === 202 && (jsonBody($recommendation)['data']['execution'] ?? null) === 'async', 'Recommendation admission lost its typed asynchronous response.');
     $recommendationId = jsonBody($recommendation)['data']['public_id'];
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
-    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'signedDeliveryExpiry' => $expiry, 'audioBytes' => strlen($audio->body), 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
 } elseif ($mode === 'dash') {
     $result = verifyDash($client(), state());
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
