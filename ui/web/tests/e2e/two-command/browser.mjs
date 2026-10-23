@@ -647,7 +647,13 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     const owner = ownedPlayback()
     await pausePlayback(owner, 'pause')
     const started = Date.now()
-    const targets = [credentials.expectedSeekPosition - 8, credentials.expectedSeekPosition - 4, credentials.expectedSeekPosition]
+    const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
+    const firstTarget = [credentials.expectedSeekPosition - 8, credentials.expectedSeekPosition + 8]
+      .filter(position => position >= 0 && position < snapshot.duration)
+      .sort((left, right) => Math.abs(right - initialSliderPosition) - Math.abs(left - initialSliderPosition))[0]
+    assert(firstTarget !== undefined && Math.abs(firstTarget - initialSliderPosition) >= 8,
+      'The first rapid gesture must move the actual source thumb far enough to change its value')
+    const targets = [firstTarget, credentials.expectedSeekPosition - 4, credentials.expectedSeekPosition]
     assert(targets.every(position => position >= 0 && position < snapshot.duration),
       'All rapid seek targets must fit the source duration')
     const committedTargets = []
@@ -717,7 +723,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     assert.deepEqual(rapidSeeks.map(control => control.position), [committedTargets[0], committedTargets[2]], 'Rapid scrubbing must send only the first and latest targets')
     assert.equal(rapidSeeks[0].generation, owner.generation, 'The first source seek must use its attached generation')
     assert.equal(rapidSeeks[1].generation, firstResponse.data.acceptedGeneration, 'The latest target must use its predecessor acceptance')
-    await recordClientControl('seek-paused', started, { targets, committedTargets, responseHoldMs, acceptedGeneration: firstResponse.data.acceptedGeneration })
+    await recordClientControl('seek-paused', started, { initialSliderPosition, targets, committedTargets, responseHoldMs, acceptedGeneration: firstResponse.data.acceptedGeneration })
     owner.generation = snapshot.generation
     await resumeAndDecode(owner, 'resume-after-seek')
     await reconnectPausedPlayback(owner, 'network')
