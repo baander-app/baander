@@ -44,8 +44,8 @@ static void our_encoded(const char* name, const std::vector<float>& pcm, int sr,
   CHECK(err == 0 && !stream.empty(), "%s: encode", name);
   CHECK(write_file(path("ours.aac"), stream.data(), stream.size()), "write stream");
   char cmd[512];
-  snprintf(cmd, sizeof(cmd), "-i %s -f f32le -ac %d -ar %d %s", path("ours.aac").c_str(), channels,
-           sr, path("ours.ff.f32").c_str());
+  snprintf(cmd, sizeof(cmd), "-i %s -f f32le -ar %d %s", path("ours.aac").c_str(), sr,
+           path("ours.ff.f32").c_str());
   CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg refused our stream", name);
   int errors = 0;
   const std::vector<float> ours = decode_stream(stream, sr, channels, &errors);
@@ -135,6 +135,12 @@ int main() {
   our_encoded("harmonics 44.1k 48k intensity", gen_harmonics(n, 44100, 2), 44100, 2, 48000,
               AAC_RC_CBR);
   our_encoded("noise 44.1k 64k pns", gen_noise(n, 2), 44100, 2, 64000, AAC_RC_CBR);
+  our_encoded("3.0 48k 192k", gen_multichannel(48000 * 3, 48000, 3), 48000, 3, 192000, AAC_RC_CBR);
+  our_encoded("5.1 48k 384k", gen_multichannel(48000 * 3, 48000, 6), 48000, 6, 384000, AAC_RC_CBR);
+  our_encoded("6.1 pce 48k 448k", gen_multichannel(48000 * 3, 48000, 7), 48000, 7, 448000,
+              AAC_RC_CBR);
+  our_encoded("7.1 48k 512k", gen_multichannel(48000 * 3, 48000, 8), 48000, 8, 512000,
+              AAC_RC_CBR);
   remove_temp_dir(g_dir);
   return test_summary("test_interop");
 }

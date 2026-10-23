@@ -6,6 +6,7 @@
 #include "aac_dsp.h"
 #include "aac_tables.h"
 #include "bitstream.h"
+#include "channel_map.h"
 #include "ics.h"
 #include "mdct.h"
 #include "psycho.h"
@@ -17,7 +18,7 @@ extern "C" {
  * appears in the decoded output. */
 #define AAC_ENCODER_DELAY 2048
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
-#define AAC_ENCODER_MAX_FRAME_BYTES (2 * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
+#define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
 
 #define AAC_ENC_TNS_MAX_ORDER 12
 #define AAC_ENC_TNS_MAX_FILTERS 2
@@ -28,6 +29,8 @@ using AacEncChannel = struct AacEncChannel_ {
   float pcm[3 * AAC_FRAME_SIZE_LONG];
   AacIcsInfo ics;
   int prev_window_shape;
+  int is_lfe;                     /* the channel of an LFE element */
+  int active_long, active_short;  /* bands below the channel's lowpass */
   float coef[1024]; /* MDCT coefficients, [window * 128 + k] for short windows */
   float x34[1024];  /* |coef|^(3/4) */
   /* Per group band, indexed group * num_swb + sfb. */
@@ -62,13 +65,26 @@ using AacEncChannel = struct AacEncChannel_ {
   AacPsyChannel psy;
 };
 
+/* One syntactic element of the raw data block and the input channels it
+ * codes (indices into the interleaved input, in the canonical order). */
+using AacEncElement = struct AacEncElement_ {
+  int type; /* AAC_ELEM_SCE, AAC_ELEM_CPE or AAC_ELEM_LFE */
+  int tag;
+  int num_ch;
+  int ch[2];
+  int ms_used[AAC_MAX_BANDS]; /* per group band of a CPE */
+  int max_sfb;                /* of the last quantization */
+};
+
 using AacEncoderState = struct AacEncoderState_ {
   int sample_rate, channels, bitrate, quality, frame_size, rate_index;
   AacObjectType aot;
   AacRateControl rc_mode;
-  AacEncChannel ch[2];
-  int ms_used[AAC_MAX_BANDS];
-  int max_sfb;
+  AacEncChannel ch[AAC_MAX_CHANNELS];
+  AacLayout layout;
+  AacEncElement elem[AAC_MAX_ELEMENTS];
+  int num_elements;
+  int channel_config; /* of the ADTS header: 0 when a PCE carries the layout */
   int bandwidth;                             /* lowpass cutoff in Hz */
   int active_bands_long, active_bands_short; /* bands below the cutoff */
   float min_snr_long[AAC_MAX_SFB_LONG];      /* bitrate-dependent, per band */
@@ -99,6 +115,17 @@ using AacEncoderState = struct AacEncoderState_ {
 AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType aot,
                                           AacRateControl rc, const AacDSP* dsp);
 void aac_encoder_state_destroy(AacEncoderState* s);
+
+/* Re-derives every setting that depends on the bitrate and quality:
+ * lowpass, active bands, minimum SNR tables and tool thresholds. */
+void aac_encoder_state_configure(AacEncoderState* s);
+
+/* Returns the encoder to its state after creation: history, filterbank
+ * overlap, reservoir and psychoacoustic memory. */
+void aac_encoder_state_reset(AacEncoderState* s);
+
+/* Largest ADTS frame the encoder can emit for its channel count. */
+int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
 
 /* Consumes one block of frame_size interleaved samples (NULL for silence)
  * and writes the next ADTS frame to s->output_buf.  Returns its length in

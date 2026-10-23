@@ -57,6 +57,11 @@ int main() {
     roundtrip(c, 44100, AAC_RC_CBR);
   }
   roundtrip({"tones", gen_tones, 2, 128000, 30.0}, 48000, AAC_RC_CBR);
+  /* Every layout the encoder offers, at 64 kbit/s per channel. */
+  for (int channels = 3; channels <= 8; channels++) {
+    roundtrip({"layout", gen_multichannel, channels, 64000 * channels, 20.0}, 48000, AAC_RC_CBR);
+  }
+  roundtrip({"layout 5.1", gen_multichannel, 6, 256000, 18.0}, 44100, AAC_RC_TVBR);
   for (AacRateControl rc : {AAC_RC_ABR, AAC_RC_CVBR, AAC_RC_TVBR}) {
     roundtrip({"harmonics", gen_harmonics, 2, 128000, 18.0}, 44100, rc);
   }

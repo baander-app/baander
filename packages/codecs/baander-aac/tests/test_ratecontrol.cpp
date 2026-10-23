@@ -64,7 +64,7 @@ static void test_api_limits() {
         "HE-AAC encoding is not offered");
   CHECK(aac_encoder_create(44100, 2, 128000, AAC_AOT_PS, AAC_RC_CBR) == nullptr,
         "HE-AAC v2 encoding is not offered");
-  CHECK(aac_encoder_create(44100, 3, 128000, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "3 channels");
+  CHECK(aac_encoder_create(44100, 9, 128000, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "9 channels");
   CHECK(aac_encoder_create(37000, 2, 128000, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "37 kHz");
   CHECK(aac_encoder_create(44100, 2, 0, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "zero bitrate");
 
@@ -74,6 +74,8 @@ static void test_api_limits() {
   CHECK(aac_encoder_encode(enc, pcm, 512, out, sizeof(out)) == AAC_ERR_INVALID_ARG,
         "partial frame refused");
   CHECK(aac_encoder_encode(enc, pcm, 1024, out, 4) == AAC_ERR_OVERFLOW, "tiny output buffer");
+  CHECK(aac_encoder_max_frame_bytes(enc) == 6144 / 8 + AAC_ADTS_HEADER_SIZE,
+        "largest mono frame");
   CHECK(aac_encoder_set_quality(enc, 0) == AAC_ERR_INVALID_ARG &&
             aac_encoder_set_quality(enc, 101) == AAC_ERR_INVALID_ARG &&
             aac_encoder_set_quality(enc, 50) == AAC_OK,
@@ -87,9 +89,116 @@ static void test_api_limits() {
   aac_encoder_destroy(enc);
 }
 
+/* Energy of the decoded signal near the top of the band, as the sum of
+ * four DFT bins. */
+static double treble_energy(const std::vector<float>& x, int sr) {
+  double total = 0.0;
+  for (double f : {17000.0, 17500.0, 18000.0, 18500.0}) {
+    double re = 0.0;
+    double im = 0.0;
+    for (size_t i = 0; i < x.size(); i++) {
+      const double ph = 2.0 * M_PI * f * (double)i / (double)sr;
+      re += x[i] * cos(ph);
+      im -= x[i] * sin(ph);
+    }
+    total += re * re + im * im;
+  }
+  return total;
+}
+
+/* A quality set after creation re-derives the lowpass: the stream's top
+ * end follows the new quality, not the creation default. */
+static void test_quality_bandwidth() {
+  const int sr = 48000;
+  const std::vector<float> pcm = gen_noise(sr * 2, 1);
+  int errors = 0;
+  const std::vector<float> low =
+      decode_stream(encode_stream(pcm, sr, 1, 64000, AAC_RC_TVBR, 20), sr, 1, &errors);
+  const std::vector<float> high =
+      decode_stream(encode_stream(pcm, sr, 1, 64000, AAC_RC_TVBR, 100), sr, 1, &errors);
+  CHECK(errors == 0, "quality streams decode");
+  const double e_low = treble_energy(low, sr);
+  const double e_high = treble_energy(high, sr);
+  printf("treble energy: quality 20 %.3g, quality 100 %.3g\n", e_low, e_high);
+  CHECK(e_high > 100.0 * e_low, "quality 100 keeps the treble that quality 20 cuts");
+}
+
+/* A refused call leaves no trace, and a flushed encoder starts over: the
+ * streams equal those of a fresh encoder. */
+static void test_state_fixes() {
+  const int sr = 44100;
+  const std::vector<float> a = gen_tones(sr, sr, 2);
+  const std::vector<float> b = gen_harmonics(sr, sr, 2);
+  const std::vector<uint8_t> ref_a = encode_stream(a, sr, 2, 128000, AAC_RC_CBR);
+  const std::vector<uint8_t> ref_b = encode_stream(b, sr, 2, 128000, AAC_RC_CBR);
+
+  AacEncoderHandle enc = aac_encoder_create(sr, 2, 128000, AAC_AOT_LC, AAC_RC_CBR);
+  std::vector<uint8_t> buf(8192);
+  std::vector<uint8_t> out;
+  std::vector<float> block(2048);
+  for (size_t pos = 0; pos < a.size(); pos += block.size()) {
+    std::fill(block.begin(), block.end(), 0.0f);
+    memcpy(block.data(), a.data() + pos, std::min(block.size(), a.size() - pos) * sizeof(float));
+    if (pos == 0) {
+      CHECK(aac_encoder_encode(enc, block.data(), 1024, buf.data(), 16) == AAC_ERR_OVERFLOW,
+            "small buffer refused");
+    }
+    const int len = aac_encoder_encode(enc, block.data(), 1024, buf.data(), (int)buf.size());
+    CHECK(len > 0, "encode");
+    out.insert(out.end(), buf.begin(), buf.begin() + len);
+  }
+  int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+  out.insert(out.end(), buf.begin(), buf.begin() + len);
+  CHECK(out == ref_a, "the refused call consumed nothing (%zu vs %zu bytes)", out.size(),
+        ref_a.size());
+
+  out.clear();
+  for (size_t pos = 0; pos < b.size(); pos += block.size()) {
+    std::fill(block.begin(), block.end(), 0.0f);
+    memcpy(block.data(), b.data() + pos, std::min(block.size(), b.size() - pos) * sizeof(float));
+    len = aac_encoder_encode(enc, block.data(), 1024, buf.data(), (int)buf.size());
+    CHECK(len > 0, "encode after flush");
+    out.insert(out.end(), buf.begin(), buf.begin() + len);
+  }
+  len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+  out.insert(out.end(), buf.begin(), buf.begin() + len);
+  CHECK(out == ref_b, "a flushed encoder starts a fresh stream (%zu vs %zu bytes)", out.size(),
+        ref_b.size());
+  aac_encoder_destroy(enc);
+}
+
+/* A loud tone with faint partials far above it at a low bitrate: the rate
+ * loop lifts the loud band's noise allowance while the faint bands keep
+ * theirs, so their scalefactors sit far apart.  The first faint band is
+ * pulled within the +-60 difference the syntax allows and quantizes to
+ * nothing; the next one must still be clamped against the loud band, not
+ * against the band that disappeared. */
+static void test_scalefactor_gap() {
+  const int sr = 48000;
+  const int n = sr * 2;
+  std::vector<float> pcm((size_t)n);
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    pcm[i] = 0.9f * sinf(2.0f * (float)M_PI * 100.0f * t) +
+             5e-5f * sinf(2.0f * (float)M_PI * 3000.0f * t) +
+             2e-4f * sinf(2.0f * (float)M_PI * 8000.0f * t);
+  }
+  for (int bitrate : {16000, 24000, 32000}) {
+    int err = 0;
+    const std::vector<uint8_t> stream = encode_stream(pcm, sr, 1, bitrate, AAC_RC_CBR, 0, &err);
+    CHECK(err == 0, "%d bit/s: encode error %d", bitrate, err);
+    int errors = 0;
+    decode_stream(stream, sr, 1, &errors);
+    CHECK(errors == 0, "%d bit/s: %d frames failed to decode", bitrate, errors);
+  }
+}
+
 int main() {
   test_cbr_abr();
   test_vbr();
   test_api_limits();
+  test_quality_bandwidth();
+  test_state_fixes();
+  test_scalefactor_gap();
   return test_summary("test_ratecontrol");
 }

@@ -16,7 +16,7 @@ extern "C" {
 void aac_enc_tools_init(AacEncoderState* s);
 
 /* TNS: chooses filters for every window of the channel's current spectrum
- * (tns_* fields), without filtering yet. */
+ * (tns_* fields), without filtering yet; an LFE channel gets none. */
 void aac_enc_tns_decide(const AacEncoderState* s, AacEncChannel* c);
 /* Makes the second channel of a pair reuse the first channel's filters
  * when they are nearly the same. */
@@ -31,11 +31,12 @@ void aac_enc_tns_write(AacBitWriter* w, const AacEncChannel* c);
 int aac_enc_tns_top(const AacEncoderState* s, const AacEncChannel* c);
 
 /* PNS: marks the noise-like bands of a long frame (pns_flag, pns_energy)
- * from the band energies and thresholds of the TNS-filtered spectrum. */
+ * from the band energies and thresholds of the TNS-filtered spectrum; an
+ * LFE channel gets none. */
 void aac_enc_pns_detect(const AacEncoderState* s, AacEncChannel* c);
-/* Reconciles the flags with the M/S decision: a band is substituted in
- * both channels or neither, with independent noise. */
-void aac_enc_pns_stereo_finish(AacEncoderState* s);
+/* Reconciles a pair's flags with its M/S decision: a band is substituted
+ * in both channels or neither, with independent noise. */
+void aac_enc_pns_stereo_finish(AacEncoderState* s, AacEncElement* el);
 /* Turns the flags into coded noise bands (tool, tool_sf) with the noise
  * energies kept within the DPCM range. */
 void aac_enc_pns_code(const AacEncoderState* s, AacEncChannel* c);
@@ -43,7 +44,7 @@ void aac_enc_pns_code(const AacEncoderState* s, AacEncChannel* c);
 /* Intensity stereo over a channel pair: highly correlated, clearly panned
  * band regions are coded as the left channel only, with the right channel's
  * level in tool_sf (tool = AAC_CB_INTENSITY or AAC_CB_INTENSITY2). */
-void aac_enc_intensity(AacEncoderState* s);
+void aac_enc_intensity(AacEncoderState* s, AacEncElement* el);
 
 #ifdef __cplusplus
 }
