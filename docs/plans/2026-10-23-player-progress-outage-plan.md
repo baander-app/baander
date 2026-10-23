@@ -63,14 +63,22 @@ Extend the client-controls browser phase after normal signing lifetimes resume.
 Intercept only automatic progress requests for the owned session: abort one before
 forwarding, then accept one through the real server and drop its response. Leave
 signing and media requests live. Each observation requires decoded running media
-before failure, no attachment teardown or playback error, advancing native time
-and decoded frames afterward, a subsequent genuine successful progress request
+before failure, no failure-induced attachment teardown or playback error,
+advancing native time and decoded frames afterward, a subsequent genuine successful progress request
 and an authenticated snapshot reflecting progress. Require unchanged job, session
 and generation and no unsolicited seek. Record the failure boundary and recovery
 evidence without recording credentials. Remove interception in a finally block.
-Each qualifying observation also retains its actual attached rendition set.
-A fresh accepted signing response that changes the set supersedes that observation;
-record it and retry within three attempts per case and a shared 60-second budget.
+First capture a media baseline after the browser observes the failed request,
+then require more than 0.2 seconds of native time and increasing decoded frames
+on the exact original attachment and rendition set. A fresh accepted signing
+response that changes the set before this preservation proof supersedes the
+observation; record it and retry within three attempts per case and a shared
+60-second budget. A later set change cannot hide earlier teardown: any source
+replacement must follow an authenticated changed-set observation.
+After preservation is proved, legitimate publication changes may replace media
+while writes reconcile. Require delivered current-set master/audio/video resources
+and advancing time and frames within the final attachment; reset that decode
+baseline on replacement. Retain ownership, generation and no-seek checks throughout.
 Correlate the later real progress response with its submitted cursor and require a
 subsequent signing snapshot at or beyond that cursor. A successful signing request
 alone does not establish that progress writes recovered.
@@ -123,3 +131,17 @@ and repeat the complete lifecycle. Preserve the failed production receipt under
 
 Independent review approved this amendment with the explicit readiness and
 attachment-ownership boundaries above.
+
+## Progress observation refinement
+
+The second production run passed the dropped-request case. Its three lost-response
+observations were superseded by legitimate rendition changes as progress advanced
+published coverage. The first two had already proved server acceptance and a later
+successful write. Requiring the entire write-reconciliation interval to retain its
+set conflated source replacement with failure handling.
+
+Independent review approved the two-part observation above: prove the original
+attachment continues decoding after the request failure, then verify subsequent
+writes and current media while allowing only authenticated publication changes.
+Keep all existing worker-recovery assertions. The failed fixture receipt and
+verified cleanup remain under `var/test-runs/player-progress-outage-production-final`.
