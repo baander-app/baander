@@ -342,7 +342,7 @@ void aac_enc_tools_init(AacEncoderState* s) {
     }
   }
 
-  s->allow_is = s->channels == 2 && s->bandwidth > 0 && s->bitrate / s->bandwidth < 5;
+  s->allow_is = s->channels >= 2 && s->bandwidth > 0 && 2 * channel_bitrate / s->bandwidth < 5;
 }
 
 /* ── TNS ────────────────────────────────────────────────────────── */
@@ -357,6 +357,9 @@ void aac_enc_tns_decide(const AacEncoderState* s, AacEncChannel* c) {
   c->tns_merged = 0;
   c->tns_gain = 1.0f;
   memset(c->tns_n_filt, 0, sizeof(c->tns_n_filt));
+  if (c->is_lfe) {
+    return;
+  }
   if (ics->num_windows == 8) {
     const int* so = ics->swb_offset;
     c->tns_coef_res = 0;
@@ -495,7 +498,7 @@ void aac_enc_pns_detect(const AacEncoderState* s, AacEncChannel* c) {
   for (int i = 0; i < ics->num_window_groups * nswb; i++) {
     c->pns_energy[i] = c->energy[i];
   }
-  if (!s->use_pns || ics->num_windows == 8) {
+  if (!s->use_pns || ics->num_windows == 8 || c->is_lfe) {
     return;
   }
   /* Heavy temporal structure that TNS did not take over is not noise. */
@@ -504,7 +507,7 @@ void aac_enc_pns_detect(const AacEncoderState* s, AacEncChannel* c) {
     return;
   }
   const int* off = ics->swb_offset;
-  const int active = s->active_bands_long;
+  const int active = c->active_long;
   float chaos[kFrame];
   chaos_measure(c->coef, off[nswb], chaos);
   const float noise_floor = 0.5f * powf(10.0f, -s->pns_ref_tonality);
@@ -557,16 +560,17 @@ void aac_enc_pns_detect(const AacEncoderState* s, AacEncChannel* c) {
   }
 }
 
-void aac_enc_pns_stereo_finish(AacEncoderState* s) {
-  AacEncChannel* l = &s->ch[0];
-  AacEncChannel* r = &s->ch[1];
+void aac_enc_pns_stereo_finish(AacEncoderState* s, AacEncElement* el) {
+  AacEncChannel* l = &s->ch[el->ch[0]];
+  AacEncChannel* r = &s->ch[el->ch[1]];
+  int* ms_used = el->ms_used;
   const AacIcsInfo* ics = &l->ics;
   if (!s->use_pns || ics->num_windows == 8) {
     return;
   }
   for (int b = 0; b < ics->num_swb; b++) {
     const bool both = l->pns_flag[b] && r->pns_flag[b];
-    if (s->ms_used[b] && !both) {
+    if (ms_used[b] && !both) {
       l->pns_flag[b] = r->pns_flag[b] = 0;
     }
     /* A set M/S flag on a noise band asks for correlated noise
@@ -575,7 +579,7 @@ void aac_enc_pns_stereo_finish(AacEncoderState* s) {
      * so correlation is never signalled: the two channels get
      * independent noise everywhere. */
     if (both) {
-      s->ms_used[b] = 0;
+      ms_used[b] = 0;
     }
   }
 }
@@ -612,13 +616,13 @@ void aac_enc_pns_code(const AacEncoderState* s, AacEncChannel* c) {
 
 /* ── intensity stereo ───────────────────────────────────────────── */
 
-void aac_enc_intensity(AacEncoderState* s) {
-  AacEncChannel* l = &s->ch[0];
-  AacEncChannel* r = &s->ch[1];
+void aac_enc_intensity(AacEncoderState* s, AacEncElement* el) {
+  AacEncChannel* l = &s->ch[el->ch[0]];
+  AacEncChannel* r = &s->ch[el->ch[1]];
   const AacIcsInfo* ics = &l->ics;
   const int nswb = ics->num_swb;
   const int* off = ics->swb_offset;
-  const int active = ics->num_windows == 8 ? s->active_bands_short : s->active_bands_long;
+  const int active = ics->num_windows == 8 ? l->active_short : l->active_long;
   const int nbands = ics->num_window_groups * nswb;
   for (int i = 0; i < nbands; i++) {
     if (r->tool[i] == AAC_CB_INTENSITY || r->tool[i] == AAC_CB_INTENSITY2) {
@@ -797,7 +801,7 @@ void aac_enc_intensity(AacEncoderState* s) {
       r->tool_sf[idx] = (int)lrintf(2.0f * scale[idx]);
       r->energy[idx] = 0.0f;
       r->spread[idx] = 0.0f;
-      s->ms_used[idx] = 0;
+      el->ms_used[idx] = 0;
     }
     w0 += ics->group_len[g];
   }

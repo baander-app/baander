@@ -98,7 +98,8 @@ static std::vector<float> gen_multichannel(int n, int sr, int channels) {
     for (int c = 0; c < channels; c++) {
       seed = seed * 1664525u + 1013904223u;
       const float noise = 0.02f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
-      const float f0 = 220.0f * (float)(c + 1);
+      /* Channel 3 is the LFE of the 5.1 and 7.1 layouts: a low tone. */
+      const float f0 = c == 3 ? 60.0f : 220.0f * (float)(c + 1);
       pcm[(size_t)i * channels + c] = 0.25f * sinf(2.0f * (float)M_PI * f0 * t) +
                                       0.1f * sinf(2.0f * (float)M_PI * (f0 * 2.5f + 50.0f) * t) +
                                       noise;

@@ -27,7 +27,7 @@ static void ensure_dsp_init() {
 
 AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, AacObjectType aot,
                                     AacRateControl rc_mode) {
-  if (sample_rate <= 0 || channels <= 0 || channels > 2 || bitrate <= 0) {
+  if (sample_rate <= 0 || channels <= 0 || channels > AAC_MAX_CHANNELS || bitrate <= 0) {
     return nullptr;
   }
   /* Only AAC-LC is implemented; HE-AAC v1/v2 need an SBR/PS encoder. */
@@ -51,13 +51,15 @@ void aac_encoder_destroy(AacEncoderHandle ctx) {
   aac_encoder_state_destroy(s);
 }
 
+/* The output must hold the largest frame before any input is consumed, so
+ * that a refused call loses nothing. */
 static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int out_size) {
+  if (out_size < aac_encoder_state_max_frame_bytes(s)) {
+    return AAC_ERR_OVERFLOW;
+  }
   const int frame_len = aac_encode_frame_internal(s, pcm);
   if (frame_len < 0) {
     return frame_len;
-  }
-  if (frame_len > out_size) {
-    return AAC_ERR_OVERFLOW;
   }
   memcpy(out, s->output_buf, frame_len);
   return frame_len;
@@ -85,6 +87,7 @@ int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
     return AAC_ERR_INVALID_ARG;
   }
   s->quality = quality;
+  aac_encoder_state_configure(s);
   return AAC_OK;
 }
 
@@ -103,12 +106,21 @@ int aac_encoder_delay(AacEncoderHandle ctx) {
   return AAC_ENCODER_DELAY;
 }
 
+int aac_encoder_max_frame_bytes(AacEncoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_encoder_state_max_frame_bytes(static_cast<AacEncoderState*>(ctx));
+}
+
 int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
   if (!ctx || !out || out_size <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
   /* Drain the lookahead and transform overlap with silent blocks; the
-   * frames are written back to back as a continuation of the ADTS stream. */
+   * frames are written back to back as a continuation of the ADTS stream.
+   * Once drained the encoder starts over, so the next input opens a clean
+   * stream. */
   auto* s = static_cast<AacEncoderState*>(ctx);
   int total = 0;
   while (s->pending_flush > 0) {
@@ -118,6 +130,10 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size) {
     }
     total += len;
     s->pending_flush--;
+  }
+  if (total > 0) {
+    aac_encoder_state_reset(s);
+    s->pending_flush = 0;
   }
   return total;
 }

@@ -64,6 +64,13 @@ The encoder follows the structure of the Fraunhofer FDK encoder and
   above 0.95 and are panned away from the middle carry the left channel
   and a level difference;
 - per-band M/S stereo chosen by perceptual entropy;
+- one to eight channels as the standard layouts (mono, stereo, 3.0, 4.0,
+  5.0, 5.1, 6.1, 7.1): each syntactic element (SCE, CPE, LFE) decides its
+  own windows, TNS, stereo tools and noise substitution, the LFE element
+  codes the lowest twelve lines in long windows only, and one rate loop
+  spends the frame's bits across all elements; the 6.1 layout, which the
+  ADTS header cannot name, carries a program config element in every
+  frame;
 - thresholds raised towards the bit budget in the fourth-root domain so
   that quiet bands become holes before loud bands lose precision, with
   hole-avoidance flags from spread energy and top-down band release when
@@ -92,22 +99,30 @@ int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size);
 int aac_encoder_set_quality(AacEncoderHandle ctx, int quality);
 int aac_encoder_frame_size(AacEncoderHandle ctx);
 int aac_encoder_delay(AacEncoderHandle ctx);
+int aac_encoder_max_frame_bytes(AacEncoderHandle ctx);
 void aac_encoder_destroy(AacEncoderHandle ctx);
 ```
 
 - `sample_rate` is one of the twelve AAC rates (8000 to 96000 Hz);
-  `channels` is 1 or 2; `aot` must be `AAC_AOT_LC`.
+  `channels` is 1 to 8, interleaved in the canonical order (L, R, C, LFE,
+  Ls, Rs, then Lc, Rc for 7.1 and Cs as the seventh channel of 6.1);
+  `aot` must be `AAC_AOT_LC`.
 - `aac_encoder_encode` takes exactly `frame_size()` (1024) interleaved
   float samples per channel at full scale 1.0 and writes one ADTS frame.
+  The output buffer must hold `aac_encoder_max_frame_bytes` (768 bytes per
+  channel plus the header); a smaller one is refused with
+  `AAC_ERR_OVERFLOW` before any input is consumed.
 - The first 2048 output samples of the decoded stream are silence
   (`aac_encoder_delay`): one block of lookahead for block switching plus
   the transform overlap.
 - `aac_encoder_flush` drains the delay: it writes the two remaining ADTS
   frames back to back and returns their total length, then 0 until the
-  next `aac_encoder_encode`.
+  next `aac_encoder_encode`. A flushed encoder starts over, so the next
+  input opens a stream identical to a fresh encoder's.
 - `quality` is 1..100 for `AAC_RC_CVBR` and `AAC_RC_TVBR`; 70 codes at the
-  masking threshold, 100 nine dB below it. The bitrate still selects the
-  lowpass in the VBR modes.
+  masking threshold, 100 nine dB below it. In the VBR modes the quality
+  also selects the lowpass (13 kHz at 1 to 19.3 kHz at 100), and a quality
+  set after creation re-derives every setting that depends on it.
 
 ### Decoder
 

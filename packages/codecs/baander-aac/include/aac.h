@@ -58,6 +58,10 @@ int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, ui
 int aac_encoder_set_quality(AacEncoderHandle ctx, int quality);
 int aac_encoder_frame_size(AacEncoderHandle ctx);
 int aac_encoder_delay(AacEncoderHandle ctx);
+/* Largest frame aac_encoder_encode can produce; a call with a smaller
+ * output buffer is refused with AAC_ERR_OVERFLOW before it consumes any
+ * input. */
+int aac_encoder_max_frame_bytes(AacEncoderHandle ctx);
 int aac_encoder_flush(AacEncoderHandle ctx, uint8_t* out, int out_size);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
