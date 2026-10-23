@@ -49,8 +49,28 @@ test('one-shot encode/decode reconstructs the signal', { skip: !available && 'na
   assert.equal(result.errors, 0);
   assert.equal(result.sampleRate, 44100);
   assert.equal(result.channels, 2);
+  assert.equal(result.streamChannels, 2);
   assert.equal(result.hasSbr, false);
+  assert.equal(result.hasPs, false);
   assert.ok(snrDb(pcm, result.pcm, 2048 * 2) > 30);
+});
+
+test('HE-AAC v2 codes a stereo signal as one channel and decodes it as two', { skip: !available && 'native binding not built' }, async () => {
+  const service = new AacService();
+  const pcm = tones(44100 * 2, 44100, 2);
+  const session = await service.openEncoder({ sampleRate: 44100, channels: 2, bitrate: 32000, profile: 'hev2' });
+  assert.deepEqual({ profile: session.profile, frameSize: session.frameSize, delay: session.delay }, { profile: 'hev2', frameSize: 2048, delay: 5635 });
+  await service.closeEncoder(session.id);
+  const stream = await service.encode(pcm, { sampleRate: 44100, channels: 2, bitrate: 32000, profile: 'hev2' });
+  const result = await service.decode(stream, { channels: 0 });
+  assert.equal(result.errors, 0);
+  assert.equal(result.sampleRate, 44100);
+  assert.equal(result.frameSize, 2048);
+  assert.equal(result.channels, 2);
+  assert.equal(result.streamChannels, 1);
+  assert.equal(result.hasSbr, true);
+  assert.equal(result.hasPs, true);
+  assert.ok(snrDb(pcm, result.pcm, 5635 * 2) > 8);
 });
 
 test('streaming sessions match the one-shot result and are closed by id', { skip: !available && 'native binding not built' }, async () => {
@@ -79,5 +99,6 @@ test('streaming sessions match the one-shot result and are closed by id', { skip
 test('unsupported options are rejected by the binding', { skip: !available && 'native binding not built' }, async () => {
   const service = new AacService();
   await assert.rejects(() => service.encode(new Float32Array(10), { sampleRate: 37000, channels: 2 }));
-  await assert.rejects(() => service.openDecoder({ channels: 5 }));
+  await assert.rejects(() => service.openDecoder({ channels: 9 }));
+  await assert.rejects(() => service.encode(new Float32Array(10), { sampleRate: 44100, channels: 1, profile: 'hev2' }));
 });

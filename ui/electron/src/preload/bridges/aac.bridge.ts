@@ -3,18 +3,23 @@ import { ipcRenderer } from 'electron';
 /** Options of the native AAC decoder; see @baander/aac-native. */
 export interface AacDecoderOptions {
   sampleRate?: number;
+  /** 0 for the stream's own channels, 1 or 2 for a downmix, up to 8. */
   channels?: number;
 }
 
 export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
+/** AAC-LC, HE-AAC v1 (SBR) or HE-AAC v2 (SBR and parametric stereo). */
+export type AacProfile = 'lc' | 'he' | 'hev2';
 
 /** Options of the native AAC encoder; see @baander/aac-native. */
 export interface AacEncoderOptions {
   sampleRate?: number;
+  /** 1 to 8 in the canonical order; 'hev2' takes exactly 2. */
   channels?: number;
   bitrate?: number;
   mode?: AacRateControlMode;
   quality?: number;
+  profile?: AacProfile;
 }
 
 export interface AacInfo {
@@ -24,17 +29,24 @@ export interface AacInfo {
 }
 
 export interface AacDecodeResult {
+  /** Output rate: twice the core rate while SBR is decoded. */
   sampleRate: number;
+  /** Output channels; a mono stream with parametric stereo plays as two. */
   channels: number;
+  /** Channels coded in the stream. */
+  streamChannels: number;
   frameSize: number;
   errors: number;
   hasSbr: boolean;
+  hasPs: boolean;
   /** Interleaved float PCM, full scale 1.0. */
   pcm: Float32Array;
 }
 
 export interface AacEncoderSession {
   id: number;
+  profile: AacProfile;
+  /** Samples per channel per frame: 1024, or 2048 for the HE-AAC profiles. */
   frameSize: number;
   /** Samples of lead-in before the first input sample in the decoded output. */
   delay: number;

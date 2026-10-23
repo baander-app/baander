@@ -6,7 +6,7 @@
  * every operation rejects with a descriptive error instead of crashing
  * the app.
  */
-import type { AacDecoder, AacDecoderOptions, AacEncoder, AacEncoderOptions } from '@baander/aac-native';
+import type { AacDecoder, AacDecoderOptions, AacEncoder, AacEncoderOptions, AacProfile } from '@baander/aac-native';
 
 type Native = {
   AacDecoder: typeof AacDecoder;
@@ -21,16 +21,22 @@ export interface AacInfo {
 }
 
 export interface AacDecodeResult {
+  /** Output rate: twice the core rate while SBR is decoded. */
   sampleRate: number;
+  /** Output channels; a mono stream with parametric stereo plays as two. */
   channels: number;
+  /** Channels coded in the stream. */
+  streamChannels: number;
   frameSize: number;
   errors: number;
   hasSbr: boolean;
+  hasPs: boolean;
   pcm: Float32Array;
 }
 
 export interface AacEncoderSession {
   id: number;
+  profile: AacProfile;
   frameSize: number;
   delay: number;
 }
@@ -122,7 +128,7 @@ export class AacService {
     const encoder = new (await this.native()).AacEncoder(options);
     const id = this.nextId++;
     this.encoders.set(id, encoder);
-    return { id, frameSize: encoder.frameSize, delay: encoder.delay };
+    return { id, profile: encoder.profile, frameSize: encoder.frameSize, delay: encoder.delay };
   }
 
   async encodeChunk(id: number, pcm: Float32Array): Promise<Uint8Array> {
@@ -161,9 +167,11 @@ function describe(decoder: AacDecoder, pcm: Float32Array): AacDecodeResult {
   return {
     sampleRate: decoder.sampleRate,
     channels: decoder.channels,
+    streamChannels: decoder.streamChannels,
     frameSize: decoder.frameSize,
     errors: decoder.errors,
     hasSbr: decoder.hasSbr,
+    hasPs: decoder.hasPs,
     pcm,
   };
 }
