@@ -358,14 +358,14 @@ function traverseSignedDelivery(string $manifestUrl, int $expires): array
         $counts[$type] = ($counts[$type] ?? 0) + 1;
         $children = [];
         if (str_ends_with($path, '.m3u8')) {
-            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $response->body, $matches, PREG_SET_ORDER);
-            foreach ($matches as $match) { $children[] = $match[1] !== '' ? $match[1] : $match[2]; }
+            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $response->body, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
+            foreach ($matches as $match) { $children[] = $match[1] ?? $match[2]; }
             ensure($children !== [], 'HLS playlist omitted signed children.');
             // A second read must retain the same deadline.
             $repeated = (new HttpExchange($resource, []))->complete(5);
             ensure($repeated->status() === 200, 'Repeated signed playlist read failed before expiry.');
-            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $repeated->body, $repeatedMatches, PREG_SET_ORDER);
-            foreach ($repeatedMatches as $match) { $children[] = $match[1] !== '' ? $match[1] : $match[2]; }
+            preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $repeated->body, $repeatedMatches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
+            foreach ($repeatedMatches as $match) { $children[] = $match[1] ?? $match[2]; }
         } elseif (str_ends_with($path, '.mpd')) {
             $xml = new DOMDocument();
             ensure($xml->loadXML($response->body, LIBXML_NONET), 'Expiry probe DASH manifest is invalid XML.');
