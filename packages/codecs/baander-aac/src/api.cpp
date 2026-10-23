@@ -136,6 +136,24 @@ int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length) {
   return aac_encoder_state_set_frame_length(s, frame_length);
 }
 
+int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (profile < AAC_DRC_NONE || profile > AAC_DRC_SPEECH || prog_ref_level < 0 ||
+      prog_ref_level > 127) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  s->drc.profile = profile;
+  s->drc.prog_ref_level = prog_ref_level;
+  aac_drc_encoder_reset(&s->drc);
+  return AAC_OK;
+}
+
 int aac_encoder_frame_size(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
@@ -411,6 +429,38 @@ int aac_decoder_channel_mode(AacDecoderHandle ctx) {
     return AAC_MODE_DEFAULT;
   }
   return aac_layout_mode(&s->layout);
+}
+
+int aac_decoder_set_drc(AacDecoderHandle ctx, int enabled, int boost, int cut, int target_ref_level,
+                        int heavy) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  if (boost < 0 || boost > 100 || cut < 0 || cut > 100 || target_ref_level < -1 ||
+      target_ref_level > 127) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  s->drc.settings.enabled = enabled ? 1 : 0;
+  s->drc.settings.boost = boost;
+  s->drc.settings.cut = cut;
+  s->drc.settings.target_ref_level = target_ref_level;
+  s->drc.settings.heavy = heavy ? 1 : 0;
+  return AAC_OK;
+}
+
+int aac_decoder_program_ref_level(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->drc.prog_ref_level;
+}
+
+int aac_decoder_has_drc(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->drc.has_drc;
 }
 
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps) {

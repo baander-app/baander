@@ -5,6 +5,7 @@
 
 #include "aac_tables.h"
 #include "bitstream.h"
+#include "drc.h"
 #include "ps.h"
 #include "qmf.h"
 
@@ -154,6 +155,7 @@ using AacSbrState = struct AacSbrState_ {
   float s_m[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   float gain[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   AacPsState ps; /* parametric stereo of a single channel element */
+  AacDrcQmf drc; /* dynamic range control gains per QMF band, set per frame by the decoder */
 };
 
 /* Prepares the state for a core sample rate and frame length (1024 or

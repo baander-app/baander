@@ -716,20 +716,6 @@ void apply_couplings(AacDecoderState* s, int elem_index, int domain) {
   }
 }
 
-int skip_dse(AacBitReader* r) {
-  aac_bitreader_skip(r, 4); /* element_instance_tag */
-  const int align = (int)aac_bitreader_read(r, 1);
-  int count = (int)aac_bitreader_read(r, 8);
-  if (count == 255) {
-    count += (int)aac_bitreader_read(r, 8);
-  }
-  if (align) {
-    aac_bitreader_byte_align(r);
-  }
-  aac_bitreader_skip(r, 8 * count);
-  return r->overread ? AAC_ERR_DECODE : 0;
-}
-
 /* The SBR state of a layout element, created on first use. */
 AacSbrState* sbr_state(AacDecoderState* s, int elem) {
   if (!s->sbr[elem]) {
@@ -769,6 +755,8 @@ int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type, boo
         }
         return r->overread ? AAC_ERR_DECODE : 0;
       }
+    } else if (ext_type == AAC_EXT_DYNAMIC_RANGE) {
+      return aac_drc_decode_fill(&s->drc, r, elem, count);
     }
   }
   aac_bitreader_skip(r, 8 * count);
@@ -854,6 +842,7 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
     s->sbr[i] = nullptr;
   }
   s->conceal_mode = AAC_CONCEAL_INTERPOLATE;
+  aac_drc_decoder_init(&s->drc);
   s->last_concealed = 0;
   s->concealed_frames = 0;
   s->conceal_random = kRandomSeed;
@@ -1007,8 +996,8 @@ int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem)
   int ret = 0;
   const int fil_elem = elem == AAC_ELEM_FIL ? p->last_elem : -1;
   const int fil_type = p->last_type;
-  p->last_elem = -1;
-  p->last_type = elem;
+  p->last_elem = fil_elem; /* consecutive fill elements follow the same channel element */
+  p->last_type = elem == AAC_ELEM_FIL ? fil_type : elem;
   switch (elem) {
     case AAC_ELEM_SCE:
     case AAC_ELEM_LFE:
@@ -1068,7 +1057,7 @@ int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem)
       break;
     }
     case AAC_ELEM_DSE:
-      ret = skip_dse(r);
+      ret = aac_drc_decode_dse(&s->drc, r);
       break;
     case AAC_ELEM_PCE: {
       AacLayout l = {};
@@ -1198,6 +1187,24 @@ void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
   aac_conceal_recovered(&ch->conceal);
 }
 
+/* Dynamic range control of an element's channels: on the spectrum before
+ * the inverse transform, or as QMF-band gains the SBR stage applies once
+ * the high band exists. */
+void apply_drc(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) {
+  if (!s->drc.settings.enabled) {
+    return;
+  }
+  if (s->sbr_mode) {
+    aac_drc_set_qmf_gains(&s->drc, elem, s->elem_base[elem], nch, &sbr_state(s, elem)->drc,
+                          s->frame_length);
+    return;
+  }
+  for (int c = 0; c < nch; c++) {
+    aac_drc_apply_spectrum(&s->drc, elem, s->elem_base[elem] + c, chans[c].cs.coef,
+                           chans[c].cs.ics.num_windows, s->frame_length);
+  }
+}
+
 /* SBR last: the stream stays at twice the core rate once an element has
  * carried SBR data, and every element goes through its filterbanks so
  * that all channels keep the same delay.  With `conceal` an element
@@ -1250,6 +1257,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->has_ps = 0;
   s->last_concealed = 0;
   s->num_crc_regions = 0;
+  aac_drc_frame_begin(&s->drc);
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
   bool damaged = false;
   for (;;) {
@@ -1311,6 +1319,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
     s->last_concealed = 1;
     s->concealed_frames++;
   }
+  aac_drc_frame_end(&s->drc);
 
   /* Coupling channels first: independently switched ones need their time
    * signal before the targets are mixed. */
@@ -1341,6 +1350,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       apply_tns(&chans[c].cs);
     }
     apply_couplings(s, i, 1);
+    apply_drc(s, i, chans, nch);
     for (int c = 0; c < nch; c++) {
       filterbank(s, &chans[c], c);
     }
@@ -1367,6 +1377,7 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
   for (int k = 0; k < AAC_MAX_CCE; k++) {
     s->cce[k].present = 0;
   }
+  aac_drc_frame_begin(&s->drc);
   const AacLayout* l = &s->layout;
   for (int i = 0; i < l->num_elements; i++) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;

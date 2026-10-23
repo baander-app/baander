@@ -7,6 +7,7 @@
 #include "aac_tables.h"
 #include "bitstream.h"
 #include "channel_map.h"
+#include "drc.h"
 #include "ics.h"
 #include "mdct.h"
 #include "psycho.h"
@@ -141,6 +142,8 @@ using AacEncoderState = struct AacEncoderState_ {
   int num_crc_regions;
   /* Transport, signalling and CRC settings, owned by the transport layer. */
   struct AacEncoderTransport_* transport;
+  /* Dynamic range control metadata (aac_encoder_set_metadata). */
+  AacDrcEncoder drc;
 };
 
 /* `sr` and `ch` are the input's; HE-AAC v2 takes a stereo input only. */

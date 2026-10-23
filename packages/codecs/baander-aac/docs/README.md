@@ -20,8 +20,8 @@ noise substitution (including correlated noise in M/S bands). Every
 raw data block element is handled: SCE, CPE and LFE channels, coupling
 channel elements (dependent and independent, with their gain lists),
 program config elements (with the height extension of ETSI TS 101 154)
-and the channel configurations 1 to 7, 11, 12 and 14 of the standard; DSE
-elements are skipped. A stream without a channel configuration or PCE
+and the channel configurations 1 to 7, 11, 12 and 14 of the standard; a
+DSE is read for DVB ancillary data and otherwise skipped. A stream without a channel configuration or PCE
 takes its layout from the elements it carries. The output is emitted in
 the canonical order left, right, centre, LFE, back left, back right, then
 the extra pair of a 7.1 layout (`aac_decoder_channel_mode` names it:
@@ -69,6 +69,25 @@ peak leaves the delay line, recovers at a constant rate in decibels over
 the release time, and passes samples that never needed a reduction
 unchanged; its delay is the attack window, reported by
 `aac_decoder_delay`.
+
+MPEG-4 dynamic range control (ISO/IEC 14496-3 4.5.2.7) is parsed from
+every fill element whose extension payload carries `dynamic_range_info`
+(the PCE tag, excluded channels, up to sixteen bands with their tops and
+interpolation scheme, the program reference level and the band gains)
+and attached to the channel element the fill element follows, or to the
+program when it comes first; the DVB ancillary data of a data stream
+element (ETSI TS 101 154) supplies the heavy compression gain. When
+`aac_decoder_set_drc` enables it, the band gains (scaled by the boost
+and cut percentages, a quarter dB per step) multiply the spectral lines
+of each channel before the inverse transform, where the window overlap
+blends one frame's gain into the next; on an SBR stream they multiply
+the 64 QMF bands after the high band is generated, interpolated across
+the frame's slots from the previous frame's gains, so that the
+replicated band is scaled as well. A target reference level adds the
+fixed gain that brings the stream's program reference level to it,
+heavy compression replaces the band gains by the ancillary data's gain,
+and excluded channels are left alone. `aac_decoder_has_drc` and
+`aac_decoder_program_ref_level` report the last frame.
 
 Against FFmpeg's decoder the output agrees to floating-point precision
 (135 dB difference SNR) on FFmpeg-encoded streams across all sample rates
@@ -208,6 +227,7 @@ int aac_encoder_frame_size(AacEncoderHandle ctx);
 int aac_encoder_delay(AacEncoderHandle ctx);
 int aac_encoder_max_frame_bytes(AacEncoderHandle ctx);
 void aac_encoder_destroy(AacEncoderHandle ctx);
+int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level);
 /* stream format, before the first frame or after a flush */
 int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport);
 int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling);
@@ -277,6 +297,10 @@ int aac_decoder_last_frame_concealed(AacDecoderHandle ctx);
 int aac_decoder_concealed_frames(AacDecoderHandle ctx);
 int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, int release_ms);
 int aac_decoder_delay(AacDecoderHandle ctx);
+int aac_decoder_set_drc(AacDecoderHandle ctx, int enabled, int boost, int cut,
+                        int target_ref_level, int heavy);
+int aac_decoder_program_ref_level(AacDecoderHandle ctx);
+int aac_decoder_has_drc(AacDecoderHandle ctx);
 int aac_decoder_channel_mode(AacDecoderHandle ctx);
 /* streaming input */
 int aac_decoder_feed(AacDecoderHandle ctx, const uint8_t* data, int size);
@@ -311,6 +335,19 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 - `aac_decoder_set_limiter` takes the attack (look-ahead) and release
   times in milliseconds; the look-ahead must fit 8192 frames at the
   highest output rate, 96 kHz doubled by SBR (about 42 ms).
+- `aac_decoder_set_drc` (off by default) takes the boost and cut
+  scaling in percent, the target reference level in quarter dB below
+  full scale (-1 for no loudness normalisation) and whether DVB heavy
+  compression is preferred; it may be changed at any time.
+- `aac_encoder_set_metadata` selects a compression profile (film
+  standard, film light, music standard, music light or speech) and the
+  program reference level in quarter dB below full scale (124 is
+  -31 dBFS) before the first frame. Every channel element is then
+  followed by a fill element with `dynamic_range_info`: the reference
+  level and one band whose gain comes from the profile's curve at the
+  frame's RMS level relative to the reference (the curves are
+  piecewise-linear tables in `src/drc.cpp`; the level estimate releases
+  by 2 dB per frame). With `AAC_DRC_NONE` the output is unchanged.
 
 ## Building
 
@@ -382,7 +419,7 @@ chunked decoder/encoder sessions).
 
 ## Testing
 
-`ctest` runs fourteen suites: table consistency (prefix-free, complete
+`ctest` runs fifteen suites: table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
 Princen-Bradley windows), MDCT against the direct definition and TDAC,
 the QMF banks (every analysis and
@@ -410,7 +447,15 @@ of LC and HE-AAC streams), concealment (transparency on undamaged
 streams, damaged and lost frames at 1 and 10 percent on LC and HE-AAC
 streams with no error, exact counts, bounded discontinuities and the
 fade), 960-sample frames (transforms, API, roundtrips at every rate,
-HE-AAC delay) and the limiter. The interop test skips when `ffmpeg` is
+HE-AAC delay), the limiter, and dynamic range control (the parser and
+writer on hand-built infos with every optional part, the gain formulas,
+the band gain and its boost and cut scaling applied to encoder-written
+metadata within 0.1 dB, reference-level normalisation, excluded
+channels and two bands from a hand-built fill element, heavy
+compression from a hand-built data stream element, an HE-AAC stream,
+and FFmpeg decoding our metadata stream without complaint and, since
+its decoder parses but does not apply the gains, matching our decode
+with DRC off at 135 dB). The interop test skips when `ffmpeg` is
 not on PATH; otherwise it requires our decoder to match FFmpeg's decode
 of FFmpeg-encoded streams (ADTS and LATM), and FFmpeg to decode our
 streams (ADTS, LOAS with implicit, backward compatible and hierarchical
@@ -430,7 +475,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, SBR and PS decoders, limiter, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, SBR and PS decoders, limiter, dynamic range control, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool
 tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)

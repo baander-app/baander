@@ -1053,6 +1053,7 @@ void aac_sbr_init(AacSbrState* s, int core_sample_rate, int frame_length) {
     aac_qmf_synthesis_init(&s->data[c].synthesis, 64);
   }
   aac_ps_init(&s->ps, s->slots);
+  aac_drc_qmf_init(&s->drc);
 }
 
 namespace {
@@ -1220,7 +1221,9 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
       }
     }
     x_gen(s, s->X[c], ch->Y[1 - ch->Ypos], ch->Y[ch->Ypos], s->X_low, c);
+    aac_drc_apply_qmf(&s->drc, c, s->X[c], slots);
   }
+  s->drc.active = 0;
   if (ps_output) {
     if (s->ps.start) {
       aac_ps_apply(&s->ps, s->X[0], s->X[1], s->kx[1] + s->m[1]);

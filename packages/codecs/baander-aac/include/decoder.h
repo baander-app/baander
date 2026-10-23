@@ -6,6 +6,7 @@
 #include "bitstream.h"
 #include "channel_map.h"
 #include "conceal.h"
+#include "drc.h"
 #include "ics.h"
 #include "limiter.h"
 #include "mdct.h"
@@ -120,6 +121,9 @@ using AacDecoderState = struct AacDecoderState_ {
   int num_crc_regions;
   /* Input FIFO and stream configuration, owned by the transport layer. */
   struct AacDecoderTransport_* transport;
+  /* Dynamic range control: the frame's dynamic_range_info per element and
+   * the DVB ancillary data, and the settings of aac_decoder_set_drc. */
+  AacDrcDecoder drc;
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);

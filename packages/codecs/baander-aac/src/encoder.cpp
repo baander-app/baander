@@ -791,6 +791,7 @@ void write_sbr(const AacEncoderState* s, int e, AacBitWriter* w) {
   if (s->sbr[e]) {
     aac_sbr_enc_write(s->sbr[e], w);
   }
+  aac_drc_encoder_write(&s->drc, e, w);
 }
 
 int write_frame(AacEncoderState* s, int buffer_fullness) {
@@ -887,6 +888,7 @@ int frame_overhead_bits(const AacEncoderState* s) {
     if (s->sbr[e]) {
       bits += aac_sbr_enc_bits(s->sbr[e]);
     }
+    bits += aac_drc_encoder_bits(&s->drc);
   }
   return bits;
 }
@@ -1464,6 +1466,7 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   memset(s->sbr_in, 0, sizeof(s->sbr_in));
   memset(s->core_in, 0, sizeof(s->core_in));
   s->reservoir = s->reservoir_max / 2;
+  aac_drc_encoder_reset(&s->drc);
   s->started = 0;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
   const float mean_pe = (float)s->avg_frame_bits;
@@ -1567,6 +1570,8 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   const int channel_bitrate = s->bitrate / s->channels;
   for (int e = 0; e < s->num_elements; e++) {
     AacEncElement* el = &s->elem[e];
+    aac_drc_encoder_analyse(&s->drc, e, s->ch[el->ch[0]].pcm,
+                            el->num_ch > 1 ? s->ch[el->ch[1]].pcm : nullptr, 2 * fl, kInputScale);
     choose_window_sequence(s, el);
     for (int k = 0; k < el->num_ch; k++) {
       AacEncChannel* ch = &s->ch[el->ch[k]];

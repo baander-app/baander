@@ -19,6 +19,7 @@
         "src/asc.cpp",
         "src/latm.cpp",
         "src/transport.cpp",
+        "src/drc.cpp",
         "src/api.cpp",
         "src/decoder.cpp",
         "src/decoder_output.cpp",
