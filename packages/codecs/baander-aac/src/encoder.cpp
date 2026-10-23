@@ -787,7 +787,45 @@ void write_pce(AacBitWriter* w, const AacLayout* l, int rate_index) {
     }
   }
   aac_bitwriter_byte_align(w);
-  aac_bitwriter_write(w, 0, 8); /* comment_field_bytes */
+  /* A layout with an element outside the normal layer carries the height
+   * extension in the comment field: the sync byte, two bits per front,
+   * side and back element in that order, alignment and the CRC. */
+  bool height = false;
+  for (int e = 0; e < l->num_elements; e++) {
+    height = height || l->elems[e].height != AAC_HEIGHT_NORMAL;
+  }
+  if (!height) {
+    aac_bitwriter_write(w, 0, 8); /* comment_field_bytes */
+    return;
+  }
+  uint8_t bytes[1 + (2 * AAC_MAX_ELEMENTS + 7) / 8] = {AAC_PCE_HEIGHT_EXTENSION_SYNC};
+  int n = 0;
+  for (int p = 0; p < 3; p++) {
+    for (int e = 0; e < l->num_elements; e++) {
+      const AacLayoutElement* el = &l->elems[e];
+      if (el->position == kPositions[p]) {
+        bytes[1 + n / 4] |= (uint8_t)(el->height << (6 - 2 * (n % 4)));
+        n++;
+      }
+    }
+  }
+  const int len = 1 + (2 * n + 7) / 8;
+  aac_bitwriter_write(w, (uint32_t)(len + 1), 8); /* comment_field_bytes */
+  for (int i = 0; i < len; i++) {
+    aac_bitwriter_write(w, bytes[i], 8);
+  }
+  aac_bitwriter_write(w, aac_pce_height_crc(bytes, len), 8);
+}
+
+/* Bits of the program config element for the layout. */
+int pce_bits(const AacLayout* l) {
+  const int bits = 3 + 34 + 5 * l->num_elements + 7 + 8;
+  for (int e = 0; e < l->num_elements; e++) {
+    if (l->elems[e].height != AAC_HEIGHT_NORMAL) {
+      return bits + 8 * (2 + (2 * l->num_elements + 7) / 8);
+    }
+  }
+  return bits;
 }
 
 /* Writes the whole ADTS frame for the current quantization; returns its
@@ -843,6 +881,7 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
   }
 
   AacAdtsHeader hdr = {};
+  hdr.id = s->mpeg2;
   hdr.protection_absent = 1;
   hdr.object_type = AAC_AOT_LC;
   hdr.sample_rate_index = s->rate_index;
@@ -861,7 +900,7 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
 int frame_overhead_bits(const AacEncoderState* s) {
   int bits = kAdtsBits + 3 + 7; /* header, END, worst-case byte alignment */
   if (s->channel_config == 0) {
-    bits += 3 + 34 + 5 * s->num_elements + 7 + 8;
+    bits += pce_bits(&s->layout);
   }
   for (int e = 0; e < s->num_elements; e++) {
     const AacEncElement* el = &s->elem[e];
@@ -1168,12 +1207,79 @@ void rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_
 
 
 
-/* Channel configuration of a channel count: the standard layouts 1 to 7,
- * with 6.1 (configuration 11, which the ADTS header cannot name and a PCE
- * carries instead) for seven channels. */
+/* Channel configuration of a channel count: the standard layouts 1 to 6,
+ * with 6.1 (configuration 11) for seven channels and 7.1 with a back pair
+ * (configuration 12) for eight; the ADTS header cannot name either, so a
+ * PCE carries them. */
 int config_for_channels(int channels) {
-  static const int kConfig[AAC_MAX_CHANNELS + 1] = {0, 1, 2, 3, 4, 5, 6, 11, 7};
+  static const int kConfig[AAC_MAX_CHANNELS + 1] = {0, 1, 2, 3, 4, 5, 6, 11, 12};
   return channels >= 1 && channels <= AAC_MAX_CHANNELS ? kConfig[channels] : 0;
+}
+
+/* Builds the layout of the channel mode (the count's own configuration
+ * for AAC_MODE_DEFAULT) and the elements that code it; returns
+ * AAC_ERR_INVALID_ARG when the mode does not fit the channel count. */
+int setup_layout(AacEncoderState* s, AacChannelMode mode) {
+  AacLayout layout = {};
+  if (mode == AAC_MODE_DEFAULT) {
+    const int config = config_for_channels(s->channels);
+    if (config == 0 || aac_layout_from_config(&layout, config) != AAC_OK) {
+      return AAC_ERR_INVALID_ARG;
+    }
+  } else if (aac_layout_from_mode(&layout, mode) != AAC_OK ||
+             layout.num_channels != s->channels) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  s->layout = layout;
+  s->channel_mode = mode;
+  s->channel_config = layout.channel_config <= 7 ? layout.channel_config : 0;
+  s->num_elements = layout.num_elements;
+  for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
+    s->ch[c].is_lfe = 0;
+  }
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacLayoutElement* le = &layout.elems[e];
+    AacEncElement* el = &s->elem[e];
+    el->type = le->type;
+    el->tag = le->tag;
+    el->num_ch = le->type == AAC_ELEM_CPE ? 2 : 1;
+    for (int k = 0; k < el->num_ch; k++) {
+      el->ch[k] = le->slot[k];
+      s->ch[le->slot[k]].is_lfe = le->type == AAC_ELEM_LFE;
+    }
+  }
+  return AAC_OK;
+}
+
+void destroy_sbr_encoders(AacEncoderState* s) {
+  for (int e = 0; e < AAC_MAX_ELEMENTS; e++) {
+    delete s->sbr[e];
+    delete s->lfe_down[e];
+    s->sbr[e] = nullptr;
+    s->lfe_down[e] = nullptr;
+  }
+}
+
+/* HE-AAC: one SBR encoder per SCE or CPE, with the element's share of
+ * the bitrate; with parametric stereo the single SCE takes both inputs.
+ * An LFE gets the half-rate downsampler instead. */
+int create_sbr_encoders(AacEncoderState* s) {
+  const bool ps = s->aot == AAC_AOT_PS;
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacEncElement* el = &s->elem[e];
+    if (el->type == AAC_ELEM_LFE) {
+      s->lfe_down[e] = new AacSbrDownsampler();
+      continue;
+    }
+    const int in_ch = ps ? 2 : el->num_ch;
+    const int el_bitrate =
+        ps ? s->bitrate : (int)((long long)s->bitrate * el->num_ch / s->channels);
+    s->sbr[e] = new AacSbrEncoder();
+    if (aac_sbr_enc_init(s->sbr[e], s->input_rate, in_ch, el_bitrate, ps)) {
+      return AAC_ERR_INIT;
+    }
+  }
+  return AAC_OK;
 }
 
 /* Lines of an LFE channel that are coded: the lowest twelve, as FFmpeg and
@@ -1196,8 +1302,7 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
     return nullptr;
   }
   const int coded_channels = ps ? 1 : ch;
-  const int config = config_for_channels(coded_channels);
-  if (config == 0) {
+  if (config_for_channels(coded_channels) == 0) {
     return nullptr;
   }
   auto* s = new AacEncoderState();
@@ -1220,40 +1325,13 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
       break;
     }
   }
-  if (s->rate_index < 0 || aac_layout_from_config(&s->layout, config) != AAC_OK) {
+  if (s->rate_index < 0 || setup_layout(s, AAC_MODE_DEFAULT) != AAC_OK) {
     delete s;
     return nullptr;
   }
-  s->channel_config = config <= 7 ? config : 0;
-  s->num_elements = s->layout.num_elements;
-  for (int e = 0; e < s->num_elements; e++) {
-    const AacLayoutElement* le = &s->layout.elems[e];
-    AacEncElement* el = &s->elem[e];
-    el->type = le->type;
-    el->tag = le->tag;
-    el->num_ch = le->type == AAC_ELEM_CPE ? 2 : 1;
-    for (int k = 0; k < el->num_ch; k++) {
-      el->ch[k] = le->slot[k];
-      s->ch[le->slot[k]].is_lfe = le->type == AAC_ELEM_LFE;
-    }
-  }
-  if (sbr) {
-    /* one SBR encoder per SCE or CPE, with the element's share of the
-     * bitrate; with parametric stereo the single SCE takes both inputs */
-    for (int e = 0; e < s->num_elements; e++) {
-      const AacEncElement* el = &s->elem[e];
-      if (el->type == AAC_ELEM_LFE) {
-        s->lfe_down[e] = new AacSbrDownsampler();
-        continue;
-      }
-      const int in_ch = ps ? 2 : el->num_ch;
-      const int el_bitrate = ps ? br : (int)((long long)br * el->num_ch / coded_channels);
-      s->sbr[e] = new AacSbrEncoder();
-      if (aac_sbr_enc_init(s->sbr[e], s->input_rate, in_ch, el_bitrate, ps)) {
-        aac_encoder_state_destroy(s);
-        return nullptr;
-      }
-    }
+  if (sbr && create_sbr_encoders(s) != AAC_OK) {
+    aac_encoder_state_destroy(s);
+    return nullptr;
   }
   aac_mdct_init(&s->mdct_long, 2 * kFrame);
   aac_mdct_init(&s->mdct_short, 2 * kShort);
@@ -1334,6 +1412,10 @@ void aac_encoder_state_configure(AacEncoderState* s) {
   init_min_snr(s->min_snr_short, channel_bitrate, s->sample_rate, 2 * kShort, so,
                s->active_bands_short);
   aac_enc_tools_init(s);
+  if (s->mpeg2) {
+    /* MPEG-2 AAC (ISO/IEC 13818-7) has no perceptual noise substitution. */
+    s->use_pns = 0;
+  }
 }
 
 void aac_encoder_state_reset(AacEncoderState* s) {
@@ -1363,6 +1445,7 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   memset(s->core_in, 0, sizeof(s->core_in));
   s->reservoir = s->reservoir_max / 2;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
+  s->started = 0;
   const float mean_pe = (float)s->avg_frame_bits;
   s->pe_min = 0.4f * mean_pe;
   s->pe_max = 0.6f * mean_pe;
@@ -1382,11 +1465,29 @@ void aac_encoder_state_destroy(AacEncoderState* s) {
   if (!s) {
     return;
   }
-  for (int e = 0; e < AAC_MAX_ELEMENTS; e++) {
-    delete s->sbr[e];
-    delete s->lfe_down[e];
-  }
+  destroy_sbr_encoders(s);
   delete s;
+}
+
+int aac_encoder_state_set_channel_mode(AacEncoderState* s, AacChannelMode mode) {
+  if (mode == s->channel_mode) {
+    return AAC_OK;
+  }
+  const AacChannelMode previous = s->channel_mode;
+  if (setup_layout(s, mode) != AAC_OK) {
+    setup_layout(s, previous);
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (s->aot != AAC_AOT_LC) {
+    /* The elements changed, and the SBR encoders belong to elements. */
+    destroy_sbr_encoders(s);
+    if (create_sbr_encoders(s) != AAC_OK) {
+      return AAC_ERR_INIT;
+    }
+  }
+  aac_encoder_state_configure(s);
+  aac_encoder_state_reset(s);
+  return AAC_OK;
 }
 
 namespace {
@@ -1426,6 +1527,7 @@ void sbr_process(AacEncoderState* s, const float* pcm) {
 }  // namespace
 
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
+  s->started = 1;
   const bool sbr = s->frame_size != kFrame;
   if (sbr) {
     sbr_process(s, pcm);

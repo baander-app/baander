@@ -18,6 +18,8 @@
         "src/ps_hybrid.cpp",
         "src/api.cpp",
         "src/decoder.cpp",
+        "src/decoder_output.cpp",
+        "src/limiter.cpp",
         "src/sbr_dec.cpp",
         "src/ps_dec.cpp",
         "src/psycho.cpp",

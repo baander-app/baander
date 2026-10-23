@@ -13,6 +13,7 @@ set(TEST_SOURCES
     test_interop.cpp
     test_layouts.cpp
     test_qmf.cpp
+    test_limiter.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

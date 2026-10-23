@@ -776,7 +776,7 @@ int decode_pce(AacDecoderState* s, AacBitReader* r, AacLayout* layout) {
   if (aac_bitreader_read(r, 1)) {
     aac_bitreader_skip(r, 3); /* matrix_mixdown_idx, pseudo_surround_enable */
   }
-  AacLayoutElement elems[AAC_MAX_ELEMENTS];
+  AacLayoutElement elems[AAC_MAX_ELEMENTS] = {};
   int n = 0;
   const int counts[4] = {front, side, back, lfe};
   for (int pos = 0; pos < 4; pos++) {
@@ -803,7 +803,28 @@ int decode_pce(AacDecoderState* s, AacBitReader* r, AacLayout* layout) {
   }
   aac_bitreader_byte_align(r);
   const int comment = (int)aac_bitreader_read(r, 8);
-  aac_bitreader_skip(r, 8 * comment);
+  /* A comment that starts with the height extension's sync byte carries
+   * two bits of height per front, side and back element, byte alignment
+   * and a CRC over the bytes before it; a failing CRC leaves every
+   * element in the normal layer. */
+  const int height_elements = front + side + back;
+  const int height_bytes = 1 + (2 * height_elements + 7) / 8;
+  int skipped = 0;
+  if (comment >= height_bytes + 1 && aac_bitreader_peek(r, 8) == AAC_PCE_HEIGHT_EXTENSION_SYNC) {
+    uint8_t bytes[1 + (2 * AAC_MAX_ELEMENTS + 7) / 8];
+    for (int i = 0; i < height_bytes; i++) {
+      bytes[i] = (uint8_t)aac_bitreader_read(r, 8);
+    }
+    const int crc = (int)aac_bitreader_read(r, 8);
+    skipped = height_bytes + 1;
+    if (crc == aac_pce_height_crc(bytes, height_bytes)) {
+      for (int i = 0; i < height_elements; i++) {
+        const int shift = 6 - 2 * (i % 4);
+        elems[i].height = (bytes[1 + i / 4] >> shift) & 3;
+      }
+    }
+  }
+  aac_bitreader_skip(r, 8 * (comment - skipped));
   if (r->overread) {
     return AAC_ERR_DECODE;
   }
@@ -920,6 +941,9 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   s->sbr_mode = 0;
   s->ps_output = 0;
   s->frame_size = AAC_FRAME_SIZE_LONG;
+  if (s->limiter_ready) {
+    aac_limiter_reset(&s->limiter);
+  }
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     if (s->sbr[i]) {
       aac_sbr_init(s->sbr[i], s->sample_rate);
@@ -991,7 +1015,7 @@ int aac_decoder_output(const AacDecoderState* s, float* out) {
 
 int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   /* Elements of a stream without configuration, collected as they arrive. */
-  AacLayoutElement sniffed[AAC_MAX_ELEMENTS];
+  AacLayoutElement sniffed[AAC_MAX_ELEMENTS] = {};
   int num_sniffed = 0;
   bool sniffing = s->layout_source == 0 || s->layout_source == 3;
   if (sniffing) {

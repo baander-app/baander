@@ -6,6 +6,7 @@
 #include "bitstream.h"
 #include "channel_map.h"
 #include "ics.h"
+#include "limiter.h"
 #include "mdct.h"
 #include "sbr.h"
 #ifdef __cplusplus
@@ -89,6 +90,14 @@ using AacDecoderState = struct AacDecoderState_ {
   AacMdct mdct_long, mdct_short;
   unsigned random_state; /* PNS noise generator */
   const AacDSP* dsp;
+  /* Peak limiter on the output, configured by aac_decoder_set_limiter and
+   * (re)initialised by aac_decoder_apply_limiter when the output channel
+   * count or rate changes. */
+  int limiter_enabled;
+  int limiter_attack_ms, limiter_release_ms;
+  int limiter_ready; /* the limiter state matches limiter_channels and limiter_rate */
+  int limiter_channels, limiter_rate;
+  AacLimiter limiter;
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);
@@ -119,6 +128,14 @@ int aac_decoder_output(const AacDecoderState* s, float* out);
 
 /* Output channels for the current layout and request. */
 int aac_decoder_output_channels(const AacDecoderState* s);
+
+/* Runs the output limiter, when enabled, over `frames` interleaved frames
+ * of `channels` channels that aac_decoder_output produced, in place.  The
+ * limiter restarts when the channel count or the output rate changes. */
+void aac_decoder_apply_limiter(AacDecoderState* s, float* pcm, int frames, int channels);
+
+/* Delay the limiter adds to the output, in frames at the output rate. */
+int aac_decoder_limiter_delay(const AacDecoderState* s);
 
 #ifdef __cplusplus
 }

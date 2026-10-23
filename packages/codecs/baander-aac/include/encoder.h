@@ -95,6 +95,8 @@ using AacEncoderState = struct AacEncoderState_ {
   AacEncElement elem[AAC_MAX_ELEMENTS];
   int num_elements;
   int channel_config; /* of the ADTS header: 0 when a PCE carries the layout */
+  AacChannelMode channel_mode; /* the 7.1 layout of an 8-channel input */
+  int mpeg2;                   /* MPEG-2 AAC: ADTS id 1, no noise substitution */
   int bandwidth;                             /* lowpass cutoff in Hz */
   int active_bands_long, active_bands_short; /* bands below the cutoff */
   float min_snr_long[AAC_MAX_SFB_LONG];      /* bitrate-dependent, per band */
@@ -117,6 +119,7 @@ using AacEncoderState = struct AacEncoderState_ {
   int reservoir_max;
   float pe_min, pe_max; /* running range of the frames' perceptual entropy */
   int pending_flush;    /* frames the flush still has to emit */
+  int started;          /* a frame has been coded since the last reset: the format is fixed */
   /* HE-AAC: the SBR encoder of each SCE or CPE, NULL for LFE and AAC-LC */
   AacSbrEncoder* sbr[AAC_MAX_ELEMENTS];
   AacSbrDownsampler* lfe_down[AAC_MAX_ELEMENTS]; /* HE-AAC: the LFE's half-rate signal */
@@ -131,6 +134,11 @@ using AacEncoderState = struct AacEncoderState_ {
 AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType aot,
                                           AacRateControl rc, const AacDSP* dsp);
 void aac_encoder_state_destroy(AacEncoderState* s);
+
+/* Rebuilds the layout and its elements for a channel mode, before any
+ * frame is encoded: AAC_ERR_INVALID_ARG when the mode does not fit the
+ * channel count. */
+int aac_encoder_state_set_channel_mode(AacEncoderState* s, AacChannelMode mode);
 
 /* Re-derives every setting that depends on the bitrate and quality:
  * lowpass, active bands, minimum SNR tables and tool thresholds. */

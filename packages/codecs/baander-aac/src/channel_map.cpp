@@ -21,6 +21,7 @@ const int kSpeakerMap[4][6] = {
 
 struct ConfigElement {
   int type, tag, position;
+  int height = AAC_HEIGHT_NORMAL;
 };
 
 const ConfigElement kConfig1[] = {{AAC_ELEM_SCE, 0, AAC_POS_FRONT}};
@@ -51,6 +52,19 @@ const ConfigElement kConfig12[] = {{AAC_ELEM_SCE, 0, AAC_POS_FRONT},
                                    {AAC_ELEM_CPE, 1, AAC_POS_BACK},
                                    {AAC_ELEM_CPE, 2, AAC_POS_BACK},
                                    {AAC_ELEM_LFE, 0, AAC_POS_LFE}};
+/* Configuration 14: 5.1 with a front pair in the top layer after the LFE. */
+const ConfigElement kConfig14[] = {{AAC_ELEM_SCE, 0, AAC_POS_FRONT},
+                                   {AAC_ELEM_CPE, 0, AAC_POS_FRONT},
+                                   {AAC_ELEM_CPE, 1, AAC_POS_BACK},
+                                   {AAC_ELEM_LFE, 0, AAC_POS_LFE},
+                                   {AAC_ELEM_CPE, 2, AAC_POS_FRONT, AAC_HEIGHT_TOP}};
+/* The rear-surround 7.1 mode has no configuration number: C, L+R, a side
+ * pair, a back pair and LFE, signalled by a program config element. */
+const ConfigElement kRearSurround[] = {{AAC_ELEM_SCE, 0, AAC_POS_FRONT},
+                                       {AAC_ELEM_CPE, 0, AAC_POS_FRONT},
+                                       {AAC_ELEM_CPE, 1, AAC_POS_SIDE},
+                                       {AAC_ELEM_CPE, 2, AAC_POS_BACK},
+                                       {AAC_ELEM_LFE, 0, AAC_POS_LFE}};
 
 struct Config {
   const ConfigElement* elems;
@@ -72,7 +86,7 @@ const Config kConfigs[16] = {
     {kConfig11, 5},
     {kConfig12, 5},
     {nullptr, 0},
-    {nullptr, 0},
+    {kConfig14, 5},
     {nullptr, 0},
 };
 
@@ -184,12 +198,36 @@ int aac_layout_from_elements(AacLayout* l, const AacLayoutElement* elems, int nu
   if (out.num_channels > AAC_MAX_CHANNELS) {
     return AAC_ERR_UNSUPPORTED;
   }
-  int current = 0;
+  /* The normal layer is placed by position; the only height element with
+   * a speaker pair is a single front pair in the top layer. */
+  AacLayoutElement normal[AAC_MAX_ELEMENTS];
+  int normal_index[AAC_MAX_ELEMENTS];
+  int num_normal = 0;
+  int top_front = -1;
   bool placed = true;
-  for (int pos = AAC_POS_FRONT; pos <= AAC_POS_LFE && placed; pos++) {
-    placed = assign_position(out.elems, num_elements, pos, &current) == 0;
+  for (int i = 0; i < num_elements; i++) {
+    const AacLayoutElement* e = &out.elems[i];
+    if (e->height == AAC_HEIGHT_NORMAL) {
+      normal_index[num_normal] = i;
+      normal[num_normal++] = *e;
+    } else if (e->height == AAC_HEIGHT_TOP && e->type == AAC_ELEM_CPE &&
+               e->position == AAC_POS_FRONT && top_front < 0) {
+      top_front = i;
+      out.elems[i].speaker[0] = AAC_SPK_TFL;
+      out.elems[i].speaker[1] = AAC_SPK_TFR;
+    } else {
+      placed = false;
+    }
   }
-  placed = placed && current == num_elements;
+  int current = 0;
+  for (int pos = AAC_POS_FRONT; pos <= AAC_POS_LFE && placed; pos++) {
+    placed = assign_position(normal, num_normal, pos, &current) == 0;
+  }
+  placed = placed && current == num_normal;
+  for (int i = 0; i < num_normal; i++) {
+    out.elems[normal_index[i]].speaker[0] = normal[i].speaker[0];
+    out.elems[normal_index[i]].speaker[1] = normal[i].speaker[1];
+  }
   int used[AAC_SPK_COUNT] = {};
   for (int i = 0; i < num_elements && placed; i++) {
     for (int c = 0; c < element_channels(out.elems[i].type); c++) {
@@ -248,6 +286,7 @@ int aac_layout_from_config(AacLayout* l, int channel_config) {
     elems[i].type = cfg.elems[i].type;
     elems[i].tag = cfg.elems[i].tag;
     elems[i].position = cfg.elems[i].position;
+    elems[i].height = cfg.elems[i].height;
   }
   l->num_cce = 0;
   const int ret = aac_layout_from_elements(l, elems, cfg.count);
@@ -268,6 +307,81 @@ int aac_layout_from_config(AacLayout* l, int channel_config) {
     l->elems[2].slot[1] = 7;
   }
   return ret;
+}
+
+int aac_layout_from_mode(AacLayout* l, AacChannelMode mode) {
+  switch (mode) {
+    case AAC_MODE_7_1_FRONT_CENTER:
+    case AAC_MODE_7_1_BACK:
+    case AAC_MODE_7_1_TOP_FRONT:
+      return aac_layout_from_config(l, (int)mode);
+    case AAC_MODE_7_1_REAR_SURROUND: {
+      AacLayoutElement elems[AAC_MAX_ELEMENTS] = {};
+      const int n = (int)(sizeof(kRearSurround) / sizeof(kRearSurround[0]));
+      for (int i = 0; i < n; i++) {
+        elems[i].type = kRearSurround[i].type;
+        elems[i].tag = kRearSurround[i].tag;
+        elems[i].position = kRearSurround[i].position;
+      }
+      l->num_cce = 0;
+      const int ret = aac_layout_from_elements(l, elems, n);
+      if (ret == 0) {
+        l->channel_config = 0;
+      }
+      return ret;
+    }
+    default:
+      return AAC_ERR_INVALID_ARG;
+  }
+}
+
+AacChannelMode aac_layout_mode(const AacLayout* l) {
+  if (l->num_channels != 8) {
+    return AAC_MODE_DEFAULT;
+  }
+  int front_pairs = 0;
+  int side_pairs = 0;
+  int back_pairs = 0;
+  int top_front_pairs = 0;
+  for (int i = 0; i < l->num_elements; i++) {
+    const AacLayoutElement* e = &l->elems[i];
+    if (e->type != AAC_ELEM_CPE || e->speaker[0] < 0) {
+      continue;
+    }
+    if (e->height == AAC_HEIGHT_TOP) {
+      top_front_pairs += e->position == AAC_POS_FRONT;
+    } else if (e->position == AAC_POS_FRONT) {
+      front_pairs++;
+    } else if (e->position == AAC_POS_SIDE) {
+      side_pairs++;
+    } else if (e->position == AAC_POS_BACK) {
+      back_pairs++;
+    }
+  }
+  if (top_front_pairs == 1) {
+    return AAC_MODE_7_1_TOP_FRONT;
+  }
+  if (side_pairs == 1 && back_pairs == 1) {
+    return AAC_MODE_7_1_REAR_SURROUND;
+  }
+  if (front_pairs == 2) {
+    return AAC_MODE_7_1_FRONT_CENTER;
+  }
+  if (back_pairs == 2) {
+    return AAC_MODE_7_1_BACK;
+  }
+  return AAC_MODE_DEFAULT;
+}
+
+uint8_t aac_pce_height_crc(const uint8_t* bytes, int n) {
+  uint8_t crc = 0xFF;
+  for (int i = 0; i < n; i++) {
+    crc ^= bytes[i];
+    for (int b = 0; b < 8; b++) {
+      crc = (uint8_t)((crc & 0x80) ? (crc << 1) ^ 0x07 : (crc << 1));
+    }
+  }
+  return crc;
 }
 
 int aac_layout_find(const AacLayout* l, int type, int tag) {
@@ -322,6 +436,8 @@ void aac_layout_mix(const AacLayout* l, const float* const* in, int n, int out_c
       {0.5f, 0.5f},             /* BC */
       {0.70710678f, 0.0f},      /* SL */
       {0.0f, 0.70710678f},      /* SR */
+      {0.70710678f, 0.0f},      /* TFL: a front pair in the top layer, ITU-R BS.775 */
+      {0.0f, 0.70710678f},      /* TFR */
   };
   /* Unknown speakers: a pair's channels go left and right, a single
    * channel to both sides at -3 dB, an LFE nowhere. */

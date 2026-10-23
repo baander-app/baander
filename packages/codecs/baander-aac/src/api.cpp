@@ -77,6 +77,38 @@ int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, ui
   return encode_block(s, pcm, out, out_size);
 }
 
+/* The stream format settings apply to a stream that has not started:
+ * before the first frame, or after a flush. */
+static int encoder_started(const AacEncoderState* s) { return s->started; }
+
+int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  s->mpeg2 = enabled ? 1 : 0;
+  aac_encoder_state_configure(s);
+  return AAC_OK;
+}
+
+int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (mode != AAC_MODE_DEFAULT && mode != AAC_MODE_7_1_FRONT_CENTER && mode != AAC_MODE_7_1_BACK &&
+      mode != AAC_MODE_7_1_TOP_FRONT && mode != AAC_MODE_7_1_REAR_SURROUND) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  return aac_encoder_state_set_channel_mode(s, mode);
+}
+
 int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
@@ -271,6 +303,42 @@ int aac_decoder_stream_channels(AacDecoderHandle ctx) {
     return AAC_ERR_INVALID_ARG;
   }
   return static_cast<AacDecoderState*>(ctx)->stream_channels;
+}
+
+int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, int release_ms) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  /* The attack window must fit the limiter at the doubled rate SBR may
+   * bring. */
+  if (attack_ms < 0 || release_ms < 0 ||
+      (long long)attack_ms * 2 * s->sample_rate / 1000 > AAC_LIMITER_MAX_LOOKAHEAD) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  s->limiter_enabled = enabled ? 1 : 0;
+  s->limiter_attack_ms = attack_ms;
+  s->limiter_release_ms = release_ms;
+  s->limiter_ready = 0; /* reconfigured on the next frame */
+  return AAC_OK;
+}
+
+int aac_decoder_delay(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_decoder_limiter_delay(static_cast<AacDecoderState*>(ctx));
+}
+
+int aac_decoder_channel_mode(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  if (!s->layout_source || s->ps_output) {
+    return AAC_MODE_DEFAULT;
+  }
+  return aac_layout_mode(&s->layout);
 }
 
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps) {
