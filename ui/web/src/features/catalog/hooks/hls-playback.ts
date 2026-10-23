@@ -4,7 +4,7 @@ interface AttachmentOptions {
   video: HTMLVideoElement
   url: string
   position: number
-  onError: () => void
+  onError: (failure?: 'network') => void
   onReady: () => void
 }
 
@@ -19,10 +19,10 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
     player = null
     instance?.destroy()
   }
-  const fail = () => {
+  const fail = (failure?: 'network') => {
     if (!active()) return
     dispose()
-    onError()
+    onError(failure)
   }
   import('hls.js').then(({ default: HlsPlayer }) => {
     if (!active()) return
@@ -37,7 +37,7 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
     const instance = new HlsPlayer({ autoStartLoad: false, startPosition: position })
     player = instance
     instance.on(HlsPlayer.Events.ERROR, (_event, data) => {
-      if (active() && player === instance && data.fatal) fail()
+      if (active() && player === instance && data.fatal) fail(data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR ? 'network' : undefined)
     })
     instance.on(HlsPlayer.Events.MEDIA_ATTACHED, () => {
       if (active() && player === instance) instance.loadSource(url)

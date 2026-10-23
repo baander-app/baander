@@ -43,6 +43,22 @@ interface PlaybackSeekTarget {
   first: boolean
 }
 
+interface PlaybackCapability {
+  expiresAt: number
+  renewAt: number
+}
+
+function playbackCapability(url: string): PlaybackCapability | null {
+  const value = new URL(url, window.__BAANDER_API_URL__ || window.location.origin).searchParams.get('exp')
+  if (value === null || !/^[0-9]+$/.test(value)) return null
+  const seconds = Number(value)
+  const expiresAt = (seconds + 1) * 1000
+  if (!Number.isSafeInteger(seconds) || seconds <= 0 || !Number.isSafeInteger(expiresAt)) return null
+  // Delivery accepts the last signed integer second. Renew before its end,
+  // allowing short leases to retain most of their useful lifetime.
+  return { expiresAt, renewAt: expiresAt - Math.min(30000, Math.max(0, expiresAt - Date.now()) / 4) }
+}
+
 export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTimeUpdate, onStateChange, onError }: UseBaanderPlayerOptions) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
@@ -91,6 +107,9 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let disposeAttachment: (() => void) | null = null
     let attachmentRevision = 0
     let attachmentReady = false
+    let attachedCapability: PlaybackCapability | null = null
+    let recoveryPosition: number | null = null
+    let terminal = false
     const playbackPosition = () => restoredSourceEnd !== null && Math.abs(video.currentTime - restoredSourceEnd) <= 0.1
       ? sourceDuration : mediaStart + video.currentTime
     const clearSourceSeek = () => {
@@ -99,7 +118,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     }
     const active = () => !abort.signal.aborted && videoRef.current === video
     const changeState = (next: string) => {
-      if (!active()) return
+      if (!active() || (terminal && next !== 'error')) return
       setState(next)
       callbacks.current.onStateChange?.(next)
     }
@@ -113,24 +132,33 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       disposeAttachment?.()
       disposeAttachment = null
     }
-    const fail = () => {
-      if (!active()) return
+    const fail = (terminalFailure = true) => {
+      if (!active() || terminal) return
+      terminal = terminalFailure
+      recoveryPosition = null
       clearSourceSeek()
       seekChain = null
       releaseAttachment()
       changeState('error')
       callbacks.current.onError?.(video.error)
     }
-    const failAttachment = () => {
-      if (!active()) return
+    const nativeFailure = () => video.error?.code === 2 ? 'network' as const : undefined
+    const failAttachment = (failure?: 'network') => {
+      if (!active() || terminal || recoveryPosition !== null) return
       // Retiring media can fail before its replacement seek is acknowledged.
       // Keep the submitted controls and latest target owned until they settle.
-      if (seekChain?.started && seekChain.remaining > 0) {
+      if ((seekChain?.started && seekChain.remaining > 0)
+        || (snapshot && loadedIdentity && !loadedIdentity.startsWith(`${snapshot.jobId}:${snapshot.generation}:`))) {
+        releaseAttachment()
+        changeState('preparing')
+      } else if (failure === 'network' && attachedCapability && Date.now() >= attachedCapability.expiresAt) {
+        recoveryPosition = pendingLoad ? mediaStart + pendingLoad.position : playbackPosition()
         releaseAttachment()
         changeState('preparing')
       } else fail()
     }
     const playVideo = () => {
+      if (terminal) return
       if (!attachmentReady) { playbackStarted = true; return }
       const revision = attachmentRevision
       video.play().catch(() => {
@@ -139,20 +167,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     }
     const desiredStatus = () => localStatus ?? snapshot?.status
     const applyPlayback = () => {
-      if (!active()) return
+      if (!active() || terminal) return
       if (!playbackStarted || desiredStatus() !== 'running') video.pause()
       else if (video.paused) playVideo()
     }
 
     const refresh = async (initial = false) => {
-      if (!active()) return
+      if (!active() || terminal) return
       const revision = ++requestRevision
       try {
         const { data } = await AXIOS_INSTANCE.post<PlaybackSnapshot>('/api/stream/sign', {
           path: `/api/transcode/${videoId}/master.m3u8`,
           ...(initial ? {} : { refresh: true }),
         }, { signal: abort.signal, timeout: 5000 })
-        if (!active() || revision < appliedRequest) return
+        if (!active() || terminal || revision < appliedRequest) return
         const previous = snapshot
         // A later response cannot move an attached job backwards in durable state.
         if (previous?.jobId === data.jobId && (data.generation < previous.generation || data.revision < previous.revision)) return
@@ -196,11 +224,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           changeState('preparing')
           return
         }
-        if (identity !== loadedIdentity) {
+        const capability = playbackCapability(data.url)
+        const renewCapability = identity === loadedIdentity && attachedCapability !== null && capability !== null
+          && capability.expiresAt > attachedCapability.expiresAt && capability.expiresAt > Date.now()
+          && (recoveryPosition !== null || Date.now() >= attachedCapability.renewAt)
+          && !seekChain && sourceSeekPosition === null && !pendingLoad && !video.seeking
+        if (identity !== loadedIdentity || renewCapability) {
+          const preserveAttachedPosition = renewCapability || (recoveryPosition !== null && !executionChanged)
+          const renewalPosition = recoveryPosition ?? playbackPosition()
+          recoveryPosition = null
+          attachedCapability = capability
           restoredSourceEnd = null
           progressPosition = data.position
           const attachedPosition = mediaStart + (pendingLoad?.position ?? video.currentTime)
-          const position = reloadCursor ?? Math.max(data.position, attachedPosition)
+          const position = preserveAttachedPosition ? renewalPosition : reloadCursor ?? Math.max(data.position, attachedPosition)
           mediaStart = data.startTime
           setDuration(data.duration)
           pendingLoad = { identity, position: Math.max(0, position - mediaStart) }
@@ -215,13 +252,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
             url: new URL(data.url, window.__BAANDER_API_URL__ || window.location.origin).href,
             position: pendingLoad.position,
             onReady: () => {
-              if (active() && attachment === attachmentRevision) {
+              if (active() && !terminal && attachment === attachmentRevision) {
                 attachmentReady = true
                 applyPlayback()
               }
             },
-            onError: () => {
-              if (attachment === attachmentRevision) failAttachment()
+            onError: (failure) => {
+              if (attachment === attachmentRevision) failAttachment(failure)
             },
           })
           // Attachment readiness applies playback intent; metadata restoration
@@ -234,22 +271,22 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           restorePendingLoad()
         }
       } catch (error) {
-        if (!active() || revision < appliedRequest) return
+        if (!active() || terminal || revision < appliedRequest) return
         const status = isAxiosError(error) ? error.response?.status : undefined
         const transient = isAxiosError(error) && !isCancel(error)
           && (error.response === undefined || (status !== undefined && status >= 500 && status <= 599))
         // A failed control-plane poll does not invalidate usable media. The
         // next scheduled poll can reconcile its generation and cursor normally.
-        if (!initial && attachmentReady && transient) return
+        if (!initial && (attachmentReady || recoveryPosition !== null) && transient) return
         fail()
       }
     }
 
-    const control = (action: 'seek' | 'pause' | 'resume' | 'progress', globalPosition = sourceSeekPosition ?? playbackPosition(), seekTarget?: PlaybackSeekTarget) => {
+    const control = (action: 'seek' | 'pause' | 'resume' | 'progress', globalPosition = sourceSeekPosition ?? recoveryPosition ?? playbackPosition(), seekTarget?: PlaybackSeekTarget) => {
       const current = snapshot
       const sessionId = current?.sessionId
-      if (!sessionId || !current || !active()) return
-      if (action === 'progress' && (sourceSeekPosition !== null || pendingControls > 0 || pendingLoad || !current.ready
+      if (!sessionId || !current || !active() || terminal) return
+      if (action === 'progress' && (recoveryPosition !== null || sourceSeekPosition !== null || pendingControls > 0 || pendingLoad || !current.ready
         || current.status !== 'running' || video.paused || video.seeking
         || Math.abs(globalPosition - (progressPosition ?? current.position)) < 1)) return
       const position = globalPosition
@@ -260,8 +297,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       }
       pendingControls++
       controls = controls.then(async () => {
-        if (!active()) return
-        if (action === 'progress' && (sourceSeekPosition !== null || snapshot?.sessionId !== sessionId
+        if (!active() || terminal) return
+        if (action === 'progress' && (recoveryPosition !== null || sourceSeekPosition !== null || snapshot?.sessionId !== sessionId
           || snapshot.generation !== current.generation || snapshot.revision !== current.revision
           || snapshot.status !== 'running' || video.paused || video.seeking)) return
         const chain = seekTarget?.chain
@@ -297,7 +334,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         if (!chain) await refresh()
       }).catch(() => {
         // A failed control belongs to the session that submitted it.
-        if (snapshot?.sessionId === sessionId && snapshot.jobId === current.jobId) fail()
+        if (snapshot?.sessionId === sessionId && snapshot.jobId === current.jobId) fail(false)
       }).finally(() => {
         pendingControls--
         if (statusRevision !== null && statusRevision === localStatusRevision) {
@@ -311,7 +348,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     }
 
     const restorePendingLoad = () => {
-      if (!active() || !attachmentReady) return
+      if (!active() || terminal || !attachmentReady) return
       if (sourceSeekPosition !== null && seekChain) return
       const load = pendingLoad
       if (load && snapshot?.ready && `${snapshot.jobId}:${snapshot.generation}:${snapshot.renditionSet}` === load.identity) {
@@ -382,7 +419,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       video.addEventListener(event, restorePendingLoad)
     }
     video.addEventListener('timeupdate', () => {
-      if (sourceSeekPosition !== null || pendingLoad) return
+      if (terminal || recoveryPosition !== null || sourceSeekPosition !== null || pendingLoad) return
       const position = playbackPosition()
       setCurrentTime(position)
       callbacks.current.onTimeUpdate?.(position, snapshot?.duration ?? mediaStart + video.duration)
@@ -396,7 +433,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     video.addEventListener('pause', () => {
       if (!video.paused) return
       if (video.error) {
-        failAttachment()
+        failAttachment(nativeFailure())
         return
       }
       changeState('paused')
@@ -424,20 +461,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       }
     })
     const seek = (time: number) => {
-      if (!active() || !snapshot?.sessionId || !Number.isFinite(time) || sourceDuration <= 0) return
+      if (!active() || terminal || !snapshot?.sessionId || !Number.isFinite(time) || sourceDuration <= 0) return
       const position = Math.max(0, Math.min(sourceDuration, time))
       sourceSeekPosition = position
       setPendingSeekPosition(position)
       enqueueSeek(position)
     }
     const requestPlay = () => {
-      if (!active()) return
+      if (!active() || terminal) return
       playbackStarted = true
       if (snapshot?.ready && desiredStatus() === 'paused') control('resume')
       if (attachmentReady) playVideo()
     }
     const requestPause = () => {
-      if (!active()) return
+      if (!active() || terminal) return
       playbackStarted = false
       if (snapshot?.ready && desiredStatus() === 'running') control('pause')
       video.pause()
@@ -446,11 +483,13 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     playRef.current = requestPlay
     pauseRef.current = requestPause
     video.addEventListener('ended', () => changeState('ended'))
-    video.addEventListener('error', () => { if (attachmentReady) failAttachment() })
-    refresh(true).catch(fail)
+    video.addEventListener('error', () => {
+      if (attachmentReady) failAttachment(nativeFailure())
+    })
+    refresh(true).catch(() => fail())
     const timer = window.setInterval(() => {
       control('progress')
-      refresh().catch(fail)
+      refresh().catch(() => fail())
     }, 1000)
     const cleanup = () => {
       if (abort.signal.aborted) return

@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBaanderPlayer } from '@/features/catalog/hooks/useBaanderPlayer'
 
 const { post, attachments, loader } = vi.hoisted(() => ({ post: vi.fn(), loader: { ready: true },
-  attachments: [] as Array<{ onError: () => void, onReady: () => void, position: number, dispose: ReturnType<typeof vi.fn> }> }))
+  attachments: [] as Array<{ onError: (failure?: 'network') => void, onReady: () => void, position: number, dispose: ReturnType<typeof vi.fn> }> }))
 vi.mock('@/features/catalog/hooks/hls-playback', () => ({
-  attachHlsPlayback: ({ video, url, position, onReady, onError }: { video: HTMLVideoElement, url: string, position: number, onReady: () => void, onError: () => void }) => {
+  attachHlsPlayback: ({ video, url, position, onReady, onError }: { video: HTMLVideoElement, url: string, position: number, onReady: () => void, onError: (failure?: 'network') => void }) => {
     const dispose = vi.fn()
     attachments.push({ onError, onReady, position, dispose })
     video.src = url
@@ -56,6 +56,295 @@ describe('useBaanderPlayer authorization', () => {
     expect(video.seeking).toBe(shouldSeek)
     if (status === 'paused') expect(video.pause).toHaveBeenCalled()
     else expect(video.play).toHaveBeenCalled()
+    unmount()
+  })
+
+  it.each(['paused', 'running'])('renews the same execution near expiry while preserving its %s cursor', async status => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const initialExpiry = Math.floor(Date.now() / 1000) + 20
+    post.mockImplementation(() => Promise.resolve({ data: {
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job',
+      generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
+      position: 42, startTime: 24, duration: 180, status,
+    } }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 30
+    vi.mocked(video.play).mockClear()
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(1)
+    await act(async () => vi.advanceTimersByTimeAsync(15000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(attachments[1].position).toBe(30)
+    expect(Number(new URL(video.src).searchParams.get('exp'))).toBeGreaterThan(initialExpiry)
+    if (status === 'paused') expect(video.play).not.toHaveBeenCalled()
+    else expect(video.play).toHaveBeenCalled()
+    video.currentTime = 0
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(video.currentTime).toBe(30)
+    expect(post.mock.calls.filter(call => call[1]?.action)).toHaveLength(0)
+    unmount()
+  })
+
+  it.each(['', 'exp=invalid', 'exp=-1', 'exp=1.5', 'exp=9007199254740992'])('does not loop when an attached expiry is missing or malformed: %s', async query => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    post.mockResolvedValueOnce({ data: { url: `/manifest?${query}`, jobId: 'job', generation: 1,
+      revision: 1, renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 100, status: 'paused' } })
+      .mockImplementation(() => Promise.resolve({ data: { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`,
+        jobId: 'job', generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
+        position: 0, startTime: 0, duration: 100, status: 'paused' } }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    await act(async () => containerRef.current.querySelector('video')!.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => vi.advanceTimersByTimeAsync(30000))
+    expect(attachments).toHaveLength(1)
+    unmount()
+  })
+
+  it.each(['restoration', 'native seek'])('defers capability renewal until %s releases the attached cursor', async owner => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    post.mockImplementation(() => Promise.resolve({ data: {
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job', generation: 1,
+      revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'paused',
+    } }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    if (owner === 'native seek') {
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      video.currentTime = 30
+      Object.defineProperty(video, 'seeking', { configurable: true, value: true })
+    }
+    await act(async () => vi.advanceTimersByTimeAsync(16000))
+    expect(attachments).toHaveLength(1)
+    if (owner === 'restoration') await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    else Object.defineProperty(video, 'seeking', { value: false })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(owner === 'restoration' ? 18 : 30)
+    unmount()
+  })
+
+  it('renews a short capability before its last valid second ends and rejects older deadlines', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const seconds = Math.floor(Date.now() / 1000)
+    let expiry = seconds + 3
+    post.mockImplementation(() => Promise.resolve({ data: { url: `/manifest?exp=${expiry}`, jobId: 'job',
+      generation: 1, revision: 1, renditionSet: 'job.1', ready: true,
+      position: 0, startTime: 0, duration: 180, status: 'paused' } }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expiry--
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(attachments).toHaveLength(1)
+    expiry = seconds + 10
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(Date.now()).toBeLessThan((seconds + 4) * 1000)
+    expect(Number(new URL(video.src).searchParams.get('exp'))).toBe(expiry)
+    unmount()
+  })
+
+  it.each([false, true])('recovers an expired network attachment through an outage and keeps its cursor with expanded renditions: %s', async expanded => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 20
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1,
+      revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 30
+    vi.setSystemTime((expiry + 2) * 1000)
+    await act(async () => attachments[0].onError('network'))
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(result.current.state).toBe('preparing')
+    video.currentTime = 0
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => attachments[0].onError('network'))
+    post.mockRejectedValueOnce(new AxiosError('Offline', 'ERR_NETWORK')).mockResolvedValue({ data: {
+      ...snapshot, url: `/manifest?exp=${expiry + 60}`, position: 90,
+      renditionSet: expanded ? 'job.1,sibling.1' : 'job.1',
+    } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(onError).not.toHaveBeenCalled()
+    expect(post.mock.calls.filter(call => call[1]?.action)).toHaveLength(0)
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(30)
+    await act(async () => {
+      attachments[0].onReady()
+      attachments[0].onError()
+      video.dispatchEvent(new Event('loadedmetadata'))
+    })
+    expect(result.current.currentTime).toBe(54)
+    expect(onError).not.toHaveBeenCalled()
+    unmount()
+    await act(async () => vi.advanceTimersByTimeAsync(30000))
+    expect(attachments[1].dispose).toHaveBeenCalledOnce()
+    expect(attachments).toHaveLength(2)
+  })
+
+  it('submits user pause with the preserved recovery cursor after the native clock resets', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 20
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', sessionId: 'owned', generation: 1,
+      revision: 1, renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
+    post.mockImplementation((path: string) => path === '/api/stream/sign'
+      ? Promise.resolve({ data: snapshot }) : new Promise(() => {}))
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 30
+    vi.setSystemTime((expiry + 2) * 1000)
+    await act(async () => attachments[0].onError('network'))
+    video.currentTime = 0
+    await act(async () => result.current.pause())
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned/position',
+      { position: 54, action: 'pause' }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    unmount()
+  })
+
+  it.each([
+    { expired: false, failure: 'network' as const },
+    { expired: true, failure: undefined },
+  ])('fences terminal media failure against future signing (expired=$expired, failure=$failure)', async ({ expired, failure }) => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 20
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'running' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    if (expired) vi.setSystemTime((expiry + 2) * 1000)
+    await act(async () => attachments[0].onError(failure))
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}`, renditionSet: 'job.1,sibling.1' } })
+    await act(async () => vi.advanceTimersByTimeAsync(30000))
+    await act(async () => { attachments[0].onReady(); result.current.play() })
+    expect(attachments).toHaveLength(1)
+    expect(onError).toHaveBeenCalledOnce()
+    expect(result.current.state).toBe('error')
+    expect(post).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('keeps signing refusal terminal during expired network recovery', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 20
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 0, startTime: 0, duration: 180, status: 'paused' }
+    post.mockResolvedValue({ data: snapshot })
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    vi.setSystemTime((expiry + 2) * 1000)
+    await act(async () => attachments[0].onError('network'))
+    post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}` } })
+    await act(async () => vi.advanceTimersByTimeAsync(30000))
+    expect(result.current.state).toBe('error')
+    expect(attachments).toHaveLength(1)
+    unmount()
+  })
+
+  it('keeps renewal behind a source seek acknowledgement and restores the accepted target first', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    let accept!: (value: unknown) => void
+    let position = 42
+    let revision = 1
+    post.mockImplementation((path: string) => {
+      if (path !== '/api/stream/sign') return new Promise(resolve => { accept = resolve })
+      return Promise.resolve({ data: { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`,
+        jobId: 'job', sessionId: 'owned', generation: 1, revision, renditionSet: 'job.1',
+        ready: true, position, startTime: 24, duration: 180, status: 'paused' } })
+    })
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => result.current.seekTo(90))
+    await act(async () => vi.advanceTimersByTimeAsync(16000))
+    expect(attachments).toHaveLength(1)
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    position = 90
+    revision = 2
+    await act(async () => accept({ data: { data: { acceptedGeneration: 1 } } }))
+    expect(video.currentTime).toBe(66)
+    expect(attachments).toHaveLength(1)
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].position).toBe(66)
+    expect(post.mock.calls.filter(call => call[1]?.action === 'seek')).toHaveLength(1)
+    unmount()
+  })
+
+  it.each(['native network', 'native decode', 'play rejection'])('limits expired capability recovery to delivery failures: %s', async failure => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-23T10:00:00Z'))
+    const expiry = Math.floor(Date.now() / 1000) + 20
+    const snapshot = { url: `/manifest?exp=${expiry}`, jobId: 'job', generation: 1, revision: 1,
+      renditionSet: 'job.1', ready: true, position: 42, startTime: 24, duration: 180, status: 'running' }
+    post.mockResolvedValue({ data: snapshot })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 30
+    vi.setSystemTime((expiry + 2) * 1000)
+    if (failure === 'play rejection') {
+      vi.mocked(video.play).mockRejectedValueOnce(new Error('Playback refused'))
+      await act(async () => result.current.play())
+    } else {
+      Object.defineProperty(video, 'error', { configurable: true, value: { code: failure === 'native network' ? 2 : 3 } })
+      await act(async () => video.dispatchEvent(new Event('error')))
+      video.currentTime = 0
+      await act(async () => video.dispatchEvent(new Event('pause')))
+      Object.defineProperty(video, 'error', { value: null })
+    }
+    post.mockResolvedValue({ data: { ...snapshot, url: `/manifest?exp=${expiry + 60}` } })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    if (failure === 'native network') {
+      expect(attachments).toHaveLength(2)
+      expect(attachments[1].position).toBe(30)
+      expect(onError).not.toHaveBeenCalled()
+    } else {
+      expect(result.current.state).toBe('error')
+      expect(attachments).toHaveLength(1)
+      expect(onError).toHaveBeenCalledOnce()
+    }
     unmount()
   })
 
@@ -117,7 +406,7 @@ describe('useBaanderPlayer authorization', () => {
     expect(containerRef.current.querySelectorAll('video')).toHaveLength(0)
   })
 
-  it('allows a same-generation expanded snapshot after a fatal error during restoration', async () => {
+  it('keeps a fatal restoration error terminal when an expanded snapshot arrives', async () => {
     vi.useFakeTimers()
     vi.spyOn(HTMLMediaElement.prototype, 'seekable', 'get').mockReturnValue({ length: 0, start: () => 0, end: () => 0 })
     const snapshot = (renditionSet: string) => ({ data: { url: `/manifest?set=${renditionSet}`, jobId: 'job',
@@ -130,8 +419,8 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => attachments[0].onError())
     expect(result.current.state).toBe('error')
     await act(async () => vi.advanceTimersByTimeAsync(1000))
-    expect(attachments).toHaveLength(2)
-    expect(containerRef.current.querySelector('video')!.src).toContain('sibling.1')
+    expect(attachments).toHaveLength(1)
+    expect(result.current.state).toBe('error')
     unmount()
   })
 

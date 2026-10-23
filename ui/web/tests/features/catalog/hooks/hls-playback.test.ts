@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({ supported: true, instances: [] as Array<{
 vi.mock('hls.js', () => ({ default: class {
   static isSupported() { return mock.supported }
   static Events = { ERROR: 'error', MEDIA_ATTACHED: 'attached', MANIFEST_PARSED: 'parsed' }
+  static ErrorTypes = { NETWORK_ERROR: 'networkError' }
   listeners: Record<string, (...args: unknown[]) => void> = {}
   destroy = vi.fn()
   attachMedia = vi.fn()
@@ -70,6 +71,14 @@ describe('HLS attachment ownership', () => {
     expect(instance.destroy).toHaveBeenCalledOnce()
     dispose()
     expect(instance.destroy).toHaveBeenCalledOnce()
+  })
+
+  it.each(['networkError', 'mediaError'])('classifies a fatal %s for owned recovery', async type => {
+    const { options } = setup()
+    await settle()
+    mock.instances[0].listeners.error('error', { fatal: true, type })
+    expect(options.onError).toHaveBeenCalledExactlyOnceWith(type === 'networkError' ? 'network' : undefined)
+    expect(mock.instances[0].destroy).toHaveBeenCalledOnce()
   })
 
   it.each(['maybe', ''])('uses native HLS only with its capability (%s)', async capability => {
