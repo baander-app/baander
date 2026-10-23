@@ -96,6 +96,32 @@ static void ffmpeg_layout(const char* name, const char* layout, int channels, in
   CHECK(d > min_db, "%s: decoders disagree (%.1f dB)", name, d);
 }
 
+/* One of the committed HE-AAC streams through ffmpeg and through our
+ * decoder.  ffmpeg widens a mono HE-AAC stream to stereo (it assumes
+ * parametric stereo may follow), so only its first channel is compared. */
+static void he_stream(const char* name, int channels, double min_db) {
+  const std::vector<uint8_t> stream = read_file(data_path(name));
+  CHECK(!stream.empty(), "%s: stream missing", name);
+  const std::string cmd = "-i '" + data_path(name) + "' -f f32le '" + path("ff.f32") + "'";
+  CHECK(run_command(ffmpeg_cmd(cmd)), "%s: ffmpeg decode", name);
+  const std::vector<float> theirs = read_f32(path("ff.f32"));
+  const int their_channels = channels == 1 ? 2 : channels;
+  int errors = 0;
+  const std::vector<float> ours = decode_stream(stream, 48000, 0, &errors);
+  CHECK(errors == 0, "%s: %d frames failed", name, errors);
+  const size_t frames = std::min(theirs.size() / their_channels, ours.size() / channels);
+  std::vector<float> a(frames * channels), b(frames * channels);
+  for (size_t i = 0; i < frames; i++) {
+    for (int c = 0; c < channels; c++) {
+      a[i * channels + c] = theirs[i * their_channels + c];
+      b[i * channels + c] = ours[i * channels + c];
+    }
+  }
+  const double d = snr_db(a.data(), b.data(), a.size());
+  printf("%-28s ffmpeg vs ours: %.1f dB\n", name, d);
+  CHECK(d > min_db, "%s: %.1f dB", name, d);
+}
+
 int main() {
   if (!have_ffmpeg()) {
     printf("SKIP: ffmpeg not found\n");
@@ -141,6 +167,9 @@ int main() {
               AAC_RC_CBR);
   our_encoded("7.1 48k 512k", gen_multichannel(48000 * 3, 48000, 8), 48000, 8, 512000,
               AAC_RC_CBR);
+  he_stream("he_mono_24k.aac", 1, 70.0);
+  he_stream("he_stereo_40k.aac", 2, 70.0);
+  he_stream("he_stereo_96k.aac", 2, 70.0);
   remove_temp_dir(g_dir);
   return test_summary("test_interop");
 }

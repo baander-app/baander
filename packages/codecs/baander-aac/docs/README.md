@@ -34,9 +34,23 @@ from 8 to 96 kHz, every layout from mono to 7.1 (including PCE-defined
 ones such as 6.1), the stereo and mono downmixes, 32 to 320 kbit/s and
 the `fast` coder; see [reference-comparison.md](reference-comparison.md).
 
-An HE-AAC stream (SBR, with or without PS) decodes as its AAC-LC core at the
-core sample rate; `aac_decoder_get_sbr_ps` reports that SBR data was
-present. SBR and PS are not decoded.
+An HE-AAC stream decodes with its spectral band replication (SBR, ISO/IEC
+14496-3 4.6.18): the SBR extension of each SCE or CPE is parsed from its
+fill element, the 32-band QMF analysis of the core, the LPC-based high
+frequency generator with inverse filtering, the envelope and noise-floor
+adjustment with gain limiting, sinusoid insertion and smoothing, and the
+64-band synthesis follow the standard, with every frame class and the
+header-reset path. Once a frame carries SBR data the stream is decoded at
+twice the core rate until a reset: `aac_decoder_frame_size` becomes 2048,
+`aac_decoder_output_sample_rate` twice `aac_decoder_sample_rate`, and
+elements without SBR data (an LFE, say) pass through the same filterbanks
+so that all channels keep the same delay. `aac_decoder_get_sbr_ps` reports
+SBR and parametric stereo data in the last frame; parametric stereo is
+parsed but not yet applied, so an HE-AAC v2 stream decodes as its mono
+SBR channel. Against FFmpeg's decoder the SBR output agrees to floating
+point precision (100 to 134 dB difference SNR) on FDK-encoded HE-AAC v1
+streams at 44.1 and 48 kHz, mono, stereo and 5.1, constant and variable
+bitrate.
 
 ### Encoder
 
@@ -219,19 +233,26 @@ decoder/encoder sessions).
 
 ## Testing
 
-`ctest` runs eight suites: table consistency (prefix-free, complete
+`ctest` runs ten suites: table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands; Princen-Bradley windows), MDCT
-against the direct definition and TDAC, bit reader/writer, ADTS and
-Huffman coding, decoder compliance on hand-built and damaged streams,
-encode/decode roundtrips at every sample rate and rate-control mode, rate
-control, the coding tools (noise substitution keeps the level of the
-substituted region, intensity stereo keeps the balance, TNS covers both
-window types), and interoperability with FFmpeg. The interop test skips
-when `ffmpeg` is not on PATH; otherwise it requires our decoder to match
-FFmpeg's decode of FFmpeg-encoded streams, and FFmpeg to decode our
-streams exactly as our decoder does, both at better than 90 dB difference
-SNR; the streams of ours it checks use TNS, noise substitution and
-intensity stereo.
+against the direct definition and TDAC, the QMF banks (every analysis and
+synthesis pairing reconstructs its input at the accuracy of the
+prototype, and the full-rate and half-rate analyses agree on the low
+band), bit reader/writer, ADTS and Huffman coding, decoder compliance on
+hand-built and damaged streams and on the committed HE-AAC streams
+(`tests/data`, FDK-encoded from `gen_he_signal`: the stream parameters,
+the low band against the source through the filterbanks, the high band's
+energy, the header reset between two streams, the return to the core
+rate after a reset), channel layouts, encode/decode roundtrips at every
+sample rate, layout and rate-control mode, rate control, the coding tools
+(noise substitution keeps the level of the substituted region, intensity
+stereo keeps the balance, TNS covers both window types), and
+interoperability with FFmpeg. The interop test skips when `ffmpeg` is not
+on PATH; otherwise it requires our decoder to match FFmpeg's decode of
+FFmpeg-encoded streams, and FFmpeg to decode our streams exactly as our
+decoder does, both at better than 90 dB difference SNR, and the committed
+HE-AAC streams to decode within 70 dB of FFmpeg; the streams of ours it
+checks use TNS, noise substitution and intensity stereo.
 
 Noise substitution never signals correlated noise (an M/S flag on a noise
 band): FFmpeg's decoder draws independent noise regardless of the flag,
@@ -241,9 +262,9 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, bitstream, decoder, psychoacoustics, encoder, coding tools, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR decoder, psychoacoustics, encoder, coding tools, SIMD
 tools/        baac command-line tool
-tests/        CTest suites
+tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
 docs/         this file and the reference comparison
 ```
@@ -258,4 +279,10 @@ switching, TNS analysis, noise substitution tuning, intensity and M/S
 decisions follow the published design of the Fraunhofer FDK AAC encoder
 (AOSP `external/aac`, the `android17-release` state as mirrored in
 `mstorsjo/fdk-aac`) and 3GPP TS 26.403 as references; no FDK code was
-copied.
+copied. The SBR decoder is written from ISO/IEC 14496-3 4.6.18 with the
+structure of FFmpeg's `libavcodec/aacsbr_template.c` as the reference
+for the processing order and buffer layout; its Huffman trees, the
+noise table and the QMF prototype are ISO/IEC 14496-3 data (Tables
+4.A.87 and 4.A.90 and the SBR codebooks), and the filterbank
+conventions were pinned against FFmpeg's and FAAD2's banks. The
+HE-AAC test streams were encoded with the Fraunhofer FDK encoder.

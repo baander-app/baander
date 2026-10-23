@@ -7,6 +7,7 @@
 #include "channel_map.h"
 #include "ics.h"
 #include "mdct.h"
+#include "sbr.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,7 +37,8 @@ using AacDecoderChannel = struct AacDecoderChannel_ {
   AacChannelStream cs;
   float overlap[1024];   /* second half of the previous windowed IMDCT */
   int prev_window_shape; /* window_shape of the previous frame */
-  float output[1024];    /* decoded PCM of the current frame, full scale = 1.0 */
+  float output[2048];    /* decoded PCM of the current frame, full scale = 1.0;
+                            2048 samples while SBR is decoded */
 };
 
 /* coupling_channel_element() (Table 4.8): the coupling channel and the
@@ -66,7 +68,7 @@ using AacDecoderState = struct AacDecoderState_ {
   int sample_rate;    /* sample rate of the stream */
   int channels;       /* output channels requested by the caller, 0 for the stream's */
   int rate_index;     /* sampling_frequency_index of the stream */
-  int frame_size;     /* 1024 */
+  int frame_size;     /* 1024, or 2048 while SBR is decoded */
   AacLayout layout;   /* element to channel assignment */
   int layout_source;  /* 0 none yet, 1 channel configuration, 2 PCE, 3 taken from the elements */
   int elem_base[AAC_MAX_ELEMENTS]; /* first channel of each layout element in ch[] */
@@ -75,6 +77,11 @@ using AacDecoderState = struct AacDecoderState_ {
   AacDecoderCce cce[AAC_MAX_CCE];
   int stream_channels; /* channels carried by the last decoded frame */
   int has_sbr, has_ps; /* the last frame carried SBR / PS extension data */
+  /* SBR: once a frame carries SBR data the stream is decoded at twice the
+   * core rate until a reset, every element through its own SBR state (an
+   * element without SBR data is only upsampled). */
+  int sbr_mode;
+  AacSbrState* sbr[AAC_MAX_ELEMENTS]; /* allocated on first use */
   AacMdct mdct_long, mdct_short;
   unsigned random_state; /* PNS noise generator */
   const AacDSP* dsp;
