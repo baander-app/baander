@@ -599,7 +599,7 @@ async function proveProgressOutages(owner) {
         const changed = publicationChange()
         const boundary = changed ? changed.receivedAt ?? changed.at : Infinity
         assert(!mediaEvents.some(event => !event.probe && event.at >= proof.startedAt
-          && event.at < boundary && ['emptied', 'error'].includes(event.event)),
+          && (event.event === 'error' || (event.event === 'emptied' && event.at < boundary))),
         'A progress failure must not tear down decoded media before a fresh publication change')
       }
       const superseded = () => {
@@ -640,13 +640,16 @@ async function proveProgressOutages(owner) {
           }
           const publications = freshPublications()
           let previousSet = renditionSet
+          let previousAttachmentAt = attachedCapabilities.get(originalAttachment).at
           for (const [number, capability] of attachedCapabilities) {
             if (number <= originalAttachment) continue
             const set = new URL(capability.url).searchParams.get('set')
             assert(set !== previousSet && publications.some(item => item.renditionSet === set
+              && (item.receivedAt ?? item.at) > previousAttachmentAt
               && (item.receivedAt ?? item.at) <= capability.at),
             'Every post-failure replacement must follow an authenticated rendition change')
             previousSet = set
+            previousAttachmentAt = capability.at
           }
           if (attachmentNumber === originalAttachment) assert.equal(state.source, before.source,
             'An unchanged attachment must retain its decoded media source')
