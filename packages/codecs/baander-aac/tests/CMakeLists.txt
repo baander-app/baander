@@ -19,6 +19,7 @@ set(TEST_SOURCES
     test_transport.cpp
     test_drc.cpp
     test_afterburner.cpp
+    test_sbr_ld.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

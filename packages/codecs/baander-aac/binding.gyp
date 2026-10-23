@@ -32,7 +32,10 @@
         "src/afterburner.cpp",
         "src/encoder.cpp",
         "src/sbr_enc.cpp",
-        "src/ps_enc.cpp"
+        "src/ps_enc.cpp",
+        "src/qmf_ld.cpp",
+        "src/sbr_ld.cpp",
+        "src/sbr_ld_enc.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
