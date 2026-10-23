@@ -106,8 +106,35 @@ The encoder follows the structure of the Fraunhofer FDK encoder and
   smoothing where it saves bits, and codebook sectioning by dynamic
   programming over all codebooks.
 
-Only AAC-LC is encoded; `aac_encoder_create` returns NULL for the HE-AAC
-object types.
+HE-AAC v1 and v2 are encoded with a spectral band replication encoder
+(ISO/IEC 14496-3 4.6.18, structured after 3GPP TS 26.404) and a
+parametric stereo encoder (8.6.4). With `AAC_AOT_SBR` or `AAC_AOT_PS`
+the input runs at twice the core rate and a frame is 2048 samples: each
+SCE or CPE of the layout gets an SBR encoder that analyses its channels
+with the 64-band QMF bank, hands the core coder the lower half of the
+spectrum resampled to half rate, and describes the upper half per frame
+as an envelope grid (fixed or transient-aligned borders with the
+relative-border parity the syntax demands), quantized envelope energies
+on the high or low frequency table, noise floors from the tonality of
+the original against the patched bands, inverse filtering levels, and
+delta coding in time or frequency, whichever is cheaper. The SBR
+configuration (start and stop frequencies, noise bands, noise floor
+ceiling, frequency scale) comes from FDK's tuning table for the core
+rate, channel count and bitrate; the core lowpass of an SBR element is
+its crossover, so that the bands the generator copies upwards carry
+signal. The extension travels in a fill element after its channel
+element and its bits are part of the frame's budget; the ADTS header
+keeps the AAC-LC profile and the core rate, so decoders detect SBR from
+the data (implicit signalling), as they do for FDK's streams. With
+`AAC_AOT_PS` a stereo input is coded as one SCE: both channels are
+analysed, their inter-channel intensity difference and coherence are
+estimated per hybrid band and envelope, quantized on the coarse grids
+and coded as frequency or time deltas, and an energy-preserving downmix
+is what the core and SBR encoders code. Phase parameters are not sent.
+Against the FDK encoder at the same settings, the decoded output lines
+up within one QMF slot in time and within about half a decibel in the
+band levels; an LFE in an HE-AAC layout goes through the same QMF
+resampling with no SBR data.
 
 ## API
 
@@ -131,19 +158,27 @@ void aac_encoder_destroy(AacEncoderHandle ctx);
 - `sample_rate` is one of the twelve AAC rates (8000 to 96000 Hz);
   `channels` is 1 to 8, interleaved in the canonical order (L, R, C, LFE,
   Ls, Rs, then Lc, Rc for 7.1 and Cs as the seventh channel of 6.1);
-  `aot` must be `AAC_AOT_LC`.
-- `aac_encoder_encode` takes exactly `frame_size()` (1024) interleaved
-  float samples per channel at full scale 1.0 and writes one ADTS frame.
-  The output buffer must hold `aac_encoder_max_frame_bytes` (768 bytes per
-  channel plus the header); a smaller one is refused with
+  `aot` is `AAC_AOT_LC`, `AAC_AOT_SBR` (HE-AAC v1) or `AAC_AOT_PS`
+  (HE-AAC v2). With SBR the sample rate is twice a core rate the tuning
+  table covers (32000 to 96000 Hz; 22050 and 44100 included); the tuning
+  rows span 8 to 160 kbit/s for a mono element and 16 to 256 kbit/s for a
+  stereo one, and a bitrate outside them takes the nearest row. HE-AAC v2
+  takes a stereo input only.
+- `aac_encoder_encode` takes exactly `frame_size()` (1024, or 2048 with
+  SBR) interleaved float samples per channel at full scale 1.0 and writes
+  one ADTS frame. The output buffer must hold
+  `aac_encoder_max_frame_bytes` (768 bytes per channel plus the header,
+  plus 272 bytes per SBR element); a smaller one is refused with
   `AAC_ERR_OVERFLOW` before any input is consumed.
-- The first 2048 output samples of the decoded stream are silence
-  (`aac_encoder_delay`): one block of lookahead for block switching plus
-  the transform overlap.
-- `aac_encoder_flush` drains the delay: it writes the two remaining ADTS
-  frames back to back and returns their total length, then 0 until the
-  next `aac_encoder_encode`. A flushed encoder starts over, so the next
-  input opens a stream identical to a fresh encoder's.
+- The first `aac_encoder_delay` output samples of the decoded stream are
+  silence: 2048 for AAC-LC (one block of lookahead for block switching
+  plus the transform overlap), 5635 at the input rate for HE-AAC (the
+  core delay at half rate plus the QMF chains of encoder and decoder).
+- `aac_encoder_flush` drains the delay: it writes the remaining ADTS
+  frames (two, or three with SBR) back to back and returns their total
+  length, then 0 until the next `aac_encoder_encode`. A flushed encoder
+  starts over, so the next input opens a stream identical to a fresh
+  encoder's.
 - `quality` is 1..100 for `AAC_RC_CVBR` and `AAC_RC_TVBR`; 70 codes at the
   masking threshold, 100 nine dB below it. In the VBR modes the quality
   also selects the lowpass (13 kHz at 1 to 19.3 kHz at 100), and a quality
@@ -255,7 +290,11 @@ hand-built and damaged streams and on the committed HE-AAC streams
 the low band against the source through the filterbanks, the high band's
 energy, the header reset between two streams, the return to the core
 rate after a reset), channel layouts, encode/decode roundtrips at every
-sample rate, layout and rate-control mode, rate control, the coding tools
+sample rate, layout and rate-control mode and of HE-AAC v1 (mono, stereo,
+5.0) and v2 (the stream decodes with SBR and PS at the input rate and
+channel count, the delay is as declared, the low band survives the core
+coder, the band between 9 and 12 kHz comes back within 3 dB of the
+source and the bitrate is held), rate control, the coding tools
 (noise substitution keeps the level of the substituted region, intensity
 stereo keeps the balance, TNS covers both window types), and
 interoperability with FFmpeg. The interop test skips when `ffmpeg` is not
@@ -263,7 +302,8 @@ on PATH; otherwise it requires our decoder to match FFmpeg's decode of
 FFmpeg-encoded streams, and FFmpeg to decode our streams exactly as our
 decoder does, both at better than 90 dB difference SNR, and the committed
 HE-AAC streams to decode within 70 dB of FFmpeg; the streams of ours it
-checks use TNS, noise substitution and intensity stereo.
+checks use TNS, noise substitution and intensity stereo, and its HE-AAC
+v1 and v2 streams of ours decode identically in both decoders.
 
 Noise substitution never signals correlated noise (an M/S flag on a noise
 band): FFmpeg's decoder draws independent noise regardless of the flag,
@@ -273,7 +313,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR and PS decoders, psychoacoustics, encoder, coding tools, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, decoder, SBR and PS decoders, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool
 tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
@@ -300,5 +340,9 @@ decoder is written from ISO/IEC 14496-3 8.6.4 with the structure of
 FFmpeg's `libavcodec/aacps.c` as the reference for the buffer layout and
 the hybrid filter alignment; its Huffman codebooks, band mappings,
 quantization tables and filter prototypes are ISO/IEC 14496-3 data
-(Tables 8.20 to 8.49). The HE-AAC test streams were encoded with the
-Fraunhofer FDK encoder.
+(Tables 8.20 to 8.49). The SBR encoder follows 3GPP TS 26.404 and the
+published design of FDK's `libSBRenc` (its tuning table, transient
+detector, noise floor estimation and envelope coding decisions) with no
+code copied; the PS encoder is written from ISO/IEC 14496-3 8.6.4 and
+3GPP TS 26.405. The HE-AAC test streams were encoded with the Fraunhofer
+FDK encoder.

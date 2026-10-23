@@ -62,6 +62,27 @@ static std::vector<float> gen_harmonics(int n, int sr, int channels) {
   return pcm;
 }
 
+/* Harmonics of 220 Hz up to 15.4 kHz over a noise bed, so that the band
+ * an SBR encoder describes carries signal; the second channel is quieter
+ * and offset in phase. */
+static std::vector<float> gen_wideband(int n, int sr, int channels) {
+  std::vector<float> pcm((size_t)n * channels);
+  unsigned seed = 777u;
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    for (int c = 0; c < channels; c++) {
+      float v = 0.0f;
+      for (int h = 1; h <= 70; h++) {
+        v += (0.12f / (float)h) * sinf(2.0f * (float)M_PI * 220.0f * (float)h * t + 0.3f * (float)c);
+      }
+      seed = seed * 1664525u + 1013904223u;
+      v += 0.03f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+      pcm[(size_t)i * channels + c] = c ? 0.7f * v : v;
+    }
+  }
+  return pcm;
+}
+
 static std::vector<float> gen_noise(int n, int channels, unsigned seed = 12345u) {
   std::vector<float> pcm((size_t)n * channels);
   for (size_t i = 0; i < pcm.size(); i++) {
@@ -211,6 +232,20 @@ static std::vector<float> lowpass_channel(const std::vector<float>& pcm, int cha
   return out;
 }
 
+/* Energy in dB of one channel between `lo` and `hi` Hz, over samples
+ * [from, to). */
+static double band_db(const std::vector<float>& pcm, int channels, int channel, float lo, float hi,
+                      int sr, size_t from, size_t to) {
+  const std::vector<float> a = lowpass_channel(pcm, channels, channel, hi, sr);
+  const std::vector<float> b = lowpass_channel(pcm, channels, channel, lo, sr);
+  double e = 0.0;
+  for (size_t i = from; i < to && i < a.size(); i++) {
+    const double v = (double)a[i] - b[i];
+    e += v * v;
+  }
+  return 10.0 * log10(e + 1e-20);
+}
+
 /* Best SNR of `out` against `ref` over a range of lead-in delays. */
 static double best_aligned_snr_db(const std::vector<float>& ref, const std::vector<float>& out,
                                   int min_delay, int max_delay, int* delay) {
@@ -270,9 +305,9 @@ static std::vector<AdtsFrame> split_adts(const std::vector<uint8_t>& s) {
 /* Encodes a whole signal (including the flush) into one ADTS stream. */
 static std::vector<uint8_t> encode_stream(const std::vector<float>& pcm, int sr, int channels,
                                           int bitrate, AacRateControl rc, int quality = 0,
-                                          int* error = nullptr) {
+                                          int* error = nullptr, AacObjectType aot = AAC_AOT_LC) {
   std::vector<uint8_t> out;
-  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, AAC_AOT_LC, rc);
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {
     if (error) {
       *error = AAC_ERR_INIT;

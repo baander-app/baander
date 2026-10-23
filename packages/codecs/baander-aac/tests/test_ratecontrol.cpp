@@ -60,10 +60,12 @@ static void test_vbr() {
 }
 
 static void test_api_limits() {
-  CHECK(aac_encoder_create(44100, 2, 128000, AAC_AOT_SBR, AAC_RC_CBR) == nullptr,
-        "HE-AAC encoding is not offered");
-  CHECK(aac_encoder_create(44100, 2, 128000, AAC_AOT_PS, AAC_RC_CBR) == nullptr,
-        "HE-AAC v2 encoding is not offered");
+  CHECK(aac_encoder_create(44100, 2, 128000, (AacObjectType)1, AAC_RC_CBR) == nullptr,
+        "AAC Main is not offered");
+  CHECK(aac_encoder_create(44100, 1, 128000, AAC_AOT_PS, AAC_RC_CBR) == nullptr,
+        "HE-AAC v2 needs a stereo input");
+  CHECK(aac_encoder_create(44101, 2, 128000, AAC_AOT_SBR, AAC_RC_CBR) == nullptr,
+        "HE-AAC needs an even sample rate with a supported core rate");
   CHECK(aac_encoder_create(44100, 9, 128000, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "9 channels");
   CHECK(aac_encoder_create(37000, 2, 128000, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "37 kHz");
   CHECK(aac_encoder_create(44100, 2, 0, AAC_AOT_LC, AAC_RC_CBR) == nullptr, "zero bitrate");

@@ -24,290 +24,65 @@ constexpr int kSlots = AAC_SBR_QMF_SLOTS;
 constexpr int kHistory = AAC_SBR_HF_HISTORY;
 constexpr int kAdj = AAC_SBR_ADJ_OFFSET;
 
-/* ── frequency tables (4.6.18.3) ───────────────────────────────── */
+/* ── frequency tables (4.6.18.3, sbr_freq.cpp) ─────────────────── */
 
-const int8_t kSbrOffset[6][16] = {
-    {-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7},        /* 16000 */
-    {-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13},         /* 22050 */
-    {-5, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16},         /* 24000 */
-    {-6, -4, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16},         /* 32000 */
-    {-4, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 20},         /* 44100..64000 */
-    {-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 20, 24},         /* above 64000 */
-};
-
-void make_bands(int16_t* bands, int start, int stop, int num_bands) {
-  const float base = powf((float)stop / (float)start, 1.0f / (float)num_bands);
-  float prod = (float)start;
-  int previous = start;
-  for (int k = 0; k < num_bands - 1; k++) {
-    prod *= base;
-    const int present = (int)lrintf(prod);
-    bands[k] = (int16_t)(present - previous);
-    previous = present;
-  }
-  bands[num_bands - 1] = (int16_t)(stop - previous);
+void freq_from_state(const AacSbrState* s, AacSbrFreq* f) {
+  memset(f, 0, sizeof(*f));
+  f->sample_rate = s->sample_rate;
+  f->start_freq = s->start_freq;
+  f->stop_freq = s->stop_freq;
+  f->xover_band = s->xover_band;
+  f->freq_scale = s->freq_scale;
+  f->alter_scale = s->alter_scale;
+  f->noise_bands = s->noise_bands;
+  f->limiter_bands = s->limiter_bands;
+  f->kx = s->kx[1];
+  f->m = s->m[1];
+  f->n[0] = s->n[0];
+  f->n[1] = s->n[1];
+  f->num_patches = s->num_patches;
+  memcpy(f->patch_num_subbands, s->patch_num_subbands, sizeof(f->patch_num_subbands));
+  memcpy(f->patch_start_subband, s->patch_start_subband, sizeof(f->patch_start_subband));
+  memcpy(f->f_tablelow, s->f_tablelow, sizeof(f->f_tablelow));
 }
 
-bool in_table(const int16_t* table, int last, int16_t needle) {
-  for (int i = 0; i <= last; i++) {
-    if (table[i] == needle) {
-      return true;
-    }
-  }
-  return false;
+void freq_to_state(const AacSbrFreq* f, AacSbrState* s) {
+  memcpy(s->k, f->k, sizeof(s->k));
+  s->kx[1] = f->kx;
+  s->m[1] = f->m;
+  s->n_master = f->n_master;
+  memcpy(s->f_master, f->f_master, sizeof(s->f_master));
+  s->n[0] = f->n[0];
+  s->n[1] = f->n[1];
+  memcpy(s->f_tablelow, f->f_tablelow, sizeof(s->f_tablelow));
+  memcpy(s->f_tablehigh, f->f_tablehigh, sizeof(s->f_tablehigh));
+  s->n_q = f->n_q;
+  memcpy(s->f_tablenoise, f->f_tablenoise, sizeof(s->f_tablenoise));
+  s->n_lim = f->n_lim;
+  memcpy(s->f_tablelim, f->f_tablelim, sizeof(s->f_tablelim));
+  s->num_patches = f->num_patches;
+  memcpy(s->patch_num_subbands, f->patch_num_subbands, sizeof(s->patch_num_subbands));
+  memcpy(s->patch_start_subband, f->patch_start_subband, sizeof(s->patch_start_subband));
 }
 
-/* Limiter band table (4.6.18.3.6). */
+/* Limiter band table alone (4.6.18.3.6), after limiter_bands changed. */
 void make_f_tablelim(AacSbrState* s) {
-  if (s->limiter_bands > 0) {
-    static const float kWarped[3] = {1.32715174233856803909f, 1.18509277094158210129f,
-                                     1.11987160404675912501f};
-    const float lim_bands_per_octave_warped = kWarped[s->limiter_bands - 1];
-    int16_t patch_borders[7];
-    patch_borders[0] = (int16_t)s->kx[1];
-    for (int k = 1; k <= s->num_patches; k++) {
-      patch_borders[k] = (int16_t)(patch_borders[k - 1] + s->patch_num_subbands[k - 1]);
-    }
-    memcpy(s->f_tablelim, s->f_tablelow, (size_t)(s->n[0] + 1) * sizeof(s->f_tablelow[0]));
-    for (int k = 1; k < s->num_patches; k++) {
-      s->f_tablelim[s->n[0] + k] = (uint16_t)patch_borders[k];
-    }
-    std::sort(s->f_tablelim, s->f_tablelim + s->num_patches + s->n[0]);
-    s->n_lim = s->n[0] + s->num_patches - 1;
-    uint16_t* in = s->f_tablelim + 1;
-    uint16_t* out = s->f_tablelim;
-    while (out < s->f_tablelim + s->n_lim) {
-      if ((float)*in >= (float)*out * lim_bands_per_octave_warped) {
-        *++out = *in++;
-      } else if (*in == *out || !in_table(patch_borders, s->num_patches, (int16_t)*in)) {
-        in++;
-        s->n_lim--;
-      } else if (!in_table(patch_borders, s->num_patches, (int16_t)*out)) {
-        *out = *in++;
-        s->n_lim--;
-      } else {
-        *++out = *in++;
-      }
-    }
-  } else {
-    s->f_tablelim[0] = s->f_tablelow[0];
-    s->f_tablelim[1] = s->f_tablelow[s->n[0]];
-    s->n_lim = 1;
-  }
+  AacSbrFreq f;
+  freq_from_state(s, &f);
+  aac_sbr_freq_limiter(&f);
+  s->n_lim = f.n_lim;
+  memcpy(s->f_tablelim, f.f_tablelim, sizeof(s->f_tablelim));
 }
 
-/* Master frequency band table (4.6.18.3.2). */
-int make_f_master(AacSbrState* s) {
-  const int8_t* offsets;
-  switch (s->sample_rate) {
-    case 16000: offsets = kSbrOffset[0]; break;
-    case 22050: offsets = kSbrOffset[1]; break;
-    case 24000: offsets = kSbrOffset[2]; break;
-    case 32000: offsets = kSbrOffset[3]; break;
-    case 44100: case 48000: case 64000: offsets = kSbrOffset[4]; break;
-    case 88200: case 96000: case 128000: case 176400: case 192000: offsets = kSbrOffset[5]; break;
-    default: return AAC_ERR_UNSUPPORTED;
+/* Every table after a header change. */
+int make_tables(AacSbrState* s) {
+  AacSbrFreq f;
+  freq_from_state(s, &f);
+  const int err = aac_sbr_freq_tables(&f);
+  if (err) {
+    return err;
   }
-  const int temp = s->sample_rate < 32000 ? 3000 : (s->sample_rate < 64000 ? 4000 : 5000);
-  const int start_min = ((temp << 7) + (s->sample_rate >> 1)) / s->sample_rate;
-  const int stop_min = ((temp << 8) + (s->sample_rate >> 1)) / s->sample_rate;
-  s->k[0] = start_min + offsets[s->start_freq];
-  if (s->stop_freq < 14) {
-    int16_t stop_dk[13];
-    s->k[2] = stop_min;
-    make_bands(stop_dk, stop_min, 64, 13);
-    std::sort(stop_dk, stop_dk + 13);
-    for (int k = 0; k < s->stop_freq; k++) {
-      s->k[2] += stop_dk[k];
-    }
-  } else if (s->stop_freq == 14) {
-    s->k[2] = 2 * s->k[0];
-  } else {
-    s->k[2] = 3 * s->k[0];
-  }
-  s->k[2] = std::min(64, s->k[2]);
-  const int max_qmf_subbands = s->sample_rate <= 32000 ? 48 : (s->sample_rate == 44100 ? 35 : 32);
-  if (s->k[2] - s->k[0] > max_qmf_subbands || s->k[0] <= 0) {
-    return AAC_ERR_DECODE;
-  }
-
-  if (!s->freq_scale) {
-    const int dk = s->alter_scale + 1;
-    s->n_master = ((s->k[2] - s->k[0] + (dk & 2)) >> dk) << 1;
-    if (s->n_master <= 0 || s->xover_band >= s->n_master) {
-      return AAC_ERR_DECODE;
-    }
-    for (int k = 1; k <= s->n_master; k++) {
-      s->f_master[k] = (uint16_t)dk;
-    }
-    const int k2diff = s->k[2] - s->k[0] - s->n_master * dk;
-    if (k2diff < 0) {
-      s->f_master[1]--;
-      s->f_master[2] -= (k2diff < -1);
-    } else if (k2diff) {
-      s->f_master[s->n_master]++;
-    }
-    s->f_master[0] = (uint16_t)s->k[0];
-    for (int k = 1; k <= s->n_master; k++) {
-      s->f_master[k] += s->f_master[k - 1];
-    }
-    return 0;
-  }
-
-  const int half_bands = 7 - s->freq_scale;
-  int two_regions;
-  if (49 * s->k[2] > 110 * s->k[0]) {
-    two_regions = 1;
-    s->k[1] = 2 * s->k[0];
-  } else {
-    two_regions = 0;
-    s->k[1] = s->k[2];
-  }
-  const int num_bands_0 = (int)lrintf((float)half_bands * log2f((float)s->k[1] / (float)s->k[0])) * 2;
-  if (num_bands_0 <= 0) {
-    return AAC_ERR_DECODE;
-  }
-  int16_t vk0[49];
-  vk0[0] = 0;
-  make_bands(vk0 + 1, s->k[0], s->k[1], num_bands_0);
-  std::sort(vk0 + 1, vk0 + 1 + num_bands_0);
-  const int vdk0_max = vk0[num_bands_0];
-  vk0[0] = (int16_t)s->k[0];
-  for (int k = 1; k <= num_bands_0; k++) {
-    if (vk0[k] <= 0) {
-      return AAC_ERR_DECODE;
-    }
-    vk0[k] = (int16_t)(vk0[k] + vk0[k - 1]);
-  }
-  if (two_regions) {
-    int16_t vk1[49];
-    const float invwarp = s->alter_scale ? 0.76923076923076923077f : 1.0f;
-    const int num_bands_1 =
-        (int)lrintf((float)half_bands * invwarp * log2f((float)s->k[2] / (float)s->k[1])) * 2;
-    if (num_bands_1 <= 0) {
-      return AAC_ERR_DECODE;
-    }
-    make_bands(vk1 + 1, s->k[1], s->k[2], num_bands_1);
-    int vdk1_min = vk1[1];
-    for (int k = 2; k <= num_bands_1; k++) {
-      vdk1_min = std::min(vdk1_min, (int)vk1[k]);
-    }
-    if (vdk1_min < vdk0_max) {
-      std::sort(vk1 + 1, vk1 + 1 + num_bands_1);
-      const int change = std::min(vdk0_max - vk1[1], (vk1[num_bands_1] - vk1[1]) >> 1);
-      vk1[1] = (int16_t)(vk1[1] + change);
-      vk1[num_bands_1] = (int16_t)(vk1[num_bands_1] - change);
-    }
-    std::sort(vk1 + 1, vk1 + 1 + num_bands_1);
-    vk1[0] = (int16_t)s->k[1];
-    for (int k = 1; k <= num_bands_1; k++) {
-      if (vk1[k] <= 0) {
-        return AAC_ERR_DECODE;
-      }
-      vk1[k] = (int16_t)(vk1[k] + vk1[k - 1]);
-    }
-    s->n_master = num_bands_0 + num_bands_1;
-    if (s->xover_band >= s->n_master) {
-      return AAC_ERR_DECODE;
-    }
-    for (int k = 0; k <= num_bands_0; k++) {
-      s->f_master[k] = (uint16_t)vk0[k];
-    }
-    for (int k = 1; k <= num_bands_1; k++) {
-      s->f_master[num_bands_0 + k] = (uint16_t)vk1[k];
-    }
-  } else {
-    s->n_master = num_bands_0;
-    if (s->xover_band >= s->n_master) {
-      return AAC_ERR_DECODE;
-    }
-    for (int k = 0; k <= num_bands_0; k++) {
-      s->f_master[k] = (uint16_t)vk0[k];
-    }
-  }
-  return 0;
-}
-
-/* Patch construction (4.6.18.6.3). */
-int hf_calc_npatches(AacSbrState* s) {
-  int last_k = -1;
-  int last_msb = -1;
-  int sb = 0;
-  int msb = s->k[0];
-  int usb = s->kx[1];
-  const int goal_sb = ((1000 << 11) + (s->sample_rate >> 1)) / s->sample_rate;
-  int k;
-  s->num_patches = 0;
-  if (goal_sb < s->kx[1] + s->m[1]) {
-    for (k = 0; s->f_master[k] < goal_sb; k++) {
-    }
-  } else {
-    k = s->n_master;
-  }
-  do {
-    int odd = 0;
-    if (k == last_k && msb == last_msb) {
-      return AAC_ERR_DECODE;
-    }
-    last_k = k;
-    last_msb = msb;
-    for (int i = k; i == k || sb > (s->k[0] - 1 + msb - odd); i--) {
-      sb = s->f_master[i];
-      odd = (sb + s->k[0]) & 1;
-    }
-    if (s->num_patches > 5) {
-      return AAC_ERR_DECODE;
-    }
-    s->patch_num_subbands[s->num_patches] = std::max(sb - usb, 0);
-    s->patch_start_subband[s->num_patches] = s->k[0] - odd - s->patch_num_subbands[s->num_patches];
-    if (s->patch_num_subbands[s->num_patches] > 0) {
-      usb = sb;
-      msb = sb;
-      s->num_patches++;
-    } else {
-      msb = s->kx[1];
-    }
-    if (s->f_master[k] - sb < 3) {
-      k = s->n_master;
-    }
-  } while (sb != s->kx[1] + s->m[1]);
-  if (s->num_patches > 1 && s->patch_num_subbands[s->num_patches - 1] < 3) {
-    s->num_patches--;
-  }
-  return 0;
-}
-
-/* Derived tables (4.6.18.3.2.2). */
-int make_f_derived(AacSbrState* s) {
-  s->n[1] = s->n_master - s->xover_band;
-  s->n[0] = (s->n[1] + 1) >> 1;
-  memcpy(s->f_tablehigh, &s->f_master[s->xover_band], (size_t)(s->n[1] + 1) * sizeof(s->f_master[0]));
-  s->m[1] = s->f_tablehigh[s->n[1]] - s->f_tablehigh[0];
-  s->kx[1] = s->f_tablehigh[0];
-  if (s->kx[1] + s->m[1] > 64 || s->kx[1] > 32) {
-    return AAC_ERR_DECODE;
-  }
-  s->f_tablelow[0] = s->f_tablehigh[0];
-  const int odd = s->n[1] & 1;
-  for (int k = 1; k <= s->n[0]; k++) {
-    s->f_tablelow[k] = s->f_tablehigh[2 * k - odd];
-  }
-  s->n_q = std::max(1, (int)lrintf((float)s->noise_bands * log2f((float)s->k[2] / (float)s->kx[1])));
-  if (s->n_q > 5) {
-    s->n_q = 1;
-    return AAC_ERR_DECODE;
-  }
-  s->f_tablenoise[0] = s->f_tablelow[0];
-  int temp = 0;
-  for (int k = 1; k <= s->n_q; k++) {
-    temp += (s->n[0] - temp) / (s->n_q + 1 - k);
-    s->f_tablenoise[k] = s->f_tablelow[temp];
-  }
-  const int ret = hf_calc_npatches(s);
-  if (ret) {
-    return ret;
-  }
-  make_f_tablelim(s);
+  freq_to_state(&f, s);
   s->data[0].f_indexnoise = 0;
   s->data[1].f_indexnoise = 0;
   return 0;
@@ -726,11 +501,7 @@ int read_data(AacSbrState* s, AacBitReader* r, int elem_type) {
 }
 
 void sbr_reset(AacSbrState* s) {
-  int err = make_f_master(s);
-  if (err == 0) {
-    err = make_f_derived(s);
-  }
-  if (err) {
+  if (make_tables(s)) {
     aac_sbr_turnoff(s);
   }
 }

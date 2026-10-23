@@ -60,6 +60,41 @@ using AacPsState = struct AacPsState_ {
   int8_t ipd_hist[AAC_PS_MAX_PAR];
 };
 
+/* Hybrid filterbank (8.6.4.3), shared with the encoder.  The analysis
+ * reads 38 slots of the QMF signal L ([re/im][slot][band]): the 32 of the
+ * frame and six of lookahead, keeping six slots of history in `in_buf`;
+ * it yields 71 (20-band mode) or 91 (34-band mode) sub-subbands of 32
+ * slots.  The synthesis sums them back into the first 32 slots. */
+void aac_ps_hybrid_init(void);
+void aac_ps_hybrid_analysis(float out[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], float in_buf[5][44][2],
+                            const float L[2][38][64], int is34);
+void aac_ps_hybrid_synthesis(float out[2][38][64],
+                             const float in[AAC_PS_MAX_SUBBANDS][AAC_PS_SLOTS][2], int is34);
+/* Parameter band of each sub-subband (Tables 8.48 and 8.49). */
+extern const int8_t aac_ps_k_to_i_20[71];
+extern const int8_t aac_ps_k_to_i_34[91];
+
+/* The Huffman codebooks (Tables 8.20 to 8.29) as {symbol, code length}
+ * in canonical order: codes are assigned in table order, each the next
+ * value of its length after the previous code; the symbol plus the
+ * table's offset is the coded value. */
+enum {
+  AAC_PS_HUFF_IID_DF1,
+  AAC_PS_HUFF_IID_DT1,
+  AAC_PS_HUFF_IID_DF0,
+  AAC_PS_HUFF_IID_DT0,
+  AAC_PS_HUFF_ICC_DF,
+  AAC_PS_HUFF_ICC_DT,
+  AAC_PS_HUFF_IPD_DF,
+  AAC_PS_HUFF_IPD_DT,
+  AAC_PS_HUFF_OPD_DF,
+  AAC_PS_HUFF_OPD_DT,
+  AAC_PS_NUM_HUFF
+};
+extern const uint8_t aac_ps_huff_sizes[AAC_PS_NUM_HUFF];
+extern const int8_t aac_ps_huff_offset[AAC_PS_NUM_HUFF];
+extern const uint8_t aac_ps_huff_tabs[][2];
+
 /* Clears the state; the derived tables are built on the first call. */
 void aac_ps_init(AacPsState* ps);
 

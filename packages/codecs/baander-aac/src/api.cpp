@@ -30,8 +30,7 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
   if (sample_rate <= 0 || channels <= 0 || channels > AAC_MAX_CHANNELS || bitrate <= 0) {
     return nullptr;
   }
-  /* Only AAC-LC is implemented; HE-AAC v1/v2 need an SBR/PS encoder. */
-  if (aot != AAC_AOT_LC) {
+  if (aot != AAC_AOT_LC && aot != AAC_AOT_SBR && aot != AAC_AOT_PS) {
     return nullptr;
   }
   if (rc_mode < AAC_RC_TVBR || rc_mode > AAC_RC_CBR) {
@@ -74,7 +73,7 @@ int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, ui
   if (n_samples != s->frame_size) {
     return AAC_ERR_INVALID_ARG;
   }
-  s->pending_flush = AAC_ENCODER_DELAY / s->frame_size;
+  s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
   return encode_block(s, pcm, out, out_size);
 }
 
@@ -103,7 +102,7 @@ int aac_encoder_delay(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return AAC_ENCODER_DELAY;
+  return static_cast<AacEncoderState*>(ctx)->delay;
 }
 
 int aac_encoder_max_frame_bytes(AacEncoderHandle ctx) {

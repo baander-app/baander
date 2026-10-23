@@ -130,8 +130,10 @@ static void test_huffman() {
           "escape %d read back %d,%d", a, out[0], out[1]);
   }
   const int too_big[2] = {8192, 0};
-  CHECK(aac_bitwriter_write_huffman(&(AacBitWriter&)*new AacBitWriter(), AAC_CB_ESCAPE, too_big) ==
-            AAC_ERR_INVALID_ARG,
+  AacBitWriter refused;
+  uint8_t refused_buf[16];
+  aac_bitwriter_init(&refused, refused_buf, sizeof(refused_buf));
+  CHECK(aac_bitwriter_write_huffman(&refused, AAC_CB_ESCAPE, too_big) == AAC_ERR_INVALID_ARG,
         "value beyond the escape range is refused");
   const int outside[4] = {2, 0, 0, 0};
   CHECK(aac_huffman_bits(1, outside) > 1000, "value outside codebook 1 is unaffordable");

@@ -45,7 +45,7 @@ static FILE* open_out(const char* path) {
 static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
-          "[quality]\n"
+          "[quality] [lc|he|hev2]\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n");
   return 2;
 }
@@ -65,12 +65,17 @@ static int encode(int argc, char** argv) {
          : mode == "tvbr" ? AAC_RC_TVBR
                           : AAC_RC_CBR;
   }
-  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, AAC_AOT_LC, rc);
+  AacObjectType aot = AAC_AOT_LC;
+  if (argc > 9) {
+    const std::string profile = argv[9];
+    aot = profile == "he" ? AAC_AOT_SBR : profile == "hev2" ? AAC_AOT_PS : AAC_AOT_LC;
+  }
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {
     fprintf(stderr, "baac: unsupported encoder configuration\n");
     return 1;
   }
-  if (argc > 8) {
+  if (argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
   const std::vector<uint8_t> in = read_all(argv[2]);

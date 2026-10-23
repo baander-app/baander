@@ -35,6 +35,36 @@ extern "C" {
 #define AAC_SBR_MAX_PATCHES 6
 #define AAC_SBR_MAX_LIMITER 30
 
+/* The frequency band tables of one SBR configuration (4.6.18.3), built
+ * from the header fields and the SBR sample rate. */
+using AacSbrFreq = struct AacSbrFreq_ {
+  int sample_rate; /* the SBR rate, twice the core rate */
+  int start_freq, stop_freq, xover_band, freq_scale, alter_scale, noise_bands;
+  int limiter_bands;
+  int k[3];  /* k0, k1, k2 */
+  int kx, m; /* first SBR band and the number of bands */
+  int n_master;
+  uint16_t f_master[49];
+  int n[2]; /* bands at low and high resolution */
+  uint16_t f_tablelow[25];
+  uint16_t f_tablehigh[49];
+  int n_q;
+  uint16_t f_tablenoise[AAC_SBR_MAX_NOISE_BANDS + 1];
+  int n_lim;
+  uint16_t f_tablelim[AAC_SBR_MAX_LIMITER];
+  int num_patches;
+  int patch_num_subbands[AAC_SBR_MAX_PATCHES];
+  int patch_start_subband[AAC_SBR_MAX_PATCHES];
+};
+
+/* Builds every table from the header fields; returns 0, AAC_ERR_DECODE for
+ * a combination the standard rules out or AAC_ERR_UNSUPPORTED for a rate
+ * without offset table. */
+int aac_sbr_freq_tables(AacSbrFreq* f);
+
+/* Rebuilds the limiter table alone after limiter_bands changed. */
+void aac_sbr_freq_limiter(AacSbrFreq* f);
+
 using AacSbrChannel = struct AacSbrChannel_ {
   /* bitstream data of the frame */
   int frame_class;
