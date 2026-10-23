@@ -37,16 +37,28 @@ owns the cursor. Old media callbacks and asynchronous imports remain fenced by
 attachment revision and effect cleanup.
 
 After expiry interrupts delivery, retain the cursor and permit a newer signed
-capability to recover the same execution. Limit this path to expired delivery;
-ordinary decoder failures and explicit signing refusal remain terminal. Temporary
-signing transport failures must not discard usable media. A successful refresh
-after suspension or an offline interval can renew expired delivery.
+capability to recover the same execution. An observed signing transport or server
+outage also permits network recovery for that attachment, including before its
+capability expires. Ordinary decoder failures and explicit signing refusal remain
+terminal. After an initial accepted snapshot, transient signing failures preserve
+owned intent during preparation, restoration and decoded playback.
 
-Recovery requires both an expired attached capability and a classified network
-failure: HLS.js network errors or native media network errors. Expiry alone cannot
-make a decoder error or rejected play request recoverable. Preserve recovery intent
-through transient signing failures even after releasing the attachment. A terminal
-failure fences subsequent polling responses so they cannot revive the player.
+Recovery requires a classified HLS.js or native media network failure and either
+expiry or an observed signing outage. A fresh attachment consumes the outage
+marker; a second network failure without another observed outage or expiry remains
+terminal. An ordinary successful poll does not clear the marker, because a delayed
+media failure can still belong to that outage. A replacement requires a newer,
+nonexpired authenticated capability. Decoder errors and rejected play requests
+remain terminal even after an outage, as does an initial signing failure.
+The capability requirement also applies when recovery expands the rendition set
+within the same execution. Every fresh attachment consumes the outage marker,
+including replacements for changed renditions or generations.
+
+The adapter fences callbacks before reporting failure, but destroys its captured
+HLS instance only after the hook has retained the cursor. Destruction can reset the
+native clock synchronously. Teardown must still run if the failure callback throws.
+Recovery intent survives transient signing failures after attachment release. A
+terminal failure fences subsequent polling responses against revival.
 
 No backend signing policy, HMAC validation, generation semantics, encoding or
 manifest format changes are planned. Native HLS uses the common replacement
@@ -59,6 +71,9 @@ Hold job, generation and rendition set constant while signed deadlines advance.
 Require replacement near expiry, preservation of a nonzero local cursor and
 paused/running intent, and no per-poll reload. Cover deferred seeks/restoration,
 expired attachment recovery, stale callbacks, unmount cleanup and signing refusal.
+Cover an unexpired attachment failing during an observed signing outage, a delayed
+failure after a successful poll, one replacement per observed outage, and callback
+ordering before HLS destruction resets the native cursor.
 Run the existing player, attachment and overlay suites, typecheck, targeted lint,
 production build and build verification.
 
@@ -73,6 +88,20 @@ Record deadlines, safe capability identifiers, cursor and frame evidence; raw
 signed URLs stay in memory. Restore normal signing lifetimes before the existing
 offline/control checks. Preserve the backend HLS/DASH descendant expiry proof.
 
+Published renditions are selected for the current cursor and compatible desired
+state; admission does not guarantee publication, and the set can grow or shrink.
+The browser proof therefore records and retries an observation if its set changes,
+with at most three attempts per mode and a shared 60-second renewal budget. A
+successful interval must retain exactly its original set through expiry, refusal
+and replacement delivery. Setup and restoration of the normal lifetime may use
+the currently available set. Rapid-seek targets must move the actual slider value;
+a click on the current thumb does not submit a seek.
+
+The offline check requires the original decoded attachment to survive the failed
+signing poll. After reconnection, an unchanged set still requires that attachment.
+A fresh accepted snapshot with a changed set may replace it only with decoded
+current media at the saved paused cursor, without a seek or generation change.
+
 Run the complete production browser lifecycle with client controls and cleanup.
 Record exact suite counts, artifacts, static gates and limitations in ROADMAP.md.
 Independent review and simplification precede the final local commits. Formal
@@ -85,3 +114,13 @@ Independent review confirmed the active-consumer gap and accepted the scope with
 explicit network-error classification, terminal-response fencing and transient
 failure handling during expired-delivery recovery. These refinements are included
 above. Implementation follows this reviewed contract.
+
+The combined browser run exposed a further integration failure during web restart:
+transient signing failures were tolerated, but a later unexpired HLS network failure
+made the new terminal guard stop polling permanently. The outage marker and adapter
+teardown order above address that failure while retaining terminal refusal and
+decoder behavior. The amendment requires new failing regressions and a rebuilt
+production image before repeating complete acceptance.
+Independent review accepted the amendment with the explicit capability guard for
+same-execution recovery when the rendition set changes; that guard is included
+above.
