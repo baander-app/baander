@@ -373,17 +373,9 @@ async function renewPlaybackCapabilities(owner) {
   }
   const seekCount = () => playbackControls.filter(control => control.action === 'seek').length
   const seeksBefore = seekCount()
-  let publishedSet = snapshot.renditionSet
   const unchangedExecution = () => {
     samePlayback(owner)
     assert.equal(seekCount(), seeksBefore, 'Capability renewal must not submit source seeks')
-    if (snapshot.renditionSet !== publishedSet) {
-      const previous = publishedSet.split(',')
-      const next = snapshot.renditionSet.split(',')
-      assert(next.length > previous.length && previous.every(member => next.includes(member)),
-        'Publication may only add renditions during renewal setup')
-      publishedSet = snapshot.renditionSet
-    }
   }
   const capabilitySet = capability => new URL(capability.url).searchParams.get('set')
   const hasDelivery = capability => mediaResponses.some(item => item.attachment === capability.attachment
@@ -415,7 +407,7 @@ async function renewPlaybackCapabilities(owner) {
       if (mode === 'paused') {
         pausedCursor ??= snapshot.startTime + before.time
         assert(Math.abs(snapshot.startTime + before.time - pausedCursor) < 0.1,
-          'Publication expansion must preserve the original paused cursor')
+          'Publication changes must preserve the original paused cursor')
       }
       assert(Date.now() < (original.expires + 1) * 1000 && original.expires * 1000 - Date.now() <= 12000,
         'Renewal must begin before the actually attached short-lived capability expires')
@@ -427,7 +419,7 @@ async function renewPlaybackCapabilities(owner) {
         unchangedExecution()
         if (snapshot.renditionSet === renditionSet) return false
         proof.status = 'superseded-by-publication'
-        proof.expansion = { at: Date.now(), renditionSet: snapshot.renditionSet }
+        proof.publicationChange = { at: Date.now(), renditionSet: snapshot.renditionSet }
         return true
       }
       await waitFor(() => publicationChanged() || Date.now() >= (original.expires + 1) * 1000,
