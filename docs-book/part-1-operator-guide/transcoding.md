@@ -128,8 +128,15 @@ still apply.
 Temporary network, timeout or server failures while the player reports progress
 automatically leave the media attachment, local position and play or pause intent
 in place. The next eligible report sends the current position rather than
-replaying the failed update. This recovery does not change how failures of
-explicit pause, resume or seek requests are handled.
+replaying the failed update.
+
+Temporary network, timeout or server failures during pause or resume preserve the
+media and its current local position. The player keeps the requested status until
+a fresh authenticated read can reconcile it with the server's accepted status;
+newer local pause or resume intent takes precedence. Reconciliation changes only
+play or pause status, without replaying the command, rewinding to an older server
+position or submitting another seek. Initial signing failures, nontransient
+pause/resume failures and failed seek requests retain their existing handling.
 
 A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
 

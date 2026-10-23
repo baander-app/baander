@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-23. This roadmap selects useful future work and records unresolved
+Updated: 2026-10-24. This roadmap selects useful future work and records unresolved
 release acceptance. Current behavior and operating contracts belong in the linked
 guides. Git history retains completed milestones and their verification evidence.
 
@@ -1153,3 +1153,59 @@ outages, native HLS and other browsers, full live FFmpeg DASH EOF, formal CMAF
 conformance, DASH subtitles and the separate native pressure observer remain
 unqualified. Existing application databases, Redis and media storage were not
 reused or reset. This checkpoint includes no push or feature merge.
+
+### Pause and resume after uncertain delivery — 2026-10-24
+
+Temporary network, timeout and server failures during pause or resume now preserve
+the media attachment and local cursor. A fresh authenticated read started after
+the failure reconciles status without replaying the command or rewinding to an
+older durable position. The requested status remains in force while that read is
+unavailable, and newer local intent wins. Pending local status intent can admit a
+new pause or resume while publication is unavailable only for its current owner.
+Seek, nontransient and unrelated failure handling remains unchanged. The operator
+guide records the status-only reconciliation contract; no API changed.
+
+Final CI verification passed 169 tests across four suites: 154 hook, nine adapter,
+two import and four overlay tests. The initial regressions failed in 18 cases with
+131 passing tests. Two readiness regressions failed with 149 tests skipped;
+two owner-guard regressions separately failed with 152 skipped. Typechecking, the
+production build, asset verification and browser/runner syntax checks passed.
+Full lint reported zero errors and eight existing warnings outside the changed
+files. Gate receipts are under `var/test-runs/player-status-outage-gates`, including
+`verification-summary.json`; application revision is `73c7496b` and browser
+fixture revision is `992566a9`.
+
+Production acceptance passed all eight phases in Chromium 148.0.7778.96. Each of
+the four pause/resume loss cases submitted exactly one command, without an
+opposite-command echo or seek. A pause lost before forwarding reconciled to
+running, advancing from 29.017679 to 29.275055 seconds and from 129 to 137 decoded
+frames. The accepted pause response was held for 231 milliseconds; playback
+settled paused at 29.333499 seconds across two fresh canonical paused polls, with
+one replacement justified by a changed-set publication and delivered successor.
+A resume lost before forwarding settled paused at 29.349274 seconds across two
+fresh polls. Accepted resume response loss, held for 943 milliseconds, reconciled
+to running and advanced from 30.353484 to 31.945407 seconds and from 18 to 22
+frames. Both accepted commands were proved in authenticated canonical state
+before their responses were dropped.
+
+The same run passed both capability-renewal modes, both automatic progress-failure
+modes and generation-12 worker recovery. One progress response-loss observation
+was superseded by a legitimate publication change and is retained in the receipt.
+The expiry check refused 31 HLS and 27 DASH URLs for tampering and after expiry,
+giving 58 responses of 403 in each check; renewal delivered 62 resources with
+status 200. Final evidence is under
+`var/test-runs/player-status-outage-production-accepted`, including
+`acceptance-summary.json`. The runner exited zero and verified cleanup.
+
+The first failed production receipt remains under
+`var/test-runs/player-status-outage-production`, with verified cleanup. A Node
+response callback arrived 17 milliseconds after a legitimate source removal,
+misclassifying its publication cause. The final fixture records browser XHR
+completion before Axios handles the response. Its real Chromium probe intercepted
+five requests with zero unexpected requests and rejected regressing state;
+the per-detachment publication and successor checks also passed five cases.
+Native HLS and other browsers, seek delivery uncertainty, full live FFmpeg DASH
+EOF, formal CMAF conformance, DASH subtitles and the separate native pressure
+observer remain unqualified. Existing application databases, Redis and media
+storage were not reused or reset. This checkpoint includes no push or feature
+merge.
