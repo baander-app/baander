@@ -11,6 +11,7 @@
         "src/mdct.cpp",
         "src/ics.cpp",
         "src/bitstream.cpp",
+        "src/channel_map.cpp",
         "src/api.cpp",
         "src/decoder.cpp",
         "src/psycho.cpp",

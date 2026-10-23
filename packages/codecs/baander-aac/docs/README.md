@@ -15,15 +15,24 @@ Decodes every AAC-LC tool of ISO/IEC 14496-3 subpart 4: long and short
 windows with window grouping, sine and KBD window shapes, section and
 scalefactor coding with all eleven spectral Huffman codebooks and escape
 sequences, pulse data, TNS, M/S stereo, intensity stereo and perceptual
-noise substitution (including correlated noise in M/S bands). SCE and CPE
-elements are decoded; DSE, PCE and FIL elements are skipped. ADTS headers
-set the sample rate and channel count of the stream; CRC-protected frames
-are accepted (the CRC is not verified).
+noise substitution (including correlated noise in M/S bands). Every
+raw data block element is handled: SCE, CPE and LFE channels, coupling
+channel elements (dependent and independent, with their gain lists),
+program config elements and the channel configurations 1 to 7, 11 and 12
+of the standard; DSE and FIL elements are skipped. A stream without a
+channel configuration or PCE takes its layout from the elements it
+carries. The output is emitted in the canonical order left, right,
+centre, LFE, back left, back right, outer left, outer right, or
+downmixed to stereo or mono with FFmpeg's default coefficients. ADTS
+headers set the sample rate and channel configuration of the stream, and
+a header may carry several raw data blocks; CRC-protected frames are
+accepted (the CRC is not verified).
 
 Against FFmpeg's decoder the output agrees to floating-point precision
 (135 dB difference SNR) on FFmpeg-encoded streams across all sample rates
-from 8 to 96 kHz, mono and stereo, 32 to 320 kbit/s and the `fast`
-coder; see [reference-comparison.md](reference-comparison.md).
+from 8 to 96 kHz, every layout from mono to 7.1 (including PCE-defined
+ones such as 6.1), the stereo and mono downmixes, 32 to 320 kbit/s and
+the `fast` coder; see [reference-comparison.md](reference-comparison.md).
 
 An HE-AAC stream (SBR, with or without PS) decodes as its AAC-LC core at the
 core sample rate; `aac_decoder_get_sbr_ps` reports that SBR data was
@@ -106,21 +115,32 @@ void aac_encoder_destroy(AacEncoderHandle ctx);
 AacDecoderHandle aac_decoder_create(int sample_rate, int channels);
 int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size,
                        float* pcm, int pcm_size);
+int aac_decoder_reset(AacDecoderHandle ctx);
 int aac_decoder_frame_size(AacDecoderHandle ctx);
 int aac_decoder_sample_rate(AacDecoderHandle ctx);
+int aac_decoder_output_sample_rate(AacDecoderHandle ctx);
 int aac_decoder_channels(AacDecoderHandle ctx);
+int aac_decoder_stream_channels(AacDecoderHandle ctx);
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps);
 void aac_decoder_destroy(AacDecoderHandle ctx);
 ```
 
-- `aac_decoder_decode` takes one ADTS frame (or one raw data block at the
-  creation sample rate) and returns the samples per channel written to
-  `pcm` (1024), or a negative `AacError`. `pcm_size` must hold a whole
-  frame.
-- The ADTS header overrides the creation sample rate;
-  `aac_decoder_sample_rate` reports the stream's rate. `channels` is the
-  output layout: a stereo stream through a mono decoder is downmixed, a
-  mono stream through a stereo decoder is duplicated.
+- `aac_decoder_decode` takes one ADTS frame (every raw data block in it)
+  or one raw data block at the creation sample rate, and returns the
+  samples per channel written to `pcm`, interleaved with
+  `aac_decoder_channels` channels, or a negative `AacError`. `pcm_size`
+  must hold the whole output; `AAC_DECODER_MAX_OUTPUT` samples per channel
+  always suffice.
+- `channels` is the output layout: 0 emits the stream's own channels in
+  canonical order, 1 and 2 downmix larger layouts (centre and surrounds
+  at -3 dB, LFE dropped; a stereo stream becomes 0.707 (L + R) in mono, a
+  mono stream goes to both stereo channels at -3 dB, as FFmpeg mixes
+  them), 3 to 8 copy the stream's channels and zero the rest.
+  `aac_decoder_stream_channels` reports what the last frame carried.
+- The ADTS header overrides the creation sample rate and channel
+  configuration; `aac_decoder_sample_rate` reports the stream's rate. A
+  change of rate or layout mid-stream resets the decoder state.
+  `aac_decoder_reset` clears the filterbank history for a seek.
 
 ## Building
 

@@ -88,6 +88,25 @@ static std::vector<float> gen_transients(int n, int sr, int channels) {
   return pcm;
 }
 
+/* A distinct tone and noise bed per channel, so that a channel landing
+ * in the wrong output slot is heard as a large error. */
+static std::vector<float> gen_multichannel(int n, int sr, int channels) {
+  std::vector<float> pcm((size_t)n * channels);
+  unsigned seed = 4242u;
+  for (int i = 0; i < n; i++) {
+    const float t = (float)i / (float)sr;
+    for (int c = 0; c < channels; c++) {
+      seed = seed * 1664525u + 1013904223u;
+      const float noise = 0.02f * ((float)(seed >> 8) / 8388608.0f - 1.0f);
+      const float f0 = 220.0f * (float)(c + 1);
+      pcm[(size_t)i * channels + c] = 0.25f * sinf(2.0f * (float)M_PI * f0 * t) +
+                                      0.1f * sinf(2.0f * (float)M_PI * (f0 * 2.5f + 50.0f) * t) +
+                                      noise;
+    }
+  }
+  return pcm;
+}
+
 /* ── metrics ───────────────────────────────────────────────────── */
 
 static double snr_db(const float* ref, const float* test, size_t n) {
@@ -192,7 +211,7 @@ static std::vector<float> decode_stream(const std::vector<uint8_t>& stream, int 
     }
     return out;
   }
-  std::vector<float> pcm((size_t)aac_decoder_frame_size(dec) * channels);
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
   int bad = 0;
   for (const AdtsFrame& f : split_adts(stream)) {
     const int n =
@@ -201,7 +220,7 @@ static std::vector<float> decode_stream(const std::vector<uint8_t>& stream, int 
       bad++;
       continue;
     }
-    out.insert(out.end(), pcm.begin(), pcm.begin() + (size_t)n * channels);
+    out.insert(out.end(), pcm.begin(), pcm.begin() + (size_t)n * aac_decoder_channels(dec));
   }
   if (errors) {
     *errors = bad;

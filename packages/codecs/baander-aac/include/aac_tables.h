@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 /* Constants */
-#define AAC_MAX_CHANNELS 2
+#define AAC_MAX_CHANNELS 8
 #define AAC_FRAME_SIZE_LONG 1024
 #define AAC_FRAME_SIZE_SHORT 128
 #define AAC_NUM_WINDOWS_SHORT 8
