@@ -1,5 +1,5 @@
 import { createElement, StrictMode } from 'react'
-import { AxiosError } from 'axios'
+import { AxiosError, CanceledError } from 'axios'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBaanderPlayer } from '@/features/catalog/hooks/useBaanderPlayer'
@@ -825,6 +825,212 @@ describe('useBaanderPlayer authorization', () => {
     video.currentTime = 11
     await act(async () => vi.advanceTimersByTimeAsync(2000))
     expect(progress()).toHaveLength(1)
+    unmount()
+  })
+
+  it.each(['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', '503'])('preserves running playback through a failed automatic progress request: %s', async code => {
+    vi.useFakeTimers()
+    const snapshot = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
+      generation: 1, revision: 5, ready: true, startTime: 24, duration: 180, position: 24, status: 'running' }
+    let attempts = 0
+    post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+      if (payload.action === 'progress' && ++attempts === 1) return Promise.reject(code === '503'
+        ? Object.assign(new AxiosError('Server unavailable'), { response: { status: 503 } })
+        : new AxiosError('Connection unavailable', code))
+      snapshot.position = payload.position!
+      return Promise.resolve({ data: {} })
+    })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 10
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    expect(result.current.state).not.toBe('error')
+    expect(video.currentTime).toBe(10)
+    video.currentTime = 20
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    const progress = post.mock.calls.filter(call => call[1].action === 'progress')
+    expect(progress.map(call => call[1])).toEqual([
+      { action: 'progress', position: 34, generation: 1, revision: 5 },
+      { action: 'progress', position: 44, generation: 1, revision: 5 },
+    ])
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(post.mock.calls.filter(call => call[1].action === 'progress')).toHaveLength(2)
+    expect(attachments).toHaveLength(1)
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('reconciles accepted progress after its response is lost and sends the latest eligible cursor next', async () => {
+    vi.useFakeTimers()
+    const snapshot = { url: '/manifest', jobId: 'job', renditionSet: 'set', sessionId: 'owned-session',
+      generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
+    let rejectProgress!: (error: Error) => void
+    let attempts = 0
+    post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+      snapshot.position = payload.position!
+      snapshot.revision++
+      if (payload.action === 'progress' && ++attempts === 1) return new Promise((_resolve, reject) => { rejectProgress = reject })
+      return Promise.resolve({ data: {} })
+    })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 10
+    await act(async () => vi.advanceTimersByTimeAsync(2000))
+    expect(snapshot.position).toBe(10)
+    expect(attachments).toHaveLength(1)
+    await act(async () => rejectProgress(new AxiosError('Response lost', 'ERR_NETWORK')))
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+    video.currentTime = 20
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(post.mock.calls.filter(call => call[1].action === 'progress').map(call => call[1])).toEqual([
+      { action: 'progress', position: 10, generation: 1, revision: 5 },
+      { action: 'progress', position: 20, generation: 1, revision: 6 },
+    ])
+    expect(snapshot.position).toBe(20)
+    expect(attachments).toHaveLength(1)
+    unmount()
+  })
+
+  it('retains queued source seeks when their predecessor progress update loses its response', async () => {
+    vi.useFakeTimers()
+    let snapshot = { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+      generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
+    let rejectProgress!: (error: Error) => void
+    post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+      if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+      if (payload.action === 'progress') return new Promise((_resolve, reject) => { rejectProgress = reject })
+      const generation = snapshot.generation + 1
+      snapshot = { ...snapshot, generation, revision: snapshot.revision + 1, position: payload.position!,
+        url: `/manifest?generation=${generation}`, renditionSet: `job.${generation}` }
+      return Promise.resolve({ data: { data: { acceptedGeneration: generation } } })
+    })
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 10
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    await act(async () => { result.current.seekTo(42); result.current.seekTo(60) })
+    expect(post.mock.calls.filter(call => call[1].action === 'seek')).toHaveLength(0)
+    await act(async () => rejectProgress(new AxiosError('Response lost', 'ERR_NETWORK')))
+    expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => call[1])).toEqual([
+      { action: 'seek', position: 42, generation: 1 },
+      { action: 'seek', position: 60, generation: 2 },
+    ])
+    expect(result.current.pendingSeekPosition).toBe(60)
+    expect(attachments.at(-1)?.position).toBe(60)
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    expect(result.current.currentTime).toBe(60)
+    expect(result.current.pendingSeekPosition).toBeNull()
+    expect(onError).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it.each(['unmounted', 'session replaced', 'generation replaced', 'terminal'])('fences a failed progress completion after playback is %s', async outcome => {
+    vi.useFakeTimers()
+    let snapshot = { url: '/manifest?generation=1', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+      generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' }
+    let rejectProgress!: (error: Error) => void
+    post.mockImplementation((path: string) => path === '/api/stream/sign'
+      ? Promise.resolve({ data: { ...snapshot } }) : new Promise((_resolve, reject) => { rejectProgress = reject }))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 10
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    if (outcome === 'unmounted') unmount()
+    else if (outcome === 'terminal') await act(async () => attachments[0].onError())
+    else {
+      snapshot = { ...snapshot, generation: 2, revision: 6, url: '/manifest?generation=2', renditionSet: 'job.2', status: 'paused',
+        ...(outcome === 'session replaced' ? { jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement-job.2' } : {}) }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    }
+    const requestCount = post.mock.calls.length
+    await act(async () => rejectProgress(new AxiosError('Old progress failed', 'ERR_NETWORK')))
+    if (outcome === 'unmounted') {
+      await act(async () => vi.advanceTimersByTimeAsync(2000))
+      expect(post).toHaveBeenCalledTimes(requestCount)
+      expect(containerRef.current.querySelector('video')).toBeNull()
+    } else if (outcome === 'terminal') {
+      await act(async () => vi.advanceTimersByTimeAsync(2000))
+      expect(result.current.state).toBe('error')
+      expect(attachments).toHaveLength(1)
+      expect(onError).toHaveBeenCalledOnce()
+    } else {
+      expect(attachments).toHaveLength(2)
+      expect(attachments[1].dispose).not.toHaveBeenCalled()
+      expect(result.current.state).not.toBe('error')
+      expect(onError).not.toHaveBeenCalled()
+    }
+    if (outcome !== 'unmounted') unmount()
+  })
+
+  it.each(['403', 'ERR_BAD_OPTION', 'ERR_BAD_REQUEST', 'no Axios code', 'unrelated exception', 'canceled'])('retains existing progress failure behavior for %s', async kind => {
+    vi.useFakeTimers()
+    const failure = kind === '403' ? Object.assign(new AxiosError('Forbidden'), { response: { status: 403 } })
+      : kind === 'unrelated exception' ? new Error('Unexpected failure')
+        : kind === 'canceled' ? new CanceledError('Canceled')
+          : new AxiosError('Invalid request', kind === 'no Axios code' ? undefined : kind)
+    post.mockImplementation((path: string) => path === '/api/stream/sign'
+      ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+        generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
+      : Promise.reject(failure))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    video.currentTime = 10
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
+    unmount()
+  })
+
+  it.each(['pause', 'resume', 'seek'])('retains existing explicit %s failure behavior for transport errors', async action => {
+    post.mockImplementation((path: string) => path === '/api/stream/sign'
+      ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
+        generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: action === 'resume' ? 'paused' : 'running' } })
+      : Promise.reject(new AxiosError('Connection lost', 'ERR_NETWORK')))
+    const onError = vi.fn()
+    const containerRef = { current: document.createElement('div') }
+    const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    if (action === 'pause') await act(async () => result.current.pause())
+    else if (action === 'resume') await act(async () => result.current.play())
+    else await act(async () => result.current.seekTo(42))
+    expect(attachments[0].dispose).toHaveBeenCalledOnce()
+    expect(result.current.state).toBe('error')
+    expect(onError).toHaveBeenCalledOnce()
     unmount()
   })
 

@@ -346,7 +346,14 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         }
         if (action === 'progress' && snapshot?.generation === current.generation) progressPosition = position
         if (!chain) await refresh()
-      }).catch(() => {
+      }).catch(error => {
+        if (action === 'progress' && isAxiosError(error) && !isCancel(error)) {
+          const status = error.response?.status
+          const transient = error.response === undefined
+            ? ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT'].includes(error.code ?? '')
+            : status !== undefined && status >= 500 && status <= 599
+          if (transient) return
+        }
         // A failed control belongs to the session that submitted it.
         if (snapshot?.sessionId === sessionId && snapshot.jobId === current.jobId) fail(false)
       }).finally(() => {
