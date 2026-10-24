@@ -31,6 +31,7 @@ using AacQmfSynthesis = struct AacQmfSynthesis_ {
 
 void aac_qmf_tables_init(void);
 
+/* `bands` is 16, 24, 32 or 64. */
 void aac_qmf_analysis_init(AacQmfAnalysis* a, int bands);
 /* One slot: consumes `bands` input samples and writes W[k] = {re, im} for
  * k < bands. */

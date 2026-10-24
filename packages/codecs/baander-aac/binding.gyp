@@ -40,6 +40,7 @@
         "src/usac_fac.cpp",
         "src/usac_lpd_tables.cpp",
         "src/sbr_dec.cpp",
+        "src/sbr_esbr.cpp",
         "src/ps_dec.cpp",
         "src/mps212.cpp",
         "src/mps212_tables.cpp",

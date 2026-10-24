@@ -52,7 +52,47 @@ float g_ana32_pre_re[64], g_ana32_pre_im[64];
 float g_ana32_post_re[32], g_ana32_post_im[32];
 float g_syn64_pre_re[64], g_syn64_pre_im[64];
 float g_syn64_post_re[128], g_syn64_post_im[128];
+/* The 16- and 24-band banks of the enhanced SBR: the prototype read every
+ * fourth tap, or interpolated at every 8/3rd tap, and the direct
+ * modulation tables (64 / B) cos and sin of pi / (2 B) (k + 1/2)
+ * (2 n - B / 64). */
+float g_window16[160], g_window24[240];
+float g_ana_cos16[16][32], g_ana_sin16[16][32];
+float g_ana_cos24[24][48], g_ana_sin24[24][48];
+
+/* The prototype at a fractional tap position by four-point Lagrange
+ * interpolation; the window is zero beyond its ends. */
+double prototype_at(double pos) {
+  const int i = (int)floor(pos);
+  const double t = pos - i;
+  if (t < 1e-9) {
+    return i >= 0 && i < 640 ? aac_sbr_qmf_window[i] : 0.0;
+  }
+  double c[4];
+  for (int j = 0; j < 4; j++) {
+    const int idx = i - 1 + j;
+    c[j] = idx >= 0 && idx < 640 ? aac_sbr_qmf_window[idx] : 0.0;
+  }
+  return c[0] * (-t * (t - 1.0) * (t - 2.0) / 6.0) + c[1] * ((t + 1.0) * (t - 1.0) * (t - 2.0) / 2.0) +
+         c[2] * (-(t + 1.0) * t * (t - 2.0) / 2.0) + c[3] * ((t + 1.0) * t * (t - 1.0) / 6.0);
+}
+
+void build_small_bank(int B, float* window, float* cos_tab, float* sin_tab) {
+  for (int i = 0; i < 10 * B; i++) {
+    window[i] = (float)prototype_at(64.0 * i / B);
+  }
+  for (int k = 0; k < B; k++) {
+    for (int n = 0; n < 2 * B; n++) {
+      const double a = M_PI / (2.0 * B) * (k + 0.5) * (2.0 * n - B / 64.0);
+      cos_tab[k * 2 * B + n] = (float)(64.0 / B * cos(a));
+      sin_tab[k * 2 * B + n] = (float)(64.0 / B * sin(a));
+    }
+  }
+}
+
 void build_tables(void) {
+  build_small_bank(16, g_window16, &g_ana_cos16[0][0], &g_ana_sin16[0][0]);
+  build_small_bank(24, g_window24, &g_ana_cos24[0][0], &g_ana_sin24[0][0]);
   for (int k = 0; k < 64; k++) {
     for (int n = 0; n < 128; n++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 1.0);
@@ -117,6 +157,33 @@ void aac_qmf_analyze(AacQmfAnalysis* a, const float* in, float (*W)[2]) {
   memmove(x + B, x, (size_t)(len - B) * sizeof(float));
   for (int n = 0; n < B; n++) {
     x[n] = in[B - 1 - n];
+  }
+  if (B == 16 || B == 24) {
+    const float* window = B == 16 ? g_window16 : g_window24;
+    const float* cos_tab = B == 16 ? &g_ana_cos16[0][0] : &g_ana_cos24[0][0];
+    const float* sin_tab = B == 16 ? &g_ana_sin16[0][0] : &g_ana_sin24[0][0];
+    float u[48];
+    for (int n = 0; n < 2 * B; n++) {
+      float sum = 0.0f;
+      for (int j = 0; j < 5; j++) {
+        const int idx = n + 2 * B * j;
+        sum += x[idx] * window[idx];
+      }
+      u[n] = sum;
+    }
+    for (int k = 0; k < B; k++) {
+      const float* c = cos_tab + k * 2 * B;
+      const float* sn = sin_tab + k * 2 * B;
+      float re = 0.0f;
+      float im = 0.0f;
+      for (int n = 0; n < 2 * B; n++) {
+        re += u[n] * c[n];
+        im += u[n] * sn[n];
+      }
+      W[k][0] = re;
+      W[k][1] = im;
+    }
+    return;
   }
   const float* window = step == 2 ? g_window32 : aac_sbr_qmf_window;
   float u[128];

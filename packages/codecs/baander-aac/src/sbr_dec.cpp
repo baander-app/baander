@@ -27,7 +27,9 @@ constexpr int kAdj = AAC_SBR_ADJ_OFFSET;
 
 /* ── frequency tables (4.6.18.3, sbr_freq.cpp) ─────────────────── */
 
-void freq_from_state(const AacSbrState* s, AacSbrFreq* f) {
+}  // namespace
+
+void aac_sbr_freq_from_state(const AacSbrState* s, AacSbrFreq* f) {
   memset(f, 0, sizeof(*f));
   f->sample_rate = s->sample_rate;
   f->start_freq = s->start_freq;
@@ -47,7 +49,7 @@ void freq_from_state(const AacSbrState* s, AacSbrFreq* f) {
   memcpy(f->f_tablelow, s->f_tablelow, sizeof(f->f_tablelow));
 }
 
-void freq_to_state(const AacSbrFreq* f, AacSbrState* s) {
+void aac_sbr_freq_to_state(const AacSbrFreq* f, AacSbrState* s) {
   memcpy(s->k, f->k, sizeof(s->k));
   s->kx[1] = f->kx;
   s->m[1] = f->m;
@@ -66,10 +68,12 @@ void freq_to_state(const AacSbrFreq* f, AacSbrState* s) {
   memcpy(s->patch_start_subband, f->patch_start_subband, sizeof(s->patch_start_subband));
 }
 
+namespace {
+
 /* Limiter band table alone (4.6.18.3.6), after limiter_bands changed. */
 void make_f_tablelim(AacSbrState* s) {
   AacSbrFreq f;
-  freq_from_state(s, &f);
+  aac_sbr_freq_from_state(s, &f);
   aac_sbr_freq_limiter(&f);
   s->n_lim = f.n_lim;
   memcpy(s->f_tablelim, f.f_tablelim, sizeof(s->f_tablelim));
@@ -78,12 +82,12 @@ void make_f_tablelim(AacSbrState* s) {
 /* Every table after a header change. */
 int make_tables(AacSbrState* s) {
   AacSbrFreq f;
-  freq_from_state(s, &f);
+  aac_sbr_freq_from_state(s, &f);
   const int err = aac_sbr_freq_tables(&f);
   if (err) {
     return err;
   }
-  freq_to_state(&f, s);
+  aac_sbr_freq_to_state(&f, s);
   s->data[0].f_indexnoise = 0;
   s->data[1].f_indexnoise = 0;
   return 0;
@@ -137,7 +141,9 @@ int read_header(AacSbrState* s, AacBitReader* r) {
 
 const int8_t kCeilLog2[] = {0, 1, 2, 2, 3, 3};
 
-int read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
+}  // namespace
+
+int aac_sbr_read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   int bs_pointer = 0;
   int abs_bord_trail = s->time_slots;
   const int num_env_old = ch->num_env;
@@ -258,7 +264,7 @@ int read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   return 0;
 }
 
-void copy_grid(AacSbrChannel* dst, const AacSbrChannel* src) {
+void aac_sbr_copy_grid(AacSbrChannel* dst, const AacSbrChannel* src) {
   dst->freq_res[0] = dst->freq_res[dst->num_env];
   dst->t_env_num_env_old = dst->t_env[dst->num_env];
   dst->e_a[0] = -(dst->e_a[1] != dst->num_env);
@@ -272,7 +278,7 @@ void copy_grid(AacSbrChannel* dst, const AacSbrChannel* src) {
   dst->e_a[1] = src->e_a[1];
 }
 
-void read_dtdf(AacBitReader* r, AacSbrChannel* ch) {
+void aac_sbr_read_dtdf(AacBitReader* r, AacSbrChannel* ch) {
   for (int i = 0; i < ch->num_env; i++) {
     ch->df_env[i] = (int)aac_bitreader_read(r, 1);
   }
@@ -281,12 +287,14 @@ void read_dtdf(AacBitReader* r, AacSbrChannel* ch) {
   }
 }
 
-void read_invf(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
+void aac_sbr_read_invf(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   memcpy(ch->invf_mode[1], ch->invf_mode[0], sizeof(ch->invf_mode[0]));
   for (int i = 0; i < s->n_q; i++) {
     ch->invf_mode[0][i] = (int)aac_bitreader_read(r, 2);
   }
 }
+
+namespace {
 
 int huff(AacBitReader* r, const int8_t (*tab)[2]) {
   int idx = 0;
@@ -299,7 +307,9 @@ int huff(AacBitReader* r, const int8_t (*tab)[2]) {
   return idx + 64;
 }
 
-int read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan) {
+}  // namespace
+
+int aac_sbr_read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan) {
   const int delta = (chan == 1 && s->coupling == 1) + 1;
   const int odd = s->n[1] & 1;
   int bits;
@@ -351,7 +361,7 @@ int read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int 
   return 0;
 }
 
-int read_noise(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan) {
+int aac_sbr_read_noise(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan) {
   const int delta = (chan == 1 && s->coupling == 1) + 1;
   const int8_t (*t_huff)[2];
   const int8_t (*f_huff)[2];
@@ -387,7 +397,7 @@ int read_noise(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int cha
   return 0;
 }
 
-void read_add_harmonic(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
+void aac_sbr_read_add_harmonic(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   ch->add_harmonic_flag = (int)aac_bitreader_read(r, 1);
   if (ch->add_harmonic_flag) {
     for (int i = 0; i < s->n[1]; i++) {
@@ -396,21 +406,23 @@ void read_add_harmonic(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch)
   }
 }
 
+namespace {
+
 int read_single_channel(AacSbrState* s, AacBitReader* r) {
   if (aac_bitreader_read(r, 1)) {
     aac_bitreader_skip(r, 4); /* bs_reserved */
   }
   AacSbrChannel* ch = &s->data[0];
-  int ret = read_grid(s, r, ch);
+  int ret = aac_sbr_read_grid(s, r, ch);
   if (ret) {
     return ret;
   }
-  read_dtdf(r, ch);
-  read_invf(s, r, ch);
-  if ((ret = read_envelope(s, r, ch, 0)) || (ret = read_noise(s, r, ch, 0))) {
+  aac_sbr_read_dtdf(r, ch);
+  aac_sbr_read_invf(s, r, ch);
+  if ((ret = aac_sbr_read_envelope(s, r, ch, 0)) || (ret = aac_sbr_read_noise(s, r, ch, 0))) {
     return ret;
   }
-  read_add_harmonic(s, r, ch);
+  aac_sbr_read_add_harmonic(s, r, ch);
   return 0;
 }
 
@@ -423,34 +435,34 @@ int read_channel_pair(AacSbrState* s, AacBitReader* r) {
   int ret;
   s->coupling = (int)aac_bitreader_read(r, 1);
   if (s->coupling) {
-    if ((ret = read_grid(s, r, l))) {
+    if ((ret = aac_sbr_read_grid(s, r, l))) {
       return ret;
     }
-    copy_grid(rt, l);
-    read_dtdf(r, l);
-    read_dtdf(r, rt);
-    read_invf(s, r, l);
+    aac_sbr_copy_grid(rt, l);
+    aac_sbr_read_dtdf(r, l);
+    aac_sbr_read_dtdf(r, rt);
+    aac_sbr_read_invf(s, r, l);
     memcpy(rt->invf_mode[1], rt->invf_mode[0], sizeof(rt->invf_mode[0]));
     memcpy(rt->invf_mode[0], l->invf_mode[0], sizeof(rt->invf_mode[0]));
-    if ((ret = read_envelope(s, r, l, 0)) || (ret = read_noise(s, r, l, 0)) ||
-        (ret = read_envelope(s, r, rt, 1)) || (ret = read_noise(s, r, rt, 1))) {
+    if ((ret = aac_sbr_read_envelope(s, r, l, 0)) || (ret = aac_sbr_read_noise(s, r, l, 0)) ||
+        (ret = aac_sbr_read_envelope(s, r, rt, 1)) || (ret = aac_sbr_read_noise(s, r, rt, 1))) {
       return ret;
     }
   } else {
-    if ((ret = read_grid(s, r, l)) || (ret = read_grid(s, r, rt))) {
+    if ((ret = aac_sbr_read_grid(s, r, l)) || (ret = aac_sbr_read_grid(s, r, rt))) {
       return ret;
     }
-    read_dtdf(r, l);
-    read_dtdf(r, rt);
-    read_invf(s, r, l);
-    read_invf(s, r, rt);
-    if ((ret = read_envelope(s, r, l, 0)) || (ret = read_envelope(s, r, rt, 1)) ||
-        (ret = read_noise(s, r, l, 0)) || (ret = read_noise(s, r, rt, 1))) {
+    aac_sbr_read_dtdf(r, l);
+    aac_sbr_read_dtdf(r, rt);
+    aac_sbr_read_invf(s, r, l);
+    aac_sbr_read_invf(s, r, rt);
+    if ((ret = aac_sbr_read_envelope(s, r, l, 0)) || (ret = aac_sbr_read_envelope(s, r, rt, 1)) ||
+        (ret = aac_sbr_read_noise(s, r, l, 0)) || (ret = aac_sbr_read_noise(s, r, rt, 1))) {
       return ret;
     }
   }
-  read_add_harmonic(s, r, l);
-  read_add_harmonic(s, r, rt);
+  aac_sbr_read_add_harmonic(s, r, l);
+  aac_sbr_read_add_harmonic(s, r, rt);
   return 0;
 }
 
@@ -526,7 +538,9 @@ void sbr_reset(AacSbrState* s) {
 
 float exp2i(int x) { return ldexpf(1.0f, x); }
 
-void dequant(AacSbrState* s) {
+}  // namespace
+
+void aac_sbr_dequant(AacSbrState* s) {
   static const float kExp2Half[2] = {1.0f, 1.41421356237309504880f};
   if (s->elem_type == AAC_ELEM_CPE && s->coupling) {
     AacSbrChannel* l = &s->data[0];
@@ -586,6 +600,8 @@ void dequant(AacSbrState* s) {
   }
 }
 
+namespace {
+
 /* ── high-frequency generation (4.6.18.6) ──────────────────────── */
 
 /* X_low: the current frame's lower subbands behind 8 slots of the previous
@@ -635,46 +651,58 @@ void autocorrelate(const float x[40][2], int n, float phi[3][2][2]) {
   phi[0][0][1] = imag_sum1 + x[last - 1][0] * x[last][1] - x[last - 1][1] * x[last][0];
 }
 
+}  // namespace
+
+/* Second-order linear prediction of one subband over its `n` columns
+ * (4.6.18.6.2). */
+void aac_sbr_lpc_band(float alpha0[2], float alpha1[2], const float (*x)[2], int n) {
+  float phi[3][2][2];
+  autocorrelate(x, n, phi);
+  const float dk = phi[2][1][0] * phi[1][0][0] -
+                   (phi[1][1][0] * phi[1][1][0] + phi[1][1][1] * phi[1][1][1]) / 1.000001f;
+  if (dk == 0.0f) {
+    alpha1[0] = 0.0f;
+    alpha1[1] = 0.0f;
+  } else {
+    const float temp_real = phi[0][0][0] * phi[1][1][0] - phi[0][0][1] * phi[1][1][1] -
+                            phi[0][1][0] * phi[1][0][0];
+    const float temp_im = phi[0][0][0] * phi[1][1][1] + phi[0][0][1] * phi[1][1][0] -
+                          phi[0][1][1] * phi[1][0][0];
+    alpha1[0] = temp_real / dk;
+    alpha1[1] = temp_im / dk;
+  }
+  if (phi[1][0][0] == 0.0f) {
+    alpha0[0] = 0.0f;
+    alpha0[1] = 0.0f;
+  } else {
+    const float temp_real =
+        phi[0][0][0] + alpha1[0] * phi[1][1][0] + alpha1[1] * phi[1][1][1];
+    const float temp_im =
+        phi[0][0][1] + alpha1[1] * phi[1][1][0] - alpha1[0] * phi[1][1][1];
+    alpha0[0] = -temp_real / phi[1][0][0];
+    alpha0[1] = -temp_im / phi[1][0][0];
+  }
+  if (alpha1[0] * alpha1[0] + alpha1[1] * alpha1[1] >= 16.0f ||
+      alpha0[0] * alpha0[0] + alpha0[1] * alpha0[1] >= 16.0f) {
+    alpha1[0] = alpha1[1] = 0.0f;
+    alpha0[0] = alpha0[1] = 0.0f;
+  }
+}
+
+namespace {
+
 /* Second-order linear prediction per subband (4.6.18.6.2). */
 void hf_inverse_filter(float (*alpha0)[2], float (*alpha1)[2], const float X_low[32][40][2],
                        int k0, int slots) {
   for (int k = 0; k < k0; k++) {
-    float phi[3][2][2];
-    autocorrelate(X_low[k], slots + kHistory, phi);
-    const float dk = phi[2][1][0] * phi[1][0][0] -
-                     (phi[1][1][0] * phi[1][1][0] + phi[1][1][1] * phi[1][1][1]) / 1.000001f;
-    if (dk == 0.0f) {
-      alpha1[k][0] = 0.0f;
-      alpha1[k][1] = 0.0f;
-    } else {
-      const float temp_real = phi[0][0][0] * phi[1][1][0] - phi[0][0][1] * phi[1][1][1] -
-                              phi[0][1][0] * phi[1][0][0];
-      const float temp_im = phi[0][0][0] * phi[1][1][1] + phi[0][0][1] * phi[1][1][0] -
-                            phi[0][1][1] * phi[1][0][0];
-      alpha1[k][0] = temp_real / dk;
-      alpha1[k][1] = temp_im / dk;
-    }
-    if (phi[1][0][0] == 0.0f) {
-      alpha0[k][0] = 0.0f;
-      alpha0[k][1] = 0.0f;
-    } else {
-      const float temp_real =
-          phi[0][0][0] + alpha1[k][0] * phi[1][1][0] + alpha1[k][1] * phi[1][1][1];
-      const float temp_im =
-          phi[0][0][1] + alpha1[k][1] * phi[1][1][0] - alpha1[k][0] * phi[1][1][1];
-      alpha0[k][0] = -temp_real / phi[1][0][0];
-      alpha0[k][1] = -temp_im / phi[1][0][0];
-    }
-    if (alpha1[k][0] * alpha1[k][0] + alpha1[k][1] * alpha1[k][1] >= 16.0f ||
-        alpha0[k][0] * alpha0[k][0] + alpha0[k][1] * alpha0[k][1] >= 16.0f) {
-      alpha1[k][0] = alpha1[k][1] = 0.0f;
-      alpha0[k][0] = alpha0[k][1] = 0.0f;
-    }
+    aac_sbr_lpc_band(alpha0[k], alpha1[k], X_low[k], slots + kHistory);
   }
 }
 
+}  // namespace
+
 /* Chirp factors (4.6.18.6.1). */
-void chirp(const AacSbrState* s, AacSbrChannel* ch) {
+void aac_sbr_chirp(const AacSbrState* s, AacSbrChannel* ch) {
   static const float kBw[4] = {0.0f, 0.75f, 0.9f, 0.98f};
   for (int i = 0; i < s->n_q; i++) {
     float new_bw;
@@ -692,8 +720,8 @@ void chirp(const AacSbrState* s, AacSbrChannel* ch) {
   }
 }
 
-void hf_gen_band(float (*X_high)[2], const float (*X_low)[2], const float alpha0[2],
-                 const float alpha1[2], float bw, int start, int end) {
+void aac_sbr_hf_gen_band(float (*X_high)[2], const float (*X_low)[2], const float alpha0[2],
+                         const float alpha1[2], float bw, int start, int end) {
   const float a0 = alpha1[0] * bw * bw;
   const float a1 = alpha1[1] * bw * bw;
   const float a2 = alpha0[0] * bw;
@@ -705,6 +733,8 @@ void hf_gen_band(float (*X_high)[2], const float (*X_low)[2], const float alpha0
                    X_low[i - 1][0] * a3 + X_low[i][1];
   }
 }
+
+namespace {
 
 int hf_gen(AacSbrState* s, const AacSbrChannel* ch) {
   int g = 0;
@@ -719,7 +749,7 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch) {
       if (g < 0) {
         return AAC_ERR_DECODE;
       }
-      hf_gen_band(s->X_high[k] + kAdj, s->X_low[p] + kAdj, s->alpha0[p], s->alpha1[p],
+      aac_sbr_hf_gen_band(s->X_high[k] + kAdj, s->X_low[p] + kAdj, s->alpha0[p], s->alpha1[p],
                   ch->bw_array[g], 2 * ch->t_env[0], 2 * ch->t_env[ch->num_env]);
     }
   }
@@ -906,10 +936,12 @@ void gain_calc(AacSbrState* s, const AacSbrChannel* ch, const int e_a[2]) {
   }
 }
 
+}  // namespace
+
 /* Noise and sinusoids for one slot: the noise phase table advances per
  * band, the sinusoid phase pattern alternates with the band index. */
-void apply_noise(float (*Y)[2], const float* s_m, const float* q_filt, unsigned noise, int kx,
-                 int m_max, int indexsine) {
+void aac_sbr_apply_noise(float (*Y)[2], const float* s_m, const float* q_filt, unsigned noise,
+                         int kx, int m_max, int indexsine) {
   float phi_sign0;
   float phi_sign1;
   switch (indexsine) {
@@ -934,6 +966,8 @@ void apply_noise(float (*Y)[2], const float* s_m, const float* q_filt, unsigned 
     phi_sign1 = -phi_sign1;
   }
 }
+
+namespace {
 
 void hf_assemble(AacSbrState* s, AacSbrChannel* ch, float Y1[38][64][2], const int e_a[2]) {
   const int h_SL = 4 * !s->smoothing_mode;
@@ -992,7 +1026,7 @@ void hf_assemble(AacSbrState* s, AacSbrChannel* ch, float Y1[38][64][2], const i
         Y1[i][kx + m][1] = s->X_high[kx + m][i + kAdj][1] * g_filt[m];
       }
       if (e != e_a[0] && e != e_a[1]) {
-        apply_noise(Y1[i] + kx, s->s_m[e], q_filt, indexnoise, kx, m_max, indexsine);
+        aac_sbr_apply_noise(Y1[i] + kx, s->s_m[e], q_filt, indexnoise, kx, m_max, indexsine);
       } else {
         const int idx = indexsine & 1;
         const int A = 1 - ((indexsine + (kx & 1)) & 2);
@@ -1183,7 +1217,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
     s->kx_and_m_pushed = 0;
   }
   if (s->start) {
-    dequant(s);
+    aac_sbr_dequant(s);
     s->ready_for_dequant = 0;
   }
   const int slots = s->slots;
@@ -1202,7 +1236,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
     ch->Ypos ^= 1;
     if (s->start) {
       hf_inverse_filter(s->alpha0, s->alpha1, s->X_low, s->k[0], slots);
-      chirp(s, ch);
+      aac_sbr_chirp(s, ch);
       if (hf_gen(s, ch) == 0 && mapping(s, ch, ch->e_a) == 0) {
         env_estimate(s, ch);
         gain_calc(s, ch, ch->e_a);

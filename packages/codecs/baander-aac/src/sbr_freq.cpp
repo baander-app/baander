@@ -83,10 +83,16 @@ void make_f_tablelim(AacSbrFreq* f) {
   }
 }
 
-/* Master frequency band table (4.6.18.3.2). */
+/* Master frequency band table (4.6.18.3.2).  The offset row and the
+ * frequency constants come from `table_rate`, the band values from
+ * `sample_rate`: the two are the same except at the USAC 4:1 ratio
+ * (ISO/IEC 23003-3 7.5), where the indices are those of the 2:1 system
+ * at twice the core rate while the bands are those of the 64-band
+ * synthesis at four times the core rate. */
 int make_f_master(AacSbrFreq* f) {
   const int8_t* offsets;
-  switch (f->sample_rate) {
+  const int table_rate = f->table_rate ? f->table_rate : f->sample_rate;
+  switch (table_rate) {
     case 16000: offsets = kSbrOffset[0]; break;
     case 22050: offsets = kSbrOffset[1]; break;
     case 24000: offsets = kSbrOffset[2]; break;
@@ -95,7 +101,7 @@ int make_f_master(AacSbrFreq* f) {
     case 88200: case 96000: case 128000: case 176400: case 192000: offsets = kSbrOffset[5]; break;
     default: return AAC_ERR_UNSUPPORTED;
   }
-  const int temp = f->sample_rate < 32000 ? 3000 : (f->sample_rate < 64000 ? 4000 : 5000);
+  const int temp = table_rate < 32000 ? 3000 : (table_rate < 64000 ? 4000 : 5000);
   const int start_min = ((temp << 7) + (f->sample_rate >> 1)) / f->sample_rate;
   const int stop_min = ((temp << 8) + (f->sample_rate >> 1)) / f->sample_rate;
   f->k[0] = start_min + offsets[f->start_freq];
@@ -113,7 +119,7 @@ int make_f_master(AacSbrFreq* f) {
     f->k[2] = 3 * f->k[0];
   }
   f->k[2] = std::min(64, f->k[2]);
-  const int max_qmf_subbands = f->sample_rate <= 32000 ? 48 : (f->sample_rate == 44100 ? 35 : 32);
+  const int max_qmf_subbands = table_rate <= 32000 ? 48 : (table_rate == 44100 ? 35 : 32);
   if (f->k[2] - f->k[0] > max_qmf_subbands || f->k[0] <= 0) {
     return AAC_ERR_DECODE;
   }

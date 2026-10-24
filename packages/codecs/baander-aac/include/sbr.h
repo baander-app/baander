@@ -8,6 +8,7 @@
 #include "drc.h"
 #include "ps.h"
 #include "qmf.h"
+#include "usac.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +42,10 @@ extern "C" {
 /* The frequency band tables of one SBR configuration (4.6.18.3), built
  * from the header fields and the SBR sample rate. */
 using AacSbrFreq = struct AacSbrFreq_ {
-  int sample_rate; /* the SBR rate, twice the core rate */
+  int sample_rate; /* the SBR rate: the rate of the 64-band synthesis output */
+  int table_rate;  /* the rate the start and stop frequency indices are read for: 0 for
+                      sample_rate itself (AAC and the USAC 2:1 and 8:3 ratios); the USAC
+                      4:1 ratio reads them for twice its core rate */
   int start_freq, stop_freq, xover_band, freq_scale, alter_scale, noise_bands;
   int limiter_bands;
   int k[3];  /* k0, k1, k2 */
@@ -112,6 +116,115 @@ using AacSbrChannel = struct AacSbrChannel_ {
   unsigned f_indexsine;
 };
 
+/* ── Enhanced SBR of USAC (ISO/IEC 23003-3 7.5): sizes and state ─────
+ * Every ratio has 16 envelope time slots per frame; a time slot is RATE
+ * QMF slots (2 at 2:1 and 8:3, 4 at 4:1).  The QMF-domain buffers keep
+ * the frame behind a history of (4 + D) time slots, D being 0 or the
+ * delay the harmonic transposer adds: the frame delivered to the
+ * synthesis starts 3 (+ D) time slots before the core frame, as the AAC
+ * decoder's does, which is where the envelope grid places it. */
+#define AAC_SBR_USAC_TIME_SLOTS 16
+#define AAC_SBR_USAC_MAX_RATE 4
+#define AAC_SBR_USAC_MAX_SLOTS 64 /* QMF slots per frame at 4:1 */
+#define AAC_SBR_USAC_HBE_DELAY 8  /* time slots the harmonic transposer delays the frame by */
+#define AAC_SBR_USAC_MAX_HISTORY ((4 + AAC_SBR_USAC_HBE_DELAY) * AAC_SBR_USAC_MAX_RATE)
+#define AAC_SBR_USAC_COLS (AAC_SBR_USAC_MAX_HISTORY + AAC_SBR_USAC_MAX_SLOTS)
+#define AAC_SBR_USAC_Y_SLOTS (AAC_SBR_USAC_MAX_RATE * (AAC_SBR_USAC_TIME_SLOTS + 3))
+#define AAC_SBR_USAC_MAX_ENV 16 /* with PVC every time slot is an envelope */
+#define AAC_SBR_USAC_HBE_N 512  /* transposer analysis window and DFT, core samples (384 at 8:3) */
+#define AAC_SBR_USAC_HBE_NS 2048 /* synthesis DFT at the output rate, 4 x 512 */
+#define AAC_SBR_USAC_HBE_HOPS 8  /* analysis hops per window */
+#define AAC_SBR_USAC_PVC_NB_LOW 3
+#define AAC_SBR_USAC_PVC_NB_HIGH 8
+
+/* Complex FFT of the transposer: n = 2^k or 3 x 2^k up to 2048. */
+using AacSbrUsacFft = struct AacSbrUsacFft_ {
+  int n, m, p; /* n = m p, m the odd factor (1 or 3) */
+  float tw_re[AAC_SBR_USAC_HBE_NS], tw_im[AAC_SBR_USAC_HBE_NS];
+  uint16_t rev[AAC_SBR_USAC_HBE_NS];
+};
+
+/* The USAC-only frame data of one channel. */
+using AacSbrUsacChannelData = struct AacSbrUsacChannelData_ {
+  int temp_shape[AAC_SBR_MAX_ENV + 1];      /* bs_temp_shape per envelope (inter-TES) */
+  int temp_shape_mode[AAC_SBR_MAX_ENV + 1]; /* bs_inter_temp_shape_mode */
+  /* PVC (7.5.6): the frame's pvcID per time slot and the smoothing mode */
+  int pvc_active;
+  int pvc_id[AAC_SBR_USAC_TIME_SLOTS];
+  int pvc_ns_mode;
+  int pvc_noise_position;
+  float pvc_env[AAC_SBR_USAC_TIME_SLOTS][AAC_SBR_MAX_BANDS]; /* predicted energies per QMF band */
+  int pvc_id_prev;
+};
+
+/* The USAC-only signal state of one channel. */
+using AacSbrUsacChannel = struct AacSbrUsacChannel_ {
+  float W_low[AAC_SBR_USAC_COLS][32][2]; /* core analysis, history then frame */
+  float W_hbe[AAC_SBR_USAC_COLS][64][2]; /* analysis of the transposed signal */
+  int Ypos;
+  float Y[2][AAC_SBR_USAC_Y_SLOTS][64][2];
+  float g_temp[AAC_SBR_USAC_Y_SLOTS + 4][AAC_SBR_MAX_BANDS];
+  float q_temp[AAC_SBR_USAC_Y_SLOTS + 4][AAC_SBR_MAX_BANDS];
+  float bw_array[AAC_SBR_MAX_NOISE_BANDS];
+  unsigned f_indexnoise, f_indexsine;
+  /* harmonic transposer: core input history and the overlap-add output */
+  float hbe_in[AAC_USAC_MAX_CORE_FRAME + AAC_SBR_USAC_HBE_N];
+  float hbe_out[AAC_USAC_MAX_OUTPUT_FRAME + AAC_SBR_USAC_HBE_NS];
+  AacQmfAnalysis hbe_analysis;
+  /* PVC: smoothed low-band energies (dB) of the previous slots */
+  float pvc_low_hist[AAC_SBR_USAC_TIME_SLOTS][AAC_SBR_USAC_PVC_NB_LOW];
+  int pvc_hist_len;
+  /* inter-TES: per-slot gains of the frame */
+  float tes_gain[AAC_SBR_USAC_Y_SLOTS];
+};
+
+using AacSbrUsac = struct AacSbrUsac_ {
+  int active;          /* the state decodes UsacSbrData() */
+  int ratio;           /* AAC_USAC_SBR_2_1, _8_3 or _4_1 */
+  int rate;            /* QMF slots per time slot */
+  int slots_of_frame;  /* QMF slots per frame: 32 or 64 */
+  int core_frame;      /* 768 or 1024 */
+  int output_frame;    /* 2048 or 4096 */
+  int analysis_bands;  /* 32, 24 or 16 */
+  int elem_type;       /* the element's type as the caller names it */
+  int history;         /* history columns in front of the frame */
+  int offset;          /* column of the frame's first output slot */
+  int harmonic_sbr, inter_tes, pvc;
+  int hbe_n, hbe_ns;   /* transposer DFT sizes */
+  int max_stretch;     /* highest transposition order */
+  /* configuration default header */
+  int dflt_start_freq, dflt_stop_freq, dflt_freq_scale, dflt_alter_scale, dflt_noise_bands;
+  int dflt_limiter_bands, dflt_limiter_gains, dflt_interpol_freq, dflt_smoothing_mode;
+  /* SbrInfo of the frame */
+  int preprocessing;
+  int pvc_mode;
+  /* the frame's harmonic patching data */
+  int patching_mode;   /* 1: LPC patching, 0: harmonic */
+  int oversampling;
+  int pitch_in_bins;
+  int frames;          /* frames processed since the header */
+  AacSbrUsacChannelData data[2];
+  AacSbrUsacChannel ch[2];
+  /* scratch */
+  float X_low[32][AAC_SBR_USAC_COLS][2];
+  float X_high[64][AAC_SBR_USAC_COLS][2];
+  float alpha0[64][2], alpha1[64][2];
+  float e_origmapped[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  float q_mapped[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  uint8_t s_mapped[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  uint8_t s_indexmapped[AAC_SBR_USAC_MAX_ENV + 1][AAC_SBR_MAX_BANDS];
+  float e_curr[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  float q_m[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  float s_m[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  float gain[AAC_SBR_USAC_MAX_ENV][AAC_SBR_MAX_BANDS];
+  float X[2][AAC_SBR_USAC_MAX_SLOTS][64]; /* [re/im][slot][band] */
+  float hbe_re[AAC_SBR_USAC_HBE_NS], hbe_im[AAC_SBR_USAC_HBE_NS];
+  float hbe_re2[AAC_SBR_USAC_HBE_NS], hbe_im2[AAC_SBR_USAC_HBE_NS];
+  float hbe_win_a[AAC_SBR_USAC_HBE_N], hbe_win_s[AAC_SBR_USAC_HBE_NS];
+  AacSbrUsacFft fft_a, fft_s;
+  AacUsacQmfFrame frame; /* scratch of aac_sbr_usac_apply */
+};
+
 using AacSbrState = struct AacSbrState_ {
   int sample_rate; /* the SBR rate, twice the core rate */
   int slots;       /* QMF slots per frame: 32, or 30 for 960-sample frames */
@@ -162,6 +275,7 @@ using AacSbrState = struct AacSbrState_ {
   float gain[AAC_SBR_MAX_ENV][AAC_SBR_MAX_BANDS];
   AacPsState ps; /* parametric stereo of a single channel element */
   AacDrcQmf drc; /* dynamic range control gains per QMF band, set per frame by the decoder */
+  AacSbrUsac usac; /* the enhanced SBR of USAC, unused by the AAC decoder */
 };
 
 /* Prepares the state for a core sample rate and frame length (1024 or
@@ -236,6 +350,33 @@ void aac_sbr_usac_apply(AacSbrState* s, float* left, float* right);
  * history. */
 void aac_sbr_usac_apply_to_qmf(AacSbrState* s, int ch, const float* core, struct AacUsacQmfFrame_* out);
 void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in, float* out);
+
+/* ── Shared internals of sbr_dec.cpp and sbr_esbr.cpp ──────────────
+ * The bitstream elements both syntaxes share (sbr_grid, sbr_dtdf,
+ * sbr_invf, sbr_envelope, sbr_noise, sbr_sinusoidal_coding of 14496-3
+ * Tables 4.60 to 4.65), the dequantisation and the per-band pieces of
+ * the high-frequency generator and the assembler.  The readers work on
+ * `s->time_slots` envelope slots and the state's frequency tables. */
+void aac_sbr_freq_from_state(const AacSbrState* s, AacSbrFreq* f);
+void aac_sbr_freq_to_state(const AacSbrFreq* f, AacSbrState* s);
+int aac_sbr_read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch);
+void aac_sbr_copy_grid(AacSbrChannel* dst, const AacSbrChannel* src);
+void aac_sbr_read_dtdf(AacBitReader* r, AacSbrChannel* ch);
+void aac_sbr_read_invf(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch);
+int aac_sbr_read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan);
+int aac_sbr_read_noise(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int chan);
+void aac_sbr_read_add_harmonic(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch);
+void aac_sbr_dequant(AacSbrState* s);
+/* Second-order linear prediction of one subband over its `n` columns. */
+void aac_sbr_lpc_band(float alpha0[2], float alpha1[2], const float (*x)[2], int n);
+void aac_sbr_chirp(const AacSbrState* s, AacSbrChannel* ch);
+/* One patched band: X_high[i] from X_low[i - 2..i] with the chirped
+ * predictor for i in [start, end). */
+void aac_sbr_hf_gen_band(float (*X_high)[2], const float (*X_low)[2], const float alpha0[2],
+                         const float alpha1[2], float bw, int start, int end);
+/* Noise and sinusoids of one slot added to Y[0..m_max) (the bands from kx). */
+void aac_sbr_apply_noise(float (*Y)[2], const float* s_m, const float* q_filt, unsigned noise,
+                         int kx, int m_max, int indexsine);
 
 /* Tables (sbr_tables.cpp). */
 extern const int8_t aac_sbr_huff_env_level_15_t[120][2];

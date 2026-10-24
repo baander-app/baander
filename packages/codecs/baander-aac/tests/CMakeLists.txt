@@ -29,6 +29,7 @@ set(TEST_SOURCES
     test_mps212.cpp
     test_unidrc.cpp
     test_usac_lpd.cpp
+    test_usac_sbr.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
