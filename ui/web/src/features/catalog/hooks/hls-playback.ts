@@ -1,4 +1,7 @@
 import type Hls from 'hls.js'
+import { observeSubtitleSelection, type SubtitlePreference } from './subtitle-selection'
+
+export type { SubtitlePreference } from './subtitle-selection'
 
 interface AttachmentOptions {
   video: HTMLVideoElement
@@ -6,14 +9,19 @@ interface AttachmentOptions {
   position: number
   onError: (failure?: 'network') => void
   onReady: () => void
+  getSubtitlePreference?: () => SubtitlePreference | undefined
+  onSubtitlePreferenceChange?: (preference: SubtitlePreference) => void
 }
 
-export function attachHlsPlayback({ video, url, position, onError, onReady }: AttachmentOptions) {
+export function attachHlsPlayback({ video, url, position, onError, onReady, getSubtitlePreference, onSubtitlePreferenceChange }: AttachmentOptions) {
   let disposed = false
   let player: Hls | null = null
+  let subtitles: ReturnType<typeof observeSubtitleSelection> | null = null
   const active = () => !disposed
   const dispose = () => {
     if (disposed) return
+    subtitles?.dispose()
+    subtitles = null
     disposed = true
     const instance = player
     player = null
@@ -21,6 +29,8 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
   }
   const fail = (failure?: 'network') => {
     if (!active()) return
+    subtitles?.dispose()
+    subtitles = null
     disposed = true
     const instance = player
     player = null
@@ -34,6 +44,9 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
   }
   import('hls.js').then(({ default: HlsPlayer }) => {
     if (!active()) return
+    if (getSubtitlePreference && onSubtitlePreferenceChange) {
+      subtitles = observeSubtitleSelection({ video, getPreference: getSubtitlePreference, onChange: onSubtitlePreferenceChange })
+    }
     if (!HlsPlayer.isSupported()) {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url
@@ -53,6 +66,7 @@ export function attachHlsPlayback({ video, url, position, onError, onReady }: At
     instance.on(HlsPlayer.Events.MANIFEST_PARSED, () => {
       if (active() && player === instance) {
         instance.startLoad(position)
+        subtitles?.ready()
         onReady()
       }
     })
