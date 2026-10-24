@@ -211,8 +211,10 @@ final class SegmentEncoder
             $args[] = $videoFilters;
         }
 
+        // Signed composition offsets avoid video edit-list shifts in HLS tracking while retaining AAC priming.
         array_push($args,
             '-f', 'dash', '-seg_duration', (string) $segmentDuration,
+            '-format_options', 'movflags=+negative_cts_offsets',
             '-use_template', '1', '-use_timeline', '1',
             '-hls_playlist', '1', '-hls_master_name', 'master.m3u8',
             '-adaptation_sets', $hasAudio ? 'id=0,streams=v id=1,streams=a' : 'id=0,streams=v',

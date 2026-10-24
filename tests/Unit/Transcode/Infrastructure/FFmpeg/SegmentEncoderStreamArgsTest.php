@@ -43,6 +43,16 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertStringContainsString('frame-threads=2', $parameters);
     }
 
+    public function testDashMp4UsesSignedCompositionOffsetsWithoutDisablingEditLists(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/videos/source.mkv', QualityTier::p720(), '', '/output');
+        $option = array_search('-format_options', $args, true);
+        self::assertNotFalse($option);
+        self::assertSame('movflags=+negative_cts_offsets', $args[$option + 1]);
+        self::assertNotContains('-use_editlist', $args);
+        self::assertNotContains('-bf', $args);
+    }
+
     public function testBuildStreamArgsProducesSeparateNativeDashTracksAndHlsIndexes(): void
     {
         $args = $this->encoder()->buildStreamArgs(
