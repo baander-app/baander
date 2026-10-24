@@ -9,7 +9,7 @@ execution: code
 
 ## Demonstrated failure
 
-The current movie path cannot play or seek reliably through a silent video tail.
+The current movie path cannot acknowledge seeks reliably through a silent video tail.
 At `c86bfd71`, a generated fourteen-second movie with four seconds of audio drives
 the actual stream manager and encoder in the CI image. Fresh encoding succeeds,
 but the resulting audio ends at about four seconds and the publication rejects
@@ -32,7 +32,9 @@ through the remaining video. Initial playback, sought generations and recovery
 must retain the complete video, its source coordinates and existing leading audio
 delay. A restart after the final source audio packet must still publish valid
 audio initialization and media fragments. The encoding process must finish; it
-must not pad indefinitely or extend the movie beyond its video tail.
+must not pad indefinitely or extend the movie beyond its video tail when selected
+source audio ends no later than video. A longer soundtrack's duration contract is
+a separate demonstrated gap, recorded below.
 
 Keep Source audio selection, source video selection, Source timestamp origin,
 canonical audio ownership, signed delivery and generation fencing unchanged.
@@ -41,7 +43,7 @@ Subtitle helpers remain separate and must
 not determine encoding duration. No API, schema, source-track control or frontend
 production behavior is added.
 
-The repair appends FFmpeg's `apad` after existing audio normalization
+The repair appends FFmpeg's `apad=packet_size=1024` after existing audio normalization
 and uses output `-shortest`, making the video the finite output stream. The
 [FFmpeg filter documentation](https://ffmpeg.org/ffmpeg-filters.html#apad) describes
 this combination. Documentation alone does not qualify the installed FFmpeg:
@@ -79,10 +81,10 @@ fresh playback and seeks with no remaining source audio packets. Check real sour
 packet bounds, selected mapping, native publication coverage, decoded frame count,
 audio sample duration and bounded process termination. Include combined leading
 delay and trailing silence. Include a selected nonzero audio ordinal that ends
-early while an unselected track continues, and controls whose source audio spans
-or exceeds the video. Padding must follow the selected source, and longer audio
-must not truncate video or prevent finite termination. These producer controls do
-not change how source duration is inferred for audio longer than video.
+early while an unselected track continues, and a matched-duration control. Padding
+must follow the selected source. A paired prior/candidate experiment separately
+checks that a longer soundtrack introduces no regression; it does not qualify
+that source's already-failing duration contract.
 Do not relax existing coverage, duration, timing or decode assertions.
 
 Add explicit short-audio fresh and seek browser scenarios using the existing
@@ -112,3 +114,33 @@ formal CMAF conformance.
 Independent plan review approved this scope before implementation, including
 selected-track padding, longer-audio and video-only controls, measured tail silence,
 actual publication readiness and bounded process completion.
+
+## Reviewed boundary amendment
+
+The first twelve-case native run exposed two boundary problems. With default
+padding packets, a matched fourteen-second AAC soundtrack reached 14.08 seconds.
+Using 1,024-sample padding packets reduced the native end to 14.016 seconds and
+decoded duration to 14.037333 seconds. This preserves the existing strict bounds;
+the matched-duration regression remains required.
+
+With fourteen seconds of video and eighteen seconds of audio, FFmpeg 5.1's
+`-shortest` still publishes eighteen seconds of audio. Disabling B-frames did not
+change that result. An explicit fourteen-second output limit works, but the probe
+currently records the eighteen-second container duration. A reliable selected-video
+endpoint requires its own probe, serialization, coordinate and consumer review;
+passing container duration as a video limit would not repair this case.
+
+Paired unchanged `c86bfd71` and candidate commands confirm this longer-audio gap
+predates the repair. Both AAC and Opus preserve all 350 video frames with identical
+decoded RGB and retain the source tone through second 17.5. Both reject exact video
+end coverage. AAC decoded duration is unchanged; Opus gains one twenty-millisecond
+packet. All processes finish in under half a second. These receipts remain under
+`var/test-runs/short-audio-tail-gates/paired-long-audio/`, alongside the failed native
+run and calibration. Longer-audio acceptance is removed from this phase's native
+suite and retained as a separate demonstrated roadmap follow-up. No short-audio,
+matched-audio, silence, frame, duration or coverage threshold is relaxed.
+
+The prior-encoder fresh browser control passed complete thirty-second playback
+with 750 decoded frames. Chromium can continue silently after audio EOF. This is
+not failure evidence; native readiness and the exhausted-audio seek are the repair
+targets. Retain the fresh control and run the prior-encoder seek separately.
