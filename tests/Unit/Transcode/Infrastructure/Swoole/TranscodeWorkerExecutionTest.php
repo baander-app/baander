@@ -36,6 +36,7 @@ use App\Transcode\Infrastructure\Swoole\TranscodeProcessPool;
 use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use Closure;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -729,6 +730,58 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->worker->run($this->current, static fn (): bool => false);
         self::assertSame(['accepted', 'failed'], $this->observed);
         self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+    }
+
+    #[DataProvider('publishedAudioTailLengths')]
+    public function testSilentTailReadinessRequiresPublishedAudioAtTheRequestedCursor(bool $fullAudioTail): void
+    {
+        $this->sourceDuration = 14.0;
+        $this->sourceFrameRate = '25/1';
+        $this->current = $this->claim(1, 1, 'paused', position: 12.0);
+        $this->spawner->onSpawn = function () use ($fullAudioTail): void {
+            $command = $this->spawner->commands[0];
+            $path = $command[array_key_last($command)];
+            $directory = dirname($path);
+            PublishedPresentationFixture::write($directory, 3, audio: true);
+            $xml = new \DOMDocument();
+            $xml->load($path);
+            $xpath = new \DOMXPath($xml);
+            $xpath->registerNamespace('m', 'urn:mpeg:dash:schema:mpd:2011');
+            foreach (['video', 'audio'] as $kind) {
+                $timelines = $xpath->query('//m:AdaptationSet[@contentType="' . $kind . '"]//m:SegmentTimeline');
+                self::assertNotFalse($timelines);
+                $timeline = $timelines->item(0);
+                self::assertInstanceOf(\DOMElement::class, $timeline);
+                while ($timeline->firstChild !== null) {
+                    $timeline->removeChild($timeline->firstChild);
+                }
+                $durations = $kind === 'audio' && !$fullAudioTail ? [4000] : [6000, 6000, 2000];
+                foreach ($durations as $duration) {
+                    $point = $xml->createElementNS('urn:mpeg:dash:schema:mpd:2011', 'S');
+                    $point->setAttribute('d', (string) $duration);
+                    $timeline->appendChild($point);
+                }
+            }
+            $xml->save($path);
+        };
+        $this->worker->run($this->current, static fn (): bool => false);
+        if ($fullAudioTail) {
+            self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+            self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
+            self::assertSame(3, $this->job->getCompletedSegments());
+            self::assertSame(12.0, $this->current->runtime->desired->position);
+        } else {
+            self::assertSame(['accepted', 'failed'], $this->observed);
+            self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+        }
+        self::assertSame(0, $this->allocations);
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function publishedAudioTailLengths(): iterable
+    {
+        yield 'published silence reaches cursor' => [true];
+        yield 'audio ending before cursor stays unready' => [false];
     }
 
     public function testCompletionSettlesTheActualGenerationLocalCount(): void

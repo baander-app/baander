@@ -152,7 +152,7 @@ final class SegmentEncoder
             }
         }
         if ($hasAudio) {
-            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0';
+            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0,apad';
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
@@ -243,6 +243,10 @@ final class SegmentEncoder
         if ($videoFilters !== '') {
             $args[] = '-vf';
             $args[] = $videoFilters;
+        }
+
+        if ($hasAudio) {
+            $args[] = '-shortest';
         }
 
         // Signed composition offsets avoid video edit-list shifts in HLS tracking while retaining AAC priming.
