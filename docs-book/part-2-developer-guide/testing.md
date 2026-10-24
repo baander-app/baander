@@ -599,19 +599,25 @@ to the finite video. When selected source audio ends early, real silence must
 cover the remaining video, including sought output with no source audio packets
 left. The producer must terminate without losing the video tail. Video-only
 commands omit both padding and `-shortest`; separate subtitle helpers do not set
-duration. A longer soundtrack's selected-video endpoint remains a separate
-contract.
+duration. Longer-soundtrack endpoint resolution uses qualified selected-video
+metadata; missing or invalid evidence retains the container estimate.
 
 One FFmpeg process reads the same source through two inputs when audio exists.
 Video input zero retains hardware options, fixture pacing and source selection;
-unpaced audio input one has two decoder threads and disables video, subtitle and
-data decoding. The selected audio ordinal maps from input one. Both readers
-share the logical source position, verified-origin
-translation and established sparse early-seek/preroll rules. Ordinary seeking
-remains accurate, while sparse audio retains the same preroll as video before
-existing trimming. Independent audio EOF lets padding publish playable fragments
-while video remains active. Video-only commands retain one input; cancellation
-stops the one process and both source reads.
+unpaced audio input one has two decoder threads and disables video, subtitle
+and data decoding. The selected audio ordinal maps from input one. Both readers
+share the logical source position and verified-origin translation. Sparse audio
+requests one nominal source-frame interval before the generation start, clamped
+to zero; a zero-relative position omits its input seek. Sparse audio retains
+preroll when it seeks. Unanchored audio receives the negative difference
+between the generation start and its earlier input seek, preserving the
+generation clock. Verified-origin audio keeps the existing common offset, and
+existing trimming removes negative local samples. Video seeking and ordinary
+accurate audio seeking are unchanged. Cue alignment may decode farther back
+than the requested nominal interval, so it is not a universal I/O bound.
+Independent audio EOF lets padding publish playable fragments while video
+remains active. Video-only commands retain one input; cancellation stops the
+one process and both source reads.
 
 `SegmentEncoderAudioDelayMediaTest` covers sixteen ordinary 25-fps MOV cases
 with video beginning at zero and no verified source origin. H.264/HEVC output
@@ -664,9 +670,39 @@ runs, followed by complete final tails. A cancellation case stops the same
 producer after playable prefixes appear. Receipts retain publication timing,
 closed audio/video lead and process memory; these fixture measurements do not
 establish general resource guarantees. A separate longer-soundtrack audit shows
-the final producer reaches the actual video endpoint, while the probe still
-records the longer container duration. Consumer duration and source-coordinate
-qualification remain a separate follow-up.
+the final producer reaches the actual video endpoint. Current probe duration
+uses qualified selected-video timing when available; the earlier container-based
+failure is retained as historical evidence, and the estimate fallback remains
+unqualified for exact-end behavior.
+
+`SegmentEncoderVideoEndpointMediaTest` covers fourteen selected-video endpoint
+cases through the real probe, stream manager, encoder and presentation reader.
+MOV/Matroska sources with longer audio, B-frames, delayed video, positive starts
+and sparse held frames must retain complete decoded video, bounded audio and
+exact-end coverage using the DTO duration. Fresh and near-end AAC/Opus cases
+check source identity, content and finite process completion. Distinct audio
+markers at source seconds 20 and 26 verify the clock through sparse seeks,
+including the retained Matroska cue-layout regression.
+
+The [Selected video endpoint](../../CONCEPTS.md#selected-video-endpoint) uses
+the same first non-attached movie stream as encoding. For MOV/MP4, its start at
+or after the normalization origin plus its positive duration span gives the
+endpoint. Valid rational time-base values take precedence over textual seconds,
+allowing only FFprobe's decimal rounding differences and rejecting
+contradictory metadata. Matroska uses the selected track's strictly parsed
+`DURATION` tag as an absolute endpoint; inferred stream duration is not
+independent evidence. Normalize once by the verified source origin, or by an
+ordinary finite nonnegative format start without inventing an origin. A
+qualified result must be finite and positive.
+
+Missing, malformed or unqualified timing retains the prior container-duration
+estimate, including its existing verified-origin adjustment. That fallback does
+not establish an exact video end. The bounded 128-packet prefix cannot determine
+an unknown endpoint; no second probe, full-file scan, frame-rate inference or
+endpoint cache is added. Serialized duration preserves the resolved value without
+another origin subtraction. Fresh worker playback metadata changes; existing
+catalog records are not backfilled or reset, and native manifest clocks stay based
+on actual media.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
@@ -1160,6 +1196,39 @@ drill; a production browser result does not qualify that pressure fixture.
 Hardware acceleration, cache-sweep policy and measured FLAC DSP CPU cost remain
 separate qualification work. Automatic movie quality switching uses the separate
 gate below.
+
+### Selected video endpoint playback
+
+Run the dedicated production-browser check against the production worker image
+built from the current checkout:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-movie-endpoint-browser.sh
+```
+
+The wrapper selects `BAANDER_TEST_MOVIE_ENDPOINT=1` in the disposable two-command
+stack, with a 300-second outer bound. Its phases are authenticated,
+movie-endpoint and endpoint-complete; the existing full lifecycle drill remains
+separate. A real 42-second video with 48-second audio must advertise duration 42
+through the signing response and actual movie slider. The observer reads those
+values from the application rather than supplying fixture-known playback
+metadata. It uses the real near-end/exact-end slider controls, natural completion
+and source-zero replay with advancing decoded frames. The paired prior-resolver
+run must retain its actual 48-second failure.
+
+During the bounded natural-end tail, capability renewal and strict rendition-set
+expansion may replace attachments within the same job, session and generation.
+Each attachment must supply its genuine metadata/frame baseline before later
+advancing frames and natural completion are compared. Source-clock continuity
+and existing timing tolerances remain required; an attachment replacement alone
+is not a playback defect. This is endpoint/completion/replay evidence, not the
+full outage drill or uninterrupted playback of all 42 source seconds.
+
+Keep signed delivery, real publication and verified worker/container cleanup
+receipts. This check qualifies the calibrated metadata and source-clock paths;
+missing/stale timing, arbitrary muxer tags, additional origins and untested
+browser/format combinations remain outside exact-end acceptance. The separate
+40 ms capture mismatch and bounded diagnostic follow-up remain unresolved.
 
 ### Automatic movie quality switching
 

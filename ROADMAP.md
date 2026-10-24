@@ -12,20 +12,11 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-Select the demonstrated selected-video endpoint problem next. The final movie
-producer now retains fourteen-second video and bounded audio for an eighteen-
-second soundtrack, with actual video-end coverage passing. The probe/DTO still
-records eighteen seconds, so consumer coverage at that container-derived end
-fails. Evidence is under
-`var/test-runs/short-audio-tail-gates/final-dual-input-long-audio`. Review probe,
-serialization, source coordinates and consumers before implementation; a container
-duration is not a verified selected-video endpoint.
-
-A separate bounded observer diagnostic remains: retain the failing callback and
-native snapshot metadata plus entry/constructor clocks before the unchanged
-assertion, to test the unproven capture-race hypothesis. The retained 24.64 versus
-24.60 mismatch is not fixed by a passing rerun and does not qualify universal
-observer stability. Evidence is under
+The remaining selected follow-up is a bounded observer diagnostic: retain the
+failing callback and native snapshot metadata plus entry/constructor clocks before
+the unchanged assertion, to test the unproven capture-race hypothesis. The retained
+24.64 versus 24.60 mismatch is not fixed by a passing rerun and does not qualify
+universal observer stability. Evidence is under
 `var/test-runs/short-audio-tail-gates/browser-final-v3-default-audio-fresh`.
 
 Historical unchecked items, old plan limitations and incomplete experiments do
@@ -2212,3 +2203,114 @@ media were untouched; only pre-existing services remained after cleanup.
 Independent code/simplification review, runner syntax/configuration, prose audits,
 local links and whitespace checks passed. The new browser scenarios and serial
 native class are wired into CI. No merge or push is included.
+
+### Selected video endpoints and movie duration — 2026-10-24
+
+Movie playback duration resolves the selected non-attached video's qualified
+endpoint in Source position coordinates. MOV/MP4 combines that stream's start
+and own span using valid time-base metadata; Matroska uses its strictly parsed
+`DURATION` endpoint rather than an inferred container-wide stream duration.
+Normalization occurs once using the existing verified origin or ordinary finite
+nonnegative format start, without inventing an anchor. Audio, subtitles,
+artwork and unselected video do not define a qualified endpoint.
+
+Missing, contradictory or unqualified timing keeps the previous container-based
+estimate and its existing verified-origin adjustment. This fallback is not
+exact video-end qualification. Duration resolution adds no extra probe,
+full-file scan, schema, catalog backfill, direct-seek rejection or frontend
+duration policy. The serialized duration and existing consumers carry the
+corrected value.
+
+Fourteen native cases exercise actual probing/encoding/publication, complete
+video content, bounded audio and exact-end coverage at the DTO endpoint. They
+include longer audio, MOV/Matroska, B-frames, positive starts, sparse holds and
+fresh and near-end AAC/Opus. The dedicated production browser mode uses real
+42-second video and 48-second audio, signing and slider values, near/exact-end
+controls, natural completion and source-zero replay. The original
+container-based failure remains separate from repaired acceptance.
+
+The first native run retained twelve cases with 4,146 assertions and one
+failure. An unanchored sparse Matroska restart at source second 24 produced
+local silence through second four, then tone through six despite continuing
+source audio. Prior and repaired duration resolvers produced identical encoder
+arguments, establishing a separate pre-existing producer failure. The failed
+receipt remains under `var/test-runs/video-endpoint-gates/native-first`; the
+subsequent producer amendment preserves its strict assertions.
+
+A separate reviewed producer amendment repairs that pre-existing cue-layout
+failure. Sparse audio requests one nominal source-frame interval before the
+generation start, clamped to zero, and omits zero-relative input seeking.
+Unanchored audio translates by the negative difference between requested and
+earlier seek positions; verified origins retain their common offset. Existing
+trim removes negative samples. Video/ordinary seeking, selected tracks, one
+process, decoder-thread bounds and cancellation ownership stay unchanged.
+Distinct source-second-20/26 tone witnesses verify unanchored starts six/24 and
+verified-origin-four fresh/six/24, preserving 8/2/near-zero onsets, full tails
+and video hashes. These diagnostic witnesses precede final regression
+acceptance. Cue alignment decoded 1,313 versus 470 audio input frames in the
+retained fixture; the nominal seek interval is not a universal I/O or latency
+bound.
+
+The metadata resolver is revision `350d5c12`; the independently reviewed
+producer repair is `528d5ef4`, with native tests at `d78fafbb`. Focused CI
+native verification passed fourteen tests with 4,604 assertions in 25.022
+seconds and verified cleanup under
+`var/test-runs/video-endpoint-gates/native-final`. Host command/worker and
+snapshot checks passed 134 tests with 1,308 assertions; metadata/consumer
+checks passed 185 with 961. The existing UI hook selection passed 215 tests,
+and the web build and manifest verification passed. These focused selections
+are separate receipts, not a summed full-suite total.
+
+At runtime/test HEAD `d78fafbb`, the full Transcode plus
+ProgressiveMediaPublication integration selection passed 1,197 tests with
+34,643 assertions across 85 files: 1,086 tests/13,104 assertions in the
+ordinary lane and 111/21,539 in the native lane, with zero failures, errors or
+skipped tests. The receipt is `backend-final/20261024-232748-f33844a2` under
+the artifact root. Full PHPStan passed; Deptrac reported zero violations,
+warnings and errors with 484 existing baseline skips.
+
+The paired prior-resolver production run failed the intended endpoint proof:
+the actual signing response and real slider both reported 48 rather than 42.
+Its cleanup was verified under `browser-prior-resolver`. The first repaired
+`browser-final` run reported 42 and passed exact-end seeking and replay, then
+failed an observer assertion freezing attachment four despite legitimate
+attachments five and six. That partial run is retained separately and does not
+qualify natural completion. Observer-only `5e337081` permits same-job/session/
+generation capability renewal and strict rendition-set expansion, requiring
+each attachment's genuine metadata/frame baseline without widening tolerances.
+
+The final `browser-final-v2` endpoint proof took 52.531 seconds against runtime
+image `d78fafbb` with observer `5e337081`. Actual signing duration and slider
+maximum were both 42; real seek requests were [42, 0, 30, 0]. Exact-end and
+natural-end source-zero replays both decoded advancing frames. During the
+natural tail, attachment four was accepted, five renewed the capability and six
+admitted a strict rendition expansion within the same owned execution. The
+final decoder's genuine metadata baseline was local 28.899123 seconds/zero
+frames, reaching native ended state at 30.015999/28 frames with source start
+twelve. Canonical completion paused exactly at source 42 once. This is bounded
+endpoint/completion/replay qualification, not an uninterrupted full-42-second
+playback or full outage-drill claim.
+
+Endpoint-complete and cleanup passed: control/execution units were removed,
+reservation was absent and seven native identities had zero survivors. The
+runner exited zero with cleanup verified. Final receipts and revision
+boundaries are recorded in
+`var/test-runs/video-endpoint-gates/acceptance-summary.json`. Independent final
+review approved acceptance with no findings.
+
+The frame-capture mismatch remains a separate unresolved limit. A 24.64-second
+snapshot versus 24.60 callback was retained without decisive failing timing
+metadata; the prior strict unchanged rerun did not fix or prove its cause. The
+bounded capture diagnostic remains selected for retaining failure metadata and
+entry/constructor clocks before the unchanged assertion. The native-frame
+capture observer and its tolerance are unchanged; the endpoint
+attachment-observer correction does not resolve this separate mismatch.
+
+The guide and shared vocabulary distinguish a qualified Selected video endpoint
+from its estimate fallback. Acceptance covers calibrated MOV/MP4 and Matroska
+metadata paths and existing source clocks; it does not establish exact
+endpoints for missing/stale metadata, arbitrary muxer tags, discontinuities,
+additional origins, hardware or untested browser/format combinations. Existing
+services and original media were untouched. Runner/configuration checks,
+independent review, prose audits, local links and whitespace checks passed. No
+merge or push is included.

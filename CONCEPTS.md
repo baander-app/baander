@@ -188,6 +188,15 @@ attributes and manifest language without reordering discovered tracks. It is
 independent of the selected video's Source timestamp origin and does not add
 interactive track controls.
 
+### Selected video endpoint
+
+The end of the selected non-attached movie video, expressed in Source position
+coordinates. Qualified selected-stream timing excludes extension from audio,
+subtitles, artwork and unselected video. The probed movie duration carries this
+endpoint when it can be resolved; otherwise it retains a container-based estimate.
+That estimate is not a verified selected video endpoint and does not establish
+exact-end coverage.
+
 ### Source position
 
 A playback position measured from the beginning of the source video. Subtracting

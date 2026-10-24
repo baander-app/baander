@@ -1,7 +1,7 @@
 ---
 title: Use selected-video timing for movie duration
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -196,3 +196,43 @@ decoder threads, publication fences and cancellation ownership remain unchanged.
 
 Independent review approved this amendment after the unanchored and
 verified-origin marker witnesses passed, before encoder implementation.
+
+## Completion checkpoint
+
+The qualified endpoint resolver and sparse audio-reader repair passed at runtime
+revision `d78fafbb`. The affected backend selection passed 1,197 tests with 34,643
+assertions across 85 files: 1,086 ordinary tests with 13,104 assertions and 111
+native tests with 21,539. Neither lane had failures, errors or skips. The focused
+endpoint media matrix passed fourteen tests with 4,604 assertions. PHPStan passed;
+Deptrac reported no violations, warnings or errors and retained 484 existing
+skipped violations. The player hook selection passed 215 tests, and the production
+web build and asset verification passed.
+
+The paired production-browser check uses the same runtime image and generated
+42-second video with 48-second audio. Replacing only the resolver with its
+`edebfa90` version reproduces signing duration and slider maximum 48. The repaired
+resolver supplies 42. The first repaired run exposed a new observer defect: it
+required an unchanged attachment across legitimate capability renewal and ready
+rendition expansion. That failed run remains separate from acceptance. The
+reviewed observer correction at `5e337081` records each owned attachment and its
+native metadata baseline, with stable attachment identities across asynchronous
+reads. Ownership, frame progression and endpoint tolerances remain strict.
+
+The final Chromium check passed authentication, movie-endpoint and
+endpoint-complete in the same production stack. The endpoint proof took 52.531
+seconds and submitted seeks at 42, zero, thirty and zero. Both exact-end and
+natural-end replay advanced decoded frames. Natural completion reached native
+second 30.015999 from source start twelve, then submitted one canonical pause at
+42. Capability renewal and rendition expansion retained the owned execution
+generation; the final decoder advanced from zero to 28 frames. Both worker units
+were removed, their reservation was released and all seven recorded native
+process identities were absent. Cleanup passed for the negative and repaired
+runs.
+
+Receipts, failed attempts and separate runtime/observer provenance are retained
+under `var/test-runs/video-endpoint-gates/`, with final browser evidence in
+`browser-final-v2/` and the consolidated checkpoint in `acceptance-summary.json`.
+The estimate fallback, existing catalog records and separate frame-capture
+diagnostic retain the limits stated above. This checkpoint adds no qualification
+for other muxers, source clocks, hardware or browsers. Work remains on the local
+plan branch; merge and push require a separate request.
