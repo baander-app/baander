@@ -117,3 +117,23 @@ Interactive alternate-track selection remains a separate product change.
 
 Independent plan review approved implementation, including the encoded-source
 priming control and preservation of ordinary frame-rate and timestamp handling.
+
+## Measuring ordinary B-frame presentation timestamps
+
+The first native red run reports sixteen failures: nine expose the intended audio
+failure, while seven controls reveal a packet-observer assumption. Ordinary
+encoding retains B-frames. Its native MP4 composition timestamps begin at zero,
+but FFmpeg 5.1.9 adds an internal decode-time shift when reporting packet PTS
+with negative composition offsets. Here the shift is 1,024 ticks at 12,800 Hz,
+so FFprobe reports an apparent 0.08-second start. The raw first decode time and
+composition offset are both zero, and all 750 native presentation timestamps
+form the correct 25 fps grid. The initialization edit has media time zero.
+
+Independent review approved a test-only correction: derive presentation time from
+bounded MP4 decode times, sample durations and signed composition offsets. Check
+the actual timescale, unshifted initialization edit, sample count and complete
+frame grid; reject unsupported or malformed layouts. Do not subtract the first
+observed timestamp or relax timing tolerances. Keep FFprobe output as diagnostic
+evidence. The native bytes establish the clock; [FFmpeg's demuxer implementation](https://raw.githubusercontent.com/FFmpeg/FFmpeg/n5.1.9/libavformat/mov.c)
+explains the reported shift. Preserve the original red receipt and rerun the
+corrected regression against the unchanged encoder before accepting green output.
