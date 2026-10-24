@@ -111,3 +111,33 @@ the final high-resolution frame must follow the low-resolution phase. Audio
 measurements are local to each phase. Both producers must remain active with
 advancing publication edges during transitions, and the sibling lag must be
 measured. Disable browser caching and retain actual body-transfer measurements.
+
+## Calibration findings
+
+The first harness run failed before requesting a manifest: the root workspace's
+PnP resolver left the caught dynamic HLS.js import outside the bundle. The runner
+now resolves the installed web dependency explicitly and verifies the bundle input
+list and absence of external imports. This required no production change.
+
+With the real player bundled, high-to-low adaptation passed. After throughput
+returned to 20 Mbit/s, completed 720p fragments covered source seconds 90 onward,
+but the 65-second recovery observation ended at source time 89.891, before those
+frames could be displayed. Decoded video and audio continued without a fatal
+error. Retain that failed receipt; it establishes the observation limit rather
+than a product defect.
+
+Use a 144-second generated source and a 90-second recovery observation within the
+unchanged 180-second browser deadline. This allows the unchanged player's
+conservative upward bandwidth estimate to recover while both producers remain
+active. The independent producer timeout is 174 seconds; the six-second delayed
+start and publication pace stay fixed. Initial and constrained observations keep
+their 65-second limits. Record waiting/playing intervals, including any buffering
+after the abrupt bandwidth drop; this qualification does not promise stall-free
+switches or an upward adaptation latency target.
+
+Move fixture telemetry outside the browser's shaped media connection. Measure
+completed signed video transfers wholly within the constrained interval, including
+first-chunk time, and require a representative rate consistent with its cap.
+Match canceled video requests only to a successful different-tier replacement
+for the same source interval near the cancellation. These assertions address
+independent review findings without changing the player's behavior.
