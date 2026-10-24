@@ -68,6 +68,12 @@ int aac_sbr_freq_tables(AacSbrFreq* f);
 /* Rebuilds the limiter table alone after limiter_bands changed. */
 void aac_sbr_freq_limiter(AacSbrFreq* f);
 
+/* Delta coding in time (4.6.18.3.4): the band of the previous envelope
+ * that band j of an envelope of resolution `res` is coded against when
+ * the previous envelope has resolution `prev_res`; `odd` is whether the
+ * high-resolution band count is odd. */
+int aac_sbr_prev_band(int j, int res, int prev_res, int odd);
+
 /* The fields up to `analysis` are what the bitstream of a frame sets (or
  * a header change derives); the decoder snapshots that prefix before
  * parsing an extension so that a damaged one leaves the previous frame's

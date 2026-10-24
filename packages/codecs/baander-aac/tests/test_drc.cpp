@@ -245,8 +245,10 @@ static void test_parse_full() {
 
   /* The writer reproduces the stream. */
   Bits w;
-  aac_drc_write(&d, &w.w);
+  const int written = aac_drc_write(&d, &w.w);
   CHECK(w.bits() == 8 * 12, "writer length (%d bits)", w.bits());
+  CHECK(written == 8 * 12 && aac_drc_bytes(&d) == 12, "writer reports %d bits, %d bytes", written,
+        aac_drc_bytes(&d));
   CHECK(memcmp(w.buf.data(), b.buf.data(), 12) == 0, "writer reproduces the hand-built bytes");
 
   /* A truncated info is refused. */
@@ -585,6 +587,82 @@ static void test_sbr_stream() {
   CHECK(checked > 5, "frames with steady gain checked (%d)", checked);
 }
 
+/* Decodes an ADTS stream through the streaming API with frame `lost`
+ * replaced by as many zero bytes, which the transport discards and
+ * stands a concealed frame in for; returns one entry per output frame. */
+static std::vector<std::vector<float>> decode_with_gap(const std::vector<uint8_t>& stream,
+                                                       int lost, int channels, int enabled,
+                                                       int target, int* concealed_at) {
+  std::vector<uint8_t> damaged = stream;
+  const std::vector<AdtsFrame> frames = split_adts(stream);
+  memset(damaged.data() + frames[lost].offset, 0, frames[lost].size);
+  AacDecoderHandle dec = aac_decoder_create(kRate, channels);
+  CHECK(aac_decoder_set_drc(dec, enabled, 100, 100, target, 0) == AAC_OK, "set_drc");
+  CHECK(aac_decoder_feed(dec, damaged.data(), (int)damaged.size()) == (int)damaged.size(),
+        "the stream fits the FIFO");
+  std::vector<std::vector<float>> out;
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  *concealed_at = -1;
+  for (;;) {
+    const int got = aac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+    if (got <= 0) {
+      CHECK(got == 0, "decode_next %d", got);
+      break;
+    }
+    if (aac_decoder_last_frame_concealed(dec) && *concealed_at < 0) {
+      *concealed_at = (int)out.size();
+    }
+    out.emplace_back(pcm.begin(), pcm.begin() + (size_t)got * aac_decoder_channels(dec));
+  }
+  aac_decoder_destroy(dec);
+  return out;
+}
+
+/* Energy in dB of one frame of interleaved output. */
+static double frame_db(const std::vector<float>& frame) {
+  double e = 0.0;
+  for (float v : frame) {
+    e += (double)v * v;
+  }
+  return 10.0 * log10(e / (double)std::max<size_t>(frame.size(), 1) + 1e-30);
+}
+
+/* A lost frame of an HE-AAC stream with DRC and a target reference level
+ * keeps the gains of the frame before it: the concealed frame's level,
+ * relative to the same concealed frame with DRC off, stays with its
+ * neighbours' instead of ramping to unity and back. */
+static void test_concealed_frame_gain() {
+  const std::vector<float> pcm = gen_wideband(kRate * 2, kRate, 2);
+  const std::vector<uint8_t> stream =
+      encode_with_metadata(pcm, kRate, 2, 64000, AAC_DRC_FILM_STANDARD, 124, AAC_AOT_SBR);
+  CHECK(!stream.empty(), "HE-AAC encoded");
+  const int lost = (int)split_adts(stream).size() / 2;
+  int concealed_off = -1;
+  int concealed_on = -1;
+  const std::vector<std::vector<float>> off =
+      decode_with_gap(stream, lost, 2, 0, -1, &concealed_off);
+  const std::vector<std::vector<float>> on =
+      decode_with_gap(stream, lost, 2, 1, 100, &concealed_on);
+  CHECK(concealed_off > 2 && concealed_off == concealed_on && on.size() == off.size(),
+        "one concealed frame at %d / %d of %zu / %zu frames", concealed_off, concealed_on,
+        off.size(), on.size());
+  if (concealed_off <= 2 || concealed_off != concealed_on || on.size() != off.size() ||
+      (size_t)concealed_off + 2 >= on.size()) {
+    return;
+  }
+  const int k = concealed_off;
+  const double before = frame_db(on[k - 1]) - frame_db(off[k - 1]);
+  const double during = frame_db(on[k]) - frame_db(off[k]);
+  const double after = frame_db(on[k + 1]) - frame_db(off[k + 1]);
+  printf("concealed frame %d: DRC gain %.2f dB, neighbours %.2f and %.2f dB\n", k, during, before,
+         after);
+  CHECK(fabs(during - 0.5 * (before + after)) < 1.0,
+        "concealed frame gain %.2f dB against neighbours %.2f and %.2f dB", during, before, after);
+  /* The reference-level gain alone is 6 dB here, which a ramp to unity
+   * would lose. */
+  CHECK(before > 3.0, "the neighbours carry the DRC gain (%.2f dB)", before);
+}
+
 static void test_api() {
   AacEncoderHandle enc = aac_encoder_create(kRate, 2, 128000, AAC_AOT_LC, AAC_RC_CBR);
   CHECK(aac_encoder_set_metadata(enc, (AacDrcProfile)6, 124) == AAC_ERR_INVALID_ARG, "bad profile");
@@ -607,6 +685,20 @@ static void test_api() {
   CHECK(aac_decoder_set_drc(dec, 1, 100, 100, 128, 0) == AAC_ERR_INVALID_ARG, "target over 127");
   CHECK(aac_decoder_set_drc(dec, 1, 100, 100, -2, 0) == AAC_ERR_INVALID_ARG, "target below -1");
   CHECK(aac_decoder_set_drc(dec, 1, 0, 0, 127, 1) == AAC_OK, "valid settings");
+  aac_decoder_destroy(dec);
+
+  /* The readback describes the last frame; a reset (a seek) clears it. */
+  const std::vector<uint8_t> with_drc =
+      encode_with_metadata(loud_tones(1, 2), kRate, 2, 128000, AAC_DRC_FILM_STANDARD, 124);
+  dec = aac_decoder_create(kRate, 2);
+  decode_stream(with_drc, kRate, 2, nullptr, dec);
+  CHECK(aac_decoder_has_drc(dec) == 1 && aac_decoder_program_ref_level(dec) == 124,
+        "readback after the stream: %d, %d", aac_decoder_has_drc(dec),
+        aac_decoder_program_ref_level(dec));
+  CHECK(aac_decoder_reset(dec) == AAC_OK, "reset");
+  CHECK(aac_decoder_has_drc(dec) == 0 && aac_decoder_program_ref_level(dec) == -1,
+        "readback cleared by the reset: %d, %d", aac_decoder_has_drc(dec),
+        aac_decoder_program_ref_level(dec));
   aac_decoder_destroy(dec);
   CHECK(aac_decoder_set_drc(nullptr, 1, 100, 100, -1, 0) == AAC_ERR_INVALID_ARG, "null decoder");
   CHECK(aac_decoder_program_ref_level(nullptr) == AAC_ERR_INVALID_ARG, "null decoder");
@@ -677,6 +769,7 @@ int main() {
   test_excluded_and_bands();
   test_heavy_compression();
   test_sbr_stream();
+  test_concealed_frame_gain();
   test_api();
   test_no_metadata_identity();
   test_ffmpeg();

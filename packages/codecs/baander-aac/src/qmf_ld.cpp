@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <mutex>
 
 /* Low-delay complex filterbank: the direct-sum structure of qmf.cpp with
  * the four windows of qmf_ld_window.inc, one per bank (analysis and
@@ -16,14 +17,7 @@ float g_ana_cos32[32][64], g_ana_sin32[32][64];
 float g_ana_cos64[64][128], g_ana_sin64[64][128];
 float g_syn_cos64[128][64], g_syn_sin64[128][64];
 float g_syn_cos32[64][32], g_syn_sin32[64][32];
-bool g_tables_ready = false;
-
-}  // namespace
-
-void aac_cldfb_tables_init(void) {
-  if (g_tables_ready) {
-    return;
-  }
+void build_tables(void) {
   for (int k = 0; k < 32; k++) {
     for (int n = 0; n < 64; n++) {
       const double a = M_PI / 64.0 * (k + 0.5) * (2.0 * n - 0.5);
@@ -52,7 +46,13 @@ void aac_cldfb_tables_init(void) {
       g_syn_sin32[n][k] = (float)(sin(a) / 64.0);
     }
   }
-  g_tables_ready = true;
+}
+
+}  // namespace
+
+void aac_cldfb_tables_init(void) {
+  static std::once_flag once;
+  std::call_once(once, build_tables);
 }
 
 void aac_cldfb_analysis_init(AacCldfbAnalysis* a, int bands) {

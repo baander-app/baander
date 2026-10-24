@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include "asc.h"
 #include "bitstream.h"
 #include "qmf_ld.h"
 #include "sbr.h"
@@ -35,20 +36,17 @@ extern "C" {
 #define AAC_SBR_LD_FRAME_FIXFIX 0
 #define AAC_SBR_LD_FRAME_LDTRAN 1
 
-/* sbr_header() as carried in ld_sbr_header() of the audio specific
- * config; the fields the header leaves out take the standard's defaults. */
-using AacSbrLdHeader = struct AacSbrLdHeader_ {
-  int amp_res;
-  int start_freq, stop_freq, xover_band;
-  int freq_scale, alter_scale, noise_bands;
-  int limiter_bands, limiter_gains, interpol_freq, smoothing_mode;
-};
-
-/* Reads one sbr_header(); returns 0 or AAC_ERR_DECODE. */
+/* The sbr_header() (AacSbrLdHeader, asc.h) as carried in ld_sbr_header()
+ * of the audio specific config.  Reads one; returns 0 or AAC_ERR_DECODE. */
 int aac_sbr_ld_header_read(AacSbrLdHeader* h, AacBitReader* r);
 /* Writes one sbr_header() with the extension fields present only where
  * they differ from the defaults. */
 void aac_sbr_ld_header_write(const AacSbrLdHeader* h, AacBitWriter* w);
+/* Whether aac_sbr_ld_init would accept the header for a core sample rate,
+ * frame length and rate mode: 0, or the error it would return.  Touches
+ * no state, so a configuration can be checked before it is applied. */
+int aac_sbr_ld_header_check(const AacSbrLdHeader* h, int core_sample_rate, int frame_length,
+                            int dual_rate);
 
 /* The envelope grid of one frame.  The transient position of an LDTRAN
  * frame splits the slots into an envelope before it, the transient's

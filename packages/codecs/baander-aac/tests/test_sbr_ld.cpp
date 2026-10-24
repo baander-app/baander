@@ -492,7 +492,34 @@ static void test_roundtrip(int frame_length, int dual_rate) {
   delete dec;
 }
 
+/* Depth of a Huffman tree: the longest code it holds. */
+static int tree_depth(const int8_t (*tree)[2], int node, int len) {
+  int deepest = 0;
+  for (int bit = 0; bit < 2; bit++) {
+    const int next = tree[node][bit];
+    deepest = std::max(deepest, next < 0 ? len + 1 : tree_depth(tree, next, len + 1));
+  }
+  return deepest;
+}
+
+/* The encoder's payload buffer is sized from the longest code of the
+ * tables it writes; the tables have to stay within that length. */
+static void test_code_lengths() {
+  const int env_15_t = tree_depth(aac_sbr_huff_env_level_15_t, 0, 0);
+  const int env_15_f = tree_depth(aac_sbr_huff_env_level_15_f, 0, 0);
+  const int env_30_t = tree_depth(aac_sbr_huff_env_level_30_t, 0, 0);
+  const int env_30_f = tree_depth(aac_sbr_huff_env_level_30_f, 0, 0);
+  const int noise_30_t = tree_depth(aac_sbr_huff_noise_level_30_t, 0, 0);
+  printf("longest codes: env %d %d %d %d, noise %d; bound %d; payload buffer %d bytes\n",
+         env_15_t, env_15_f, env_30_t, env_30_f, noise_30_t, AAC_SBR_LD_ENC_MAX_CODE_BITS,
+         AAC_SBR_LD_ENC_MAX_BYTES);
+  CHECK(std::max({env_15_t, env_15_f, env_30_t, env_30_f, noise_30_t}) <=
+            AAC_SBR_LD_ENC_MAX_CODE_BITS,
+        "a code is longer than the payload bound assumes");
+}
+
 int main() {
+  test_code_lengths();
   test_cldfb();
   test_grid();
   for (int fl : {512, 480}) {

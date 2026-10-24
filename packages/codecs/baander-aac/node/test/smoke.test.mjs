@@ -251,6 +251,26 @@ test('encodes and decodes the low-delay profiles', () => {
   assert.throws(() => new AacEncoder({ profile: 'ld', transport: 'adts' }));
   assert.throws(() => new AacEncoder({ profile: 'lc', frameLength: 512 }));
   assert.throws(() => new AacEncoder({ profile: 'lc', ldSbr: true }));
+  for (const profile of ['ld', 'eld']) {
+    assert.throws(
+      () => new AacEncoder({ profile, metadata: { drcProfile: 'film-standard' } }),
+      /metadata is not available for the ld and eld profiles/,
+    );
+  }
+});
+
+test('refuses numeric options that are not numbers', () => {
+  assert.throws(() => new AacDecoder({ eldDownscale: true }), /eldDownscale must be a number/);
+  assert.throws(() => new AacDecoder({ frameLength: {} }), /frameLength must be a number/);
+  assert.throws(() => new AacDecoder({ drc: { boost: '50' } }), /drc\.boost must be a number/);
+  assert.throws(() => new AacDecoder({ drc: { cut: false } }), /drc\.cut must be a number/);
+  assert.throws(() => new AacDecoder({ drc: { targetRefLevel: null } }), /targetRefLevel must be a number/);
+  assert.throws(() => new AacEncoder({ frameLength: '960' }), /frameLength must be a number/);
+  assert.throws(
+    () => new AacEncoder({ metadata: { drcProfile: 'speech', programRefLevel: true } }),
+    /programRefLevel must be a number/,
+  );
+  assert.ok(new AacDecoder({ eldDownscale: 1, frameLength: 960, drc: { boost: 50 } }));
 });
 
 test('writes and applies dynamic range control, and runs the afterburner', () => {

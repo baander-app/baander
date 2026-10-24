@@ -95,18 +95,7 @@ static void aac_vector_fmul_reverse_sse2(float* dst, const float* a, const float
 static void aac_fft_radix2_stage_sse2(float* re, float* im, int n, int half, const float* wr,
                                       const float* wi) {
   if (half < 4) {
-    for (int start = 0; start < n; start += 2 * half) {
-      for (int j = 0; j < half; j++) {
-        const int a = start + j;
-        const int b = a + half;
-        const float tr = re[b] * wr[j] - im[b] * wi[j];
-        const float ti = re[b] * wi[j] + im[b] * wr[j];
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
-      }
-    }
+    aac_fft_radix2_stage_c(re, im, n, half, wr, wi);
     return;
   }
   for (int start = 0; start < n; start += 2 * half) {

@@ -99,27 +99,46 @@ bool asc_supported(const AacAsc* asc, int rate_index) {
   return true;
 }
 
-/* The sbr_header() of an ELDSpecificConfig as the LD-SBR decoder takes
- * it: the fields the header left out already carry their defaults. */
-AacSbrLdHeader ld_sbr_header_of(const AacAscSbrHeader* h) {
-  AacSbrLdHeader out = {};
-  out.amp_res = h->amp_res;
-  out.start_freq = h->start_freq;
-  out.stop_freq = h->stop_freq;
-  out.xover_band = h->xover_band;
-  out.freq_scale = h->freq_scale;
-  out.alter_scale = h->alter_scale;
-  out.noise_bands = h->noise_bands;
-  out.limiter_bands = h->limiter_bands;
-  out.limiter_gains = h->limiter_gains;
-  out.interpol_freq = h->interpol_freq;
-  out.smoothing_mode = h->smoothing_mode;
-  return out;
+/* Whether the decoder can take the LD-SBR part of an AAC-ELD
+ * configuration, checked before anything of the configuration is
+ * applied: no downscale factor is set, the configuration carries one
+ * header per SCE or CPE of its channel configuration, and every header's
+ * band tables build at the configuration's rate and frame length. */
+int check_ld_sbr(const AacDecoderState* s, const AacAsc* asc) {
+  if (asc->aot != AAC_AOT_ER_ELD || !asc->ld_sbr_present) {
+    return AAC_OK;
+  }
+  if (s->eld_downscale != 1) {
+    return AAC_ERR_UNSUPPORTED; /* the CLDFB chain has no downscaled form */
+  }
+  AacLayout l = {};
+  if (aac_layout_from_config(&l, asc->channel_config)) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  int needed = 0;
+  for (int i = 0; i < l.num_elements; i++) {
+    needed += l.elems[i].type == AAC_ELEM_SCE || l.elems[i].type == AAC_ELEM_CPE;
+  }
+  if (needed > asc->num_ld_sbr_headers || needed > AAC_ASC_MAX_LD_SBR_HEADERS) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  for (int i = 0; i < needed; i++) {
+    const int ret = aac_sbr_ld_header_check(&asc->ld_sbr_header[i], asc->sample_rate,
+                                            asc->frame_length, asc->ld_sbr_sampling_rate);
+    if (ret) {
+      return ret;
+    }
+  }
+  return AAC_OK;
 }
 
 /* Applies a configuration: sample rate, layout, object type, frame length
  * and the extension modes.  Repeating the same configuration changes
- * nothing. */
+ * nothing.  Everything that can be refused is checked first, so a refused
+ * configuration leaves the decoder as it was; should a step still fail
+ * while it is applied, the decoder is left without a layout, so that the
+ * following frames wait for a configuration instead of decoding against
+ * a half-applied one. */
 int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   const int index = aac_asc_rate_index(asc->sample_rate);
   if (!asc_supported(asc, index)) {
@@ -128,43 +147,41 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   if (asc->sbr_present == 1 && asc->ext_sample_rate != 2 * asc->sample_rate) {
     return AAC_ERR_UNSUPPORTED;
   }
-  int ret = aac_decoder_set_rate_index(s, index);
+  int ret = check_ld_sbr(s, asc);
   if (ret) {
     return ret;
   }
-  if (asc->channel_config != 0) {
-    ret = aac_decoder_set_channel_config(s, asc->channel_config);
-  } else if (asc->has_pce) {
-    ret = aac_decoder_set_layout(s, &asc->layout);
+  ret = aac_decoder_set_rate_index(s, index);
+  if (ret == 0) {
+    if (asc->channel_config != 0) {
+      ret = aac_decoder_set_channel_config(s, asc->channel_config);
+    } else if (asc->has_pce) {
+      ret = aac_decoder_set_layout(s, &asc->layout);
+    }
+  }
+  if (ret == 0) {
+    ret = aac_decoder_set_object_type(s, asc->aot);
+  }
+  if (ret == 0) {
+    ret = set_frame_length(s, asc->frame_length);
+  }
+  if (ret == 0) {
+    /* The error resilience tools of an error resilient stream (the flags
+     * mean nothing to the plain syntax). */
+    const bool er = aac_aot_is_er(asc->aot);
+    s->section_resilience = er && asc->section_resilience;
+    s->scalefactor_resilience = er && asc->scalefactor_resilience;
+    s->spectral_resilience = er && asc->spectral_resilience;
+    /* AAC-ELD: the low-delay SBR of the stream, configured last so that
+     * it sees the final rate, layout and frame length. */
+    const bool ld_sbr = asc->aot == AAC_AOT_ER_ELD && asc->ld_sbr_present;
+    const int num_headers = std::min(asc->num_ld_sbr_headers, AAC_ASC_MAX_LD_SBR_HEADERS);
+    ret = aac_decoder_set_ld_sbr(s, ld_sbr ? 1 : 0, asc->ld_sbr_sampling_rate, asc->ld_sbr_crc,
+                                 asc->ld_sbr_header, num_headers);
   }
   if (ret) {
-    return ret;
-  }
-  ret = aac_decoder_set_object_type(s, asc->aot);
-  if (ret) {
-    return ret;
-  }
-  /* The error resilience tools of an error resilient stream (the flags
-   * mean nothing to the plain syntax). */
-  const bool er = aac_aot_is_er(asc->aot);
-  s->section_resilience = er && asc->section_resilience;
-  s->scalefactor_resilience = er && asc->scalefactor_resilience;
-  s->spectral_resilience = er && asc->spectral_resilience;
-  ret = set_frame_length(s, asc->frame_length);
-  if (ret) {
-    return ret;
-  }
-  /* AAC-ELD: the low-delay SBR of the stream, configured last so that it
-   * sees the final rate, layout and frame length. */
-  const bool ld_sbr = asc->aot == AAC_AOT_ER_ELD && asc->ld_sbr_present;
-  AacSbrLdHeader headers[AAC_ASC_MAX_LD_SBR_HEADERS];
-  for (int i = 0; i < asc->num_ld_sbr_headers && i < AAC_ASC_MAX_LD_SBR_HEADERS; i++) {
-    headers[i] = ld_sbr_header_of(&asc->ld_sbr_header[i]);
-  }
-  const int num_headers = std::min(asc->num_ld_sbr_headers, AAC_ASC_MAX_LD_SBR_HEADERS);
-  ret = aac_decoder_set_ld_sbr(s, ld_sbr ? 1 : 0, asc->ld_sbr_sampling_rate, asc->ld_sbr_crc,
-                               headers, num_headers);
-  if (ret) {
+    aac_decoder_set_ld_sbr(s, 0, 0, 0, nullptr, 0);
+    s->layout_source = 0;
     return ret;
   }
   preset_extension(s, asc);
@@ -863,32 +880,21 @@ int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTranspor
   }
   if (s->ld_sbr) {
     /* AAC-ELD with LD-SBR: the sampling frequency is the core's, and the
-     * config carries the header of every SCE and CPE in element order. */
+     * config carries the header of every SCE and CPE in element order.
+     * A layout with more of them than the config can hold has no valid
+     * config, so it is refused rather than written short. */
+    if (aac_encoder_ld_sbr_header_count(s) > AAC_ASC_MAX_LD_SBR_HEADERS) {
+      return AAC_ERR_UNSUPPORTED;
+    }
     asc->ld_sbr_present = 1;
     asc->ld_sbr_sampling_rate = s->ld_sbr_dual_rate;
     asc->ld_sbr_crc = s->ld_sbr_crc;
     asc->num_ld_sbr_headers = 0;
     for (int e = 0; e < s->num_elements; e++) {
-      if (s->elem[e].type == AAC_ELEM_LFE ||
-          asc->num_ld_sbr_headers >= AAC_ASC_MAX_LD_SBR_HEADERS) {
+      if (s->elem[e].type == AAC_ELEM_LFE) {
         continue;
       }
-      const AacSbrLdHeader* h = aac_sbr_ld_enc_header(s->ld_sbr_enc[e]);
-      AacAscSbrHeader* out = &asc->ld_sbr_header[asc->num_ld_sbr_headers++];
-      out->amp_res = h->amp_res;
-      out->start_freq = h->start_freq;
-      out->stop_freq = h->stop_freq;
-      out->xover_band = h->xover_band;
-      out->freq_scale = h->freq_scale;
-      out->alter_scale = h->alter_scale;
-      out->noise_bands = h->noise_bands;
-      out->limiter_bands = h->limiter_bands;
-      out->limiter_gains = h->limiter_gains;
-      out->interpol_freq = h->interpol_freq;
-      out->smoothing_mode = h->smoothing_mode;
-      out->header_extra_1 = h->freq_scale != 2 || h->alter_scale != 1 || h->noise_bands != 2;
-      out->header_extra_2 = h->limiter_bands != 2 || h->limiter_gains != 2 ||
-                            h->interpol_freq != 1 || h->smoothing_mode != 1;
+      asc->ld_sbr_header[asc->num_ld_sbr_headers++] = *aac_sbr_ld_enc_header(s->ld_sbr_enc[e]);
     }
   }
   if (sbr) {

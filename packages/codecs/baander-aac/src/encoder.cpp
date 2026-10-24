@@ -1206,7 +1206,7 @@ float quality_factor(int quality) { return exp2f((70.0f - (float)quality) / 10.0
  * overshoot, the fewest released bands.  With room to spare and a full
  * reservoir the thresholds are lowered instead.  Returns the frame's bits
  * at the chosen working point. */
-int rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_improve) {
+int rate_control(AacEncoderState* s, int target_bits, float base_improve) {
   ReleaseEntry release[2 * AAC_MAX_BANDS];
   const int n_release = prepare_bands(s, release);
 
@@ -1242,7 +1242,6 @@ int rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_i
     set_allowances(s, 0.0f, exp2f(hi), release, 0);
     return quantize_frame(s);
   }
-
   float lo = 0.0f;
   float hi = max_root;
   set_allowances(s, hi, 1.0f, release, 0);
@@ -1275,7 +1274,6 @@ int rate_control(AacEncoderState* s, int target_bits, int max_bits, float base_i
     }
   }
   set_allowances(s, max_root, 1.0f, release, k_hi);
-  (void)max_bits;
   return quantize_frame(s);
 }
 
@@ -1664,6 +1662,14 @@ void aac_encoder_state_destroy(AacEncoderState* s) {
   delete s;
 }
 
+int aac_encoder_ld_sbr_header_count(const AacEncoderState* s) {
+  int count = 0;
+  for (int e = 0; e < s->num_elements; e++) {
+    count += s->elem[e].type != AAC_ELEM_LFE;
+  }
+  return count;
+}
+
 int aac_encoder_state_set_ld_sbr(AacEncoderState* s, int enabled, int dual_rate) {
   if (s->aot != AAC_AOT_ER_ELD) {
     return AAC_ERR_INVALID_ARG;
@@ -1675,6 +1681,11 @@ int aac_encoder_state_set_ld_sbr(AacEncoderState* s, int enabled, int dual_rate)
   const int core_rate = half ? s->input_rate / 2 : s->input_rate;
   const int rate_index = aac_asc_rate_index(core_rate);
   if (rate_index < 0 || !aac_low_delay_rate_supported(rate_index)) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  /* The configuration carries one header per SCE or CPE; a layout with
+   * more than it can hold has no configuration a decoder accepts. */
+  if (enabled && aac_encoder_ld_sbr_header_count(s) > AAC_ASC_MAX_LD_SBR_HEADERS) {
     return AAC_ERR_UNSUPPORTED;
   }
   destroy_ld_sbr_encoders(s);
@@ -1874,7 +1885,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       improve = quality_factor(s->quality);
       break;
   }
-  const int bits = rate_control(s, target, max_bits, improve);
+  const int bits = rate_control(s, target, improve);
   if (s->afterburner) {
     /* The constant-rate modes may fill the frame's budget; the quality
      * modes only redistribute the bits the frame already has. */

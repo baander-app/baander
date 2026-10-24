@@ -12,16 +12,8 @@
 #include "encoder.h"
 #endif
 
-/* Global DSP context — initialized once */
-static AacDSP g_dsp;
-static int g_dsp_initialized = 0;
-
-static void ensure_dsp_init() {
-  if (!g_dsp_initialized) {
-    aac_dsp_init(&g_dsp);
-    g_dsp_initialized = 1;
-  }
-}
+/* Every codec object dispatches through the process-wide table of
+ * aac_dsp_global(), which the first use fills from the CPU flags. */
 
 #if defined(BAAC_AAC_HAVE_ENCODER)
 /* ── Encoder API ───────────────────────────────────────────────── */
@@ -39,8 +31,8 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
     return nullptr;
   }
 
-  ensure_dsp_init();
-  auto* s = aac_encoder_state_create(sample_rate, channels, bitrate, aot, rc_mode, &g_dsp);
+  auto* s =
+      aac_encoder_state_create(sample_rate, channels, bitrate, aot, rc_mode, aac_dsp_global());
   if (s) {
     s->transport = aac_encoder_transport_create();
     if (aac_encoder_aot_low_delay(aot)) {
@@ -287,8 +279,7 @@ AacDecoderHandle aac_decoder_create(int sample_rate, int channels) {
     return nullptr;
   }
 
-  ensure_dsp_init();
-  auto* s = aac_decoder_state_create(sample_rate, channels, &g_dsp);
+  auto* s = aac_decoder_state_create(sample_rate, channels, aac_dsp_global());
   if (s) {
     s->transport = aac_decoder_transport_create();
   }
@@ -312,6 +303,7 @@ int aac_decoder_reset(AacDecoderHandle ctx) {
   aac_decoder_reset_state(s);
   aac_decoder_transport_reset(s->transport);
   aac_decoder_transport_reapply(s, s->transport);
+  s->decoded_since_reset = 0;
   return AAC_OK;
 }
 
@@ -355,7 +347,9 @@ int aac_decoder_set_eld_downscale(AacDecoderHandle ctx, int factor) {
   if (factor != 1 && factor != 2 && factor != 4) {
     return AAC_ERR_INVALID_ARG;
   }
-  if (s->blocks_decoded > 0) {
+  /* A reconfiguration mid-stream (a new rate or layout) clears the block
+   * count but not this flag, so the factor stays fixed until a reset. */
+  if (s->decoded_since_reset) {
     return AAC_ERR_STATE;
   }
   if (s->ld_sbr_mode && factor != 1) {

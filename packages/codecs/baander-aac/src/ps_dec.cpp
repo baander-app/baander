@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 /* Parametric stereo decoder (ISO/IEC 14496-3 8.6.4).  The buffer layout
  * and the order of operations follow FFmpeg's float decoder, which the
@@ -57,7 +58,6 @@ float g_HA[46][8][4];
 float g_HB[46][8][4];
 float g_Q_fract_allpass[2][50][3][2];
 float g_phi_fract[2][50][2];
-bool g_tables_ready = false;
 
 void init_huffman(void) {
   const uint8_t (*tab)[2] = aac_ps_huff_tabs;
@@ -78,10 +78,7 @@ void init_huffman(void) {
   }
 }
 
-void init_tables(void) {
-  if (g_tables_ready) {
-    return;
-  }
+void build_tables(void) {
   init_huffman();
 
   static const float ipdopd_sin[8] = {0, (float)M_SQRT1_2, 1, (float)M_SQRT1_2,
@@ -182,7 +179,11 @@ void init_tables(void) {
   }
 
   aac_ps_hybrid_init();
-  g_tables_ready = true;
+}
+
+void init_tables(void) {
+  static std::once_flag once;
+  std::call_once(once, build_tables);
 }
 
 /* ── bitstream ─────────────────────────────────────────────────── */

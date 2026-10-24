@@ -56,9 +56,10 @@ using AacDrcInfo = struct AacDrcInfo_ {
 int aac_drc_parse(AacDrcInfo* d, AacBitReader* r);
 
 /* Writes the extension_type and dynamic_range_info() of `d`; returns the
- * bytes written, which is what the fill element's count has to carry. */
+ * bits written. */
 int aac_drc_write(const AacDrcInfo* d, AacBitWriter* w);
-/* The bytes aac_drc_write would write. */
+/* The bytes aac_drc_write writes, which is what the fill element's count
+ * has to carry. */
 int aac_drc_bytes(const AacDrcInfo* d);
 
 /* The DVB ancillary data of a data stream element (ETSI TS 101 154):
@@ -153,6 +154,9 @@ void aac_drc_apply_spectrum(const AacDrcDecoder* d, int elem, int channel, float
 void aac_drc_set_qmf_gains(const AacDrcDecoder* d, int elem, int first_channel, int nch,
                            AacDrcQmf* q, int frame_length);
 void aac_drc_qmf_init(AacDrcQmf* q);
+/* Keeps the previous frame's gains for this frame (a concealed element,
+ * whose DRC data was lost with it), so they are applied without a ramp. */
+void aac_drc_qmf_hold(AacDrcQmf* q);
 /* Scales the QMF matrix X[re/im][slot][band] of one channel by this
  * frame's gains, interpolated from the previous frame's over `slots`. */
 void aac_drc_apply_qmf(AacDrcQmf* q, int channel, float (*X)[38][64], int slots);

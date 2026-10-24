@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <mutex>
 
 #include "fft.h"
 
@@ -51,14 +52,7 @@ float g_ana32_pre_re[64], g_ana32_pre_im[64];
 float g_ana32_post_re[32], g_ana32_post_im[32];
 float g_syn64_pre_re[64], g_syn64_pre_im[64];
 float g_syn64_post_re[128], g_syn64_post_im[128];
-bool g_tables_ready = false;
-
-}  // namespace
-
-void aac_qmf_tables_init(void) {
-  if (g_tables_ready) {
-    return;
-  }
+void build_tables(void) {
   for (int k = 0; k < 64; k++) {
     for (int n = 0; n < 128; n++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 1.0);
@@ -98,7 +92,13 @@ void aac_qmf_tables_init(void) {
     g_syn64_post_re[n] = (float)(cos(a) / 64.0);
     g_syn64_post_im[n] = (float)(sin(a) / 64.0);
   }
-  g_tables_ready = true;
+}
+
+}  // namespace
+
+void aac_qmf_tables_init(void) {
+  static std::once_flag once;
+  std::call_once(once, build_tables);
 }
 
 void aac_qmf_analysis_init(AacQmfAnalysis* a, int bands) {

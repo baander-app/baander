@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "aac_tables.h"
+#include "sbr_ld.h"
 
 namespace {
 
@@ -106,56 +107,6 @@ int read_ga_config(AacBitReader* r, AacAsc* asc, int align_anchor) {
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
-/* sbr_header() (Table 4.56) inside ld_sbr_header(). */
-void read_sbr_header(AacBitReader* r, AacAscSbrHeader* h) {
-  h->amp_res = (int)aac_bitreader_read(r, 1);
-  h->start_freq = (int)aac_bitreader_read(r, 4);
-  h->stop_freq = (int)aac_bitreader_read(r, 4);
-  h->xover_band = (int)aac_bitreader_read(r, 3);
-  aac_bitreader_skip(r, 2); /* bs_reserved */
-  h->header_extra_1 = (int)aac_bitreader_read(r, 1);
-  h->header_extra_2 = (int)aac_bitreader_read(r, 1);
-  h->freq_scale = 2;
-  h->alter_scale = 1;
-  h->noise_bands = 2;
-  if (h->header_extra_1) {
-    h->freq_scale = (int)aac_bitreader_read(r, 2);
-    h->alter_scale = (int)aac_bitreader_read(r, 1);
-    h->noise_bands = (int)aac_bitreader_read(r, 2);
-  }
-  h->limiter_bands = 2;
-  h->limiter_gains = 2;
-  h->interpol_freq = 1;
-  h->smoothing_mode = 1;
-  if (h->header_extra_2) {
-    h->limiter_bands = (int)aac_bitreader_read(r, 2);
-    h->limiter_gains = (int)aac_bitreader_read(r, 2);
-    h->interpol_freq = (int)aac_bitreader_read(r, 1);
-    h->smoothing_mode = (int)aac_bitreader_read(r, 1);
-  }
-}
-
-void write_sbr_header(AacBitWriter* w, const AacAscSbrHeader* h) {
-  aac_bitwriter_write(w, (uint32_t)h->amp_res, 1);
-  aac_bitwriter_write(w, (uint32_t)h->start_freq, 4);
-  aac_bitwriter_write(w, (uint32_t)h->stop_freq, 4);
-  aac_bitwriter_write(w, (uint32_t)h->xover_band, 3);
-  aac_bitwriter_write(w, 0, 2); /* bs_reserved */
-  aac_bitwriter_write(w, (uint32_t)h->header_extra_1, 1);
-  aac_bitwriter_write(w, (uint32_t)h->header_extra_2, 1);
-  if (h->header_extra_1) {
-    aac_bitwriter_write(w, (uint32_t)h->freq_scale, 2);
-    aac_bitwriter_write(w, (uint32_t)h->alter_scale, 1);
-    aac_bitwriter_write(w, (uint32_t)h->noise_bands, 2);
-  }
-  if (h->header_extra_2) {
-    aac_bitwriter_write(w, (uint32_t)h->limiter_bands, 2);
-    aac_bitwriter_write(w, (uint32_t)h->limiter_gains, 2);
-    aac_bitwriter_write(w, (uint32_t)h->interpol_freq, 1);
-    aac_bitwriter_write(w, (uint32_t)h->smoothing_mode, 1);
-  }
-}
-
 /* sbr_header() count of ld_sbr_header(): one per SCE or CPE of the
  * channel configuration (Table 4.4). */
 int ld_sbr_header_count(int channel_config) {
@@ -192,7 +143,7 @@ int read_eld_config(AacBitReader* r, AacAsc* asc) {
     asc->ld_sbr_crc = (int)aac_bitreader_read(r, 1);
     asc->num_ld_sbr_headers = ld_sbr_header_count(asc->channel_config);
     for (int i = 0; i < asc->num_ld_sbr_headers; i++) {
-      read_sbr_header(r, &asc->ld_sbr_header[i]);
+      aac_sbr_ld_header_read(&asc->ld_sbr_header[i], r);
     }
   }
   for (;;) {
@@ -227,7 +178,7 @@ void write_eld_config(AacBitWriter* w, const AacAsc* asc) {
     aac_bitwriter_write(w, asc->ld_sbr_crc ? 1u : 0u, 1);
     const int n = ld_sbr_header_count(asc->channel_config);
     for (int i = 0; i < n; i++) {
-      write_sbr_header(w, &asc->ld_sbr_header[i]);
+      aac_sbr_ld_header_write(&asc->ld_sbr_header[i], w);
     }
   }
   aac_bitwriter_write(w, kEldExtTerm, 4);

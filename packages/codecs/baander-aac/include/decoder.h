@@ -88,6 +88,9 @@ using AacDecoderState = struct AacDecoderState_ {
    * coded scalefactors and reordered spectral data. */
   int section_resilience, scalefactor_resilience, spectral_resilience;
   int rvlc_recovered; /* a channel of this block needed the backward RVLC pass */
+  int decoded_since_reset; /* a block was decoded or concealed since creation or
+                              aac_decoder_reset; reconfigurations leave it set, so
+                              the downscale factor cannot change mid-stream */
   int blocks_decoded; /* raw data blocks decoded or concealed since creation or reset */
   AacMdct mdct_eld;   /* AAC-ELD: the transform of the (downscaled) output frame */
   AacLayout layout;   /* element to channel assignment */

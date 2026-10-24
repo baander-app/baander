@@ -54,6 +54,11 @@ void aac_dsp_init(AacDSP* dsp);
  * transforms and filterbanks), filled once from the detected CPU flags. */
 const AacDSP* aac_dsp_global(void);
 
+/* The scalar radix-2 stage, which the SIMD kernels fall back to for the
+ * stages too short for a vector. */
+void aac_fft_radix2_stage_c(float* re, float* im, int n, int half, const float* wr,
+                            const float* wi);
+
 /* Platform-specific init functions (called internally by aac_dsp_init) */
 void aac_dsp_init_sse2(AacDSP* dsp);
 void aac_dsp_init_avx2(AacDSP* dsp);

@@ -810,6 +810,29 @@ Electron service suite (5 tests). Listening tests and the Electron IPC and
 bridge suites did not run in that environment. Deviations by design are
 recorded in the [codec README](packages/codecs/baander-aac/docs/README.md).
 
+Checkpoint, 2026-10-24, low delay and dynamics: the second tier, per the
+[plan](docs/plans/2026-10-23-003-feat-aac-codec-low-delay-and-drc-plan.md),
+is delivered. Decoder: the error resilient object types with virtual
+codebook 11, RVLC and HCR, AAC-LD at 512 and 480, AAC-ELD with downscaled
+playout, LD-SBR as a self-contained module, MPEG-4 dynamic range control
+applied on the spectrum or the QMF bands, and the object type, program
+reference level and DRC presence reported. Encoder: AAC-LD and AAC-ELD over
+every transport, ELD with LD-SBR, DRC metadata from five compression
+profiles, and the afterburner. Performance: table-driven Huffman reading,
+FFT-form QMF banks, SIMD kernels (SSE2, AVX2, NEON) behind a dispatch table
+and a `baac bench` command. Binding, Electron service, IPC validation, bridge
+types and CONCEPTS.md follow. Limits: the LD-SBR windows and frame grid, the
+RVLC escape codebook and the HCR reordering rules were written without the
+standard's tables and round-trip within the codec only; the DRC metadata
+path is not available for the low-delay types. Verification: CTest 28/28 in
+the release and sanitizer builds, FFmpeg decoding the LD, ELD and DRC streams
+at 135 to 137 dB, afterburner gains of 0.6 to 1.0 dB segmental SNR, encode
+1.3 to 2 times and decode 1.1 to 1.9 times faster with byte-identical
+encoder output, the binding's smoke test (9 tests) and the Electron service
+suite (5 tests). A read-only review found fourteen correctness and contract
+findings, all applied. Not run: listening tests, interop for ELD with LD-SBR
+and for the RVLC and HCR tools.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

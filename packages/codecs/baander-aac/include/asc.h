@@ -24,12 +24,18 @@ extern "C" {
 #define AAC_ASC_MAX_BYTES 64
 
 /* One sbr_header() of the ld_sbr_header() in an ELDSpecificConfig
- * (ISO/IEC 14496-3 4.6.18.3.1 fields), kept for the LD-SBR decoder. */
-using AacAscSbrHeader = struct AacAscSbrHeader_ {
-  int amp_res, start_freq, stop_freq, xover_band;
-  int header_extra_1, header_extra_2;
-  int freq_scale, alter_scale, noise_bands; /* with header_extra_1, else defaults */
-  int limiter_bands, limiter_gains, interpol_freq, smoothing_mode; /* with header_extra_2 */
+ * (ISO/IEC 14496-3 4.6.18.3.1), as the LD-SBR decoder and encoder keep
+ * it: the fields the header leaves out carry the standard's defaults
+ * (freq_scale 2, alter_scale 1, noise_bands 2, limiter_bands 2,
+ * limiter_gains 2, interpol_freq 1, smoothing_mode 1), and the writer
+ * sends the extension fields only where a value differs from them.
+ * aac_sbr_ld_header_read and aac_sbr_ld_header_write (sbr_ld.h) are the
+ * bitstream form. */
+using AacSbrLdHeader = struct AacSbrLdHeader_ {
+  int amp_res;
+  int start_freq, stop_freq, xover_band;
+  int freq_scale, alter_scale, noise_bands;
+  int limiter_bands, limiter_gains, interpol_freq, smoothing_mode;
 };
 #define AAC_ASC_MAX_LD_SBR_HEADERS 4
 
@@ -57,7 +63,7 @@ using AacAsc = struct AacAsc_ {
   int ld_sbr_sampling_rate; /* ldSbrSamplingRate: 1 when the SBR runs at twice the core rate */
   int ld_sbr_crc;           /* ldSbrCrcFlag */
   int num_ld_sbr_headers;   /* one per SCE or CPE of the channel configuration */
-  AacAscSbrHeader ld_sbr_header[AAC_ASC_MAX_LD_SBR_HEADERS];
+  AacSbrLdHeader ld_sbr_header[AAC_ASC_MAX_LD_SBR_HEADERS];
 };
 
 /* Fills `asc` with the settings of a plain AAC-LC stream without any

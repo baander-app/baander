@@ -1,7 +1,7 @@
 ---
 title: AAC codec low delay and dynamics: ER tools, AAC-LD, AAC-ELD, afterburner, MPEG-4 DRC, performance pass
 date: 2026-10-23
-status: draft
+status: delivered
 execution: code
 ---
 

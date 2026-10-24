@@ -32,8 +32,24 @@ extern "C" {
  * output of the same frame (`core_delay`, in core samples, 0 when the
  * core is transparent). */
 
-#define AAC_SBR_LD_ENC_RING 128     /* analysis slots kept per channel */
-#define AAC_SBR_LD_ENC_MAX_BYTES 256 /* largest sbr_data() */
+#define AAC_SBR_LD_ENC_RING 128 /* analysis slots kept per channel */
+
+/* The payload buffer holds the largest sbr_data() the writer can produce,
+ * so no frame is ever cut short.  The longest code of the envelope and
+ * noise floor Huffman tables (aac_sbr_huff_env_level_15_f and _30_f) is
+ * 20 bits; one channel then takes at most an LDTRAN grid with
+ * AAC_SBR_LD_MAX_ENV envelopes (1 + 4 bits and one per envelope), a delta
+ * flag per envelope and per noise floor, two bits of inverse filtering
+ * per noise band, every band of every envelope and noise floor at the
+ * longest code (the start value of a frequency-coded run, 7 or 5 bits, is
+ * shorter than the code it stands in for) and the harmonic flag; a
+ * channel pair adds bs_data_extra, bs_coupling and bs_extended_data. */
+#define AAC_SBR_LD_ENC_MAX_CODE_BITS 20
+#define AAC_SBR_LD_ENC_CHANNEL_BITS                                                      \
+  (5 + AAC_SBR_LD_MAX_ENV + AAC_SBR_LD_MAX_ENV + 2 + 2 * AAC_SBR_MAX_NOISE_BANDS +       \
+   AAC_SBR_LD_MAX_ENV * AAC_SBR_MAX_BANDS * AAC_SBR_LD_ENC_MAX_CODE_BITS +               \
+   2 * (5 + AAC_SBR_MAX_NOISE_BANDS * AAC_SBR_LD_ENC_MAX_CODE_BITS) + 1)
+#define AAC_SBR_LD_ENC_MAX_BYTES ((3 + 2 * AAC_SBR_LD_ENC_CHANNEL_BITS + 7) / 8)
 
 using AacSbrLdEncChannel = struct AacSbrLdEncChannel_ {
   AacCldfbAnalysis analysis;   /* 64 bands (dual rate) or 32 (single rate) */

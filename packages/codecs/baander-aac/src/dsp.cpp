@@ -40,8 +40,8 @@ static void aac_vector_fmul_accumulate_c(float* dst, const float* a, const float
 
 /* ── Scalar transform kernels ─────────────────────────────────────── */
 
-static void aac_fft_radix2_stage_c(float* re, float* im, int n, int half, const float* wr,
-                                   const float* wi) {
+void aac_fft_radix2_stage_c(float* re, float* im, int n, int half, const float* wr,
+                            const float* wi) {
   for (int start = 0; start < n; start += 2 * half) {
     for (int j = 0; j < half; j++) {
       const int a = start + j;

@@ -327,20 +327,9 @@ int read_envelope(const AacSbrState* s, AacBitReader* r, AacSbrChannel* ch, int 
   for (int i = 0; i < ch->num_env; i++) {
     const int n = s->n[ch->freq_res[i + 1]];
     if (ch->df_env[i]) {
-      if (ch->freq_res[i + 1] == ch->freq_res[i]) {
-        for (int j = 0; j < n; j++) {
-          ch->env_facs_q[i + 1][j] = ch->env_facs_q[i][j] + delta * huff(r, t_huff);
-        }
-      } else if (ch->freq_res[i + 1]) {
-        for (int j = 0; j < n; j++) {
-          const int k = (j + odd) >> 1;
-          ch->env_facs_q[i + 1][j] = ch->env_facs_q[i][k] + delta * huff(r, t_huff);
-        }
-      } else {
-        for (int j = 0; j < n; j++) {
-          const int k = j ? 2 * j - odd : 0;
-          ch->env_facs_q[i + 1][j] = ch->env_facs_q[i][k] + delta * huff(r, t_huff);
-        }
+      for (int j = 0; j < n; j++) {
+        const int k = aac_sbr_prev_band(j, ch->freq_res[i + 1], ch->freq_res[i], odd);
+        ch->env_facs_q[i + 1][j] = ch->env_facs_q[i][k] + delta * huff(r, t_huff);
       }
     } else {
       ch->env_facs_q[i + 1][0] = delta * (int)aac_bitreader_read(r, bits);

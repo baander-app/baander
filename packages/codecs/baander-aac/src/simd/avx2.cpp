@@ -112,35 +112,26 @@ static void aac_vector_fmul_reverse_avx2(float* dst, const float* a, const float
  * explicitly where they want them. */
 static void aac_fft_radix2_stage_avx2(float* re, float* im, int n, int half, const float* wr,
                                       const float* wi) {
-  if (half < 8) {
-    for (int start = 0; start < n; start += 2 * half) {
-      if (half == 4) {
-        float* ra = re + start;
-        float* ia = im + start;
-        const __m128 vwr = _mm_loadu_ps(wr);
-        const __m128 vwi = _mm_loadu_ps(wi);
-        const __m128 xr = _mm_loadu_ps(ra + 4);
-        const __m128 xi = _mm_loadu_ps(ia + 4);
-        const __m128 tr = _mm_sub_ps(_mm_mul_ps(xr, vwr), _mm_mul_ps(xi, vwi));
-        const __m128 ti = _mm_add_ps(_mm_mul_ps(xr, vwi), _mm_mul_ps(xi, vwr));
-        const __m128 ar = _mm_loadu_ps(ra);
-        const __m128 ai = _mm_loadu_ps(ia);
-        _mm_storeu_ps(ra + 4, _mm_sub_ps(ar, tr));
-        _mm_storeu_ps(ia + 4, _mm_sub_ps(ai, ti));
-        _mm_storeu_ps(ra, _mm_add_ps(ar, tr));
-        _mm_storeu_ps(ia, _mm_add_ps(ai, ti));
-        continue;
-      }
-      for (int j = 0; j < half; j++) {
-        const int a = start + j;
-        const int b = a + half;
-        const float tr = re[b] * wr[j] - im[b] * wi[j];
-        const float ti = re[b] * wi[j] + im[b] * wr[j];
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
-      }
+  if (half < 4) {
+    aac_fft_radix2_stage_c(re, im, n, half, wr, wi);
+    return;
+  }
+  if (half == 4) {
+    for (int start = 0; start < n; start += 8) {
+      float* ra = re + start;
+      float* ia = im + start;
+      const __m128 vwr = _mm_loadu_ps(wr);
+      const __m128 vwi = _mm_loadu_ps(wi);
+      const __m128 xr = _mm_loadu_ps(ra + 4);
+      const __m128 xi = _mm_loadu_ps(ia + 4);
+      const __m128 tr = _mm_sub_ps(_mm_mul_ps(xr, vwr), _mm_mul_ps(xi, vwi));
+      const __m128 ti = _mm_add_ps(_mm_mul_ps(xr, vwi), _mm_mul_ps(xi, vwr));
+      const __m128 ar = _mm_loadu_ps(ra);
+      const __m128 ai = _mm_loadu_ps(ia);
+      _mm_storeu_ps(ra + 4, _mm_sub_ps(ar, tr));
+      _mm_storeu_ps(ia + 4, _mm_sub_ps(ai, ti));
+      _mm_storeu_ps(ra, _mm_add_ps(ar, tr));
+      _mm_storeu_ps(ia, _mm_add_ps(ai, ti));
     }
     return;
   }

@@ -8,6 +8,7 @@
 #include "asc.h"
 #include "encoder.h"
 #include "qmf_ld.h"
+#include "sbr_ld_enc.h"
 #include "test_util.h"
 
 struct Encoded {
@@ -258,7 +259,7 @@ static void config_roundtrip(int channels, int dual_rate) {
         "config: ld_sbr %d, rate flag %d, crc %d", asc.ld_sbr_present, asc.ld_sbr_sampling_rate,
         asc.ld_sbr_crc);
   CHECK(asc.num_ld_sbr_headers == 1, "config: %d headers", asc.num_ld_sbr_headers);
-  const AacAscSbrHeader& h = asc.ld_sbr_header[0];
+  const AacSbrLdHeader& h = asc.ld_sbr_header[0];
   uint8_t again[64];
   const int len = aac_asc_write(&asc, again, sizeof(again));
   CHECK(len == (int)e.asc.size() && memcmp(again, e.asc.data(), (size_t)len) == 0,
@@ -342,6 +343,171 @@ static void test_api() {
   aac_decoder_destroy(dec);
 }
 
+/* ── reconfiguration from mono to stereo ───────────────────────── */
+
+/* Decodes a LOAS stream through the streaming API, one frame per entry
+ * of the result. */
+static std::vector<std::vector<float>> decode_loas_frames(AacDecoderHandle dec,
+                                                          const std::vector<uint8_t>& stream) {
+  std::vector<std::vector<float>> frames;
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  CHECK(aac_decoder_feed(dec, stream.data(), (int)stream.size()) == (int)stream.size(),
+        "the stream fits the FIFO");
+  for (;;) {
+    const int got = aac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+    if (got <= 0) {
+      CHECK(got == 0, "decode_next %d", got);
+      break;
+    }
+    frames.emplace_back(pcm.begin(), pcm.begin() + (size_t)got * aac_decoder_channels(dec));
+  }
+  return frames;
+}
+
+/* A mono LD-SBR stream followed by a stereo one with the same SBR header:
+ * the in-band configuration switches the layout from one single channel
+ * element to one channel pair, and the LD-SBR states have to follow (a
+ * state built for the single channel cannot serve the pair), so the
+ * stereo frames come out as from a decoder that only ever saw them. */
+static void mono_then_stereo() {
+  const int sr = 48000;
+  const std::vector<float> mono_pcm = gen_wideband(sr / 4, sr, 1);
+  const std::vector<float> stereo_pcm = gen_wideband(sr / 4, sr, 2);
+  const Encoded mono = encode(mono_pcm, sr, 1, 64000, 512, 1, 1, AAC_TRANSPORT_LOAS);
+  const Encoded stereo = encode(stereo_pcm, sr, 2, 128000, 512, 1, 1, AAC_TRANSPORT_LOAS);
+  AacAsc a, b;
+  CHECK(aac_asc_parse(mono.asc.data(), (int)mono.asc.size(), &a) == 0 &&
+            aac_asc_parse(stereo.asc.data(), (int)stereo.asc.size(), &b) == 0,
+        "both configs parse");
+  CHECK(memcmp(&a.ld_sbr_header[0], &b.ld_sbr_header[0], sizeof(a.ld_sbr_header[0])) == 0,
+        "the mono and the stereo stream share their SBR header");
+  std::vector<uint8_t> both = mono.stream;
+  both.insert(both.end(), stereo.stream.begin(), stereo.stream.end());
+
+  AacDecoderHandle joint = aac_decoder_create(sr, 2);
+  const std::vector<std::vector<float>> joint_frames = decode_loas_frames(joint, both);
+  AacDecoderHandle fresh = aac_decoder_create(sr, 2);
+  const std::vector<std::vector<float>> mono_frames = decode_loas_frames(fresh, mono.stream);
+  aac_decoder_reset(fresh);
+  const std::vector<std::vector<float>> stereo_frames = decode_loas_frames(fresh, stereo.stream);
+  CHECK(joint_frames.size() == mono_frames.size() + stereo_frames.size(),
+        "mono then stereo: %zu frames, expected %zu + %zu", joint_frames.size(),
+        mono_frames.size(), stereo_frames.size());
+  if (joint_frames.size() != mono_frames.size() + stereo_frames.size()) {
+    aac_decoder_destroy(joint);
+    aac_decoder_destroy(fresh);
+    return;
+  }
+  for (size_t f = 0; f < 3 && f < stereo_frames.size(); f++) {
+    const std::vector<float>& got = joint_frames[mono_frames.size() + f];
+    const std::vector<float>& want = stereo_frames[f];
+    CHECK(got.size() == want.size(), "stereo frame %zu: %zu samples, expected %zu", f, got.size(),
+          want.size());
+    if (got.size() != want.size()) {
+      continue;
+    }
+    float worst = 0.0f;
+    for (size_t i = 0; i < got.size(); i++) {
+      worst = std::max(worst, fabsf(got[i] - want[i]));
+    }
+    CHECK(worst < 1e-5f, "stereo frame %zu after the mono stream differs by up to %g", f, worst);
+  }
+  /* The stereo frames carry two different channels: the comparison is
+   * not satisfied by a decoder that duplicates one channel. */
+  const std::vector<float>& last = stereo_frames.back();
+  double diff = 0.0;
+  for (size_t i = 0; i + 1 < last.size(); i += 2) {
+    diff += fabs((double)last[i] - last[i + 1]);
+  }
+  CHECK(diff > 1.0, "the stereo stream's channels differ (%g)", diff);
+  aac_decoder_destroy(joint);
+  aac_decoder_destroy(fresh);
+}
+
+/* ── the payload buffer holds the longest sbr_data() ───────────── */
+
+/* Every other QMF band of the SBR range driven to full scale while the
+ * rest stay silent, with the band parity and the level flipping from
+ * frame to frame: the envelopes take large deltas in frequency and in
+ * time and every frame has a transient.  With the CRC on, a payload cut
+ * short would fail it; every frame must decode without concealment and
+ * the writer stays within the buffer it is sized for (the bound itself
+ * rests on the code lengths test_sbr_ld checks). */
+static void worst_case_payload() {
+  const int sr = 48000;
+  const int channels = 2;
+  const int fl = 512;
+  /* The low bitrate puts the crossover at 5 kHz, which gives the most bands. */
+  AacEncoderHandle enc = aac_encoder_create(sr, channels, 32000, AAC_AOT_ER_ELD, AAC_RC_CBR);
+  CHECK(enc != nullptr, "ELD encoder");
+  CHECK(aac_encoder_set_frame_length(enc, fl) == AAC_OK, "frame length");
+  CHECK(aac_encoder_set_transport(enc, AAC_TRANSPORT_RAW) == AAC_OK, "raw units");
+  CHECK(aac_encoder_set_ld_sbr(enc, 1, 1) == AAC_OK, "LD-SBR dual rate");
+  auto* state = static_cast<AacEncoderState*>(enc);
+  state->ld_sbr_crc = 1;
+  const int frame = aac_encoder_frame_size(enc);
+  const int frames = 48;
+  std::vector<float> pcm((size_t)frame * frames * channels, 0.0f);
+  const double band_hz = (double)sr / 128.0; /* a QMF band of the 64-band bank */
+  for (int f = 1; f < frames; f += 2) {
+    const int parity = (f / 2) & 1;
+    for (int i = 0; i < frame; i++) {
+      const double t = (double)(f * frame + i) / sr;
+      double v = 0.0;
+      for (int k = parity; k < 64; k += 2) {
+        v += sin(2.0 * M_PI * (k + 0.5) * band_hz * t + 0.7 * k);
+      }
+      for (int c = 0; c < channels; c++) {
+        pcm[((size_t)f * frame + i) * channels + c] = (float)(0.95 * v / 6.0 * (c ? -1.0 : 1.0));
+      }
+    }
+  }
+  for (float& v : pcm) {
+    v = std::max(-0.95f, std::min(0.95f, v));
+  }
+  uint8_t asc[64];
+  const int asc_len = aac_encoder_config(enc, asc, sizeof(asc));
+  std::vector<std::vector<uint8_t>> aus;
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) * 2);
+  int most_bits = 0;
+  for (int f = 0; f < frames; f++) {
+    const int len = aac_encoder_encode(enc, pcm.data() + (size_t)f * frame * channels, frame,
+                                       buf.data(), (int)buf.size());
+    CHECK(len > 0, "encode frame %d: %d", f, len);
+    aus.emplace_back(buf.begin(), buf.begin() + std::max(len, 0));
+    for (int e = 0; e < state->num_elements; e++) {
+      most_bits = std::max(most_bits, aac_sbr_ld_enc_bits(state->ld_sbr_enc[e]));
+    }
+  }
+  aac_encoder_destroy(enc);
+  printf("worst-case payload: %d bits at most, buffer %d bytes\n", most_bits,
+         AAC_SBR_LD_ENC_MAX_BYTES);
+  CHECK(most_bits <= 8 * AAC_SBR_LD_ENC_MAX_BYTES, "payload %d bits exceeds the buffer",
+        most_bits);
+
+  AacDecoderHandle dec = aac_decoder_create(sr, channels);
+  CHECK(aac_decoder_set_config(dec, asc, asc_len) == AAC_OK, "config");
+  std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  int concealed = 0;
+  int errors = 0;
+  int with_sbr = 0;
+  for (const std::vector<uint8_t>& au : aus) {
+    const int got = aac_decoder_decode(dec, au.data(), (int)au.size(), out.data(), (int)out.size());
+    if (got < 0) {
+      errors++;
+      continue;
+    }
+    concealed += aac_decoder_last_frame_concealed(dec);
+    int has_sbr = 0;
+    aac_decoder_get_sbr_ps(dec, &has_sbr, nullptr);
+    with_sbr += has_sbr;
+  }
+  CHECK(errors == 0 && concealed == 0, "worst-case payload: %d errors, %d concealed (CRC) frames",
+        errors, concealed);
+  CHECK(with_sbr == frames, "worst-case payload: SBR data in %d of %d frames", with_sbr, frames);
+  aac_decoder_destroy(dec);
+}
+
 /* ── plain ELD stays byte for byte the same ────────────────────── */
 
 /* The references were written by the release build before LD-SBR was
@@ -382,6 +548,8 @@ int main() {
   roundtrip(480, 1, 0, AAC_TRANSPORT_LOAS);
   crc_and_concealment(1);
   crc_and_concealment(0);
+  mono_then_stereo();
+  worst_case_payload();
   for (int fl : {512, 480}) {
     for (int ch : {1, 2}) {
       plain_eld_identity(fl, ch);

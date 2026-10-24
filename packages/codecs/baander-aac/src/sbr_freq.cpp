@@ -309,3 +309,13 @@ int aac_sbr_freq_tables(AacSbrFreq* f) {
 }
 
 void aac_sbr_freq_limiter(AacSbrFreq* f) { make_f_tablelim(f); }
+
+int aac_sbr_prev_band(int j, int res, int prev_res, int odd) {
+  if (res == prev_res) {
+    return j;
+  }
+  if (res) {
+    return (j + odd) >> 1;
+  }
+  return j ? 2 * j - odd : 0;
+}

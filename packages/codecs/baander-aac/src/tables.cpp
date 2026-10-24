@@ -393,7 +393,7 @@ int aac_tns_max_bands(int frame_length, int rate_index, int is_short) {
   if (frame_length == AAC_FRAME_SIZE_LD_480) {
     return aac_tns_max_bands_480[low_delay_table_index(rate_index)];
   }
-  return is_short ? aac_tns_max_bands_short[rate_index] : aac_tns_max_bands_long[rate_index];
+  return aac_tns_max_bands_long[rate_index];
 }
 const int aac_tns_max_order_short = 7;
 const AacChannelConfig aac_channel_config[8] = {{0, 0, 0, 0}, {1, 0, 1, 0}, {2, 1, 0, 0},

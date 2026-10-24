@@ -911,6 +911,7 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   s->frame_size = s->frame_length;
   s->aot = 0;
   s->eld_downscale = 1;
+  s->decoded_since_reset = 0;
   s->dsp = dsp;
   s->rate_index = -1;
   for (int i = 0; i < AAC_NUM_SAMPLE_RATES; i++) {
@@ -977,6 +978,9 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   s->sbr_mode = 0;
   s->ps_output = 0;
   s->blocks_decoded = 0;
+  /* The DRC readback and the held gains describe frames before the
+   * reset. */
+  aac_drc_frame_begin(&s->drc);
   if (s->aot == AAC_AOT_ER_ELD) {
     aac_mdct_init(&s->mdct_eld, 2 * core_output_length(s));
   }
@@ -1020,7 +1024,12 @@ bool same_ld_sbr(const AacDecoderState* s, int dual_rate, int crc, const AacSbrL
   for (int i = 0; i < l->num_elements; i++) {
     const AacSbrLdState* st = s->ld_sbr[i];
     const int type = l->elems[i].type;
-    if (!st || st->core_sample_rate != s->sample_rate || st->frame_length != s->frame_length) {
+    /* A state built for a single channel element does not serve a pair
+     * at the same position (a mono stream followed by a stereo one with
+     * the same header), so the element type has to match as well. */
+    const int state_type = type == AAC_ELEM_CPE ? AAC_ELEM_CPE : AAC_ELEM_SCE;
+    if (!st || st->core_sample_rate != s->sample_rate || st->frame_length != s->frame_length ||
+        st->elem_type != state_type) {
       return false;
     }
     if (type != AAC_ELEM_SCE && type != AAC_ELEM_CPE) {
@@ -1367,12 +1376,42 @@ int effective_conceal_mode(const AacDecoderState* s) {
 }
 
 /* Replaces a lost channel's frame by its concealed continuation. */
-void conceal_channel(AacDecoderState* s, AacDecoderChannel* ch) {
+void conceal_spectrum(AacDecoderState* s, AacDecoderChannel* ch) {
   aac_conceal_spectrum(&ch->conceal, effective_conceal_mode(s), s->frame_length,
                        &s->conceal_random, &ch->cs.ics,
                        ch->cs.coef);
   ch->cs.tns_present = 0;
-  imdct_and_window(s, ch);
+}
+
+/* Dynamic range control of a concealed element, whose own DRC data was
+ * lost with it: in the QMF domain the previous frame's gains stay in
+ * force (the SBR stage applies them without a ramp), on the spectrum the
+ * gains of the DRC info in hand are applied, which for a lost block is
+ * the previous frame's.  Either way the level does not pump across the
+ * gap. */
+void hold_drc(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) {
+  if (!s->drc.settings.enabled) {
+    return;
+  }
+  if (s->sbr_mode && s->sbr[elem]) {
+    aac_drc_qmf_hold(&s->sbr[elem]->drc);
+    return;
+  }
+  for (int c = 0; c < nch; c++) {
+    aac_drc_apply_spectrum(&s->drc, elem, s->elem_base[elem] + c, chans[c].cs.coef,
+                           chans[c].cs.ics.num_windows, s->frame_length);
+  }
+}
+
+/* Concealed output for every channel of an element. */
+void conceal_element(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) {
+  for (int c = 0; c < nch; c++) {
+    conceal_spectrum(s, &chans[c]);
+  }
+  hold_drc(s, elem, chans, nch);
+  for (int c = 0; c < nch; c++) {
+    imdct_and_window(s, &chans[c]);
+  }
 }
 
 /* The first good frame after concealed ones is crossfaded from the
@@ -1413,13 +1452,15 @@ void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
 
 /* Dynamic range control of an element's channels: on the spectrum before
  * the inverse transform, or as QMF-band gains the SBR stage applies once
- * the high band exists. */
+ * the high band exists.  An element that has no SBR state yet (an LFE
+ * before the first SBR frame) is scaled on its spectrum, so that DRC
+ * never creates a state. */
 void apply_drc(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) {
   if (!s->drc.settings.enabled) {
     return;
   }
-  if (s->sbr_mode) {
-    aac_drc_set_qmf_gains(&s->drc, elem, s->elem_base[elem], nch, &sbr_state(s, elem)->drc,
+  if (s->sbr_mode && s->sbr[elem]) {
+    aac_drc_set_qmf_gains(&s->drc, elem, s->elem_base[elem], nch, &s->sbr[elem]->drc,
                           s->frame_length);
     return;
   }
@@ -1565,8 +1606,15 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   }
   const bool er = aac_aot_is_er(s->aot);
   if (er) {
+    /* The channel configuration names the elements: without any
+     * configuration the block waits for one; with a layout from a PCE or
+     * from the elements of an earlier block the stream cannot be decoded
+     * (the streaming layer would otherwise wait for ever). */
+    if (s->layout_source == 0) {
+      return AAC_ERR_STATE;
+    }
     if (s->layout_source != 1) {
-      return AAC_ERR_STATE; /* the configuration names the elements */
+      return AAC_ERR_UNSUPPORTED;
     }
     p.sniffing = false;
     const int ret = decode_er_elements(s, r);
@@ -1652,10 +1700,10 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
     AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
     if (!s->elem_present[i]) {
-      for (int c = 0; c < nch; c++) {
-        if (damaged) {
-          conceal_channel(s, &chans[c]);
-        } else {
+      if (damaged) {
+        conceal_element(s, i, chans, nch);
+      } else {
+        for (int c = 0; c < nch; c++) {
           memset(chans[c].output, 0, sizeof(chans[c].output));
         }
       }
@@ -1677,6 +1725,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   sbr_stage(s, conceal);
   s->stream_channels = l->num_channels;
   s->blocks_decoded++;
+  s->decoded_since_reset = 1;
   return l->num_channels;
 }
 
@@ -1696,19 +1745,18 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
   for (int k = 0; k < AAC_MAX_CCE; k++) {
     s->cce[k].present = 0;
   }
-  aac_drc_frame_begin(&s->drc);
+  /* The lost block carried no DRC data of its own: the previous frame's
+   * gains stay in force, so the level does not pump across the gap. */
   const AacLayout* l = &s->layout;
   for (int i = 0; i < l->num_elements; i++) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
-    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
-    for (int c = 0; c < nch; c++) {
-      conceal_channel(s, &chans[c]);
-    }
+    conceal_element(s, i, &s->ch[s->elem_base[i]], nch);
   }
   sbr_stage(s, true);
   s->last_concealed = 1;
   s->concealed_frames++;
   s->blocks_decoded++;
+  s->decoded_since_reset = 1;
   s->stream_channels = l->num_channels;
   return l->num_channels;
 }

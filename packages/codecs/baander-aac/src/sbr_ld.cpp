@@ -198,18 +198,6 @@ int huff(AacBitReader* r, const int8_t (*tab)[2]) {
   return idx + 64;
 }
 
-/* Band of the previous envelope that band j of an envelope of resolution
- * `res` is delta-coded against when the previous one has `prev_res`. */
-int prev_band(int j, int res, int prev_res, int odd) {
-  if (res == prev_res) {
-    return j;
-  }
-  if (res) {
-    return (j + odd) >> 1;
-  }
-  return j ? 2 * j - odd : 0;
-}
-
 int read_envelope(const AacSbrLdState* s, AacBitReader* r, AacSbrLdChannel* ch, int chan) {
   const int delta = (chan == 1 && s->coupling == 1) + 1;
   const int odd = s->freq.n[1] & 1;
@@ -243,7 +231,7 @@ int read_envelope(const AacSbrLdState* s, AacBitReader* r, AacSbrLdChannel* ch, 
     if (ch->df_env[i]) {
       for (int j = 0; j < n; j++) {
         ch->env_facs_q[i + 1][j] =
-            ch->env_facs_q[i][prev_band(j, res, prev_res, odd)] + delta * huff(r, t_huff);
+            ch->env_facs_q[i][aac_sbr_prev_band(j, res, prev_res, odd)] + delta * huff(r, t_huff);
       }
     } else {
       ch->env_facs_q[i + 1][0] = delta * (int)aac_bitreader_read(r, bits);
@@ -842,6 +830,35 @@ void reset_channel(AacSbrLdChannel* ch) {
 
 /* ── public ────────────────────────────────────────────────────── */
 
+namespace {
+
+/* The band tables of a header at a core sample rate; returns 0 or the
+ * error of the tables. */
+int header_tables(const AacSbrLdHeader* header, int core_sample_rate, AacSbrFreq* f) {
+  memset(f, 0, sizeof(*f));
+  f->sample_rate = 2 * core_sample_rate;
+  f->start_freq = header->start_freq;
+  f->stop_freq = header->stop_freq;
+  f->xover_band = header->xover_band;
+  f->freq_scale = header->freq_scale;
+  f->alter_scale = header->alter_scale;
+  f->noise_bands = header->noise_bands;
+  f->limiter_bands = header->limiter_bands;
+  return aac_sbr_freq_tables(f);
+}
+
+}  // namespace
+
+int aac_sbr_ld_header_check(const AacSbrLdHeader* h, int core_sample_rate, int frame_length,
+                            int dual_rate) {
+  (void)dual_rate; /* both rate modes take every table the standard allows */
+  if ((frame_length != 512 && frame_length != 480) || !h) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  AacSbrFreq f;
+  return header_tables(h, core_sample_rate, &f);
+}
+
 int aac_sbr_ld_init(AacSbrLdState* s, int core_sample_rate, int frame_length, int dual_rate,
                     const AacSbrLdHeader* header) {
   memset(s, 0, sizeof(*s));
@@ -854,17 +871,7 @@ int aac_sbr_ld_init(AacSbrLdState* s, int core_sample_rate, int frame_length, in
   s->dual_rate = dual_rate != 0;
   s->elem_type = -1;
   s->header = *header;
-  AacSbrFreq* f = &s->freq;
-  memset(f, 0, sizeof(*f));
-  f->sample_rate = 2 * core_sample_rate;
-  f->start_freq = header->start_freq;
-  f->stop_freq = header->stop_freq;
-  f->xover_band = header->xover_band;
-  f->freq_scale = header->freq_scale;
-  f->alter_scale = header->alter_scale;
-  f->noise_bands = header->noise_bands;
-  f->limiter_bands = header->limiter_bands;
-  const int err = aac_sbr_freq_tables(f);
+  const int err = header_tables(header, core_sample_rate, &s->freq);
   if (err) {
     return err;
   }

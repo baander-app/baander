@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <mutex>
 
 /* SBR encoder (ISO/IEC 14496-3 4.6.18, 3GPP TS 26.404).  The frame the
  * core encoder emits for an input block decodes two blocks later, so the
@@ -119,7 +120,6 @@ struct HuffCode {
 };
 
 HuffCode g_env_15_t, g_env_15_f, g_env_30_t, g_env_30_f, g_noise_30_t;
-bool g_codes_ready = false;
 
 void walk(const int8_t (*tree)[2], int node, uint32_t code, int len, HuffCode* out) {
   for (int bit = 0; bit < 2; bit++) {
@@ -136,16 +136,17 @@ void walk(const int8_t (*tree)[2], int node, uint32_t code, int len, HuffCode* o
   }
 }
 
-void build_codes(void) {
-  if (g_codes_ready) {
-    return;
-  }
+void build_code_tables(void) {
   walk(aac_sbr_huff_env_level_15_t, 0, 0, 0, &g_env_15_t);
   walk(aac_sbr_huff_env_level_15_f, 0, 0, 0, &g_env_15_f);
   walk(aac_sbr_huff_env_level_30_t, 0, 0, 0, &g_env_30_t);
   walk(aac_sbr_huff_env_level_30_f, 0, 0, 0, &g_env_30_f);
   walk(aac_sbr_huff_noise_level_30_t, 0, 0, 0, &g_noise_30_t);
-  g_codes_ready = true;
+}
+
+void build_codes(void) {
+  static std::once_flag once;
+  std::call_once(once, build_code_tables);
 }
 
 int code_bits(const HuffCode* h, int value) { return h->len[value + 64]; }
@@ -518,18 +519,6 @@ void decide_invf(const AacSbrEncoder* s, AacSbrEncChannel* ch, int base) {
 
 /* ── delta coding (4.6.18.3.4) ─────────────────────────────────── */
 
-/* Index of the previous envelope's band that the decoder pairs with
- * band j of an envelope of resolution res, given the previous one's. */
-int prev_band(int j, int res, int prev_res, int odd) {
-  if (res == prev_res) {
-    return j;
-  }
-  if (res) {
-    return (j + odd) >> 1;
-  }
-  return j ? 2 * j - odd : 0;
-}
-
 void code_envelopes(const AacSbrEncoder* s, AacSbrEncChannel* ch, bool allow_time) {
   const AacSbrGrid* g = &ch->grid;
   const AacSbrFreq* f = &s->freq;
@@ -560,7 +549,7 @@ void code_envelopes(const AacSbrEncoder* s, AacSbrEncChannel* ch, bool allow_tim
     bool time_ok = have_prev;
     if (time_ok) {
       for (int b = 0; b < n && time_ok; b++) {
-        const int d = q[b] - prev[prev_band(b, res, prev_res, odd)];
+        const int d = q[b] - prev[aac_sbr_prev_band(b, res, prev_res, odd)];
         if (std::abs(d) > t_huff->lav) {
           time_ok = false;
         } else {
@@ -670,7 +659,7 @@ void write_envelope(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChan
     const int* q = ch->env_q[e];
     if (ch->df_env[e]) {
       for (int b = 0; b < n; b++) {
-        write_code(w, t_huff, q[b] - prev[prev_band(b, res, prev_res, odd)]);
+        write_code(w, t_huff, q[b] - prev[aac_sbr_prev_band(b, res, prev_res, odd)]);
       }
     } else {
       aac_bitwriter_write(w, (uint32_t)q[0], start_bits);

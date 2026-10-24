@@ -64,7 +64,7 @@ export interface AacDrcOptions {
 }
 
 export interface AacMetadataOptions {
-  /** The DRC profile written into every frame. Default 'none'. */
+  /** The DRC profile written into every frame ('lc', 'he' and 'hev2' only). Default 'none'. */
   drcProfile?: AacDrcProfile;
   /** Program reference level in quarter dB below full scale (0..127). Default 124 (-31 dBFS). */
   programRefLevel?: number;
@@ -196,7 +196,11 @@ export interface AacEncoderOptions {
   ldSbr?: boolean | AacLdSbrOptions;
   /** A second quantisation pass for better quality at more CPU. Default false. */
   afterburner?: boolean;
-  /** Dynamic range control metadata written into the stream. */
+  /**
+   * Dynamic range control metadata written into the stream.  Not available
+   * for the 'ld' and 'eld' profiles, whose frames carry no fill elements:
+   * the constructor throws when a profile other than 'none' is given.
+   */
   metadata?: AacMetadataOptions;
 }
 

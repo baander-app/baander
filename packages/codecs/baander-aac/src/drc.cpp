@@ -172,6 +172,7 @@ int aac_drc_bytes(const AacDrcInfo* d) {
 }
 
 int aac_drc_write(const AacDrcInfo* d, AacBitWriter* w) {
+  const int start = aac_bitwriter_bits_written(w);
   aac_bitwriter_write(w, AAC_EXT_DYNAMIC_RANGE, 4);
   aac_bitwriter_write(w, d->pce_tag_present ? 1 : 0, 1);
   if (d->pce_tag_present) {
@@ -206,7 +207,7 @@ int aac_drc_write(const AacDrcInfo* d, AacBitWriter* w) {
     aac_bitwriter_write(w, d->sign[i] ? 1 : 0, 1);
     aac_bitwriter_write(w, (uint32_t)d->ctl[i], 7);
   }
-  return aac_drc_bytes(d);
+  return aac_bitwriter_bits_written(w) - start;
 }
 
 /* The DVB ancillary data of a data stream element (ETSI TS 101 154,
@@ -481,6 +482,11 @@ void aac_drc_qmf_init(AacDrcQmf* q) {
   }
 }
 
+void aac_drc_qmf_hold(AacDrcQmf* q) {
+  memcpy(q->gain, q->prev, sizeof(q->gain));
+  q->active = 1;
+}
+
 /* ── encoder ──────────────────────────────────────────────────────── */
 
 /* The compression curves, as gain in dB against the level of the frame
@@ -599,8 +605,10 @@ int aac_drc_encoder_bits(const AacDrcEncoder* e) {
   if (e->profile == AAC_DRC_NONE) {
     return 0;
   }
-  /* One flag byte, the reference level and one band. */
-  return kFilBits + 8 * 3;
+  AacDrcInfo info = {};
+  info.num_bands = 1;
+  info.prog_ref_level = e->prog_ref_level;
+  return kFilBits + 8 * aac_drc_bytes(&info);
 }
 
 void aac_drc_encoder_write(const AacDrcEncoder* e, int elem, AacBitWriter* w) {

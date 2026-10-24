@@ -6,6 +6,7 @@
 #include "aac_tables.h"
 #include "asc.h"
 #include "bitstream.h"
+#include "decoder.h"
 #include "lowdelay.h"
 #include "mdct.h"
 #include "test_util.h"
@@ -195,6 +196,13 @@ static void test_asc() {
   asc.ld_sbr_header[0].amp_res = 1;
   asc.ld_sbr_header[0].start_freq = 5;
   asc.ld_sbr_header[0].stop_freq = 9;
+  asc.ld_sbr_header[0].freq_scale = 2;
+  asc.ld_sbr_header[0].alter_scale = 1;
+  asc.ld_sbr_header[0].noise_bands = 2;
+  asc.ld_sbr_header[0].limiter_bands = 2;
+  asc.ld_sbr_header[0].limiter_gains = 2;
+  asc.ld_sbr_header[0].interpol_freq = 1;
+  asc.ld_sbr_header[0].smoothing_mode = 1;
   uint8_t buf[32];
   const int len = aac_asc_write(&asc, buf, sizeof(buf));
   CHECK(len > 0, "ELD with LD-SBR: write %d", len);
@@ -513,6 +521,94 @@ static void test_api() {
         aac_decoder_output_sample_rate(dec));
   CHECK(aac_decoder_set_frame_length(dec, 1024) == AAC_ERR_STATE,
         "the config's frame length stands");
+  aac_decoder_destroy(dec);
+
+  /* A configuration the decoder refuses leaves it as it was: an LD-SBR
+   * config against a downscaled decoder is refused before anything of it
+   * is applied, and a plain ELD config afterwards decodes as in a fresh
+   * decoder. */
+  enc = aac_encoder_create(48000, 2, 128000, AAC_AOT_ER_ELD, AAC_RC_CBR);
+  CHECK(aac_encoder_set_ld_sbr(enc, 1, 1) == AAC_OK, "LD-SBR for the refused config");
+  uint8_t sbr_asc[16];
+  const int sbr_asc_len = aac_encoder_config(enc, sbr_asc, sizeof(sbr_asc));
+  CHECK(sbr_asc_len > 0, "LD-SBR config %d", sbr_asc_len);
+  aac_encoder_destroy(enc);
+  const Encoded plain = encode(gen_tones(2048, 48000, 2), 48000, 2, 128000, AAC_AOT_ER_ELD, 480,
+                               AAC_TRANSPORT_RAW);
+  dec = aac_decoder_create(48000, 0);
+  CHECK(aac_decoder_set_eld_downscale(dec, 2) == AAC_OK, "downscale before the configs");
+  CHECK(aac_decoder_set_config(dec, sbr_asc, sbr_asc_len) == AAC_ERR_UNSUPPORTED,
+        "LD-SBR config refused while downscaled");
+  CHECK(aac_decoder_object_type(dec) == 0 && aac_decoder_sample_rate(dec) == 48000 &&
+            aac_decoder_frame_size(dec) == 1024,
+        "nothing of the refused config applied: aot %d, %d Hz, frame %d",
+        aac_decoder_object_type(dec), aac_decoder_sample_rate(dec), aac_decoder_frame_size(dec));
+  CHECK(aac_decoder_set_config(dec, plain.asc.data(), (int)plain.asc.size()) == AAC_OK,
+        "plain ELD config after the refusal");
+  AacDecoderHandle fresh = aac_decoder_create(48000, 0);
+  CHECK(aac_decoder_set_eld_downscale(fresh, 2) == AAC_OK, "downscale of the fresh decoder");
+  CHECK(aac_decoder_set_config(fresh, plain.asc.data(), (int)plain.asc.size()) == AAC_OK,
+        "plain ELD config of the fresh decoder");
+  std::vector<float> got((size_t)AAC_DECODER_MAX_OUTPUT * 2);
+  std::vector<float> want((size_t)AAC_DECODER_MAX_OUTPUT * 2);
+  for (size_t i = 0; i < plain.aus.size() && i < 3; i++) {
+    const int n = aac_decoder_decode(dec, plain.aus[i].data(), (int)plain.aus[i].size(),
+                                     got.data(), (int)got.size());
+    const int m = aac_decoder_decode(fresh, plain.aus[i].data(), (int)plain.aus[i].size(),
+                                     want.data(), (int)want.size());
+    CHECK(n == 240 && m == 240, "unit %zu after the refusal: %d samples, fresh %d", i, n, m);
+    CHECK(n == m && memcmp(got.data(), want.data(), (size_t)std::max(n, 0) * 2 * sizeof(float)) == 0,
+          "unit %zu after the refusal decodes as in a fresh decoder", i);
+  }
+  CHECK(aac_decoder_output_sample_rate(dec) == 24000, "downscaled rate %d",
+        aac_decoder_output_sample_rate(dec));
+  aac_decoder_destroy(fresh);
+  aac_decoder_destroy(dec);
+
+  /* The downscale factor is fixed from the first frame until a reset,
+   * whatever reconfiguration the stream goes through. */
+  dec = aac_decoder_create(48000, 0);
+  CHECK(aac_decoder_set_config(dec, plain.asc.data(), (int)plain.asc.size()) == AAC_OK,
+        "config before the first frame");
+  CHECK(aac_decoder_decode(dec, plain.aus[0].data(), (int)plain.aus[0].size(), got.data(),
+                           (int)got.size()) == 480,
+        "one full-rate unit");
+  CHECK(aac_decoder_set_eld_downscale(dec, 2) == AAC_ERR_STATE, "factor after the first frame");
+  const Encoded other = encode(gen_tones(2048, 48000, 1), 48000, 1, 64000, AAC_AOT_ER_ELD, 512,
+                               AAC_TRANSPORT_RAW);
+  CHECK(aac_decoder_set_config(dec, other.asc.data(), (int)other.asc.size()) == AAC_OK,
+        "a new layout and frame length mid-stream");
+  CHECK(aac_decoder_set_eld_downscale(dec, 2) == AAC_ERR_STATE,
+        "factor after a reconfiguration mid-stream");
+  CHECK(aac_decoder_reset(dec) == AAC_OK, "reset");
+  CHECK(aac_decoder_set_eld_downscale(dec, 2) == AAC_OK, "factor after the reset");
+  CHECK(aac_decoder_decode(dec, other.aus[0].data(), (int)other.aus[0].size(), got.data(),
+                           (int)got.size()) == 256,
+        "a downscaled unit after the reset");
+  aac_decoder_destroy(dec);
+
+  /* An error resilient block needs a layout from a channel configuration:
+   * without any layout it waits for one, with a layout taken from the
+   * elements of an earlier (non-ER) block the stream cannot be decoded and
+   * says so, rather than waiting for ever. */
+  dec = aac_decoder_create(48000, 0);
+  auto* state = static_cast<AacDecoderState*>(dec);
+  AacBitReader reader;
+  aac_bitreader_init(&reader, other.aus[0].data(), (int)other.aus[0].size());
+  aac_decoder_set_object_type(state, AAC_AOT_ER_LD);
+  CHECK(aac_decode_raw_data_block(state, &reader) == AAC_ERR_STATE,
+        "ER block without a layout waits for a configuration");
+  aac_decoder_destroy(dec);
+  dec = aac_decoder_create(48000, 0);
+  state = static_cast<AacDecoderState*>(dec);
+  const std::vector<uint8_t> lc = encode_stream(gen_tones(2048, 48000, 1), 48000, 1, 64000,
+                                                AAC_RC_CBR);
+  CHECK(decode_stream(lc, 48000, 0, nullptr, dec).size() > 0, "an LC frame sets a layout");
+  state->layout_source = 3; /* as if the elements of the block had defined it */
+  aac_decoder_set_object_type(state, AAC_AOT_ER_LD);
+  aac_bitreader_init(&reader, other.aus[0].data(), (int)other.aus[0].size());
+  CHECK(aac_decode_raw_data_block(state, &reader) == AAC_ERR_UNSUPPORTED,
+        "ER block with a sniffed layout is refused for good");
   aac_decoder_destroy(dec);
 }
 

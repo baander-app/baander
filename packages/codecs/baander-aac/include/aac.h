@@ -169,7 +169,9 @@ int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
 /* Writes dynamic_range_info with the profile's compression curve and
  * `prog_ref_level` (0..127, the program's loudness in quarter dB below
  * full scale, so 124 is -31 dBFS) into every frame; AAC_DRC_NONE writes
- * nothing (default).  Before the first frame only. */
+ * nothing (default).  Before the first frame only.  AAC_ERR_UNSUPPORTED
+ * for a profile on the low-delay object types (AAC_AOT_ER_LD,
+ * AAC_AOT_ER_ELD): their frames carry no fill elements. */
 int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
@@ -250,8 +252,10 @@ int aac_decoder_channel_mode(AacDecoderHandle ctx);
 int aac_decoder_object_type(AacDecoderHandle ctx);
 /* AAC-ELD downscaled playout: decodes a 512 (480) frame stream to
  * 512 / factor samples per frame at 1 / factor of the rate with the
- * correspondingly shorter filterbank; factor 1 (default), 2 or 4.
- * AAC_ERR_STATE once a frame was decoded, AAC_ERR_UNSUPPORTED for a
+ * correspondingly shorter filterbank; factor 1 (default), 2 or 4.  To be
+ * set before the first frame after creation or aac_decoder_reset: once a
+ * frame was decoded the call returns AAC_ERR_STATE until a reset, whatever
+ * reconfiguration the stream went through.  AAC_ERR_UNSUPPORTED for a
  * stream with LD-SBR.  Only ELD streams are affected. */
 int aac_decoder_set_eld_downscale(AacDecoderHandle ctx, int factor);
 /* MPEG-4 dynamic range control (ISO/IEC 14496-3 4.5.2.7).  When enabled

@@ -47,18 +47,22 @@ struct Profile {
   int frame_length; /* 0 keeps the default */
   int afterburner;
   int channels;
+  int drc; /* the encoder writes DRC metadata and the decoder applies it */
 };
 
 static const Profile kProfiles[] = {
-    {"LC 1024 stereo", AAC_AOT_LC, 128000, 0, 0, 2},
-    {"LC 960 stereo", AAC_AOT_LC, 128000, 960, 0, 2},
-    {"LC 5.1", AAC_AOT_LC, 320000, 0, 0, 6},
-    {"LC afterburner", AAC_AOT_LC, 48000, 0, 1, 2},
-    {"HE-AAC v1", AAC_AOT_SBR, 64000, 0, 0, 2},
-    {"HE-AAC v2", AAC_AOT_PS, 32000, 0, 0, 2},
-    {"LD 512", AAC_AOT_ER_LD, 64000, 512, 0, 2},
-    {"LD 480", AAC_AOT_ER_LD, 64000, 480, 0, 2},
-    {"ELD 512", AAC_AOT_ER_ELD, 64000, 512, 0, 2},
+    {"LC 1024 stereo", AAC_AOT_LC, 128000, 0, 0, 2, 0},
+    {"LC 960 stereo", AAC_AOT_LC, 128000, 960, 0, 2, 0},
+    {"LC 5.1", AAC_AOT_LC, 320000, 0, 0, 6, 0},
+    {"LC afterburner", AAC_AOT_LC, 48000, 0, 1, 2, 0},
+    {"HE-AAC v1", AAC_AOT_SBR, 64000, 0, 0, 2, 0},
+    {"HE-AAC v2", AAC_AOT_PS, 32000, 0, 0, 2, 0},
+    /* The LFE carries no SBR data; with DRC on, its gains must not make
+     * the decoder build an SBR state for it after the first frames. */
+    {"HE-AAC 5.1 DRC", AAC_AOT_SBR, 192000, 0, 0, 6, 1},
+    {"LD 512", AAC_AOT_ER_LD, 64000, 512, 0, 2, 0},
+    {"LD 480", AAC_AOT_ER_LD, 64000, 480, 0, 2, 0},
+    {"ELD 512", AAC_AOT_ER_ELD, 64000, 512, 0, 2, 0},
 };
 
 static const int kSettleFrames = 8;
@@ -76,6 +80,10 @@ static void test_profile(const Profile& p) {
   }
   if (p.afterburner) {
     aac_encoder_set_afterburner(enc, 1);
+  }
+  if (p.drc) {
+    CHECK(aac_encoder_set_metadata(enc, AAC_DRC_FILM_STANDARD, 124) == AAC_OK, "%s: metadata",
+          p.name);
   }
   const int frame = aac_encoder_frame_size(enc);
   const int total_frames = kSettleFrames + kSteadyFrames;
@@ -112,6 +120,9 @@ static void test_profile(const Profile& p) {
   if (p.frame_length == 960) {
     aac_decoder_set_frame_length(dec, 960);
   }
+  if (p.drc) {
+    aac_decoder_set_drc(dec, 1, 100, 100, 100, 0);
+  }
   CHECK(aac_decoder_feed(dec, stream.data(), (int)stream.size()) == (int)stream.size(),
         "%s: the whole stream fits the FIFO (%zu bytes)", p.name, stream.size());
   std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 8);
@@ -142,6 +153,9 @@ static void test_profile(const Profile& p) {
     dec = aac_decoder_create(sr, 2);
     if (p.frame_length == 960) {
       aac_decoder_set_frame_length(dec, 960);
+    }
+    if (p.drc) {
+      aac_decoder_set_drc(dec, 1, 100, 100, 100, 0);
     }
     steady_allocations = 0;
     for (int f = 0; f < total_frames; f++) {

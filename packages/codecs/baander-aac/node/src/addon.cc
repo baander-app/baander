@@ -65,6 +65,24 @@ int option_int(const Napi::Object& o, const char* key, int fallback) {
   return o.Get(key).ToNumber().Int32Value();
 }
 
+/* An integer option that, when given, has to be a number: a boolean or an
+ * object is refused with the option's name (`what`, as the message names
+ * it) instead of being read as 0 or 1.  `*out` keeps its value when the
+ * option is absent.  Returns false after throwing. */
+bool option_number(const Napi::Env& env, const Napi::Object& o, const char* key, const char* what,
+                   int* out) {
+  if (!o.Has(key) || o.Get(key).IsUndefined()) {
+    return true;
+  }
+  const Napi::Value v = o.Get(key);
+  if (!v.IsNumber()) {
+    throw_error(env, std::string(what) + " must be a number");
+    return false;
+  }
+  *out = v.As<Napi::Number>().Int32Value();
+  return true;
+}
+
 std::string option_string(const Napi::Object& o, const char* key, const char* fallback) {
   if (!o.Has(key) || !o.Get(key).IsString()) {
     return fallback;
@@ -210,19 +228,24 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     if (info.Length() > 0 && info[0].IsObject()) {
       const Napi::Object o = info[0].As<Napi::Object>();
       sample_rate = option_int(o, "sampleRate", sample_rate);
-      eld_downscale = option_int(o, "eldDownscale", 1);
+      if (!option_number(env, o, "eldDownscale", "AacDecoder: eldDownscale", &eld_downscale) ||
+          !option_number(env, o, "frameLength", "AacDecoder: frameLength", &frame_length)) {
+        return;
+      }
       if (o.Has("drc") && o.Get("drc").IsObject()) {
         const Napi::Object d = o.Get("drc").As<Napi::Object>();
         drc = true;
-        boost = option_int(d, "boost", boost);
-        cut = option_int(d, "cut", cut);
-        target_ref_level = option_int(d, "targetRefLevel", target_ref_level);
+        if (!option_number(env, d, "boost", "AacDecoder: drc.boost", &boost) ||
+            !option_number(env, d, "cut", "AacDecoder: drc.cut", &cut) ||
+            !option_number(env, d, "targetRefLevel", "AacDecoder: drc.targetRefLevel",
+                           &target_ref_level)) {
+          return;
+        }
         heavy = option_bool(d, "heavy", false);
       } else {
         drc = option_bool(o, "drc", false);
       }
       channels = option_int(o, "channels", channels);
-      frame_length = option_int(o, "frameLength", 0);
       if (!transport_of(option_string(o, "transport", "detect"), &transport)) {
         throw_error(env, "AacDecoder: transport must be detect, adts, loas, latm, latm-raw or raw");
         return;
@@ -523,7 +546,10 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       throw_error(env, "AacEncoder: channelMode must be default, 7.1, 7.1-front, 7.1-top or 7.1-rear");
       return false;
     }
-    const int frame_length = option_int(o, "frameLength", 0);
+    int frame_length = 0;
+    if (!option_number(env, o, "frameLength", "AacEncoder: frameLength", &frame_length)) {
+      return false;
+    }
     bool ld_sbr = false;
     bool dual_rate = true;
     if (o.Has("ldSbr") && o.Get("ldSbr").IsObject()) {
@@ -541,7 +567,16 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
                          "music-standard, music-light or speech");
         return false;
       }
-      prog_ref_level = option_int(m, "programRefLevel", prog_ref_level);
+      if (!option_number(env, m, "programRefLevel", "AacEncoder: metadata.programRefLevel",
+                         &prog_ref_level)) {
+        return false;
+      }
+    }
+    /* The error resilient frames of the low-delay profiles carry no fill
+     * elements, so there is nowhere to put the metadata. */
+    if (drc_profile != AAC_DRC_NONE && low_delay) {
+      throw_error(env, "AacEncoder: metadata is not available for the ld and eld profiles");
+      return false;
     }
     int ret = 0;
     if ((ret = aac_encoder_set_transport(handle_, transport)) < 0 ||

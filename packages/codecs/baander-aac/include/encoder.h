@@ -210,6 +210,10 @@ int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length);
  * AAC_ERR_UNSUPPORTED when the core rate has no low-delay band tables. */
 int aac_encoder_state_set_ld_sbr(AacEncoderState* s, int enabled, int dual_rate);
 
+/* The sbr_header() count of the layout's ld_sbr_header(): one per SCE
+ * or CPE. */
+int aac_encoder_ld_sbr_header_count(const AacEncoderState* s);
+
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
 

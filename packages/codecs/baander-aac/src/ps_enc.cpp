@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <mutex>
 
 /* Parametric stereo encoder (ISO/IEC 14496-3 8.6.4, 3GPP TS 26.405).
  * The parameters of a frame are estimated over the same output slots the
@@ -31,7 +32,6 @@ struct HuffCode {
 };
 
 HuffCode g_iid_df, g_iid_dt, g_icc_df, g_icc_dt;
-bool g_codes_ready = false;
 
 void build_code(int table, HuffCode* out) {
   const uint8_t (*tab)[2] = aac_ps_huff_tabs;
@@ -49,15 +49,16 @@ void build_code(int table, HuffCode* out) {
   }
 }
 
-void build_codes(void) {
-  if (g_codes_ready) {
-    return;
-  }
+void build_code_tables(void) {
   build_code(AAC_PS_HUFF_IID_DF0, &g_iid_df);
   build_code(AAC_PS_HUFF_IID_DT0, &g_iid_dt);
   build_code(AAC_PS_HUFF_ICC_DF, &g_icc_df);
   build_code(AAC_PS_HUFF_ICC_DT, &g_icc_dt);
-  g_codes_ready = true;
+}
+
+void build_codes(void) {
+  static std::once_flag once;
+  std::call_once(once, build_code_tables);
 }
 
 int code_bits(const HuffCode* h, int value) { return h->len[value + 16]; }
