@@ -92,6 +92,11 @@ const poll = async (check, description, timeout = 120000) => {
   }
   throw new Error(`Timed out waiting for ${description}`)
 }
+function allowedColors(sourceTime) {
+  if (Math.abs(sourceTime - 10) <= 0.05) return ['red', 'green']
+  if (Math.abs(sourceTime - 20) <= 0.05) return ['green', 'blue']
+  return [sourceTime < 10 ? 'red' : sourceTime < 20 ? 'green' : 'blue']
+}
 function verifyPlayback() {
   assert.deepEqual(failures, [], 'All media and transport operations must succeed')
   assert.deepEqual(state.errors, [], 'The production adapter must not report an error')
@@ -112,14 +117,16 @@ function verifyPlayback() {
   }
   for (const frame of state.colorFrames.slice(colorFrames.length)) {
     const sourceTime = frame.time + fixture.sourceStartTime
-    const expected = sourceTime < 10 - 0.05 ? 'red' : sourceTime < 20 - 0.05 ? 'green' : 'blue'
     const channels = { red: frame.rgb[0], green: frame.rgb[1], blue: frame.rgb[2] }
     const actual = Object.keys(channels).sort((left, right) => channels[right] - channels[left])[0]
     assert(channels[actual] > 70 && Object.entries(channels).every(([color, value]) => color === actual || value < 35),
       `The decoded frame must contain an unambiguous color: ${frame.rgb}`)
-    assert.equal(actual, expected, `Decoded color at local ${frame.time}, source ${sourceTime}`)
-    assert(frame.clock >= frame.time - 0.15 && frame.clock <= frame.time + 1.15,
-      'Presented frame timestamps must agree with the native playback clock')
+    assert(allowedColors(sourceTime).includes(actual), `Decoded color at local ${frame.time}, source ${sourceTime}`)
+    const sourceClock = frame.clock + fixture.sourceStartTime
+    assert(allowedColors(sourceClock).includes(actual), `Displayed color at native source clock ${sourceClock}`)
+    // Frame PTS and the audio-backed native clock can differ while buffering resumes.
+    assert(frame.time - frame.clock <= 1.05 && frame.clock - frame.time <= 1.15,
+      'Presented frame timestamps must stay within one native frame of the playback clock')
     colorFrames.push({ ...frame, color: actual, sourceTime })
   }
 }
@@ -138,6 +145,8 @@ try {
     const observe = (at, metadata) => {
       canvasContext.drawImage(video, 0, 0, 1, 1)
       window.sparseColorFrames.push({ at, time: metadata.mediaTime, clock: video.currentTime,
+        presentedFrames: metadata.presentedFrames, presentationTime: metadata.presentationTime,
+        expectedDisplayTime: metadata.expectedDisplayTime,
         rgb: [...canvasContext.getImageData(0, 0, 1, 1).data].slice(0, 3) })
       video.requestVideoFrameCallback(observe)
     }

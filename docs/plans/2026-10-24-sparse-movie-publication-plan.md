@@ -201,3 +201,21 @@ of a thirty-second real-time input. This conservative margin excludes an EOF
 flush that briefly leaves the process running and the MPD dynamic; it is not a
 subsecond startup guarantee. Commands, effective encoder logs and observed edges
 are retained under the phase calibration directory.
+
+## Browser observer correction
+
+The first run after the buffering repair attached during publication, then rejected
+a frame callback with video PTS 13 while the audio-backed native clock remained
+at 12.010666 during recovery from a buffer pause. Both positions correctly showed
+the green held frame. The [frame callback definition](https://wicg.github.io/video-rvfc/#dom-videoframecallbackmetadata-mediatime)
+and [Chromium clock explanation](https://web.dev/articles/requestvideoframecallback-rvfc#using_the_method)
+distinguish submitted-frame PTS from currentTime; exact equality is not the API
+contract.
+
+Independent review approved a bounded observer correction. Check canvas colour
+against both source positions, permitting adjacent colours only within 50 ms of
+a transition. Bound video PTS lead to one normalized frame plus 50 ms and retain
+the existing reverse bound. Retain callback presentation metadata, native clock
+progress, full held-frame coverage, recent audio, signed delivery and natural end
+checks. This changes the test observer; it does not change playback or encoders.
+The rejected run remains under `browser-sparse-fresh-final` in phase evidence.
