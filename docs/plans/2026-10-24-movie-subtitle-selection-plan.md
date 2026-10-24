@@ -1,7 +1,7 @@
 ---
 title: Preserve movie subtitle selection across playback replacement
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -155,3 +155,36 @@ from final acceptance and record this additional mechanism in ROADMAP.md.
 Independent review approved the synchronization addendum before implementation,
 including the optional-controller configuration, actual-library regression and
 unchanged control and deadline assertions.
+
+## Delivered verification checkpoint
+
+The movie adapter retains subtitle selection by source key across replacement and
+disables live-edge latency synchronization for growing movie output. Independent
+review findings about owner reset, queued selection and track-event ordering were
+applied before final acceptance. The unchanged adapter failed both initial
+preference regressions, and the installed-library regression reproduced the
+backward clock write before the synchronization repair.
+
+Final CI-image verification passed 245 tests across five suites: 215 hook,
+22 adapter, two actual-library, two import and four overlay tests. Typechecking,
+production build, asset verification and browser/runner syntax passed. Lint
+reported no errors and eight existing warnings outside the changed files.
+Backend code and APIs were unchanged, so PHP suites were not rerun for this phase.
+
+Chromium 148.0.7778.96 and Firefox 150.0.2 each passed all eight production phases
+on worker image `ab35840b6b69`, built from application revision `5b592ec5`.
+The runs took 579.154 and 577.856 seconds; completion/replay took 41.073 and
+40.301 seconds. Both kept the original 600-second lifecycle and 60-second
+completion bounds and verified cleanup. Each retained 22 subtitle observations,
+including four before/after continuity proofs with no intervening reselection.
+Forced remained exclusively showing with the expected cue; Off remained disabled
+across two observations of the same replacement attachment. Existing progress,
+status, seek, renewal, signed-delivery and completion assertions passed.
+
+Final receipts are under `var/test-runs/movie-subtitle-selection-chromium-final`
+and `var/test-runs/movie-subtitle-selection-firefox-final`; gate results and the
+failed-run history are indexed in ROADMAP.md. Native-menu interaction and automated
+caption-pixel comparison were not qualified. Safari/native HLS and the other
+recorded transcoding gaps remain outside this checkpoint. Choosing Off while all
+available tracks are already disabled has no observable TextTrack mode change;
+an absent selected-track preference remains retained in that case.

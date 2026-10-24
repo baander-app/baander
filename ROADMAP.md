@@ -1441,3 +1441,67 @@ Safari/native HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DAS
 EOF and the separate native pressure observer remain unqualified. Existing
 application databases, Redis and media storage and the user's original videos
 were not changed. This checkpoint includes no push or feature merge.
+
+### Movie subtitle selection continuity — 2026-10-24
+
+The movie player retains the selected source subtitle key or Off across attachment
+replacement within the same playback owner. Duplicate-language tracks keep their
+identities. A missing selected track leaves captions disabled while its identity
+waits for publication. Teardown, initialization and restoration do not replace
+viewer intent. A different movie/owner or final cleanup resets preference; a page
+reload may use the manifest default. No backend API or durable storage changed.
+Choosing Off when all available tracks are already disabled creates no observable
+mode change, so a retained missing-track preference cannot be replaced that way.
+
+Each browser scenario now selects its intended choice once and only observes
+afterward. Forced stays exclusively showing with the expected cue across a source
+seek and paused renewal; Off remains disabled across a paused source seek and
+running renewal. Each Off proof includes two observations without reselection.
+The unchanged application lost Forced after a source seek: Dialogue became
+showing and Forced disabled. Two unit regressions failed alongside nine passes.
+The original 254.323-second production failure and verified cleanup remain under
+`var/test-runs/movie-subtitle-selection-before-fix`.
+
+The first repaired image passed Chromium's eight phases in 576.566 seconds under
+`var/test-runs/movie-subtitle-selection-chromium`. Firefox passed all four subtitle
+proofs, then failed a progress-outage invariant after 326.790 seconds, with verified
+cleanup under `var/test-runs/movie-subtitle-selection-firefox`. Its media clock
+moved backward from 24.00566 to 10.501 while output grew; the hook treated that
+native movement as a source seek, advancing generation 6 to 7. A focused test of
+installed HLS.js reproduced the movement through live-edge synchronization.
+The probe's synthetic playlist age reproduced the target without establishing
+the production library's internal age or stall counters. Disabling the optional
+latency controller prevents that write, retaining the movie's source cursor while
+waiting for publication. The actual-library regression failed before the fix;
+control assertions and deadlines remain unchanged. These earlier runs are retained
+separately from final qualification.
+
+Final verification passed 245 tests across five suites: 215 hook, 22 adapter, two
+actual-HLS-library, two import and four overlay tests. Typechecking, production
+build, asset verification and browser/runner syntax passed. Lint reported zero
+errors and eight existing warnings outside the changed files. PHP suites were not
+rerun for this frontend-only change. Final source is `5b592ec5`, and the rebuilt
+worker image is `ab35840b6b69`. Gate receipts are under
+`var/test-runs/movie-subtitle-selection-gates`, including
+`verification-summary.json` and the final `progressive-sync` gates.
+
+Final Chromium 148.0.7778.96 passed all eight phases in 579.153816 seconds, retaining
+41 control records and 22 subtitle observations; its completion/replay scenario
+took 41.073 seconds. Firefox 150.0.2 passed all eight in 577.856129 seconds, with
+40 control records, 22 subtitle observations and a 40.301-second completion/replay
+scenario. Both engines passed all four subtitle continuity proofs without
+reselection and retained the existing media, ownership, outage, renewal,
+completion/replay and retirement checks. One Chromium progress observation was
+superseded by a legitimate publication before its bounded retry passed. Final
+receipts are under `var/test-runs/movie-subtitle-selection-chromium-final` and
+`var/test-runs/movie-subtitle-selection-firefox-final`, each with
+`acceptance-summary.json` and `subtitle-acceptance.json`. Both runners exited zero
+and verified cleanup within the unchanged 600-second lifecycle deadline.
+
+The testing guide documents source-key preference, observation-only checks and
+growing-movie clock behavior. Screenshots support inspection; native-caption-menu
+interaction and pixel-level caption rendering are not automated. Safari/native
+HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH EOF and the
+separate native pressure observer remain unqualified. Existing application data
+and the user's original videos were untouched. This checkpoint includes no push
+or feature merge.
