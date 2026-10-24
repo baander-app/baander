@@ -141,3 +141,9 @@ first-chunk time, and require a representative rate consistent with its cap.
 Match canceled video requests only to a successful different-tier replacement
 for the same source interval near the cancellation. These assertions address
 independent review findings without changing the player's behavior.
+
+The next run displayed all three renditions in order but failed the final transport
+check on Chromium's implicit favicon request, which the fixture answered with HTTP
+204. Its retained receipt records an aborted icon fetch, no player error, and
+3.548 seconds of rebuffering after the bandwidth drop. An inline fixture icon
+removes that unrelated request; the signed-media transport assertions stay intact.
