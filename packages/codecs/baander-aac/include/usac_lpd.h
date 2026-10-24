@@ -40,6 +40,10 @@ int aac_usac_lpd_decode(AacUsacCoreChannel* ch, int frame_length, int indep, Aac
  * this adds the FAC synthesis to ch->overlap before the FD overlap-add. */
 void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
                             int frame_length);
+/* The same with the fac_gain index (7 bits) the FD frame's fac_data
+ * carries; aac_usac_lpd_fac_to_fd applies a gain of one. */
+void aac_usac_lpd_fac_to_fd_gain(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
+                                 int frame_length, int fac_gain_index);
 
 /* Concealment of a lost LPD frame: repeats the last excitation with
  * decaying gain and keeps the contract. */

@@ -4,7 +4,6 @@
 
 #include "sbr.h"
 #include "usac_fd.h"
-#include "usac_lpd.h"
 
 /* Placeholders for the USAC modules that are still being written: the
  * library links and the frame walker reaches each module's entry point,
@@ -48,49 +47,6 @@ void aac_usac_core_conceal(AacUsacCoreChannel* const* ch, int nr_channels, int f
   for (int c = 0; c < nr_channels; c++) {
     memset(out[c], 0, (size_t)frame_length * sizeof(float));
   }
-}
-
-/* ── usac_lpd.h ────────────────────────────────────────────────── */
-
-struct AacUsacLpdChannel_ {
-  int frame_length;
-  int core_sample_rate;
-};
-
-AacUsacLpdChannel* aac_usac_lpd_channel_create(int frame_length, int core_sample_rate) {
-  auto* c = new (std::nothrow) AacUsacLpdChannel_();
-  if (c) {
-    c->frame_length = frame_length;
-    c->core_sample_rate = core_sample_rate;
-  }
-  return c;
-}
-
-void aac_usac_lpd_channel_destroy(AacUsacLpdChannel* c) { delete c; }
-
-void aac_usac_lpd_channel_reset(AacUsacLpdChannel* c) { (void)c; }
-
-int aac_usac_lpd_decode(AacUsacCoreChannel* ch, int frame_length, int indep, AacBitReader* r,
-                        float* out) {
-  (void)ch;
-  (void)frame_length;
-  (void)indep;
-  (void)r;
-  (void)out;
-  return AAC_ERR_UNSUPPORTED;
-}
-
-void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
-                            int frame_length) {
-  (void)ch;
-  (void)fac_q;
-  (void)fac_length;
-  (void)frame_length;
-}
-
-void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out) {
-  (void)ch;
-  memset(out, 0, (size_t)frame_length * sizeof(float));
 }
 
 /* ── sbr.h: aac_sbr_usac_* ─────────────────────────────────────── */
