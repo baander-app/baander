@@ -67,6 +67,7 @@
   "tests/Unit/Shared/Interface/HealthCheckMemoryPressureTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/Shared/Interface/HealthCheckWorkerOutageTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/SwooleBundle/Command/ServerStopCommandTest.php": "nested coroutine command and signal target",
+  "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderAudioDelayMediaTest.php": "Owns real FFmpeg producers and HLS decoders to verify ordinary movie audio onset and complete tails.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderAudioProfileMediaTest.php": "Owns real FFmpeg producers and independent fragment decoders for AAC and Opus publication.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderSparseMediaTest.php": "Owns real FFmpeg sparse movie producers and independent fragment/HLS decoders.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderTimestampOriginMediaTest.php": "Owns real Matroska producers, timestamp probes, subtitle extraction and independent media decoders.",

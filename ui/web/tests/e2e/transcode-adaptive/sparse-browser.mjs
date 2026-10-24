@@ -5,15 +5,26 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'].includes(fixture.scenario))
-const delayed = fixture.scenario.startsWith('matroska-delayed-')
-if (delayed) {
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek'].includes(fixture.scenario))
+const matroska = fixture.scenario.startsWith('matroska-delayed-')
+const ordinary = fixture.scenario.startsWith('ordinary-delayed-')
+const delayed = matroska || ordinary
+const hasSubtitles = fixture.hasSubtitles
+assert.equal(hasSubtitles, matroska)
+if (matroska) {
   assert.equal(fixture.sourceTimestampOrigin, 4)
   assert.equal(Number(fixture.rawSourceDuration), 34)
-  assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+}
+if (delayed) assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+if (ordinary) {
+  assert.equal(fixture.sourceTimestampOrigin, null)
+  assert.equal(fixture.sourceVideoFirstPts, 0)
+  assert.equal(fixture.sourceAudioFirstPts, 8)
+  assert.equal(fixture.sourceDuration, 30)
+  assert.deepEqual(fixture.expectedCues, [])
 }
 assert.equal(fixture.audioProfile, 'streaming_stereo')
-assert.equal(fixture.sourceFrameRate, 0.1)
+assert.equal(fixture.sourceFrameRate, ordinary ? 25 : 0.1)
 const evidence = '/work/evidence'
 await mkdir(evidence, { recursive: true })
 const started = Date.now()
@@ -147,7 +158,7 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(({ manifest, delayed }) => {
+  await page.evaluate(({ manifest, hasSubtitles }) => {
     window.adaptiveManifest = manifest
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
@@ -168,7 +179,7 @@ try {
         active: Array.from(track.activeCues ?? []).map(cue => window.sparseCueState(cue)) }
     }
     window.sparseObserveCues = true
-    if (delayed) {
+    if (hasSubtitles) {
       video.textTracks.addEventListener('addtrack', event => {
         const track = event.track
         track.mode = 'showing'
@@ -197,7 +208,7 @@ try {
       video.requestVideoFrameCallback(observe)
     }
     video.requestVideoFrameCallback(observe)
-  }, { manifest: fixture.manifestUrl, delayed })
+  }, { manifest: fixture.manifestUrl, hasSubtitles })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -214,7 +225,7 @@ try {
     const recentAudio = state.audio.filter(audio => state.at - audio.at < 1000)
     samples.push({ at: state.at, time: state.time, decodedFrames: state.decodedFrames,
       audio: recentAudio, ended: state.ended })
-    if (delayed) {
+    if (hasSubtitles) {
       for (const [index, cue] of fixture.expectedCues.entries()) {
         const phase = state.time >= cue.start + 0.25 && state.time < cue.end - 0.05 ? 'active'
           : state.time >= cue.end + 0.25 && state.time <= cue.end + 0.75 ? 'cleared' : null
@@ -240,12 +251,22 @@ try {
   assert(Math.abs(state.duration - fixture.expectedDuration) <= 0.15)
   assert(state.events.some(event => event.name === 'ended'))
   assert(state.firstPlayingTime !== null && state.firstPlayingTime < 1)
-  assert(state.decodedFrames >= fixture.expectedDuration - 2, 'Native decoding must advance throughout held frames')
+  assert(state.decodedFrames >= fixture.expectedDuration * (ordinary ? 25 : 1) - 2, 'Native decoding must advance throughout held frames')
+  if (ordinary) {
+    const frameTicks = colorFrames.map(frame => frame.time * 25)
+    assert(frameTicks.every(tick => Math.abs(tick - Math.round(tick)) < 0.02), 'Displayed movie frames must follow the twenty-five fps presentation grid')
+    const uniqueFrames = new Set(frameTicks.map(Math.round))
+    assert(uniqueFrames.size >= fixture.expectedDuration * 25 * 0.6, 'Observe ordinary-rate displayed frames despite occasional missed callbacks')
+    assert(frameTicks.some((tick, index) => index > 0 && Math.abs(tick - frameTicks[index - 1] - 1) < 0.02),
+      'The actual native frame callbacks must expose the forty-millisecond movie cadence')
+    receipt.frameCadence = { sourceRate: 25, expectedFrames: fixture.expectedDuration * 25,
+      decodedFrames: state.decodedFrames, callbacks: colorFrames.length, uniquePresentedFrames: uniqueFrames.size }
+  }
   for (const [color, sourceBegin, sourceEnd] of [['red', fixture.sourceStartTime, 10], ['green', 10, 20], ['blue', 20, 30]]) {
     const frames = colorFrames.filter(frame => frame.color === color)
-    assert(frames.length >= sourceEnd - sourceBegin - 2, `Retain native displayed ${color} frames throughout its hold`)
-    assert(frames.some(frame => frame.sourceTime < sourceBegin + 1.15), `Observe the beginning of ${color}`)
-    assert(frames.some(frame => frame.sourceTime >= sourceEnd - 1.15), `Observe the tail of ${color}`)
+    assert(frames.length >= (ordinary ? (sourceEnd - sourceBegin) * 25 * 0.6 : sourceEnd - sourceBegin - 2), `Retain native displayed ${color} frames throughout its hold`)
+    assert(frames.some(frame => frame.sourceTime < sourceBegin + (ordinary ? 0.15 : 1.15)), `Observe the beginning of ${color}`)
+    assert(frames.some(frame => frame.sourceTime >= sourceEnd - (ordinary ? 0.15 : 1.15)), `Observe the tail of ${color}`)
     const audibleFrames = delayed
       ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
     assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
@@ -280,6 +301,9 @@ try {
     const onset = samples.find(sample => sample.audio.some(audio => audio.rms > 0.001))
     assert(onset && onset.time >= fixture.expectedAudioDelay - 0.15 && onset.time <= fixture.expectedAudioDelay + 0.75,
       'Measured audio must begin at its intended source-relative delay')
+    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
+  }
+  if (hasSubtitles) {
     assert(master.body.includes('TYPE=SUBTITLES'), 'The production master must advertise embedded subtitles')
     const subtitleManifests = manifests.filter(manifest => manifest.url.includes('/subtitles/'))
     assert(subtitleManifests.length > 0 && subtitleFiles.length > 0, 'The real HLS adapter must load signed subtitles')
@@ -329,11 +353,15 @@ try {
     assert.deepEqual([...new Set(cues.map(cue => cue.text))].sort(), fixture.expectedCues.map(cue => cue.text).sort(),
       'Only the source-relative retained cues may reach the real text track')
     assert.equal(subtitleScreenshots.length, fixture.expectedCues.length * 2, 'Retain visible and cleared subtitle screenshots for every cue')
-    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
     receipt.subtitles = { files: subtitleFiles, manifests: subtitleManifests, cues, events: state.cueEvents, nativeSamples: state.cueSamples, screenshots: subtitleScreenshots }
   }
+  if (ordinary) {
+    assert(!master.body.includes('TYPE=SUBTITLES'))
+    assert.equal(subtitleFiles.length, 0)
+    assert.deepEqual(state.textTracks, [])
+  }
   await page.screenshot({ path: `${evidence}/complete.png` })
-  if (delayed) {
+  if (hasSubtitles) {
     receipt.subtitleSeekProof = []
     for (const expected of fixture.expectedCues) {
       const proof = await page.evaluate(async expected => {

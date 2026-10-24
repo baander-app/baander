@@ -162,6 +162,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         self::assertEqualsWithDelta($rate, $probe->framerate, 0.0001);
         self::assertSame($audio, $probe->hasAudio());
         if ($audioDelay > 0) {
+            self::assertNull($probe->sourceTimestampOrigin);
             self::assertArrayHasKey('start_time', $sourceProbe['format']);
             self::assertArrayHasKey('start_time', $sourceProbe['streams'][0]);
             self::assertEqualsWithDelta(0, (float) $sourceProbe['format']['start_time'], 0.002);
@@ -197,6 +198,8 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         self::assertSame($audio ? ['video', 'audio'] : ['video'], array_keys($presentation->tracks));
         $sourceStart = $startSegment * SegmentEncoder::getSegmentDuration();
         $remaining = $duration - $sourceStart;
+        $expectedDelay = max(0.0, $audioDelay - $sourceStart);
+        $codecFrameDuration = 1024 / 48_000;
         $markers = [];
         $timestamps = [];
         foreach ($presentation->tracks as $track) {
@@ -229,16 +232,28 @@ final class SegmentEncoderSparseMediaTest extends TestCase
                         $timestamps[] = (float) $packet['pts_time'];
                     }
                 } else {
-                    self::assertSame('aac', $raw['streams'][0]['codec_name']);
-                    // A terminal AAC packet can contain only encoder padding after the audible tail.
+                    self::assertSame($profile->codec, $raw['streams'][0]['codec_name']);
+                    // A terminal codec packet can contain only encoder padding after the audible tail.
                     $paddingOnlyTail = $segment === $track->segments[array_key_last($track->segments)]
-                        && count($packets) === 1 && $segment->duration / $track->timescale <= 1024 / 48_000 + 0.0001;
-                    $pcm = $this->decodeAudio($combined, requireSignal: !$paddingOnlyTail);
-                    $pcmSeconds += strlen($pcm) / 4 / 48_000;
+                        && count($packets) === 1 && $segment->duration / $track->timescale <= $codecFrameDuration + 0.0001;
+                    $pcm = $this->decodeAudio($combined, requireSignal: false);
+                    $decodedDuration = strlen($pcm) / 4 / 48_000;
+                    self::assertEqualsWithDelta($segment->duration / $track->timescale, $decodedDuration, 0.05);
+                    $pcmSeconds += $decodedDuration;
+                    $localStart = ($segment->start - $track->presentationTimeOffset) / $track->timescale;
+                    $localDelay = max(0.0, $expectedDelay - $localStart);
+                    $silentDuration = min($decodedDuration, max(0.0, $localDelay - 0.1));
+                    if ($silentDuration > 0.1) {
+                        self::assertLessThan(0.0005, $this->rms($pcm, 0, $silentDuration), 'Fragments before the intended onset must contain real silence.');
+                    }
+                    if (!$paddingOnlyTail && $localDelay + 0.3 < $decodedDuration) {
+                        self::assertGreaterThan(0.005, $this->rms($pcm, $localDelay + 0.2, 0.1), 'Audible fragments must retain the tone after its intended onset.');
+                        self::assertGreaterThan(0.005, $this->rms($pcm, $decodedDuration - 0.2, 0.1), 'Audible fragments must retain their tail.');
+                    }
                     $audioFirst ??= (float) $packets[0]['pts_time'];
                     $last = $packets[array_key_last($packets)];
                     $audioEnd = (float) $last['pts_time'] + (isset($last['duration_time'])
-                        ? (float) $last['duration_time'] : 1024 / 48_000);
+                        ? (float) $last['duration_time'] : $codecFrameDuration);
                 }
                 $prefix = (new ManifestGenerator())->generateMediaManifest($track->initFile, $segments, false);
                 self::assertStringContainsString("#EXT-X-TARGETDURATION:7\n", $prefix);
@@ -258,14 +273,13 @@ final class SegmentEncoderSparseMediaTest extends TestCase
                 self::assertLessThan(1.002, $extension, 'Tail extension must remain below one output frame.');
                 self::assertSame($markers, $this->decodeVideo($playlist), 'HLS must decode the same held frames as independent fragments.');
             } else {
-                $expectedDelay = max(0.0, $audioDelay - $sourceStart);
-                self::assertEqualsWithDelta($expectedDelay, $audioFirst, 0.05, 'Audio must retain its source delay after seeking.');
+                self::assertEqualsWithDelta(0.0, $audioFirst, 0.05, 'Materialized leading silence must begin on the local presentation timeline.');
                 self::assertEqualsWithDelta($remaining, $audioEnd, 0.05);
                 self::assertEqualsWithDelta($remaining, $track->end(), 0.05);
-                self::assertEqualsWithDelta($remaining - $expectedDelay, $pcmSeconds, 0.15);
+                self::assertEqualsWithDelta($remaining, $pcmSeconds, 0.15);
                 $playlistPcm = $this->decodeAudio($playlist);
                 self::assertGreaterThan(0, strlen($playlistPcm));
-                self::assertEqualsWithDelta($remaining - $expectedDelay, strlen($playlistPcm) / 4 / 48_000, 0.15);
+                $this->assertAudioTimeline($playlistPcm, $expectedDelay, $remaining);
             }
         }
         $expectedMarkers = [];
@@ -358,6 +372,46 @@ final class SegmentEncoderSparseMediaTest extends TestCase
             self::assertGreaterThan(0.005, sqrt($energy / count($samples)), 'Decoded audio must contain a signal.');
         }
         return $pcm;
+    }
+
+    private function assertAudioTimeline(string $pcm, float $expectedDelay, float $expectedDuration): void
+    {
+        $duration = strlen($pcm) / 4 / 48_000;
+        $onset = null;
+        // AAC priming and independent codec packet padding fit within the 100ms onset tolerance.
+        for ($position = 0.0; $position + 0.02 <= $duration; $position += 0.02) {
+            if ($this->rms($pcm, $position, 0.02) > 0.005) {
+                $onset = $position;
+                break;
+            }
+        }
+        $beforeRms = $expectedDelay > 0.3 ? $this->rms($pcm, $expectedDelay - 0.25, 0.1) : null;
+        $afterRms = $this->rms($pcm, $expectedDelay + 0.2, 0.1);
+        $tailRms = $this->rms($pcm, $duration - 0.3, 0.1);
+        $this->observation(['track' => 'audio', 'decode' => 'HLS', 'decodedDuration' => $duration,
+            'expectedDuration' => $expectedDuration, 'toneOnset' => $onset, 'expectedOnset' => $expectedDelay,
+            'beforeOnsetRms' => $beforeRms, 'afterOnsetRms' => $afterRms, 'tailRms' => $tailRms]);
+        self::assertEqualsWithDelta($expectedDuration, $duration, 0.15, 'HLS audio must contain the complete presentation, including leading silence.');
+        self::assertNotNull($onset, 'The decoded HLS track must contain the source tone.');
+        self::assertEqualsWithDelta($expectedDelay, $onset, 0.1, 'HLS must preserve the actual audible onset without relying on an MP4 edit list.');
+        if ($beforeRms !== null) {
+            self::assertLessThan(0.0005, $beforeRms, 'HLS samples before the source tone must be silent.');
+        }
+        self::assertGreaterThan(0.005, $afterRms, 'HLS must contain the tone after its intended onset.');
+        self::assertGreaterThan(0.005, $tailRms, 'HLS must preserve audible content through the source tail.');
+    }
+
+    private function rms(string $pcm, float $position, float $duration): float
+    {
+        $samples = unpack('g*', substr($pcm, (int) round($position * 48_000) * 4, (int) round($duration * 48_000) * 4));
+        if (!is_array($samples) || $samples === []) {
+            throw new \RuntimeException('The requested PCM observation window has no decoded samples.');
+        }
+        $energy = 0.0;
+        foreach ($samples as $sample) {
+            $energy += $sample * $sample;
+        }
+        return sqrt($energy / count($samples));
     }
 
     /** @return array<string, mixed> */

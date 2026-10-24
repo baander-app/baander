@@ -151,7 +151,7 @@ final class SegmentEncoder
                 $audioFilters = 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters);
             }
         }
-        if ($hasAudio && $sourceTimestampOrigin !== null) {
+        if ($hasAudio) {
             $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0';
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
