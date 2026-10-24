@@ -186,3 +186,44 @@ assertions to accept missing content.
 
 Independent review approved this measured first-interval guard before its
 implementation, with all timing and complete-tail assertions retained.
+
+## Representing delayed audio in HLS samples
+
+The first real delayed-Matroska browser run reaches the full thirty-second
+picture and displays both subtitle cues correctly, but plays the tone immediately.
+The native MPD places audio at 7.978667 seconds. Its first AAC fragment instead
+has decode time zero; the delay is carried by an empty edit in the initialization
+file. The pinned HLS player reads fragment decode times without applying that
+edit. Native packet timestamps alone therefore do not prove audible delay.
+
+For a verified source anchor with audio, append `aresample=first_pts=0` after
+negative-preroll trimming and the existing profile filters. This represents the
+source's leading gap as encoded silence, while preserving the tone's source-relative
+onset and endpoint. It does not shift the audio independently of video or subtitles.
+Do not add asynchronous compensation, change profile selection, or alter commands
+without a verified anchor. Existing source qualification remains in force.
+
+The first controlled runs retain exact thirty-, 24- and six-second video tails.
+Decoded AAC tone onset is about 8.020479 seconds fresh, 2.020479 seconds after a
+six-second seek, and 0.006417 seconds in the final hold. These runs cover origins
+zero and four and the original source whose audio packets precede video. Complete
+profile-filter and Opus controls before accepting the exact filter order.
+
+Strengthen native acceptance to require decoded HLS PCM for the complete remaining
+presentation, including silence, and measure the actual tone onset at eight, two
+or zero seconds. Check near-silent windows before onset, positive signal after
+onset and near the tail, and audio endpoints aligned with the complete video.
+Independent fragments wholly within the expected initial gap may be silent;
+fragments containing audible source content must still decode that content.
+Preserve the narrow terminal AAC padding exception. Add delayed native Opus
+controls because the anchored filter applies to that profile too.
+
+Production silence represents an observed source interval. Fixtures and observers
+must not manufacture silence, rewrite timing evidence or relax onset requirements
+to hide a failure. Retain the failed browser receipt and show the stronger native
+checks fail against the encoder before this amendment. Both actual delayed HLS
+browser scenarios and the ordinary adaptive control remain required, along with
+signed subtitle cues, the full Transcode selection and static gates.
+
+Independent review approved this amendment before implementation, with the exact
+filter order conditional on the profile-filter and Opus calibration results.
