@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isAxiosError, isCancel } from 'axios'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
-import { attachHlsPlayback } from './hls-playback'
+import { attachHlsPlayback, type SubtitlePreference } from './hls-playback'
 import type { PostTranscodeSessionPosition200 } from '@/shared/api-client/gen/endpoints'
 
 interface UseBaanderPlayerOptions {
@@ -110,6 +110,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
     let appliedRequest = 0
     let snapshot: PlaybackSnapshot | null = null
     let loadedIdentity: string | null = null
+    let subtitlePreference: SubtitlePreference | undefined
     let pendingLoad: { identity: string, position: number } | null = null
     let reloadCursor: number | null = null
     let localStatus: 'running' | 'paused' | null = null
@@ -163,8 +164,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
       attachmentReady = false
       attachmentRestored = false
       retiringPlayback = null
-      attachmentRevision++
       disposeAttachment?.()
+      attachmentRevision++
       disposeAttachment = null
     }
     const cancelSeekReconciliation = () => {
@@ -261,6 +262,8 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           && loadedIdentity?.startsWith(`${data.jobId}:${data.generation}:`)
           && !settlesSeek && canonicalSeekRecovery === null
           && ((sourceSeekPosition !== null && !recoverAcceptedSeek) || pendingLoad || video.seeking)) return
+        const ownerChanged = previous !== null && (previous.jobId !== data.jobId || previous.sessionId !== data.sessionId)
+        if (ownerChanged) subtitlePreference = undefined
         appliedRequest = revision
         snapshot = data
         if (!completed()) completion = null
@@ -320,7 +323,7 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
         const renewCapability = identity === loadedIdentity && newerCapability && attachedCapability !== null
           && (recoveryPosition !== null || Date.now() >= attachedCapability.renewAt)
           && !seekChain && (sourceSeekPosition === null || recoverAcceptedSeek) && !pendingLoad && !video.seeking
-        if (identity !== loadedIdentity || renewCapability || (restoringSeek && disposeAttachment === null)) {
+        if (ownerChanged || identity !== loadedIdentity || renewCapability || (restoringSeek && disposeAttachment === null)) {
           const preserveAttachedPosition = renewCapability || (recoveryPosition !== null && !executionChanged)
           // An acknowledged seek submitted after release owns the replacement
           // cursor; its response fence keeps older polling intent out.
@@ -338,15 +341,20 @@ export function useBaanderPlayer({ videoId, containerRef, autoPlay = false, onTi
           pendingLoad = { identity, position: Math.max(0, position - mediaStart) }
           loadedIdentity = identity
           retiringPlayback = null
-          const attachment = ++attachmentRevision
           attachmentReady = false
           disposeAttachment?.()
+          const attachment = ++attachmentRevision
           video.removeAttribute('src')
           video.load()
           disposeAttachment = attachHlsPlayback({
             video,
             url: new URL(data.url, window.__BAANDER_API_URL__ || window.location.origin).href,
             position: pendingLoad.position,
+            getSubtitlePreference: () => subtitlePreference,
+            onSubtitlePreferenceChange: preference => {
+              if (active() && !terminal && attachment === attachmentRevision
+                && snapshot?.jobId === data.jobId && snapshot.sessionId === data.sessionId) subtitlePreference = preference
+            },
             onReady: () => {
               if (active() && !terminal && attachment === attachmentRevision) {
                 attachmentReady = true

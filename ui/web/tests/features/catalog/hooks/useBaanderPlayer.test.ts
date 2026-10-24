@@ -3,13 +3,26 @@ import { AxiosError, CanceledError } from 'axios'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBaanderPlayer } from '@/features/catalog/hooks/useBaanderPlayer'
+import type { SubtitlePreference } from '@/features/catalog/hooks/hls-playback'
 
-const { post, attachments, loader } = vi.hoisted(() => ({ post: vi.fn(), loader: { ready: true },
-  attachments: [] as Array<{ onError: (failure?: 'network') => void, onReady: () => void, position: number, dispose: ReturnType<typeof vi.fn> }> }))
+interface TestAttachment {
+  onError: (failure?: 'network') => void
+  onReady: () => void
+  position: number
+  dispose: ReturnType<typeof vi.fn>
+  getSubtitlePreference: () => SubtitlePreference | undefined
+  onSubtitlePreferenceChange: (preference: SubtitlePreference) => void
+}
+
+type MockAttachmentOptions = Omit<TestAttachment, 'dispose'> & { video: HTMLVideoElement, url: string }
+
+const { post, attachments, loader } = vi.hoisted(() => ({
+  post: vi.fn(), loader: { ready: true }, attachments: [] as TestAttachment[],
+}))
 vi.mock('@/features/catalog/hooks/hls-playback', () => ({
-  attachHlsPlayback: ({ video, url, position, onReady, onError }: { video: HTMLVideoElement, url: string, position: number, onReady: () => void, onError: (failure?: 'network') => void }) => {
+  attachHlsPlayback: ({ video, url, position, onReady, onError, getSubtitlePreference, onSubtitlePreferenceChange }: MockAttachmentOptions) => {
     const dispose = vi.fn()
-    attachments.push({ onError, onReady, position, dispose })
+    attachments.push({ onError, onReady, position, dispose, getSubtitlePreference, onSubtitlePreferenceChange })
     video.src = url
     if (loader.ready) onReady()
     return dispose
@@ -3174,6 +3187,67 @@ describe('useBaanderPlayer authorization', () => {
       ])
       player.unmount()
     })
+  })
+
+
+  it.each(['s3', 'off'] as const)('retains %s through same-owner replacement and renewal but rejects retired callbacks', async preference => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))
+    let generation = 1
+    post.mockImplementation(() => Promise.resolve({ data: {
+      url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 20}`, jobId: 'job', sessionId: 'owned-session',
+      generation, revision: generation, renditionSet: `job.${generation}`, ready: true,
+      position: 0, startTime: 0, duration: 180, status: 'paused',
+    } }))
+    const containerRef = { current: document.createElement('div') }
+    const { unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef }))
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    // Disposal snapshots a gesture whose queued native change event has not run.
+    attachments[0].dispose.mockImplementation(() => attachments[0].onSubtitlePreferenceChange(preference))
+    generation = 2
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].getSubtitlePreference()).toBe(preference)
+    attachments[0].onSubtitlePreferenceChange('s2')
+    expect(attachments[1].getSubtitlePreference()).toBe(preference)
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    await act(async () => vi.advanceTimersByTimeAsync(16000))
+    expect(attachments.length).toBeGreaterThanOrEqual(3)
+    expect(attachments.at(-1)!.getSubtitlePreference()).toBe(preference)
+    unmount()
+  })
+
+  it.each(['movie', 'session', 'job'] as const)('resets caption preference for a different %s owner', async owner => {
+    vi.useFakeTimers()
+    let sessionId = 'owned-session'
+    let jobId = 'job'
+    post.mockImplementation(() => Promise.resolve({ data: {
+      url: '/manifest', jobId, sessionId, generation: 1, revision: 1, renditionSet: `${jobId}.1`,
+      ready: true, position: 0, startTime: 0, duration: 180, status: 'paused',
+    } }))
+    const containerRef = { current: document.createElement('div') }
+    const { rerender, unmount } = renderHook(({ videoId }) => useBaanderPlayer({ videoId, containerRef }), {
+      initialProps: { videoId: 'first-video' },
+    })
+    await act(async () => {})
+    const video = containerRef.current.querySelector('video')!
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+    attachments[0].onSubtitlePreferenceChange('s3')
+    attachments[0].dispose.mockImplementation(() => attachments[0].onSubtitlePreferenceChange('off'))
+    if (owner === 'movie') rerender({ videoId: 'second-video' })
+    else {
+      if (owner === 'session') sessionId = 'replacement-session'
+      else jobId = 'replacement-job'
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+    }
+    await act(async () => {})
+    expect(attachments).toHaveLength(2)
+    expect(attachments[1].getSubtitlePreference()).toBeUndefined()
+    attachments[0].onSubtitlePreferenceChange('s2')
+    expect(attachments[1].getSubtitlePreference()).toBeUndefined()
+    unmount()
   })
 
 })

@@ -371,13 +371,9 @@ function hasDecodedFrame(state) {
     && frame.chromaticPixels >= 8 && frame.opaquePixels === 144
 }
 
-async function subtitleState(selectDialogue = false) {
-  return video.evaluate((element, select) => {
+async function subtitleState() {
+  return video.evaluate(element => {
     const tracks = Array.from(element.textTracks)
-    const dialogue = tracks.find(track => track.label.includes('Dialogue'))
-    if (select && dialogue) {
-      for (const track of tracks) track.mode = track === dialogue ? 'showing' : 'disabled'
-    }
     const cues = values => Array.from(values ?? [], cue => ({
       start: cue.startTime, end: cue.endTime, text: 'text' in cue ? cue.text : null,
     }))
@@ -388,22 +384,39 @@ async function subtitleState(selectDialogue = false) {
         cueCount: track.cues?.length ?? null, activeCues: cues(track.activeCues),
       })),
     }
-  }, selectDialogue)
+  })
 }
 
-async function observeSubtitles(phase, expectedText) {
+async function selectSubtitles(phase, selection, deadline = Date.now() + 5000) {
+  assert(Date.now() < deadline, 'Subtitle selection must stay within its playback proof budget')
+  await until(async () => (await subtitleState()).tracks.length === 3,
+    'all source subtitle tracks before a single explicit selection', Math.min(5000, deadline - Date.now()))
+  assert(Date.now() < deadline, 'Subtitle selection must stay within its playback proof budget')
+  await video.evaluate((element, choice) => {
+    const tracks = Array.from(element.textTracks)
+    const selected = choice === 'Off' ? null : tracks.find(track => track.label.includes(choice))
+    if (choice !== 'Off' && !selected) throw new Error(`Missing subtitle track: ${choice}`)
+    // This is one TextTrack API gesture, not an interaction with a native caption menu.
+    for (const track of tracks) track.mode = track === selected ? 'showing' : 'disabled'
+  }, selection)
+  subtitleObservations.push({ phase, status: 'selected', selection, at: Date.now(),
+    attachment: attachmentNumber, generation: snapshot?.generation, ...await subtitleState() })
+}
+
+async function observeSubtitles(phase, expectedText, selection = 'Dialogue', deadline = Date.now() + 15000) {
+  assert(Date.now() < deadline, 'Subtitle observation must stay within its playback proof budget')
   // Native HLS capability does not establish native subtitle support. Retain
   // that distinction explicitly instead of treating an empty track list as a pass.
-  let state = await subtitleState(true)
+  let state = await subtitleState()
   const engine = (await mediaState()).source.startsWith('blob:') ? 'mse-hls' : 'native-hls'
-  const deadline = Date.now() + 5000
-  while (state.tracks.length < 3 && Date.now() < deadline) {
+  const trackDeadline = Math.min(deadline, Date.now() + 5000)
+  while (state.tracks.length < 3 && Date.now() < trackDeadline) {
     await new Promise(resolve => setTimeout(resolve, 100))
-    state = await subtitleState(true)
+    state = await subtitleState()
   }
   if (state.tracks.length === 0 && engine === 'native-hls') {
     if (subtitleObservations.some(observation => observation.status === 'active-cue')) {
-      subtitleObservations.push({ phase, engine, status: 'failed', expectedText, ...state })
+      subtitleObservations.push({ phase, engine, status: 'failed', selection, expectedText, ...state })
       await savePlaybackTimeline()
       assert.fail('Previously available native subtitle tracks disappeared after the generation changed')
     }
@@ -417,17 +430,41 @@ async function observeSubtitles(phase, expectedText) {
     assert.equal(state.tracks.length, 3, 'HLS playback must retain all three independently identified subtitle tracks')
     assert(state.tracks.some(track => track.label.includes('Forced')), 'The duplicate-language forced track must remain selectable')
     assert(state.tracks.some(track => track.label.includes('Unlabelled')), 'The track without language metadata must remain selectable')
+    let disabledPolls = 0
+    let observedAttachment = attachmentNumber
+    const disabledObservations = []
     await until(async () => {
-      state = await subtitleState(true)
-      return state.tracks.some(track => track.label.includes('Dialogue') && track.mode === 'showing'
-        && track.activeCues.some(cue => cue.text?.includes(expectedText)))
-    }, `the Dialogue track to activate "${expectedText}"`, 10000)
-    subtitleObservations.push({ phase, engine, status: 'active-cue', expectedText, ...state })
+      state = await subtitleState()
+      const selected = state.tracks.length === 3
+        && state.tracks.filter(track => track.mode === 'showing').length === (selection === 'Off' ? 0 : 1)
+        && state.tracks.some(track => selection === 'Off' || track.label.includes(selection))
+        && state.tracks.every(track => {
+          if (selection === 'Off' || !track.label.includes(selection)) return track.mode === 'disabled'
+          return track.mode === 'showing'
+            && track.activeCues.some(cue => cue.text?.includes(expectedText))
+        })
+      if (selection !== 'Off') return selected
+      if (!selected || observedAttachment !== attachmentNumber) {
+        disabledPolls = 0
+        disabledObservations.length = 0
+      }
+      observedAttachment = attachmentNumber
+      if (selected) {
+        disabledPolls++
+        disabledObservations.push({ at: Date.now(), attachment: attachmentNumber, ...state })
+      }
+      return disabledPolls >= 2
+    }, selection === 'Off' ? 'all subtitle tracks to remain disabled'
+      : `the exclusive ${selection} track to activate "${expectedText}"`, Math.min(10000, deadline - Date.now()))
+    subtitleObservations.push({ phase, engine, status: selection === 'Off' ? 'disabled' : 'active-cue',
+      selection, expectedText, at: Date.now(), attachment: attachmentNumber,
+      generation: snapshot?.generation, ...(selection === 'Off' ? { disabledObservations } : {}), ...state })
     // The cue assertion establishes TextTrack activation; this screenshot supports
     // inspection of painted captions without claiming a pixel-level assertion.
-    await page.screenshot({ path: `${evidence}/subtitles-${phase}.png` })
+    assert(Date.now() < deadline, 'Subtitle evidence must stay within its playback proof budget')
+    await page.screenshot({ path: `${evidence}/subtitles-${phase}.png`, timeout: deadline - Date.now() })
   } catch (error) {
-    subtitleObservations.push({ phase, engine, status: 'failed', expectedText, ...state })
+    subtitleObservations.push({ phase, engine, status: 'failed', selection, expectedText, ...state })
     throw error
   } finally {
     await savePlaybackTimeline()
@@ -589,10 +626,16 @@ async function renewPlaybackCapabilities(owner) {
     }
     assert.fail(`Publication did not leave a stable ${mode} renewal interval within three attempts`)
   }
+  await selectSubtitles('capability-renewal-paused-choice', 'Forced', deadline)
   await pausePlayback(owner, 'capability-renewal-pause', Math.max(1, Math.min(15000, deadline - Date.now())))
+  await observeSubtitles('capability-renewal-paused-before', 'Forced early', 'Forced', deadline)
   await crossDeadline('paused')
+  await observeSubtitles('capability-renewal-paused-after', 'Forced early', 'Forced', deadline)
+  await selectSubtitles('capability-renewal-running-choice', 'Off', deadline)
+  await observeSubtitles('capability-renewal-running-before', null, 'Off', deadline)
   await resumeAndDecode(owner, 'capability-renewal-resume', Math.max(1, Math.min(15000, deadline - Date.now())))
   await crossDeadline('running')
+  await observeSubtitles('capability-renewal-running-after', null, 'Off', deadline)
   shortSigningLifetime = false
   let normalBaseline
   await waitFor(async () => {
@@ -607,6 +650,7 @@ async function renewPlaybackCapabilities(owner) {
     }
     return state.time > normalBaseline.time + 1 && state.decodedFrames > normalBaseline.decodedFrames
   }, 'a real attachment using the restored normal signing lifetime', 20000)
+  await observeSubtitles('capability-renewal-normal-lifetime', null, 'Off', deadline)
   await recordClientControl('capability-renewal-normal-lifetime', Date.now())
 }
 
@@ -1655,11 +1699,21 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     assert(target > publishedEnd + 6, 'The fixture must leave source media beyond the currently published native window')
     assert(initial.source.startsWith('blob:'), 'The selected browser must use the supported MSE HLS path')
     assert(initial.seekable.length > 0, 'MSE must expose an actual published seekable window')
+    await selectSubtitles('source-initial-dialogue-choice', 'Dialogue')
+    await observeSubtitles('source-initial-dialogue', 'Dialogue early')
+    await selectSubtitles('source-seek-forced-choice', 'Forced')
+    await observeSubtitles('source-seek-forced-before', 'Forced early', 'Forced')
     const requested = await seekSourceAndDecode(owner, target, 'source-seek-beyond-window')
     assert(requested > publishedEnd, 'The movie source control must seek beyond the old native window')
+    await observeSubtitles('source-seek-forced-after', 'Forced sought', 'Forced')
+    await selectSubtitles('source-sought-dialogue-choice', 'Dialogue')
     await observeSubtitles('source-sought', 'Dialogue sought')
     await pausePlayback(owner, 'source-pause')
+    await selectSubtitles('source-seek-paused-off-choice', 'Off')
+    await observeSubtitles('source-seek-paused-off-before', null, 'Off')
     await seekSourceAndDecode(owner, Math.min(snapshot.duration - 24, requested + 24), 'source-seek-forward-paused', true)
+    await observeSubtitles('source-seek-paused-off-after', null, 'Off')
+    await selectSubtitles('source-sought-paused-dialogue-choice', 'Dialogue')
     await observeSubtitles('source-sought-paused', 'Dialogue sought')
     await seekSourceAndDecode(owner, 0, 'source-seek-return-to-start-paused', true)
     await resumeAndDecode(owner, 'source-resume-after-return')
@@ -1789,6 +1843,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   } else if (phase === 'sought-paused') {
     await pausedAt(credentials.expectedSeekPosition, initialGeneration + 1)
     soughtGeneration = snapshot.generation
+    await selectSubtitles('sought-paused-dialogue-choice', 'Dialogue')
     await observeSubtitles('sought-paused', credentials.expectedSeekPosition >= 90 ? 'Dialogue sought' : 'Dialogue late')
   } else if (phase === 'web-restarted') {
     await pausedAt(credentials.expectedSeekPosition, soughtGeneration)
