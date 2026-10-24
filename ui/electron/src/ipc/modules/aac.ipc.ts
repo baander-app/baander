@@ -5,6 +5,7 @@ import type {
   AacChannelMode,
   AacConcealment,
   AacDecoderOptions,
+  AacDrcProfile,
   AacEncoderOptions,
   AacProfile,
   AacRateControlMode,
@@ -14,13 +15,17 @@ import type {
 
 const SAMPLE_RATES = new Set([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000, 88200, 96000]);
 const MODES = new Set<AacRateControlMode>(['cbr', 'abr', 'cvbr', 'tvbr']);
-const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2']);
+const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2', 'ld', 'eld']);
+const LOW_DELAY_PROFILES = new Set<AacProfile>(['ld', 'eld']);
+const DRC_PROFILES = new Set<AacDrcProfile>(['none', 'film-standard', 'film-light', 'music-standard', 'music-light', 'speech']);
 const MAX_CHANNELS = 8;
 const TRANSPORTS = new Set<AacTransport>(['detect', 'adts', 'loas', 'latm', 'latm-raw', 'raw']);
 const SIGNALINGS = new Set<AacSignaling>(['implicit', 'explicit', 'hierarchical']);
 const CONCEALMENTS = new Set<AacConcealment>(['off', 'noise', 'interpolate']);
 const CHANNEL_MODES = new Set<AacChannelMode>(['default', '7.1', '7.1-front', '7.1-top', '7.1-rear']);
 const FRAME_LENGTHS = new Set([960, 1024]);
+const LOW_DELAY_FRAME_LENGTHS = new Set([512, 480]);
+const ELD_DOWNSCALES = new Set([1, 2, 4]);
 const MAX_CONFIG_BYTES = 64;
 
 function oneOf<T extends string>(value: unknown, allowed: Set<T>, what: string): T | undefined {
@@ -29,10 +34,59 @@ function oneOf<T extends string>(value: unknown, allowed: Set<T>, what: string):
   return value as T;
 }
 
-function frameLength(value: unknown): 960 | 1024 | undefined {
+function frameLength(value: unknown, lowDelay = false): 960 | 1024 | 512 | 480 | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== 'number' || !FRAME_LENGTHS.has(value)) invalid('frameLength');
-  return value as 960 | 1024;
+  const allowed = lowDelay ? LOW_DELAY_FRAME_LENGTHS : FRAME_LENGTHS;
+  if (typeof value !== 'number' || !allowed.has(value)) invalid('frameLength');
+  return value as 960 | 1024 | 512 | 480;
+}
+
+function percent(value: unknown, what: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!(typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100)) invalid(what);
+  return value;
+}
+
+/** A reference level in quarter dB below full scale, 0..127; `none` admits -1. */
+function refLevel(value: unknown, what: string, none: boolean): number | undefined {
+  if (value === undefined) return undefined;
+  const min = none ? -1 : 0;
+  if (!(typeof value === 'number' && Number.isInteger(value) && value >= min && value <= 127)) invalid(what);
+  return value;
+}
+
+function drcOption(value: unknown): AacDecoderOptions['drc'] {
+  if (value === undefined || typeof value === 'boolean') return value;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('drc');
+  const { boost, cut, targetRefLevel, heavy } = value as Record<string, unknown>;
+  return {
+    boost: percent(boost, 'boost'),
+    cut: percent(cut, 'cut'),
+    targetRefLevel: refLevel(targetRefLevel, 'targetRefLevel', true),
+    heavy: flag(heavy, 'heavy'),
+  };
+}
+
+function eldDownscale(value: unknown): 1 | 2 | 4 | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !ELD_DOWNSCALES.has(value)) invalid('eldDownscale');
+  return value as 1 | 2 | 4;
+}
+
+function ldSbrOption(value: unknown): AacEncoderOptions['ldSbr'] {
+  if (value === undefined || typeof value === 'boolean') return value;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('ldSbr');
+  return { dualRate: flag((value as Record<string, unknown>).dualRate, 'dualRate') };
+}
+
+function metadataOption(value: unknown): AacEncoderOptions['metadata'] {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('metadata');
+  const { drcProfile, programRefLevel } = value as Record<string, unknown>;
+  return {
+    drcProfile: oneOf(drcProfile, DRC_PROFILES, 'drcProfile'),
+    programRefLevel: refLevel(programRefLevel, 'programRefLevel', false),
+  };
 }
 
 function flag(value: unknown, what: string): boolean | undefined {
@@ -90,6 +144,8 @@ function decoderOptions(value: unknown): AacDecoderOptions {
     frameLength: frameLength(options.frameLength),
     concealment: oneOf(concealment, CONCEALMENTS, 'concealment'),
     limiter: limiterOption(limiter),
+    drc: drcOption(options.drc),
+    eldDownscale: eldDownscale(options.eldDownscale),
   };
 }
 
@@ -104,6 +160,9 @@ function encoderOptions(value: unknown): AacEncoderOptions {
   if (bitrate !== undefined && !(typeof bitrate === 'number' && Number.isInteger(bitrate) && bitrate >= 8000 && bitrate <= 1_000_000)) invalid('bitrate');
   if (mode !== undefined && !(typeof mode === 'string' && MODES.has(mode as AacRateControlMode))) invalid('mode');
   if (quality !== undefined && !(typeof quality === 'number' && Number.isInteger(quality) && quality >= 1 && quality <= 100)) invalid('quality');
+  const lowDelay = LOW_DELAY_PROFILES.has(profile as AacProfile);
+  if (lowDelay && transport === 'adts') invalid('transport');
+  if (options.ldSbr !== undefined && profile !== 'eld') invalid('ldSbr');
   return {
     sampleRate: sampleRate as number | undefined,
     channels: channels as number | undefined,
@@ -113,10 +172,13 @@ function encoderOptions(value: unknown): AacEncoderOptions {
     profile: profile as AacProfile | undefined,
     transport: oneOf(transport, TRANSPORTS, 'transport') as Exclude<AacTransport, 'detect'> | undefined,
     signaling: oneOf(signaling, SIGNALINGS, 'signaling'),
-    frameLength: frameLength(options.frameLength),
+    frameLength: frameLength(options.frameLength, lowDelay),
     crc: flag(options.crc, 'crc'),
     mpeg2: flag(options.mpeg2, 'mpeg2'),
     channelMode: oneOf(channelMode, CHANNEL_MODES, 'channelMode'),
+    ldSbr: ldSbrOption(options.ldSbr),
+    afterburner: flag(options.afterburner, 'afterburner'),
+    metadata: metadataOption(options.metadata),
   };
 }
 

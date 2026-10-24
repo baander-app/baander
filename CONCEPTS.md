@@ -366,3 +366,25 @@ The 7.1 layout of an eight-channel stream, which the channel count alone does no
 
 A look-ahead gain stage on the decoder's output that keeps every sample within full scale after a downmix or loud content, at the cost of its attack window as delay. Off by default.
 
+### Low-delay profile
+
+AAC-LD and AAC-ELD, the object types for conversation and live links: frames of 512 or 480 samples instead of 1024, a single long window without block switching, and for AAC-ELD a low-overlap filterbank whose window spans four frames with most of its weight at the front, so the codec delay drops to a few tens of milliseconds. The native binding and the Electron service name them `ld` and `eld`. ADTS cannot carry them; LOAS is their default transport.
+
+### LD-SBR
+
+Spectral band replication for AAC-ELD, run through a low-delay filterbank and a frame grid of the short frame; its header travels in the AudioSpecificConfig rather than in the stream. With dual rate the core runs at half the input rate as in HE-AAC; without it the core and the SBR share one rate.
+*Avoid: HE-AAC ELD, which no standard names.*
+
+### Error resilience tools
+
+The optional tools of the error-resilient AAC syntax (object types 17, 23 and 39): virtual codebooks that bound the values a damaged section can take, reversible variable length coding of the scalefactors readable from both ends, and reordering of the spectral codewords so that a bit error damages few of them. The AudioSpecificConfig says which of the three a stream uses; the decoder reads them all, the encoder writes none.
+
+### Afterburner
+
+A second quantisation pass in the encoder that re-searches the scalefactors and codebooks of a frame against its bit budget, trading CPU for quality at low bitrates. Off by default and switchable at any time.
+
+### Dynamic range control
+
+MPEG-4 DRC: per-band gains and a program reference level the encoder writes into fill elements as metadata, which a decoder applies on request, scaled by the listener's boost and cut shares and optionally normalised to a target loudness. The DVB variant adds a heavy compression gain in the ancillary data. The encoder derives the gains from one of five named compression profiles; the decoder applies nothing unless asked.
+*Avoid: MPEG-D DRC, the separate loudness and DRC standard of USAC streams.*
+

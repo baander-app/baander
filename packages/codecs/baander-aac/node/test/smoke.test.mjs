@@ -215,3 +215,79 @@ test('names the 7.1 layout of an eight-channel stream', () => {
   assert.throws(() => new AacEncoder({ transport: 'detect' }));
   assert.throws(() => new AacDecoder({ concealment: 'maybe' }));
 });
+
+test('encodes and decodes the low-delay profiles', () => {
+  const sampleRate = 48000;
+  const pcm = tones(sampleRate, sampleRate, 2);
+  for (const [profile, frameLength, delay] of [
+    ['ld', 512, 1024],
+    ['ld', 480, 960],
+    ['eld', 512, 768],
+  ]) {
+    const encoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000, profile, frameLength });
+    assert.equal(encoder.profile, profile);
+    assert.equal(encoder.frameSize, frameLength);
+    assert.equal(encoder.delay, delay, `${profile} ${frameLength}: delay`);
+    const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+    assert.equal(stream[0], 0x56, `${profile}: LOAS by default`);
+    const decoder = new AacDecoder({ channels: 2 });
+    const out = decodeAll(decoder, stream, 500);
+    assert.equal(decoder.errors, 0);
+    assert.equal(decoder.objectType, profile);
+    assert.equal(decoder.frameSize, frameLength);
+    const snr = snrDb(pcm, out, encoder.delay * 2);
+    assert.ok(snr > 25, `${profile} ${frameLength}: reconstruction SNR ${snr.toFixed(1)} dB`);
+  }
+  assert.throws(() => new AacEncoder({ profile: 'ld', transport: 'adts' }));
+  assert.throws(() => new AacEncoder({ profile: 'lc', frameLength: 512 }));
+  assert.throws(() => new AacEncoder({ profile: 'lc', ldSbr: true }));
+});
+
+test('writes and applies dynamic range control, and runs the afterburner', () => {
+  const sampleRate = 44100;
+  const pcm = tones(sampleRate, sampleRate, 2);
+  const plain = new AacEncoder({ sampleRate, channels: 2, bitrate: 96000 });
+  const plainStream = Buffer.concat([plain.encode(pcm), plain.flush()]);
+  const metadata = new AacEncoder({
+    sampleRate, channels: 2, bitrate: 96000,
+    metadata: { drcProfile: 'film-standard', programRefLevel: 124 },
+  });
+  const stream = Buffer.concat([metadata.encode(pcm), metadata.flush()]);
+  const plainDecoder = new AacDecoder({ channels: 2 });
+  decodeAll(plainDecoder, plainStream, plainStream.length);
+  assert.equal(plainDecoder.hasDrc, false);
+  assert.equal(plainDecoder.programRefLevel, -1);
+
+  const off = new AacDecoder({ channels: 2 });
+  const offOut = decodeAll(off, stream, stream.length);
+  assert.equal(off.hasDrc, true);
+  assert.equal(off.programRefLevel, 124);
+  const gainDb = (decoder) => {
+    const out = decodeAll(decoder, stream, stream.length);
+    assert.equal(decoder.errors, 0);
+    let offRms = 0;
+    let onRms = 0;
+    for (let i = 0; i < offOut.length; i++) {
+      offRms += offOut[i] * offOut[i];
+      onRms += out[i] * out[i];
+    }
+    return 10 * Math.log10(onRms / offRms);
+  };
+  /* The signal sits about 18 dB above the reference level, where the film
+   * standard curve cuts; the target level then lifts everything by 6 dB. */
+  const cut = gainDb(new AacDecoder({ channels: 2, drc: true }));
+  assert.ok(cut < -4 && cut > -10, `signalled cut ${cut.toFixed(2)} dB`);
+  const half = gainDb(new AacDecoder({ channels: 2, drc: { cut: 50 } }));
+  assert.ok(Math.abs(half - cut / 2) < 0.5, `half cut ${half.toFixed(2)} dB`);
+  const lifted = gainDb(new AacDecoder({ channels: 2, drc: { cut: 0, boost: 0, targetRefLevel: 100 } }));
+  assert.ok(Math.abs(lifted - 6) < 0.3, `reference level gain ${lifted.toFixed(2)} dB`);
+  assert.throws(() => new AacDecoder({ drc: { boost: 200 } }));
+  assert.throws(() => new AacEncoder({ metadata: { drcProfile: 'loud' } }));
+
+  const burner = new AacEncoder({ sampleRate, channels: 2, bitrate: 48000, afterburner: true });
+  const burnt = Buffer.concat([burner.encode(pcm), burner.flush()]);
+  const decoder = new AacDecoder({ channels: 2 });
+  const out = decodeAll(decoder, burnt, burnt.length);
+  assert.equal(decoder.errors, 0);
+  assert.ok(snrDb(pcm, out, burner.delay * 2) > 20, 'afterburner stream decodes');
+});

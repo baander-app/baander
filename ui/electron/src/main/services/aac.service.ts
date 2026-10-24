@@ -8,6 +8,7 @@
  */
 import type {
   AacChannelMode,
+  AacObjectType,
   AacDecoder,
   AacDecoderOptions,
   AacEncoder,
@@ -45,6 +46,12 @@ export interface AacDecodeResult {
   delay: number;
   hasSbr: boolean;
   hasPs: boolean;
+  /** The object type of the stream: 'lc', 'er-lc', 'ld', 'eld' or 'unknown'. */
+  objectType: AacObjectType;
+  /** The program reference level the last frame carried, or -1. */
+  programRefLevel: number;
+  /** The last frame carried dynamic range control data. */
+  hasDrc: boolean;
   pcm: Float32Array;
 }
 
@@ -197,6 +204,9 @@ function describe(decoder: AacDecoder, pcm: Float32Array): AacDecodeResult {
     delay: decoder.delay,
     hasSbr: decoder.hasSbr,
     hasPs: decoder.hasPs,
+    objectType: decoder.objectType,
+    programRefLevel: decoder.programRefLevel,
+    hasDrc: decoder.hasDrc,
     pcm,
   };
 }

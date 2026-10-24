@@ -1,6 +1,6 @@
 /**
- * Native binding of the baander-aac codec (AAC-LC and HE-AAC v1/v2
- * encoder and decoder).
+ * Native binding of the baander-aac codec (AAC-LC, HE-AAC v1/v2, AAC-LD
+ * and AAC-ELD encoder and decoder).
  *
  * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS
  * or LOAS stream, LATM elements or raw access units.  Both classes accept
@@ -29,6 +29,46 @@ export type AacConcealment = 'off' | 'noise' | 'interpolate';
  * 'default' covers every other channel count.
  */
 export type AacChannelMode = 'default' | '7.1' | '7.1-front' | '7.1-top' | '7.1-rear';
+/**
+ * The object type of a decoded stream: 'lc' covers AAC-LC and the HE-AAC
+ * profiles, 'er-lc' the error-resilient AAC-LC syntax, 'ld' AAC-LD and
+ * 'eld' AAC-ELD; 'unknown' before the first frame.
+ */
+export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'unknown';
+/**
+ * MPEG-4 dynamic range control profiles the encoder writes as metadata:
+ * a compression curve of the named character plus the program reference
+ * level.
+ */
+export type AacDrcProfile =
+  | 'none'
+  | 'film-standard'
+  | 'film-light'
+  | 'music-standard'
+  | 'music-light'
+  | 'speech';
+
+export interface AacDrcOptions {
+  /** How much of the signalled boost to apply, in percent. Default 100. */
+  boost?: number;
+  /** How much of the signalled cut to apply, in percent. Default 100. */
+  cut?: number;
+  /**
+   * Wanted program loudness in quarter dB below full scale (0..127; 124
+   * is -31 dBFS); a stream's program reference level is matched to it.
+   * Default -1: no loudness normalisation.
+   */
+  targetRefLevel?: number;
+  /** Apply the DVB heavy compression gains instead of the DRC bands when present. Default false. */
+  heavy?: boolean;
+}
+
+export interface AacMetadataOptions {
+  /** The DRC profile written into every frame. Default 'none'. */
+  drcProfile?: AacDrcProfile;
+  /** Program reference level in quarter dB below full scale (0..127). Default 124 (-31 dBFS). */
+  programRefLevel?: number;
+}
 
 export interface AacLimiterOptions {
   /** Look-ahead and attack time in ms, which is also the added delay. Default 15. */
@@ -56,6 +96,13 @@ export interface AacDecoderOptions {
   concealment?: AacConcealment;
   /** Peak limiter on the output; off by default. */
   limiter?: boolean | AacLimiterOptions;
+  /** Apply the stream's MPEG-4 dynamic range control data; off by default. */
+  drc?: boolean | AacDrcOptions;
+  /**
+   * AAC-ELD downscaled playout: decode at 1/2 or 1/4 of the stream's rate
+   * with correspondingly shorter frames. Default 1.
+   */
+  eldDownscale?: 1 | 2 | 4;
 }
 
 export declare class AacDecoder {
@@ -93,11 +140,29 @@ export declare class AacDecoder {
   readonly concealedFrames: number;
   /** Output samples of delay added by the limiter (0 without it). */
   readonly delay: number;
+  /** The object type of the stream being decoded. */
+  readonly objectType: AacObjectType;
+  /** The program reference level the last frame carried (quarter dB below full scale), or -1. */
+  readonly programRefLevel: number;
+  /** The last frame carried dynamic range control data. */
+  readonly hasDrc: boolean;
 }
 
 export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
-/** AAC-LC, HE-AAC v1 (SBR) or HE-AAC v2 (SBR and parametric stereo). */
-export type AacProfile = 'lc' | 'he' | 'hev2';
+/**
+ * AAC-LC, HE-AAC v1 (SBR), HE-AAC v2 (SBR and parametric stereo), AAC-LD
+ * or AAC-ELD (the low-delay profiles, 512 or 480 samples per frame, LOAS
+ * by default; ADTS cannot carry them).
+ */
+export type AacProfile = 'lc' | 'he' | 'hev2' | 'ld' | 'eld';
+
+export interface AacLdSbrOptions {
+  /**
+   * The core runs at half the input rate and a frame is 1024 (960) input
+   * samples; without it the core and the SBR share one rate. Default true.
+   */
+  dualRate?: boolean;
+}
 
 export interface AacEncoderOptions {
   /**
@@ -115,18 +180,24 @@ export interface AacEncoderOptions {
   mode?: AacRateControlMode;
   /** 1..100 for the VBR modes (70 is the masking threshold). */
   quality?: number;
-  /** Default 'adts'. */
+  /** Default 'adts', or 'loas' for the low-delay profiles. */
   transport?: Exclude<AacTransport, 'detect'>;
   /** SBR/PS signalling in the AudioSpecificConfig. Default 'implicit'. */
   signaling?: AacSignaling;
-  /** 1024 (default) or 960 samples per frame. */
-  frameLength?: 960 | 1024;
-  /** Write the ADTS or LATM CRC. Default false. */
+  /** 1024 (default) or 960 samples per frame; 512 (default) or 480 for the low-delay profiles. */
+  frameLength?: 960 | 1024 | 512 | 480;
+  /** Write the ADTS CRC. Default false. */
   crc?: boolean;
   /** MPEG-2 AAC (ADTS id 1, no noise substitution). Default false. */
   mpeg2?: boolean;
   /** The 7.1 layout of an 8-channel input. Default '7.1'. */
   channelMode?: AacChannelMode;
+  /** 'eld' only: SBR with the low-delay filterbank. Default false. */
+  ldSbr?: boolean | AacLdSbrOptions;
+  /** A second quantisation pass for better quality at more CPU. Default false. */
+  afterburner?: boolean;
+  /** Dynamic range control metadata written into the stream. */
+  metadata?: AacMetadataOptions;
 }
 
 export declare class AacEncoder {

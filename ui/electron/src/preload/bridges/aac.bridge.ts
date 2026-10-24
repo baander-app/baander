@@ -4,6 +4,31 @@ export type AacTransport = 'detect' | 'adts' | 'loas' | 'latm' | 'latm-raw' | 'r
 export type AacSignaling = 'implicit' | 'explicit' | 'hierarchical';
 export type AacConcealment = 'off' | 'noise' | 'interpolate';
 export type AacChannelMode = 'default' | '7.1' | '7.1-front' | '7.1-top' | '7.1-rear';
+export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'unknown';
+export type AacDrcProfile = 'none' | 'film-standard' | 'film-light' | 'music-standard' | 'music-light' | 'speech';
+
+/** How the decoder applies a stream's MPEG-4 dynamic range control data. */
+export interface AacDrcOptions {
+  /** Share of the signalled boost, in percent. Default 100. */
+  boost?: number;
+  /** Share of the signalled cut, in percent. Default 100. */
+  cut?: number;
+  /** Wanted loudness in quarter dB below full scale (0..127), or -1 for none. */
+  targetRefLevel?: number;
+  /** Use the DVB heavy compression gains when present. */
+  heavy?: boolean;
+}
+
+export interface AacMetadataOptions {
+  drcProfile?: AacDrcProfile;
+  /** Program reference level in quarter dB below full scale (0..127). */
+  programRefLevel?: number;
+}
+
+export interface AacLdSbrOptions {
+  /** The core at half the input rate (default) or the same rate. */
+  dualRate?: boolean;
+}
 
 export interface AacLimiterOptions {
   attackMs?: number;
@@ -23,11 +48,15 @@ export interface AacDecoderOptions {
   /** Default 'interpolate'. */
   concealment?: AacConcealment;
   limiter?: boolean | AacLimiterOptions;
+  /** Apply the stream's dynamic range control data; off by default. */
+  drc?: boolean | AacDrcOptions;
+  /** AAC-ELD playout at 1/2 or 1/4 of the stream's rate. Default 1. */
+  eldDownscale?: 1 | 2 | 4;
 }
 
 export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
-/** AAC-LC, HE-AAC v1 (SBR) or HE-AAC v2 (SBR and parametric stereo). */
-export type AacProfile = 'lc' | 'he' | 'hev2';
+/** AAC-LC, HE-AAC v1 (SBR), HE-AAC v2 (SBR and parametric stereo), AAC-LD or AAC-ELD. */
+export type AacProfile = 'lc' | 'he' | 'hev2' | 'ld' | 'eld';
 
 /** Options of the native AAC encoder; see @baander/aac-native. */
 export interface AacEncoderOptions {
@@ -40,10 +69,17 @@ export interface AacEncoderOptions {
   profile?: AacProfile;
   transport?: Exclude<AacTransport, 'detect'>;
   signaling?: AacSignaling;
-  frameLength?: 960 | 1024;
+  /** 1024 or 960; 512 or 480 for the low-delay profiles. */
+  frameLength?: 960 | 1024 | 512 | 480;
   crc?: boolean;
   mpeg2?: boolean;
   channelMode?: AacChannelMode;
+  /** 'eld' only: SBR with the low-delay filterbank. */
+  ldSbr?: boolean | AacLdSbrOptions;
+  /** A second quantisation pass for better quality at more CPU. */
+  afterburner?: boolean;
+  /** Dynamic range control metadata written into the stream. */
+  metadata?: AacMetadataOptions;
 }
 
 export interface AacInfo {
@@ -69,6 +105,12 @@ export interface AacDecodeResult {
   delay: number;
   hasSbr: boolean;
   hasPs: boolean;
+  /** The object type of the stream. */
+  objectType: AacObjectType;
+  /** The program reference level the last frame carried, or -1. */
+  programRefLevel: number;
+  /** The last frame carried dynamic range control data. */
+  hasDrc: boolean;
   /** Interleaved float PCM, full scale 1.0. */
   pcm: Float32Array;
 }

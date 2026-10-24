@@ -9,6 +9,14 @@ mock.module('../src/main/services/aac.service.ts', { exports: { getAacService: (
 const { registerAacIpc } = await import('../src/ipc/modules/aac.ipc.ts');
 registerAacIpc();
 
+/** The validated options without the keys the validator leaves undefined. */
+function given(call: unknown[]): unknown[] {
+  return call.map(arg =>
+    arg && typeof arg === 'object' && !ArrayBuffer.isView(arg) && !(arg instanceof ArrayBuffer)
+      ? Object.fromEntries(Object.entries(arg).filter(([, v]) => v !== undefined))
+      : arg);
+}
+
 async function invoke(channel: string, ...args: unknown[]) {
   const handler = handlers.get(`baander:aac:${channel}`);
   assert.ok(handler, channel);
@@ -30,13 +38,18 @@ test('valid requests reach the service with validated arguments', async () => {
   assert.equal(await invoke('encoder-flush', 8), 'flushEncoder-result');
   assert.equal(await invoke('encoder-close', 8), 'closeEncoder-result');
   assert.deepEqual(calls.map(c => c[0]), ['info', 'decode', 'decode', 'encode', 'openDecoder', 'decodeChunk', 'closeDecoder', 'openEncoder', 'encodeChunk', 'flushEncoder', 'closeEncoder']);
-  assert.deepEqual(calls[1], ['decode', data, { sampleRate: undefined, channels: 1 }]);
-  assert.deepEqual(calls[7], ['openEncoder', { sampleRate: undefined, channels: undefined, bitrate: undefined, mode: 'tvbr', quality: 90, profile: undefined }]);
+  assert.deepEqual(given(calls[1]), ['decode', data, { channels: 1 }]);
+  assert.deepEqual(given(calls[7]), ['openEncoder', { mode: 'tvbr', quality: 90 }]);
   calls.length = 0;
   assert.equal(await invoke('decode', data, { channels: 0 }), 'decode-result');
   assert.equal(await invoke('encoder-open', { sampleRate: 48000, channels: 6, bitrate: 192000, profile: 'he' }), 'openEncoder-result');
-  assert.deepEqual(calls[0], ['decode', data, { sampleRate: undefined, channels: 0 }]);
-  assert.deepEqual(calls[1], ['openEncoder', { sampleRate: 48000, channels: 6, bitrate: 192000, mode: undefined, quality: undefined, profile: 'he' }]);
+  assert.deepEqual(given(calls[0]), ['decode', data, { channels: 0 }]);
+  assert.deepEqual(given(calls[1]), ['openEncoder', { sampleRate: 48000, channels: 6, bitrate: 192000, profile: 'he' }]);
+  calls.length = 0;
+  assert.equal(await invoke('decoder-open', { drc: { cut: 50, targetRefLevel: 100 }, eldDownscale: 2 }), 'openDecoder-result');
+  assert.equal(await invoke('encoder-open', { profile: 'eld', frameLength: 480, ldSbr: { dualRate: false }, afterburner: true, metadata: { drcProfile: 'speech', programRefLevel: 112 } }), 'openEncoder-result');
+  assert.deepEqual(given(calls[0]), ['openDecoder', { drc: { cut: 50, targetRefLevel: 100 }, eldDownscale: 2 }]);
+  assert.deepEqual(given(calls[1]), ['openEncoder', { profile: 'eld', frameLength: 480, ldSbr: { dualRate: false }, afterburner: true, metadata: { drcProfile: 'speech', programRefLevel: 112 } }]);
 });
 
 test('malformed payloads are rejected before the service is called', async () => {
@@ -52,6 +65,14 @@ test('malformed payloads are rejected before the service is called', async () =>
     ['encode', [pcm, { mode: 'fast' }]],
     ['encode', [pcm, { bitrate: 100 }]],
     ['encode', [pcm, { quality: 0 }]],
+    ['encode', [pcm, { profile: 'ld', transport: 'adts' }]],
+    ['encode', [pcm, { profile: 'ld', frameLength: 1024 }]],
+    ['encode', [pcm, { profile: 'lc', frameLength: 512 }]],
+    ['encode', [pcm, { profile: 'lc', ldSbr: true }]],
+    ['encode', [pcm, { metadata: { drcProfile: 'loud' } }]],
+    ['encode', [pcm, { metadata: { programRefLevel: 128 } }]],
+    ['decode', [new Uint8Array(1), { drc: { boost: 101 } }]],
+    ['decode', [new Uint8Array(1), { eldDownscale: 3 }]],
     ['encode', [pcm, []]],
     ['decoder-decode', ['1', new Uint8Array(1)]],
     ['decoder-decode', [0, new Uint8Array(1)]],

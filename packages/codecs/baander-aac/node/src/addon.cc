@@ -116,6 +116,40 @@ bool channel_mode_of(const std::string& name, AacChannelMode* out) {
   return true;
 }
 
+const char* object_type_name(int aot) {
+  switch (aot) {
+    case AAC_AOT_LC:
+      return "lc";
+    case AAC_AOT_ER_LC:
+      return "er-lc";
+    case AAC_AOT_ER_LD:
+      return "ld";
+    case AAC_AOT_ER_ELD:
+      return "eld";
+    default:
+      return "unknown";
+  }
+}
+
+bool drc_profile_of(const std::string& name, AacDrcProfile* out) {
+  if (name == "none") {
+    *out = AAC_DRC_NONE;
+  } else if (name == "film-standard") {
+    *out = AAC_DRC_FILM_STANDARD;
+  } else if (name == "film-light") {
+    *out = AAC_DRC_FILM_LIGHT;
+  } else if (name == "music-standard") {
+    *out = AAC_DRC_MUSIC_STANDARD;
+  } else if (name == "music-light") {
+    *out = AAC_DRC_MUSIC_LIGHT;
+  } else if (name == "speech") {
+    *out = AAC_DRC_SPEECH;
+  } else {
+    return false;
+  }
+  return true;
+}
+
 const char* channel_mode_name(int mode) {
   switch (mode) {
     case AAC_MODE_7_1_BACK:
@@ -149,7 +183,10 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
          InstanceAccessor("hasPs", &Decoder::HasPs, nullptr),
          InstanceAccessor("errors", &Decoder::Errors, nullptr),
          InstanceAccessor("concealedFrames", &Decoder::ConcealedFrames, nullptr),
-         InstanceAccessor("delay", &Decoder::Delay, nullptr)});
+         InstanceAccessor("delay", &Decoder::Delay, nullptr),
+         InstanceAccessor("objectType", &Decoder::ObjectType, nullptr),
+         InstanceAccessor("programRefLevel", &Decoder::ProgramRefLevel, nullptr),
+         InstanceAccessor("hasDrc", &Decoder::HasDrc, nullptr)});
   }
 
   explicit Decoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Decoder>(info) {
@@ -164,9 +201,26 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     int release_ms = 50;
     const uint8_t* config = nullptr;
     size_t config_size = 0;
+    bool drc = false;
+    int boost = 100;
+    int cut = 100;
+    int target_ref_level = -1;
+    bool heavy = false;
+    int eld_downscale = 1;
     if (info.Length() > 0 && info[0].IsObject()) {
       const Napi::Object o = info[0].As<Napi::Object>();
       sample_rate = option_int(o, "sampleRate", sample_rate);
+      eld_downscale = option_int(o, "eldDownscale", 1);
+      if (o.Has("drc") && o.Get("drc").IsObject()) {
+        const Napi::Object d = o.Get("drc").As<Napi::Object>();
+        drc = true;
+        boost = option_int(d, "boost", boost);
+        cut = option_int(d, "cut", cut);
+        target_ref_level = option_int(d, "targetRefLevel", target_ref_level);
+        heavy = option_bool(d, "heavy", false);
+      } else {
+        drc = option_bool(o, "drc", false);
+      }
       channels = option_int(o, "channels", channels);
       frame_length = option_int(o, "frameLength", 0);
       if (!transport_of(option_string(o, "transport", "detect"), &transport)) {
@@ -208,6 +262,8 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
         (ret = aac_decoder_set_concealment(handle_, concealment)) < 0 ||
         (frame_length && (ret = aac_decoder_set_frame_length(handle_, frame_length)) < 0) ||
         (limiter && (ret = aac_decoder_set_limiter(handle_, 1, attack_ms, release_ms)) < 0) ||
+        (drc && (ret = aac_decoder_set_drc(handle_, 1, boost, cut, target_ref_level, heavy ? 1 : 0)) < 0) ||
+        (eld_downscale != 1 && (ret = aac_decoder_set_eld_downscale(handle_, eld_downscale)) < 0) ||
         (config && (ret = aac_decoder_set_config(handle_, config, static_cast<int>(config_size))) < 0)) {
       aac_decoder_destroy(handle_);
       handle_ = nullptr;
@@ -325,6 +381,16 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   Napi::Value Delay(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), handle_ ? aac_decoder_delay(handle_) : 0);
   }
+  Napi::Value ObjectType(const Napi::CallbackInfo& info) {
+    return Napi::String::New(info.Env(),
+                             object_type_name(handle_ ? aac_decoder_object_type(handle_) : 0));
+  }
+  Napi::Value ProgramRefLevel(const Napi::CallbackInfo& info) {
+    return Napi::Number::New(info.Env(), handle_ ? aac_decoder_program_ref_level(handle_) : -1);
+  }
+  Napi::Value HasDrc(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), handle_ && aac_decoder_has_drc(handle_) > 0);
+  }
 
   AacDecoderHandle handle_ = nullptr;
   int errors_ = 0;
@@ -385,13 +451,21 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
           aot = AAC_AOT_SBR;
         } else if (profile == "hev2") {
           aot = AAC_AOT_PS;
+        } else if (profile == "ld") {
+          aot = AAC_AOT_ER_LD;
+        } else if (profile == "eld") {
+          aot = AAC_AOT_ER_ELD;
         } else {
-          throw_error(env, "AacEncoder: profile must be lc, he or hev2");
+          throw_error(env, "AacEncoder: profile must be lc, he, hev2, ld or eld");
           return;
         }
       }
     }
-    profile_ = aot == AAC_AOT_LC ? "lc" : aot == AAC_AOT_SBR ? "he" : "hev2";
+    profile_ = aot == AAC_AOT_LC    ? "lc"
+               : aot == AAC_AOT_SBR ? "he"
+               : aot == AAC_AOT_PS  ? "hev2"
+               : aot == AAC_AOT_ER_LD ? "ld"
+                                      : "eld";
     handle_ = aac_encoder_create(sample_rate_, channels_, bitrate, aot, rc);
     if (!handle_) {
       throw_error(env, "AacEncoder: unsupported sample rate, channel count, bitrate or profile");
@@ -418,15 +492,16 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
 
  private:
   /* Stream format options: transport, signalling, frame length, CRC, the
-   * MPEG-2 header and the 7.1 channel mode.  Throws and returns false on
-   * an invalid one. */
+   * MPEG-2 header, the 7.1 channel mode, LD-SBR, the afterburner and the
+   * DRC metadata.  Throws and returns false on an invalid one. */
   bool apply_stream_options(const Napi::Env& env, const Napi::CallbackInfo& info) {
     if (info.Length() == 0 || !info[0].IsObject()) {
       return true;
     }
     const Napi::Object o = info[0].As<Napi::Object>();
+    const bool low_delay = profile_ == "ld" || profile_ == "eld";
     AacTransport transport = AAC_TRANSPORT_ADTS;
-    if (!transport_of(option_string(o, "transport", "adts"), &transport) ||
+    if (!transport_of(option_string(o, "transport", low_delay ? "loas" : "adts"), &transport) ||
         transport == AAC_TRANSPORT_DETECT) {
       throw_error(env, "AacEncoder: transport must be adts, loas, latm, latm-raw or raw");
       return false;
@@ -449,13 +524,36 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       return false;
     }
     const int frame_length = option_int(o, "frameLength", 0);
+    bool ld_sbr = false;
+    bool dual_rate = true;
+    if (o.Has("ldSbr") && o.Get("ldSbr").IsObject()) {
+      ld_sbr = true;
+      dual_rate = option_bool(o.Get("ldSbr").As<Napi::Object>(), "dualRate", true);
+    } else {
+      ld_sbr = option_bool(o, "ldSbr", false);
+    }
+    AacDrcProfile drc_profile = AAC_DRC_NONE;
+    int prog_ref_level = 124;
+    if (o.Has("metadata") && o.Get("metadata").IsObject()) {
+      const Napi::Object m = o.Get("metadata").As<Napi::Object>();
+      if (!drc_profile_of(option_string(m, "drcProfile", "none"), &drc_profile)) {
+        throw_error(env, "AacEncoder: metadata.drcProfile must be none, film-standard, film-light, "
+                         "music-standard, music-light or speech");
+        return false;
+      }
+      prog_ref_level = option_int(m, "programRefLevel", prog_ref_level);
+    }
     int ret = 0;
     if ((ret = aac_encoder_set_transport(handle_, transport)) < 0 ||
         (ret = aac_encoder_set_signaling(handle_, signaling)) < 0 ||
         (frame_length && (ret = aac_encoder_set_frame_length(handle_, frame_length)) < 0) ||
         (ret = aac_encoder_set_crc(handle_, option_bool(o, "crc", false) ? 1 : 0)) < 0 ||
         (ret = aac_encoder_set_mpeg2(handle_, option_bool(o, "mpeg2", false) ? 1 : 0)) < 0 ||
-        (mode != AAC_MODE_DEFAULT && (ret = aac_encoder_set_channel_mode(handle_, mode)) < 0)) {
+        (mode != AAC_MODE_DEFAULT && (ret = aac_encoder_set_channel_mode(handle_, mode)) < 0) ||
+        (ld_sbr && (ret = aac_encoder_set_ld_sbr(handle_, 1, dual_rate ? 1 : 0)) < 0) ||
+        (ret = aac_encoder_set_afterburner(handle_, option_bool(o, "afterburner", false) ? 1 : 0)) < 0 ||
+        (drc_profile != AAC_DRC_NONE &&
+         (ret = aac_encoder_set_metadata(handle_, drc_profile, prog_ref_level)) < 0)) {
       throw_error(env, std::string("AacEncoder: ") + error_name(ret));
       return false;
     }
