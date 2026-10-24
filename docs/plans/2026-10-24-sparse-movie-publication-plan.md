@@ -136,3 +136,55 @@ Native terminal extension must be nonnegative and less than one second, allowing
 only a small numerical epsilon; a symmetric tolerance must not permit truncation.
 Audio retains its independent source interval and delay without padding or clock
 rebasing. The integer-duration browser cases retain exact completion bounds.
+
+## Review findings and fixture calibration
+
+Independent code review required a genuine video-only restart in addition to the
+half-fps fresh case. The native suite now includes both. Delayed audio uses an
+indexed MOV/PCM source and verifies container/video origin zero and audio origin
+eight seconds before checking the encoded result. The original sparse Matroska
+fixture reports format/video origin eight seconds despite earlier video packets;
+FFmpeg then subtracts that origin and shortens the output. Its failing evidence
+remains under `var/test-runs/sparse-movie-gates/native-green` as a separate open
+container-origin finding. Changing the fixture establishes the intended source
+clock; it does not repair that Matroska behavior.
+
+A terminal AAC fragment can contain a single silent padding packet. The native
+assertion permits silence only in the final fragment with one packet and duration
+at most one 1,024-sample AAC frame plus a small numerical tolerance. Independent
+decoding must still produce samples, and complete-playlist signal, audio end and
+duration checks remain strict. Explicit source-origin metadata is required for
+the delayed MOV fixture; silent Matroska sources are checked through their actual
+packet timestamps rather than absent optional metadata.
+
+The unchanged encoder comparison adds only an unused sourceFrameRate parameter
+to the disposable base copy. Its final run reports 48 tests, 560 assertions,
+seven errors and 14 failures. The repaired encoder passes the same selection
+with 48 tests and 1,604 assertions, including all 12 native media cases. Artifacts
+are `native-red-verified` and `native-green-verified` under the phase evidence
+directory. Earlier diagnostic runs remain available.
+
+## Growing-publication amendment
+
+The first Chromium run at c5ece38a found that both sparse renditions became ready
+only after encoding completed. The CI FFmpeg 5 calibration confirms that x264's
+40-frame lookahead retained the entire thirty-frame output until EOF. Completed
+media checks alone cannot establish progressive publication.
+
+Extend the sparse software path with buffering settings selected through isolated
+CI-runtime comparisons. Preserve the existing command for unknown rates and rates
+at or above one fps. Scope encoder-specific settings to their software encoders;
+preserve existing thread limits, timing filters and source-coordinate arithmetic.
+Change input decoder buffering only if a separate controlled comparison shows it
+is required. Record effective encoder settings and native publication times.
+
+Add paced native cases for H.264 and HEVC. Poll the production presentation reader
+while the real encoder runs: require a readable closed segment in an incomplete
+presentation, followed by a larger published edge before EOF. Retain native index
+snapshots and observations. Bound each run without promising a fragile subsecond
+startup time. Keep all completed-media regressions and both browser readiness
+assertions intact. Rerun the full Transcode selection, static gates, both sparse
+browser scenarios and an ordinary adaptive control after the final change.
+
+Independent review approved this bounded extension. The exact settings remain
+subject to CI-runtime calibration and focused review before production edits.
