@@ -15,6 +15,7 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
@@ -269,6 +270,33 @@ final class GenerationDeliveryTest extends TestCase
         $native->save($index);
         self::assertStringContainsString('#EXTINF:5.990000,', $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Audio, 3, 2000000000));
         self::assertTrue($this->service->getPlaybackState($this->job->getVideoId(), $ids)['ready']);
+    }
+
+    public function testSelectedVideoEndpointReachesPlaybackStateWithoutExtendingPublishedMedia(): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput([
+            'format' => ['format_name' => 'mov,mp4', 'start_time' => '0', 'duration' => '18'],
+            'streams' => [
+                ['codec_type' => 'video', 'start_time' => '0', 'duration' => '12'],
+                ['codec_type' => 'audio', 'duration' => '18'],
+            ],
+        ]);
+        $this->job->updateProbeData($probe->jsonSerialize());
+        $path = $this->directory.'/generation.json';
+        $metadata = json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+        $metadata['duration'] = $probe->duration;
+        file_put_contents($path, json_encode($metadata, JSON_THROW_ON_ERROR));
+        $this->runtime = $this->snapshot(position: 12.0);
+        $ids = [$this->job->getPublicId()->toString()];
+
+        $state = $this->service->getPlaybackState($this->job->getVideoId(), $ids);
+        self::assertSame(12.0, $state['duration']);
+        self::assertSame(12.0, $state['position']);
+        self::assertTrue($state['ready']);
+        $manifest = $this->service->getMediaManifest($this->job->getPublicId(), MediaTrack::Video, 3, 2000000000);
+        self::assertSame(2, substr_count($manifest, '#EXTINF:6.000000,'));
+        $this->runtime = $this->snapshot(position: 18.0);
+        self::assertFalse($this->service->getPlaybackState($this->job->getVideoId(), $ids)['ready']);
     }
 
     public function testPlaybackStateUsesTheValidatedCanonicalRevisionAndCursor(): void

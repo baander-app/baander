@@ -11,6 +11,152 @@ use PHPUnit\Framework\TestCase;
 
 class VideoProbeResultTest extends TestCase
 {
+    /** @return array<string, mixed> */
+    private static function movieWithLongerAudio(): array
+    {
+        return ['format' => ['format_name' => 'mov,mp4,m4a,3gp,3g2,mj2', 'start_time' => '0.000000', 'duration' => '18.000000'],
+            'streams' => [
+                ['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'time_base' => '1/12800',
+                    'start_pts' => 0, 'start_time' => '0.000000', 'duration_ts' => 179200, 'duration' => '14.000000'],
+                ['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'duration' => '18.000000'],
+            ]];
+    }
+
+    /** @param array<string, mixed> $raw */
+    #[DataProvider('selectedVideoEndpoints')]
+    public function testSelectedVideoEndpointUsesItsOwnMetadataAndInputClock(array $raw, float $expected): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        foreach ([$probe, VideoProbeResult::fromSerialized($probe->jsonSerialize())] as $result) {
+            self::assertSame($expected, $result->duration);
+            self::assertSame($probe->sourceTimestampOrigin, $result->sourceTimestampOrigin);
+        }
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, float}> */
+    public static function selectedVideoEndpoints(): iterable
+    {
+        $raw = self::movieWithLongerAudio();
+        yield 'MOV video ends before audio' => [$raw, 14.0];
+        $raw['streams'][0]['start_pts'] = 51200;
+        $raw['streams'][0]['start_time'] = '4.000000';
+        yield 'video starts after audio' => [$raw, 18.0];
+        $raw['format']['start_time'] = '4.000000';
+        $raw['format']['duration'] = '22.000000';
+        yield 'both tracks start after zero' => [$raw, 14.0];
+        $raw = self::movieWithLongerAudio();
+        unset($raw['streams'][0]['start_time'], $raw['streams'][0]['duration']);
+        yield 'rational timing without textual seconds' => [$raw, 14.0];
+        $raw = self::movieWithLongerAudio();
+        unset($raw['streams'][0]['start_pts'], $raw['streams'][0]['duration_ts']);
+        yield 'textual timing without rational values' => [$raw, 14.0];
+        $raw = self::movieWithLongerAudio();
+        $raw['streams'][0]['time_base'] = '1/3';
+        $raw['streams'][0]['duration_ts'] = 40;
+        $raw['streams'][0]['duration'] = '13.333333';
+        yield 'rational value survives decimal rounding' => [$raw, 40 / 3];
+        $raw = self::movieWithLongerAudio();
+        $raw['streams'][] = ['codec_type' => 'video', 'duration' => '40', 'disposition' => ['default' => 1]];
+        array_unshift($raw['streams'], ['codec_type' => 'video', 'duration' => '90', 'disposition' => ['attached_pic' => 1]]);
+        $raw['format']['duration'] = '90';
+        yield 'artwork and longer alternate video do not determine endpoint' => [$raw, 14.0];
+        $raw = self::movieWithLongerAudio();
+        $raw['format']['format_name'] = 'matroska,webm';
+        $raw['streams'][0]['duration'] = '18';
+        $raw['streams'][0]['duration_ts'] = 230400;
+        $raw['streams'][0]['tags']['DURATION'] = '00:00:14.000000000';
+        yield 'Matroska tag overrides inferred container span' => [$raw, 14.0];
+        unset($raw['streams'][0]['duration'], $raw['streams'][0]['duration_ts']);
+        yield 'Matroska without stream duration' => [$raw, 14.0];
+        $raw['streams'][0]['tags']['DURATION'] = '00:00:14.040000000';
+        yield 'Matroska fractional presentation tail' => [$raw, 14.04];
+        $raw['streams'][0]['tags']['DURATION'] = '01:02:03.004';
+        $raw['format']['duration'] = '4000';
+        yield 'Matroska clock hours and minutes' => [$raw, 3723.004];
+        $raw = self::anchoredMovie();
+        $raw['format']['duration'] = '42';
+        $raw['streams'][0]['duration'] = '42';
+        $raw['streams'][0]['tags']['DURATION'] = '00:00:34.000000000';
+        yield 'Matroska endpoint subtracts verified origin once' => [$raw, 30.0];
+    }
+
+    /** @param array<string, mixed> $raw */
+    #[DataProvider('unqualifiedVideoEndpoints')]
+    public function testUnqualifiedVideoEndpointKeepsTheExistingEstimate(array $raw, float $expected = 18.0): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame($expected, $probe->duration);
+        self::assertSame($expected, VideoProbeResult::fromSerialized($probe->jsonSerialize())->duration);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, float}|array{array<string, mixed>}> */
+    public static function unqualifiedVideoEndpoints(): iterable
+    {
+        foreach ([null, '-1', INF, 'unknown', []] as $start) {
+            $raw = self::movieWithLongerAudio();
+            $raw['format']['start_time'] = $start;
+            yield 'unqualified ordinary start '.json_encode($start, JSON_PARTIAL_OUTPUT_ON_ERROR) => [$raw];
+        }
+        $raw = self::movieWithLongerAudio();
+        unset($raw['format']['start_time']);
+        yield 'missing ordinary start' => [$raw];
+        $raw = self::movieWithLongerAudio();
+        unset($raw['streams'][0]['start_pts'], $raw['streams'][0]['start_time']);
+        yield 'missing selected video start' => [$raw];
+        $raw = self::movieWithLongerAudio();
+        unset($raw['streams'][0]['duration_ts'], $raw['streams'][0]['duration']);
+        yield 'missing selected video span' => [$raw];
+        $raw = self::movieWithLongerAudio();
+        $raw['streams'][0] = array_replace($raw['streams'][0], ['time_base' => '1/1',
+            'start_pts' => '1000000000000000000', 'start_time' => '1000000000000000128',
+            'duration_ts' => 14]);
+        yield 'large magnitude does not expand decimal tolerance' => [$raw];
+        foreach ([
+            ['duration_ts', 'bad'], ['duration_ts', '99999999999999999999999'], ['duration_ts', 0],
+            ['duration_ts', -1], ['time_base', '1/0'], ['time_base', '-1/12800'], ['time_base', '1/12800/2'],
+            ['time_base', null], ['time_base', '99999999999999999999999/1'],
+            ['duration', '13.999999'], ['duration', null], ['duration', INF], ['duration', 'bad'],
+            ['start_time', '0.000001'], ['start_pts', 'bad'],
+        ] as [$key, $value]) {
+            $raw = self::movieWithLongerAudio();
+            $raw['streams'][0][$key] = $value;
+            yield $key.'='.json_encode($value, JSON_PARTIAL_OUTPUT_ON_ERROR) => [$raw];
+        }
+        foreach (['14', '00:60:14', '00:00:60', '00:00:-1', '00:00:14.0000000000',
+            ' 00:00:14.000', '00:00:14.000 ', '00:00:0e1', '00:00:00', str_repeat('9', 30).':00:00', null, []] as $tag) {
+            $raw = self::movieWithLongerAudio();
+            $raw['format']['format_name'] = 'matroska,webm';
+            $raw['streams'][0]['tags']['DURATION'] = $tag;
+            yield 'unqualified tag '.json_encode($tag) => [$raw];
+        }
+        foreach (['mpegts', 'unknown', null, []] as $format) {
+            $raw = self::movieWithLongerAudio();
+            $raw['format']['format_name'] = $format;
+            yield 'unqualified format '.json_encode($format) => [$raw];
+        }
+        $raw = self::movieWithLongerAudio();
+        $raw['format']['start_time'] = '4';
+        yield 'selected MOV start before ordinary origin' => [$raw];
+        $raw = self::movieWithLongerAudio();
+        $raw['format']['start_time'] = '14';
+        yield 'endpoint at ordinary origin' => [$raw];
+        $raw['format']['start_time'] = '15';
+        yield 'endpoint before ordinary origin' => [$raw];
+        $raw = self::anchoredMovie();
+        $raw['format']['duration'] = '42';
+        $raw['streams'][0]['tags']['DURATION'] = '00:00:04.000';
+        yield 'invalid endpoint retains verified-origin estimate' => [$raw, 38.0];
+    }
+
+    public function testSerializedAndDirectDurationsAreNotResolvedAgain(): void
+    {
+        $probe = VideoProbeResult::fromSerialized(['duration' => 18.0, 'sourceTimestampOrigin' => 4.0]);
+        self::assertSame(18.0, $probe->duration);
+        $direct = new VideoProbeResult(18.0, 64, 64, 25, null, null, null, 0, 'h264', 2, 'aac', 48000, false,
+            sourceTimestampOrigin: 4.0);
+        self::assertSame(18.0, $direct->duration);
+    }
+
     /** @param list<bool> $defaults */
     #[DataProvider('sourceAudioDefaults')]
     public function testSourceAudioSelectionKeepsOrdinalsAndCanonicalAttributes(array $defaults, ?int $expected): void

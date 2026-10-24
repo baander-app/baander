@@ -59,6 +59,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private bool $renewAllowed = true;
     private ?Closure $onFence = null;
     private float $sourceDuration = 6.0;
+    /** @var array<string, mixed>|null */
+    private ?array $sourceProbeOutput = null;
     private string $sourceFrameRate = '0/0';
     /** @var list<array<string, mixed>>|null */
     private ?array $sourceAudioStreams = null;
@@ -130,7 +132,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 file_put_contents($arguments[array_key_last($arguments)], "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
                 return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => ''];
             }
-            return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode([
+            return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode($this->sourceProbeOutput ?? [
                 'format' => ['duration' => $this->sourceDuration + ($this->sourceTimestampOrigin ?? 0.0),
                     'format_name' => 'matroska,webm', 'start_time' => ($this->sourceTimestampOrigin ?? 0.0) + 8.0],
                 'packets' => $this->sourceTimestampOrigin === null ? [] : [['stream_index' => 0, 'pts_time' => $this->sourceTimestampOrigin, 'flags' => 'K_']],
@@ -205,6 +207,28 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame('streaming_stereo', $metadata['audioProfile']['name']);
         self::assertSame(0, $this->allocations);
         self::assertSame(1, $this->releases);
+    }
+
+    public function testSelectedVideoEndpointControlsWorkerReadinessAndPublishedDuration(): void
+    {
+        $this->sourceProbeOutput = [
+            'format' => ['format_name' => 'mov,mp4', 'start_time' => '0', 'duration' => '10'],
+            'streams' => [
+                ['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720,
+                    'start_time' => '0', 'duration' => '6', 'r_frame_rate' => '25/1'],
+                ['codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000', 'duration' => '10'],
+            ],
+        ];
+        $this->current = $this->claim(1, 1, 'paused', position: 6.0);
+        $this->worker->run($this->current, static fn(): bool => false);
+
+        self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
+        self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
+        self::assertSame(6.0, $this->job->getProbeData()['duration']);
+        self::assertSame(1, $this->job->getTotalSegments());
+        $metadata = json_decode(file_get_contents($this->job->getOutputDirectory().'/generation.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(6.0, (float) $metadata['duration']);
+        self::assertSame(0.0, (float) $metadata['startTime']);
     }
 
     public function testPausedSeekReapsOldProcessBeforeStartingReplacementAndCancelEndsIt(): void

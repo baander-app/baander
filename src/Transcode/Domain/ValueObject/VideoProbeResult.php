@@ -123,7 +123,8 @@ final readonly class VideoProbeResult implements JsonSerializable
         $sourceTimestampOrigin = self::verifiedSourceTimestampOrigin($format, $videoStream, $raw['packets'] ?? []);
 
         return new self(
-            duration: (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
+            duration: self::selectedVideoEndpoint($format, $videoStream, $sourceTimestampOrigin)
+                ?? (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
             width: (int) ($videoStream['width'] ?? 0),
             height: (int) ($videoStream['height'] ?? 0),
             framerate: self::parseFramerate($videoStream['r_frame_rate'] ?? null),
@@ -227,13 +228,90 @@ final readonly class VideoProbeResult implements JsonSerializable
         return null;
     }
 
-    private static function nonnegativeTimestamp(mixed $value): ?float
+    /**
+     * @param array<string, mixed> $format
+     * @param array<string, mixed> $video
+     */
+    private static function selectedVideoEndpoint(array $format, array $video, ?float $verifiedOrigin): ?float
+    {
+        if (($video['codec_type'] ?? null) !== 'video' || !is_string($format['format_name'] ?? null)) {
+            return null;
+        }
+        $origin = $verifiedOrigin ?? self::nonnegativeTimestamp($format['start_time'] ?? null);
+        if ($origin === null) {
+            return null;
+        }
+        $formats = explode(',', $format['format_name']);
+        if (in_array('mov', $formats, true) || in_array('mp4', $formats, true)) {
+            $start = self::streamTime($video, 'start_pts', 'start_time');
+            $span = self::streamTime($video, 'duration_ts', 'duration');
+            if ($start === null || $span === null || $span <= 0.0 || $start < $origin) {
+                return null;
+            }
+            $end = $start + $span;
+        } elseif (in_array('matroska', $formats, true)) {
+            // FFmpeg's Matroska track tag records the presentation end, while
+            // stream duration may have been inferred from the entire container.
+            $tag = is_array($video['tags'] ?? null) ? ($video['tags']['DURATION'] ?? null) : null;
+            if (!is_string($tag) || preg_match('/^([0-9]{2,}):([0-5][0-9]):([0-5][0-9])(?:\.([0-9]{1,9}))?$/D', $tag, $parts) !== 1) {
+                return null;
+            }
+            $end = (float) $parts[1] * 3600 + (float) $parts[2] * 60 + (float) $parts[3];
+            if (isset($parts[4])) {
+                $end += (float) ('0.' . $parts[4]);
+            }
+            if ($end > PHP_INT_MAX) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+        $endpoint = $end - $origin;
+
+        return is_finite($endpoint) && $endpoint > 0.0 ? $endpoint : null;
+    }
+
+    /** @param array<string, mixed> $stream */
+    private static function streamTime(array $stream, string $ticksKey, string $secondsKey): ?float
+    {
+        $seconds = array_key_exists($secondsKey, $stream) ? self::finiteTimestamp($stream[$secondsKey]) : null;
+        if (array_key_exists($secondsKey, $stream) && $seconds === null) {
+            return null;
+        }
+        if (!array_key_exists($ticksKey, $stream)) {
+            return $seconds;
+        }
+        $ticks = $stream[$ticksKey];
+        $base = $stream['time_base'] ?? null;
+        if ((!is_int($ticks) && !is_string($ticks)) || filter_var($ticks, FILTER_VALIDATE_INT) === false
+            || !is_string($base) || preg_match('/^([1-9][0-9]*)\/([1-9][0-9]*)$/D', $base, $parts) !== 1
+            || filter_var($parts[1], FILTER_VALIDATE_INT) === false || filter_var($parts[2], FILTER_VALIDATE_INT) === false) {
+            return null;
+        }
+        $rational = (float) $ticks * (float) $parts[1] / (float) $parts[2];
+        // FFprobe prints textual seconds to six decimal places.
+        if (!is_finite($rational) || ($seconds !== null && abs($rational - $seconds) > 0.0000005 + PHP_FLOAT_EPSILON)) {
+            return null;
+        }
+
+        return $rational;
+    }
+
+    private static function finiteTimestamp(mixed $value): ?float
     {
         if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
             return null;
         }
         $timestamp = (float) $value;
-        return is_finite($timestamp) && $timestamp >= 0.0 ? $timestamp : null;
+
+        return is_finite($timestamp) ? $timestamp : null;
+    }
+
+    private static function nonnegativeTimestamp(mixed $value): ?float
+    {
+        $timestamp = self::finiteTimestamp($value);
+
+        return $timestamp !== null && $timestamp >= 0.0 ? $timestamp : null;
     }
 
     private static function parseFramerate(mixed $rate): float
