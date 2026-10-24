@@ -497,6 +497,18 @@ unique disposable Compose project and runs one worker with a fresh process for
 every file. Scheduling stays at class/file level; ParaTest's method-level
 `--functional` mode is not used.
 
+`SegmentEncoderMediaTest` generates deterministic colour patches, probes them,
+encodes through the actual movie command builder and independently decodes the
+published fragment. H.264 and HEVC cases compare interior Y/U/V samples at the
+same pixel format and range, covering fresh output and a nonzero source start.
+BT.2020 SDR must retain its primaries, transfer, matrix and range without tone
+mapping; PQ and HLG cases require decoded software tone mapping to BT.709.
+
+This covers transfer-based HDR classification and the software encode path, not
+display-gamut certification, a complete HDR reference-vector suite, Dolby Vision
+or hardware acceleration. Native colour checks do not establish new HTTP or
+browser playback acceptance.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each

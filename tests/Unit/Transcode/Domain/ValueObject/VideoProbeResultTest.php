@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Domain\ValueObject;
 
 use App\Transcode\Domain\ValueObject\ColorSpace;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class VideoProbeResultTest extends TestCase
@@ -118,6 +119,36 @@ class VideoProbeResultTest extends TestCase
 
         $result = VideoProbeResult::fromProbeOutput($raw);
         $this->assertFalse($result->isHdr());
+    }
+
+    #[DataProvider('wideGamutSdrTransfers')]
+    public function testWideGamutSdrMetadataSurvivesProbeAndSerialization(?string $transfer): void
+    {
+        $stream = ['codec_type' => 'video', 'color_primaries' => 'bt2020', 'color_space' => 'bt2020nc'];
+        if ($transfer !== null) {
+            $stream['color_transfer'] = $transfer;
+        }
+        $probe = VideoProbeResult::fromProbeOutput(['streams' => [$stream]]);
+        $serialized = $probe->jsonSerialize();
+        self::assertFalse($serialized['isHdr']);
+
+        $legacy = $serialized;
+        unset($legacy['colorSpace']);
+        $legacy['isHdr'] = true;
+        foreach ([$probe, VideoProbeResult::fromSerialized($serialized), VideoProbeResult::fromSerialized($legacy)] as $result) {
+            self::assertFalse($result->isHdr());
+            self::assertSame(['primaries' => 'bt2020', 'transfer' => $transfer ?? 'bt709', 'matrix' => 'bt2020nc'],
+                $result->colorSpace?->jsonSerialize());
+        }
+    }
+
+    /** @return iterable<string, array{?string}> */
+    public static function wideGamutSdrTransfers(): iterable
+    {
+        foreach (['bt709', 'bt2020-10', 'bt2020-12', 'unknown', ''] as $transfer) {
+            yield $transfer === '' ? 'empty' : $transfer => [$transfer];
+        }
+        yield 'missing' => [null];
     }
 
     public function testIsSurround(): void

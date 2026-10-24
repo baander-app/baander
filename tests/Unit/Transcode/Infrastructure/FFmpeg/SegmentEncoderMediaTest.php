@@ -11,6 +11,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Service\AudioProcessingRules;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -210,6 +211,128 @@ final class SegmentEncoderMediaTest extends TestCase
         $audioProbe = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_entries',
             'packet=pts', '-of', 'json', $combinedAudio]), true, 512, JSON_THROW_ON_ERROR);
         self::assertLessThan(0, (int) $audioProbe['packets'][0]['pts'], 'AAC preroll must remain before its first presentation sample.');
+    }
+
+    #[DataProvider('colorProfiles')]
+    public function testPublishedFragmentsPreserveSdrAndToneMapHdr(string $codec, string $transfer, int $start, bool $hdr): void
+    {
+        try {
+            $source = $this->directory.'/color.mkv';
+            $frame = '';
+            // Gray and a neutral ramp occupy the top half; the bottom half adds chroma patches.
+            for ($y = 0; $y < 64; ++$y) {
+                for ($x = 0; $x < 64; ++$x) {
+                    $frame .= pack('v', [126, 96, 160, 208][intdiv($x, 16)] * 4);
+                }
+            }
+            foreach ([0, 1] as $plane) {
+                for ($y = 0; $y < 32; ++$y) {
+                    for ($x = 0; $x < 32; ++$x) {
+                        $value = $y < 16 ? 128 : ($plane === 0 ? [96, 160, 112, 144] : [160, 96, 144, 112])[intdiv($x, 8)];
+                        $frame .= pack('v', $value * 4);
+                    }
+                }
+            }
+            $raw = $this->directory.'/source.yuv';
+            file_put_contents($raw, $frame);
+            $this->runColorMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+                '-stream_loop', '-1', '-f', 'rawvideo', '-pixel_format', 'yuv420p10le', '-video_size', '64x64',
+                '-framerate', '4', '-i', $raw, '-t', $hdr ? '0.5' : '6.5', '-c:v', 'ffv1', '-threads', '1',
+                '-color_primaries', 'bt2020', '-color_trc', $transfer, '-colorspace', 'bt2020nc', '-color_range', 'tv', $source]);
+            $sourceProbe = $this->probeColorMedia($source);
+            $probe = VideoProbeResult::fromProbeOutput($sourceProbe);
+            $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
+                $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($codec));
+            $tier = new QualityTier('fixture', 64, 64, 1_000_000, 2_000_000, 2_000_000, 'avc1', 'avc1.64001f');
+            $filters = $encoder->buildVideoFilters($probe, $tier);
+            file_put_contents($this->directory.'/filters.txt', $filters);
+            $this->runColorMedia($encoder->buildStreamArgs($source, $tier, $filters, $this->directory, $start, hasAudio: false));
+            $presentation = (new PublishedPresentationReader())->read($this->directory);
+            self::assertNotNull($presentation);
+            self::assertTrue($presentation->complete);
+            $video = $presentation->track(MediaTrack::Video);
+            self::assertNotNull($video);
+            self::assertNotEmpty($video->segments);
+            self::assertEqualsWithDelta(($hdr ? 0.5 : 6.5) - $start * 6, $video->end(), 0.25,
+                'The published duration must reflect the requested source start.');
+            $fragment = $this->directory.'/published.mp4';
+            file_put_contents($fragment, file_get_contents($this->directory.'/'.$video->initFile)
+                .file_get_contents($this->directory.'/'.$video->segments[0]->file));
+            $outputProbe = $this->probeColorMedia($fragment);
+            $reference = $this->decodeColorSamples($source, 'reference');
+            $actual = $this->decodeColorSamples($fragment, 'actual');
+            file_put_contents($this->directory.'/samples.json', json_encode([
+                'source' => $reference, 'published' => $actual, 'hdr' => $probe->isHdr(),
+                'codec' => $codec, 'transfer' => $transfer, 'startSegment' => $start,
+            ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+            if ($hdr) {
+                self::assertTrue($probe->isHdr());
+                self::assertStringContainsString('tonemap=tonemap=hable', $filters);
+                self::assertGreaterThan(10, max(array_map(static fn (int $value, int $encoded): int => abs($value - $encoded),
+                    $reference, $actual)), 'HDR samples must pass through the tone mapper.');
+            } else {
+                foreach ($reference as $index => $value) {
+                    self::assertEqualsWithDelta($value, $actual[$index], 3,
+                        'SDR interior luma and chroma samples must survive encoding without tone mapping.');
+                }
+                self::assertFalse($probe->isHdr());
+                self::assertStringNotContainsString('tonemap', $filters);
+            }
+            $stream = $outputProbe['streams'][0];
+            self::assertSame($hdr ? 'bt709' : 'bt2020', $stream['color_primaries']);
+            self::assertSame($hdr ? 'bt709' : $transfer, $stream['color_transfer']);
+            self::assertSame($hdr ? 'bt709' : 'bt2020nc', $stream['color_space']);
+            self::assertSame('tv', $stream['color_range']);
+        } finally {
+            $artifacts = getenv('BAANDER_MEDIA_ARTIFACT_DIR');
+            if (is_string($artifacts) && $artifacts !== '') {
+                (new Filesystem())->mirror($this->directory, $artifacts.'/'.$codec.'-'.$transfer.'-'.$start);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{string, string, int, bool}> */
+    public static function colorProfiles(): iterable
+    {
+        yield 'h264 wide gamut SDR' => ['libx264', 'bt709', 0, false];
+        yield 'h264 wide gamut SDR seek' => ['libx264', 'bt709', 1, false];
+        yield 'hevc wide gamut SDR' => ['libx265', 'bt2020-10', 0, false];
+        yield 'hevc wide gamut SDR seek' => ['libx265', 'bt2020-10', 1, false];
+        yield 'h264 PQ' => ['libx264', 'smpte2084', 0, true];
+        yield 'h264 HLG' => ['libx264', 'arib-std-b67', 0, true];
+    }
+
+    /** @return array<string, mixed> */
+    private function probeColorMedia(string $path): array
+    {
+        $json = $this->runColorMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $path]);
+        file_put_contents($path.'.probe.json', $json);
+        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    /** @return list<int> */
+    private function decodeColorSamples(string $source, string $name): array
+    {
+        $output = $this->directory.'/'.$name.'.yuv';
+        $this->runColorMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y', '-i', $source,
+            '-frames:v', '1', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', $output]);
+        $frame = file_get_contents($output);
+        self::assertSame(6144, strlen($frame));
+        $samples = [];
+        foreach ([8, 24, 40, 56] as $x) {
+            $samples[] = ord($frame[8 * 64 + $x]);
+            $samples[] = ord($frame[48 * 64 + $x]);
+            $samples[] = ord($frame[4096 + 24 * 32 + intdiv($x, 2)]);
+            $samples[] = ord($frame[5120 + 24 * 32 + intdiv($x, 2)]);
+        }
+        return $samples;
+    }
+
+    /** @param list<string> $arguments */
+    private function runColorMedia(array $arguments): string
+    {
+        file_put_contents($this->directory.'/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
+        return $this->runMedia($arguments);
     }
 
     /** @return iterable<string, array{string, string, int, bool}> */
