@@ -86,7 +86,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     public function testAudioProfileUsesItsEncoderAndSettingsWithMp4Dash(AudioProfile $profile, string $encoder): void
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
-            audioProfile: $profile, audioFilters: 'volume=0.5');
+            audioProfile: $profile, audioFilters: 'volume=0.5', sourceFrameRate: 25.0);
 
         foreach ([
             '-c:a' => $encoder,
@@ -94,7 +94,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             '-ac' => (string) $profile->channelCount,
             '-ar' => (string) $profile->sampleRate,
             '-threads:a' => '1',
-            '-af' => 'volume=0.5',
+            '-af' => 'volume=0.5,aresample=first_pts=0',
             '-dash_segment_type' => 'mp4',
             '-format_options' => 'movflags=+negative_cts_offsets',
             '-adaptation_sets' => 'id=0,streams=v id=1,streams=a',
@@ -261,7 +261,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             '-ac' => (string) $profile->channelCount,
             '-ar' => (string) $profile->sampleRate,
             '-threads:a' => '1',
-            '-af' => 'atrim=start=0,volume=0.5',
+            '-af' => 'atrim=start=0,volume=0.5,aresample=first_pts=0',
         ] as $option => $expected) {
             $index = array_search($option, $args, true);
             self::assertNotFalse($index, $option);
@@ -321,7 +321,8 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertNotContains('-noaccurate_seek', $args);
         }
         $expectedAudio = $seeking ? 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters) : $audioFilters;
-        if ($hasAudio && $expectedAudio !== '') {
+        $expectedAudio = ($expectedAudio === '' ? '' : $expectedAudio . ',') . 'aresample=first_pts=0';
+        if ($hasAudio) {
             self::assertSame($expectedAudio, $args[array_search('-af', $args, true) + 1]);
             self::assertStringNotContainsString('asetpts', $expectedAudio);
         } else {
@@ -413,7 +414,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertSame(sprintf('%.6f', -($origin + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
         }
         if ($start > 0) {
-            self::assertSame('atrim=start=0' . ($origin === null ? '' : ',aresample=first_pts=0'), $args[array_search('-af', $args, true) + 1]);
+            self::assertSame('atrim=start=0,aresample=first_pts=0', $args[array_search('-af', $args, true) + 1]);
         }
         self::assertSame('fps=1:start_time=0:round=up', $args[array_search('-vf', $args, true) + 1]);
     }
@@ -461,6 +462,43 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
         self::assertNotContains('-af', $videoOnly);
         self::assertNotContains('-c:a', $videoOnly);
+    }
+
+    #[DataProvider('ordinaryAudioChains')]
+    public function testOrdinaryAudioPadsLeadingSilenceWithoutAddingSourceOriginOptions(int $start, string $filters, bool $hasAudio): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mov', QualityTier::p720(), 'scale=-2:720', '/output',
+            startSegment: $start, audioFilters: $filters, hasAudio: $hasAudio, sourceFrameRate: 25.0);
+        if ($hasAudio) {
+            self::assertSame(($filters === '' ? '' : $filters . ',') . 'aresample=first_pts=0',
+                $args[array_search('-af', $args, true) + 1]);
+            self::assertSame('aac', $args[array_search('-c:a', $args, true) + 1]);
+            self::assertSame('48000', $args[array_search('-ar', $args, true) + 1]);
+        } else {
+            self::assertNotContains('-af', $args);
+            self::assertNotContains('-c:a', $args);
+            self::assertNotContains('0:a:0', $args);
+        }
+        self::assertSame('scale=-2:720', $args[array_search('-vf', $args, true) + 1]);
+        foreach (['-copyts', '-itsoffset', '-seek_timestamp', '-noaccurate_seek'] as $option) {
+            self::assertNotContains($option, $args);
+        }
+        if ($start === 0) {
+            self::assertNotContains('-ss', $args);
+        } else {
+            self::assertSame(sprintf('%.6f', $start * 6.0), $args[array_search('-ss', $args, true) + 1]);
+        }
+    }
+
+    /** @return iterable<string, array{int, string, bool}> */
+    public static function ordinaryAudioChains(): iterable
+    {
+        foreach ([0, 1, 2] as $start) {
+            yield 'empty filters at segment ' . $start => [$start, '', true];
+            yield 'profile filters at segment ' . $start => [$start, 'acompressor=ratio=6:threshold=-20dB,aformat=channel_layouts=stereo', true];
+        }
+        yield 'video only fresh' => [0, '', false];
+        yield 'video only seek ignores audio chain' => [1, 'volume=0.5', false];
     }
 
     public function testAbsentOriginPreservesSparseArgumentsAndExplicitZeroDoesNot(): void

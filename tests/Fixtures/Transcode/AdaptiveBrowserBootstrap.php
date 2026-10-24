@@ -23,11 +23,14 @@ use Symfony\Component\Process\Process;
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
 $scenario = getenv('BAANDER_ADAPTIVE_SCENARIO') ?: 'adaptive';
-if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'], true)) {
+if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek'], true)) {
     throw new RuntimeException('Unknown adaptive browser scenario: ' . $scenario);
 }
-$sparse = $scenario !== 'adaptive';
 $matroska = str_starts_with($scenario, 'matroska-delayed-');
+$ordinary = str_starts_with($scenario, 'ordinary-delayed-');
+$sparse = $matroska || str_starts_with($scenario, 'sparse-');
+$delayedAudio = $matroska || $ordinary;
+$hasSubtitles = $matroska;
 $sourceStartTime = str_ends_with($scenario, '-seek') ? 6 : 0;
 $directory = AdaptiveBrowserFixture::directory();
 $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_stereo') {
@@ -35,8 +38,8 @@ $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_st
     'opus_stereo' => AudioProfile::opusStereo(),
     default => throw new RuntimeException('The adaptive fixture supports only streaming_stereo and opus_stereo.'),
 };
-if ($sparse && $audioProfile->name !== 'streaming_stereo') {
-    throw new RuntimeException('Sparse browser scenarios require streaming_stereo audio.');
+if ($scenario !== 'adaptive' && $audioProfile->name !== 'streaming_stereo') {
+    throw new RuntimeException('Movie qualification scenarios require streaming_stereo audio.');
 }
 if (is_file($directory . '/state.serialized') || is_file($directory . '/ready.json')) {
     throw new RuntimeException('Use a fresh disposable adaptive directory for each qualification.');
@@ -50,7 +53,14 @@ $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
 if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
     throw new RuntimeException('The browser qualification requires FFmpeg 5: ' . (string) $version);
 }
-if ($matroska) {
+if ($ordinary) {
+    $source = $directory . '/source.mov';
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+        '-f', 'lavfi', '-i', 'color=c=red:size=1280x720:rate=25,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)',
+        '-itsoffset', '8', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=22',
+        '-map', '0:v', '-map', '1:a', '-t', '30', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p', '-bf', '0', '-g', '25', '-c:a', 'pcm_s16le', $source]);
+} elseif ($matroska) {
     $captions = $directory . '/captions.srt';
     file_put_contents($captions, "1\n00:00:02,000 --> 00:00:04,000\nEarly source cue\n\n2\n00:00:12,000 --> 00:00:14,000\nLater source cue\n");
     $base = $directory . '/source-zero.mkv';
@@ -81,6 +91,33 @@ if ($matroska && ($probe->sourceTimestampOrigin !== 4.0 || abs($probe->duration 
     || abs((float) ($rawProbe['format']['duration'] ?? 0) - 34.0) > 0.01)) {
     throw new RuntimeException('The delayed Matroska fixture must verify origin four and a thirty-second source timeline.');
 }
+$movieStreamIndex = null;
+foreach ($rawProbe['streams'] ?? [] as $stream) {
+    if (($stream['codec_type'] ?? null) === 'video' && !($stream['disposition']['attached_pic'] ?? false)) {
+        $movieStreamIndex = $stream['index'];
+        break;
+    }
+}
+$sourceVideoFirstPts = null;
+foreach ($rawProbe['packets'] ?? [] as $packet) {
+    if (($packet['stream_index'] ?? null) === $movieStreamIndex) {
+        $sourceVideoFirstPts = isset($packet['pts_time']) ? (float) $packet['pts_time'] : null;
+        break;
+    }
+}
+$sourceAudioFirstPts = null;
+if ($ordinary) {
+    $audioPacketArguments = ['/usr/bin/ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_packets',
+        '-read_intervals', '%+#1', '-show_entries', 'packet=stream_index,pts_time,flags', '-of', 'json', $source];
+    $audioPacketProbe = json_decode($run($audioPacketArguments), true, 512, JSON_THROW_ON_ERROR);
+    AdaptiveBrowserFixture::writeJson($directory . '/source-audio-packet.json', $audioPacketProbe);
+    AdaptiveBrowserFixture::writeJson($directory . '/source-audio-packet-command.json', $audioPacketArguments);
+    $sourceAudioFirstPts = isset($audioPacketProbe['packets'][0]['pts_time']) ? (float) $audioPacketProbe['packets'][0]['pts_time'] : null;
+    if ($probe->sourceTimestampOrigin !== null || $probe->framerate !== 25.0 || $sourceVideoFirstPts !== 0.0
+        || $sourceAudioFirstPts !== 8.0 || abs($probe->duration - 30.0) > 0.01 || $probe->subtitleStreams !== []) {
+        throw new RuntimeException('The ordinary fixture must verify video zero, twenty-five fps, audio eight, no anchor and no subtitles.');
+    }
+}
 $generator = new Generator();
 $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
@@ -104,7 +141,7 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
         startSegment: $sourceStartTime > 0 ? 1 : null, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
         sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin);
-    if ($matroska) {
+    if ($hasSubtitles) {
         $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
         $subtitleDirectory = $output . '/subtitles/' . $track->trackKey();
         mkdir($subtitleDirectory, 0750, true);
@@ -155,8 +192,10 @@ try {
     AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'manifestUrl' => $manifest,
         'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
         'sourceTimestampOrigin' => $probe->sourceTimestampOrigin, 'rawSourceDuration' => $rawProbe['format']['duration'] ?? null,
-        'expectedAudioDelay' => $matroska ? 8 - $sourceStartTime : 0,
-        'expectedCues' => $matroska ? ($sourceStartTime > 0
+        'expectedAudioDelay' => $delayedAudio ? 8 - $sourceStartTime : 0,
+        'sourceDuration' => $probe->duration, 'sourceVideoFirstPts' => $sourceVideoFirstPts, 'sourceAudioFirstPts' => $sourceAudioFirstPts,
+        'hasSubtitles' => $hasSubtitles,
+        'expectedCues' => $hasSubtitles ? ($sourceStartTime > 0
             ? [['start' => 6, 'end' => 8, 'text' => 'Later source cue']]
             : [['start' => 2, 'end' => 4, 'text' => 'Early source cue'], ['start' => 12, 'end' => 14, 'text' => 'Later source cue']]) : [],
         'sourceFrameRate' => $probe->framerate, 'sourceStartTime' => $sourceStartTime, 'scenario' => $scenario, 'ffmpegVersion' => $version,
@@ -171,7 +210,7 @@ try {
             $startedAt = microtime(true);
         }
         foreach ($commands as $name => $arguments) {
-            if (!isset($producers[$name]) && $startedAt !== null && microtime(true) >= $startedAt + (!$sparse && $name === '720p' ? 6 : 0)) {
+            if (!isset($producers[$name]) && $startedAt !== null && microtime(true) >= $startedAt + ($scenario === 'adaptive' && $name === '720p' ? 6 : 0)) {
                 $producers[$name] = new Process($arguments, timeout: 174);
                 $producers[$name]->start(static function (string $type, string $bytes) use ($directory, $name): void {
                     file_put_contents($directory . '/producer-' . $name . '.log', $bytes, FILE_APPEND);

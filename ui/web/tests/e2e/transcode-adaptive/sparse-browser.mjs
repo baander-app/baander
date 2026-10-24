@@ -5,27 +5,74 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'].includes(fixture.scenario))
-const delayed = fixture.scenario.startsWith('matroska-delayed-')
-if (delayed) {
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek'].includes(fixture.scenario))
+const matroska = fixture.scenario.startsWith('matroska-delayed-')
+const ordinary = fixture.scenario.startsWith('ordinary-delayed-')
+const delayed = matroska || ordinary
+const hasSubtitles = fixture.hasSubtitles
+assert.equal(hasSubtitles, matroska)
+if (matroska) {
   assert.equal(fixture.sourceTimestampOrigin, 4)
   assert.equal(Number(fixture.rawSourceDuration), 34)
-  assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+}
+if (delayed) assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+if (ordinary) {
+  assert.equal(fixture.sourceTimestampOrigin, null)
+  assert.equal(fixture.sourceVideoFirstPts, 0)
+  assert.equal(fixture.sourceAudioFirstPts, 8)
+  assert.equal(fixture.sourceDuration, 30)
+  assert.deepEqual(fixture.expectedCues, [])
 }
 assert.equal(fixture.audioProfile, 'streaming_stereo')
-assert.equal(fixture.sourceFrameRate, 0.1)
+assert.equal(fixture.sourceFrameRate, ordinary ? 25 : 0.1)
 const evidence = '/work/evidence'
 await mkdir(evidence, { recursive: true })
 const started = Date.now()
 const deadline = started + 120000
-const browser = await chromium.launch({ channel: 'chromium', headless: true,
-  args: ['--mute-audio', '--host-resolver-rules=MAP adaptive.baander.app 127.0.0.1', '--no-proxy-server'] })
+const launchFlags = ['--mute-audio', '--host-resolver-rules=MAP adaptive.baander.app 127.0.0.1', '--no-proxy-server']
+const browser = await chromium.launch({ channel: 'chromium', headless: true, args: launchFlags })
 const context = await browser.newContext()
 await context.tracing.start({ screenshots: true, snapshots: true })
 const page = await context.newPage()
 const cdp = await context.newCDPSession(page)
 await cdp.send('Network.enable')
 await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
+const browserCdp = await browser.newBrowserCDPSession()
+const systemInfo = await browserCdp.send('SystemInfo.getInfo')
+const boundedValue = value => typeof value === 'string' ? value.slice(0, 1024) : value
+const rendering = {
+  devices: (systemInfo.gpu.devices ?? []).slice(0, 4).map(device => Object.fromEntries(Object.entries(device)
+    .filter(([, value]) => ['string', 'number', 'boolean'].includes(typeof value)).slice(0, 16)
+    .map(([key, value]) => [key, boundedValue(value)]))),
+  features: Object.fromEntries(Object.entries(systemInfo.gpu.featureStatus ?? {})
+    .filter(([, value]) => ['string', 'number', 'boolean'].includes(typeof value)).slice(0, 64)
+    .map(([key, value]) => [key, boundedValue(value)])),
+  auxiliary: Object.fromEntries(Object.entries(systemInfo.gpu.auxAttributes ?? {})
+    .filter(([key, value]) => /renderer|vendor|version|display|sandbox|process|implementation|decoder/i.test(key)
+      && ['string', 'number', 'boolean'].includes(typeof value)).slice(0, 32)
+    .map(([key, value]) => [key, boundedValue(value)])),
+  commandLine: systemInfo.commandLine?.slice(0, 8192),
+}
+const mediaDiagnostics = { players: [], properties: [], events: [], droppedProperties: 0, droppedEvents: 0 }
+cdp.on('Media.playersCreated', event => {
+  for (const player of event.players) {
+    if (mediaDiagnostics.players.length >= 16) break
+    mediaDiagnostics.players.push(typeof player === 'string' ? player.slice(0, 128)
+      : { playerId: String(player.playerId).slice(0, 128), domNodeId: player.domNodeId })
+  }
+})
+cdp.on('Media.playerPropertiesChanged', event => {
+  if (mediaDiagnostics.properties.length >= 64) { mediaDiagnostics.droppedProperties++; return }
+  mediaDiagnostics.properties.push({ playerId: event.playerId, properties: event.properties.slice(0, 16)
+    .map(property => ({ name: property.name.slice(0, 128), value: property.value.slice(0, 1024) })) })
+})
+cdp.on('Media.playerEventsAdded', event => {
+  for (const item of event.events) {
+    if (mediaDiagnostics.events.length >= 128) { mediaDiagnostics.droppedEvents++; continue }
+    mediaDiagnostics.events.push({ playerId: event.playerId, timestamp: item.timestamp, value: item.value.slice(0, 1024) })
+  }
+})
+await cdp.send('Media.enable')
 const failures = []
 const network = []
 const manifests = []
@@ -37,7 +84,8 @@ let status
 let requests = []
 let state
 const receipt = { ...versions, scenario: fixture.scenario, fixture, browser: browser.version(),
-  settings: { deadlineSeconds: 120, readinessSeconds: 45, cacheDisabled: true, browserMuteAudio: true } }
+  settings: { deadlineSeconds: 120, readinessSeconds: 45, cacheDisabled: true, browserMuteAudio: true,
+    launchFlags }, rendering, mediaDiagnostics }
 cdp.on('Network.requestWillBeSent', event => {
   if (network.length >= 2000) return failures.push({ kind: 'request-bound' })
   network.push({ id: event.requestId, url: event.request.url, started: event.timestamp })
@@ -93,6 +141,7 @@ const json = (path, method = 'GET', expectedStatus = 200) => new Promise((resolv
   request.end()
 })
 const snapshot = () => page.evaluate(() => ({ ...window.adaptiveState(), colorFrames: [...window.sparseColorFrames],
+  frameObserver: { ...window.sparseFrameObserver },
   cueEvents: [...window.sparseCueEvents], cueSamples: [...window.sparseCueSamples],
   textTracks: Array.from(document.querySelector('#video').textTracks).map(track => window.sparseTrackState(track)),
 }))
@@ -110,6 +159,7 @@ function allowedColors(sourceTime) {
   return [sourceTime < 10 ? 'red' : sourceTime < 20 ? 'green' : 'blue']
 }
 function verifyPlayback() {
+  assert.deepEqual(state.frameObserver.errors, [], 'Native frame capture must not fail or lose observations')
   assert.deepEqual(failures, [], 'All media and transport operations must succeed')
   assert.deepEqual(state.errors, [], 'The production adapter must not report an error')
   assert.equal(state.mediaError, null)
@@ -147,7 +197,7 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(({ manifest, delayed }) => {
+  await page.evaluate(({ manifest, hasSubtitles }) => {
     window.adaptiveManifest = manifest
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
@@ -168,7 +218,7 @@ try {
         active: Array.from(track.activeCues ?? []).map(cue => window.sparseCueState(cue)) }
     }
     window.sparseObserveCues = true
-    if (delayed) {
+    if (hasSubtitles) {
       video.textTracks.addEventListener('addtrack', event => {
         const track = event.track
         track.mode = 'showing'
@@ -185,19 +235,106 @@ try {
         })
       }, 100)
     }
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = 1
-    const canvasContext = canvas.getContext('2d', { willReadFrequently: true })
-    const observe = (at, metadata) => {
-      canvasContext.drawImage(video, 0, 0, 1, 1)
-      window.sparseColorFrames.push({ at, time: metadata.mediaTime, clock: video.currentTime,
-        presentedFrames: metadata.presentedFrames, presentationTime: metadata.presentationTime,
-        expectedDisplayTime: metadata.expectedDisplayTime,
-        rgb: [...canvasContext.getImageData(0, 0, 1, 1).data].slice(0, 3) })
-      video.requestVideoFrameCallback(observe)
+    const observer = window.sparseFrameObserver = {
+      errors: [], droppedErrors: 0, constructed: 0, closed: 0, pending: 0, maxPending: 0, callbacks: 0, stopped: false,
     }
-    video.requestVideoFrameCallback(observe)
-  }, { manifest: fixture.manifestUrl, delayed })
+    const ownedFrames = new Set()
+    const pendingCopies = new Set()
+    const completed = new Map()
+    let nextPublished = 0
+    let callbackId
+    const stop = () => {
+      observer.stopped = true
+      if (callbackId !== undefined) video.cancelVideoFrameCallback(callbackId)
+    }
+    const fail = (phase, error, sequence) => {
+      stop()
+      if (observer.errors.length < 64) observer.errors.push({ phase, sequence, message: String(error).slice(0, 1024) })
+      else observer.droppedErrors++
+    }
+    const closeOwned = frame => {
+      if (!ownedFrames.delete(frame)) return
+      try { frame.close(); observer.closed++ } catch (error) { fail('close', error) }
+    }
+    window.sparseStopFrameObserver = async () => {
+      stop()
+      let timeout
+      try {
+        await Promise.race([
+          Promise.all([...pendingCopies]),
+          new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Native frame capture did not drain within two seconds')), 2000) }),
+        ])
+      } catch (error) { fail('drain', error) } finally {
+        clearTimeout(timeout)
+        for (const frame of ownedFrames) closeOwned(frame)
+      }
+      return { ...observer }
+    }
+    const observe = (at, metadata) => {
+      if (observer.stopped) return
+      callbackId = video.requestVideoFrameCallback(observe)
+      const sequence = observer.callbacks++
+      const entryAt = performance.now()
+      const entryClock = video.currentTime
+      let frame
+      let phase = 'constructor'
+      try {
+        if (ownedFrames.size >= 4) throw new Error('Native frame capture exceeded four outstanding snapshots')
+        frame = new VideoFrame(video)
+        ownedFrames.add(frame)
+        observer.constructed++
+        const afterConstructAt = performance.now()
+        const afterConstructClock = video.currentTime
+        phase = 'timestamp'
+        const snapshotTime = frame.timestamp / 1000000
+        if (!Number.isFinite(snapshotTime) || Math.abs(snapshotTime - metadata.mediaTime) > 0.000001) {
+          throw new Error(`Native snapshot timestamp ${snapshotTime} does not match callback ${metadata.mediaTime}`)
+        }
+        phase = 'crop'
+        const visible = frame.visibleRect
+        if (!visible || ![visible.x, visible.y, visible.width, visible.height, frame.codedWidth, frame.codedHeight].every(Number.isInteger)
+          || visible.width < 2 || visible.height < 2) throw new Error('Native snapshot has invalid visible dimensions')
+        const rect = { x: Math.floor((visible.x + visible.width / 2) / 2) * 2,
+          y: Math.floor((visible.y + visible.height / 2) / 2) * 2, width: 2, height: 2 }
+        if (rect.x < visible.x || rect.y < visible.y || rect.x + 2 > visible.x + visible.width
+          || rect.y + 2 > visible.y + visible.height || rect.x < 0 || rect.y < 0
+          || rect.x + 2 > frame.codedWidth || rect.y + 2 > frame.codedHeight) throw new Error('Native snapshot crop exceeds its frame')
+        const options = { format: 'RGBA', colorSpace: 'srgb', rect }
+        if (frame.allocationSize(options) !== 16) throw new Error('Native snapshot crop must occupy sixteen bytes')
+        const pixels = new Uint8Array(16)
+        const record = { sequence, at, time: metadata.mediaTime, clock: entryClock, snapshotTime,
+          presentedFrames: metadata.presentedFrames, presentationTime: metadata.presentationTime,
+          expectedDisplayTime: metadata.expectedDisplayTime,
+          stages: { entryAt, entryClock, afterConstructAt, afterConstructClock } }
+        observer.pending++
+        observer.maxPending = Math.max(observer.pending, observer.maxPending)
+        let task
+        task = (async () => {
+          try {
+            record.stages.copyStartedAt = performance.now()
+            const copying = frame.copyTo(pixels, options)
+            record.stages.afterCopyCallAt = performance.now()
+            const layout = await copying
+            record.stages.completedAt = performance.now()
+            if (layout.length !== 1 || layout[0].offset !== 0 || layout[0].stride !== 8 || pixels.byteLength !== 16) {
+              throw new Error('Native snapshot returned an unexpected RGBA plane layout')
+            }
+            record.rgb = [...pixels.slice(0, 3)]
+            completed.set(sequence, record)
+            while (completed.has(nextPublished)) {
+              window.sparseColorFrames.push(completed.get(nextPublished))
+              completed.delete(nextPublished++)
+            }
+          } catch (error) { fail('copy', error, sequence) } finally { closeOwned(frame) }
+        })().finally(() => { pendingCopies.delete(task); observer.pending-- })
+        pendingCopies.add(task)
+      } catch (error) {
+        fail(phase, error, sequence)
+        if (frame) closeOwned(frame)
+      }
+    }
+    callbackId = video.requestVideoFrameCallback(observe)
+  }, { manifest: fixture.manifestUrl, hasSubtitles })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -214,7 +351,7 @@ try {
     const recentAudio = state.audio.filter(audio => state.at - audio.at < 1000)
     samples.push({ at: state.at, time: state.time, decodedFrames: state.decodedFrames,
       audio: recentAudio, ended: state.ended })
-    if (delayed) {
+    if (hasSubtitles) {
       for (const [index, cue] of fixture.expectedCues.entries()) {
         const phase = state.time >= cue.start + 0.25 && state.time < cue.end - 0.05 ? 'active'
           : state.time >= cue.end + 0.25 && state.time <= cue.end + 0.75 ? 'cleared' : null
@@ -227,7 +364,10 @@ try {
     if (state.ended) return true
     return false
   }, 'natural completion of the complete held-frame movie')
-  await page.evaluate(() => { window.sparseObserveCues = false })
+  await page.evaluate(async () => { window.sparseObserveCues = false; await window.sparseStopFrameObserver() })
+  state = await snapshot()
+  assert.equal(state.frameObserver.pending, 0, 'Every native frame copy must finish before acceptance')
+  assert.equal(state.frameObserver.constructed, state.frameObserver.closed, 'Every native snapshot must be closed')
   receipt.naturalEnd = Object.freeze(structuredClone(state))
   status = await json('/__adaptive/status')
   requests = await json('/__adaptive/requests')
@@ -240,12 +380,22 @@ try {
   assert(Math.abs(state.duration - fixture.expectedDuration) <= 0.15)
   assert(state.events.some(event => event.name === 'ended'))
   assert(state.firstPlayingTime !== null && state.firstPlayingTime < 1)
-  assert(state.decodedFrames >= fixture.expectedDuration - 2, 'Native decoding must advance throughout held frames')
+  assert(state.decodedFrames >= fixture.expectedDuration * (ordinary ? 25 : 1) - 2, 'Native decoding must advance throughout held frames')
+  if (ordinary) {
+    const frameTicks = colorFrames.map(frame => frame.time * 25)
+    assert(frameTicks.every(tick => Math.abs(tick - Math.round(tick)) < 0.02), 'Displayed movie frames must follow the twenty-five fps presentation grid')
+    const uniqueFrames = new Set(frameTicks.map(Math.round))
+    assert(uniqueFrames.size >= fixture.expectedDuration * 25 * 0.6, 'Observe ordinary-rate displayed frames despite occasional missed callbacks')
+    assert(frameTicks.some((tick, index) => index > 0 && Math.abs(tick - frameTicks[index - 1] - 1) < 0.02),
+      'The actual native frame callbacks must expose the forty-millisecond movie cadence')
+    receipt.frameCadence = { sourceRate: 25, expectedFrames: fixture.expectedDuration * 25,
+      decodedFrames: state.decodedFrames, callbacks: colorFrames.length, uniquePresentedFrames: uniqueFrames.size }
+  }
   for (const [color, sourceBegin, sourceEnd] of [['red', fixture.sourceStartTime, 10], ['green', 10, 20], ['blue', 20, 30]]) {
     const frames = colorFrames.filter(frame => frame.color === color)
-    assert(frames.length >= sourceEnd - sourceBegin - 2, `Retain native displayed ${color} frames throughout its hold`)
-    assert(frames.some(frame => frame.sourceTime < sourceBegin + 1.15), `Observe the beginning of ${color}`)
-    assert(frames.some(frame => frame.sourceTime >= sourceEnd - 1.15), `Observe the tail of ${color}`)
+    assert(frames.length >= (ordinary ? (sourceEnd - sourceBegin) * 25 * 0.6 : sourceEnd - sourceBegin - 2), `Retain native displayed ${color} frames throughout its hold`)
+    assert(frames.some(frame => frame.sourceTime < sourceBegin + (ordinary ? 0.15 : 1.15)), `Observe the beginning of ${color}`)
+    assert(frames.some(frame => frame.sourceTime >= sourceEnd - (ordinary ? 0.15 : 1.15)), `Observe the tail of ${color}`)
     const audibleFrames = delayed
       ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
     assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
@@ -280,6 +430,9 @@ try {
     const onset = samples.find(sample => sample.audio.some(audio => audio.rms > 0.001))
     assert(onset && onset.time >= fixture.expectedAudioDelay - 0.15 && onset.time <= fixture.expectedAudioDelay + 0.75,
       'Measured audio must begin at its intended source-relative delay')
+    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
+  }
+  if (hasSubtitles) {
     assert(master.body.includes('TYPE=SUBTITLES'), 'The production master must advertise embedded subtitles')
     const subtitleManifests = manifests.filter(manifest => manifest.url.includes('/subtitles/'))
     assert(subtitleManifests.length > 0 && subtitleFiles.length > 0, 'The real HLS adapter must load signed subtitles')
@@ -329,11 +482,15 @@ try {
     assert.deepEqual([...new Set(cues.map(cue => cue.text))].sort(), fixture.expectedCues.map(cue => cue.text).sort(),
       'Only the source-relative retained cues may reach the real text track')
     assert.equal(subtitleScreenshots.length, fixture.expectedCues.length * 2, 'Retain visible and cleared subtitle screenshots for every cue')
-    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
     receipt.subtitles = { files: subtitleFiles, manifests: subtitleManifests, cues, events: state.cueEvents, nativeSamples: state.cueSamples, screenshots: subtitleScreenshots }
   }
+  if (ordinary) {
+    assert(!master.body.includes('TYPE=SUBTITLES'))
+    assert.equal(subtitleFiles.length, 0)
+    assert.deepEqual(state.textTracks, [])
+  }
   await page.screenshot({ path: `${evidence}/complete.png` })
-  if (delayed) {
+  if (hasSubtitles) {
     receipt.subtitleSeekProof = []
     for (const expected of fixture.expectedCues) {
       const proof = await page.evaluate(async expected => {
@@ -383,6 +540,13 @@ try {
   await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
   process.exitCode = 1
 } finally {
+  receipt.frameObserverCleanup = await page.evaluate(() => window.sparseStopFrameObserver?.()).catch(error => ({ error: String(error) }))
+  const observerCleanup = receipt.frameObserverCleanup
+  if (observerCleanup?.error || (observerCleanup && (observerCleanup.errors.length > 0 || observerCleanup.pending !== 0
+    || observerCleanup.constructed !== observerCleanup.closed || !observerCleanup.stopped))) {
+    receipt.passed = false
+    process.exitCode = 1
+  }
   requests = await json('/__adaptive/requests').catch(() => requests)
   await Promise.all([...pendingManifests])
   Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, subtitleFiles, failures })

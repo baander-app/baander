@@ -1,0 +1,194 @@
+---
+title: Preserve audible delay in ordinary movie playback
+date: 2026-10-24
+status: implemented
+execution: code
+---
+
+# Preserve audible delay in ordinary movie playback
+
+## Selected failure
+
+Master `2f7a055a` preserves delayed audio for a verified sparse Matroska origin,
+but an ordinary 25 fps MOV still loses its audio delay in HLS. The production
+probe reports video starting at zero, duration fourteen seconds and no Source
+timestamp origin. Audio starts at source second eight. The encoder puts that
+delay in the native MPD and an empty initialization edit, while fragment decode
+time starts at zero. Decoded HLS audio starts immediately and contains only six
+seconds of tone. Seeking to source second six similarly loses the remaining
+two-second delay.
+
+Controlled CI FFmpeg 5.1.9 decoding reproduces the failure through the real probe,
+encoder and generated HLS playlist. Appending only `aresample=first_pts=0` retains
+the complete fourteen- and eight-second presentations, with actual AAC tone onset
+at about 8.02048 and 2.02048 seconds. Opus onset becomes 7.99940 seconds; a 44.1 kHz
+AAC profile with DRC and sample-rate conversion retains about two seconds after
+seeking. The matched audio-zero control retains identical packet timing, decoded
+length and zero waveform lag, although PCM is not byte-identical after changing
+the filter graph. Evidence is under `var/test-runs/ordinary-movie-delay-audit/`;
+the authoritative directory uses the CI image for both production and HLS decode.
+
+The active consumer is the existing web movie player: session subscriber, stream
+manager, SegmentEncoder, published presentation and signed HLS delivery. This is
+a demonstrated playback failure, not qualification of an unused codec or client.
+
+## Change and boundaries
+
+Apply the existing initial audio normalization whenever a movie has audio,
+independently of a verified timestamp anchor or sparse frame rate. Keep it after
+existing negative-preroll trimming and profile filters. The
+[FFmpeg resampler contract](https://www.ffmpeg.org/ffmpeg-resampler.html) defines
+`first_pts` in samples and permits padding or trimming at the start; setting zero
+represents a positive leading gap as actual silence. Keep asynchronous
+compensation disabled. Preserve ordinary zero-start content timing, profile
+selection, sample rate, channel processing and the complete audible tail.
+
+This changes the output audio samples, not source-origin qualification. An absent
+Source timestamp origin remains absent; do not add copyts, timestamp offsets or
+absolute-seek flags to ordinary sources. Existing sparse video normalization,
+first-interval seeking, generation source positions, subtitle rebasing, codec
+declarations and stable playlist targets retain their contracts. Video-only
+commands must not gain audio options. The audio-only transcoder is outside this
+movie-path change. No API, schema or new shared term is needed.
+
+## Implementation and verification
+
+Continue the previously authorized equivalent reviewed-plan workflow while the
+compound-engineering skills remain unavailable. Obtain independent plan review
+before implementation. One worker owns the encoder and its argument tests. A
+second owns ordinary delayed-audio native regressions and any existing sparse
+audio assertions that must now measure encoded silence instead of a delayed
+first packet. A third owns the browser fixture and observer. The lead owns the
+runner, native-lane registration, CI, documentation, integration and commits.
+Workers preserve others' edits and do not stage or commit.
+
+Native cases must use the production probe, encoder, native presentation reader
+and HLS renderer. Verify ordinary 25 fps video beginning at zero and audio delayed
+eight seconds, with a null anchor. Cover fresh output, a six-second restart while
+delay remains, and a restart after onset. Require full video duration and frame
+content, continuous native tracks, independently decoded fragments, complete HLS
+PCM including silence, measured audible onset and signal through the source tail.
+Cover software H.264/HEVC output, AAC/Opus, a 44.1 kHz profile and matched audio
+controls. Include ordinary AAC source audio with negative initial packet PTS from
+codec priming, requiring near-zero audible onset, aligned content and a complete
+tail after decoding. Compare bounded waveform lag or frequency/content rather
+than requiring byte-identical PCM. Keep existing sparse and anchored regressions; strengthen their audio
+assertions where first-packet timing previously stood in for audible delay.
+
+Argument tests cover filter ordering with and without an anchor, ordinary and
+sparse rates, fresh and seeking paths, empty/custom chains and video-only output.
+Null-anchor cases must still omit source-origin flags. Do not use a new frame-rate
+condition to conceal the same defect in another movie path.
+
+Add explicit ordinary delayed fresh/seek browser scenarios to the disposable
+runner. Their source is a thirty-second 25 fps movie with video zero, audio at
+eight seconds, red/green/blue intervals of ten seconds and no verified anchor.
+Preserve actual growing publication, signed uncached resources, canonical audio,
+stable targets, one attachment and natural completion. Require near-silent samples
+before local eight/two seconds and positive measured audio afterward, full colour
+intervals and thirty-/24-second tails. Embedded text cues, if included, must pass
+the existing signed native subtitle timing and identity assertions; otherwise
+make subtitle availability explicit without weakening the Matroska scenarios.
+Do not classify every non-adaptive source as sparse or infer an anchor from delay.
+
+Retain failing native and browser evidence against the prior encoder and passing
+receipts after repair. Then run the full Transcode selection in the CI image,
+full PHPStan and Deptrac, both new browser scenarios, an existing anchored-delay
+browser control and the ordinary adaptive control. Serialize expensive checks.
+Run relevant fixture syntax, runner preflight/configuration and whitespace checks.
+Complete independent code and simplification review, apply justified findings,
+and record exact revisions, counts, media observations, cleanup and limits in
+ROADMAP.md and the testing guide through prose-fix. Commit locally; merge and push
+are separate requests.
+
+Acceptance covers the selected software movie path and Chromium HLS sources.
+It does not certify arbitrary timestamp discontinuities, new source-origin
+handling, hardware, other browsers, DASH browser playback or formal CMAF
+conformance. Original media and existing application services remain untouched.
+
+## Separate concrete follow-up
+
+The current movie path also ignores a source audio track's default disposition:
+commentary first and main dialogue second still maps ordinal zero, and probe
+filter attributes and manifest language use that first track. A bounded two-tone
+fixture confirms the selected audio differs from the marked default. Record this
+as a separate actionable roadmap item; it does not belong in the delay repair.
+Interactive alternate-track selection remains a separate product change.
+
+Independent plan review approved implementation, including the encoded-source
+priming control and preservation of ordinary frame-rate and timestamp handling.
+
+## Measuring ordinary B-frame presentation timestamps
+
+The first native red run reports sixteen failures: nine expose the intended audio
+failure, while seven controls reveal a packet-observer assumption. Ordinary
+encoding retains B-frames. Its native MP4 composition timestamps begin at zero,
+but FFmpeg 5.1.9 adds an internal decode-time shift when reporting packet PTS
+with negative composition offsets. Here the shift is 1,024 ticks at 12,800 Hz,
+so FFprobe reports an apparent 0.08-second start. The raw first decode time and
+composition offset are both zero, and all 750 native presentation timestamps
+form the correct 25 fps grid. The initialization edit has media time zero.
+
+Independent review approved a test-only correction: derive presentation time from
+bounded MP4 decode times, sample durations and signed composition offsets. Check
+the actual timescale, unshifted initialization edit, sample count and complete
+frame grid; reject unsupported or malformed layouts. Do not subtract the first
+observed timestamp or relax timing tolerances. Keep FFprobe output as diagnostic
+evidence. The native bytes establish the clock; [FFmpeg's demuxer implementation](https://raw.githubusercontent.com/FFmpeg/FFmpeg/n5.1.9/libavformat/mov.c)
+explains the reported shift. Preserve the original red receipt and rerun the
+corrected regression against the unchanged encoder before accepting green output.
+
+## Capturing browser frame colours without blocking playback
+
+The ordinary browser runs exposed synchronous canvas capture stalls. Instrumented
+`drawImage` calls took 2.0–2.375 seconds, while pixel readback took at most 0.1 ms.
+The same stalls occurred with the old and repaired encoders. Disabling GPU
+acceleration did not remove them; retain that failed experiment and remove its
+flag. These observations identify capture overhead, not a general playback or
+timestamp qualification failure.
+
+A short probe in the pinned Chromium captured 149 native 720p frames directly
+through `VideoFrame`. Every native timestamp matched its presentation callback,
+all frames were closed, and copying a centered two-by-two RGBA crop took at most
+1.6 ms. The API works at the existing HTTP fixture origin without extra flags.
+Cropping before RGB conversion avoids converting the entire frame merely to
+observe its colour. The probe and operation timings are retained under
+`var/test-runs/ordinary-movie-audio-delay-gates/video-frame-feasibility/`.
+
+Independent review approved replacing canvas capture with this bounded native
+snapshot observer. Preserve timestamps without overrides, compare them with
+callback presentation time, retain the callback-entry playback clock and copy
+actual pixels. Publish completed samples in callback order, cap outstanding
+copies at four and fail on overflow or capture errors. Cancel callbacks and drain
+copies before freezing natural-end evidence; close each owned frame exactly once
+on every exit path. Validate crop dimensions and layout. Retain all existing
+frame, colour, clock, audio, tail, subtitle and transport assertions. Rerun the
+old-encoder browser comparison and repaired scenarios with the corrected observer.
+
+## Verification checkpoint
+
+The encoder and native regressions are committed in `cd6e5595`; the reviewed
+browser observer is committed in `d5ae6955`. The corrected old-encoder native run
+has nine expected delay failures and seven passing controls across sixteen tests
+and 3,928 assertions. The corrected browser comparison reaches the full
+thirty-second end and decodes all 750 frames, then fails the initial-silence
+assertion. Both comparisons retain the encoder from `2f7a055a`.
+
+The repaired native selection passes 30 tests and 5,672 assertions. Full Transcode
+verification in the CI image passes 1,068 tests and 21,750 assertions across
+81 files. Full PHPStan passes; Deptrac reports zero violations, warnings and
+errors, retaining 484 existing baseline skips.
+
+All four final browser scenarios pass on `d5ae6955`: ordinary delayed fresh and
+seek, the delayed Matroska subtitle control and ordinary adaptive playback.
+Fresh and seek retain their thirty-/24-second tails and all 750/600 decoded
+frames. Observed audio-onset polls are 8.202667 and 2.111271 seconds. Native
+subtitle timing and identity after seeking pass; adaptive playback completes its
+high/low/high quality transitions. Capture ownership and container cleanup pass.
+Syntax, configuration, runner preflight, prose preservation, link and whitespace
+checks pass, as do independent implementation and simplification reviews.
+
+Receipts are retained under `var/test-runs/ordinary-movie-audio-delay-gates/`,
+including `acceptance-summary.json`, original failed experiments and corrected
+red/green evidence. The roadmap records exact scope and the separate source-audio
+default-disposition follow-up. Delivery is local; merge and push remain separate.

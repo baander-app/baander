@@ -579,12 +579,34 @@ With a verified anchor, a positive sparse restart before one nominal frame
 interval reads from the file beginning instead of input seeking, preserving
 leading physical audio while retaining the requested offset and trimming. Later
 restarts keep fast input seeking. The nominal interval is not a proof of general
-variable-rate behavior. Anchored audio then materializes its remaining delay as
-encoded silence after trimming and profile filters, without asynchronous
-resampling or a new timestamp anchor. HLS therefore receives actual silent
-samples before the intended tone instead of relying on an MP4 edit list.
-Missing movie-packet evidence, malformed metadata, negative origins, B-frame
-sources, other containers and general variable-rate gaps remain unqualified.
+variable-rate behavior.
+Source-origin qualification remains unavailable for missing movie-packet
+evidence, malformed metadata, negative origins, B-frame input, other containers
+and general variable-rate gaps.
+
+Every movie with audio applies `aresample=first_pts=0` after any negative-preroll
+trimming and profile filters, whether or not the probe has a verified timestamp
+anchor. Positive leading delay becomes actual encoded silence; negative codec
+priming is trimmed without asynchronous compensation. Ordinary sources retain
+their existing source-origin and seek commands, and video-only output gains no
+audio options. HLS therefore receives actual silent samples before the intended
+tone instead of relying on an MP4 edit list. The audio-only transcoder is outside
+this movie-path normalization.
+
+`SegmentEncoderAudioDelayMediaTest` covers sixteen ordinary 25-fps MOV cases
+with video beginning at zero and no verified source origin. H.264/HEVC output
+and AAC/Opus profiles cover fresh output and six-/24-second restarts of a
+thirty-second source with audio delayed eight seconds. Independent fragment and
+HLS decoding must retain the full video grid, held colour intervals, continuous
+tracks, complete PCM including silence, measured tone onset and the audible tail.
+Controls cover 44.1 kHz AAC with DRC, matched PCM audio and encoded AAC with
+negative initial priming timestamps. Matched-source waveform correlation and
+bounded lag check content alignment without requiring byte-identical PCM.
+
+Ordinary B-frame timestamps are checked from bounded native MP4 decode times,
+sample durations and signed composition offsets, with the actual timescale and
+unshifted initialization edit. FFprobe timestamps remain diagnostic evidence;
+subtracting its first reported PTS must not conceal a displaced presentation.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
@@ -1159,12 +1181,18 @@ must preserve red until source second ten, green until twenty and blue through
 the natural end. The seek case retains red through local second four and green
 through fourteen, then blue to its 24-second end. Native displayed-frame colour
 samples must coincide with recent audio signal while the clock advances.
-Independent canvas colours are checked against both presented-frame time and the
-audio-backed playback clock, with a 50 ms transition tolerance. Fresh signed
-resources, one attachment, no media or transport errors and stable
+Cropped native frame colours are checked against both presented-frame time and
+the callback-entry audio-backed playback clock, with a 50 ms transition tolerance.
+Fresh signed resources, one attachment, no media or transport errors and stable
 seven-second media targets are required. Each scenario has a 120-second browser
 deadline and retains growing and completed playlists, samples, screenshots,
 versions and cleanup receipts.
+
+The observer copies a centered two-by-two RGBA crop from each owned `VideoFrame`,
+checking its native timestamp against callback presentation time. Completed
+samples are published in callback order, with at most four copies outstanding;
+overflow and capture errors fail the gate. Natural-end evidence cancels callbacks
+and drains copies before it is frozen. Each frame must close exactly once.
 
 These checks qualify the selected sparse software source and Chromium HLS path.
 They do not certify arbitrary variable-rate input, every source container,
@@ -1203,6 +1231,30 @@ It removes and re-adds the same cue object without changing cue times or mode;
 disposal and fatal failure remove the attachment's timing listener. Native HLS
 fallback keeps its existing behavior. These cases qualify the verified
 packet-origin contract, not arbitrary Matroska origins or missing prefix evidence.
+
+### Ordinary delayed movie audio
+
+Use the same isolated runner with the ordinary delayed source and AAC:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_VIDEO_SCENARIO=ordinary-delayed-fresh \
+BAANDER_TEST_AUDIO_PROFILE=streaming_stereo bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Set `BAANDER_TEST_VIDEO_SCENARIO=ordinary-delayed-seek` for the six-second restart.
+Both scenarios require `streaming_stereo`. The source is a thirty-second 25-fps
+MOV with video starting at zero, audio at source second eight, no verified
+origin and no embedded subtitles. The fixture verifies that absence explicitly;
+Matroska scenarios keep their signed subtitle assertions.
+
+Fresh and restarted playback must retain the red/green/blue source intervals and
+natural thirty-/24-second tails. Near-silent samples must precede local audio
+onset at eight/two seconds, followed by positive signal through the later holds.
+Growing publication, signed uncached resources, canonical audio, stable targets,
+one attachment and no media or transport errors remain required. These scenarios
+qualify the selected software movie path and Chromium HLS. They do not certify
+arbitrary timestamp discontinuities, new source-origin handling, hardware, other
+browsers, DASH browser playback or formal CMAF conformance.
 
 ### Ordinary worker autoscaling qualification
 
