@@ -1797,15 +1797,66 @@ async function proveMovieEndpoint(baseUrl, credentials) {
     const tail = await acceptSeek(requested, tailStarted, owner.generation)
     await waitReady(tail, state => !state.paused && state.ready >= 2 && state.decodedFrames > 0
       && snapshot.startTime + state.time >= requested && snapshot.status === 'running')
-    const baseline = { attachment: attachmentNumber, ...(await mediaState()) }
+    let baseline
+    let initialCapability
+    await waitFor(async () => {
+      const initialAttachment = attachmentNumber
+      const state = await mediaState()
+      if (attachmentNumber !== initialAttachment || !currentSource(state)) return false
+      initialCapability = attachedCapabilities.get(initialAttachment)
+      assert(initialCapability, 'Tail playback must retain its actual signed attachment')
+      baseline = { attachment: initialAttachment, ...state }
+      return true
+    }, 'a stable owned attachment to establish the initial tail baseline')
+    proof.tailAttachments = [{ attachment: baseline.attachment, reason: 'accepted-seek',
+      capability: initialCapability.capability, renditionSet: snapshot.renditionSet,
+      playback: safePlayback(snapshot), baseline: safeMedia(baseline) }]
     let ended
     await waitFor(async () => {
       samePlayback(owner)
+      const sampledAttachment = attachmentNumber
       const state = await mediaState()
+      if (attachmentNumber !== sampledAttachment) return false
       assert.equal(state.error, null)
       assert.equal(state.playbackRate, 1)
+      if (!currentSource(state)) return false
+      if (sampledAttachment !== baseline.attachment) {
+        const replacementAttachment = sampledAttachment
+        const capability = attachedCapabilities.get(replacementAttachment)
+        assert(capability, 'A replacement must retain its actual signed capability')
+        const renditionSet = new URL(capability.url).searchParams.get('set')
+        assert.equal(renditionSet, snapshot.renditionSet, 'Replacement media must use the current canonical rendition set')
+        assert(renditionSet.split(',').includes(`${owner.jobId}.${owner.generation}`),
+          'A replacement must retain the same owned execution generation')
+        const events = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
+        if (attachmentNumber !== replacementAttachment) return false
+        const metadata = events.find(event => !event.probe && event.event === 'loadedmetadata'
+          && event.at >= capability.at && event.at >= tailStarted && !event.ended && event.errorCode === null
+          && event.source === new URL(state.source).pathname)
+        if (!metadata) return false
+        const previous = proof.tailAttachments.at(-1)
+        const previousPairs = previous.renditionSet.split(',')
+        const currentPairs = renditionSet.split(',')
+        const reason = renditionSet === previous.renditionSet ? 'capability-renewal' : 'rendition-set-expansion'
+        if (reason === 'capability-renewal') {
+          assert.notEqual(capability.capability, previous.capability, 'Renewal must carry a fresh signed capability')
+        } else {
+          assert(currentPairs.length > previousPairs.length && previousPairs.every(pair => currentPairs.includes(pair)),
+            'A tail rendition replacement must only add ready siblings to the owned set')
+        }
+        // Native metadata records the new decoder before its first frames, even when replacement is close to EOF.
+        baseline = { ...metadata, attachment: replacementAttachment, source: state.source }
+        proof.tailAttachments.push({ attachment: replacementAttachment, previousAttachment: previous.attachment,
+          reason, capability: capability.capability, renditionSet, playback: safePlayback(snapshot),
+          baseline: safeMedia(baseline) })
+        await persist()
+        if (attachmentNumber !== replacementAttachment) return false
+      }
+      if (attachmentNumber !== sampledAttachment) return false
+      samePlayback(owner)
       if (!state.ended || !state.paused || state.seeking) return false
-      assert.equal(attachmentNumber, baseline.attachment, 'Natural endpoint completion must retain its owned attachment')
+      assert.equal(attachmentNumber, baseline.attachment, 'Natural endpoint completion must retain its evidenced owned attachment')
+      assert.equal(state.source, baseline.source, 'Native completion must belong to the decoder whose baseline was retained')
       assert(Math.abs(snapshot.startTime + state.time - sourceEnd) <= 0.1)
       assert(Math.abs(state.time - state.duration) <= 0.1, 'Natural completion must reach the native presentation end')
       assert(state.time > baseline.time && state.decodedFrames > baseline.decodedFrames,
@@ -1816,6 +1867,7 @@ async function proveMovieEndpoint(baseUrl, credentials) {
     await waitFor(async () => {
       const events = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
       return events.some(event => !event.probe && event.event === 'ended' && event.at >= tailStarted
+        && event.source === new URL(ended.source).pathname
         && event.ended && Math.abs(event.time - ended.time) <= 0.1)
     }, 'the genuine native endpoint event')
     await waitFor(() => snapshot.status === 'paused' && Math.abs(snapshot.position - sourceEnd) <= 0.1,
