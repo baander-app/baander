@@ -805,6 +805,15 @@ MSE, without media feature overrides. A capability report or HTTP response does
 not prove decoding: the gate requires current-generation delivered media, decoded
 frames, an advancing clock and real seekable ranges.
 
+Paused restoration retains the browser's raw frame counter. If it is zero, a
+fresh draw of the current video into a 16-by-9 canvas can establish the fixture's
+expected colour pattern. The sample is tied to the current element, source,
+media time and dimensions. This pixel fallback rejects blank and black samples;
+a positive raw counter remains sufficient frame evidence. The fallback is
+specific to this fixture and covers Firefox displaying a paused decoded image
+while reporting zero quality-counter frames. Running playback still requires
+the raw frame counter to increase alongside the clock.
+
 Set `BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1` to include client controls. With that
 flag, each engine runs all eight phases: authentication, attachment, client
 controls, paused seek, web restart, worker containment, worker recovery and
