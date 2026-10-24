@@ -99,6 +99,7 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
             $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $spawner = new class(fn (array $command): string => $this->runMedia($command)) implements ProcessSpawnerInterface {
+            /** @var list<string> */
             public array $command = [];
             public function __construct(private readonly \Closure $runner) {}
             public function spawn(array $command): mixed
