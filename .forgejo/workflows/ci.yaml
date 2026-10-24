@@ -103,10 +103,22 @@ jobs:
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                       bash scripts/test-worker-production-container.sh
 
-            -   name: Independent web and worker media ownership
+            -   name: Independent web and worker media ownership in Chromium
                 run: |
                     BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_BROWSER_ENGINE=chromium \
+                    BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/two-command-chromium" \
+                    BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
+                    BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
+                      bash scripts/test-two-command-deployment-container.sh
+
+            -   name: Independent web and worker media ownership in Firefox
+                run: |
+                    BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_BROWSER_ENGINE=firefox \
+                    BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/two-command-firefox" \
                     BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
                     BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
                       bash scripts/test-two-command-deployment-container.sh

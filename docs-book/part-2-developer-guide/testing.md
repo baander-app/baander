@@ -792,13 +792,37 @@ BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-check
 ```
 
 The hook uses `mcr.microsoft.com/playwright:v1.60.0-noble`, Docker host networking
-and the checkout's `playwright-core` dependency. It launches headless Chromium
-with `channel: 'chromium'`, records the engine/version and checks native HLS
-capability during its authenticated phase before testing worker absence. No media
-JavaScript library or media feature override is used. A successful capability
-probe or HTTP response is not proof of decoded playback. The browser gate still
-requires actual decoding, an advancing clock and paused seeking from
-worker-produced output.
+and the checkout's `playwright-core` dependency. Set
+`BAANDER_TEST_BROWSER_ENGINE` to `chromium` (the default) or `firefox`; unknown
+values fail before the deployment runner creates resources. Chromium keeps its
+`channel: 'chromium'` launch option; Firefox uses its own engine. Both run
+headless. Receipts retain the actual engine and version, or the requested engine
+and error if launch fails.
+
+The preflight checks H.264/AAC support through Media Source Extensions and records
+native HLS support separately. Playback uses the product's HLS.js player through
+MSE, without media feature overrides. A capability report or HTTP response does
+not prove decoding: the gate requires current-generation delivered media, decoded
+frames, an advancing clock and real seekable ranges.
+
+Paused restoration retains the browser's raw frame counter. If it is zero, a
+fresh draw of the current video into a 16-by-9 canvas can establish the fixture's
+expected colour pattern. The sample is tied to the current element, source,
+media time and dimensions. This pixel fallback rejects blank and black samples;
+a positive raw counter remains sufficient frame evidence. The fallback is
+specific to this fixture and covers Firefox displaying a paused decoded image
+while reporting zero quality-counter frames. Running playback still requires
+the raw frame counter to increase alongside the clock.
+
+Set `BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1` to include client controls. With that
+flag, each engine runs all eight phases: authentication, attachment, client
+controls, paused seek, web restart, worker containment, worker recovery and
+completion. Each run retains the 600-second outer deadline. CI runs Chromium and
+then Firefox against the same built worker image, with separate
+`var/test-runs/two-command-chromium` and `var/test-runs/two-command-firefox`
+artifacts. Run the local engine checks sequentially as well; use
+`BAANDER_TEST_ARTIFACTS` to keep their evidence separate. CI configuration alone
+is not evidence that either browser passed.
 
 The production fixture also submits a captured old-generation native seek after
 an explicit paused seek, while the worker is live and while it is absent. It must

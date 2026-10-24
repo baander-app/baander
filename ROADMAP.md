@@ -1266,3 +1266,65 @@ HLS and other browsers, full live FFmpeg DASH EOF, formal CMAF conformance, DASH
 subtitles and the separate native pressure observer remain unqualified. Existing
 application databases, Redis and media storage were not reused or reset. This
 checkpoint includes no push or feature merge.
+
+### Firefox movie playback qualification — 2026-10-24
+
+The production browser fixture now selects Chromium or Firefox through
+`BAANDER_TEST_BROWSER_ENGINE`, defaulting to Chromium and rejecting unknown values
+before resource creation. H.264/AAC MSE support replaces the native-HLS prerequisite
+for the product's HLS.js path. Receipts retain engine/version or launch failure.
+CI configures separate blocking Chromium and Firefox runs sequentially against the
+same worker image, with distinct artifacts and the existing 600-second deadline
+per run. This configuration does not establish a hosted CI result.
+
+Firefox 150.0.2 passed all eight lifecycle phases, including 40 client-control
+receipts, four subtitle observations, both capability-renewal and progress-outage
+modes, four status-loss cases, two seek-loss cases and generation-15 recovery.
+Paused seeking to source position 120 and returning to zero retained raw frame
+counts of zero but exposed fresh decoded fixture pixels. Resuming from zero
+advanced to 1.062337 seconds and ten frames. A lost seek to 78 used two identical
+transports with one identity, advanced generation 6 to 7 once and resumed to source
+position 79.008422 with 31 frames. Accepted-response loss retained first/latest
+seeks 21 and 29 after gestures 21, 25 and 29, advancing generation 7 to 9. The
+524-millisecond total hold and browser receipt order proved the duplicate settled
+before a fresh canonical read and the latest target's first send. Resuming reached
+source position 30.048209 with 31 frames. Evidence and verified cleanup are under
+`var/test-runs/firefox-movie-playback-production-accepted`.
+
+The first Firefox run failed a paused-frame assertion and remains under
+`var/test-runs/firefox-movie-playback-production`, with verified cleanup. A fresh
+16-by-9 canvas sample now provides separate fixture-pattern evidence for paused
+media when Firefox's raw quality counter stays at zero. It is bound to the current
+element, source, time and dimensions; blank/black samples fail the pixel fallback.
+Raw counters remain unchanged, positive raw counts remain valid and running checks
+still require increasing counters and clock. An isolated eight-case probe covered
+both engines with three real-source extracts and a black negative control per
+engine, without calling play; frame callbacks and pixels established the Firefox
+counter discrepancy. Three eight-second 640×360 H.264/AAC extracts used the two
+user videos' MP3, AC3 and Opus inputs. Native checks decoded 240 frames and audio
+per extract, and original hashes stayed unchanged. These are bounded extract
+checks, not authenticated full-source qualification.
+
+Chromium 148.0.7778.96 also passed all eight phases with 41 control records and
+four subtitle observations. It retained all four status-loss and two seek-loss
+cases, both renewal/progress modes and generation-15 recovery. One extra progress
+response-loss observation was superseded by a legitimate publication before the
+case passed. Each engine refused all 31 HLS and 27 DASH URLs for tampering and
+after expiry, giving 58 responses of 403 in each check, and delivered 62 renewed
+resources with status 200. Chromium evidence is under
+`var/test-runs/firefox-movie-playback-chromium`. Both runners exited zero and
+verified cleanup.
+
+Fixture revision is `1e338d02`; the reused worker image is `e7e573886695` from
+source `29d187d7`. Application-source comparison found no changes, and all 289
+built-file hashes matched separately. Unit suites were not rerun because
+application source was unchanged; real browser runs verified the fixture changes.
+JavaScript/shell syntax, invalid-engine exit 64 without resource changes,
+missing-executable failure evidence and CI YAML checks passed. Combined receipts
+and probes are under `var/test-runs/firefox-movie-playback-gates`, including
+`verification-summary.json` and `paused-frame-probe-summary.json`; bounded source
+extracts remain under `var/test-runs/firefox-movie-playback-samples`. Safari/native
+HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH EOF and the
+separate native pressure observer remain unqualified. Existing application
+databases, Redis and media storage were not reused or reset. This checkpoint
+includes no push or feature merge.

@@ -2,13 +2,28 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { chromium } from 'playwright-core'
+import { chromium, firefox } from 'playwright-core'
 
 const evidence = '/work/evidence'
-await mkdir(evidence, { recursive: true })
-const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--mute-audio'] })
-const browserInfo = { engine: 'chromium', version: browser.version() }
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const requestedEngine = process.env.BAANDER_TEST_BROWSER_ENGINE ?? 'chromium'
+const browserInfo = { engine: requestedEngine, version: null }
+let browser
+let context
+try {
+  assert(['chromium', 'firefox'].includes(requestedEngine), `Unsupported browser engine: ${requestedEngine}`)
+  await mkdir(evidence, { recursive: true })
+  const engine = requestedEngine === 'firefox' ? firefox : chromium
+  browser = await engine.launch(requestedEngine === 'chromium'
+    ? { channel: 'chromium', headless: true, args: ['--mute-audio'] } : { headless: true })
+  browserInfo.engine = engine.name()
+  browserInfo.version = browser.version()
+  context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+} catch (error) {
+  await mkdir(evidence, { recursive: true })
+  await writeFile(`${evidence}/failure.json`, JSON.stringify({ requestedEngine, browser: browserInfo, error: error.message }, null, 2))
+  if (browser) await browser.close().catch(() => {})
+  throw error
+}
 await context.addInitScript(() => {
   const ranges = value => Array.from({ length: value.length }, (_, index) => [value.start(index), value.end(index)])
   window.__twoCommandMediaState = element => ({
@@ -310,13 +325,49 @@ async function until(check, description, milliseconds = 45000) {
 
 async function mediaState() {
   assert(video, 'An attached video must exist')
-  return video.evaluate(element => ({
-    ...window.__twoCommandMediaState(element),
-    connected: element.isConnected, time: element.currentTime, paused: element.paused,
-    ready: element.readyState, error: element.error?.code ?? null, source: element.currentSrc,
-    nativeHls: element.canPlayType('application/vnd.apple.mpegurl'),
-    h264: element.canPlayType('video/mp4; codecs="avc1.42E01E"'),
-  }))
+  return video.evaluate(element => {
+    const state = { ...window.__twoCommandMediaState(element),
+      connected: element.isConnected, time: element.currentTime, paused: element.paused,
+      ready: element.readyState, error: element.error?.code ?? null, source: element.currentSrc,
+      nativeHls: element.canPlayType('application/vnd.apple.mpegurl'),
+      h264: element.canPlayType('video/mp4; codecs="avc1.42E01E"') }
+    // Firefox can expose a decoded paused frame while its presentation counter is zero.
+    if (state.paused && state.ready >= 2 && !state.seeking && state.error === null
+      && element.videoWidth > 0 && element.videoHeight > 0) {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = 16
+        canvas.height = 9
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        context.drawImage(element, 0, 0, canvas.width, canvas.height)
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+        let minimum = 255, maximum = 0, chromaticPixels = 0, opaquePixels = 0
+        for (let index = 0; index < pixels.length; index += 4) {
+          const rgb = [pixels[index], pixels[index + 1], pixels[index + 2]]
+          const luminance = (rgb[0] + rgb[1] + rgb[2]) / 3
+          minimum = Math.min(minimum, luminance)
+          maximum = Math.max(maximum, luminance)
+          if (Math.max(...rgb) - Math.min(...rgb) > 32) chromaticPixels++
+          if (pixels[index + 3] === 255) opaquePixels++
+        }
+        state.pausedFrame = { at: Date.now(), source: new URL(state.source).pathname, time: state.time,
+          width: element.videoWidth, height: element.videoHeight, luminanceRange: maximum - minimum,
+          chromaticPixels, opaquePixels,
+          stable: element.currentSrc === state.source && element.src === state.source && element.currentTime === state.time
+            && element.paused && !element.seeking && element.error === null }
+      } catch (error) { state.pausedFrame = { error: error.name } }
+    }
+    return state
+  })
+}
+
+function hasDecodedFrame(state) {
+  if (state.decodedFrames > 0) return true
+  const frame = state.pausedFrame
+  return state.paused && state.ready >= 2 && !state.seeking && state.error === null && frame?.stable
+    && frame.source === new URL(state.source).pathname && frame.time === state.time
+    && frame.width > 0 && frame.height > 0 && frame.luminanceRange >= 32
+    && frame.chromaticPixels >= 8 && frame.opaquePixels === 144
 }
 
 async function subtitleState(selectDialogue = false) {
@@ -385,7 +436,7 @@ async function observeSubtitles(phase, expectedText) {
 async function pausedAt(position, minimumGeneration) {
   await until(async () => {
     const state = await mediaState()
-    return state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking
+    return state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state) && !state.seeking
       && snapshot?.ready && snapshot.status === 'paused' && snapshot.generation >= minimumGeneration
       && Number.isFinite(snapshot.startTime)
       && state.error === null && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
@@ -463,7 +514,7 @@ async function renewPlaybackCapabilities(owner) {
       const state = await mediaState()
       if (candidate?.expires && (candidate.expires + 1) * 1000 > Date.now() + 1000
         && capabilitySet(candidate) === snapshot.renditionSet && hasDelivery(candidate)
-        && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking
+        && state.ready >= 2 && hasDecodedFrame(state) && !state.seeking
         && state.error === null && currentSource(state)) selected = candidate
       return Boolean(selected)
     }, 'a decoded attachment with genuine short-lived signed delivery', 15000)
@@ -516,7 +567,7 @@ async function renewPlaybackCapabilities(owner) {
         }
         const valid = candidate?.expires > original.expires && candidate.expires * 1000 > Date.now()
           && capabilitySet(candidate) === renditionSet && hasDelivery(candidate)
-          && state.connected && state.ready >= 2 && state.error === null && !state.seeking
+          && state.connected && state.ready >= 2 && state.error === null && !state.seeking && hasDecodedFrame(state)
           && currentSource(state) && state.paused === before.paused
           && (mode === 'paused' ? Math.abs(snapshot.startTime + state.time - pausedCursor) < 0.1
             : runningBaseline && state.time > before.time + 1 && state.time > runningBaseline.time + 1
@@ -531,7 +582,7 @@ async function renewPlaybackCapabilities(owner) {
       proof.renewed = { attachment: renewed.candidate.attachment, expires: renewed.candidate.expires,
         capability: renewed.candidate.capability, requestedAt: renewed.candidate.at }
       proof.after = { at: Date.now(), time: renewed.state.time,
-        decodedFrames: renewed.state.decodedFrames, paused: renewed.state.paused }
+        decodedFrames: renewed.state.decodedFrames, paused: renewed.state.paused, pausedFrame: renewed.state.pausedFrame }
       await recordClientControl(`capability-renewal-${mode}`, proof.startedAt)
       return
     }
@@ -805,7 +856,7 @@ async function proveStatusOutages(owner) {
         samePlayback(owner)
         const state = await mediaState()
         if (snapshot?.ready && snapshot.status === initialStatus && state.connected
-          && state.paused === (initialStatus === 'paused') && state.ready >= 2 && state.decodedFrames > 0
+          && state.paused === (initialStatus === 'paused') && state.ready >= 2 && hasDecodedFrame(state)
           && !state.seeking && state.error === null && currentSource(state)) before = state
         return Boolean(before)
       }, `decoded ${initialStatus} media before uncertain ${action}`)
@@ -926,7 +977,7 @@ async function proveStatusOutages(owner) {
               && item.path.endsWith('/master.m3u8'))
             && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
               && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
-          if (!(snapshot.ready && delivered && state.connected && state.ready >= 2 && state.decodedFrames > 0
+          if (!(snapshot.ready && delivered && state.connected && state.ready >= 2 && hasDecodedFrame(state)
             && !state.seeking && currentSource(state) && state.paused === (expectedStatus === 'paused')
             && state.seekable.some(([start, end]) => state.time >= start && state.time <= end))) return false
           const position = snapshot.startTime + state.time
@@ -953,7 +1004,7 @@ async function proveStatusOutages(owner) {
             status: latest.status, position: latest.position, revision: latest.revision }
           proof.convergenceBaseline = convergenceBaseline
           proof.after = { at: Date.now(), attachment: attachmentNumber, renditionSet: snapshot.renditionSet,
-            time: state.time, position, decodedFrames: state.decodedFrames, paused: state.paused }
+            time: state.time, position, decodedFrames: state.decodedFrames, paused: state.paused, pausedFrame: state.pausedFrame }
           proof.commands = commands()
           return true
         }, `uncertain ${action} (${mode}) to reconcile canonical status without command replay`)
@@ -977,7 +1028,7 @@ async function reconnectPausedPlayback(owner, prefix) {
   let before
   await until(async () => {
     const state = await mediaState()
-    const usable = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+    const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
       && !state.seeking && state.error === null && currentSource(state)
       && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
     if (usable) before = state
@@ -993,7 +1044,7 @@ async function reconnectPausedPlayback(owner, prefix) {
   const failureCount = networkInterruptions.length
   let reconnected
   const preserved = state => state.connected && state.paused && state.ready >= 2
-    && state.decodedFrames >= before.decodedFrames && !state.seeking && state.error === null
+    && state.decodedFrames >= before.decodedFrames && hasDecodedFrame(state) && !state.seeking && state.error === null
     && state.source === before.source && attachmentNumber === beforeAttachment
     && Math.abs(state.time - before.time) < 0.1
     && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
@@ -1023,7 +1074,7 @@ async function reconnectPausedPlayback(owner, prefix) {
         && item.path.endsWith('/master.m3u8'))
       && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
         && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
-    const restored = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+    const restored = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
       && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
       && Math.abs(snapshot.startTime + state.time - beforePosition) < 0.1
       && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
@@ -1072,7 +1123,7 @@ async function seekSourceAndDecode(owner, position, action, paused = false) {
   await until(async () => {
     const state = await mediaState()
     return snapshot?.ready && snapshot.generation === owner.generation + 1
-      && state.connected && state.paused === paused && state.ready >= 2 && state.error === null && state.decodedFrames > 0
+      && state.connected && state.paused === paused && state.ready >= 2 && state.error === null && hasDecodedFrame(state)
       && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
       && (paused ? Math.abs(snapshot.startTime + state.time - requested) < 2
         : snapshot.startTime + state.time > requested + 1 && snapshot.startTime + state.time < requested + 8)
@@ -1119,7 +1170,7 @@ async function proveSeekOutages(owner, expectedPosition) {
     await waitFor(async () => {
       const state = await mediaState()
       return snapshot?.ready && snapshot.status === 'paused' && state.connected && state.paused
-        && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking && state.error === null && currentSource(state)
+        && state.ready >= 2 && hasDecodedFrame(state) && !state.seeking && state.error === null && currentSource(state)
     }, 'decoded paused playback before an uncertain source seek')
     const generation = owner.generation
     const sourceDuration = Number(await page.getByRole('slider', { name: 'Seek movie' }).getAttribute('max'))
@@ -1266,7 +1317,7 @@ async function proveSeekOutages(owner, expectedPosition) {
               && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
           }))
         if (!(snapshot.ready && snapshot.generation === generation + logicalSeeks && state.connected && state.paused
-          && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking && state.error === null
+          && state.ready >= 2 && hasDecodedFrame(state) && !state.seeking && state.error === null
           && currentSource(state) && delivered && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
           && Math.abs(snapshot.startTime + state.time - proof.committedTargets.at(-1)) < 2)) return false
         const requests = playbackControls.filter(item => item.at >= proof.startedAt && item.action !== 'progress')
@@ -1277,7 +1328,7 @@ async function proveSeekOutages(owner, expectedPosition) {
         assert.equal(new Set(requests.map(item => item.requestId)).size, logicalSeeks)
         proof.status = 'passed'
         proof.restored = { at: Date.now(), attachment: attachmentNumber, ...safePlayback(snapshot),
-          time: state.time, decodedFrames: state.decodedFrames }
+          time: state.time, decodedFrames: state.decodedFrames, pausedFrame: state.pausedFrame }
         return true
       }, `${mode} source seek recovery to restore genuine paused media`, 45000)
     } finally {
@@ -1299,8 +1350,17 @@ async function proveSeekOutages(owner, expectedPosition) {
 
 async function checkpoint({ phase, baseUrl, credentials }) {
   if (phase === 'authenticated') {
-    assert(await page.evaluate(() => document.createElement('video').canPlayType('application/vnd.apple.mpegurl')),
-      'The browser must provide native HLS decoding')
+    browserInfo.capabilities = await page.evaluate(() => {
+      const video = document.createElement('video')
+      const h264 = 'video/mp4; codecs="avc1.42E01E"'
+      const aac = 'audio/mp4; codecs="mp4a.40.2"'
+      return { nativeHls: video.canPlayType('application/vnd.apple.mpegurl'),
+        h264: video.canPlayType(h264), aac: video.canPlayType(aac),
+        mseVideo: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(h264),
+        mseAudio: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(aac) }
+    })
+    assert(browserInfo.capabilities.mseVideo && browserInfo.capabilities.mseAudio,
+      'The browser must provide H.264 and AAC Media Source Extensions for the product HLS player')
     await page.goto(`${baseUrl}/login`)
     await page.locator('#email').fill(credentials.email)
     await page.locator('#password').fill(credentials.password)
@@ -1315,13 +1375,13 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       const state = await mediaState()
       return state.connected && !state.paused && state.ready >= 2 && state.time > 1
         && state.decodedFrames > 0 && state.error === null && snapshot?.ready
-    }, 'native HLS to decode and advance')
+    }, 'the product HLS player to decode and advance')
     const owner = ownedPlayback()
     const initial = await mediaState()
     const publishedEnd = snapshot.startTime + Math.max(...initial.seekable.map(range => range[1]), 0)
     const target = Math.min(snapshot.duration - 18, Math.max(90, publishedEnd + 24))
     assert(target > publishedEnd + 6, 'The fixture must leave source media beyond the currently published native window')
-    assert(initial.source.startsWith('blob:'), 'Pinned Chromium must use the supported MSE HLS path')
+    assert(initial.source.startsWith('blob:'), 'The selected browser must use the supported MSE HLS path')
     assert(initial.seekable.length > 0, 'MSE must expose an actual published seekable window')
     const requested = await seekSourceAndDecode(owner, target, 'source-seek-beyond-window')
     assert(requested > publishedEnd, 'The movie source control must seek beyond the old native window')
@@ -1430,7 +1490,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     let pausedPosition
     await until(async () => {
       const state = await mediaState()
-      const usable = state.connected && state.paused && state.ready >= 2 && state.decodedFrames > 0
+      const usable = state.connected && state.paused && state.ready >= 2 && hasDecodedFrame(state)
         && !state.seeking && state.error === null && snapshot?.ready && snapshot.status === 'paused'
         && currentSource(state) && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
       if (usable) pausedPosition = snapshot.startTime + state.time
