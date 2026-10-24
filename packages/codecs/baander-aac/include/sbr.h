@@ -203,6 +203,40 @@ void aac_sbr_mark_lost(AacSbrState* s);
  * PS data is active. */
 void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right);
 
+/* ── Enhanced SBR for USAC (ISO/IEC 23003-3 7.5) ───────────────────
+ * The same state decodes UsacSbrData(): the sbr_info and sbr_header of
+ * the configuration's default header and of the frame, the sbr_data with
+ * the harmonic transposer, PVC envelopes and inter-TES, at the ratios
+ * 2:1 (32-band analysis), 8:3 (24-band analysis of a 768 frame) and 4:1
+ * (16-band analysis); the synthesis is always 64 bands. */
+struct AacUsacSbrConfig_;
+
+/* Prepares the state for a USAC element: `ratio` is AAC_USAC_SBR_2_1,
+ * _8_3 or _4_1, `frame_length` the core frame (768 or 1024), `cfg` the
+ * element's SbrConfig with the default header. */
+void aac_sbr_usac_init(AacSbrState* s, int core_sample_rate, int frame_length, int ratio,
+                       const struct AacUsacSbrConfig_* cfg);
+
+/* Parses UsacSbrData() of an SCE or CPE (`elem_type` AAC_ELEM_SCE or
+ * AAC_ELEM_CPE; for a CPE with MPS 212 the data is that of the single
+ * downmix channel, `nr_channels` 1).  `indep` is usacIndependencyFlag.
+ * Returns AAC_OK or AAC_ERR_DECODE (previous parameters kept). */
+int aac_sbr_usac_decode(AacSbrState* s, AacBitReader* r, int elem_type, int nr_channels,
+                        int indep);
+
+/* Reconstructs the element in place: each buffer holds frame_length core
+ * samples at full scale 1.0 on entry and output_frame_length samples on
+ * return.  `right` is NULL for one channel. */
+void aac_sbr_usac_apply(AacSbrState* s, float* left, float* right);
+
+/* The two halves of aac_sbr_usac_apply for the MPS 212 coupling: the
+ * first takes the core samples of channel `ch` (0 or 1) and leaves the
+ * reconstructed 64-band QMF frame; the second synthesises a QMF frame
+ * into output_frame_length samples with channel `ch`'s synthesis
+ * history. */
+void aac_sbr_usac_apply_to_qmf(AacSbrState* s, int ch, const float* core, struct AacUsacQmfFrame_* out);
+void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in, float* out);
+
 /* Tables (sbr_tables.cpp). */
 extern const int8_t aac_sbr_huff_env_level_15_t[120][2];
 extern const int8_t aac_sbr_huff_env_level_15_f[120][2];

@@ -21,6 +21,7 @@ typedef enum AacObjectType_ {
   AAC_AOT_ER_LD = 23,  /* AAC-LD: 512 or 480 samples per frame, low-overlap window */
   AAC_AOT_PS = 29,     /* HE-AAC v2 (SBR + Parametric Stereo) */
   AAC_AOT_ER_ELD = 39, /* AAC-ELD: the low-delay filterbank, with optional LD-SBR */
+  AAC_AOT_USAC = 42,   /* USAC / xHE-AAC (decoder only) */
 } AacObjectType;
 
 /* Rate Control Modes */
@@ -247,7 +248,8 @@ int aac_decoder_channel_mode(AacDecoderHandle ctx);
 /* ── Decoder: low delay and dynamic range ────────────────────────── */
 
 /* The object type of the stream being decoded (AAC_AOT_LC for AAC-LC and
- * the HE-AAC profiles, AAC_AOT_ER_LC, AAC_AOT_ER_LD or AAC_AOT_ER_ELD),
+ * the HE-AAC profiles, AAC_AOT_ER_LC, AAC_AOT_ER_LD, AAC_AOT_ER_ELD or
+ * AAC_AOT_USAC),
  * from the AudioSpecificConfig or the first frame; 0 before any. */
 int aac_decoder_object_type(AacDecoderHandle ctx);
 /* AAC-ELD downscaled playout: decodes a 512 (480) frame stream to
@@ -274,6 +276,39 @@ int aac_decoder_set_drc(AacDecoderHandle ctx, int enabled, int boost, int cut, i
 int aac_decoder_program_ref_level(AacDecoderHandle ctx);
 /* Whether the last decoded frame carried dynamic range control data. */
 int aac_decoder_has_drc(AacDecoderHandle ctx);
+
+/* ── Decoder: USAC loudness and MPEG-D DRC ───────────────────────── */
+
+/* The DRC effect a player asks for (ISO/IEC 23003-4 selection process);
+ * the stream's DRC sets are matched to it, with the standard's fallback
+ * order when the exact effect is absent. */
+typedef enum AacDrcEffect_ {
+  AAC_DRC_EFFECT_OFF = -1,     /* no MPEG-D DRC at all */
+  AAC_DRC_EFFECT_NONE = 0,     /* none requested; DRC only to prevent clipping (default) */
+  AAC_DRC_EFFECT_NIGHT = 1,
+  AAC_DRC_EFFECT_NOISY = 2,
+  AAC_DRC_EFFECT_LIMITED = 3,
+  AAC_DRC_EFFECT_LOWLEVEL = 4,
+  AAC_DRC_EFFECT_DIALOG = 5,
+  AAC_DRC_EFFECT_GENERAL = 6,
+} AacDrcEffect;
+
+/* Loudness normalisation of USAC streams from their MPEG-D loudness
+ * metadata: when enabled (the default) the program is brought to
+ * `target_lufs_x100` (LUFS times 100; default -2400, range -3100 to
+ * -1000).  Streams without loudness metadata are left as they are.  May
+ * be changed at any time; takes effect from the next frame. */
+int aac_decoder_set_loudness(AacDecoderHandle ctx, int enabled, int target_lufs_x100);
+/* The MPEG-D DRC request: the effect, album mode (use the album loudness
+ * and gains when the stream has them) and the scaling of the boosting
+ * and attenuating gains in percent (0..100). */
+int aac_decoder_set_drc_effect(AacDecoderHandle ctx, AacDrcEffect effect, int album_mode,
+                               int boost, int cut);
+/* Readback after a frame: the program loudness the stream declares (LUFS
+ * times 100) or INT32_MIN when it declares none, and the normalisation
+ * gain applied (dB times 100).  Either pointer may be NULL. */
+int aac_decoder_loudness(AacDecoderHandle ctx, int* program_loudness_x100,
+                         int* norm_gain_db_x100);
 
 /* ── Streaming decode ────────────────────────────────────────────── */
 
