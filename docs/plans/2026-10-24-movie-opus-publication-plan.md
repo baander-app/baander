@@ -1,7 +1,7 @@
 ---
 title: Repair the accepted Opus movie audio profile
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -103,3 +103,43 @@ actual MPD and initialized stream codec, use explicit numerical priming toleranc
 and verify that restarted audio and video cover the intended source interval.
 Browser expectations must distinguish the requested profile from the observed
 native codec so a metadata or encoder mismatch cannot satisfy the check.
+
+## Delivered checkpoint
+
+Implementation and independent code/simplification review completed at source
+revision `3e559f86`. The unchanged command builder failed eight of 23 focused
+cases with 263 assertions, including both native Opus encodes. The repaired
+selection passed all 23 cases with 465 assertions. Native Opus output decoded to
+140 video frames and 14.0005 seconds of audio for fresh output, and 80 frames with
+7.987 seconds of audio after the six-second restart. AAC controls and all source
+colour/tone markers passed. Commands, probes, manifests and independent decode
+observations remain under `var/test-runs/movie-opus-gates/native-red` and
+`var/test-runs/movie-opus-gates/native-green`.
+
+The full Transcode unit selection passed 913 tests with 12,079 assertions across
+77 files: 892 ordinary tests with 11,678 assertions and 21 native tests with
+401 assertions. The focused cases are included in these totals. Full PHPStan
+reported no errors; Deptrac reported zero violations, warnings and errors with
+484 existing skipped violations. Shell syntax, browser script syntax, invalid
+profile rejection and workflow YAML checks passed. The first PHPStan run was
+incomplete after a parallel worker was killed under a 2 GiB container limit;
+the repeated analysis passed with 4 GiB. Its diagnostic is retained separately.
+
+Both browser profiles passed at the same source revision with Chromium
+148.0.7778.96, HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1. Opus completed in
+115.506 seconds and AAC in 115.484 seconds. Each displayed 720p, 360p and 720p,
+retained positive audio signal in every phase, matched the requested audio codec
+against native MP4 and the signed HLS master, and reached 2,178 decoded frames.
+Both producers remained active and incomplete with advancing publication edges.
+One player attachment served each run without player or transport errors.
+The abrupt bandwidth drop caused one buffering pause per run: 3.5612 seconds for
+Opus and 3.5591 seconds for AAC. Playback resumed without a source-position jump.
+Both fixture cleanups passed.
+
+The final receipts are `var/test-runs/movie-opus-gates/browser-opus` and
+`var/test-runs/movie-opus-gates/browser-aac`.
+`var/test-runs/movie-opus-gates/verification-summary.json` records source,
+versions, exact counts, phase observations and retained diagnostics. The testing
+guide documents the native cases and browser profile option. ROADMAP.md records
+the delivered repair and the separate sparse-CFR finding. No merge or push is
+included in this checkpoint.

@@ -1659,3 +1659,69 @@ Chromium. Whole-application lifecycle, other browsers, every network profile,
 DASH switching, hardware, HDR, alternate audio and formal CMAF conformance remain
 outside this acceptance. Existing application databases, Redis and the user's
 original media were untouched. This checkpoint includes no push or feature merge.
+
+### Opus movie audio publication — 2026-10-24
+
+Movie encoding maps the accepted `opus_stereo` profile to FFmpeg's `libopus`
+encoder and explicitly publishes MP4 DASH segments. The public codec remains
+Opus. The previous command selected the experimental native encoder and exited
+with status 1. Selecting libopus alone produced WebM audio that the production
+presentation reader rejected. Encoder selection and MP4 publication repair that
+existing profile without introducing a new container backend or profile.
+
+Native Opus and AAC cases cover fresh output and a restart at source second six,
+requiring readable closed MP4 tracks, continuous timelines, actual native codec
+metadata and independent decoding of every fragment. Explicit priming tolerances,
+video colour markers and audio frequency changes verify the intended source
+interval. The adaptive browser runner accepts `BAANDER_TEST_AUDIO_PROFILE`,
+defaults to AAC and checks the selected codec in the HLS master and published
+audio. CI runs both profiles separately through the production adapter.
+
+The focused unchanged-source run failed eight of 23 cases with 263 assertions,
+including both Opus cases selecting the experimental encoder. After repair all
+23 passed with 465 assertions. Opus fresh output decoded 140 video frames and
+14.0005 seconds of PCM; its seek tail decoded 80 frames and 7.987 seconds.
+AAC decoded 14.037333 and 8.021333 seconds respectively. All source-interval
+colour and frequency markers passed, and decoded durations stayed within the
+stated priming tolerances.
+
+The full Transcode unit selection at `3e559f86` passed 913 tests with 12,079
+assertions across 77 files, including the focused cases: 892 tests with 11,678
+assertions in the ordinary lane and 21 with 401 in the native lane. The receipt
+is `var/test-runs/movie-opus-gates/backend/20261024-150803-1be810ac`;
+`var/test-runs/movie-opus-gates/native-evidence.json` records native observations.
+Full PHPStan reported no errors after rerunning with a 4 GiB container limit.
+A parallel worker exited 137 under the initial 2 GiB container limit; that
+diagnostic is retained. Deptrac reported
+zero violations, warnings and errors with 484 existing skipped violations.
+Shell, Node syntax and CI YAML checks passed.
+
+Both adaptive browser gates passed at the same source revision: Opus in
+115.506 seconds and AAC in 115.484 seconds, with Chromium 148.0.7778.96,
+HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1. Each presented 720p-to-360p-to-720p,
+with positive audio in every phase, one attachment and no media or transport
+errors. Native audio codecs, MP4 MIME types and HLS codec declarations matched
+the requested profile. Both producers remained active with low/high publication
+edges advancing from 24/18 to 42/36 and 108/102 seconds. Opus recorded one
+3.5612-second buffer pause at source position 17.927 seconds; AAC recorded one
+3.5591-second pause at 17.92. Both resumed from that position.
+
+Evidence is under `var/test-runs/movie-opus-gates/browser-opus` and
+`var/test-runs/movie-opus-gates/browser-aac`; both cleanup checks passed.
+`var/test-runs/movie-opus-gates/verification-summary.json` retains the exact
+phase positions, decoded frame counts, audio measurements and final checkpoint.
+
+The separate sparse-CFR finding remains open: a generated 0.1-fps source creates
+two ten-second fragments that the stable seven-second HLS target rejects. This
+is a demonstrated sparse-CFR failure, distinct from unverified variable-frame-rate
+gaps. Its repair must preserve source duration, seeking and a constant target
+throughout a growing playlist; this phase does not change it. Its reproduction
+is retained under `var/test-runs/movie-opus-gates/sparse-frame-finding`.
+
+The testing guide documents native audio-profile coverage and the browser option.
+Acceptance covers selected software encoding, signed delivery and Chromium
+adaptation, including positive audio signal; it does not promise stall-free
+playback. Other browsers, hardware, alternate audio tracks, general Opus
+conformance, DASH browser playback and formal CMAF conformance remain outside
+this acceptance. Existing application databases, Redis and the user's original
+media were untouched. This checkpoint includes no push or feature merge.
