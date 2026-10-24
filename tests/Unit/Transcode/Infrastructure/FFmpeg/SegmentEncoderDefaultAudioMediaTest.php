@@ -139,7 +139,7 @@ final class SegmentEncoderDefaultAudioMediaTest extends TestCase
                 $maps[] = $spawner->command[$index + 1];
             }
         }
-        self::assertSame(['0:V:0', '0:a:'.$ordinal], $maps);
+        self::assertSame(['0:V:0', '1:a:'.$ordinal], $maps);
         self::assertNotContains('-copyts', $spawner->command);
         self::assertNotContains('-seek_timestamp', $spawner->command);
         $presentation = (new PublishedPresentationReader())->read($output);

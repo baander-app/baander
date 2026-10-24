@@ -78,6 +78,9 @@ jobs:
             -   name: Xdebug runtime contract
                 run: BAANDER_TEST_IMAGE="$CI_IMAGE" bash scripts/test-dev-xdebug-container.sh
 
+            -   name: Browser video replacement evidence
+                run: node --test ui/web/tests/e2e/transcode-adaptive/video-cancellation.test.mjs
+
             -   name: Progressive DASH browser completion
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
@@ -122,6 +125,15 @@ jobs:
             -   name: Source default audio and source seeking
                 run: |
                     for scenario in default-audio-fresh default-audio-seek; do
+                      BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                      BAANDER_TEST_VIDEO_SCENARIO="$scenario" \
+                      BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/transcode-$scenario" \
+                        bash scripts/test-transcode-adaptive-browser.sh || exit "$?"
+                    done
+
+            -   name: Movie playback through silent audio tails
+                run: |
+                    for scenario in short-audio-fresh short-audio-seek; do
                       BAANDER_TEST_IMAGE="$CI_IMAGE" \
                       BAANDER_TEST_VIDEO_SCENARIO="$scenario" \
                       BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/transcode-$scenario" \
