@@ -1,7 +1,7 @@
 ---
 title: Qualify Firefox movie playback through the production deployment
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -105,3 +105,33 @@ HLS, formal CMAF conformance, DASH subtitles or unrestricted live FFmpeg DASH EO
 Independent plan review approved the active-consumer scope, unchanged media and
 control assertions, outer-runner validation, startup-failure evidence and explicit
 Safari boundary before implementation.
+
+## Completion evidence
+
+Fixture `1e338d02` passed all eight production lifecycle phases in Firefox
+150.0.2 and Chromium 148.0.7778.96, with verified cleanup for each run. Both
+engines passed subtitle, renewal, offline, control-loss, rapid-seek, remount,
+restart and generation-15 recovery checks. The first Firefox receipt remains
+retained as a failed paused-frame measurement, with its cleanup verified.
+
+Three eight-second extracts from the user's two videos exercised MP3, AC-3 and
+Opus source audio through H.264/AAC conversion. Each extract decoded 240 video
+frames and audio in the worker image; both original file hashes remained unchanged.
+An eight-case browser probe used those extracts and a black control in both
+engines without calling play. Real frame callbacks and fresh pixels proved that
+Firefox's zero paused quality counter did not mean decoding had failed. Blank and
+black samples failed the pixel fallback. These probes establish the measurement
+boundary, not authenticated full-source qualification for the supplied videos.
+
+Application source stayed unchanged from worker-image source `29d187d7`; 289
+built files matched the image byte-for-byte. JavaScript and shell syntax, CI
+configuration, invalid-engine rejection before resource creation, startup-failure
+receipts and whitespace checks passed. Unit suites were not rerun for this fixture
+and documentation change. Independent review approved the plan and final changes.
+
+The combined verification receipt is
+`var/test-runs/firefox-movie-playback-gates/verification-summary.json`. Successful
+production receipts are under `var/test-runs/firefox-movie-playback-production-accepted`
+and `var/test-runs/firefox-movie-playback-chromium`, each with an
+`acceptance-summary.json`. ROADMAP.md records the measured results and remaining
+qualification limits. No merge or push was made.
