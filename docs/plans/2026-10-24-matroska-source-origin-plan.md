@@ -227,3 +227,59 @@ signed subtitle cues, the full Transcode selection and static gates.
 
 Independent review approved this amendment before implementation, with the exact
 filter order conditional on the profile-filter and Opus calibration results.
+
+## Native subtitle cues retained after their endpoint
+
+Two Chromium HLS runs now preserve the delayed audio and complete picture but
+retain the native cue from seconds two to four until second 8.584. The cue's
+stored times remain correct, its track remains selected, and both screenshots
+and native activeCues observations confirm the overstay. Audio packet timestamps
+and fragment decode times are continuous. A standalone native MP4 control clears
+the same cue correctly; that single control does not exclude a conditional browser
+scheduling defect.
+
+Chromium 148.0.7778.96 uses closed interval overlap when determining active cues
+and an exclusive next interval boundary when scheduling the next update. At an
+exact endpoint, those rules can retain the current cue while scheduling the next
+boundary. The repeated ten-second wall interval matches that mechanism, but the
+internal timer invocation has not been observed. Treat this attribution as an
+inference; the stale native cue itself is directly reproduced.
+
+Before changing application code, measure whether removing and re-adding only an
+expired active cue clears its native state and display while preserving the same
+cue object, timestamps, selection and later seek re-entry. Retain the original
+browser failure and distinguish native state observations from cuechange events.
+Do not change source cues, fixture timings or the permitted clearing interval.
+
+If that public-API operation passes calibration, add a small observer owned by
+the HLS attachment. On native timeupdate, inspect active subtitle or caption cues
+only on showing tracks; refresh a cue only when the current time exceeds its end
+by more than 100 milliseconds. Preserve the same object and times. Do not poll,
+reset track modes, replace the subtitle renderer or refresh ordinary active cues.
+Skip an in-progress seek and ensure attachment disposal or fatal failure releases
+the listener. Keep selection persistence under its existing owner.
+
+Focused tests must cover stale and ordinary cues, the endpoint tolerance, hidden
+or disabled tracks, metadata tracks, seek transitions, backward re-entry, duplicate
+prevention, selection preservation and attachment teardown, including lazy import
+cancellation and fatal errors. Add a browser check of actual native activeCues if
+the repair changes whether cuechange fires; do not synthesize events as evidence.
+Require timely activation and clearing within the existing bounds, preserved cue
+objects and signed delivery, and unchanged audio/video acceptance. Run both delayed
+browser scenarios and the ordinary adaptive control, relevant frontend tests,
+typechecking and lint, then independent code and simplification review.
+
+Calibration reproduced stale cues during natural fresh and seek playback. Refresh
+at local seconds 14.176426 and 8.170667 cleared native state synchronously; the
+next recorded screenshot showed the overlay removed within eight milliseconds.
+Cue objects, times, counts and selection remained unchanged. The repaired seek
+cue re-entered as the same object at 6.5 seconds, remained active at the exact
+endpoint eight, and cleared after seeking to nine. The operation emits no
+cuechange event, so retain that event stream as diagnostic evidence and require
+actual native-state observations for timely clearing. Both original event-only
+failure receipts remain available.
+
+Independent review approved implementation after these measurements. Snapshot
+live cue lists before mutation, preserve current track ownership and guard against
+reentrant refresh. The final browser tests retain the existing timing bounds and
+must prove actual cue clearing, signed delivery and natural audio/video completion.
