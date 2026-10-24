@@ -73,7 +73,8 @@ bool is_ga_type(int aot) {
 /* GASpecificConfig() (Table 4.1).  Only the object types this codec can
  * mean to decode are read past the fields they share. */
 int read_ga_config(AacBitReader* r, AacAsc* asc, int align_anchor) {
-  asc->frame_length = aac_bitreader_read(r, 1) ? 960 : 1024;
+  const int flag = (int)aac_bitreader_read(r, 1);
+  asc->frame_length = asc->aot == AAC_AOT_ER_LD ? (flag ? 480 : 512) : (flag ? 960 : 1024);
   asc->depends_on_core_coder = (int)aac_bitreader_read(r, 1);
   if (asc->depends_on_core_coder) {
     asc->core_coder_delay = (int)aac_bitreader_read(r, 14);
@@ -94,11 +95,156 @@ int read_ga_config(AacBitReader* r, AacAsc* asc, int align_anchor) {
       aac_bitreader_skip(r, 5 + 11); /* numOfSubFrame, layer_length */
     }
     if (asc->aot == 17 || asc->aot == 19 || asc->aot == 20 || asc->aot == 23) {
-      aac_bitreader_skip(r, 3); /* the resilience flags */
+      asc->section_resilience = (int)aac_bitreader_read(r, 1);
+      asc->scalefactor_resilience = (int)aac_bitreader_read(r, 1);
+      asc->spectral_resilience = (int)aac_bitreader_read(r, 1);
     }
     if (aac_bitreader_read(r, 1)) { /* extensionFlag3 */
       return AAC_ERR_UNSUPPORTED;
     }
+  }
+  return r->overread ? AAC_ERR_DECODE : 0;
+}
+
+/* sbr_header() (Table 4.56) inside ld_sbr_header(). */
+void read_sbr_header(AacBitReader* r, AacAscSbrHeader* h) {
+  h->amp_res = (int)aac_bitreader_read(r, 1);
+  h->start_freq = (int)aac_bitreader_read(r, 4);
+  h->stop_freq = (int)aac_bitreader_read(r, 4);
+  h->xover_band = (int)aac_bitreader_read(r, 3);
+  aac_bitreader_skip(r, 2); /* bs_reserved */
+  h->header_extra_1 = (int)aac_bitreader_read(r, 1);
+  h->header_extra_2 = (int)aac_bitreader_read(r, 1);
+  h->freq_scale = 2;
+  h->alter_scale = 1;
+  h->noise_bands = 2;
+  if (h->header_extra_1) {
+    h->freq_scale = (int)aac_bitreader_read(r, 2);
+    h->alter_scale = (int)aac_bitreader_read(r, 1);
+    h->noise_bands = (int)aac_bitreader_read(r, 2);
+  }
+  h->limiter_bands = 2;
+  h->limiter_gains = 2;
+  h->interpol_freq = 1;
+  h->smoothing_mode = 1;
+  if (h->header_extra_2) {
+    h->limiter_bands = (int)aac_bitreader_read(r, 2);
+    h->limiter_gains = (int)aac_bitreader_read(r, 2);
+    h->interpol_freq = (int)aac_bitreader_read(r, 1);
+    h->smoothing_mode = (int)aac_bitreader_read(r, 1);
+  }
+}
+
+void write_sbr_header(AacBitWriter* w, const AacAscSbrHeader* h) {
+  aac_bitwriter_write(w, (uint32_t)h->amp_res, 1);
+  aac_bitwriter_write(w, (uint32_t)h->start_freq, 4);
+  aac_bitwriter_write(w, (uint32_t)h->stop_freq, 4);
+  aac_bitwriter_write(w, (uint32_t)h->xover_band, 3);
+  aac_bitwriter_write(w, 0, 2); /* bs_reserved */
+  aac_bitwriter_write(w, (uint32_t)h->header_extra_1, 1);
+  aac_bitwriter_write(w, (uint32_t)h->header_extra_2, 1);
+  if (h->header_extra_1) {
+    aac_bitwriter_write(w, (uint32_t)h->freq_scale, 2);
+    aac_bitwriter_write(w, (uint32_t)h->alter_scale, 1);
+    aac_bitwriter_write(w, (uint32_t)h->noise_bands, 2);
+  }
+  if (h->header_extra_2) {
+    aac_bitwriter_write(w, (uint32_t)h->limiter_bands, 2);
+    aac_bitwriter_write(w, (uint32_t)h->limiter_gains, 2);
+    aac_bitwriter_write(w, (uint32_t)h->interpol_freq, 1);
+    aac_bitwriter_write(w, (uint32_t)h->smoothing_mode, 1);
+  }
+}
+
+/* sbr_header() count of ld_sbr_header(): one per SCE or CPE of the
+ * channel configuration (Table 4.4). */
+int ld_sbr_header_count(int channel_config) {
+  switch (channel_config) {
+    case 1:
+    case 2:
+      return 1;
+    case 3:
+      return 2;
+    case 4:
+    case 5:
+    case 6:
+      return 3;
+    case 7:
+      return 4;
+    default:
+      return 0;
+  }
+}
+
+constexpr int kEldExtTerm = 0;
+
+/* ELDSpecificConfig() (Table 4.180): the frame length, the resilience
+ * flags, the low-delay SBR signalling with its headers, and extensions
+ * (such as the SAOC and LD MPEG Surround payloads) that are skipped. */
+int read_eld_config(AacBitReader* r, AacAsc* asc) {
+  asc->frame_length = aac_bitreader_read(r, 1) ? 480 : 512;
+  asc->section_resilience = (int)aac_bitreader_read(r, 1);
+  asc->scalefactor_resilience = (int)aac_bitreader_read(r, 1);
+  asc->spectral_resilience = (int)aac_bitreader_read(r, 1);
+  asc->ld_sbr_present = (int)aac_bitreader_read(r, 1);
+  if (asc->ld_sbr_present) {
+    asc->ld_sbr_sampling_rate = (int)aac_bitreader_read(r, 1);
+    asc->ld_sbr_crc = (int)aac_bitreader_read(r, 1);
+    asc->num_ld_sbr_headers = ld_sbr_header_count(asc->channel_config);
+    for (int i = 0; i < asc->num_ld_sbr_headers; i++) {
+      read_sbr_header(r, &asc->ld_sbr_header[i]);
+    }
+  }
+  for (;;) {
+    const int ext_type = (int)aac_bitreader_read(r, 4);
+    if (ext_type == kEldExtTerm || r->overread) {
+      break;
+    }
+    int len = (int)aac_bitreader_read(r, 4);
+    if (len == 15) {
+      const int add = (int)aac_bitreader_read(r, 8);
+      len += add;
+      if (add == 255) {
+        len += (int)aac_bitreader_read(r, 16);
+      }
+    }
+    if (aac_bitreader_bits_left(r) < 8 * len) {
+      return AAC_ERR_DECODE;
+    }
+    aac_bitreader_skip(r, 8 * len);
+  }
+  return r->overread ? AAC_ERR_DECODE : 0;
+}
+
+void write_eld_config(AacBitWriter* w, const AacAsc* asc) {
+  aac_bitwriter_write(w, asc->frame_length == 480 ? 1u : 0u, 1);
+  aac_bitwriter_write(w, asc->section_resilience ? 1u : 0u, 1);
+  aac_bitwriter_write(w, asc->scalefactor_resilience ? 1u : 0u, 1);
+  aac_bitwriter_write(w, asc->spectral_resilience ? 1u : 0u, 1);
+  aac_bitwriter_write(w, asc->ld_sbr_present ? 1u : 0u, 1);
+  if (asc->ld_sbr_present) {
+    aac_bitwriter_write(w, asc->ld_sbr_sampling_rate ? 1u : 0u, 1);
+    aac_bitwriter_write(w, asc->ld_sbr_crc ? 1u : 0u, 1);
+    const int n = ld_sbr_header_count(asc->channel_config);
+    for (int i = 0; i < n; i++) {
+      write_sbr_header(w, &asc->ld_sbr_header[i]);
+    }
+  }
+  aac_bitwriter_write(w, kEldExtTerm, 4);
+}
+
+bool is_low_delay_type(int aot) { return aot == AAC_AOT_ER_LD || aot == AAC_AOT_ER_ELD; }
+
+/* The error resilient object types whose AudioSpecificConfig ends with
+ * epConfig (Table 1.15). */
+bool has_ep_config(int aot) { return (aot >= 17 && aot <= 27) || aot == AAC_AOT_ER_ELD; }
+
+/* epConfig: 0 or 1 carry no error protection data; 2 and 3 are followed
+ * by an ErrorProtectionSpecificConfig this codec does not read. */
+int read_ep_config(AacBitReader* r) {
+  const int ep_config = (int)aac_bitreader_read(r, 2);
+  if (ep_config >= 2) {
+    return AAC_ERR_UNSUPPORTED;
   }
   return r->overread ? AAC_ERR_DECODE : 0;
 }
@@ -145,10 +291,20 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
   if (r->overread || asc->sample_rate == 0) {
     return AAC_ERR_DECODE;
   }
+  if (asc->aot == AAC_AOT_ER_ELD) {
+    if (asc->channel_config == 0) {
+      return AAC_ERR_UNSUPPORTED; /* the ELD config carries no program config element */
+    }
+    const int ret = read_eld_config(r, asc);
+    return ret ? ret : read_ep_config(r);
+  }
   if (!is_ga_type(asc->aot)) {
     return AAC_ERR_UNSUPPORTED;
   }
-  const int ret = read_ga_config(r, asc, anchor);
+  int ret = read_ga_config(r, asc, anchor);
+  if (ret == 0 && has_ep_config(asc->aot)) {
+    ret = read_ep_config(r);
+  }
   if (ret) {
     return ret;
   }
@@ -190,13 +346,17 @@ int aac_asc_parse(const uint8_t* data, int size, AacAsc* asc) {
 }
 
 int aac_asc_write_bits(const AacAsc* asc, AacBitWriter* w) {
-  if (!is_ga_type(asc->aot) || asc->sample_rate <= 0 || asc->channel_config < 0 ||
-      asc->channel_config > 15 || (asc->channel_config == 0 && !asc->has_pce) ||
-      (asc->frame_length != 1024 && asc->frame_length != 960)) {
+  const bool low_delay = is_low_delay_type(asc->aot);
+  const bool length_ok = low_delay ? asc->frame_length == 512 || asc->frame_length == 480
+                                   : asc->frame_length == 1024 || asc->frame_length == 960;
+  if ((!is_ga_type(asc->aot) && asc->aot != AAC_AOT_ER_ELD) || asc->sample_rate <= 0 ||
+      asc->channel_config < 0 || asc->channel_config > 15 ||
+      (asc->channel_config == 0 && !asc->has_pce) || !length_ok ||
+      (asc->aot == AAC_AOT_ER_ELD && asc->channel_config == 0)) {
     return AAC_ERR_INVALID_ARG;
   }
-  const bool sbr = asc->sbr_present == 1;
-  const bool ps = asc->ps_present == 1;
+  const bool sbr = asc->sbr_present == 1 && !low_delay;
+  const bool ps = asc->ps_present == 1 && !low_delay;
   if (sbr && asc->ext_sample_rate <= 0) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -213,15 +373,34 @@ int aac_asc_write_bits(const AacAsc* asc, AacBitWriter* w) {
     write_rate(w, asc->sample_rate);
     aac_bitwriter_write(w, (uint32_t)asc->channel_config, 4);
   }
-  /* GASpecificConfig */
-  aac_bitwriter_write(w, asc->frame_length == 960 ? 1u : 0u, 1);
+  if (asc->aot == AAC_AOT_ER_ELD) {
+    write_eld_config(w, asc);
+    aac_bitwriter_write(w, 0, 2); /* epConfig */
+    if (aac_bitwriter_overflow(w)) {
+      return AAC_ERR_OVERFLOW;
+    }
+    return aac_bitwriter_bits_written(w) - start;
+  }
+  /* GASpecificConfig; the error resilient types carry their tool flags
+   * in the extension. */
+  const bool er = asc->aot == AAC_AOT_ER_LC || asc->aot == AAC_AOT_ER_LD;
+  aac_bitwriter_write(w, asc->frame_length == 960 || asc->frame_length == 480 ? 1u : 0u, 1);
   aac_bitwriter_write(w, asc->depends_on_core_coder ? 1u : 0u, 1);
   if (asc->depends_on_core_coder) {
     aac_bitwriter_write(w, (uint32_t)asc->core_coder_delay, 14);
   }
-  aac_bitwriter_write(w, 0, 1); /* extensionFlag */
+  aac_bitwriter_write(w, er ? 1u : 0u, 1); /* extensionFlag */
   if (asc->channel_config == 0) {
     aac_pce_write(w, &asc->layout, aac_asc_rate_index(asc->sample_rate), anchor);
+  }
+  if (er) {
+    aac_bitwriter_write(w, asc->section_resilience ? 1u : 0u, 1);
+    aac_bitwriter_write(w, asc->scalefactor_resilience ? 1u : 0u, 1);
+    aac_bitwriter_write(w, asc->spectral_resilience ? 1u : 0u, 1);
+    aac_bitwriter_write(w, 0, 1); /* extensionFlag3 */
+  }
+  if (has_ep_config(asc->aot)) {
+    aac_bitwriter_write(w, 0, 2); /* epConfig */
   }
   if (asc->signaling == AAC_SIGNAL_EXPLICIT_BC && asc->sbr_present >= 0) {
     aac_bitwriter_write(w, kSyncExtensionSbr, 11);

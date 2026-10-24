@@ -291,7 +291,8 @@ void aac_enc_tools_init(AacEncoderState* s) {
   s->tns_order_long = channel_bitrate < 16000 ? 10 : 12;
   s->tns_order_short = channel_bitrate < 16000 ? 3 : 5;
   s->tns_lo_band_long = sr < 9391 ? 2 : (sr < 18783 ? 4 : 8);
-  s->tns_top_long = std::min(aac_tns_max_bands_long[s->rate_index], s->active_bands_long);
+  s->tns_top_long =
+      std::min(aac_tns_max_bands(s->frame_length, s->rate_index, 0), s->active_bands_long);
   s->tns_top_short = std::min(aac_tns_max_bands_short[s->rate_index], s->active_bands_short);
   s->tns_lo_band_long = std::min(s->tns_lo_band_long, s->tns_top_long);
   {

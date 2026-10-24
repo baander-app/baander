@@ -9,6 +9,7 @@
 #include "channel_map.h"
 #include "drc.h"
 #include "ics.h"
+#include "lowdelay.h"
 #include "mdct.h"
 #include "psycho.h"
 #include "sbr_enc.h"
@@ -28,16 +29,31 @@ extern "C" {
  * 960 frames, measured against our decoder. */
 #define AAC_ENCODER_SBR_DELAY 5635
 #define AAC_ENCODER_SBR_DELAY_960 5379
+/* AAC-LD keeps the block of lookahead of AAC-LC: one frame plus the
+ * window overlap of one frame, 1024 (960) samples.  AAC-ELD: one frame
+ * plus the low-delay filterbank's delay of half a frame, 768 (720). */
+#define AAC_ENCODER_LD_DELAY(frame_length) (2 * (frame_length))
+#define AAC_ENCODER_ELD_DELAY(frame_length) (3 * (frame_length) / 2)
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
 
 #define AAC_ENC_TNS_MAX_ORDER 12
 #define AAC_ENC_TNS_MAX_FILTERS 2
 
+/* Whether an object type codes SBR (HE-AAC v1 or v2). */
+static inline int aac_encoder_aot_has_sbr(int aot) {
+  return aot == AAC_AOT_SBR || aot == AAC_AOT_PS;
+}
+/* Whether an object type is one of the low-delay ones (AAC-LD, AAC-ELD). */
+static inline int aac_encoder_aot_low_delay(int aot) {
+  return aot == AAC_AOT_ER_LD || aot == AAC_AOT_ER_ELD;
+}
+
 using AacEncChannel = struct AacEncChannel_ {
   /* Three blocks of frame_length input samples at full scale 32768: the
    * frame being coded spans the first two, the third is lookahead for
-   * block switching. */
+   * block switching.  AAC-ELD keeps four blocks of 512 or 480: its
+   * analysis window spans the first three, the fourth is the lookahead. */
   float pcm[3 * AAC_FRAME_SIZE_LONG];
   AacIcsInfo ics;
   int prev_window_shape;
@@ -93,7 +109,7 @@ using AacEncoderState = struct AacEncoderState_ {
    * input runs at twice the rate, and with parametric stereo a stereo
    * input is coded as one channel. */
   int sample_rate, channels, bitrate, quality, frame_size, rate_index;
-  int frame_length; /* core samples per frame: 1024 or 960 */
+  int frame_length; /* core samples per frame: 1024 or 960; 512 or 480 for AAC-LD/ELD */
   int input_rate, input_channels;
   int delay;   /* input samples before the first one is decoded */
   int started; /* a frame has been encoded since creation or the last flush */
@@ -165,9 +181,9 @@ void aac_encoder_state_configure(AacEncoderState* s);
  * overlap, reservoir and psychoacoustic memory. */
 void aac_encoder_state_reset(AacEncoderState* s);
 
-/* Switches to 1024 or 960 core samples per frame (frame_size and delay
- * follow) and resets the encoder; AAC_ERR_INVALID_ARG for any other
- * length. */
+/* Switches to 1024 or 960 core samples per frame (512 or 480 for the
+ * low-delay object types; frame_size and delay follow) and resets the
+ * encoder; AAC_ERR_INVALID_ARG for any other length. */
 int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length);
 
 /* Largest ADTS frame the encoder can emit for its channel count. */

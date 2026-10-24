@@ -549,7 +549,21 @@ int short_region_start(int frame_length) {
 const int kGrouping[8][4] = {{1, 3, 3, 1}, {1, 1, 3, 3}, {2, 1, 3, 2}, {3, 1, 3, 1},
                              {3, 1, 1, 3}, {3, 2, 1, 2}, {3, 3, 1, 1}, {3, 3, 1, 1}};
 
+/* The low-delay object types code every frame in one long window: AAC-LD
+ * with the sine window, AAC-ELD with its own filterbank. */
+void low_delay_window_sequence(AacEncoderState* s, const AacEncElement* el) {
+  for (int k = 0; k < el->num_ch; k++) {
+    AacEncChannel* c = &s->ch[el->ch[k]];
+    aac_ics_layout(&c->ics, s->rate_index, s->frame_length, AAC_WIN_ONLY_LONG, 0);
+    c->ics.window_shape = AAC_WIN_SINE;
+  }
+}
+
 void choose_window_sequence(AacEncoderState* s, const AacEncElement* el) {
+  if (aac_encoder_aot_low_delay(s->aot)) {
+    low_delay_window_sequence(s, el);
+    return;
+  }
   int attack_now = 0;
   int attack_next = 0;
   const int fl = s->frame_length;
@@ -600,6 +614,11 @@ void choose_window_sequence(AacEncoderState* s, const AacEncElement* el) {
 void window_and_mdct(AacEncoderState* s, AacEncChannel* c) {
   const AacIcsInfo* ics = &c->ics;
   const int fl = s->frame_length;
+  if (s->aot == AAC_AOT_ER_ELD) {
+    aac_eld_analysis(&s->mdct_long, fl, c->pcm, c->coef);
+    memset(c->coef + fl, 0, (size_t)(AAC_FRAME_SIZE_LONG - fl) * sizeof(float));
+    return;
+  }
   const int sl = aac_short_length(fl);
   const int start = short_region_start(fl);
   const float* lw_prev = aac_window_long_for(fl, c->prev_window_shape);
@@ -651,7 +670,12 @@ void window_and_mdct(AacEncoderState* s, AacEncChannel* c) {
 
 /* ── bitstream writing ─────────────────────────────────────────── */
 
-void write_ics_info(AacBitWriter* w, const AacIcsInfo* ics, int max_sfb) {
+/* ics_info(); AAC-ELD sends only max_sfb. */
+void write_ics_info(AacBitWriter* w, const AacIcsInfo* ics, int max_sfb, int aot = AAC_AOT_LC) {
+  if (aot == AAC_AOT_ER_ELD) {
+    aac_bitwriter_write(w, (uint32_t)max_sfb, 6);
+    return;
+  }
   aac_bitwriter_write(w, 0, 1); /* ics_reserved_bit */
   aac_bitwriter_write(w, (uint32_t)ics->window_sequence, 2);
   aac_bitwriter_write(w, (uint32_t)ics->window_shape, 1);
@@ -672,12 +696,18 @@ void write_ics_info(AacBitWriter* w, const AacIcsInfo* ics, int max_sfb) {
   }
 }
 
-void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, int common_window) {
+/* individual_channel_stream(); the error resilient object types send
+ * tns_data() after the gain control flag, AAC-ELD has neither pulse nor
+ * gain control data. */
+void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, int common_window,
+                          int aot = AAC_AOT_LC) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
+  const bool er = aac_encoder_aot_low_delay(aot);
+  const bool eld = aot == AAC_AOT_ER_ELD;
   aac_bitwriter_write(w, (uint32_t)c->global_gain, 8);
   if (!common_window) {
-    write_ics_info(w, ics, max_sfb);
+    write_ics_info(w, ics, max_sfb, aot);
   }
 
   /* section_data */
@@ -732,12 +762,19 @@ void write_channel_stream(AacBitWriter* w, const AacEncChannel* c, int max_sfb, 
     }
   }
 
-  aac_bitwriter_write(w, 0, 1); /* pulse_data_present */
+  if (!eld) {
+    aac_bitwriter_write(w, 0, 1); /* pulse_data_present */
+  }
   aac_bitwriter_write(w, (uint32_t)c->tns_present, 1);
-  if (c->tns_present) {
+  if (c->tns_present && !er) {
     aac_enc_tns_write(w, c);
   }
-  aac_bitwriter_write(w, 0, 1); /* gain_control_data_present */
+  if (!eld) {
+    aac_bitwriter_write(w, 0, 1); /* gain_control_data_present */
+  }
+  if (c->tns_present && er) {
+    aac_enc_tns_write(w, c);
+  }
 
   /* spectral_data */
   int w0 = 0;
@@ -795,7 +832,56 @@ void write_sbr(const AacEncoderState* s, int e, AacBitWriter* w) {
   aac_drc_encoder_write(&s->drc, e, w);
 }
 
+/* er_raw_data_block() of the low-delay object types: the channel
+ * elements of the channel configuration in their fixed order, without
+ * element ids or END (AAC-ELD: without element_instance_tag and with an
+ * implicit common window).  Behind the space of an ADTS header, which the
+ * transport layer drops; returns the length with that space. */
+int write_er_frame(AacEncoderState* s) {
+  AacBitWriter w;
+  aac_bitwriter_init(&w, s->output_buf, sizeof(s->output_buf));
+  aac_bitwriter_write(&w, 0, 32);
+  aac_bitwriter_write(&w, 0, kAdtsBits - 32);
+  s->num_crc_regions = 0;
+  const bool eld = s->aot == AAC_AOT_ER_ELD;
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacEncElement* el = &s->elem[e];
+    const int max_sfb = el->max_sfb;
+    if (!eld) {
+      aac_bitwriter_write(&w, (uint32_t)el->tag, 4);
+    }
+    if (el->type != AAC_ELEM_CPE) {
+      write_channel_stream(&w, &s->ch[el->ch[0]], max_sfb, 0, s->aot);
+      continue;
+    }
+    const AacIcsInfo* ics = &s->ch[el->ch[0]].ics;
+    if (!eld) {
+      aac_bitwriter_write(&w, 1, 1); /* common_window */
+    }
+    write_ics_info(&w, ics, max_sfb, s->aot);
+    const int ms_present = ms_present_mode(s, el);
+    aac_bitwriter_write(&w, (uint32_t)ms_present, 2);
+    if (ms_present == 1) {
+      for (int b = 0; b < max_sfb; b++) {
+        aac_bitwriter_write(&w, (uint32_t)el->ms_used[b], 1);
+      }
+    }
+    write_channel_stream(&w, &s->ch[el->ch[0]], max_sfb, 1, s->aot);
+    write_channel_stream(&w, &s->ch[el->ch[1]], max_sfb, 1, s->aot);
+  }
+  /* LD-SBR: an AAC-ELD encoder with SBR writes the ld_sbr payload of
+   * every channel element here, after the last one. */
+  aac_bitwriter_byte_align(&w);
+  if (aac_bitwriter_overflow(&w)) {
+    return AAC_ERR_OVERFLOW;
+  }
+  return aac_bitwriter_bytes_written(&w);
+}
+
 int write_frame(AacEncoderState* s, int buffer_fullness) {
+  if (aac_encoder_aot_low_delay(s->aot)) {
+    return write_er_frame(s);
+  }
   AacBitWriter w;
   aac_bitwriter_init(&w, s->output_buf, sizeof(s->output_buf));
   /* The header is filled in below; it is longer than one write takes. */
@@ -1269,12 +1355,17 @@ constexpr int kSbrBitrateEstimate = 1500;
  * frame (ISO/IEC 14496-3 4.5.3.1 allows 6144 bits per channel for 1024
  * samples, scaled with the frame length). */
 void apply_frame_length(AacEncoderState* s) {
-  const bool sbr = s->aot != AAC_AOT_LC;
+  const bool sbr = aac_encoder_aot_has_sbr(s->aot);
   const int fl = s->frame_length;
   const bool is960 = fl == AAC_FRAME_SIZE_LONG_960;
   s->frame_size = sbr ? 2 * fl : fl;
   s->delay = sbr ? (is960 ? AAC_ENCODER_SBR_DELAY_960 : AAC_ENCODER_SBR_DELAY)
                  : (is960 ? AAC_ENCODER_DELAY_960 : AAC_ENCODER_DELAY);
+  if (s->aot == AAC_AOT_ER_LD) {
+    s->delay = AAC_ENCODER_LD_DELAY(fl);
+  } else if (s->aot == AAC_AOT_ER_ELD) {
+    s->delay = AAC_ENCODER_ELD_DELAY(fl);
+  }
   aac_mdct_init(&s->mdct_long, 2 * fl);
   aac_mdct_init(&s->mdct_short, 2 * aac_short_length(fl));
   for (int e = 0; e < s->num_elements; e++) {
@@ -1295,8 +1386,9 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
                                           AacRateControl rc, const AacDSP* dsp) {
   aac_tables_init();
   init_sf_tables();
-  const bool sbr = aot != AAC_AOT_LC;
+  const bool sbr = aac_encoder_aot_has_sbr(aot);
   const bool ps = aot == AAC_AOT_PS;
+  const bool low_delay = aac_encoder_aot_low_delay(aot);
   if ((sbr && sr % 2) || (ps && ch != 2)) {
     return nullptr;
   }
@@ -1313,7 +1405,7 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
   s->aot = aot;
   s->rc_mode = rc;
   s->quality = 70;
-  s->frame_length = AAC_FRAME_SIZE_LONG;
+  s->frame_length = low_delay ? AAC_FRAME_SIZE_LD : AAC_FRAME_SIZE_LONG;
   s->dsp = dsp;
   sr = s->sample_rate;
   s->rate_index = -1;
@@ -1324,6 +1416,12 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
     }
   }
   if (s->rate_index < 0 || setup_layout(s, AAC_MODE_DEFAULT) != AAC_OK) {
+    delete s;
+    return nullptr;
+  }
+  /* The low-delay types have band tables for five rates and code the
+   * channel configurations 1..7 only (their frames have no PCE). */
+  if (low_delay && (!aac_low_delay_rate_supported(s->rate_index) || s->channel_config == 0)) {
     delete s;
     return nullptr;
   }
@@ -1338,7 +1436,11 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
 }
 
 int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length) {
-  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
+  const bool valid =
+      aac_encoder_aot_low_delay(s->aot)
+          ? aac_is_low_delay_frame(frame_length)
+          : frame_length == AAC_FRAME_SIZE_LONG || frame_length == AAC_FRAME_SIZE_LONG_960;
+  if (!valid) {
     return AAC_ERR_INVALID_ARG;
   }
   if (frame_length == s->frame_length) {
@@ -1497,11 +1599,12 @@ int aac_encoder_state_set_channel_mode(AacEncoderState* s, AacChannelMode mode) 
     return AAC_OK;
   }
   const AacChannelMode previous = s->channel_mode;
-  if (setup_layout(s, mode) != AAC_OK) {
+  if (setup_layout(s, mode) != AAC_OK ||
+      (aac_encoder_aot_low_delay(s->aot) && s->channel_config == 0)) {
     setup_layout(s, previous);
     return AAC_ERR_INVALID_ARG;
   }
-  if (s->aot != AAC_AOT_LC) {
+  if (aac_encoder_aot_has_sbr(s->aot)) {
     /* The elements changed, and the SBR encoders belong to elements. */
     destroy_sbr_encoders(s);
     if (create_sbr_encoders(s) != AAC_OK) {
@@ -1550,20 +1653,22 @@ void sbr_process(AacEncoderState* s, const float* pcm) {
 }  // namespace
 
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
-  const bool sbr = s->aot != AAC_AOT_LC;
+  const bool sbr = aac_encoder_aot_has_sbr(s->aot);
   const int fl = s->frame_length;
   s->started = 1;
   if (sbr) {
     sbr_process(s, pcm);
   }
-  /* Shift in the new block; the frame to code spans pcm[0 .. 2 fl). */
+  /* Shift in the new block; the frame to code spans pcm[0 .. 2 fl) (AAC-ELD:
+   * pcm[0 .. 3 fl)), the newest block is the lookahead. */
+  const int history = s->aot == AAC_AOT_ER_ELD ? 3 * fl : 2 * fl;
   for (int c = 0; c < s->channels; c++) {
     float* buf = s->ch[c].pcm;
-    memmove(buf, buf + fl, (size_t)(2 * fl) * sizeof(float));
+    memmove(buf, buf + fl, (size_t)history * sizeof(float));
     for (int i = 0; i < fl; i++) {
-      buf[2 * fl + i] = sbr   ? s->core_in[c][i]
-                        : pcm ? pcm[i * s->channels + c] * kInputScale
-                              : 0.0f;
+      buf[history + i] = sbr   ? s->core_in[c][i]
+                         : pcm ? pcm[i * s->channels + c] * kInputScale
+                               : 0.0f;
     }
   }
 

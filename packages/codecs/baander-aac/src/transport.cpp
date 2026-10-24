@@ -79,14 +79,34 @@ void preset_extension(AacDecoderState* s, const AacAsc* asc) {
   }
 }
 
-/* Applies a configuration: sample rate, layout, frame length and the
- * extension modes.  Repeating the same configuration changes nothing. */
-int apply_asc(AacDecoderState* s, const AacAsc* asc) {
-  if (asc->aot != AAC_AOT_LC) {
-    return AAC_ERR_UNSUPPORTED;
+/* Whether the decoder handles a configuration's object type and its
+ * error resilience and low-delay options. */
+bool asc_supported(const AacAsc* asc, int rate_index) {
+  const bool low_delay = asc->aot == AAC_AOT_ER_LD || asc->aot == AAC_AOT_ER_ELD;
+  if (asc->aot != AAC_AOT_LC && asc->aot != AAC_AOT_ER_LC && !low_delay) {
+    return false;
   }
+  if (rate_index < 0 || (low_delay && !aac_low_delay_rate_supported(rate_index))) {
+    return false;
+  }
+  if (aac_aot_is_er(asc->aot)) {
+    /* The resilience tools (virtual codebooks, RVLC, HCR) are not
+     * decoded, and the fixed element order needs a channel configuration. */
+    if (asc->section_resilience || asc->scalefactor_resilience || asc->spectral_resilience ||
+        asc->channel_config < 1 || asc->channel_config > 7) {
+      return false;
+    }
+  }
+  /* LD-SBR (AAC-ELD with ldSbrPresentFlag) is not decoded. */
+  return !(asc->aot == AAC_AOT_ER_ELD && asc->ld_sbr_present);
+}
+
+/* Applies a configuration: sample rate, layout, object type, frame length
+ * and the extension modes.  Repeating the same configuration changes
+ * nothing. */
+int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   const int index = aac_asc_rate_index(asc->sample_rate);
-  if (index < 0) {
+  if (!asc_supported(asc, index)) {
     return AAC_ERR_UNSUPPORTED;
   }
   if (asc->sbr_present == 1 && asc->ext_sample_rate != 2 * asc->sample_rate) {
@@ -101,6 +121,10 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   } else if (asc->has_pce) {
     ret = aac_decoder_set_layout(s, &asc->layout);
   }
+  if (ret) {
+    return ret;
+  }
+  ret = aac_decoder_set_object_type(s, asc->aot);
   if (ret) {
     return ret;
   }
@@ -160,7 +184,8 @@ int decode_adts_frame(AacDecoderState* s, const uint8_t* data, int size, float* 
     return AAC_ERR_UNSUPPORTED;
   }
   int ret = 0;
-  if ((ret = aac_decoder_set_rate_index(s, hdr.sample_rate_index)) != 0 ||
+  if ((ret = aac_decoder_set_object_type(s, AAC_AOT_LC)) != 0 ||
+      (ret = aac_decoder_set_rate_index(s, hdr.sample_rate_index)) != 0 ||
       (ret = aac_decoder_set_channel_config(s, hdr.channel_config)) != 0) {
     return ret;
   }
@@ -297,8 +322,7 @@ bool looks_like_latm(const uint8_t* data, int size, AacLatmConfig* cfg) {
   int used = 0;
   const int count = aac_latm_read_mux_element(data, size, 1, &c, scratch.data(), size, payloads,
                                               AAC_LATM_MAX_SUBFRAMES, &used);
-  if (count <= 0 || used != size || c.asc.aot != AAC_AOT_LC ||
-      aac_asc_rate_index(c.asc.sample_rate) < 0) {
+  if (count <= 0 || used != size || !asc_supported(&c.asc, aac_asc_rate_index(c.asc.sample_rate))) {
     return false;
   }
   *cfg = c;
@@ -791,9 +815,15 @@ int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTranspor
     asc->has_pce = 1;
     asc->layout = s->layout;
   }
-  const bool sbr = s->aot != AAC_AOT_LC;
+  const bool sbr = aac_encoder_aot_has_sbr(s->aot);
   asc->frame_length = sbr ? s->frame_size / 2 : s->frame_size;
   asc->signaling = t->signaling;
+  if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
+    asc->aot = s->aot;
+    asc->frame_length = s->frame_length;
+    /* LD-SBR: an ELD encoder with SBR signals ldSbrPresentFlag and its
+     * ld_sbr_header here. */
+  }
   if (sbr) {
     asc->sbr_present = 1;
     asc->ps_present = s->aot == AAC_AOT_PS ? 1 : -1;

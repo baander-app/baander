@@ -9,6 +9,8 @@
         "src/dsp.cpp",
         "src/fft.cpp",
         "src/mdct.cpp",
+        "src/lowdelay.cpp",
+        "src/eld_tables.cpp",
         "src/ics.cpp",
         "src/bitstream.cpp",
         "src/channel_map.cpp",

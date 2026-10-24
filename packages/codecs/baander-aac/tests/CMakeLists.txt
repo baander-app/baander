@@ -20,6 +20,7 @@ set(TEST_SOURCES
     test_drc.cpp
     test_afterburner.cpp
     test_sbr_ld.cpp
+    test_lowdelay.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

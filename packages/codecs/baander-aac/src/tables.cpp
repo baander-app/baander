@@ -133,7 +133,79 @@ const int aac_sfb_offset_short_960[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_SHORT + 1] 
     /*  8000 */ {0, 4, 8, 12, 16, 20, 24, 28, 36, 44, 52, 60, 72, 88, 108, 120},
 };
 
+/* Low-delay bands, ISO/IEC 14496-3 Tables 4.141-4.150: 48 and 44.1 kHz
+ * share one table, as do 24 and 22.05 kHz. */
+const int aac_num_sfb_512[AAC_NUM_SAMPLE_RATES] = {0, 0, 0, 36, 36, 37, 31, 31, 0, 0, 0, 0};
+const int aac_sfb_offset_512[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_LONG + 1] = {
+    {},
+    {},
+    {},
+    /* 48000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
+                 52,  56,  60,  68,  76,  84,  92,  100, 112, 124, 136, 148, 164,
+                 184, 208, 236, 268, 300, 332, 364, 396, 428, 460, 512},
+    /* 44100 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
+                 52,  56,  60,  68,  76,  84,  92,  100, 112, 124, 136, 148, 164,
+                 184, 208, 236, 268, 300, 332, 364, 396, 428, 460, 512},
+    /* 32000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
+                 52,  56,  64,  72,  80,  88,  96,  108, 120, 132, 144, 160, 176,
+                 192, 212, 236, 260, 288, 320, 352, 384, 416, 448, 480, 512},
+    /* 24000 */ {0,  4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68,  80,
+                 92, 104, 120, 140, 164, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480, 512},
+    /* 22050 */ {0,  4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68,  80,
+                 92, 104, 120, 140, 164, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480, 512},
+    {},
+    {},
+    {},
+    {},
+};
+
+const int aac_num_sfb_480[AAC_NUM_SAMPLE_RATES] = {0, 0, 0, 35, 35, 37, 30, 30, 0, 0, 0, 0};
+const int aac_sfb_offset_480[AAC_NUM_SAMPLE_RATES][AAC_MAX_SFB_LONG + 1] = {
+    {},
+    {},
+    {},
+    /* 48000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,
+                 48,  52,  56,  64,  72,  80,  88,  96,  108, 120, 132, 144,
+                 156, 172, 188, 212, 240, 272, 304, 336, 368, 400, 432, 480},
+    /* 44100 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,
+                 48,  52,  56,  64,  72,  80,  88,  96,  108, 120, 132, 144,
+                 156, 172, 188, 212, 240, 272, 304, 336, 368, 400, 432, 480},
+    /* 32000 */ {0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,
+                 52,  56,  60,  64,  72,  80,  88,  96,  104, 112, 124, 136, 148,
+                 164, 180, 200, 224, 256, 288, 320, 352, 384, 416, 448, 480},
+    /* 24000 */ {0,  4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68, 80,
+                 92, 104, 120, 140, 164, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480},
+    /* 22050 */ {0,  4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  52,  60,  68, 80,
+                 92, 104, 120, 140, 164, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480},
+    {},
+    {},
+    {},
+    {},
+};
+
+int aac_low_delay_rate_supported(int rate_index) {
+  return rate_index >= 0 && rate_index < AAC_NUM_SAMPLE_RATES && aac_num_sfb_512[rate_index] > 0;
+}
+
+namespace {
+
+/* The rate index whose low-delay table stands in for one without. */
+int low_delay_table_index(int rate_index) {
+  return rate_index < 3 ? 3 : (rate_index > 7 ? 7 : rate_index);
+}
+
+}  // namespace
+
 int aac_num_sfb(int frame_length, int rate_index, int is_short) {
+  if (is_short && aac_is_low_delay_frame(frame_length)) {
+    return aac_num_sfb_short[rate_index];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD) {
+    return aac_num_sfb_512[low_delay_table_index(rate_index)];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD_480) {
+    return aac_num_sfb_480[low_delay_table_index(rate_index)];
+  }
   if (frame_length == AAC_FRAME_SIZE_LONG_960) {
     return is_short ? aac_num_sfb_short_960[rate_index] : aac_num_sfb_long_960[rate_index];
   }
@@ -141,6 +213,15 @@ int aac_num_sfb(int frame_length, int rate_index, int is_short) {
 }
 
 const int* aac_sfb_offset(int frame_length, int rate_index, int is_short) {
+  if (is_short && aac_is_low_delay_frame(frame_length)) {
+    return aac_sfb_offset_short[rate_index];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD) {
+    return aac_sfb_offset_512[low_delay_table_index(rate_index)];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD_480) {
+    return aac_sfb_offset_480[low_delay_table_index(rate_index)];
+  }
   if (frame_length == AAC_FRAME_SIZE_LONG_960) {
     return is_short ? aac_sfb_offset_short_960[rate_index] : aac_sfb_offset_long_960[rate_index];
   }
@@ -248,11 +329,21 @@ float aac_window_long[2][AAC_FRAME_SIZE_LONG];
 float aac_window_short[2][AAC_FRAME_SIZE_SHORT];
 float aac_window_long_960[2][AAC_FRAME_SIZE_LONG_960];
 float aac_window_short_120[2][AAC_FRAME_SIZE_SHORT_120];
+float aac_window_ld_512[2][AAC_FRAME_SIZE_LD];
+float aac_window_ld_480[2][AAC_FRAME_SIZE_LD_480];
 float aac_pow43[AAC_POW43_SIZE];
 
 const float* aac_window_long_for(int frame_length, int shape) {
-  return frame_length == AAC_FRAME_SIZE_LONG_960 ? aac_window_long_960[shape]
-                                                 : aac_window_long[shape];
+  switch (frame_length) {
+    case AAC_FRAME_SIZE_LONG_960:
+      return aac_window_long_960[shape];
+    case AAC_FRAME_SIZE_LD:
+      return aac_window_ld_512[shape];
+    case AAC_FRAME_SIZE_LD_480:
+      return aac_window_ld_480[shape];
+    default:
+      return aac_window_long[shape];
+  }
 }
 
 const float* aac_window_short_for(int frame_length, int shape) {
@@ -266,6 +357,21 @@ const int aac_tns_max_bands_long[AAC_NUM_SAMPLE_RATES] = {31, 31, 34, 40, 42, 51
 const int aac_tns_max_bands_short[AAC_NUM_SAMPLE_RATES] = {9,  9,  10, 14, 14, 14,
                                                            14, 14, 14, 14, 14, 14};
 const int aac_tns_max_order_long = 12;
+const int aac_tns_max_bands_512[AAC_NUM_SAMPLE_RATES] = {0, 0, 0, 31, 32, 37, 31, 31, 0, 0, 0, 0};
+const int aac_tns_max_bands_480[AAC_NUM_SAMPLE_RATES] = {0, 0, 0, 31, 32, 37, 30, 30, 0, 0, 0, 0};
+
+int aac_tns_max_bands(int frame_length, int rate_index, int is_short) {
+  if (is_short) {
+    return aac_tns_max_bands_short[rate_index];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD) {
+    return aac_tns_max_bands_512[low_delay_table_index(rate_index)];
+  }
+  if (frame_length == AAC_FRAME_SIZE_LD_480) {
+    return aac_tns_max_bands_480[low_delay_table_index(rate_index)];
+  }
+  return is_short ? aac_tns_max_bands_short[rate_index] : aac_tns_max_bands_long[rate_index];
+}
 const int aac_tns_max_order_short = 7;
 const AacChannelConfig aac_channel_config[8] = {{0, 0, 0, 0}, {1, 0, 1, 0}, {2, 1, 0, 0},
                                                 {3, 1, 1, 0}, {4, 1, 1, 0}, {5, 2, 1, 0},
@@ -944,6 +1050,28 @@ void aac_tables_init(void) {
     aac_kbd_window(full, 2 * w.half, w.alpha);
     for (int i = 0; i < w.half; i++) {
       w.out[w.half + i] = full[i];
+    }
+  }
+  /* AAC-LD: sine and low-overlap rising halves.  The low-overlap window
+   * of length n = 2 * half is 0 below 3n/16, a quarter sine period up to
+   * 5n/16 and 1 above, so neighbouring windows overlap by n/8. */
+  float* const ld_windows[2] = {aac_window_ld_512[0], aac_window_ld_480[0]};
+  const int ld_halves[2] = {AAC_FRAME_SIZE_LD, AAC_FRAME_SIZE_LD_480};
+  for (int t = 0; t < 2; t++) {
+    const int half = ld_halves[t];
+    const int n = 2 * half;
+    float* sine = ld_windows[t];
+    float* low = ld_windows[t] + half;
+    aac_sine_window(full, n);
+    for (int i = 0; i < half; i++) {
+      sine[i] = full[i];
+      if (i < 3 * n / 16) {
+        low[i] = 0.0f;
+      } else if (i < 5 * n / 16) {
+        low[i] = (float)sin(M_PI / (n / 4.0) * (i - 3 * n / 16 + 0.5));
+      } else {
+        low[i] = 1.0f;
+      }
     }
   }
   for (int i = 0; i < AAC_POW43_SIZE; i++) {

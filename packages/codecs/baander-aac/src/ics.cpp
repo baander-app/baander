@@ -19,13 +19,13 @@ void aac_ics_layout(AacIcsInfo* ics, int rate_index, int frame_length, int windo
     }
     ics->num_swb = aac_num_sfb(frame_length, rate_index, 1);
     ics->swb_offset = aac_sfb_offset(frame_length, rate_index, 1);
-    ics->tns_max_bands = aac_tns_max_bands_short[rate_index];
+    ics->tns_max_bands = aac_tns_max_bands(frame_length, rate_index, 1);
   } else {
     ics->num_windows = 1;
     ics->num_window_groups = 1;
     ics->group_len[0] = 1;
     ics->num_swb = aac_num_sfb(frame_length, rate_index, 0);
     ics->swb_offset = aac_sfb_offset(frame_length, rate_index, 0);
-    ics->tns_max_bands = aac_tns_max_bands_long[rate_index];
+    ics->tns_max_bands = aac_tns_max_bands(frame_length, rate_index, 0);
   }
 }

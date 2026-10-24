@@ -31,7 +31,8 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
   if (sample_rate <= 0 || channels <= 0 || channels > AAC_MAX_CHANNELS || bitrate <= 0) {
     return nullptr;
   }
-  if (aot != AAC_AOT_LC && aot != AAC_AOT_SBR && aot != AAC_AOT_PS) {
+  if (aot != AAC_AOT_LC && aot != AAC_AOT_SBR && aot != AAC_AOT_PS && aot != AAC_AOT_ER_LD &&
+      aot != AAC_AOT_ER_ELD) {
     return nullptr;
   }
   if (rc_mode < AAC_RC_TVBR || rc_mode > AAC_RC_CBR) {
@@ -42,6 +43,10 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
   auto* s = aac_encoder_state_create(sample_rate, channels, bitrate, aot, rc_mode, &g_dsp);
   if (s) {
     s->transport = aac_encoder_transport_create();
+    if (aac_encoder_aot_low_delay(aot)) {
+      /* ADTS cannot signal the low-delay object types. */
+      aac_encoder_transport_set(s->transport, AAC_TRANSPORT_LOAS);
+    }
   }
   return (AacEncoderHandle)s;
 }
@@ -153,6 +158,9 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
       prog_ref_level > 127) {
     return AAC_ERR_INVALID_ARG;
   }
+  if (aac_encoder_aot_low_delay(s->aot) && profile != AAC_DRC_NONE) {
+    return AAC_ERR_UNSUPPORTED; /* error resilient frames carry no fill elements */
+  }
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
   }
@@ -189,7 +197,27 @@ int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return aac_encoder_transport_set(static_cast<AacEncoderState*>(ctx)->transport, transport);
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (aac_encoder_aot_low_delay(s->aot) && transport == AAC_TRANSPORT_ADTS) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return aac_encoder_transport_set(s->transport, transport);
+}
+
+int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int /* dual_rate */) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_ER_ELD) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (s->started) {
+    return AAC_ERR_STATE;
+  }
+  /* LD-SBR encoding hooks in here: the SBR encoders, the frame size
+   * (doubled with dual_rate) and the ASC's ld_sbr fields. */
+  return enabled ? AAC_ERR_UNSUPPORTED : AAC_OK;
 }
 
 int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling) {
@@ -302,7 +330,40 @@ int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return aac_decoder_set_frame_length_internal(static_cast<AacDecoderState*>(ctx), frame_length);
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  /* 512 and 480 only come with the low-delay object types, from their
+   * AudioSpecificConfig. */
+  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
+    return AAC_ERR_STATE;
+  }
+  return aac_decoder_set_frame_length_internal(s, frame_length);
+}
+
+int aac_decoder_object_type(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->aot;
+}
+
+int aac_decoder_set_eld_downscale(AacDecoderHandle ctx, int factor) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  if (factor != 1 && factor != 2 && factor != 4) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (s->blocks_decoded > 0) {
+    return AAC_ERR_STATE;
+  }
+  /* LD-SBR streams are refused when their configuration is applied; once
+   * they are decoded, downscaling them answers AAC_ERR_UNSUPPORTED here. */
+  aac_decoder_set_eld_downscale_internal(s, factor);
+  return AAC_OK;
 }
 
 int aac_decoder_set_concealment(AacDecoderHandle ctx, AacConcealment mode) {
@@ -385,8 +446,7 @@ int aac_decoder_output_sample_rate(AacDecoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  auto* s = static_cast<AacDecoderState*>(ctx);
-  return s->sbr_mode ? 2 * s->sample_rate : s->sample_rate;
+  return aac_decoder_output_rate(static_cast<AacDecoderState*>(ctx));
 }
 
 int aac_decoder_channels(AacDecoderHandle ctx) {

@@ -9,6 +9,7 @@
 #include "drc.h"
 #include "ics.h"
 #include "limiter.h"
+#include "lowdelay.h"
 #include "mdct.h"
 #include "sbr.h"
 #ifdef __cplusplus
@@ -46,6 +47,7 @@ using AacDecoderChannel = struct AacDecoderChannel_ {
   float output[2048];    /* decoded PCM of the current frame, full scale = 1.0;
                             2048 samples while SBR is decoded */
   AacConcealChannel conceal; /* the last good spectrum and the state of a fade */
+  float eld_overlap[AAC_ELD_OVERLAP]; /* AAC-ELD: windowed output of the last three frames */
 };
 
 /* coupling_channel_element() (Table 4.8): the coupling channel and the
@@ -76,7 +78,12 @@ using AacDecoderState = struct AacDecoderState_ {
   int channels;       /* output channels requested by the caller, 0 for the stream's */
   int rate_index;     /* sampling_frequency_index of the stream */
   int frame_size;     /* samples per block in the output: frame_length, or twice it while SBR is decoded */
-  int frame_length;   /* 1024 or 960 samples per raw data block of the core */
+  int frame_length;   /* 1024 or 960 samples per raw data block of the core; 512 or
+                         480 for the low-delay object types */
+  int aot;            /* object type of the stream (AacObjectType), 0 before any */
+  int eld_downscale;  /* AAC-ELD downscaled playout factor: 1, 2 or 4 */
+  int blocks_decoded; /* raw data blocks decoded or concealed since creation or reset */
+  AacMdct mdct_eld;   /* AAC-ELD: the transform of the (downscaled) output frame */
   AacLayout layout;   /* element to channel assignment */
   int layout_source;  /* 0 none yet, 1 channel configuration, 2 PCE, 3 taken from the elements */
   int elem_base[AAC_MAX_ELEMENTS]; /* first channel of each layout element in ch[] */
@@ -153,10 +160,30 @@ void aac_decoder_note_lost_block(AacDecoderState* s);
  * index without tables. */
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index);
 
-/* Selects the frame length (1024 or 960 samples per raw data block),
- * resetting the filterbank state when it changes; returns
- * AAC_ERR_INVALID_ARG for any other length. */
+/* Selects the frame length (1024 or 960 samples per raw data block; 512
+ * or 480 for the low-delay object types), resetting the filterbank state
+ * when it changes; returns AAC_ERR_INVALID_ARG for any other length. */
 int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length);
+
+/* Selects the object type whose syntax and filterbank the following
+ * blocks use (AAC_AOT_LC, AAC_AOT_ER_LC, AAC_AOT_ER_LD or AAC_AOT_ER_ELD),
+ * resetting the filterbank state when it changes.  Leaving a low-delay
+ * type returns the frame length to 1024. */
+int aac_decoder_set_object_type(AacDecoderState* s, int aot);
+
+/* AAC-ELD downscaled playout factor (1, 2 or 4); takes effect for ELD
+ * streams only. */
+void aac_decoder_set_eld_downscale_internal(AacDecoderState* s, int factor);
+
+/* Whether the object type uses the error resilient syntax
+ * (er_raw_data_block). */
+static inline int aac_aot_is_er(int aot) {
+  return (aot >= AAC_AOT_ER_LC && aot <= 27) || aot == AAC_AOT_ER_ELD;
+}
+
+/* Sample rate of the output: the core rate, doubled while SBR is decoded
+ * and divided by the downscale factor of an AAC-ELD stream. */
+int aac_decoder_output_rate(const AacDecoderState* s);
 
 /* Selects the layout of a channel configuration (1..7, 11, 12), resetting
  * state when it differs from the current one; 0 keeps a PCE-defined or

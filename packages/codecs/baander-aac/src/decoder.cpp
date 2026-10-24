@@ -26,10 +26,21 @@ int lcg_random(unsigned* state) {
 /* ── ics_info ──────────────────────────────────────────────────── */
 
 int decode_ics_info(const AacDecoderState* s, AacBitReader* r, AacIcsInfo* ics) {
+  if (s->aot == AAC_AOT_ER_ELD) {
+    /* AAC-ELD: one long window of the low-delay filterbank, only max_sfb
+     * is sent. */
+    ics->window_shape = 0;
+    ics->max_sfb = (int)aac_bitreader_read(r, 6);
+    aac_ics_layout(ics, s->rate_index, s->frame_length, AAC_WIN_ONLY_LONG, 0);
+    return ics->max_sfb > ics->num_swb || r->overread ? AAC_ERR_DECODE : 0;
+  }
   if (aac_bitreader_read(r, 1)) { /* ics_reserved_bit */
     return AAC_ERR_DECODE;
   }
   const int seq = (int)aac_bitreader_read(r, 2);
+  if (s->aot == AAC_AOT_ER_LD && seq != AAC_WIN_ONLY_LONG) {
+    return AAC_ERR_DECODE; /* AAC-LD codes every frame in one long window */
+  }
   ics->window_shape = (int)aac_bitreader_read(r, 1);
   if (seq == AAC_WIN_EIGHT_SHORT) {
     ics->max_sfb = (int)aac_bitreader_read(r, 4);
@@ -213,8 +224,12 @@ int decode_spectral_data(AacBitReader* r, AacChannelStream* cs) {
 }
 
 /* individual_channel_stream() (Table 4.50).  With common_window the
- * ics_info is already in cs->ics. */
+ * ics_info is already in cs->ics.  The error resilient object types send
+ * tns_data() after the gain control flag, and AAC-ELD has neither pulse
+ * nor gain control data. */
 int decode_ics(AacDecoderState* s, AacBitReader* r, AacChannelStream* cs, int common_window) {
+  const bool er = aac_aot_is_er(s->aot);
+  const bool eld = s->aot == AAC_AOT_ER_ELD;
   const int global_gain = (int)aac_bitreader_read(r, 8);
   int ret = 0;
   if (!common_window && (ret = decode_ics_info(s, r, &cs->ics)) != 0) {
@@ -227,7 +242,7 @@ int decode_ics(AacDecoderState* s, AacBitReader* r, AacChannelStream* cs, int co
     return ret;
   }
   PulseData pulse = {};
-  const int pulse_present = (int)aac_bitreader_read(r, 1);
+  const int pulse_present = eld ? 0 : (int)aac_bitreader_read(r, 1);
   if (pulse_present) {
     if (cs->ics.num_windows == 8) {
       return AAC_ERR_DECODE; /* pulse data is only allowed in long windows */
@@ -237,11 +252,14 @@ int decode_ics(AacDecoderState* s, AacBitReader* r, AacChannelStream* cs, int co
     }
   }
   cs->tns_present = (int)aac_bitreader_read(r, 1);
-  if (cs->tns_present && (ret = decode_tns_data(r, &cs->ics, &cs->tns)) != 0) {
+  if (!er && cs->tns_present && (ret = decode_tns_data(r, &cs->ics, &cs->tns)) != 0) {
     return ret;
   }
-  if (aac_bitreader_read(r, 1)) {
+  if (!eld && aac_bitreader_read(r, 1)) {
     return AAC_ERR_UNSUPPORTED; /* gain_control_data: AAC SSR only */
+  }
+  if (er && cs->tns_present && (ret = decode_tns_data(r, &cs->ics, &cs->tns)) != 0) {
+    return ret;
   }
   if ((ret = decode_spectral_data(r, cs)) != 0) {
     return ret;
@@ -384,7 +402,24 @@ void apply_tns(AacChannelStream* cs) {
 /* The window of a frame spans two blocks of `fl` samples (1024 or 960);
  * the eight short windows of `sl` lines sit in the middle, starting at
  * (fl - sl) / 2 (448 or 420). */
+/* Samples per channel the core filterbank produces for one block: the
+ * frame length, divided by the downscale factor of an AAC-ELD stream. */
+int core_output_length(const AacDecoderState* s) {
+  return s->aot == AAC_AOT_ER_ELD ? s->frame_length / s->eld_downscale : s->frame_length;
+}
+
+/* AAC-ELD: the low-delay synthesis of the (downscaled) frame. */
+void eld_synthesis(AacDecoderState* s, AacDecoderChannel* ch) {
+  const int m = core_output_length(s);
+  aac_eld_synthesis(&s->mdct_eld, aac_eld_synthesis_window(s->frame_length, s->eld_downscale), m,
+                    ch->cs.coef, ch->eld_overlap, ch->output, kOutputScale);
+}
+
 void imdct_and_window(AacDecoderState* s, AacDecoderChannel* ch) {
+  if (s->aot == AAC_AOT_ER_ELD) {
+    eld_synthesis(s, ch);
+    return;
+  }
   const AacIcsInfo* ics = &ch->cs.ics;
   const int seq = ics->window_sequence;
   const int fl = s->frame_length;
@@ -512,7 +547,8 @@ int decode_cpe(AacDecoderState* s, AacBitReader* r, AacDecoderChannel* left,
   AacChannelStream* l = &left->cs;
   AacChannelStream* rc = &right->cs;
   MsMask ms = {};
-  const int common_window = (int)aac_bitreader_read(r, 1);
+  /* AAC-ELD channel pairs always share one ics_info. */
+  const int common_window = s->aot == AAC_AOT_ER_ELD ? 1 : (int)aac_bitreader_read(r, 1);
   int ret = 0;
   if (common_window) {
     if ((ret = decode_ics_info(s, r, &l->ics)) != 0) {
@@ -822,6 +858,8 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   s->stream_channels = 0;
   s->frame_length = AAC_FRAME_SIZE_LONG;
   s->frame_size = s->frame_length;
+  s->aot = 0;
+  s->eld_downscale = 1;
   s->dsp = dsp;
   s->rate_index = -1;
   for (int i = 0; i < AAC_NUM_SAMPLE_RATES; i++) {
@@ -865,6 +903,7 @@ void aac_decoder_state_destroy(AacDecoderState* s) {
 void aac_decoder_reset_state(AacDecoderState* s) {
   for (int c = 0; c < AAC_MAX_CHANNELS; c++) {
     memset(s->ch[c].overlap, 0, sizeof(s->ch[c].overlap));
+    memset(s->ch[c].eld_overlap, 0, sizeof(s->ch[c].eld_overlap));
     memset(s->ch[c].output, 0, sizeof(s->ch[c].output));
     s->ch[c].prev_window_shape = 0;
     aac_conceal_reset(&s->ch[c].conceal);
@@ -874,13 +913,18 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   s->conceal_random = kRandomSeed;
   for (int k = 0; k < AAC_MAX_CCE; k++) {
     memset(s->cce[k].ch.overlap, 0, sizeof(s->cce[k].ch.overlap));
+    memset(s->cce[k].ch.eld_overlap, 0, sizeof(s->cce[k].ch.eld_overlap));
     s->cce[k].ch.prev_window_shape = 0;
     s->cce[k].present = 0;
   }
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
   s->ps_output = 0;
-  s->frame_size = s->frame_length;
+  s->blocks_decoded = 0;
+  if (s->aot == AAC_AOT_ER_ELD) {
+    aac_mdct_init(&s->mdct_eld, 2 * core_output_length(s));
+  }
+  s->frame_size = core_output_length(s);
   if (s->limiter_ready) {
     aac_limiter_reset(&s->limiter);
   }
@@ -892,7 +936,8 @@ void aac_decoder_reset_state(AacDecoderState* s) {
 }
 
 int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length) {
-  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
+  if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960 &&
+      !aac_is_low_delay_frame(frame_length)) {
     return AAC_ERR_INVALID_ARG;
   }
   if (frame_length == s->frame_length) {
@@ -903,6 +948,32 @@ int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length) 
   aac_mdct_init(&s->mdct_short, 2 * aac_short_length(frame_length));
   aac_decoder_reset_state(s);
   return 0;
+}
+
+int aac_decoder_set_object_type(AacDecoderState* s, int aot) {
+  if (aot == s->aot) {
+    return 0;
+  }
+  const bool low_delay = aot == AAC_AOT_ER_LD || aot == AAC_AOT_ER_ELD;
+  s->aot = aot;
+  if (!low_delay && aac_is_low_delay_frame(s->frame_length)) {
+    return aac_decoder_set_frame_length_internal(s, AAC_FRAME_SIZE_LONG);
+  }
+  aac_decoder_reset_state(s);
+  return 0;
+}
+
+void aac_decoder_set_eld_downscale_internal(AacDecoderState* s, int factor) {
+  if (factor == s->eld_downscale) {
+    return;
+  }
+  s->eld_downscale = factor;
+  aac_decoder_reset_state(s);
+}
+
+int aac_decoder_output_rate(const AacDecoderState* s) {
+  const int core = s->aot == AAC_AOT_ER_ELD ? s->sample_rate / s->eld_downscale : s->sample_rate;
+  return s->sbr_mode ? 2 * core : core;
 }
 
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index) {
@@ -1176,10 +1247,11 @@ void filterbank(AacDecoderState* s, AacDecoderChannel* ch, int slot) {
   }
   AacDecoderChannel* alt = &s->recover[slot];
   memcpy(alt->overlap, ch->overlap, sizeof(alt->overlap));
+  memcpy(alt->eld_overlap, ch->eld_overlap, sizeof(alt->eld_overlap));
   alt->prev_window_shape = ch->prev_window_shape;
   imdct_and_window(s, alt);
   imdct_and_window(s, ch);
-  const int fl = s->frame_length;
+  const int fl = core_output_length(s);
   for (int i = 0; i < fl; i++) {
     const float w = ((float)i + 0.5f) / (float)fl;
     ch->output[i] = alt->output[i] + (ch->output[i] - alt->output[i]) * w;
@@ -1212,7 +1284,8 @@ void apply_drc(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) 
  * previous frame's envelope instead of dropping to upsampling. */
 void sbr_stage(AacDecoderState* s, bool conceal) {
   const AacLayout* l = &s->layout;
-  s->frame_size = s->sbr_mode ? 2 * s->frame_length : s->frame_length;
+  const int core = core_output_length(s);
+  s->frame_size = s->sbr_mode ? 2 * core : core;
   if (!s->sbr_mode) {
     return;
   }
@@ -1234,6 +1307,35 @@ void sbr_stage(AacDecoderState* s, bool conceal) {
     }
     aac_sbr_apply(sbr, l->elems[i].type, chans[0].output, right);
   }
+}
+
+/* er_raw_data_block() (ISO/IEC 14496-3 Table 4.4 and 1.6.2.2): the
+ * channel elements of the channel configuration in a fixed order, without
+ * element ids and without END; AAC-ELD elements carry no
+ * element_instance_tag either.  The layout of the configuration lists its
+ * elements in that order (1: SCE; 2: CPE; 3: SCE CPE; 4: SCE CPE SCE; 5:
+ * SCE CPE CPE; 6: SCE CPE CPE LFE; 7: SCE CPE CPE CPE LFE). */
+int decode_er_elements(AacDecoderState* s, AacBitReader* r) {
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    if (s->aot != AAC_AOT_ER_ELD) {
+      aac_bitreader_read(r, 4); /* element_instance_tag */
+    }
+    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+    const int ret = l->elems[i].type == AAC_ELEM_CPE ? decode_cpe(s, r, &chans[0], &chans[1])
+                                                     : decode_sce(s, r, &chans[0]);
+    if (ret) {
+      return ret;
+    }
+    if (r->overread) {
+      return AAC_ERR_DECODE;
+    }
+    s->elem_present[i] = 1;
+  }
+  /* AAC-ELD with LD-SBR: the ld_sbr payload of every channel element
+   * follows here, after the last channel element (streams that signal
+   * LD-SBR are refused when their configuration is applied). */
+  return 0;
 }
 
 }  // namespace
@@ -1260,7 +1362,25 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   aac_drc_frame_begin(&s->drc);
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
   bool damaged = false;
-  for (;;) {
+  if (s->aot == 0) {
+    s->aot = AAC_AOT_LC; /* a stream without configuration is AAC-LC */
+  }
+  const bool er = aac_aot_is_er(s->aot);
+  if (er) {
+    if (s->layout_source != 1) {
+      return AAC_ERR_STATE; /* the configuration names the elements */
+    }
+    p.sniffing = false;
+    const int ret = decode_er_elements(s, r);
+    if (ret) {
+      if (!conceal) {
+        aac_decoder_note_lost_block(s);
+        return ret;
+      }
+      damaged = true;
+    }
+  }
+  while (!er) {
     const int elem = (int)aac_bitreader_read(r, 3);
     int ret = r->overread ? AAC_ERR_DECODE : 0;
     if (ret == 0 && elem == AAC_ELEM_END) {
@@ -1358,6 +1478,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   }
   sbr_stage(s, conceal);
   s->stream_channels = l->num_channels;
+  s->blocks_decoded++;
   return l->num_channels;
 }
 
@@ -1389,6 +1510,7 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
   sbr_stage(s, true);
   s->last_concealed = 1;
   s->concealed_frames++;
+  s->blocks_decoded++;
   s->stream_channels = l->num_channels;
   return l->num_channels;
 }
