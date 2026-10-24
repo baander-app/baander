@@ -1,7 +1,7 @@
 ---
 title: Keep completed movies stopped and replay from the source beginning
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -230,3 +230,30 @@ separately; do not accept arbitrary later generations. Keep the one logical repl
 seek assertion, receipt ownership, pending-intent fences, native Play settlement
 and all time budgets. Review this fixture correction before implementation and
 repeat both full browser lifecycles against the unchanged verified worker image.
+
+## Delivered verification checkpoint
+
+The completion latch, source-zero replay, signed composition timestamps and
+receipt-based browser observations are implemented and independently reviewed.
+All four frontend suites passed: 225 tests, including 210 hook tests. Typechecking,
+production build and asset verification passed; lint reported no errors and eight
+existing warnings outside the changed files. The affected backend suites passed
+29 tests with 11,437 assertions in the CI image. PHPStan reported no errors;
+Deptrac reported no violations, warnings or errors, with 484 existing baseline
+entries skipped. Browser and runner syntax checks passed.
+
+Chromium 148.0.7778.96 and Firefox 150.0.2 each passed all eight production lifecycle
+phases. Their full runs took 574.686 and 575.887 seconds; the completion scenarios
+took 41.921 and 41.959 seconds within the unchanged 60-second bound. Both observed
+native EOF at normal speed, held the finished attachment through a dropped ending
+pause and actual capability expiry, then acknowledged replay at generation 17 and
+decoded the fresh worker execution at generation 18 from source zero. Both runs
+verified cleanup. The worker image uses application revision `180f2e31`; source
+parity was checked against final browser-fixture revision `460e67c4`.
+
+The acceptance summaries are retained under
+`var/test-runs/movie-completion-replay-chromium-qualified` and
+`var/test-runs/movie-completion-replay-firefox`; gate results, failed-run receipts
+and native diagnostics are indexed in the corresponding ROADMAP.md entry.
+Safari/native HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH
+EOF and the separate native pressure observer remain outside this checkpoint.
