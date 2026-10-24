@@ -21,6 +21,12 @@ using AacFft = struct AacFft_ {
   int p; /* power-of-two factor, n = m * p */
   float tw_re[AAC_FFT_MAX]; /* exp(-2 pi i k / n) for k < n */
   float tw_im[AAC_FFT_MAX];
+  /* The twiddles of each radix-2 stage laid out contiguously: the stage
+   * with `half` butterflies per block starts at index half - 1 and holds
+   * tw[j * m * p / (2 half)] for j < half (the same values as above, so
+   * the result does not depend on which table a kernel reads). */
+  float stage_re[AAC_FFT_MAX];
+  float stage_im[AAC_FFT_MAX];
   short bitrev[AAC_FFT_MAX];
 };
 

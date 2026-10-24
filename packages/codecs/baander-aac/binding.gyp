@@ -49,13 +49,13 @@
         "BAAC_AAC_HAVE_ENCODER",
         "BAAC_AAC_HAVE_DECODER"
       ],
-      "cflags_cc": ["-std=c++17", "-O3", "-fvisibility=hidden"],
+      "cflags_cc": ["-std=c++17", "-O3", "-fvisibility=hidden", "-ffp-contract=off"],
       "cflags_cc!": ["-fno-exceptions", "-fno-rtti"],
       "xcode_settings": {
         "CLANG_CXX_LANGUAGE_STANDARD": "c++17",
         "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
         "MACOSX_DEPLOYMENT_TARGET": "11.0",
-        "OTHER_CFLAGS": ["-O3"]
+        "OTHER_CFLAGS": ["-O3", "-ffp-contract=off"]
       },
       "msvs_settings": {
         "VCCLCompilerTool": {

@@ -284,6 +284,29 @@ static const uint8_t* const huff_len_ptrs[AAC_NUM_CODEBOOKS + 1] = {
     huff6_len, huff7_len, huff8_len, huff9_len, huff10_len, huff11_len};
 const uint32_t* aac_huff_code[AAC_NUM_CODEBOOKS + 1];
 const uint8_t* aac_huff_len[AAC_NUM_CODEBOOKS + 1];
+static uint8_t huff_cost_storage[AAC_NUM_CODEBOOKS + 1][289];
+const uint8_t* aac_huff_cost[AAC_NUM_CODEBOOKS + 1];
+
+/* Fills the cost table of one book: the codeword length, plus one sign bit
+ * per nonzero magnitude for the unsigned books. */
+static void init_huff_cost(int cb) {
+  const AacCodebookInfo* info = &aac_codebook_info[cb];
+  const int mod = info->is_unsigned ? info->max_val + 1 : 2 * info->max_val + 1;
+  for (int idx = 0; idx < aac_huff_count[cb]; idx++) {
+    int cost = aac_huff_len[cb][idx];
+    if (info->is_unsigned) {
+      int t = idx;
+      for (int k = 0; k < info->dim; k++) {
+        if (t % mod != 0) {
+          cost++;
+        }
+        t /= mod;
+      }
+    }
+    huff_cost_storage[cb][idx] = (uint8_t)cost;
+  }
+  aac_huff_cost[cb] = huff_cost_storage[cb];
+}
 
 /* Window Functions */
 void aac_sine_window(float* out, int n) {
@@ -1029,6 +1052,7 @@ void aac_tables_init(void) {
   for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
     aac_huff_code[cb] = huff_code_ptrs[cb];
     aac_huff_len[cb] = huff_len_ptrs[cb];
+    init_huff_cost(cb);
   }
   /* Rising halves of the long and short windows of both frame lengths;
    * index 0 is sine, 1 KBD. */

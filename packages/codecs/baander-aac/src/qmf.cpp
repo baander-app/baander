@@ -3,10 +3,14 @@
 #include <cmath>
 #include <cstring>
 
-/* Complex QMF banks (ISO/IEC 14496-3 4.6.18.4 and 4.6.18.8, 4.B.18.2) as
- * direct sums over the modulation tables: a slot costs bands * 2 * bands
- * multiplications per direction, which is small next to the rest of the
- * decoder.
+#include "fft.h"
+
+/* Complex QMF banks (ISO/IEC 14496-3 4.6.18.4 and 4.6.18.8, 4.B.18.2).
+ * The decoder's banks (32-band analysis, 64-band synthesis) run their
+ * modulation through a complex FFT with a twiddle before and after; the
+ * encoder's banks (64-band analysis, 32-band synthesis) keep the direct
+ * sums over the modulation tables, so that the encoder's output does not
+ * depend on the transform's rounding.
  *
  * Analysis with B bands: the window of 10 B taps (the prototype, or every
  * second tap for 32 bands) weights the newest 10 B input samples, the
@@ -22,15 +26,31 @@
  * c = 127.5 for the downsampled 32-band bank; the newest block of v is
  * windowed together with alternating halves of the nine older ones, and
  * the ten windowed blocks are summed to B output samples.  Both
- * conventions were pinned against FFmpeg's and FAAD2's filterbanks. */
+ * conventions were pinned against FFmpeg's and FAAD2's filterbanks.
+ *
+ * FFT form of the decoder's banks.  Analysis: with f = pi / 64,
+ *   (k + 1/2)(2 n - 1/2) = 2 n k + (n - 1/4) - k / 2,
+ * so W(k) = 2 exp(-i f k / 2) sum_n [u(n) exp(i f (n - 1/4))] exp(2 pi i
+ * n k / 64): a real-to-complex twiddle, a 64-point transform and a
+ * twiddle of the 32 wanted outputs.  Synthesis: with t = pi / 128,
+ *   (k + 1/2)(2 n - 255) = 2 n k + (n - 127.5) - 255 k,
+ * so v(n) = Re{exp(i t (n - 127.5)) sum_k [X(k) exp(-i t 255 k)] exp(2 pi
+ * i n k / 128)} / 64 over the 64 bands zero-padded to 128 points.  Both
+ * sums carry the positive exponent, which the forward transform gives as
+ * the conjugate of the transform of the conjugated input. */
 
 namespace {
 
-
-float g_ana_cos32[32][64], g_ana_sin32[32][64];
 float g_ana_cos64[64][128], g_ana_sin64[64][128];
-float g_syn_cos64[128][64], g_syn_sin64[128][64];
 float g_syn_cos32[64][32], g_syn_sin32[64][32];
+/* The 32-band banks read every second prototype tap. */
+float g_window32[320];
+/* Decoder banks: transforms and twiddles. */
+AacFft g_fft64, g_fft128;
+float g_ana32_pre_re[64], g_ana32_pre_im[64];
+float g_ana32_post_re[32], g_ana32_post_im[32];
+float g_syn64_pre_re[64], g_syn64_pre_im[64];
+float g_syn64_post_re[128], g_syn64_post_im[128];
 bool g_tables_ready = false;
 
 }  // namespace
@@ -39,25 +59,11 @@ void aac_qmf_tables_init(void) {
   if (g_tables_ready) {
     return;
   }
-  for (int k = 0; k < 32; k++) {
-    for (int n = 0; n < 64; n++) {
-      const double a = M_PI / 64.0 * (k + 0.5) * (2.0 * n - 0.5);
-      g_ana_cos32[k][n] = (float)(2.0 * cos(a));
-      g_ana_sin32[k][n] = (float)(2.0 * sin(a));
-    }
-  }
   for (int k = 0; k < 64; k++) {
     for (int n = 0; n < 128; n++) {
       const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 1.0);
       g_ana_cos64[k][n] = (float)cos(a);
       g_ana_sin64[k][n] = (float)sin(a);
-    }
-  }
-  for (int n = 0; n < 128; n++) {
-    for (int k = 0; k < 64; k++) {
-      const double a = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 255.0);
-      g_syn_cos64[n][k] = (float)(cos(a) / 64.0);
-      g_syn_sin64[n][k] = (float)(sin(a) / 64.0);
     }
   }
   for (int n = 0; n < 64; n++) {
@@ -66,6 +72,31 @@ void aac_qmf_tables_init(void) {
       g_syn_cos32[n][k] = (float)(cos(a) / 64.0);
       g_syn_sin32[n][k] = (float)(sin(a) / 64.0);
     }
+  }
+  for (int i = 0; i < 320; i++) {
+    g_window32[i] = aac_sbr_qmf_window[2 * i];
+  }
+  aac_fft_init(&g_fft64, 64);
+  aac_fft_init(&g_fft128, 128);
+  for (int n = 0; n < 64; n++) {
+    const double a = M_PI / 64.0 * (n - 0.25);
+    g_ana32_pre_re[n] = (float)cos(a);
+    g_ana32_pre_im[n] = (float)sin(a);
+  }
+  for (int k = 0; k < 32; k++) {
+    const double a = -M_PI / 64.0 * k / 2.0;
+    g_ana32_post_re[k] = (float)(2.0 * cos(a));
+    g_ana32_post_im[k] = (float)(2.0 * sin(a));
+  }
+  for (int k = 0; k < 64; k++) {
+    const double a = -M_PI / 128.0 * 255.0 * k;
+    g_syn64_pre_re[k] = (float)cos(a);
+    g_syn64_pre_im[k] = (float)sin(a);
+  }
+  for (int n = 0; n < 128; n++) {
+    const double a = M_PI / 128.0 * (n - 127.5);
+    g_syn64_post_re[n] = (float)(cos(a) / 64.0);
+    g_syn64_post_im[n] = (float)(sin(a) / 64.0);
   }
   g_tables_ready = true;
 }
@@ -87,27 +118,30 @@ void aac_qmf_analyze(AacQmfAnalysis* a, const float* in, float (*W)[2]) {
   for (int n = 0; n < B; n++) {
     x[n] = in[B - 1 - n];
   }
+  const float* window = step == 2 ? g_window32 : aac_sbr_qmf_window;
   float u[128];
   for (int n = 0; n < 2 * B; n++) {
     float sum = 0.0f;
     for (int j = 0; j < 5; j++) {
       const int idx = n + 2 * B * j;
-      sum += x[idx] * aac_sbr_qmf_window[idx * step];
+      sum += x[idx] * window[idx];
     }
     u[n] = sum;
   }
   if (B == 32) {
+    /* The conjugate of the twiddled input through the forward transform
+     * gives the conjugate of the positive-exponent sum. */
+    float re[64], im[64];
+    for (int n = 0; n < 64; n++) {
+      re[n] = u[n] * g_ana32_pre_re[n];
+      im[n] = -(u[n] * g_ana32_pre_im[n]);
+    }
+    aac_fft_forward(&g_fft64, re, im);
     for (int k = 0; k < 32; k++) {
-      float re = 0.0f;
-      float im = 0.0f;
-      const float* c = g_ana_cos32[k];
-      const float* s = g_ana_sin32[k];
-      for (int n = 0; n < 64; n++) {
-        re += u[n] * c[n];
-        im += u[n] * s[n];
-      }
-      W[k][0] = re;
-      W[k][1] = im;
+      const float sr = re[k];
+      const float si = -im[k];
+      W[k][0] = g_ana32_post_re[k] * sr - g_ana32_post_im[k] * si;
+      W[k][1] = g_ana32_post_re[k] * si + g_ana32_post_im[k] * sr;
     }
   } else {
     for (int k = 0; k < 64; k++) {
@@ -148,14 +182,20 @@ void aac_qmf_synthesize(AacQmfSynthesis* s, const float (*X)[2], float* out) {
   }
   float* v = s->v + s->off;
   if (B == 64) {
+    /* Twiddle the 64 bands, zero-pad to 128 points, transform the
+     * conjugate and take the real part of the twiddled conjugate. */
+    float re[128], im[128];
+    for (int k = 0; k < 64; k++) {
+      const float yr = X[k][0] * g_syn64_pre_re[k] - X[k][1] * g_syn64_pre_im[k];
+      const float yi = X[k][0] * g_syn64_pre_im[k] + X[k][1] * g_syn64_pre_re[k];
+      re[k] = yr;
+      im[k] = -yi;
+    }
+    memset(re + 64, 0, 64 * sizeof(float));
+    memset(im + 64, 0, 64 * sizeof(float));
+    aac_fft_forward(&g_fft128, re, im);
     for (int n = 0; n < 128; n++) {
-      const float* c = g_syn_cos64[n];
-      const float* sn = g_syn_sin64[n];
-      float acc = 0.0f;
-      for (int k = 0; k < 64; k++) {
-        acc += X[k][0] * c[k] - X[k][1] * sn[k];
-      }
-      v[n] = acc;
+      v[n] = g_syn64_post_re[n] * re[n] - g_syn64_post_im[n] * (-im[n]);
     }
   } else {
     for (int n = 0; n < 64; n++) {
@@ -170,13 +210,13 @@ void aac_qmf_synthesize(AacQmfSynthesis* s, const float (*X)[2], float* out) {
   }
   /* g takes the first half of even blocks and the second half of odd
    * ones; w = g * c; the output sums the ten windowed segments. */
+  const float* window = step == 2 ? g_window32 : aac_sbr_qmf_window;
   for (int k = 0; k < B; k++) {
     float acc = 0.0f;
     for (int j = 0; j < 5; j++) {
       const int g0 = 2 * block * j + k;         /* g(2 B (2 j) + k) */
       const int g1 = 2 * block * j + 3 * B + k; /* g(2 B (2 j + 1) + k) */
-      acc += v[g0] * aac_sbr_qmf_window[(2 * j * B + k) * step] +
-             v[g1] * aac_sbr_qmf_window[((2 * j + 1) * B + k) * step];
+      acc += v[g0] * window[2 * j * B + k] + v[g1] * window[(2 * j + 1) * B + k];
     }
     out[k] = acc;
   }

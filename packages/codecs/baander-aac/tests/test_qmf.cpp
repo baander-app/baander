@@ -113,8 +113,104 @@ static void test_analysis_scaling() {
   CHECK(fabs(ratio) < 0.5, "64-band and 32-band low-band energies differ by %.2f dB", ratio);
 }
 
+/* The decoder's banks run their modulation through an FFT.  Against the
+ * direct sums of the standard's formulas, computed here in double
+ * precision with the same windowing, they agree to float precision. */
+static void test_fft_form_matches_direct_sums() {
+  aac_qmf_tables_init();
+  unsigned seed = 99u;
+  auto rnd = [&seed]() {
+    seed = seed * 1664525u + 1013904223u;
+    return (float)(seed >> 8) / 8388608.0f - 1.0f;
+  };
+  /* 32-band analysis: history newest first, u(n) folds the ten windowed
+   * taps, W(k) = 2 sum_n u(n) exp(i pi / 64 (k + 1/2)(2 n - 1/2)). */
+  {
+    AacQmfAnalysis a;
+    aac_qmf_analysis_init(&a, 32);
+    std::vector<double> hist(320, 0.0);
+    double err = 0.0, peak = 1e-30;
+    for (int slot = 0; slot < 40; slot++) {
+      float in[32];
+      for (float& v : in) {
+        v = 20000.0f * rnd();
+      }
+      for (int i = 319; i >= 32; i--) {
+        hist[i] = hist[i - 32];
+      }
+      for (int n = 0; n < 32; n++) {
+        hist[n] = in[31 - n];
+      }
+      float W[64][2];
+      aac_qmf_analyze(&a, in, W);
+      double u[64];
+      for (int n = 0; n < 64; n++) {
+        u[n] = 0.0;
+        for (int j = 0; j < 5; j++) {
+          u[n] += hist[n + 64 * j] * aac_sbr_qmf_window[2 * (n + 64 * j)];
+        }
+      }
+      for (int k = 0; k < 32; k++) {
+        double re = 0.0, im = 0.0;
+        for (int n = 0; n < 64; n++) {
+          const double ang = M_PI / 64.0 * (k + 0.5) * (2.0 * n - 0.5);
+          re += u[n] * cos(ang);
+          im += u[n] * sin(ang);
+        }
+        re *= 2.0;
+        im *= 2.0;
+        peak = std::max(peak, std::max(fabs(re), fabs(im)));
+        err = std::max(err, std::max(fabs(re - W[k][0]), fabs(im - W[k][1])));
+      }
+    }
+    printf("QMF 32-band analysis, FFT form against direct sums: %.3g relative\n", err / peak);
+    CHECK(err / peak < 1e-5, "32-band analysis FFT form: %.3g relative", err / peak);
+  }
+  /* 64-band synthesis: v(n) = 1/64 Re sum_k X(k) exp(i pi / 128 (k + 1/2)
+   * (2 n - 255)) for n < 128, the newest block in front of nine older
+   * ones, and out(k) sums the ten windowed segments. */
+  {
+    AacQmfSynthesis s;
+    aac_qmf_synthesis_init(&s, 64);
+    std::vector<double> v(1280, 0.0);
+    double err = 0.0, peak = 1e-30;
+    for (int slot = 0; slot < 40; slot++) {
+      float X[64][2];
+      for (auto& x : X) {
+        x[0] = 20000.0f * rnd();
+        x[1] = 20000.0f * rnd();
+      }
+      float out[64];
+      aac_qmf_synthesize(&s, X, out);
+      for (int i = 1279; i >= 128; i--) {
+        v[i] = v[i - 128];
+      }
+      for (int n = 0; n < 128; n++) {
+        double acc = 0.0;
+        for (int k = 0; k < 64; k++) {
+          const double ang = M_PI / 128.0 * (k + 0.5) * (2.0 * n - 255.0);
+          acc += X[k][0] * cos(ang) - X[k][1] * sin(ang);
+        }
+        v[n] = acc / 64.0;
+      }
+      for (int k = 0; k < 64; k++) {
+        double acc = 0.0;
+        for (int j = 0; j < 5; j++) {
+          acc += v[256 * j + k] * aac_sbr_qmf_window[128 * j + k] +
+                 v[256 * j + 192 + k] * aac_sbr_qmf_window[128 * j + 64 + k];
+        }
+        peak = std::max(peak, fabs(acc));
+        err = std::max(err, fabs(acc - out[k]));
+      }
+    }
+    printf("QMF 64-band synthesis, FFT form against direct sums: %.3g relative\n", err / peak);
+    CHECK(err / peak < 1e-5, "64-band synthesis FFT form: %.3g relative", err / peak);
+  }
+}
+
 int main() {
   test_reconstruction();
   test_analysis_scaling();
+  test_fft_form_matches_direct_sums();
   return test_summary("test_qmf");
 }

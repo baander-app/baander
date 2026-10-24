@@ -23,6 +23,13 @@ uint32_t aac_bitreader_peek(const AacBitReader* r, int n) {
   }
   const int byte = r->pos >> 3;
   const int shift = r->pos & 7;
+  /* Up to 25 bits come out of the next four bytes when they exist. */
+  if (n <= 25 && byte + 4 <= r->size) {
+    const uint8_t* p = r->data + byte;
+    const uint32_t w =
+        ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+    return (w << shift) >> (32 - n);
+  }
   uint64_t cache = 0;
   if (byte + 8 <= r->size) {
     for (int i = 0; i < 8; i++) {
@@ -109,14 +116,67 @@ int tree_decode(const HuffTree* t, AacBitReader* r) {
   return -1;
 }
 
+/* Fast path of the decoding: the next kLookupBits bits index a table whose
+ * entry names the leaf and the codeword length for every codeword of at
+ * most that length; an entry of zero means the codeword is longer and the
+ * tree walk takes over (such codewords are the rare ones). */
+constexpr int kLookupBits = 12;
+struct HuffLookup {
+  uint16_t entry[1 << kLookupBits]; /* (leaf index << 5) | length */
+};
+
+HuffLookup g_spec_lookup[AAC_NUM_CODEBOOKS + 1];
+HuffLookup g_sf_lookup;
+/* The values of every leaf of the spectral books: the magnitudes of an
+ * unsigned book, the signed values of a signed one. */
+int8_t g_spec_values[AAC_NUM_CODEBOOKS + 1][289][4];
+
+void lookup_build(HuffLookup* t, const uint32_t* codes_left_aligned, const uint32_t* codes_right,
+                  const uint8_t* lens, int count) {
+  memset(t->entry, 0, sizeof(t->entry));
+  for (int i = 0; i < count; i++) {
+    const int len = lens[i];
+    if (len > kLookupBits) {
+      continue;
+    }
+    const uint32_t code = codes_left_aligned ? codes_left_aligned[i] >> (32 - len) : codes_right[i];
+    const uint32_t base = code << (kLookupBits - len);
+    const uint32_t span = 1u << (kLookupBits - len);
+    for (uint32_t j = 0; j < span; j++) {
+      t->entry[base + j] = (uint16_t)((i << 5) | len);
+    }
+  }
+}
+
+int lookup_decode(const HuffLookup* t, const HuffTree* tree, AacBitReader* r) {
+  const uint16_t e = t->entry[aac_bitreader_peek(r, kLookupBits)];
+  if (e) {
+    aac_bitreader_skip(r, e & 31);
+    return e >> 5;
+  }
+  return tree_decode(tree, r);
+}
+
 struct TreeInit {
   TreeInit() {
     aac_tables_init();
     for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
       tree_build(&g_spec_trees[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
                  aac_huff_count[cb]);
+      lookup_build(&g_spec_lookup[cb], aac_huff_code[cb], nullptr, aac_huff_len[cb],
+                   aac_huff_count[cb]);
+      const AacCodebookInfo* info = &aac_codebook_info[cb];
+      const int mod = info->is_unsigned ? info->max_val + 1 : 2 * info->max_val + 1;
+      for (int idx = 0; idx < aac_huff_count[cb]; idx++) {
+        int t = idx;
+        for (int k = info->dim - 1; k >= 0; k--) {
+          g_spec_values[cb][idx][k] = (int8_t)(t % mod - (info->is_unsigned ? 0 : info->max_val));
+          t /= mod;
+        }
+      }
     }
     tree_build(&g_sf_tree, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
+    lookup_build(&g_sf_lookup, nullptr, aac_scalefactor_code, aac_scalefactor_bits, 121);
   }
 } g_tree_init;  // NOLINT(bugprone-throwing-static-initialization)
 }  // namespace
@@ -125,22 +185,30 @@ int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
   if (cb < 1 || cb > AAC_NUM_CODEBOOKS) {
     return AAC_ERR_INVALID_ARG;
   }
-  const int idx = tree_decode(&g_spec_trees[cb], r);
+  const int idx = lookup_decode(&g_spec_lookup[cb], &g_spec_trees[cb], r);
   if (idx < 0) {
     return AAC_ERR_DECODE;
   }
   const AacCodebookInfo* info = &aac_codebook_info[cb];
   const int dim = info->dim;
+  const int8_t* vals = g_spec_values[cb][idx];
+  int signs = 0;
+  for (int k = 0; k < dim; k++) {
+    out[k] = vals[k];
+    signs += vals[k] != 0;
+  }
   if (info->is_unsigned) {
-    const int mod = info->max_val + 1;
-    int t = idx;
-    for (int k = dim - 1; k >= 0; k--) {
-      out[k] = t % mod;
-      t /= mod;
-    }
-    for (int k = 0; k < dim; k++) {
-      if (out[k] != 0 && aac_bitreader_read(r, 1)) {
-        out[k] = -out[k];
+    /* One sign bit per nonzero magnitude, in coefficient order. */
+    if (signs) {
+      const uint32_t s = aac_bitreader_read(r, signs);
+      int bit = signs - 1;
+      for (int k = 0; k < dim; k++) {
+        if (out[k] != 0) {
+          if ((s >> bit) & 1u) {
+            out[k] = -out[k];
+          }
+          bit--;
+        }
       }
     }
     if (cb == AAC_CB_ESCAPE) {
@@ -157,20 +225,12 @@ int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
         }
       }
     }
-  } else {
-    const int mv = info->max_val;
-    const int mod = 2 * mv + 1;
-    int t = idx;
-    for (int k = dim - 1; k >= 0; k--) {
-      out[k] = (t % mod) - mv;
-      t /= mod;
-    }
   }
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
 int aac_bitreader_read_scalefactor(AacBitReader* r) {
-  const int idx = tree_decode(&g_sf_tree, r);
+  const int idx = lookup_decode(&g_sf_lookup, &g_sf_tree, r);
   if (idx < 0) {
     return AAC_SF_INVALID;
   }
@@ -188,17 +248,23 @@ void aac_bitwriter_init(AacBitWriter* w, uint8_t* d, int c) {
   memset(d, 0, c);
 }
 
-/* Fields wider than 32 bits are written with leading zero bits. */
+/* Fields wider than 32 bits are written with leading zero bits.  The bits
+ * go out a byte at a time; a write that runs out of buffer stops there and
+ * flags the overflow. */
 void aac_bitwriter_write(AacBitWriter* w, uint32_t v, int n) {
-  for (int i = n - 1; i >= 0; i--) {
+  while (n > 0) {
     if (w->byte_pos >= w->capacity) {
       w->overflow = 1;
       return;
     }
-    if (i < 32 && ((v >> i) & 1)) {
-      w->data[w->byte_pos] |= (uint8_t)(1 << (7 - w->bit_pos));
-    }
-    if (++w->bit_pos == 8) {
+    const int room = 8 - w->bit_pos;
+    const int take = n < room ? n : room;
+    const int low = n - take; /* the lowest bit of v that goes out now */
+    const uint32_t bits = low >= 32 ? 0u : (v >> low) & ((1u << take) - 1u);
+    w->data[w->byte_pos] |= (uint8_t)(bits << (room - take));
+    w->bit_pos += take;
+    n -= take;
+    if (w->bit_pos == 8) {
       w->bit_pos = 0;
       w->byte_pos++;
     }
@@ -234,34 +300,6 @@ static int huffman_index(int cb, const int* v) {
     }
   }
   return idx;
-}
-
-static int escape_bits(int mag) {
-  int n = 4;
-  while (mag >= (1 << (n + 1))) {
-    n++;
-  }
-  return (n - 4) + 1 + n;
-}
-
-int aac_huffman_bits(int cb, const int* v) {
-  const int idx = huffman_index(cb, v);
-  if (idx < 0) {
-    return 1 << 20;
-  }
-  const AacCodebookInfo* info = &aac_codebook_info[cb];
-  int bits = aac_huff_len[cb][idx];
-  if (info->is_unsigned) {
-    for (int k = 0; k < info->dim; k++) {
-      if (v[k] != 0) {
-        bits++;
-      }
-      if (cb == AAC_CB_ESCAPE && std::abs(v[k]) > 15) {
-        bits += escape_bits(std::abs(v[k]));
-      }
-    }
-  }
-  return bits;
 }
 
 int aac_bitwriter_write_huffman(AacBitWriter* w, int cb, const int* v) {

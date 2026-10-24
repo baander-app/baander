@@ -89,12 +89,24 @@ endif()
 
 # Per-file compile flags for SIMD sources — must compile with ISA enabled
 # regardless of build type (Debug/Release) for runtime dispatch to work.
+# Contraction is off in these files: the transform kernels must give the
+# same bits as the scalar ones, and a compiler that fuses a product and a
+# sum into one FMA instruction would change the rounding.  Kernels that
+# want a fused multiply-add ask for it with the intrinsic.
 if(HAS_AVX2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    set_source_files_properties(src/simd/avx2.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mfma -mbmi2")
+    set_source_files_properties(src/simd/avx2.cpp PROPERTIES
+        COMPILE_FLAGS "-mavx2 -mfma -mbmi2 -ffp-contract=off")
 endif()
 if(HAS_SSE2 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
-    set_source_files_properties(src/simd/sse2.cpp PROPERTIES COMPILE_FLAGS "-msse2")
+    set_source_files_properties(src/simd/sse2.cpp PROPERTIES COMPILE_FLAGS "-msse2 -ffp-contract=off")
 endif()
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|arm")
+    set_source_files_properties(src/simd/neon.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
+endif()
+# The scalar kernels the SIMD ones are compared against follow the same
+# rule (on x86-64 without FMA this changes nothing; on ARM it keeps the
+# scalar table in step with NEON).
+set_source_files_properties(src/dsp.cpp PROPERTIES COMPILE_FLAGS "-ffp-contract=off")
 
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)

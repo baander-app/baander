@@ -8,9 +8,35 @@
 
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 static std::atomic<int> g_cpu_flags{-1};
 static std::atomic<int> g_cpu_flags_override{-1};
+
+/* The BAAC_AAC_CPU environment variable caps the dispatch level for tests
+ * and comparisons: "scalar", "sse2", "avx2" or "neon".  Returns -1 when it
+ * is unset or unknown. */
+static int env_cpu_cap(void) {
+  const char* v = getenv("BAAC_AAC_CPU");
+  if (!v || !*v) {
+    return -1;
+  }
+  if (strcmp(v, "scalar") == 0) {
+    return AAC_CPU_FLAG_NONE;
+  }
+  if (strcmp(v, "sse2") == 0) {
+    return AAC_CPU_FLAG_SSE2;
+  }
+  if (strcmp(v, "avx2") == 0) {
+    return AAC_CPU_FLAG_SSE2 | AAC_CPU_FLAG_SSE41 | AAC_CPU_FLAG_AVX | AAC_CPU_FLAG_AVX2 |
+           AAC_CPU_FLAG_FMA3 | AAC_CPU_FLAG_BMI2;
+  }
+  if (strcmp(v, "neon") == 0) {
+    return AAC_CPU_FLAG_NEON;
+  }
+  return -1;
+}
 
 void aac_set_cpu_flags_override(int flags) {
   g_cpu_flags_override.store(flags, std::memory_order_release);
@@ -155,6 +181,13 @@ int aac_get_cpu_flags(void) {
 #else
   flags = 0;
 #endif
+
+  /* The environment can only take features away, never claim ones the
+   * processor lacks. */
+  const int cap = env_cpu_cap();
+  if (cap >= 0) {
+    flags &= cap;
+  }
 
   g_cpu_flags.store(flags, std::memory_order_release);
   return flags;

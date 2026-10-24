@@ -22,6 +22,8 @@ set(TEST_SOURCES
     test_sbr_ld.cpp
     test_lowdelay.cpp
     test_eld_sbr.cpp
+    test_dsp.cpp
+    test_allocation.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})
@@ -34,4 +36,20 @@ foreach(test_src ${TEST_SOURCES})
         target_link_libraries(${test_name} PRIVATE m)
     endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
+endforeach()
+
+# The transforms and filterbanks go through the DSP dispatch table; the
+# same suites run again with the table capped at the scalar and the SSE2
+# kernels (BAAC_AAC_CPU), so that every level this machine can run is
+# exercised end to end, not only in the kernel comparison of test_dsp.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")
+    set(BAAC_DISPATCH_LEVELS scalar sse2)
+else()
+    set(BAAC_DISPATCH_LEVELS scalar)
+endif()
+foreach(level ${BAAC_DISPATCH_LEVELS})
+    foreach(test_name test_mdct test_qmf test_roundtrip)
+        add_test(NAME ${test_name}_${level} COMMAND ${test_name})
+        set_tests_properties(${test_name}_${level} PROPERTIES ENVIRONMENT "BAAC_AAC_CPU=${level}")
+    endforeach()
 endforeach()

@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "aac_dsp.h"
+
 void aac_mdct_init(AacMdct* m, int n) {
   m->n = n;
   const int half = n / 2;
@@ -21,21 +23,11 @@ void aac_mdct_init(AacMdct* m, int n) {
  * via an n/4-point complex FFT.  in and out may not alias. */
 static void dct4(const AacMdct* m, const float* in, float* out) {
   const int half = m->n / 2;
-  const int quarter = m->n / 4;
+  const AacDSP* dsp = aac_dsp_global();
   float re[AAC_FFT_MAX], im[AAC_FFT_MAX];
-  for (int j = 0; j < quarter; j++) {
-    const float a = in[2 * j];
-    const float b = in[half - 1 - 2 * j];
-    re[j] = a * m->pre_re[j] - b * m->pre_im[j];
-    im[j] = a * m->pre_im[j] + b * m->pre_re[j];
-  }
+  dsp->mdct_pre_twiddle(re, im, in, m->pre_re, m->pre_im, half);
   aac_fft_forward(&m->fft, re, im);
-  for (int j = 0; j < quarter; j++) {
-    const float yr = re[j] * m->post_re[j] - im[j] * m->post_im[j];
-    const float yi = re[j] * m->post_im[j] + im[j] * m->post_re[j];
-    out[2 * j] = yr;
-    out[half - 1 - 2 * j] = -yi;
-  }
+  dsp->mdct_post_twiddle(out, re, im, m->post_re, m->post_im, half);
 }
 
 void aac_mdct_forward(const AacMdct* m, const float* in, float* out) {

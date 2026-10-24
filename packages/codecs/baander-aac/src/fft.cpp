@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include "aac_dsp.h"
+
 void aac_fft_init(AacFft* f, int n) {
   f->n = n;
   int p = 1;
@@ -26,13 +28,21 @@ void aac_fft_init(AacFft* f, int n) {
     f->tw_re[k] = (float)cos(a);
     f->tw_im[k] = (float)sin(a);
   }
+  /* The stage tables copy the n-point twiddles, so a stage reads the same
+   * values whichever table it takes them from. */
+  for (int half = 1; half < p; half <<= 1) {
+    const int stride = f->m * (p / (2 * half));
+    for (int j = 0; j < half; j++) {
+      f->stage_re[half - 1 + j] = f->tw_re[j * stride];
+      f->stage_im[half - 1 + j] = f->tw_im[j * stride];
+    }
+  }
 }
 
 namespace {
 
-/* Radix-2 transform of the p points at re[0..p) and im[0..p), whose
- * twiddles are every m-th entry of the n-point table. */
-void fft_pow2(const AacFft* f, float* re, float* im) {
+/* Radix-2 transform of the p points at re[0..p) and im[0..p). */
+void fft_pow2(const AacFft* f, const AacDSP* dsp, float* re, float* im) {
   const int n = f->p;
   for (int i = 0; i < n; i++) {
     int j = f->bitrev[i];
@@ -46,21 +56,7 @@ void fft_pow2(const AacFft* f, float* re, float* im) {
     }
   }
   for (int half = 1; half < n; half <<= 1) {
-    const int stride = f->m * (n / (2 * half));
-    for (int start = 0; start < n; start += 2 * half) {
-      for (int j = 0; j < half; j++) {
-        const float wr = f->tw_re[j * stride];
-        const float wi = f->tw_im[j * stride];
-        const int a = start + j;
-        const int b = a + half;
-        const float tr = re[b] * wr - im[b] * wi;
-        const float ti = re[b] * wi + im[b] * wr;
-        re[b] = re[a] - tr;
-        im[b] = im[a] - ti;
-        re[a] += tr;
-        im[a] += ti;
-      }
-    }
+    dsp->fft_radix2_stage(re, im, n, half, f->stage_re + half - 1, f->stage_im + half - 1);
   }
 }
 
@@ -69,8 +65,9 @@ void fft_pow2(const AacFft* f, float* re, float* im) {
 void aac_fft_forward(const AacFft* f, float* re, float* im) {
   const int m = f->m;
   const int p = f->p;
+  const AacDSP* dsp = aac_dsp_global();
   if (m == 1) {
-    fft_pow2(f, re, im);
+    fft_pow2(f, dsp, re, im);
     return;
   }
   /* Cooley-Tukey with n = m p: for each residue j2 modulo p an m-point
@@ -81,6 +78,10 @@ void aac_fft_forward(const AacFft* f, float* re, float* im) {
     for (int k1 = 0; k1 < m; k1++) {
       float sr = 0.0f;
       float si = 0.0f;
+      /* The twiddle index is computed here rather than read from a table:
+       * the sum must stay in this order for the encoder's output to be
+       * independent of the build, and the modulo keeps the compiler from
+       * splitting it into partial sums. */
       for (int j1 = 0; j1 < m; j1++) {
         const int t = (j1 * k1 % m) * p; /* exp(-2 pi i j1 k1 / m) */
         const float xr = re[p * j1 + j2];
@@ -99,7 +100,7 @@ void aac_fft_forward(const AacFft* f, float* re, float* im) {
       zr[j2] = yr[j2 * m + k1];
       zi[j2] = yi[j2 * m + k1];
     }
-    fft_pow2(f, zr, zi);
+    fft_pow2(f, dsp, zr, zi);
     for (int k2 = 0; k2 < p; k2++) {
       re[k1 + m * k2] = zr[k2];
       im[k1 + m * k2] = zi[k2];

@@ -83,6 +83,10 @@ extern const AacCodebookInfo aac_codebook_info[AAC_NUM_CODEBOOKS + 1];
 extern const int aac_huff_count[AAC_NUM_CODEBOOKS + 1];
 extern const uint32_t* aac_huff_code[AAC_NUM_CODEBOOKS + 1];
 extern const uint8_t* aac_huff_len[AAC_NUM_CODEBOOKS + 1];
+/* Codeword length plus the sign bits of the unsigned books, per index
+ * (the index fixes the magnitudes, so the sign bit count is known);
+ * escape words of book 11 are not included. */
+extern const uint8_t* aac_huff_cost[AAC_NUM_CODEBOOKS + 1];
 
 /* ISO 14496-3 scalefactor Huffman table (Table 4.47).  Index 60 codes a
  * zero DPCM difference; indices 0..120 represent differences -60..+60. */

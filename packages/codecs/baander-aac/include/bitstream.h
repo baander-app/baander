@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "aac.h"
+#include "aac_tables.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,13 +52,13 @@ int aac_bitwriter_overflow(const AacBitWriter* w);
  * escape sequences.  Returns 0, or AAC_ERR_INVALID_ARG when a value does not
  * fit the codebook (nothing is written then). */
 int aac_bitwriter_write_huffman(AacBitWriter* w, int codebook, const int* v);
-/* Bits aac_bitwriter_write_huffman would write, or a large number when the
- * values do not fit the codebook. */
-int aac_huffman_bits(int codebook, const int* v);
-void aac_bitwriter_write_scalefactor(AacBitWriter* w, int diff);
-void aac_bitwriter_byte_align(AacBitWriter* w);
-int aac_bitwriter_bits_written(const AacBitWriter* w);
-int aac_bitwriter_bytes_written(const AacBitWriter* w);
+/* Bits aac_bitwriter_write_huffman would write, or AAC_HUFF_NO_FIT when
+ * the values do not fit the codebook.  The encoder's rate loop counts the
+ * bits of every band for every applicable book many times per frame, so
+ * the function is inline and specialised per book: the codebook index is
+ * formed directly from the values, the sign bits come from the cost table
+ * and only the escape words of book 11 need a computation. */
+#define AAC_HUFF_NO_FIT (1 << 20)
 
 /* Codebook with escape-sequence support (ISO/IEC 14496-3 4.6.3.3): unsigned
  * book 11 codes magnitudes 0..16 plus per-coefficient sign bits; magnitude 16
@@ -68,6 +69,85 @@ int aac_bitwriter_bytes_written(const AacBitWriter* w);
 #define AAC_CB_NOISE 13
 #define AAC_CB_INTENSITY2 14
 #define AAC_CB_INTENSITY 15
+
+static inline int aac_huffman_abs_(int v) { return v < 0 ? -v : v; }
+
+/* Bits of the escape word of magnitude mag > 15: (n - 4) ones, a zero and
+ * n bits, with 2^n <= mag < 2^(n+1). */
+static inline int aac_huffman_escape_bits_(int mag) {
+  int n = 4;
+  while (mag >= (1 << (n + 1))) {
+    n++;
+  }
+  return 2 * n - 3;
+}
+
+static inline int aac_huffman_bits(int codebook, const int* v) {
+  switch (codebook) {
+    case 1:
+    case 2: {
+      const unsigned a = (unsigned)(v[0] + 1), b = (unsigned)(v[1] + 1);
+      const unsigned c = (unsigned)(v[2] + 1), d = (unsigned)(v[3] + 1);
+      if (a > 2u || b > 2u || c > 2u || d > 2u) {
+        return AAC_HUFF_NO_FIT;
+      }
+      return aac_huff_cost[codebook][27u * a + 9u * b + 3u * c + d];
+    }
+    case 3:
+    case 4: {
+      const unsigned a = (unsigned)aac_huffman_abs_(v[0]), b = (unsigned)aac_huffman_abs_(v[1]);
+      const unsigned c = (unsigned)aac_huffman_abs_(v[2]), d = (unsigned)aac_huffman_abs_(v[3]);
+      if (a > 2u || b > 2u || c > 2u || d > 2u) {
+        return AAC_HUFF_NO_FIT;
+      }
+      return aac_huff_cost[codebook][27u * a + 9u * b + 3u * c + d];
+    }
+    case 5:
+    case 6: {
+      const unsigned a = (unsigned)(v[0] + 4), b = (unsigned)(v[1] + 4);
+      if (a > 8u || b > 8u) {
+        return AAC_HUFF_NO_FIT;
+      }
+      return aac_huff_cost[codebook][9u * a + b];
+    }
+    case 7:
+    case 8: {
+      const unsigned a = (unsigned)aac_huffman_abs_(v[0]), b = (unsigned)aac_huffman_abs_(v[1]);
+      if (a > 7u || b > 7u) {
+        return AAC_HUFF_NO_FIT;
+      }
+      return aac_huff_cost[codebook][8u * a + b];
+    }
+    case 9:
+    case 10: {
+      const unsigned a = (unsigned)aac_huffman_abs_(v[0]), b = (unsigned)aac_huffman_abs_(v[1]);
+      if (a > 12u || b > 12u) {
+        return AAC_HUFF_NO_FIT;
+      }
+      return aac_huff_cost[codebook][13u * a + b];
+    }
+    case 11: {
+      const int a = aac_huffman_abs_(v[0]), b = aac_huffman_abs_(v[1]);
+      if (a > AAC_ESC_MAX_MAG || b > AAC_ESC_MAX_MAG) {
+        return AAC_HUFF_NO_FIT;
+      }
+      int bits = aac_huff_cost[11][17 * (a > 16 ? 16 : a) + (b > 16 ? 16 : b)];
+      if (a > 15) {
+        bits += aac_huffman_escape_bits_(a);
+      }
+      if (b > 15) {
+        bits += aac_huffman_escape_bits_(b);
+      }
+      return bits;
+    }
+    default:
+      return AAC_HUFF_NO_FIT;
+  }
+}
+void aac_bitwriter_write_scalefactor(AacBitWriter* w, int diff);
+void aac_bitwriter_byte_align(AacBitWriter* w);
+int aac_bitwriter_bits_written(const AacBitWriter* w);
+int aac_bitwriter_bytes_written(const AacBitWriter* w);
 
 #define AAC_ADTS_HEADER_SIZE 7
 

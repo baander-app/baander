@@ -576,6 +576,10 @@ AacDecoderTransport* aac_decoder_transport_create(void) {
   t->synced = 0;
   t->discarded = 0;
   memset(&t->latm, 0, sizeof(t->latm));
+  /* Sized once for any frame the FIFO can deliver; only a larger element
+   * handed to the one-shot decode grows it. */
+  t->au_buf.resize(AAC_TRANSPORT_MAX_FRAME_BYTES);
+  t->fifo.reserve(AAC_TRANSPORT_FIFO_BYTES);
   return t;
 }
 

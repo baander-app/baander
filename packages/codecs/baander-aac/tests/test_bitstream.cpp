@@ -157,9 +157,102 @@ static void test_huffman() {
   CHECK(r.overread, "reading a scalefactor from nothing flags the overread");
 }
 
+/* The inline bit counter and the table-driven reader against the writer:
+ * for every codeword of every spectral book, with every sign pattern and
+ * a range of escape magnitudes for book 11, the counted bits equal the
+ * written bits and the reader returns the values; values outside a book
+ * do not fit.  The scalefactor codewords go through the same reader. */
+static void test_huffman_counts_and_lookup() {
+  uint8_t buf[64];
+  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+    const AacCodebookInfo* info = &aac_codebook_info[cb];
+    const int dim = info->dim;
+    const int mod = info->is_unsigned ? info->max_val + 1 : 2 * info->max_val + 1;
+    int checked = 0;
+    for (int idx = 0; idx < aac_huff_count[cb]; idx++) {
+      int mags[4] = {0, 0, 0, 0};
+      int t = idx;
+      for (int k = dim - 1; k >= 0; k--) {
+        mags[k] = t % mod - (info->is_unsigned ? 0 : info->max_val);
+        t /= mod;
+      }
+      const int patterns = info->is_unsigned ? 1 << dim : 1;
+      /* escape magnitudes to put in place of a 16 of book 11 */
+      static const int kEscapes[] = {16, 17, 31, 32, 100, 1023, 1024, 8191};
+      const int escapes = cb == AAC_CB_ESCAPE ? (int)(sizeof(kEscapes) / sizeof(kEscapes[0])) : 1;
+      for (int pattern = 0; pattern < patterns; pattern++) {
+        for (int e = 0; e < escapes; e++) {
+          int v[4];
+          for (int k = 0; k < dim; k++) {
+            int mag = mags[k];
+            if (cb == AAC_CB_ESCAPE && mag == 16) {
+              mag = kEscapes[e];
+            }
+            v[k] = info->is_unsigned && ((pattern >> k) & 1) ? -mag : mag;
+          }
+          AacBitWriter w;
+          aac_bitwriter_init(&w, buf, sizeof(buf));
+          CHECK(aac_bitwriter_write_huffman(&w, cb, v) == 0, "book %d index %d writes", cb, idx);
+          const int written = aac_bitwriter_bits_written(&w);
+          CHECK(aac_huffman_bits(cb, v) == written, "book %d index %d: counted %d, wrote %d", cb,
+                idx, aac_huffman_bits(cb, v), written);
+          AacBitReader r;
+          aac_bitreader_init(&r, buf, sizeof(buf));
+          int out[4] = {0, 0, 0, 0};
+          CHECK(aac_bitreader_read_huffman(&r, cb, out) == 0, "book %d index %d reads", cb, idx);
+          CHECK(r.pos == written, "book %d index %d: read %d bits of %d", cb, idx, r.pos, written);
+          bool same = true;
+          for (int k = 0; k < dim; k++) {
+            same = same && out[k] == v[k];
+          }
+          CHECK(same, "book %d index %d: values differ after the roundtrip", cb, idx);
+          checked++;
+        }
+      }
+    }
+    printf("book %d: %d codewords checked\n", cb, checked);
+    /* One step outside the range in each position does not fit. */
+    for (int k = 0; k < dim; k++) {
+      int v[4] = {0, 0, 0, 0};
+      v[k] = cb == AAC_CB_ESCAPE ? AAC_ESC_MAX_MAG + 1 : info->max_val + 1;
+      CHECK(aac_huffman_bits(cb, v) == AAC_HUFF_NO_FIT, "book %d: %d does not fit", cb, v[k]);
+      v[k] = -v[k];
+      CHECK(aac_huffman_bits(cb, v) == AAC_HUFF_NO_FIT, "book %d: %d does not fit", cb, v[k]);
+    }
+  }
+  for (int diff = -60; diff <= 60; diff++) {
+    AacBitWriter w;
+    aac_bitwriter_init(&w, buf, sizeof(buf));
+    aac_bitwriter_write_scalefactor(&w, diff);
+    AacBitReader r;
+    aac_bitreader_init(&r, buf, sizeof(buf));
+    CHECK(aac_bitreader_read_scalefactor(&r) == diff, "scalefactor difference %d", diff);
+    CHECK(r.pos == aac_bitwriter_bits_written(&w), "scalefactor difference %d: length", diff);
+  }
+  /* Multi-bit writes land where bit-by-bit writes would, across byte
+   * boundaries and for a field wider than 32 bits. */
+  {
+    AacBitWriter w;
+    aac_bitwriter_init(&w, buf, sizeof(buf));
+    aac_bitwriter_write(&w, 0x5, 3);
+    aac_bitwriter_write(&w, 0xABCDE, 20);
+    aac_bitwriter_write(&w, 0xFFFFFFFFu, 36);
+    aac_bitwriter_write(&w, 0x1, 1);
+    AacBitReader r;
+    aac_bitreader_init(&r, buf, sizeof(buf));
+    CHECK(aac_bitreader_read(&r, 3) == 0x5, "3-bit field");
+    CHECK(aac_bitreader_read(&r, 20) == 0xABCDE, "20-bit field");
+    CHECK(aac_bitreader_read(&r, 4) == 0, "leading zero bits of a 36-bit field");
+    CHECK(aac_bitreader_read(&r, 32) == 0xFFFFFFFFu, "36-bit field");
+    CHECK(aac_bitreader_read(&r, 1) == 1, "1-bit field");
+    CHECK(aac_bitwriter_bits_written(&w) == 60, "60 bits written");
+  }
+}
+
 int main() {
   test_bits();
   test_adts();
   test_huffman();
+  test_huffman_counts_and_lookup();
   return test_summary("test_bitstream");
 }

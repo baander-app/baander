@@ -17,8 +17,12 @@ extern "C" {
  * applies an AudioSpecificConfig; the encoder side wraps each raw data
  * block in the chosen transport and writes the config. */
 
+/* The largest frame the stream transports deliver: ADTS and LOAS carry a
+ * 13-bit length.  The LATM element buffer is sized to it once, so that a
+ * larger element arriving later does not grow it mid-stream. */
+#define AAC_TRANSPORT_MAX_FRAME_BYTES 8192
 /* Bytes the decoder FIFO holds: 64 KiB plus one largest frame. */
-#define AAC_TRANSPORT_FIFO_BYTES (65536 + 8192)
+#define AAC_TRANSPORT_FIFO_BYTES (65536 + AAC_TRANSPORT_MAX_FRAME_BYTES)
 
 #if defined(BAAC_AAC_HAVE_DECODER)
 struct AacDecoderState_;

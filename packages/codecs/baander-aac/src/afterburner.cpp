@@ -259,6 +259,28 @@ int section_group(const ChannelWork* w, int g, int max_sfb, int* cb_out) {
     const int idx = g * w->nswb + b;
     const int tool = w->c->tool[idx];
     const int max_mag = tool ? 0 : w->max_mag[idx];
+    /* The best predecessor of a band is either the same book, which
+     * continues the section, or the cheapest other book plus a section
+     * header, so the two cheapest entries of the previous row decide it;
+     * a tie goes to the lower book, as a scan over all books would. */
+    int m1 = kInfBits, p1 = -1, m2 = kInfBits, p2 = -1;
+    if (b > 0) {
+      for (int prev = 0; prev < kNumBooks; prev++) {
+        const int v = cost[b - 1][prev];
+        if (v >= kInfBits) {
+          continue;
+        }
+        if (v < m1) {
+          m2 = m1;
+          p2 = p1;
+          m1 = v;
+          p1 = prev;
+        } else if (v < m2) {
+          m2 = v;
+          p2 = prev;
+        }
+      }
+    }
     for (int cb = 0; cb < kNumBooks; cb++) {
       cost[b][cb] = kInfBits;
       from[b][cb] = -1;
@@ -272,16 +294,23 @@ int section_group(const ChannelWork* w, int g, int max_sfb, int* cb_out) {
         cost[b][cb] = header + band;
         continue;
       }
-      for (int prev = 0; prev < kNumBooks; prev++) {
-        if (cost[b - 1][prev] >= kInfBits) {
-          continue;
-        }
-        const int total = cost[b - 1][prev] + (prev == cb ? 0 : header) + band;
-        if (total < cost[b][cb]) {
-          cost[b][cb] = total;
-          from[b][cb] = prev;
+      int best_total = kInfBits;
+      int best_prev = -1;
+      const int same = cost[b - 1][cb];
+      if (same < kInfBits && same + band < kInfBits) {
+        best_total = same + band;
+        best_prev = cb;
+      }
+      const int other = p1 == cb ? p2 : p1;
+      if (other >= 0) {
+        const int total = (p1 == cb ? m2 : m1) + header + band;
+        if (total < best_total || (total == best_total && other < best_prev)) {
+          best_total = total;
+          best_prev = other;
         }
       }
+      cost[b][cb] = best_total;
+      from[b][cb] = best_prev;
     }
   }
   if (max_sfb == 0) {
