@@ -891,7 +891,7 @@ describe('useBaanderPlayer authorization', () => {
       video.dispatchEvent(new Event('seeking'))
       video.dispatchEvent(new Event('seeked'))
     })
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 42, action: 'seek', generation: 1 }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 42, action: 'seek', requestId: expect.any(String), generation: 1 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     await act(async () => video.dispatchEvent(new Event('pause')))
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 42, action: 'pause' }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
@@ -1049,8 +1049,8 @@ describe('useBaanderPlayer authorization', () => {
     expect(post.mock.calls.filter(call => call[1].action === 'seek')).toHaveLength(0)
     await act(async () => rejectProgress(new AxiosError('Response lost', 'ERR_NETWORK')))
     expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => call[1])).toEqual([
-      { action: 'seek', position: 42, generation: 1 },
-      { action: 'seek', position: 60, generation: 2 },
+      { action: 'seek', requestId: expect.any(String), position: 42, generation: 1 },
+      { action: 'seek', requestId: expect.any(String), position: 60, generation: 2 },
     ])
     expect(result.current.pendingSeekPosition).toBe(60)
     expect(attachments.at(-1)?.position).toBe(60)
@@ -1130,7 +1130,7 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it('retains existing explicit seek failure behavior for transport errors', async () => {
+  it('preserves decoded playback after both explicit seek transport attempts fail', async () => {
     post.mockImplementation((path: string) => path === '/api/stream/sign'
       ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
         generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
@@ -1142,9 +1142,11 @@ describe('useBaanderPlayer authorization', () => {
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => result.current.seekTo(42))
-    expect(attachments[0].dispose).toHaveBeenCalledOnce()
-    expect(result.current.state).toBe('error')
-    expect(onError).toHaveBeenCalledOnce()
+    expect(attachments[0].dispose).not.toHaveBeenCalled()
+    expect(result.current.state).not.toBe('error')
+    expect(result.current.pendingSeekPosition).toBeNull()
+    expect(post.mock.calls.filter(call => call[1].action === 'seek')).toHaveLength(2)
+    expect(onError).not.toHaveBeenCalled()
     unmount()
   })
 
@@ -1474,7 +1476,7 @@ describe('useBaanderPlayer authorization', () => {
     expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toHaveLength(0)
     revision = 6
     await act(async () => finishProgress({ data: {} }))
-    expect(post.mock.calls.filter((call) => call[1].action === 'seek').at(-1)?.[1]).toEqual({ position: 42, action: 'seek', generation: 1 })
+    expect(post.mock.calls.filter((call) => call[1].action === 'seek').at(-1)?.[1]).toEqual({ position: 42, action: 'seek', requestId: expect.any(String), generation: 1 })
     unmount()
   })
 
@@ -1504,7 +1506,7 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('generation=2')
     await act(async () => finishProgress({ data: {} }))
-    expect(post.mock.calls.filter((call) => call[1].action === 'seek').at(-1)?.[1]).toEqual({ position: 42, action: 'seek', generation: 1 })
+    expect(post.mock.calls.filter((call) => call[1].action === 'seek').at(-1)?.[1]).toEqual({ position: 42, action: 'seek', requestId: expect.any(String), generation: 1 })
     unmount()
   })
 
@@ -1547,11 +1549,11 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('generation=4')
     const seeks = () => post.mock.calls.filter((call) => call[1].action === 'seek').map((call) => call[1])
-    expect(seeks()).toEqual([{ action: 'seek', position: 45, generation: 4 }])
+    expect(seeks()).toEqual([{ action: 'seek', requestId: expect.any(String), position: 45, generation: 4 }])
     await act(async () => finishSeek({ data: { data: { acceptedGeneration } } }))
     expect(seeks()).toEqual([
-      { action: 'seek', position: 45, generation: 4 },
-      ...(acceptedGeneration === undefined ? [] : [{ action: 'seek', position: 65, generation: acceptedGeneration }]),
+      { action: 'seek', requestId: expect.any(String), position: 45, generation: 4 },
+      ...(acceptedGeneration === undefined ? [] : [{ action: 'seek', requestId: expect.any(String), position: 65, generation: acceptedGeneration }]),
     ])
     expect(video.src).toContain('generation=9')
     unmount()
@@ -1597,9 +1599,9 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => finishFirst({ data: { data: { acceptedGeneration: 5 } } }))
     const commands = () => post.mock.calls.filter((call) => call[1].action).map((call) => call[1])
     expect(commands()).toEqual([
-      { action: 'seek', position: 45, generation: 4 },
+      { action: 'seek', requestId: expect.any(String), position: 45, generation: 4 },
       { action: 'pause', position: 55 },
-      { action: 'seek', position: 65, generation: 5 },
+      { action: 'seek', requestId: expect.any(String), position: 65, generation: 5 },
     ])
     expect(video.paused).toBe(true)
     await act(async () => finishLast({ data: { data: { acceptedGeneration: 6 } } }))
@@ -1645,8 +1647,8 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => video.dispatchEvent(new Event('seeking')))
     await act(async () => finishRefresh(committedFirst))
     expect(post.mock.calls.filter((call) => call[1].action === 'seek').map((call) => call[1])).toEqual([
-      { action: 'seek', position: 45, generation: 4 },
-      { action: 'seek', position: 65, generation: 5 },
+      { action: 'seek', requestId: expect.any(String), position: 45, generation: 4 },
+      { action: 'seek', requestId: expect.any(String), position: 65, generation: 5 },
     ])
     expect(video.src).toContain('generation=4')
     await act(async () => finishLast({ data: { data: { acceptedGeneration: 6 } } }))
@@ -1654,6 +1656,482 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(53)
     unmount()
+  })
+
+  describe('uncertain seek delivery', () => {
+    const initial = (status = 'paused') => ({ url: '/manifest?generation=4', jobId: 'job', sessionId: 'owned-session',
+      generation: 4, revision: 10, renditionSet: 'job.4', ready: true, position: 30, startTime: 12, duration: 180, status })
+    const outage = (code = 'ERR_NETWORK') => code === '503'
+      ? Object.assign(new AxiosError('Unavailable'), { response: { status: 503 } }) : new AxiosError('Unavailable', code)
+    const mount = async () => {
+      const onError = vi.fn()
+      const containerRef = { current: document.createElement('div') }
+      const hook = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+      await act(async () => {})
+      const video = containerRef.current.querySelector('video')!
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      return { ...hook, video, onError }
+    }
+    const cases = ['paused', 'running'].flatMap(status => [false, true].map(accepted => ({ status, accepted, code: 'ERR_NETWORK' })))
+      .concat(['ECONNABORTED', 'ETIMEDOUT', '503'].map(code => ({ status: 'paused', accepted: false, code })))
+
+    it.each(cases)('resends one immutable $status seek after $code (accepted=$accepted)', async ({ status, accepted, code }) => {
+      let snapshot = initial(status)
+      const attempts: Array<Record<string, unknown>> = []
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        attempts.push({ ...payload })
+        if (attempts.length === 1) {
+          if (accepted) snapshot = { ...snapshot, generation: 5, revision: 11, position: 120, startTime: 102, renditionSet: 'job.5', url: '/manifest?generation=5' }
+          return Promise.reject(outage(code))
+        }
+        snapshot = { ...snapshot, generation: 5, revision: 11, position: 120, startTime: 102, renditionSet: 'job.5', url: '/manifest?generation=5' }
+        return Promise.resolve({ data: { data: accepted ? {} : { acceptedGeneration: 5 } } })
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      expect(attempts).toHaveLength(2)
+      expect(attempts[0].requestId).toMatch(/^[0-9a-f-]{36}$/)
+      expect(attempts[1]).toEqual(attempts[0])
+      expect(attempts[0]).toMatchObject({ action: 'seek', requestId: expect.any(String), position: 120, generation: 4 })
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(attachments.at(-1)?.dispose).not.toHaveBeenCalled()
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(120)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      if (status === 'paused') expect(player.video.play).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it.each([false, true])('waits for a post-duplicate read before giving the latest unsent seek a fresh generation and UUID (read outage: %s)', async readOutage => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      let rejectFirst!: (error: Error) => void
+      let resolveOld!: (value: unknown) => void
+      let resolveFresh!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 2) return new Promise(resolve => { resolveOld = resolve })
+          if (signs === 3 && readOutage) return Promise.reject(outage('503'))
+          if (signs === (readOutage ? 4 : 3)) return new Promise(resolve => { resolveFresh = resolve })
+          return Promise.resolve({ data: { ...snapshot } })
+        }
+        attempts.push({ ...payload })
+        if (attempts.length === 1) return new Promise((_resolve, reject) => { rejectFirst = reject })
+        if (attempts.length === 2) return Promise.resolve({ data: { data: {} } })
+        snapshot = { ...snapshot, generation: 6, revision: 12, position: 140, startTime: 122, renditionSet: 'job.6', url: '/manifest?generation=6' }
+        return Promise.resolve({ data: { data: { acceptedGeneration: 6 } } })
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      const submitted = { ...attempts[0] }
+      await act(async () => { player.result.current.seekTo(130); player.result.current.seekTo(140) })
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      snapshot = { ...snapshot, generation: 5, revision: 11, position: 120, startTime: 102, renditionSet: 'job.5', url: '/manifest?generation=5' }
+      await act(async () => rejectFirst(outage()))
+      expect(attempts).toHaveLength(2)
+      expect(attempts[0]).toEqual(submitted)
+      expect(attempts[1]).toEqual(submitted)
+      await act(async () => resolveOld({ data: { ...snapshot, generation: 99, revision: 99 } }))
+      expect(attempts).toHaveLength(2)
+      if (readOutage) await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => resolveFresh({ data: snapshot }))
+      expect(attempts).toHaveLength(3)
+      expect(attempts[2]).toMatchObject({ action: 'seek', requestId: expect.any(String), position: 140, generation: 5 })
+      expect(attempts[2].requestId).not.toBe(submitted.requestId)
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(140)
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('cancels the old tail after two transport failures and coalesces a new gesture until fresh owned state', async () => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      let rejectFirst!: (error: Error) => void
+      let resolveFresh!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 2) return Promise.reject(outage())
+          if (signs === 3) return new Promise(resolve => { resolveFresh = resolve })
+          return Promise.resolve({ data: { ...snapshot } })
+        }
+        attempts.push({ ...payload })
+        if (attempts.length === 1) return new Promise((_resolve, reject) => { rejectFirst = reject })
+        if (attempts.length === 2) return Promise.reject(outage())
+        snapshot = { ...snapshot, generation: 5, revision: 11, position: 170, startTime: 152, renditionSet: 'job.5', url: '/manifest?generation=5' }
+        return Promise.resolve({ data: { data: { acceptedGeneration: 5 } } })
+      })
+      const player = await mount()
+      await act(async () => { player.result.current.seekTo(120); player.result.current.seekTo(130); player.result.current.seekTo(140) })
+      await act(async () => rejectFirst(outage()))
+      expect(attempts).toHaveLength(2)
+      expect(player.onError).not.toHaveBeenCalled()
+      await act(async () => { player.result.current.seekTo(160); player.result.current.seekTo(170) })
+      expect(attempts).toHaveLength(2)
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => resolveFresh({ data: snapshot }))
+      expect(attempts).toHaveLength(3)
+      expect(attempts[2]).toMatchObject({ position: 170, generation: 4 })
+      expect(attempts[2].requestId).not.toBe(attempts[0].requestId)
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(170)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      player.unmount()
+    })
+
+    it.each([false, true])('reserves fallback seek delivery before a later pause without coalescing across it (later seek: %s)', async laterSeek => {
+      let snapshot = initial('running')
+      const commands: Array<Record<string, unknown>> = []
+      let resolveRead!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 2) return new Promise(resolve => { resolveRead = resolve })
+          return Promise.resolve({ data: { ...snapshot } })
+        }
+        commands.push({ ...payload })
+        if (commands.length <= 2) return Promise.reject(outage())
+        if (payload.action === 'pause') {
+          snapshot = { ...snapshot, status: 'paused', revision: snapshot.revision + 1 }
+          return Promise.resolve({ data: {} })
+        }
+        const generation = snapshot.generation + 1
+        snapshot = { ...snapshot, generation, revision: snapshot.revision + 1, position: Number(payload.position),
+          startTime: Number(payload.position) - 18, renditionSet: `job.${generation}`, url: `/manifest?generation=${generation}` }
+        return Promise.resolve({ data: { data: { acceptedGeneration: generation } } })
+      })
+      const player = await mount()
+      vi.mocked(player.video.play).mockClear()
+      await act(async () => player.result.current.seekTo(120))
+      expect(commands).toHaveLength(2)
+      expect(signs).toBe(2)
+      await act(async () => {
+        player.result.current.seekTo(160)
+        player.result.current.pause()
+        if (laterSeek) player.result.current.seekTo(170)
+      })
+      expect(commands).toHaveLength(2)
+      await act(async () => resolveRead({ data: snapshot }))
+      expect(commands.map(item => [item.action, item.position])).toEqual([
+        ['seek', 120], ['seek', 120], ['seek', 160], ['pause', 160],
+        ...(laterSeek ? [['seek', 170]] : []),
+      ])
+      expect(commands[2].generation).toBe(4)
+      expect(commands[2].requestId).not.toBe(commands[0].requestId)
+      if (laterSeek) {
+        expect(commands[4].generation).toBe(5)
+        expect(commands[4].requestId).not.toBe(commands[2].requestId)
+      }
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(laterSeek ? 170 : 160)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      expect(player.video.play).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('rolls an unfinished native seek back to the fresh canonical cursor after both attempts fail', async () => {
+      const attempts: Array<Record<string, unknown>> = []
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: initial() })
+        attempts.push({ ...payload })
+        return Promise.reject(outage())
+      })
+      const player = await mount()
+      let time = 48
+      let seeking = true
+      Object.defineProperty(player.video, 'seeking', { configurable: true, get: () => seeking })
+      Object.defineProperty(player.video, 'currentTime', { configurable: true, get: () => time, set: value => {
+        time = value
+        seeking = false
+        player.video.dispatchEvent(new Event('seeking'))
+      } })
+      await act(async () => player.video.dispatchEvent(new Event('seeking')))
+      expect(attempts).toHaveLength(2)
+      expect(attempts[1]).toEqual(attempts[0])
+      expect(player.video.currentTime).toBe(18)
+      expect(player.result.current.currentTime).toBe(30)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('observes a late committed generation after fallback without claiming the failed request stopped or sending again', async () => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        attempts.push({ ...payload })
+        return Promise.reject(outage())
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      expect(player.result.current.currentTime).toBe(30)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      snapshot = { ...snapshot, generation: 5, revision: 11, position: 120, startTime: 102,
+        renditionSet: 'job.5', url: '/manifest?generation=5' }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(120)
+      expect(attempts).toHaveLength(2)
+      expect(attempts[1]).toEqual(attempts[0])
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('cancels an unfinished native seek only once while asynchronous rollback is still seeking', async () => {
+      const attempts: Array<Record<string, unknown>> = []
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: initial() })
+        attempts.push({ ...payload })
+        return Promise.reject(outage())
+      })
+      const player = await mount()
+      let time = 48
+      let seeking = true
+      const assign = vi.fn((value: number) => { time = value })
+      Object.defineProperty(player.video, 'seeking', { configurable: true, get: () => seeking })
+      Object.defineProperty(player.video, 'currentTime', { configurable: true, get: () => time, set: assign })
+      await act(async () => player.video.dispatchEvent(new Event('seeking')))
+      expect(assign).toHaveBeenCalledExactlyOnceWith(18)
+      await act(async () => {
+        for (const event of ['progress', 'canplay', 'loadeddata']) player.video.dispatchEvent(new Event(event))
+      })
+      expect(assign).toHaveBeenCalledOnce()
+      seeking = false
+      await act(async () => player.video.dispatchEvent(new Event('seeked')))
+      expect(assign).toHaveBeenCalledOnce()
+      expect(player.result.current.currentTime).toBe(30)
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(attempts).toHaveLength(2)
+      player.unmount()
+    })
+
+    it.each(['unmounted', 'owner replaced', 'terminal'])('fences the resend after the player is %s', async outcome => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      let rejectFirst!: (error: Error) => void
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        attempts.push({ ...payload })
+        return new Promise((_resolve, reject) => { rejectFirst = reject })
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      if (outcome === 'unmounted') player.unmount()
+      else if (outcome === 'terminal') {
+        post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+      } else {
+        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+      }
+      await act(async () => rejectFirst(outage()))
+      expect(attempts).toHaveLength(1)
+      if (outcome === 'owner replaced') expect(attachments[1].dispose).not.toHaveBeenCalled()
+      if (outcome !== 'unmounted') player.unmount()
+    })
+
+    it.each(['first', 'retry'].flatMap(stage => [false, true].map(success => ({ stage, success }))))('lets canonical cancellation supersede a held $stage seek (successful completion=$success)', async ({ stage, success }) => {
+      vi.useFakeTimers()
+      let cancelled = false
+      const attempts: Array<Record<string, unknown>> = []
+      let rejectHeld!: (error: Error) => void
+      let resolveHeld!: (value: unknown) => void
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: cancelled
+          ? { ...initial(), ready: false, status: 'cancelled', revision: 11,
+            url: null, startTime: null, duration: null, renditionSet: '' } : initial() })
+        attempts.push({ ...payload })
+        if (stage === 'retry' && attempts.length === 1) return Promise.reject(outage())
+        return new Promise((resolve, reject) => { resolveHeld = resolve; rejectHeld = reject })
+      })
+      const player = await mount()
+      await act(async () => { player.result.current.seekTo(120); player.result.current.seekTo(140) })
+      expect(attempts).toHaveLength(stage === 'first' ? 1 : 2)
+      cancelled = true
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(player.result.current.state).toBe('ended')
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      const count = post.mock.calls.length
+      await act(async () => {
+        if (success) resolveHeld({ data: { data: { acceptedGeneration: 5 } } })
+        else rejectHeld(outage())
+      })
+      expect(attempts).toHaveLength(stage === 'first' ? 1 : 2)
+      expect(post).toHaveBeenCalledTimes(count)
+      expect(player.result.current.state).toBe('ended')
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it.each(['403', 'ERR_BAD_OPTION', 'unrelated'])('ignores a stale retry failure after replacement media has advanced: %s', async kind => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      let rejectRetry!: (error: Error) => void
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        attempts.push({ ...payload })
+        if (attempts.length === 1) return Promise.reject(outage())
+        return new Promise((_resolve, reject) => { rejectRetry = reject })
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      expect(attempts).toHaveLength(2)
+      snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session',
+        renditionSet: 'replacement.4', url: '/replacement-manifest' }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      player.video.currentTime = 25
+      await act(async () => player.video.dispatchEvent(new Event('timeupdate')))
+      expect(player.result.current.currentTime).toBe(37)
+      const failure = kind === '403' ? Object.assign(new AxiosError('Refused'), { response: { status: 403 } })
+        : kind === 'unrelated' ? new Error('Old operation failed') : new AxiosError('Invalid', kind)
+      await act(async () => rejectRetry(failure))
+      expect(player.video.currentTime).toBe(25)
+      expect(player.result.current.currentTime).toBe(37)
+      expect(attachments[1].dispose).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(attempts).toHaveLength(2)
+      player.unmount()
+    })
+
+    it.each(['rebase', 'fallback'].flatMap(mode => ['unmounted', 'owner replaced', 'terminal'].map(outcome => ({ mode, outcome }))))('releases the waiting $mode barrier after $outcome without sending its queued target', async ({ mode, outcome }) => {
+      vi.useFakeTimers()
+      let snapshot = initial()
+      const attempts: Array<Record<string, unknown>> = []
+      let resolveRead!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 2) return new Promise(resolve => { resolveRead = resolve })
+          return Promise.resolve({ data: { ...snapshot } })
+        }
+        attempts.push({ ...payload })
+        if (attempts.length === 1 || mode === 'fallback') return Promise.reject(outage())
+        return Promise.resolve({ data: { data: {} } })
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      expect(signs).toBe(2)
+      expect(attempts).toHaveLength(2)
+      await act(async () => player.result.current.seekTo(140))
+      if (outcome === 'unmounted') player.unmount()
+      else if (outcome === 'terminal') {
+        post.mockRejectedValueOnce(Object.assign(new AxiosError('Refused'), { response: { status: 403 } }))
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+      } else {
+        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+        await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      }
+      const count = post.mock.calls.length
+      await act(async () => resolveRead({ data: { ...initial(), generation: 5, revision: 11, position: 120 } }))
+      expect(attempts).toHaveLength(2)
+      if (outcome === 'owner replaced') {
+        expect(attachments).toHaveLength(2)
+        expect(attachments[1].dispose).not.toHaveBeenCalled()
+        expect(player.onError).not.toHaveBeenCalled()
+      } else {
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+        expect(post).toHaveBeenCalledTimes(count)
+        expect(player.onError).toHaveBeenCalledTimes(outcome === 'terminal' ? 1 : 0)
+      }
+      if (outcome !== 'unmounted') player.unmount()
+    })
+
+    it('does not submit a queued first target after its owner has been replaced', async () => {
+      vi.useFakeTimers()
+      let snapshot = initial('running')
+      const attempts: Array<Record<string, unknown>> = []
+      let finishProgress!: (value: unknown) => void
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        if (payload.action === 'progress') return new Promise(resolve => { finishProgress = resolve })
+        attempts.push({ ...payload })
+        return Promise.resolve({ data: { data: { acceptedGeneration: 5 } } })
+      })
+      const player = await mount()
+      Object.defineProperty(player.video, 'paused', { configurable: true, value: false })
+      player.video.currentTime = 20
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => player.result.current.seekTo(120))
+      snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4', status: 'paused' }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => finishProgress({ data: {} }))
+      expect(attempts).toHaveLength(0)
+      expect(attachments[1].dispose).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('keeps a status command between seek groups while the predecessor duplicate is reconciled', async () => {
+      let snapshot = initial('running')
+      const commands: Array<Record<string, unknown>> = []
+      let rejectFirst!: (error: Error) => void
+      let seeks = 0
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        commands.push({ ...payload })
+        if (payload.action === 'pause') {
+          snapshot = { ...snapshot, status: 'paused', revision: snapshot.revision + 1 }
+          return Promise.resolve({ data: {} })
+        }
+        if (++seeks === 1) return new Promise((_resolve, reject) => { rejectFirst = reject })
+        if (seeks === 2) return Promise.resolve({ data: { data: {} } })
+        const generation = snapshot.generation + 1
+        snapshot = { ...snapshot, generation, revision: snapshot.revision + 1, position: Number(payload.position),
+          startTime: Number(payload.position) - 18, renditionSet: `job.${generation}`, url: `/manifest?generation=${generation}` }
+        return Promise.resolve({ data: { data: { acceptedGeneration: generation } } })
+      })
+      const player = await mount()
+      vi.mocked(player.video.play).mockClear()
+      await act(async () => {
+        player.result.current.seekTo(120)
+        player.result.current.seekTo(130)
+        player.result.current.pause()
+        player.result.current.seekTo(140)
+      })
+      snapshot = { ...snapshot, generation: 5, revision: 11, position: 120, startTime: 102, renditionSet: 'job.5', url: '/manifest?generation=5' }
+      await act(async () => rejectFirst(outage()))
+      expect(commands.map(item => [item.action, item.position])).toEqual([
+        ['seek', 120], ['seek', 120], ['seek', 130], ['pause', 130], ['seek', 140],
+      ])
+      expect(commands[0]).toEqual(commands[1])
+      expect(commands[2].generation).toBe(5)
+      expect(commands[4].generation).toBe(6)
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(140)
+      expect(player.video.play).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it.each(['ERR_BAD_OPTION', 'ERR_BAD_REQUEST', 'canceled', '403'])('does not resend a seek after %s', async kind => {
+      const attempts: Array<Record<string, unknown>> = []
+      const failure = kind === '403' ? Object.assign(new AxiosError('Refused'), { response: { status: 403 } })
+        : kind === 'canceled' ? new CanceledError('Canceled') : new AxiosError('Invalid', kind)
+      post.mockImplementation((path: string, payload: Record<string, unknown>) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: initial() })
+        attempts.push({ ...payload })
+        return Promise.reject(failure)
+      })
+      const player = await mount()
+      await act(async () => player.result.current.seekTo(120))
+      expect(attempts).toHaveLength(1)
+      expect(player.onError).toHaveBeenCalledOnce()
+      player.unmount()
+    })
   })
 
   it('fences explicit source seek intent with the attached generation', async () => {
@@ -1664,7 +2142,7 @@ describe('useBaanderPlayer authorization', () => {
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => result.current.seekTo(60))
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', requestId: expect.any(String), generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
 
@@ -1722,7 +2200,7 @@ describe('useBaanderPlayer authorization', () => {
       video.dispatchEvent(new Event('seeking'))
       video.dispatchEvent(new Event('seeked'))
     })
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 32, action: 'seek', generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 32, action: 'seek', requestId: expect.any(String), generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
 
@@ -1751,7 +2229,7 @@ describe('useBaanderPlayer authorization', () => {
     Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 0, start: () => 0, end: () => 0 } })
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     await act(async () => result.current.seekTo(60))
-    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
+    expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', { position: 60, action: 'seek', requestId: expect.any(String), generation: 4 }, { signal: expect.any(AbortSignal), timeout: 5000 })
     unmount()
   })
 
@@ -1929,7 +2407,7 @@ describe('useBaanderPlayer authorization', () => {
     Object.defineProperty(video, 'seeking', { configurable: true, writable: true, value: true })
     await act(async () => video.dispatchEvent(new Event('seeking')))
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', {
-      position: 35, action: 'seek', generation: 4,
+      position: 35, action: 'seek', requestId: expect.any(String), generation: 4,
     }, { signal: expect.any(AbortSignal), timeout: 5000 })
     Object.defineProperty(video, 'seeking', { value: false })
     await act(async () => video.dispatchEvent(new Event('seeked')))
@@ -1959,7 +2437,7 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => video.dispatchEvent(new Event('seeked')))
     expect(post.mock.calls.filter((call) => call[1].action === 'seek')).toHaveLength(1)
     expect(post).toHaveBeenCalledWith('/api/transcode/sessions/owned-session/position', {
-      position: 35, action: 'seek', generation: 4,
+      position: 35, action: 'seek', requestId: expect.any(String), generation: 4,
     }, { signal: expect.any(AbortSignal), timeout: 5000 })
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(video.src).toContain('sibling.3')
@@ -2165,7 +2643,7 @@ describe('useBaanderPlayer authorization', () => {
     })
     expect(result.current.pendingSeekPosition).toBe(120)
     expect(post.mock.calls.filter(call => call[1].action).map(call => call[1])).toEqual([
-      { action: 'seek', position: 120, generation: 4 },
+      { action: 'seek', requestId: expect.any(String), position: 120, generation: 4 },
     ])
     snapshot = { data: { ...initial, url: undefined, generation: 5, revision: 5, ready: false, position: 120 } }
     await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
@@ -2222,8 +2700,8 @@ describe('useBaanderPlayer authorization', () => {
     snapshot = { ...initial, url: '/manifest?generation=6', renditionSet: 'job.6', generation: 6, revision: 6, position: 140, startTime: 122 }
     await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
     expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => call[1])).toEqual([
-      { action: 'seek', position: 120, generation: 4 },
-      { action: 'seek', position: 140, generation: 5 },
+      { action: 'seek', requestId: expect.any(String), position: 120, generation: 4 },
+      { action: 'seek', requestId: expect.any(String), position: 140, generation: 5 },
     ])
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
     expect(video.currentTime).toBe(18)
@@ -2272,7 +2750,7 @@ describe('useBaanderPlayer authorization', () => {
     if (outcome === 'rejected' || outcome === 'replaced-rejected') await act(async () => reject(new Error('Seek refused')))
     else await act(async () => accept({ data: { data: { acceptedGeneration: 5 } } }))
     expect(post.mock.calls.filter(call => call[1].action === 'seek').map(call => [call[0], call[1]])).toEqual([
-      ['/api/transcode/sessions/owned-session/position', { action: 'seek', position: 120, generation: 4 }],
+      ['/api/transcode/sessions/owned-session/position', { action: 'seek', requestId: expect.any(String), position: 120, generation: 4 }],
     ])
     expect(video.play).not.toHaveBeenCalled()
     if (outcome === 'rejected') {
@@ -2383,7 +2861,7 @@ describe('useBaanderPlayer authorization', () => {
     expect(result.current.pendingSeekPosition).toBeNull()
     expect(result.current.currentTime).toBe(180)
     expect(post.mock.calls.filter(call => call[1].action).map(call => call[1])).toEqual([
-      { action: 'seek', position: 180, generation: 5 },
+      { action: 'seek', requestId: expect.any(String), position: 180, generation: 5 },
     ])
     unmount()
   })

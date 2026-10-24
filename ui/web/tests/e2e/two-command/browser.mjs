@@ -24,16 +24,41 @@ await context.addInitScript(() => {
   window.__twoCommandMediaEvents = []
   window.__twoCommandSigningReceipts = []
   window.__twoCommandObserveSigningReceipts = false
+  window.__twoCommandSeekReceipts = []
+  window.__twoCommandSeekRequestOrders = []
+  window.__twoCommandObserveSeekReceipts = false
+  window.__twoCommandObservationOrder = 0
   const open = XMLHttpRequest.prototype.open
   XMLHttpRequest.prototype.open = function (method, url) {
     const result = open.apply(this, arguments)
-    if (String(method).toUpperCase() === 'POST' && new URL(url, window.location.href).pathname === '/api/stream/sign') {
+    const path = new URL(url, window.location.href).pathname
+    const signing = path === '/api/stream/sign'
+    const position = /^\/api\/transcode\/sessions\/[^/]+\/position$/.test(path)
+    if (String(method).toUpperCase() === 'POST' && (signing || position)) {
+      const requestedAt = Date.now()
+      const requestedOrder = ++window.__twoCommandObservationOrder
+      if (position && window.__twoCommandObserveSeekReceipts) {
+        const requests = window.__twoCommandSeekRequestOrders
+        requests.push({ requestedAt, requestedOrder })
+        if (requests.length > 20) requests.shift()
+      }
       const observe = () => {
         if (this.readyState !== XMLHttpRequest.DONE) return
         this.removeEventListener('readystatechange', observe)
-        if (!window.__twoCommandObserveSigningReceipts || this.status < 200 || this.status >= 300) return
+        if (this.status < 200 || this.status >= 300 || !(signing
+          ? window.__twoCommandObserveSigningReceipts : window.__twoCommandObserveSeekReceipts)) return
         try {
           const value = JSON.parse(this.responseText)
+          if (position) {
+            if (typeof value.data?.requestId !== 'string') return
+            const receipts = window.__twoCommandSeekReceipts
+            receipts.push({ requestId: value.data.requestId, receivedAt: Date.now(),
+              receivedOrder: ++window.__twoCommandObservationOrder,
+              ...(Number.isSafeInteger(value.data.acceptedGeneration) && value.data.acceptedGeneration > 0
+                ? { acceptedGeneration: value.data.acceptedGeneration } : {}) })
+            if (receipts.length > 20) receipts.shift()
+            return
+          }
           const receipts = window.__twoCommandSigningReceipts
           const previous = receipts.findLast(item => item.jobId === value.jobId)
           if (typeof value.jobId !== 'string' || typeof value.sessionId !== 'string'
@@ -41,11 +66,12 @@ await context.addInitScript(() => {
             || typeof value.renditionSet !== 'string' || typeof value.ready !== 'boolean'
             || typeof value.status !== 'string' || (previous
               && (value.generation < previous.generation || value.revision < previous.revision))) return
-          receipts.push({ receivedAt: Date.now(), jobId: value.jobId, sessionId: value.sessionId,
+          receipts.push({ requestedAt, requestedOrder, receivedAt: Date.now(),
+            receivedOrder: ++window.__twoCommandObservationOrder, jobId: value.jobId, sessionId: value.sessionId,
             generation: value.generation, revision: value.revision, renditionSet: value.renditionSet,
             ready: value.ready, status: value.status })
           if (receipts.length > 100) receipts.shift()
-        } catch { /* Malformed responses cannot authorize media replacement. */ }
+        } catch { /* Malformed responses cannot authorize media replacement or seek continuation. */ }
       }
       // Axios installs its loadend handler after open returns. Observe the real
       // response at DONE before Axios can replace the current attachment.
@@ -102,6 +128,7 @@ const mediaRequestOrder = []
 const capabilityRenewals = []
 const progressOutages = []
 const statusOutages = []
+const seekOutages = []
 const signingRequests = new WeakMap()
 const attachedCapabilities = new Map()
 function capabilityEvidence(url) {
@@ -205,7 +232,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -235,7 +262,7 @@ page.on('request', request => {
   try {
     const value = request.postDataJSON()
     appendBounded(playbackControls, { at: Date.now(), ...Object.fromEntries(
-      ['action', 'position', 'generation', 'revision'].map(key => [key, value[key]]),
+      ['action', 'position', 'generation', 'revision', 'requestId'].map(key => [key, value[key]]),
     ) }, 100)
   } catch { /* An interrupted request may have no readable JSON body. */ }
 })
@@ -1014,10 +1041,10 @@ async function reconnectPausedPlayback(owner, prefix) {
   await resumeAndDecode(owner, `${prefix}-resume`)
 }
 
-async function commitSourceSeek(position) {
+async function commitSourceSeek(position, sourceDuration = snapshot.duration) {
   const timeline = page.getByRole('slider', { name: 'Seek movie' })
-  assert.equal(Number(await timeline.getAttribute('max')), snapshot.duration, 'Source seeking must span the full source duration')
-  assert(position >= 0 && position < snapshot.duration, 'The source target must fit the source duration')
+  assert.equal(Number(await timeline.getAttribute('max')), sourceDuration, 'Source seeking must span the full source duration')
+  assert(position >= 0 && position < sourceDuration, 'The source target must fit the source duration')
   if (position === 0) {
     await timeline.focus()
     await timeline.press('Home')
@@ -1025,7 +1052,7 @@ async function commitSourceSeek(position) {
   }
   const box = await timeline.boundingBox()
   assert(box, 'The source timeline must be visible')
-  await page.mouse.move(box.x + box.width * position / snapshot.duration, box.y + box.height / 2)
+  await page.mouse.move(box.x + box.width * position / sourceDuration, box.y + box.height / 2)
   await page.mouse.down()
   try {
     // Read the browser's actual range value before pointer-up commits the draft.
@@ -1079,6 +1106,197 @@ async function seekSourceAndDecode(owner, position, action, paused = false) {
   return requested
 }
 
+async function proveSeekOutages(owner, expectedPosition) {
+  const deadline = Date.now() + 90000
+  const remaining = maximum => {
+    assert(Date.now() < deadline, 'Seek outage proof exceeded its total time budget')
+    return Math.max(1, Math.min(maximum, deadline - Date.now()))
+  }
+  const waitFor = (check, description, maximum = 15000) => until(check, description, remaining(maximum))
+  const positionRoute = `**/api/transcode/sessions/${owner.sessionId}/position`
+  for (const mode of ['before-forwarding', 'accepted-response-loss']) {
+    await pausePlayback(owner, `seek-outage-${mode}-pause`, remaining(10000))
+    await waitFor(async () => {
+      const state = await mediaState()
+      return snapshot?.ready && snapshot.status === 'paused' && state.connected && state.paused
+        && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking && state.error === null && currentSource(state)
+    }, 'decoded paused playback before an uncertain source seek')
+    const generation = owner.generation
+    const sourceDuration = Number(await page.getByRole('slider', { name: 'Seek movie' }).getAttribute('max'))
+    assert.equal(sourceDuration, snapshot.duration, 'The captured source range must match the ready source duration')
+    const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
+    const candidates = mode === 'before-forwarding'
+      ? [expectedPosition + 24, expectedPosition + 48] : [expectedPosition - 8, expectedPosition + 8]
+    const firstTarget = candidates.filter(value => value >= 0 && value < sourceDuration)
+      .sort((left, right) => Math.abs(right - initialSliderPosition) - Math.abs(left - initialSliderPosition))[0]
+    assert(firstTarget !== undefined && Math.abs(firstTarget - initialSliderPosition) >= 8,
+      'The uncertain seek must move the actual source thumb to a different target')
+    const targets = mode === 'before-forwarding' ? [firstTarget] : [firstTarget, expectedPosition - 4, expectedPosition]
+    assert(targets.every(value => value >= 0 && value < sourceDuration), 'Every queued target must fit the captured source range')
+    const logicalSeeks = mode === 'before-forwarding' ? 1 : 2
+    const proof = { mode, status: 'observing', startedAt: Date.now(), generation, initialSliderPosition,
+      sourceDuration, targets, committedTargets: [], attempts: [] }
+    seekOutages.push(proof)
+    let firstPayload
+    let faultRequest
+    let routeError
+    let queuedTargetsReady = mode === 'before-forwarding'
+    const pendingRoutes = new Set()
+    const checkOwnership = () => {
+      assert.equal(snapshot.jobId, owner.jobId, 'Seek recovery must retain the owned job')
+      assert.equal(snapshot.sessionId, owner.sessionId, 'Seek recovery must retain the owned session')
+      assert(snapshot.generation >= generation && snapshot.generation <= generation + logicalSeeks,
+        'Only accepted logical seeks may advance the recovery generation')
+      assert.equal(snapshot.status, 'paused', 'Uncertain source seeks must preserve paused intent')
+      if (routeError) throw routeError
+    }
+    const requestFailed = request => {
+      if (request === faultRequest) proof.failureObservedAt = Date.now()
+    }
+    const interceptSeek = route => {
+      const task = (async () => {
+        const request = route.request()
+        const payload = request.method() === 'POST' ? request.postDataJSON() : null
+        if (payload?.action !== 'seek') { await route.continue(); return }
+        const attempt = { at: Date.now(), payload: Object.fromEntries(
+          ['action', 'position', 'generation', 'requestId'].map(key => [key, payload[key]])) }
+        proof.attempts.push(attempt)
+        const number = proof.attempts.length
+        assert(number <= logicalSeeks + 1, 'Each uncertain seek permits only one identical transport resend')
+        if (number === 1) {
+          firstPayload = payload
+          faultRequest = request
+          assert.equal(payload.generation, generation)
+          assert.match(payload.requestId, /^[0-9a-f-]{36}$/i, 'Submitted source seeks must carry a UUID')
+          if (mode === 'accepted-response-loss') {
+            const holdDeadline = attempt.at + 4000
+            const response = await route.fetch({ timeout: remaining(3500) })
+            const body = await response.json()
+            proof.firstResponse = { at: Date.now(), status: response.status(), requestId: body.data?.requestId,
+              acceptedGeneration: body.data?.acceptedGeneration }
+            await response.dispose()
+            assert.equal(proof.firstResponse.status, 200)
+            assert.equal(proof.firstResponse.requestId, payload.requestId)
+            assert.equal(proof.firstResponse.acceptedGeneration, generation + 1,
+              'The first logical seek must really advance its execution generation')
+            assert(Date.now() < holdDeadline, 'Real seek forwarding must leave time to prove acceptance')
+            await until(() => {
+              checkOwnership()
+              const canonical = playbackSnapshots.find(item => item.accepted && item.requestedAt >= proof.firstResponse.at
+                && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+                && item.generation === generation + 1 && item.status === 'paused'
+                && Math.abs(item.position - payload.position) < 0.00001)
+              if (canonical) proof.acceptedCanonical = { at: canonical.at, requestedAt: canonical.requestedAt,
+                ...safePlayback(canonical) }
+              return Boolean(canonical && queuedTargetsReady)
+            }, 'signed desired state and queued slider targets before dropping the accepted response',
+            remaining(holdDeadline - Date.now()))
+          }
+          await route.abort('failed')
+          proof.abortedAt = Date.now()
+          assert(proof.abortedAt - attempt.at < 4500, 'Forwarding and seek response loss must finish below the client timeout')
+          return
+        }
+        if (number === 2) assert.deepEqual(payload, firstPayload, 'The one resend must preserve the entire original seek payload')
+        else {
+          assert.equal(payload.position, proof.committedTargets.at(-1), 'Only the latest unsent slider target may follow reconciliation')
+          assert.notEqual(payload.requestId, firstPayload.requestId, 'The successor is a new logical seek with a new UUID')
+          assert.equal(payload.generation, generation + 1)
+          const observed = await page.evaluate(() => ({ receipts: window.__twoCommandSeekReceipts,
+            signing: window.__twoCommandSigningReceipts, requests: window.__twoCommandSeekRequestOrders }))
+          const retryReceipt = observed.receipts.find(item => item.requestId === firstPayload.requestId)
+          assert(retryReceipt && !Object.hasOwn(retryReceipt, 'acceptedGeneration'),
+            'The delivered duplicate must omit continuation acknowledgement')
+          assert.equal(observed.requests.length, 3, 'Only first, identical resend and latest seek may reach the browser transport')
+          const latestOrder = observed.requests.at(-1).requestedOrder
+          const canonical = observed.signing.find(item => item.jobId === owner.jobId && item.sessionId === owner.sessionId
+            && item.generation === payload.generation && item.status === 'paused'
+            && item.requestedOrder > retryReceipt.receivedOrder && item.receivedOrder < latestOrder)
+          assert(canonical, 'The latest seek must follow a canonical read started after the browser received the duplicate')
+          proof.continuation = { retryReceipt, canonical, latestRequestedOrder: latestOrder }
+        }
+        const response = await route.fetch({ timeout: remaining(4500) })
+        const body = await response.json()
+        attempt.response = { at: Date.now(), status: response.status(), requestId: body.data?.requestId,
+          ...(Object.hasOwn(body.data ?? {}, 'acceptedGeneration') ? { acceptedGeneration: body.data.acceptedGeneration } : {}) }
+        assert.equal(attempt.response.status, 200)
+        assert.equal(attempt.response.requestId, payload.requestId)
+        if (number === 2 && mode === 'accepted-response-loss') {
+          assert(!Object.hasOwn(attempt.response, 'acceptedGeneration'), 'A duplicate seek must not fabricate an accepted generation')
+        } else assert.equal(attempt.response.acceptedGeneration, generation + logicalSeeks)
+        await route.fulfill({ response })
+      })().catch(async error => { routeError = error; await route.abort().catch(() => {}) })
+      pendingRoutes.add(task)
+      task.finally(() => pendingRoutes.delete(task))
+      return task
+    }
+    await page.evaluate(() => {
+      window.__twoCommandSigningReceipts = []
+      window.__twoCommandSeekReceipts = []
+      window.__twoCommandSeekRequestOrders = []
+      window.__twoCommandObserveSigningReceipts = true
+      window.__twoCommandObserveSeekReceipts = true
+    })
+    page.on('requestfailed', requestFailed)
+    await page.route(positionRoute, interceptSeek)
+    try {
+      proof.committedTargets.push(await commitSourceSeek(targets[0], sourceDuration))
+      if (mode === 'accepted-response-loss') {
+        await waitFor(() => { checkOwnership(); return proof.firstResponse }, 'the genuine first seek response to be held')
+        for (const target of targets.slice(1)) proof.committedTargets.push(await commitSourceSeek(target, sourceDuration))
+        assert.equal(proof.attempts.length, 1, 'All newer slider targets must queue while the first transport attempt is pending')
+        queuedTargetsReady = true
+        proof.queuedAt = Date.now()
+        assert.equal(new Set(proof.committedTargets).size, 3, 'The three gestures must commit distinct source positions')
+      }
+      await waitFor(async () => {
+        checkOwnership()
+        const lastAttempt = proof.attempts.at(-1)
+        if (!proof.failureObservedAt || proof.attempts.length !== logicalSeeks + 1 || !lastAttempt?.response) return false
+        const sampledAttachment = attachmentNumber
+        const state = await mediaState()
+        if (sampledAttachment !== attachmentNumber) return false
+        const capability = attachedCapabilities.get(attachmentNumber)
+        const delivered = capability && new URL(capability.url).searchParams.get('set') === snapshot.renditionSet
+          && mediaResponses.some(item => item.attachment === attachmentNumber && item.status === 200
+            && item.path.endsWith('/master.m3u8'))
+          && ['video', 'audio'].every(track => mediaResponses.some(item => {
+            const match = /^\/api\/transcode\/([^/]+)\/tracks\/(video|audio)\/segment\.m4s$/.exec(item.path)
+            return item.attachment === attachmentNumber && item.status === 200 && match?.[2] === track
+              && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
+          }))
+        if (!(snapshot.ready && snapshot.generation === generation + logicalSeeks && state.connected && state.paused
+          && state.ready >= 2 && state.decodedFrames > 0 && !state.seeking && state.error === null
+          && currentSource(state) && delivered && state.seekable.some(([start, end]) => state.time >= start && state.time <= end)
+          && Math.abs(snapshot.startTime + state.time - proof.committedTargets.at(-1)) < 2)) return false
+        const requests = playbackControls.filter(item => item.at >= proof.startedAt && item.action !== 'progress')
+        assert.deepEqual(requests.map(item => item.position), mode === 'before-forwarding'
+          ? [proof.committedTargets[0], proof.committedTargets[0]]
+          : [proof.committedTargets[0], proof.committedTargets[0], proof.committedTargets[2]])
+        assert(requests.every(item => item.action === 'seek'), 'Seek recovery must not echo pause/resume controls')
+        assert.equal(new Set(requests.map(item => item.requestId)).size, logicalSeeks)
+        proof.status = 'passed'
+        proof.restored = { at: Date.now(), attachment: attachmentNumber, ...safePlayback(snapshot),
+          time: state.time, decodedFrames: state.decodedFrames }
+        return true
+      }, `${mode} source seek recovery to restore genuine paused media`, 45000)
+    } finally {
+      await page.unroute(positionRoute, interceptSeek)
+      await Promise.all([...pendingRoutes])
+      page.off('requestfailed', requestFailed)
+      await page.evaluate(() => {
+        window.__twoCommandObserveSigningReceipts = false
+        window.__twoCommandObserveSeekReceipts = false
+      })
+    }
+    if (routeError) throw routeError
+    owner.generation = generation + logicalSeeks
+    samePlayback(owner)
+    await recordClientControl(`seek-outage-${mode}-restored`, proof.startedAt)
+    await resumeAndDecode(owner, `seek-outage-${mode}-resume`, remaining(10000))
+  }
+}
+
 async function checkpoint({ phase, baseUrl, credentials }) {
   if (phase === 'authenticated') {
     assert(await page.evaluate(() => document.createElement('video').canPlayType('application/vnd.apple.mpegurl')),
@@ -1125,6 +1343,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     const owner = ownedPlayback()
     await proveProgressOutages(owner)
     await proveStatusOutages(owner)
+    await proveSeekOutages(owner, credentials.expectedSeekPosition)
     await pausePlayback(owner, 'pause')
     const started = Date.now()
     const initialSliderPosition = Number(await page.getByRole('slider', { name: 'Seek movie' }).inputValue())
@@ -1267,7 +1486,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages }, null, 2))
   return { phase, passed: true }
 }
 
@@ -1284,7 +1503,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })

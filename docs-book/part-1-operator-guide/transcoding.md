@@ -118,12 +118,27 @@ current generation and revision; it cannot overwrite a later explicit seek.
 
 When native seek gestures arrive while a seek is still in flight, the player
 retains the latest queued target and keeps pause and resume commands in order.
-Each following native seek uses only the generation returned by its preceding
-freshly accepted seek. Stale, replayed, terminal or otherwise unproven responses
-cannot continue that chain. Same-session polling leaves the attachment in place
-until the chain settles. Replacing the source, session or player component
-invalidates pending intent; generation checks and the latest pause/resume intent
-still apply.
+A following native seek normally uses the generation acknowledged by its
+predecessor. If a seek encounters a temporary network, timeout or server failure,
+the player may resend that exact request once with its original identity and
+generation. A successful resend without an accepted generation requires a fresh
+authenticated read started after that response before the latest unsent target
+can use the canonical generation. A read after a timeout alone cannot establish that delivery has
+settled. A successful first response without an accepted generation still
+abandons the queued tail. Stale, terminal or unproven responses cannot continue
+the chain.
+
+If both transport attempts fail, the player abandons the unsent tail and restores
+the current execution and cursor from fresh authenticated state, preserving pause
+intent. It sends no third copy. A new gesture immediately reserves its place in
+the control queue. Consecutive unsent seeks coalesce to the latest target, while
+pause and resume commands keep their order between seeks. Submission waits for
+a fresh authenticated generation and uses a new request identity. This resend
+policy applies only to transient seek failures; pause, resume and progress retain
+their separate recovery rules.
+
+Replacing the source, session or player component invalidates pending intent;
+generation checks and the latest pause/resume intent still apply.
 
 Temporary network, timeout or server failures while the player reports progress
 automatically leave the media attachment, local position and play or pause intent
@@ -136,7 +151,7 @@ a fresh authenticated read can reconcile it with the server's accepted status;
 newer local pause or resume intent takes precedence. Reconciliation changes only
 play or pause status, without replaying the command, rewinding to an older server
 position or submitting another seek. Initial signing failures, nontransient
-pause/resume failures and failed seek requests retain their existing handling.
+control failures retain their existing handling.
 
 A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
 

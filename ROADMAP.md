@@ -1209,3 +1209,60 @@ EOF, formal CMAF conformance, DASH subtitles and the separate native pressure
 observer remain unqualified. Existing application databases, Redis and media
 storage were not reused or reset. This checkpoint includes no push or feature
 merge.
+
+### Bounded delivery of uncertain source seeks — 2026-10-24
+
+Transient network, timeout and server failures during a source seek now permit one
+identical resend, preserving the submitted position, request identity and original
+generation. A definitive second response without an accepted generation requires
+a fresh owned authenticated read before the latest queued successor can use the
+canonical generation. A timeout followed by a read alone does not settle delivery;
+a successful first response without acknowledgement still abandons the old tail.
+
+If both attempts fail, the player sends no third copy, cancels the unsent tail and
+restores the canonical execution and cursor. New gestures reserve queue order
+immediately, coalescing consecutive unsent seeks while retaining pause/resume
+boundaries. Submission waits for a fresh owned baseline and uses a new request
+identity. Progress and status recovery rules remain separate. The operator guide
+records these boundaries; no backend or API changed.
+
+Final CI verification passed 206 tests across four suites: 191 hook, nine adapter,
+two import and four overlay tests. Typechecking, the production build, asset
+verification and browser/runner syntax checks passed. Full lint reported zero
+errors and eight existing warnings outside the changed files. The initial seek
+regressions produced ten failures, seven passes and 154 skips. Further regressions
+failed before their fixes: one unfinished native restore, three stale-completion,
+four cancellation and two fallback-ordering cases. Implementation
+revision is `1f8b0a07`; fixture and production-image source is `29d187d7`.
+Gate evidence is under `var/test-runs/player-seek-outage-gates`.
+
+Production acceptance passed all eight phases in Chromium 148.0.7778.96. A seek
+to source position 78 lost before forwarding used two identical transports with
+one request identity and advanced generation 6 to 7 once. It restored paused at
+local position 18 plus source start 60, with four decoded frames. Resuming reached
+source position 79.038006 and 36 frames. The accepted-response-loss case committed
+slider targets 21, 25 and 29. Position 21 was sent twice with one identity and
+generation 7; only position 29 followed, with a new identity and generation 8,
+advancing the final generation to 9. The first response was held for 524
+milliseconds in total; canonical position 21 and generation 8 were proved before
+it was dropped, while media was still unavailable. The duplicate response omitted its accepted
+generation.
+Browser event order proved that the duplicate receipt preceded the new canonical
+read and its response, which preceded submission of position 29. Final restoration
+was paused at source position 29, local position 23 plus start 6, with four frames;
+resuming reached source position 30.039354 and 36 frames.
+
+The same run passed all four status-loss cases, both renewal modes, both progress
+fault modes and recovery in generation 15. Two progress observations superseded
+by legitimate publication changes remain in the receipt. All 31 HLS and 27 DASH
+URLs refused tampering and expired access, giving 58 responses of 403 in each
+check; renewal delivered 62 resources with status 200. Sanitized evidence is under
+`var/test-runs/player-seek-outage-production`, including `acceptance-summary.json`.
+The runner exited zero and verified removal of its resources.
+
+The two-attempt fallback does not prove a timed-out server request has stopped;
+later accepted generations remain authoritative through normal polling. Native
+HLS and other browsers, full live FFmpeg DASH EOF, formal CMAF conformance, DASH
+subtitles and the separate native pressure observer remain unqualified. Existing
+application databases, Redis and media storage were not reused or reset. This
+checkpoint includes no push or feature merge.
