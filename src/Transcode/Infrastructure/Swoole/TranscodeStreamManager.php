@@ -76,6 +76,7 @@ final class TranscodeStreamManager
         string $audioFilters = '',
         ?int $generation = null,
         bool $hasAudio = true,
+        float $sourceFrameRate = 0.0,
     ): string {
         $jobId = $job->getId();
         $jobKey = $jobId->toString();
@@ -102,6 +103,7 @@ final class TranscodeStreamManager
             audioProfile: $audioProfile,
             audioFilters: $audioFilters,
             hasAudio: $hasAudio,
+            sourceFrameRate: $sourceFrameRate,
         );
 
         $this->logger->info('Starting long-lived video stream', [

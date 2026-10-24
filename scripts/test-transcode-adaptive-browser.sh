@@ -7,6 +7,16 @@ case "$audio_profile" in
     streaming_stereo|opus_stereo) ;;
     *) echo 'BAANDER_TEST_AUDIO_PROFILE must be streaming_stereo or opus_stereo.' >&2; exit 1 ;;
 esac
+scenario="${BAANDER_TEST_VIDEO_SCENARIO:-adaptive}"
+case "$scenario" in
+    adaptive) browser_script=browser.mjs; browser_timeout=195 ;;
+    sparse-fresh|sparse-seek)
+        if [ "$audio_profile" != streaming_stereo ]; then
+            echo 'Sparse movie scenarios require streaming_stereo.' >&2; exit 1
+        fi
+        browser_script=sparse-browser.mjs; browser_timeout=135 ;;
+    *) echo 'BAANDER_TEST_VIDEO_SCENARIO must be adaptive, sparse-fresh or sparse-seek.' >&2; exit 1 ;;
+esac
 artifacts="${BAANDER_TEST_ARTIFACTS:-$PWD/var/test-runs/transcode-adaptive-browser-$(date +%s)-$$}"
 mkdir -p "$artifacts"
 chmod 700 "$artifacts"
@@ -73,13 +83,14 @@ if (!Object.keys(bundle.metafile.inputs).some(path => path.endsWith('/hls.js/dis
 writeFileSync(`${workspace}/browser/bundle-inputs.json`, JSON.stringify(bundle.metafile.inputs, null, 2))
 JS
 cp ui/web/tests/e2e/transcode-adaptive/index.html "$workspace/assets/"
-cp ui/web/tests/e2e/transcode-adaptive/browser.mjs "$workspace/browser/"
+cp "ui/web/tests/e2e/transcode-adaptive/$browser_script" "$workspace/browser/browser.mjs"
 cp -R ui/web/node_modules/playwright-core "$workspace/browser/node_modules/"
 cp "$workspace/browser/versions.json" "$artifacts/versions.json"
 cp "$workspace/browser/bundle-inputs.json" "$artifacts/bundle-inputs.json"
 timeout 30s docker create --name "$fixture" --network none --memory=2g --pids-limit=128 --user root \
     -e BAANDER_ADAPTIVE_DIRECTORY=/tmp/baander-adaptive \
     -e BAANDER_ADAPTIVE_AUDIO_PROFILE="$audio_profile" \
+    -e BAANDER_ADAPTIVE_SCENARIO="$scenario" \
     --entrypoint php "$BAANDER_TEST_IMAGE" /var/www/html/tests/Fixtures/Transcode/AdaptiveBrowserBootstrap.php >/dev/null
 fixture_created=1
 # Current source and fixture assets are copied into disposable containers.
@@ -103,12 +114,13 @@ timeout 30s docker create --name "$browser" --network "container:$fixture" --mem
 browser_created=1
 docker cp "$workspace/browser" "$browser:/work"
 echo "Adaptive browser evidence: $artifacts"
-timeout 195s docker start -a "$browser"
+timeout "${browser_timeout}s" docker start -a "$browser"
 test "$(docker inspect --format '{{.State.ExitCode}}' "$browser")" = 0
 docker cp "$browser:/work/evidence/result.json" "$artifacts/result.json"
 node - "$artifacts/result.json" <<'JS'
 const { readFileSync } = require('node:fs')
 const result = JSON.parse(readFileSync(process.argv[2]))
-if (result.passed !== true) throw new Error('Automatic high-to-low-to-high movie switching did not qualify.')
-console.log(JSON.stringify({ passed: true, browser: result.browser, hls: result.hls, sourceRevision: result.sourceRevision }))
+if (result.passed !== true) throw new Error('Movie playback did not qualify.')
+console.log(JSON.stringify({ passed: true, scenario: result.scenario ?? 'adaptive', browser: result.browser,
+  hls: result.hls, sourceRevision: result.sourceRevision }))
 JS

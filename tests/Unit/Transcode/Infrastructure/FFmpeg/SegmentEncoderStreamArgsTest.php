@@ -250,6 +250,98 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('id=0,streams=v', $args[array_search('-adaptation_sets', $args, true) + 1]);
     }
 
+    #[DataProvider('audioProfiles')]
+    public function testSparseSeekRetainsAudioEncoderSettings(AudioProfile $profile, string $encoder): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: 1, audioProfile: $profile, audioFilters: 'volume=0.5', sourceFrameRate: 0.1);
+        foreach ([
+            '-c:a' => $encoder,
+            '-b:a' => (string) $profile->bitrate,
+            '-ac' => (string) $profile->channelCount,
+            '-ar' => (string) $profile->sampleRate,
+            '-threads:a' => '1',
+            '-af' => 'atrim=start=0,volume=0.5',
+        ] as $option => $expected) {
+            $index = array_search($option, $args, true);
+            self::assertNotFalse($index, $option);
+            self::assertSame($expected, $args[$index + 1], $option);
+        }
+    }
+
+    #[DataProvider('unchangedFrameRates')]
+    public function testOrdinaryAndUnknownFrameRatesPreserveArguments(float $rate): void
+    {
+        $encoder = $this->encoder();
+        $args = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), 'scale=-2:720,fps=30', '/output',
+            startSegment: 1, audioFilters: 'aformat=channel_layouts=stereo', sourceFrameRate: $rate);
+        self::assertSame($encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), 'scale=-2:720,fps=30', '/output',
+            startSegment: 1, audioFilters: 'aformat=channel_layouts=stereo'), $args);
+    }
+
+    /** @return iterable<string, array{float}> */
+    public static function unchangedFrameRates(): iterable
+    {
+        yield 'unknown' => [0.0];
+        yield 'negative' => [-0.1];
+        yield 'one fps boundary' => [1.0];
+        yield 'fractional ordinary' => [24000 / 1001];
+        yield 'above upper cap' => [60.0];
+        yield 'positive infinity' => [INF];
+        yield 'negative infinity' => [-INF];
+        yield 'not a number' => [NAN];
+    }
+
+    #[DataProvider('sparseArguments')]
+    public function testSparseFramesPreserveFilterOrderAndSeekPreroll(
+        string $codec,
+        float $rate,
+        ?int $start,
+        string $videoFilters,
+        string $audioFilters,
+        bool $hasAudio,
+    ): void {
+        $args = $this->encoder(codec: $codec)->buildStreamArgs('/source.mkv', QualityTier::p720(), $videoFilters, '/output',
+            startSegment: $start, audioFilters: $audioFilters, hasAudio: $hasAudio, sourceFrameRate: $rate);
+        self::assertSame(($videoFilters === '' ? '' : $videoFilters . ',') . 'fps=1:start_time=0:round=up',
+            $args[array_search('-vf', $args, true) + 1]);
+        $bframes = array_search('-bf:v', $args, true);
+        self::assertNotFalse($bframes);
+        self::assertSame('0', $args[$bframes + 1]);
+        self::assertGreaterThan(array_search('-c:v', $args, true), $bframes);
+        $seeking = $start !== null && $start > 0;
+        if ($seeking) {
+            $seek = array_search('-ss', $args, true);
+            self::assertNotFalse($seek);
+            self::assertSame(sprintf('%.6f', $start * 6.0), $args[$seek + 1]);
+            self::assertSame('-noaccurate_seek', $args[$seek + 2]);
+            self::assertLessThan(array_search('-i', $args, true), $seek);
+        } else {
+            self::assertNotContains('-ss', $args);
+            self::assertNotContains('-noaccurate_seek', $args);
+        }
+        $expectedAudio = $seeking ? 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters) : $audioFilters;
+        if ($hasAudio && $expectedAudio !== '') {
+            self::assertSame($expectedAudio, $args[array_search('-af', $args, true) + 1]);
+            self::assertStringNotContainsString('asetpts', $expectedAudio);
+        } else {
+            self::assertNotContains('-af', $args);
+        }
+        self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
+        self::assertSame('movflags=+negative_cts_offsets', $args[array_search('-format_options', $args, true) + 1]);
+        self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
+    }
+
+    /** @return iterable<string, array{string, float, ?int, string, string, bool}> */
+    public static function sparseArguments(): iterable
+    {
+        yield 'fresh empty filters' => ['libx264', 0.1, null, '', '', true];
+        yield 'zero seek preserves audio chain' => ['libx265', 0.999999, 0, 'scale=-2:720', 'aformat=channel_layouts=stereo', true];
+        yield 'seek prefixes existing chain' => ['libx264', 0.1, 1, 'yadif,scale=-2:720', 'aformat=channel_layouts=stereo', true];
+        yield 'seek creates trim filter' => ['libx265', 1 / 12, 3, '', '', true];
+        yield 'seek video only' => ['libx264', 0.1, 1, 'scale=-2:720', 'unused', false];
+    }
+
     public function testProbeFieldOrderEnablesDeinterlacing(): void
     {
         $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([

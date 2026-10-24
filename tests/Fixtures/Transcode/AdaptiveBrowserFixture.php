@@ -101,7 +101,7 @@ final class AdaptiveBrowserFixture
                 if ($entry['job']->getId()->equals($id)) {
                     $presentation = (new PublishedPresentationReader())->read($entry['directory']);
                     return new TranscodeRuntimeSnapshot($id, $entry['sessionId'], 'browser-fixture',
-                        new DesiredTranscodeState(AudioProfile::fromString($state['audioProfile']), 'running', 0), 1, 1, 1,
+                        new DesiredTranscodeState(AudioProfile::fromString($state['audioProfile']), 'running', $state['sourceStartTime']), 1, 1, 1,
                         $presentation?->complete ? 'complete' : 'ready', $entry['directory'], null, true);
                 }
             }
