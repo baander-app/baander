@@ -376,6 +376,55 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         }
     }
 
+    public function testExplicitOriginKeepsFreshAndSeekPresentationSourceRelative(): void
+    {
+        foreach ([0, 1, 4] as $start) {
+            $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+                startSegment: $start, sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
+            $input = array_search('-i', $args, true);
+            self::assertLessThan($input, array_search('-copyts', $args, true));
+            self::assertSame('1', $args[array_search('-seek_timestamp', $args, true) + 1]);
+            self::assertSame(sprintf('%.6f', -(4 + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
+            if ($start === 0) {
+                self::assertNotContains('-ss', $args);
+            } else {
+                self::assertSame(sprintf('%.6f', 4 + $start * 6), $args[array_search('-ss', $args, true) + 1]);
+                self::assertContains('-noaccurate_seek', $args);
+            }
+        }
+    }
+
+    public function testAbsentOriginPreservesSparseArgumentsAndExplicitZeroDoesNot(): void
+    {
+        $encoder = $this->encoder();
+        $args = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', startSegment: 1, sourceFrameRate: 0.1);
+        self::assertSame($args, $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: null));
+        self::assertNotContains('-copyts', $args);
+        self::assertNotContains('-itsoffset', $args);
+        self::assertNotContains('-seek_timestamp', $args);
+        $zero = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: 0.0);
+        self::assertContains('-copyts', $zero);
+        self::assertSame('-6.000000', $zero[array_search('-itsoffset', $zero, true) + 1]);
+    }
+
+    #[DataProvider('invalidSourceOrigins')]
+    public function testInvalidExplicitOriginIsRejected(float $origin): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output', sourceTimestampOrigin: $origin);
+    }
+
+    /** @return iterable<string, array{float}> */
+    public static function invalidSourceOrigins(): iterable
+    {
+        yield 'negative' => [-1.0];
+        yield 'infinity' => [INF];
+        yield 'negative infinity' => [-INF];
+        yield 'not a number' => [NAN];
+    }
+
     public function testProbeFieldOrderEnablesDeinterlacing(): void
     {
         $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([

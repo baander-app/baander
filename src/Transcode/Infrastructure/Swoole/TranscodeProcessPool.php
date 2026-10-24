@@ -8,6 +8,8 @@ use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use App\Transcode\Infrastructure\HLS\WebVttTimeline;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -35,11 +37,11 @@ final class TranscodeProcessPool
     public function probeVideo(TranscodeJob $job, string $sourcePath, int $generation): string
     {
         $key = sprintf('probe_video:%s:%d', $job->getId()->toString(), $generation);
-        $this->submit($key, ['/usr/bin/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', $sourcePath], 60);
+        $this->submit($key, FFprobeArguments::video($sourcePath), 60);
         return $key;
     }
 
-    public function extractSubtitles(TranscodeJob $job, string $sourcePath, int $streamIndex, string $outputPath, int $generation, float $startTime = 0.0): string
+    public function extractSubtitles(TranscodeJob $job, string $sourcePath, int $streamIndex, string $outputPath, int $generation, float $startTime = 0.0, ?float $sourceTimestampOrigin = null): string
     {
         if ($streamIndex < 0 || $startTime < 0 || !is_finite($startTime)) {
             throw new \InvalidArgumentException('Invalid subtitle stream index or start time.');
@@ -49,9 +51,7 @@ final class TranscodeProcessPool
             throw new \RuntimeException('Unable to create subtitle output directory.');
         }
         $key = sprintf('extract_subtitles:%s:%d:s%d', $job->getId()->toString(), $generation, $streamIndex);
-        $argv = ['/usr/bin/ffmpeg', '-nostdin', '-y', '-threads', '2'];
-        array_push($argv, '-i', $sourcePath, '-map', '0:' . $streamIndex,
-            '-vn', '-an', '-c:s', 'webvtt', '-f', 'webvtt', $outputPath . '.part');
+        $argv = FFmpegArguments::subtitleExtraction($sourcePath, $streamIndex, $outputPath . '.part', $sourceTimestampOrigin);
         $this->submit($key, $argv, 120, $outputPath, $startTime);
         return $key;
     }

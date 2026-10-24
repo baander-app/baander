@@ -138,7 +138,11 @@ final class SegmentEncoder
         string $audioFilters = '',
         bool $hasAudio = true,
         float $sourceFrameRate = 0.0,
+        ?float $sourceTimestampOrigin = null,
     ): array {
+        if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
+            throw new \InvalidArgumentException('Invalid source timestamp origin.');
+        }
         $sparse = is_finite($sourceFrameRate) && $sourceFrameRate > 0.0 && $sourceFrameRate < 1.0;
         $seeking = $startSegment !== null && $startSegment > 0;
         if ($sparse) {
@@ -170,9 +174,13 @@ final class SegmentEncoder
 
         array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
+        $sourceStart = $seeking ? $startSegment * self::SEGMENT_DURATION : 0.0;
+        if ($sourceTimestampOrigin !== null) {
+            array_push($args, '-copyts', '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
+        }
         if ($seeking) {
             $args[] = '-ss';
-            $args[] = sprintf('%.6f', $startSegment * self::SEGMENT_DURATION);
+            $args[] = sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $sourceStart);
             if ($sparse) {
                 $args[] = '-noaccurate_seek';
             }

@@ -5,7 +5,13 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek'].includes(fixture.scenario))
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'].includes(fixture.scenario))
+const delayed = fixture.scenario.startsWith('matroska-delayed-')
+if (delayed) {
+  assert.equal(fixture.sourceTimestampOrigin, 4)
+  assert.equal(Number(fixture.rawSourceDuration), 34)
+  assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+}
 assert.equal(fixture.audioProfile, 'streaming_stereo')
 assert.equal(fixture.sourceFrameRate, 0.1)
 const evidence = '/work/evidence'
@@ -25,6 +31,7 @@ const network = []
 const manifests = []
 const samples = []
 const colorFrames = []
+const subtitleFiles = []
 let status
 let requests = []
 let state
@@ -50,12 +57,13 @@ await page.route('**/*', async route => {
 const pendingManifests = new Set()
 page.on('response', response => {
   if (response.status() >= 400) failures.push({ kind: 'http-error', url: response.url(), status: response.status() })
-  if (!response.url().includes('.m3u8') || response.status() !== 200) return
+  if ((!response.url().includes('.m3u8') && !response.url().includes('.vtt')) || response.status() !== 200) return
   const pending = (async () => {
     try {
       const body = await response.text()
       assert(manifests.length < 150, 'Playlist evidence exceeded its bound')
-      manifests.push({ at: Date.now(), url: response.url(), body })
+      const collection = response.url().includes('.vtt') ? subtitleFiles : manifests
+      collection.push({ at: Date.now(), url: response.url(), body })
     } catch (error) { failures.push({ kind: 'playlist-body', message: error.message }) }
   })()
   pendingManifests.add(pending)
@@ -83,7 +91,11 @@ const json = (path, method = 'GET', expectedStatus = 200) => new Promise((resolv
   request.on('error', reject)
   request.end()
 })
-const snapshot = () => page.evaluate(() => ({ ...window.adaptiveState(), colorFrames: [...window.sparseColorFrames] }))
+const snapshot = () => page.evaluate(() => ({ ...window.adaptiveState(), colorFrames: [...window.sparseColorFrames],
+  cueEvents: [...window.sparseCueEvents],
+  textTracks: Array.from(document.querySelector('#video').textTracks).map(track => ({ mode: track.mode,
+    cues: Array.from(track.cues ?? []).map(cue => ({ start: cue.startTime, end: cue.endTime, text: cue.text })) })),
+}))
 const poll = async (check, description, timeout = 120000) => {
   const end = Math.min(deadline, Date.now() + timeout)
   while (Date.now() < end) {
@@ -135,10 +147,21 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(manifest => {
+  await page.evaluate(({ manifest, delayed }) => {
     window.adaptiveManifest = manifest
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
+    window.sparseCueEvents = []
+    if (delayed) {
+      video.textTracks.addEventListener('addtrack', event => {
+        const track = event.track
+        track.mode = 'showing'
+        track.addEventListener('cuechange', () => {
+          window.sparseCueEvents.push({ at: performance.now(), time: video.currentTime,
+            active: Array.from(track.activeCues ?? []).map(cue => ({ start: cue.startTime, end: cue.endTime, text: cue.text })) })
+        })
+      })
+    }
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 1
     const canvasContext = canvas.getContext('2d', { willReadFrequently: true })
@@ -151,7 +174,7 @@ try {
       video.requestVideoFrameCallback(observe)
     }
     video.requestVideoFrameCallback(observe)
-  }, fixture.manifestUrl)
+  }, { manifest: fixture.manifestUrl, delayed })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -188,14 +211,20 @@ try {
     assert(frames.length >= sourceEnd - sourceBegin - 2, `Retain native displayed ${color} frames throughout its hold`)
     assert(frames.some(frame => frame.sourceTime < sourceBegin + 1.15), `Observe the beginning of ${color}`)
     assert(frames.some(frame => frame.sourceTime >= sourceEnd - 1.15), `Observe the tail of ${color}`)
-    assert(frames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
-      && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} must coincide with recent audible samples`)
+    const audibleFrames = delayed
+      ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
+    assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
+      && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} after audio onset must coincide with recent audible samples`)
   }
   const master = manifests.find(manifest => manifest.body.includes('#EXT-X-STREAM-INF:'))
   assert(master, 'Retain the signed production master playlist')
   assert.equal(master.body.split('\n').filter(line => line.startsWith('#EXT-X-STREAM-INF:')).length, 2)
   assert(master.body.includes('mp4a.40.2'))
-  const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:'))
+  const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:')
+    && (!delayed || /\/tracks\/(?:video|audio)\//.test(new URL(manifest.url).pathname)))
+  if (delayed) {
+    for (const track of ['video', 'audio']) assert(media.some(manifest => manifest.url.includes(`/tracks/${track}/`)))
+  }
   assert(media.some(manifest => !manifest.body.includes('#EXT-X-ENDLIST')), 'Retain a growing playlist')
   for (const manifest of media) assert.equal(/#EXT-X-TARGETDURATION:(\d+)/.exec(manifest.body)?.[1], '7')
   const delivered = requests.filter(request => /\/(?:init\.mp4|segment\.m4s)(?:\?|$)/.test(request.path))
@@ -209,6 +238,47 @@ try {
   assert(delivered.some(request => request.track === 'video'))
   assert(delivered.some(request => request.track === 'audio'))
   assert(delivered.filter(request => request.track === 'audio').every(request => request.jobId === fixture.canonicalAudioJobId))
+  if (delayed) {
+    const silence = samples.filter(sample => sample.time >= 0.25 && sample.time < fixture.expectedAudioDelay - 0.25 && sample.audio.length > 0)
+    assert(silence.length >= 3, 'Observe the played initial silence before the delayed audio begins')
+    assert(silence.every(sample => sample.audio.every(audio => audio.rms < 0.001)), 'Initial audio must remain near-silent')
+    const onset = samples.find(sample => sample.audio.some(audio => audio.rms > 0.001))
+    assert(onset && onset.time >= fixture.expectedAudioDelay - 0.15 && onset.time <= fixture.expectedAudioDelay + 0.75,
+      'Measured audio must begin at its intended source-relative delay')
+    assert(master.body.includes('TYPE=SUBTITLES'), 'The production master must advertise embedded subtitles')
+    const subtitleManifests = manifests.filter(manifest => manifest.url.includes('/subtitles/'))
+    assert(subtitleManifests.length > 0 && subtitleFiles.length > 0, 'The real HLS adapter must load signed subtitles')
+    for (const manifest of subtitleManifests) {
+      const url = new URL(manifest.url)
+      assert.equal(url.searchParams.get('generation'), '1')
+      assert(url.searchParams.has('sig') && url.searchParams.has('exp'))
+      assert.equal(Number(/#EXT-X-TARGETDURATION:(\d+)/.exec(manifest.body)?.[1]), fixture.expectedDuration)
+      assert.equal(Number(/#EXTINF:([\d.]+)/.exec(manifest.body)?.[1]), fixture.expectedDuration)
+    }
+    for (const file of subtitleFiles) {
+      const url = new URL(file.url)
+      assert.equal(url.searchParams.get('generation'), '1')
+      assert(url.searchParams.has('sig') && url.searchParams.has('exp'))
+      const transfer = network.find(item => item.url === file.url && item.finished && item.status === 200)
+      assert(transfer && !transfer.fromDiskCache && !transfer.fromServiceWorker)
+      const served = requests.find(request => new URL(request.path, fixture.origin).href === file.url)
+      assert(served?.closed && served.status === 200, 'Subtitle bytes must come from the current closed generation file')
+    }
+    const cues = state.textTracks.flatMap(track => track.cues)
+    for (const expected of fixture.expectedCues) {
+      assert(cues.some(cue => cue.text === expected.text && Math.abs(cue.start - expected.start) < 0.05
+        && Math.abs(cue.end - expected.end) < 0.05), `The real text track must expose ${expected.text} at the local source time`)
+      const active = state.cueEvents.find(event => event.active.some(cue => cue.text === expected.text))
+      assert(active && active.time >= expected.start - 0.15 && active.time <= expected.start + 0.75,
+        `The real text track must activate ${expected.text} at its local cue time`)
+      assert(state.cueEvents.some(event => event.time >= expected.end - 0.05 && event.time <= expected.end + 0.75
+        && !event.active.some(cue => cue.text === expected.text)), `The text track must clear ${expected.text} at its end`)
+    }
+    assert.deepEqual([...new Set(cues.map(cue => cue.text))].sort(), fixture.expectedCues.map(cue => cue.text).sort(),
+      'Only the source-relative retained cues may reach the real text track')
+    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
+    receipt.subtitles = { files: subtitleFiles, manifests: subtitleManifests, cues, events: state.cueEvents }
+  }
   await page.screenshot({ path: `${evidence}/complete.png` })
   Object.assign(receipt, { passed: true, final: state, producer: status })
 } catch (error) {
@@ -218,7 +288,7 @@ try {
 } finally {
   requests = await json('/__adaptive/requests').catch(() => requests)
   await Promise.all([...pendingManifests])
-  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, failures })
+  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, subtitleFiles, failures })
   await writeFile(`${evidence}/result.json`, JSON.stringify(receipt, null, 2))
   await context.tracing.stop({ path: `${evidence}/trace.zip` })
   await browser.close()

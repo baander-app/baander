@@ -59,6 +59,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private ?Closure $onFence = null;
     private float $sourceDuration = 6.0;
     private string $sourceFrameRate = '0/0';
+    private ?float $sourceTimestampOrigin = null;
+    /** @var list<list<string>> */
+    private array $probeCommands = [];
     private bool $sourceHasAudio = true;
     /** @var list<array<string, mixed>> */
     private array $subtitleStreams = [];
@@ -102,6 +105,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $pool->method('release')->willReturn(true);
         $pool->method('submit')->willReturnCallback(function (array $arguments): NativeExecutionHandle {
             if ($arguments[0] === '/usr/bin/ffprobe') {
+                $this->probeCommands[] = $arguments;
                 ($this->onDispatch)?->__invoke();
                 return new NativeExecutionHandle(str_repeat('a', 64), 1);
             }
@@ -124,8 +128,10 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => ''];
             }
             return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'stdout' => json_encode([
-                'format' => ['duration' => $this->sourceDuration],
-                'streams' => array_merge([['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720, 'r_frame_rate' => $this->sourceFrameRate]],
+                'format' => ['duration' => $this->sourceDuration + ($this->sourceTimestampOrigin ?? 0.0),
+                    'format_name' => 'matroska,webm', 'start_time' => ($this->sourceTimestampOrigin ?? 0.0) + 8.0],
+                'packets' => $this->sourceTimestampOrigin === null ? [] : [['stream_index' => 0, 'pts_time' => $this->sourceTimestampOrigin, 'flags' => 'K_']],
+                'streams' => array_merge([['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720, 'r_frame_rate' => $this->sourceFrameRate, 'has_b_frames' => 0]],
                     $this->sourceHasAudio ? [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000']] : [], $this->subtitleStreams),
             ], JSON_THROW_ON_ERROR)];
         });
@@ -261,6 +267,60 @@ final class TranscodeWorkerExecutionTest extends TestCase
         }
         self::assertNotContains('failed', $this->observed);
         self::assertContains('cancelled', $this->observed);
+        self::assertSame(0, $this->allocations);
+    }
+
+    public function testVerifiedOriginReachesMediaAndSubtitlesAcrossSeekAndRecovery(): void
+    {
+        $this->sourceFrameRate = '1/10';
+        $this->sourceTimestampOrigin = 4.0;
+        $this->sourceDuration = 60.0;
+        $this->subtitleStreams = [['index' => 2, 'codec_type' => 'subtitle', 'codec_name' => 'subrip']];
+        $this->spawner->running = true;
+        $phase = 0;
+        $this->spawner->onRunning = function () use (&$phase): void {
+            if ($phase === 0 && count($this->subtitleCommands) >= 1) {
+                $phase = 1;
+                $this->current = $this->claim(2, 2, position: 24.0);
+            } elseif ($phase === 1 && count($this->subtitleCommands) >= 2) {
+                $this->current = null;
+            }
+        };
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertCount(2, $this->spawner->commands);
+        $this->current = $this->claim(3, 3, position: 24.0);
+        $this->spawner->onRunning = function (): void {
+            if (count($this->subtitleCommands) >= 3) {
+                $this->current = $this->claim(3, 4, 'cancelled', position: 24.0);
+            }
+        };
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertCount(3, $this->spawner->commands);
+        self::assertCount(3, $this->subtitleCommands);
+        self::assertCount(2, $this->probeCommands);
+        foreach ($this->probeCommands as $command) {
+            self::assertSame(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video($this->root . '/source'), $command);
+        }
+        foreach ($this->spawner->commands as $index => $command) {
+            $sourceStart = $index === 0 ? 0.0 : 6.0;
+            self::assertContains('-copyts', $command);
+            self::assertSame('1', $command[array_search('-seek_timestamp', $command, true) + 1]);
+            self::assertSame(sprintf('%.6f', -(4 + $sourceStart)), $command[array_search('-itsoffset', $command, true) + 1]);
+            if ($index > 0) {
+                self::assertSame('10.000000', $command[array_search('-ss', $command, true) + 1]);
+            }
+            $metadata = json_decode(file_get_contents(dirname($command[array_key_last($command)]) . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
+            self::assertSame($sourceStart, (float) $metadata['startTime']);
+            self::assertSame(60.0, (float) $metadata['duration']);
+        }
+        foreach ($this->subtitleCommands as $command) {
+            self::assertContains('-copyts', $command);
+            self::assertSame('-4.000000', $command[array_search('-itsoffset', $command, true) + 1]);
+            self::assertNotContains('-ss', $command);
+        }
+        self::assertSame(4.0, $this->job->getProbeData()['sourceTimestampOrigin']);
+        self::assertSame(60.0, $this->job->getProbeData()['duration']);
+        self::assertNotContains('failed', $this->observed);
         self::assertSame(0, $this->allocations);
     }
 
@@ -583,7 +643,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $queue = [$track];
         $active = [$key => $track];
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
-        $arguments = [$this->current, $this->job, $this->root.'/source', $storage, 0.0, &$queue, &$active, hrtime(true) - 1];
+        $arguments = [$this->current, $this->job, $this->root.'/source', $storage, 0.0, null, &$queue, &$active, hrtime(true) - 1];
         (new \ReflectionMethod(TranscodeSessionSubscriber::class, 'pollSubtitles'))->invokeArgs($this->worker, $arguments);
         self::assertSame([], $queue);
         self::assertSame([], $active);

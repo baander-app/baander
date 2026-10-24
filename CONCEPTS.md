@@ -185,6 +185,14 @@ the execution generation's source start time gives its local media position. The
 movie seek control spans the full source duration even while the published
 presentation contains only part of the remaining media.
 
+### Source timestamp origin
+
+An explicit timestamp anchor established from the selected movie stream's first
+verified presentation packet. Subtracting this anchor maps source timestamps to
+Source position. It can differ from the container's reported start time and is
+separate from a generation's requested source start position. An absent anchor
+retains the existing input timestamp handling; it does not mean an inferred zero.
+
 ### Transcode control receipt
 
 A durable record that one session has applied a request identity. It prevents the
