@@ -111,3 +111,47 @@ this phase.
 Independent review approved this plan before implementation, including source-key
 identity, owner resets, teardown/default-selection races and observation-only
 browser checks.
+
+## Progressive movie synchronization repair
+
+The first repaired Chromium run passed all eight phases in 576.566 seconds.
+Firefox passed every new subtitle continuity check, then failed the existing
+progress-outage generation invariant. Its retained run under
+`var/test-runs/movie-subtitle-selection-firefox` exited after 326.790 seconds with
+verified cleanup. The current media clock reached 24.00566 at a buffer ending at
+24 seconds; a subsequent playlist update was followed by a backward native seek
+to 10.501. The hook submitted that movement as a source seek, advancing execution
+generation from 6 to 7. No fixture pointer, keyboard or position mutation occurred
+in this interval. This run is not final acceptance evidence.
+
+Installed HLS.js synchronizes growing playlists as live streams. Its stream
+controller can move backward to the live sync point when playback is outside the
+current playlist window and the buffer is starving. A focused reproduction using
+the actual installed library produces the exact 24.00566-to-10.501 movement. The
+chosen synthetic playlist age reproduces the target; the production receipt does
+not separately establish its internal age and stall-counter values. Retain this
+probe and variants under `var/test-runs/movie-subtitle-selection-gates`.
+
+Extend this phase narrowly to disable the optional latency controller for the
+movie attachment through `latencyController: undefined`. The library preserves
+this configuration, skips controller construction and returns null from its
+[public live-sync position getter](https://hlsjs.video-dev.org/api-docs/hls.js.hls.livesyncposition).
+The stream controller's null guard then prevents live-edge seeking. Movies retain
+explicit source positions as their clock authority while their output grows.
+The focused actual-library variant preserves the cursor and configured start
+position. Do not patch private library methods, change manifests, reinterpret
+native user gestures, remove the generation assertion or increase deadlines.
+
+The application worker owns the adapter and a focused integration regression that
+uses the real installed HLS.js synchronization behavior through the adapter's
+configuration. First show the regression failing with the current adapter; a mock
+configuration assertion alone is insufficient. Retain the existing hook controls,
+subtitle checks, native fallback and cleanup. Independently review this addendum
+before implementation and the final diff before acceptance. Repeat affected
+frontend gates, rebuild the worker image, then run both full browser lifecycles
+sequentially. Preserve the earlier Chromium pass and Firefox failure separately
+from final acceptance and record this additional mechanism in ROADMAP.md.
+
+Independent review approved the synchronization addendum before implementation,
+including the optional-controller configuration, actual-library regression and
+unchanged control and deadline assertions.
