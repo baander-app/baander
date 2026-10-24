@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
 import { chromium } from 'playwright-core'
+import { canDeferVideoCancellation, classifyVideoCancellations } from './video-cancellation.mjs'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
@@ -97,6 +98,7 @@ cdp.on('Media.playerEventsAdded', event => {
 })
 await cdp.send('Media.enable')
 const failures = []
+const deferredCancellations = []
 const network = []
 const manifests = []
 const samples = []
@@ -111,14 +113,21 @@ const receipt = { ...versions, scenario: fixture.scenario, fixture, browser: bro
     launchFlags }, rendering, mediaDiagnostics }
 cdp.on('Network.requestWillBeSent', event => {
   if (network.length >= 2000) return failures.push({ kind: 'request-bound' })
-  network.push({ id: event.requestId, url: event.request.url, started: event.timestamp })
+  network.push({ id: event.requestId, url: event.request.url, method: event.request.method,
+    started: event.timestamp, wallTime: event.wallTime })
 })
 cdp.on('Network.responseReceived', event => Object.assign(network.find(item => item.id === event.requestId) ?? {},
   { status: event.response.status, fromDiskCache: event.response.fromDiskCache, fromServiceWorker: event.response.fromServiceWorker }))
 cdp.on('Network.loadingFinished', event => Object.assign(network.find(item => item.id === event.requestId) ?? {},
   { finished: event.timestamp, bytes: event.encodedDataLength }))
-cdp.on('Network.loadingFailed', event => failures.push({ kind: 'transport', url: network.find(item => item.id === event.requestId)?.url,
-  error: event.errorText, canceled: event.canceled }))
+cdp.on('Network.loadingFailed', event => {
+  const transfer = network.find(item => item.id === event.requestId)
+  Object.assign(transfer ?? {}, { failed: event.timestamp, error: event.errorText, canceled: event.canceled, blockedReason: event.blockedReason })
+  const failure = { kind: 'transport', id: event.requestId, url: transfer?.url, method: transfer?.method,
+    failed: event.timestamp, error: event.errorText, canceled: event.canceled, blockedReason: event.blockedReason }
+  if (canDeferVideoCancellation(failure, fixture)) deferredCancellations.push(failure)
+  else failures.push(failure)
+})
 page.on('pageerror', error => failures.push({ kind: 'page-error', message: error.message }))
 await page.route('**/*', async route => {
   if (new URL(route.request().url()).origin !== fixture.origin) {
@@ -447,13 +456,16 @@ try {
   }
   assert(media.some(manifest => !manifest.body.includes('#EXT-X-ENDLIST')), 'Retain a growing playlist')
   for (const manifest of media) assert.equal(/#EXT-X-TARGETDURATION:(\d+)/.exec(manifest.body)?.[1], '7')
+  receipt.acceptedCancellations = classifyVideoCancellations({ fixture, cancellations: deferredCancellations, network, requests })
   const delivered = requests.filter(request => /\/(?:init\.mp4|segment\.m4s)(?:\?|$)/.test(request.path))
   assert(delivered.length > 0 && delivered.every(request => request.status === 200 && request.closed))
   for (const request of delivered) {
     const url = new URL(request.path, fixture.origin)
     assert(url.searchParams.has('sig') && url.searchParams.has('exp'), 'Every resource must be signed')
     const transfer = network.find(item => item.url === url.href && item.finished && item.status === 200)
-    assert(transfer && !transfer.fromDiskCache && !transfer.fromServiceWorker, 'Media must arrive freshly over the network')
+    const replaced = receipt.acceptedCancellations.find(evidence => evidence.abandoned.serverReceipt === request)
+    assert((transfer && !transfer.fromDiskCache && !transfer.fromServiceWorker) || replaced,
+      'Media must arrive freshly or have its exact canceled server receipt covered by a completed authenticated replacement')
   }
   assert(delivered.some(request => request.track === 'video'))
   assert(delivered.some(request => request.track === 'audio'))
@@ -632,6 +644,8 @@ try {
     }
     assert.deepEqual(failures, [], 'Subtitle seek verification must preserve successful transport and playback')
   }
+  requests = await json('/__adaptive/requests')
+  receipt.acceptedCancellations = classifyVideoCancellations({ fixture, cancellations: deferredCancellations, network, requests })
   Object.assign(receipt, { passed: true, final: state, producer: status })
 } catch (error) {
   Object.assign(receipt, { passed: false, error: error.stack, final: receipt.naturalEnd ?? await snapshot().catch(() => null), producer: status })
@@ -647,7 +661,17 @@ try {
   }
   requests = await json('/__adaptive/requests').catch(() => requests)
   await Promise.all([...pendingManifests])
-  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, subtitleFiles, failures })
+  if (receipt.passed) {
+    try {
+      assert.deepEqual(failures, [], 'Every nonreplacement transport failure remains fatal')
+      receipt.acceptedCancellations = classifyVideoCancellations({ fixture, cancellations: deferredCancellations, network, requests })
+    } catch (error) {
+      receipt.passed = false
+      receipt.error = error.stack
+      process.exitCode = 1
+    }
+  }
+  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, subtitleFiles, failures, deferredCancellations })
   await writeFile(`${evidence}/result.json`, JSON.stringify(receipt, null, 2))
   await context.tracing.stop({ path: `${evidence}/trace.zip` })
   await browser.close()

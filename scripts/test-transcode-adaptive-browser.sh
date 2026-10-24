@@ -84,6 +84,7 @@ writeFileSync(`${workspace}/browser/bundle-inputs.json`, JSON.stringify(bundle.m
 JS
 cp ui/web/tests/e2e/transcode-adaptive/index.html "$workspace/assets/"
 cp "ui/web/tests/e2e/transcode-adaptive/$browser_script" "$workspace/browser/browser.mjs"
+cp ui/web/tests/e2e/transcode-adaptive/video-cancellation.mjs "$workspace/browser/"
 cp -R ui/web/node_modules/playwright-core "$workspace/browser/node_modules/"
 cp "$workspace/browser/versions.json" "$artifacts/versions.json"
 cp "$workspace/browser/bundle-inputs.json" "$artifacts/bundle-inputs.json"
