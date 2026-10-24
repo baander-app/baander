@@ -1,7 +1,7 @@
 ---
 title: Preserve the verified source origin of sparse Matroska movies
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -9,9 +9,9 @@ execution: code
 
 ## Selected failure
 
-Current master 404729b6 still truncates the retained sparse Matroska movie. Its
-three H.264 frames have PTS 0, 10 and 20 with ten-second holds, while audio begins
-at eight seconds. FFmpeg reports format and video origins of eight seconds.
+At the start of this plan, master 404729b6 truncates the retained sparse Matroska
+movie. Its three H.264 frames have PTS 0, 10 and 20 with ten-second holds, while
+audio begins at eight seconds. FFmpeg reports format and video origins of eight seconds.
 Implicit timestamp subtraction produces a 22-second fresh presentation, changes
 red to green after two seconds and removes the intended audio delay. Restarting
 at source second six produces sixteen seconds beginning on the wrong frame.
@@ -238,8 +238,9 @@ and fragment decode times are continuous. A standalone native MP4 control clears
 the same cue correctly; that single control does not exclude a conditional browser
 scheduling defect.
 
-Chromium 148.0.7778.96 uses closed interval overlap when determining active cues
-and an exclusive next interval boundary when scheduling the next update. At an
+Chromium 148.0.7778.96 uses [closed interval overlap](https://raw.githubusercontent.com/chromium/chromium/148.0.7778.96/third_party/blink/renderer/platform/wtf/pod_interval.h)
+when determining active cues and an [exclusive next interval boundary](https://raw.githubusercontent.com/chromium/chromium/148.0.7778.96/third_party/blink/renderer/platform/wtf/pod_interval_tree.h)
+when [scheduling the next update](https://raw.githubusercontent.com/chromium/chromium/148.0.7778.96/third_party/blink/renderer/core/html/track/cue_timeline.cc). At an
 exact endpoint, those rules can retain the current cue while scheduling the next
 boundary. The repeated ten-second wall interval matches that mechanism, but the
 internal timer invocation has not been observed. Treat this attribution as an
@@ -283,3 +284,31 @@ Independent review approved implementation after these measurements. Snapshot
 live cue lists before mutation, preserve current track ownership and guard against
 reentrant refresh. The final browser tests retain the existing timing bounds and
 must prove actual cue clearing, signed delivery and natural audio/video completion.
+
+## Verification checkpoint
+
+Implementation and independent code/simplification review are complete at
+`538cc7e1`. The source-origin native selection passes nineteen cases with 3,486
+assertions, including actual decoded AAC/Opus onset and complete tails. The full
+Transcode selection at `3b0cfc79` passes 1,044 tests with 17,426 assertions across
+80 files; subsequent changes affect only the frontend guard and observer.
+PHPStan reports no errors. Deptrac reports no violations, warnings or errors and
+484 existing skipped violations. The catalog-hook selection passes 271 tests
+across five files, full frontend typechecking passes, and focused lint passes.
+
+Fresh and source-seek Chromium acceptance passes at `538cc7e1`, retaining natural
+thirty- and 24-second completion, actual audio onset at 8.064 and 2.082667 seconds,
+signed native subtitles, timely visible cue removal and same-object backward
+re-entry. The ordinary adaptive control also passes with 720p-to-360p-to-720p
+presentation and positive audio in each phase. Caption screenshots and native
+state observations agree. Recovered publication waits remain recorded; these
+results do not establish generally uninterrupted playback.
+
+The native subtitle guard is installed only for Hls.js attachments. Native HLS
+fallback remains unchanged. Controlled AAC/Opus runs also preserve the measured
+loudness filter chain before leading-silence normalization, without asynchronous
+resampling. Final receipts and their source revisions are collected in
+`var/test-runs/matroska-origin-gates/verification-summary.json`. ROADMAP.md and the
+testing guide record the commands, exact checkpoints and remaining qualification
+limits. All owned containers were removed; the pre-existing nginx, PostgreSQL and
+Redis containers remain. This work is committed locally; merge and push are separate.

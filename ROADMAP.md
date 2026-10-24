@@ -1813,3 +1813,90 @@ browsers, DASH browser playback, formal CMAF conformance or the whole applicatio
 lifecycle.
 Existing application databases, Redis and original media were untouched. This
 checkpoint includes no push or feature merge.
+
+### Verified sparse Matroska origins and native caption timing — 2026-10-24
+
+The shared video probe reads at most 128 packets across all streams alongside
+format and stream metadata. Origin evidence comes only from the selected
+non-attached H.264 stream with explicitly zero B-frames, finite positive cadence
+below one fps and a first key packet with finite nonnegative PTS and no discard
+flag. Format start must be at or after that PTS and duration must exceed it.
+A mismatched start or positive verified origin selects an explicit common anchor.
+Qualified Matroska duration is normalized once; generation positions remain
+source-relative while media shifts video/audio together and seeks absolutely.
+Subtitle extraction removes only the origin before existing seek rebasing.
+
+For an anchored positive restart before one nominal frame interval, encoding
+reads from the beginning while retaining the logical seek offset and trimming;
+later restarts keep fast seeking. Anchored audio materializes leading delay as
+encoded silence after profile filters, without asynchronous resampling or a new
+anchor. The nominal interval does not qualify general variable-rate seeking.
+
+The actual audio-first source puts its first movie packet at position 95. The
+original sixteen-packet prefix correctly yielded no evidence; 128 packets retain
+that source and measured 19,706 output bytes in 0.068 seconds. The native probe
+keeps its one-MiB stdout and stderr limits and sixty-second deadline. Unit controls
+cover packet 128, no selected movie packet and rejection of a 129-packet input;
+native audio-first cases retain the movie packet at position 95.
+
+Earlier native timestamp checks passed while HLS played the tone immediately:
+the delay existed in the MPD and an MP4 edit list, not encoded silent samples.
+The failed `browser-fresh-expanded` receipt and `audio-delay-diagnosis.json` retain
+that proof gap. Strengthened HLS PCM tests measure full duration, initial silence
+and actual tone onset. Against `27052197` they failed 12 of 19 cases with 3,250
+assertions; production `2a5bdc96` and test revision `3b0cfc79` passed all nineteen
+with 3,486 assertions. Native cases cover zero/positive origins, matched/delayed
+audio, fresh/six-/24-second restarts, H.264/HEVC, AAC/Opus and embedded subtitles.
+
+The browser then exposed an expired early cue remaining visible until 8.584
+seconds despite correct cue timestamps. The HLS attachment now refreshes showing
+subtitle/caption cues that remain active over 100 ms past their end while not
+seeking. It removes and re-adds the same native cue without changing times or mode
+or fabricating events. Disposal and fatal failure remove the listener; native HLS
+fallback is unchanged. Review verified same-object backward re-entry, stable cue count and
+selection, activity at the exact endpoint and clearance afterward. Observer
+`538cc7e1` samples actual native state every 100 ms and separately tests seeking
+after natural completion; raw cue-change events remain diagnostics.
+
+Backend verification at `3b0cfc79` passed 1,044 tests with 17,426 assertions across
+80 files: 990 with 12,118 assertions in the ordinary lane and 54 with 5,308 in the
+native lane, including the nineteen origin cases. The receipt is
+`var/test-runs/matroska-origin-gates/backend/20261024-172114-d78b704b`.
+Full PHPStan reported no errors; Deptrac reported zero violations, warnings and
+errors with 484 existing skipped violations. At frontend revision `b935bbf3`,
+271 tests across five files, full frontend typechecking and focused lint of
+four changed TypeScript files passed. Backend behavior did not change with the
+subsequent frontend guard and observer commits.
+
+Both delayed Matroska scenarios passed at `538cc7e1` with Chromium 148.0.7778.96,
+Playwright 1.60.0, HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1. Fresh playback
+finished in 38.908 seconds at its thirty-second natural end with 30 decoded
+frames. Tone began at 8.064 seconds after 51 qualifying silent samples; native
+cues activated/cleared at 2.040056/4.040060 and 12.010666/14.128064. Playback
+resumed after waits of 3.4206 seconds at 5.994667 and 3.4836 at 12.010666.
+The seek run finished in 33.773 seconds at its 24-second end with 24 frames,
+tone onset at 2.082667 after seven silent samples, and its retained cue active
+from 6.082667 to 8.282667. It recorded no waits after playback began. All six
+caption screenshots were inspected; same-object backward re-entry and cleanup
+passed for both scenarios. These are measured timing results, not a promise of
+stall-free playback. Receipts and visual-timing evidence are under
+`var/test-runs/matroska-origin-gates/browser-fresh-final` and
+`var/test-runs/matroska-origin-gates/browser-seek-final`.
+
+The ordinary adaptive control also passed at `538cc7e1` in 115.602 seconds,
+presenting 720p-to-360p-to-720p at source positions 6.469333, 24.498667 and
+90.546608 with 160, 593 and 2,178 decoded frames and positive audio in every
+phase. It retained one attachment without media or transport failures and
+recovered after a 3.5562-second wait at source 17.92. Its receipt is
+`var/test-runs/matroska-origin-gates/browser-adaptive-final`. All three final
+browser cleanup checks passed; only pre-existing containers remained.
+Independent final acceptance review approved the delivered scope.
+`var/test-runs/matroska-origin-gates/verification-summary.json` records exact
+versions, source revisions, measurements and the final checkpoint.
+
+Evidence is under `var/test-runs/matroska-origin-gates`; the testing guide records
+commands and the verified contract. Missing packet evidence, negative origins,
+B-frame sources, arbitrary Matroska files, other containers, general variable-rate
+gaps, hardware, other browsers, DASH browser playback and formal CMAF conformance
+remain unqualified. Existing application databases, Redis and original media were
+untouched. This checkpoint includes no push or feature merge.
