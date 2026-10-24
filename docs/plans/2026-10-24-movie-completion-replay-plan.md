@@ -171,3 +171,29 @@ origin and frame synchronization; keep copied packet CRCs, PCM output, strict
 480-frame full-output checks with their existing one-frame tolerance, exact
 312-frame prefix checks, duration limits and live-versus-completed equality checks.
 Do not change the producer or increase count tolerances for this observation.
+
+## Progress observation timing
+
+The rebuilt Chromium run stopped in an existing progress-outage observation before
+the completion scenario. Decoding survived the dropped progress request, and a
+later progress write succeeded. The source detached 11 milliseconds before Node
+recorded a response with a changed rendition set; the successor master matched
+that response's set and capability. Its capability expiry was a day away. The
+failure and verified cleanup remain under
+`var/test-runs/movie-completion-replay-chromium-accepted`; that directory name does
+not indicate a passing run. The exact browser response time was not captured in
+this progress observation.
+
+Use the fixture's existing browser XHR-DONE signing receipts and causal detachment
+checks for progress outages, as the status-outage checks already do. Read media
+events and signing receipts together. Keep owner/generation checks, real progress
+acceptance and canonical-position evidence, advancing decoded media, no-seek
+assertions and bounded attempts. Require every replacement to follow an actual
+browser receipt for its successor rendition set; retain failure for media errors,
+unexplained teardown or unmatched replacement. Do not substitute Node scheduling
+time for browser delivery order or accept a later response retrospectively.
+
+This is a browser-fixture change only. Review it before implementation, preserve
+all existing assertions and deadlines, and rerun both full browser lifecycles.
+The verified worker image can be reused when application-source parity with its
+recorded revision is checked.
