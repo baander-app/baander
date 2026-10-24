@@ -869,8 +869,20 @@ int write_er_frame(AacEncoderState* s) {
     write_channel_stream(&w, &s->ch[el->ch[0]], max_sfb, 1, s->aot);
     write_channel_stream(&w, &s->ch[el->ch[1]], max_sfb, 1, s->aot);
   }
-  /* LD-SBR: an AAC-ELD encoder with SBR writes the ld_sbr payload of
-   * every channel element here, after the last one. */
+  if (s->ld_sbr) {
+    /* ld_sbr_data(): the sbr_data() of every SCE and CPE in element
+     * order, each behind its CRC when the stream carries one. */
+    for (int e = 0; e < s->num_elements; e++) {
+      const AacSbrLdEncoder* sbr = s->ld_sbr_enc[e];
+      if (s->elem[e].type == AAC_ELEM_LFE) {
+        continue;
+      }
+      if (s->ld_sbr_crc) {
+        aac_bitwriter_write(&w, aac_sbr_ld_crc(sbr->payload, 0, sbr->payload_bits), 10);
+      }
+      aac_sbr_ld_enc_write(sbr, &w);
+    }
+  }
   aac_bitwriter_byte_align(&w);
   if (aac_bitwriter_overflow(&w)) {
     return AAC_ERR_OVERFLOW;
@@ -974,6 +986,9 @@ int frame_overhead_bits(const AacEncoderState* s) {
     }
     if (s->sbr[e]) {
       bits += aac_sbr_enc_bits(s->sbr[e]);
+    }
+    if (s->ld_sbr && el->type != AAC_ELEM_LFE) {
+      bits += aac_sbr_ld_enc_bits(s->ld_sbr_enc[e]) + (s->ld_sbr_crc ? 10 : 0);
     }
     bits += aac_drc_encoder_bits(&s->drc);
   }
@@ -1319,6 +1334,34 @@ void destroy_sbr_encoders(AacEncoderState* s) {
   }
 }
 
+void destroy_ld_sbr_encoders(AacEncoderState* s) {
+  for (int e = 0; e < AAC_MAX_ELEMENTS; e++) {
+    delete s->ld_sbr_enc[e];
+    s->ld_sbr_enc[e] = nullptr;
+  }
+}
+
+/* AAC-ELD with LD-SBR: one low-delay SBR encoder per element with the
+ * element's share of the bitrate.  The core codec's delay, which the
+ * encoder aligns its envelopes to, is the ELD chain's: the frame's
+ * lookahead and the low-delay filterbank, in core samples. */
+int create_ld_sbr_encoders(AacEncoderState* s) {
+  destroy_ld_sbr_encoders(s);
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacEncElement* el = &s->elem[e];
+    const int el_bitrate = (int)((long long)s->bitrate * el->num_ch / s->channels);
+    s->ld_sbr_enc[e] = new AacSbrLdEncoder();
+    const int ret = aac_sbr_ld_enc_init(s->ld_sbr_enc[e], s->sample_rate, s->frame_length,
+                                        s->ld_sbr_dual_rate, el->num_ch, el_bitrate,
+                                        AAC_ENCODER_ELD_DELAY(s->frame_length), nullptr);
+    if (ret) {
+      destroy_ld_sbr_encoders(s);
+      return ret;
+    }
+  }
+  return AAC_OK;
+}
+
 /* HE-AAC: one SBR encoder per SCE or CPE, with the element's share of
  * the bitrate; with parametric stereo the single SCE takes both inputs.
  * An LFE gets the half-rate downsampler instead. */
@@ -1365,6 +1408,11 @@ void apply_frame_length(AacEncoderState* s) {
     s->delay = AAC_ENCODER_LD_DELAY(fl);
   } else if (s->aot == AAC_AOT_ER_ELD) {
     s->delay = AAC_ENCODER_ELD_DELAY(fl);
+  }
+  if (s->ld_sbr) {
+    s->frame_size = s->ld_sbr_dual_rate ? 2 * fl : fl;
+    s->delay =
+        s->ld_sbr_dual_rate ? AAC_ENCODER_ELD_SBR_DELAY(fl) : AAC_ENCODER_ELD_SBR_SINGLE_DELAY(fl);
   }
   aac_mdct_init(&s->mdct_long, 2 * fl);
   aac_mdct_init(&s->mdct_short, 2 * aac_short_length(fl));
@@ -1457,6 +1505,13 @@ int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length) {
       }
     }
   }
+  if (s->ld_sbr) {
+    const int ret = create_ld_sbr_encoders(s);
+    if (ret) {
+      s->ld_sbr = 0;
+      return ret;
+    }
+  }
   apply_frame_length(s);
   aac_encoder_state_configure(s);
   aac_encoder_state_reset(s);
@@ -1498,6 +1553,9 @@ void aac_encoder_state_configure(AacEncoderState* s) {
     if (s->sbr[e]) {
       core_bitrate -= kSbrBitrateEstimate * (s->sbr[e]->ps ? 1 : s->sbr[e]->channels);
     }
+    if (s->ld_sbr && s->elem[e].type != AAC_ELEM_LFE) {
+      core_bitrate -= kSbrBitrateEstimate * s->elem[e].num_ch;
+    }
   }
   const int channel_bitrate = std::max(core_bitrate, 8000) / s->channels;
   const int fl = s->frame_length;
@@ -1518,10 +1576,15 @@ void aac_encoder_state_configure(AacEncoderState* s) {
    * crossover, whatever the bitrate suggests: the generator copies the
    * bands just below it upwards, so they must carry signal. */
   for (int e = 0; e < s->num_elements; e++) {
-    if (!s->sbr[e]) {
+    int cutoff;
+    if (s->sbr[e]) {
+      cutoff = s->sbr[e]->freq.kx * s->input_rate / 128;
+    } else if (s->ld_sbr && s->elem[e].type != AAC_ELEM_LFE) {
+      /* the SBR bands of LD-SBR are core_rate / 64 wide at either rate */
+      cutoff = s->ld_sbr_enc[e]->freq.kx * s->sample_rate / 64;
+    } else {
       continue;
     }
-    const int cutoff = s->sbr[e]->freq.kx * s->input_rate / 128;
     const AacEncElement* el = &s->elem[e];
     for (int k = 0; k < el->num_ch; k++) {
       AacEncChannel* ch = &s->ch[el->ch[k]];
@@ -1564,6 +1627,9 @@ void aac_encoder_state_reset(AacEncoderState* s) {
     if (s->lfe_down[e]) {
       aac_sbr_downsampler_init(s->lfe_down[e], s->frame_length);
     }
+    if (s->ld_sbr_enc[e]) {
+      aac_sbr_ld_enc_reset(s->ld_sbr_enc[e]);
+    }
   }
   memset(s->sbr_in, 0, sizeof(s->sbr_in));
   memset(s->core_in, 0, sizeof(s->core_in));
@@ -1582,6 +1648,9 @@ int aac_encoder_state_max_frame_bytes(const AacEncoderState* s) {
     if (s->sbr[e]) {
       bytes += AAC_SBR_ENC_MAX_BYTES + 2;
     }
+    if (s->ld_sbr && s->elem[e].type != AAC_ELEM_LFE) {
+      bytes += AAC_SBR_LD_ENC_MAX_BYTES + 2;
+    }
   }
   return bytes;
 }
@@ -1591,7 +1660,40 @@ void aac_encoder_state_destroy(AacEncoderState* s) {
     return;
   }
   destroy_sbr_encoders(s);
+  destroy_ld_sbr_encoders(s);
   delete s;
+}
+
+int aac_encoder_state_set_ld_sbr(AacEncoderState* s, int enabled, int dual_rate) {
+  if (s->aot != AAC_AOT_ER_ELD) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const bool half = enabled && dual_rate;
+  if (half && s->input_rate % 2) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const int core_rate = half ? s->input_rate / 2 : s->input_rate;
+  const int rate_index = aac_asc_rate_index(core_rate);
+  if (rate_index < 0 || !aac_low_delay_rate_supported(rate_index)) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  destroy_ld_sbr_encoders(s);
+  s->ld_sbr = enabled ? 1 : 0;
+  s->ld_sbr_dual_rate = half ? 1 : 0;
+  s->sample_rate = core_rate;
+  s->rate_index = rate_index;
+  int ret = AAC_OK;
+  if (enabled && (ret = create_ld_sbr_encoders(s)) != AAC_OK) {
+    /* back to plain AAC-ELD at the input rate */
+    s->ld_sbr = 0;
+    s->ld_sbr_dual_rate = 0;
+    s->sample_rate = s->input_rate;
+    s->rate_index = aac_asc_rate_index(s->input_rate);
+  }
+  apply_frame_length(s);
+  aac_encoder_state_configure(s);
+  aac_encoder_state_reset(s);
+  return ret;
 }
 
 int aac_encoder_state_set_channel_mode(AacEncoderState* s, AacChannelMode mode) {
@@ -1610,6 +1712,10 @@ int aac_encoder_state_set_channel_mode(AacEncoderState* s, AacChannelMode mode) 
     if (create_sbr_encoders(s) != AAC_OK) {
       return AAC_ERR_INIT;
     }
+  }
+  if (s->ld_sbr && create_ld_sbr_encoders(s) != AAC_OK) {
+    s->ld_sbr = 0;
+    return AAC_ERR_INIT;
   }
   aac_encoder_state_configure(s);
   aac_encoder_state_reset(s);
@@ -1650,13 +1756,45 @@ void sbr_process(AacEncoderState* s, const float* pcm) {
   }
 }
 
+/* AAC-ELD with LD-SBR: runs each element's low-delay SBR encoder over
+ * the input block (at full scale 1.0, as the module takes it) and leaves
+ * the core signal of every channel in core_in at the coder's scale. */
+void ld_sbr_process(AacEncoderState* s, const float* pcm) {
+  const int in_ch = s->input_channels;
+  if (pcm) {
+    for (int c = 0; c < in_ch; c++) {
+      for (int i = 0; i < s->frame_size; i++) {
+        s->sbr_in[c][i] = pcm[i * in_ch + c];
+      }
+    }
+  }
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacEncElement* el = &s->elem[e];
+    const float* in[2] = {nullptr, nullptr};
+    float* core[2] = {nullptr, nullptr};
+    for (int k = 0; k < el->num_ch; k++) {
+      in[k] = pcm ? s->sbr_in[el->ch[k]] : nullptr;
+      core[k] = s->core_in[el->ch[k]];
+    }
+    aac_sbr_ld_enc_process(s->ld_sbr_enc[e], in[0], in[1], core[0], core[1]);
+    for (int k = 0; k < el->num_ch; k++) {
+      for (int i = 0; i < s->frame_length; i++) {
+        core[k][i] *= kInputScale;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
-  const bool sbr = aac_encoder_aot_has_sbr(s->aot);
+  /* with SBR of either kind the core codes the signal in core_in */
+  const bool sbr = aac_encoder_aot_has_sbr(s->aot) || s->ld_sbr;
   const int fl = s->frame_length;
   s->started = 1;
-  if (sbr) {
+  if (s->ld_sbr) {
+    ld_sbr_process(s, pcm);
+  } else if (sbr) {
     sbr_process(s, pcm);
   }
   /* Shift in the new block; the frame to code spans pcm[0 .. 2 fl) (AAC-ELD:

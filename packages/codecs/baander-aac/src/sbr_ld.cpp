@@ -889,6 +889,20 @@ int aac_sbr_ld_delay(const AacSbrLdState* s) {
   return s->dual_rate ? AAC_CLDFB_DELAY + 1 : (AAC_CLDFB_DELAY + 1) / 2;
 }
 
+uint16_t aac_sbr_ld_crc(const uint8_t* data, int bit_offset, int nbits) {
+  uint16_t crc = 0x3FF;
+  for (int i = 0; i < nbits; i++) {
+    const int pos = bit_offset + i;
+    const int bit = (data[pos >> 3] >> (7 - (pos & 7))) & 1;
+    const int feedback = ((crc >> 9) & 1) ^ bit;
+    crc = (uint16_t)((crc << 1) & 0x3FF);
+    if (feedback) {
+      crc ^= 0x233;
+    }
+  }
+  return crc;
+}
+
 int aac_sbr_ld_read(AacSbrLdState* s, AacBitReader* r, int elem_type, int crc) {
   if (elem_type != s->elem_type) {
     /* delta coding in time starts over */
@@ -898,9 +912,11 @@ int aac_sbr_ld_read(AacSbrLdState* s, AacBitReader* r, int elem_type, int crc) {
     }
     s->elem_type = elem_type;
   }
+  uint32_t crc_sent = 0;
   if (crc) {
-    aac_bitreader_skip(r, 10);
+    crc_sent = aac_bitreader_read(r, 10);
   }
+  const int data_start = r->pos;
   int ret;
   if (elem_type == AAC_ELEM_SCE) {
     ret = read_single_channel(s, r);
@@ -919,13 +935,10 @@ int aac_sbr_ld_read(AacSbrLdState* s, AacBitReader* r, int elem_type, int crc) {
   if (ret == 0 && r->overread) {
     ret = AAC_ERR_DECODE;
   }
-  s->have_data = ret == 0;
-  if (ret) {
-    for (int c = 0; c < 2; c++) {
-      memset(s->ch[c].env_facs_q, 0, sizeof(s->ch[c].env_facs_q));
-      memset(s->ch[c].noise_facs_q, 0, sizeof(s->ch[c].noise_facs_q));
-    }
+  if (ret == 0 && crc && aac_sbr_ld_crc(r->data, data_start, r->pos - data_start) != crc_sent) {
+    ret = AAC_ERR_DECODE;
   }
+  s->have_data = ret == 0;
   return ret;
 }
 

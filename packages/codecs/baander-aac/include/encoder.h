@@ -13,6 +13,7 @@
 #include "mdct.h"
 #include "psycho.h"
 #include "sbr_enc.h"
+#include "sbr_ld_enc.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,6 +35,15 @@ extern "C" {
  * plus the low-delay filterbank's delay of half a frame, 768 (720). */
 #define AAC_ENCODER_LD_DELAY(frame_length) (2 * (frame_length))
 #define AAC_ENCODER_ELD_DELAY(frame_length) (3 * (frame_length) / 2)
+/* AAC-ELD with LD-SBR, in input samples: the core's delay at the core
+ * rate, the encoder's CLDFB analysis and core synthesis
+ * (aac_sbr_ld_enc_delay) and the decoder's CLDFB analysis and synthesis
+ * (aac_sbr_ld_delay: AAC_CLDFB_DELAY + 1 at the doubled rate, half that at
+ * the core rate). */
+#define AAC_ENCODER_ELD_SBR_DELAY(frame_length) \
+  (2 * AAC_ENCODER_ELD_DELAY(frame_length) + 2 * AAC_CLDFB_DELAY + 1)
+#define AAC_ENCODER_ELD_SBR_SINGLE_DELAY(frame_length) \
+  (AAC_ENCODER_ELD_DELAY(frame_length) + AAC_CLDFB_DELAY + 1)
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
 
@@ -148,6 +158,14 @@ using AacEncoderState = struct AacEncoderState_ {
   /* HE-AAC: the SBR encoder of each SCE or CPE, NULL for LFE and AAC-LC */
   AacSbrEncoder* sbr[AAC_MAX_ELEMENTS];
   AacSbrDownsampler* lfe_down[AAC_MAX_ELEMENTS]; /* HE-AAC: the LFE's half-rate signal */
+  /* AAC-ELD with LD-SBR (aac_encoder_set_ld_sbr): one low-delay SBR
+   * encoder per element; an LFE's only resamples its signal to the core
+   * rate through the same filterbanks and writes no data.  With dual rate
+   * the core runs at half the input rate. */
+  int ld_sbr;
+  int ld_sbr_dual_rate;
+  int ld_sbr_crc; /* a 10-bit CRC in front of every element's sbr_data() */
+  AacSbrLdEncoder* ld_sbr_enc[AAC_MAX_ELEMENTS];
   float sbr_in[AAC_MAX_CHANNELS][2 * AAC_FRAME_SIZE_LONG]; /* full-rate input */
   float core_in[AAC_MAX_CHANNELS][AAC_FRAME_SIZE_LONG];    /* half-rate core signal */
   AacMdct mdct_long, mdct_short;
@@ -185,6 +203,12 @@ void aac_encoder_state_reset(AacEncoderState* s);
  * low-delay object types; frame_size and delay follow) and resets the
  * encoder; AAC_ERR_INVALID_ARG for any other length. */
 int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length);
+
+/* AAC-ELD: switches low-delay SBR on or off (with the core at half the
+ * input rate when `dual_rate` is set) and resets the encoder; frame_size
+ * and delay follow.  AAC_ERR_INVALID_ARG for another object type,
+ * AAC_ERR_UNSUPPORTED when the core rate has no low-delay band tables. */
+int aac_encoder_state_set_ld_sbr(AacEncoderState* s, int enabled, int dual_rate);
 
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);

@@ -3,6 +3,7 @@
 #include "asc.h"
 #include "channel_map.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -406,6 +407,17 @@ void apply_tns(AacChannelStream* cs) {
  * frame length, divided by the downscale factor of an AAC-ELD stream. */
 int core_output_length(const AacDecoderState* s) {
   return s->aot == AAC_AOT_ER_ELD ? s->frame_length / s->eld_downscale : s->frame_length;
+}
+
+/* Whether the output runs at twice the core rate: SBR data has been seen,
+ * or the configuration announced dual-rate LD-SBR. */
+bool doubled_output(const AacDecoderState* s) {
+  return s->sbr_mode || (s->ld_sbr_mode && s->ld_sbr_dual_rate);
+}
+
+/* Samples per channel of one block in the output. */
+int output_length(const AacDecoderState* s) {
+  return doubled_output(s) ? 2 * core_output_length(s) : core_output_length(s);
 }
 
 /* AAC-ELD: the low-delay synthesis of the (downscaled) frame. */
@@ -876,8 +888,12 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   aac_mdct_init(&s->mdct_short, 2 * aac_short_length(s->frame_length));
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
+  s->ld_sbr_mode = 0;
+  s->ld_sbr_dual_rate = 0;
+  s->ld_sbr_crc = 0;
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     s->sbr[i] = nullptr;
+    s->ld_sbr[i] = nullptr;
   }
   s->conceal_mode = AAC_CONCEAL_INTERPOLATE;
   aac_drc_decoder_init(&s->drc);
@@ -896,6 +912,7 @@ void aac_decoder_state_destroy(AacDecoderState* s) {
   }
   for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
     delete s->sbr[i];
+    delete s->ld_sbr[i];
   }
   delete s;
 }
@@ -924,7 +941,7 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   if (s->aot == AAC_AOT_ER_ELD) {
     aac_mdct_init(&s->mdct_eld, 2 * core_output_length(s));
   }
-  s->frame_size = core_output_length(s);
+  s->frame_size = output_length(s);
   if (s->limiter_ready) {
     aac_limiter_reset(&s->limiter);
   }
@@ -932,7 +949,100 @@ void aac_decoder_reset_state(AacDecoderState* s) {
     if (s->sbr[i]) {
       aac_sbr_init(s->sbr[i], s->sample_rate, s->frame_length);
     }
+    if (s->ld_sbr[i]) {
+      aac_sbr_ld_reset(s->ld_sbr[i]);
+    }
   }
+}
+
+namespace {
+
+void drop_ld_sbr(AacDecoderState* s) {
+  for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+    delete s->ld_sbr[i];
+    s->ld_sbr[i] = nullptr;
+  }
+  s->ld_sbr_mode = 0;
+  s->ld_sbr_dual_rate = 0;
+  s->ld_sbr_crc = 0;
+}
+
+/* Whether the LD-SBR configuration in force is the one asked for, so
+ * that a transport repeating its configuration every frame leaves the
+ * filterbanks and the inter-frame state alone. */
+bool same_ld_sbr(const AacDecoderState* s, int dual_rate, int crc, const AacSbrLdHeader* headers,
+                 int num_headers) {
+  if (!s->ld_sbr_mode || s->ld_sbr_dual_rate != (dual_rate ? 1 : 0) ||
+      s->ld_sbr_crc != (crc ? 1 : 0)) {
+    return false;
+  }
+  const AacLayout* l = &s->layout;
+  int next_header = 0;
+  for (int i = 0; i < l->num_elements; i++) {
+    const AacSbrLdState* st = s->ld_sbr[i];
+    const int type = l->elems[i].type;
+    if (!st || st->core_sample_rate != s->sample_rate || st->frame_length != s->frame_length) {
+      return false;
+    }
+    if (type != AAC_ELEM_SCE && type != AAC_ELEM_CPE) {
+      continue;
+    }
+    if (next_header >= num_headers ||
+        memcmp(&st->header, &headers[next_header], sizeof(st->header)) != 0) {
+      return false;
+    }
+    next_header++;
+  }
+  return true;
+}
+
+}  // namespace
+
+int aac_decoder_set_ld_sbr(AacDecoderState* s, int present, int dual_rate, int crc,
+                           const AacSbrLdHeader* headers, int num_headers) {
+  if (!present) {
+    drop_ld_sbr(s);
+    s->frame_size = output_length(s);
+    return 0;
+  }
+  if (s->aot != AAC_AOT_ER_ELD || s->eld_downscale != 1 || s->layout_source != 1) {
+    drop_ld_sbr(s);
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (same_ld_sbr(s, dual_rate, crc, headers, num_headers)) {
+    return 0;
+  }
+  drop_ld_sbr(s);
+  const AacLayout* l = &s->layout;
+  int next_header = 0;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int type = l->elems[i].type;
+    const bool has_header = type == AAC_ELEM_SCE || type == AAC_ELEM_CPE;
+    if (has_header && next_header >= num_headers) {
+      drop_ld_sbr(s);
+      return AAC_ERR_UNSUPPORTED;
+    }
+    /* An LFE takes the header of the element before it: its state only
+     * carries the core through the filterbanks. */
+    const AacSbrLdHeader* h = &headers[has_header ? next_header : std::max(next_header - 1, 0)];
+    s->ld_sbr[i] = new AacSbrLdState();
+    const int ret = aac_sbr_ld_init(s->ld_sbr[i], s->sample_rate, s->frame_length, dual_rate, h);
+    if (ret) {
+      drop_ld_sbr(s);
+      return ret;
+    }
+    /* The element type is known from the configuration, so a channel
+     * pair produces both outputs before its first payload is read. */
+    s->ld_sbr[i]->elem_type = type == AAC_ELEM_CPE ? AAC_ELEM_CPE : AAC_ELEM_SCE;
+    if (has_header) {
+      next_header++;
+    }
+  }
+  s->ld_sbr_mode = 1;
+  s->ld_sbr_dual_rate = dual_rate ? 1 : 0;
+  s->ld_sbr_crc = crc ? 1 : 0;
+  s->frame_size = output_length(s);
+  return 0;
 }
 
 int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length) {
@@ -956,6 +1066,9 @@ int aac_decoder_set_object_type(AacDecoderState* s, int aot) {
   }
   const bool low_delay = aot == AAC_AOT_ER_LD || aot == AAC_AOT_ER_ELD;
   s->aot = aot;
+  if (aot != AAC_AOT_ER_ELD) {
+    drop_ld_sbr(s);
+  }
   if (!low_delay && aac_is_low_delay_frame(s->frame_length)) {
     return aac_decoder_set_frame_length_internal(s, AAC_FRAME_SIZE_LONG);
   }
@@ -973,7 +1086,7 @@ void aac_decoder_set_eld_downscale_internal(AacDecoderState* s, int factor) {
 
 int aac_decoder_output_rate(const AacDecoderState* s) {
   const int core = s->aot == AAC_AOT_ER_ELD ? s->sample_rate / s->eld_downscale : s->sample_rate;
-  return s->sbr_mode ? 2 * core : core;
+  return doubled_output(s) ? 2 * core : core;
 }
 
 int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index) {
@@ -1282,10 +1395,34 @@ void apply_drc(AacDecoderState* s, int elem, AacDecoderChannel* chans, int nch) 
  * that all channels keep the same delay.  With `conceal` an element
  * whose SBR is active but got no data in this frame continues on the
  * previous frame's envelope instead of dropping to upsampling. */
-void sbr_stage(AacDecoderState* s, bool conceal) {
+/* AAC-ELD with LD-SBR: every element's core output goes through its
+ * CLDFB chain; an element whose payload was read gets its high band,
+ * the others (an LFE, or a damaged or lost frame) pass the core through
+ * with the high band muted so that the delay stays. */
+void ld_sbr_stage(AacDecoderState* s) {
   const AacLayout* l = &s->layout;
   const int core = core_output_length(s);
-  s->frame_size = s->sbr_mode ? 2 * core : core;
+  float left[AAC_FRAME_SIZE_LD];
+  float right[AAC_FRAME_SIZE_LD];
+  for (int i = 0; i < l->num_elements; i++) {
+    AacDecoderChannel* chans = &s->ch[s->elem_base[i]];
+    const bool pair = l->elems[i].type == AAC_ELEM_CPE;
+    memcpy(left, chans[0].output, (size_t)core * sizeof(float));
+    if (pair) {
+      memcpy(right, chans[1].output, (size_t)core * sizeof(float));
+    }
+    aac_sbr_ld_process(s->ld_sbr[i], left, pair ? right : nullptr, chans[0].output,
+                       pair ? chans[1].output : nullptr);
+  }
+}
+
+void sbr_stage(AacDecoderState* s, bool conceal) {
+  const AacLayout* l = &s->layout;
+  s->frame_size = output_length(s);
+  if (s->ld_sbr_mode) {
+    ld_sbr_stage(s);
+    return;
+  }
   if (!s->sbr_mode) {
     return;
   }
@@ -1315,6 +1452,27 @@ void sbr_stage(AacDecoderState* s, bool conceal) {
  * element_instance_tag either.  The layout of the configuration lists its
  * elements in that order (1: SCE; 2: CPE; 3: SCE CPE; 4: SCE CPE SCE; 5:
  * SCE CPE CPE; 6: SCE CPE CPE LFE; 7: SCE CPE CPE CPE LFE). */
+/* ld_sbr_data() of an AAC-ELD frame (ISO/IEC 14496-3 4.6.20): after the
+ * last channel element, one sbr_data() per SCE or CPE in element order,
+ * each behind its 10-bit CRC when the configuration says so.  A damaged
+ * payload mutes the high band of its element and of those after it,
+ * which cannot be found any more. */
+int decode_ld_sbr_data(AacDecoderState* s, AacBitReader* r) {
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int type = l->elems[i].type;
+    if (type != AAC_ELEM_SCE && type != AAC_ELEM_CPE) {
+      continue;
+    }
+    const int ret = aac_sbr_ld_read(s->ld_sbr[i], r, type, s->ld_sbr_crc);
+    if (ret) {
+      return ret;
+    }
+    s->has_sbr = 1;
+  }
+  return 0;
+}
+
 int decode_er_elements(AacDecoderState* s, AacBitReader* r) {
   const AacLayout* l = &s->layout;
   for (int i = 0; i < l->num_elements; i++) {
@@ -1332,9 +1490,9 @@ int decode_er_elements(AacDecoderState* s, AacBitReader* r) {
     }
     s->elem_present[i] = 1;
   }
-  /* AAC-ELD with LD-SBR: the ld_sbr payload of every channel element
-   * follows here, after the last channel element (streams that signal
-   * LD-SBR are refused when their configuration is applied). */
+  if (s->ld_sbr_mode) {
+    return decode_ld_sbr_data(s, r);
+  }
   return 0;
 }
 

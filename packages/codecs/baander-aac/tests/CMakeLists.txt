@@ -21,6 +21,7 @@ set(TEST_SOURCES
     test_afterburner.cpp
     test_sbr_ld.cpp
     test_lowdelay.cpp
+    test_eld_sbr.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

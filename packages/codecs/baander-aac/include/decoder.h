@@ -12,6 +12,7 @@
 #include "lowdelay.h"
 #include "mdct.h"
 #include "sbr.h"
+#include "sbr_ld.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -97,6 +98,15 @@ using AacDecoderState = struct AacDecoderState_ {
    * element without SBR data is only upsampled). */
   int sbr_mode;
   AacSbrState* sbr[AAC_MAX_ELEMENTS]; /* allocated on first use */
+  /* AAC-ELD with LD-SBR: the configuration announced it and carries the
+   * header of every SCE and CPE, so each layout element owns a state from
+   * the start (an LFE's state only passes its core through the filterbanks
+   * so that all channels keep the same delay).  With dual rate the output
+   * runs at twice the core rate. */
+  int ld_sbr_mode;
+  int ld_sbr_dual_rate;
+  int ld_sbr_crc; /* each element's sbr_data() follows a 10-bit CRC */
+  AacSbrLdState* ld_sbr[AAC_MAX_ELEMENTS];
   /* PS: once the single channel element of a mono stream has carried
    * parametric stereo data the output is a stereo pair (ch[1] holds the
    * right channel) until a reset. */
@@ -174,6 +184,17 @@ int aac_decoder_set_object_type(AacDecoderState* s, int aot);
 /* AAC-ELD downscaled playout factor (1, 2 or 4); takes effect for ELD
  * streams only. */
 void aac_decoder_set_eld_downscale_internal(AacDecoderState* s, int factor);
+
+/* AAC-ELD: configures the low-delay SBR of the stream from its
+ * ELDSpecificConfig, after the layout, the sample rate and the frame
+ * length are set: `headers` holds one sbr_header per SCE or CPE of the
+ * layout in element order, `dual_rate` says that the output runs at
+ * twice the core rate and `crc` that every sbr_data() follows a CRC.
+ * `present` 0 turns LD-SBR off.  Returns 0, AAC_ERR_UNSUPPORTED while a
+ * downscale factor is set or the headers do not cover the layout, or
+ * the error of the SBR frequency tables. */
+int aac_decoder_set_ld_sbr(AacDecoderState* s, int present, int dual_rate, int crc,
+                           const AacSbrLdHeader* headers, int num_headers);
 
 /* Whether the object type uses the error resilient syntax
  * (er_raw_data_block). */

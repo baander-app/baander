@@ -97,8 +97,25 @@ bool asc_supported(const AacAsc* asc, int rate_index) {
       return false;
     }
   }
-  /* LD-SBR (AAC-ELD with ldSbrPresentFlag) is not decoded. */
-  return !(asc->aot == AAC_AOT_ER_ELD && asc->ld_sbr_present);
+  return true;
+}
+
+/* The sbr_header() of an ELDSpecificConfig as the LD-SBR decoder takes
+ * it: the fields the header left out already carry their defaults. */
+AacSbrLdHeader ld_sbr_header_of(const AacAscSbrHeader* h) {
+  AacSbrLdHeader out = {};
+  out.amp_res = h->amp_res;
+  out.start_freq = h->start_freq;
+  out.stop_freq = h->stop_freq;
+  out.xover_band = h->xover_band;
+  out.freq_scale = h->freq_scale;
+  out.alter_scale = h->alter_scale;
+  out.noise_bands = h->noise_bands;
+  out.limiter_bands = h->limiter_bands;
+  out.limiter_gains = h->limiter_gains;
+  out.interpol_freq = h->interpol_freq;
+  out.smoothing_mode = h->smoothing_mode;
+  return out;
 }
 
 /* Applies a configuration: sample rate, layout, object type, frame length
@@ -129,6 +146,19 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
     return ret;
   }
   ret = set_frame_length(s, asc->frame_length);
+  if (ret) {
+    return ret;
+  }
+  /* AAC-ELD: the low-delay SBR of the stream, configured last so that it
+   * sees the final rate, layout and frame length. */
+  const bool ld_sbr = asc->aot == AAC_AOT_ER_ELD && asc->ld_sbr_present;
+  AacSbrLdHeader headers[AAC_ASC_MAX_LD_SBR_HEADERS];
+  for (int i = 0; i < asc->num_ld_sbr_headers && i < AAC_ASC_MAX_LD_SBR_HEADERS; i++) {
+    headers[i] = ld_sbr_header_of(&asc->ld_sbr_header[i]);
+  }
+  const int num_headers = std::min(asc->num_ld_sbr_headers, AAC_ASC_MAX_LD_SBR_HEADERS);
+  ret = aac_decoder_set_ld_sbr(s, ld_sbr ? 1 : 0, asc->ld_sbr_sampling_rate, asc->ld_sbr_crc,
+                               headers, num_headers);
   if (ret) {
     return ret;
   }
@@ -821,8 +851,36 @@ int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTranspor
   if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
     asc->aot = s->aot;
     asc->frame_length = s->frame_length;
-    /* LD-SBR: an ELD encoder with SBR signals ldSbrPresentFlag and its
-     * ld_sbr_header here. */
+  }
+  if (s->ld_sbr) {
+    /* AAC-ELD with LD-SBR: the sampling frequency is the core's, and the
+     * config carries the header of every SCE and CPE in element order. */
+    asc->ld_sbr_present = 1;
+    asc->ld_sbr_sampling_rate = s->ld_sbr_dual_rate;
+    asc->ld_sbr_crc = s->ld_sbr_crc;
+    asc->num_ld_sbr_headers = 0;
+    for (int e = 0; e < s->num_elements; e++) {
+      if (s->elem[e].type == AAC_ELEM_LFE ||
+          asc->num_ld_sbr_headers >= AAC_ASC_MAX_LD_SBR_HEADERS) {
+        continue;
+      }
+      const AacSbrLdHeader* h = aac_sbr_ld_enc_header(s->ld_sbr_enc[e]);
+      AacAscSbrHeader* out = &asc->ld_sbr_header[asc->num_ld_sbr_headers++];
+      out->amp_res = h->amp_res;
+      out->start_freq = h->start_freq;
+      out->stop_freq = h->stop_freq;
+      out->xover_band = h->xover_band;
+      out->freq_scale = h->freq_scale;
+      out->alter_scale = h->alter_scale;
+      out->noise_bands = h->noise_bands;
+      out->limiter_bands = h->limiter_bands;
+      out->limiter_gains = h->limiter_gains;
+      out->interpol_freq = h->interpol_freq;
+      out->smoothing_mode = h->smoothing_mode;
+      out->header_extra_1 = h->freq_scale != 2 || h->alter_scale != 1 || h->noise_bands != 2;
+      out->header_extra_2 = h->limiter_bands != 2 || h->limiter_gains != 2 ||
+                            h->interpol_freq != 1 || h->smoothing_mode != 1;
+    }
   }
   if (sbr) {
     asc->sbr_present = 1;

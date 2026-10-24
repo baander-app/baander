@@ -204,7 +204,7 @@ int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport) {
   return aac_encoder_transport_set(s->transport, transport);
 }
 
-int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int /* dual_rate */) {
+int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -215,9 +215,7 @@ int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int /* dual_rate *
   if (s->started) {
     return AAC_ERR_STATE;
   }
-  /* LD-SBR encoding hooks in here: the SBR encoders, the frame size
-   * (doubled with dual_rate) and the ASC's ld_sbr fields. */
-  return enabled ? AAC_ERR_UNSUPPORTED : AAC_OK;
+  return aac_encoder_state_set_ld_sbr(s, enabled, dual_rate);
 }
 
 int aac_encoder_set_signaling(AacEncoderHandle ctx, AacSignaling signaling) {
@@ -360,8 +358,9 @@ int aac_decoder_set_eld_downscale(AacDecoderHandle ctx, int factor) {
   if (s->blocks_decoded > 0) {
     return AAC_ERR_STATE;
   }
-  /* LD-SBR streams are refused when their configuration is applied; once
-   * they are decoded, downscaling them answers AAC_ERR_UNSUPPORTED here. */
+  if (s->ld_sbr_mode && factor != 1) {
+    return AAC_ERR_UNSUPPORTED; /* the CLDFB chain has no downscaled form */
+  }
   aac_decoder_set_eld_downscale_internal(s, factor);
   return AAC_OK;
 }

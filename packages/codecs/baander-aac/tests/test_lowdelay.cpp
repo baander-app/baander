@@ -180,14 +180,15 @@ static void test_asc() {
     }
   }
   /* ELDSpecificConfig with LD-SBR (one header for a stereo stream) and an
-   * extension entry before the terminator: parsed, then refused by the
-   * decoder because LD-SBR is not decoded. */
+   * extension entry before the terminator: parsed, then accepted by the
+   * decoder, which outputs at twice the 24 kHz core rate
+   * (ldSbrSamplingRate 1). */
   AacAsc asc;
-  aac_asc_init(&asc, 48000, 2);
+  aac_asc_init(&asc, 24000, 2);
   asc.aot = AAC_AOT_ER_ELD;
   asc.frame_length = 512;
   asc.ld_sbr_present = 1;
-  asc.ld_sbr_sampling_rate = 0;
+  asc.ld_sbr_sampling_rate = 1;
   asc.ld_sbr_crc = 0;
   asc.num_ld_sbr_headers = 1;
   asc.ld_sbr_header[0] = {};
@@ -203,7 +204,11 @@ static void test_asc() {
             back.ld_sbr_header[0].stop_freq == 9,
         "ELD with LD-SBR: read back");
   AacDecoderHandle dec = aac_decoder_create(48000, 0);
-  CHECK(aac_decoder_set_config(dec, buf, len) == AAC_ERR_UNSUPPORTED, "LD-SBR refused");
+  CHECK(aac_decoder_set_config(dec, buf, len) == AAC_OK, "LD-SBR config accepted");
+  CHECK(aac_decoder_frame_size(dec) == 1024 && aac_decoder_output_sample_rate(dec) == 48000 &&
+            aac_decoder_sample_rate(dec) == 24000,
+        "dual-rate LD-SBR: frame %d at %d Hz, core %d Hz", aac_decoder_frame_size(dec),
+        aac_decoder_output_sample_rate(dec), aac_decoder_sample_rate(dec));
   /* An AAC-LD config with the section data resilience flag. */
   aac_asc_init(&asc, 48000, 1);
   asc.aot = AAC_AOT_ER_LD;
@@ -461,8 +466,12 @@ static void test_api() {
   CHECK(aac_encoder_set_frame_length(enc, 480) == AAC_OK, "480 for ELD");
   CHECK(aac_encoder_frame_size(enc) == 480 && aac_encoder_delay(enc) == 720, "ELD 480: %d, %d",
         aac_encoder_frame_size(enc), aac_encoder_delay(enc));
-  CHECK(aac_encoder_set_ld_sbr(enc, 1, 1) == AAC_ERR_UNSUPPORTED, "LD-SBR not available");
+  CHECK(aac_encoder_set_ld_sbr(enc, 1, 1) == AAC_OK, "LD-SBR on");
+  CHECK(aac_encoder_frame_size(enc) == 960, "LD-SBR dual rate frame %d",
+        aac_encoder_frame_size(enc));
   CHECK(aac_encoder_set_ld_sbr(enc, 0, 0) == AAC_OK, "LD-SBR off");
+  CHECK(aac_encoder_frame_size(enc) == 480 && aac_encoder_delay(enc) == 720,
+        "ELD 480 after LD-SBR off: %d, %d", aac_encoder_frame_size(enc), aac_encoder_delay(enc));
   CHECK(aac_encoder_set_metadata(enc, AAC_DRC_MUSIC_STANDARD, 124) == AAC_ERR_UNSUPPORTED,
         "no DRC metadata in error resilient frames");
   uint8_t asc_bytes[16];

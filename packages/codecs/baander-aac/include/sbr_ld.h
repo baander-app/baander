@@ -144,8 +144,17 @@ int aac_sbr_ld_delay(const AacSbrLdState* s);
 
 /* Reads the frame's SBR payload (the CRC when `crc` is set, then
  * sbr_data() for the element type) and leaves the reader after it.  On
- * AAC_ERR_DECODE the high band of the frame is muted. */
+ * AAC_ERR_DECODE (a malformed payload or a CRC mismatch) the high band
+ * of the frame is muted, and the last envelope and noise floor read
+ * before it stay the reference of the next frame's deltas in time, as
+ * they do for a frame that never arrived. */
 int aac_sbr_ld_read(AacSbrLdState* s, AacBitReader* r, int elem_type, int crc);
+
+/* The SBR CRC (ISO/IEC 14496-3 4.6.18.3.2): a 10-bit CRC with the
+ * polynomial x^10 + x^9 + x^5 + x^4 + x + 1 and all-ones initial state
+ * over `nbits` bits of `data` from `bit_offset`, as written in
+ * bs_sbr_crc_bits in front of the sbr_data() it covers. */
+uint16_t aac_sbr_ld_crc(const uint8_t* data, int bit_offset, int nbits);
 
 /* Turns the core output of a frame (frame_length samples per channel at
  * full scale 1.0; `core_right` NULL for an SCE) into the frame's output

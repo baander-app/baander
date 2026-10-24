@@ -238,6 +238,16 @@ test('encodes and decodes the low-delay profiles', () => {
     const snr = snrDb(pcm, out, encoder.delay * 2);
     assert.ok(snr > 25, `${profile} ${frameLength}: reconstruction SNR ${snr.toFixed(1)} dB`);
   }
+  const eldSbr = new AacEncoder({ sampleRate, channels: 2, bitrate: 64000, profile: 'eld', ldSbr: true });
+  assert.equal(eldSbr.frameSize, 1024, 'dual-rate LD-SBR frame');
+  const sbrStream = Buffer.concat([eldSbr.encode(pcm), eldSbr.flush()]);
+  const sbrDecoder = new AacDecoder({ channels: 2 });
+  const sbrOut = decodeAll(sbrDecoder, sbrStream, 700);
+  assert.equal(sbrDecoder.errors, 0);
+  assert.equal(sbrDecoder.hasSbr, true, 'LD-SBR decoded');
+  assert.equal(sbrDecoder.coreSampleRate, sampleRate / 2);
+  assert.equal(sbrDecoder.sampleRate, sampleRate);
+  assert.ok(snrDb(pcm, sbrOut, eldSbr.delay * 2) > 8, 'ELD with LD-SBR reconstructs');
   assert.throws(() => new AacEncoder({ profile: 'ld', transport: 'adts' }));
   assert.throws(() => new AacEncoder({ profile: 'lc', frameLength: 512 }));
   assert.throws(() => new AacEncoder({ profile: 'lc', ldSbr: true }));
