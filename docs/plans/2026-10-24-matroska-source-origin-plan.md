@@ -45,8 +45,8 @@ application databases, Redis and the user's original media are outside the work.
 
 Use one shared video-probe argument builder for the synchronous adapter and the
 native process pool. Preserve format and all stream metadata, and additionally
-read at most sixteen packets with stream index, PTS and flags. The verified
-FFprobe options are show_packets, read_intervals %+#16 and show_entries
+read at most 128 packets with stream index, PTS and flags. The verified
+FFprobe options are show_packets, read_intervals %+#128 and show_entries
 packet=stream_index,pts_time,flags. The bound counts all streams, so a prefix
 without the selected movie packet supplies no origin evidence. Retain existing
 process deadlines and native execution ownership and cleanup.
@@ -129,3 +129,27 @@ onset from declared profile metadata or require sound during every displayed
 frame. Existing scenarios retain their assertions. The new scenarios use a
 verified positive origin of four seconds to exercise duration normalization and
 source-relative playback together; native cases also cover origin zero.
+
+## Measured packet-prefix amendment
+
+The unchanged 720p browser source places its first movie packet at position 95,
+with PTS four, after audio packets. The initial sixteen-packet probe correctly
+supplied no movie-origin evidence. Repeating source creation reproduces that
+layout. Retain this source and extend the bounded probe to 128 packets rather
+than changing source encoding to move the video packet earlier.
+
+CI FFmpeg 5 measures 6,755 output bytes and 0.073 seconds for sixteen packets,
+and 19,706 bytes and 0.068 seconds for 128. The first sixteen packet objects are
+identical; format and stream metadata differ only in packet-read counters.
+The larger result remains within the existing one-MiB output limit and sixty-second
+probe deadline. Neither execution limit changes. Preserve the failed browser
+receipt and the paired measurements under `probe128-calibration`.
+
+Independent review approved this measured expansion. Update the shared command,
+origin resolver and boundary tests together. Native fresh and seek cases must
+retain the actual audio-first layout, prove its first movie packet lies after
+sixteen and within 128 packets, and verify corrected media and subtitle clocks.
+Unit controls cover a movie packet at position 128, no movie packet in the prefix,
+and rejection of a 129-packet input. A prefix without a verified movie packet
+still supplies no anchor; this amendment does not establish unbounded probing or
+arbitrary-source qualification.
