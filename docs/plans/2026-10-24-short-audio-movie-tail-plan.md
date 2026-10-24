@@ -43,8 +43,10 @@ Subtitle helpers remain separate and must
 not determine encoding duration. No API, schema, source-track control or frontend
 production behavior is added.
 
-The repair appends FFmpeg's `apad=packet_size=1024` after existing audio normalization
-and uses output `-shortest`, making the video the finite output stream. The
+The repair gives audio its own input within the existing FFmpeg process, appends
+`apad=packet_size=1024` after existing audio normalization and uses output
+`-shortest`. The video remains finite while selected audio can generate silence
+independently. The
 [FFmpeg filter documentation](https://ffmpeg.org/ffmpeg-filters.html#apad) describes
 this combination. Documentation alone does not qualify the installed FFmpeg:
 before implementation, the CI calibration must establish complete video frames,
@@ -144,3 +146,48 @@ The prior-encoder fresh browser control passed complete thirty-second playback
 with 750 decoded frames. Chromium can continue silently after audio EOF. This is
 not failure evidence; native readiness and the exhausted-audio seek are the repair
 targets. Retain the fresh control and run the prior-encoder seek separately.
+
+## Progressive publication amendment
+
+The first implementation passes complete native decoding but fails the unchanged
+browser startup requirement for a seek after audio EOF. Both renditions must first
+be jointly playable while their publications are still growing. With one shared
+input, audio EOF reaches the padding filter only when the video input finishes.
+The lower rendition is already complete when valid audio appears. Preserve this
+failure under `browser-final-short-audio-seek`; do not relax its startup assertion.
+
+A paced thirty-second source with four seconds of audio and a six-second restart
+confirms the mechanism. The shared input first publishes video at 17.994 seconds
+and audio at 24.091 seconds; the first readable joint presentation is already
+complete. With separate video and audio inputs in one process, dynamic joint
+prefixes appear at 8.085, 14.075 and 20.063 seconds, before completion at 24.188
+seconds. Both variants retain all 600 video frames and entirely silent audio
+lasting 24.021333 seconds. CPU time changes from 0.19 to 0.24 seconds, peak RSS
+from 69.54 to 70.76 MB, and logical read bytes from 274,169 to 357,309 in this
+bounded fixture. These measurements establish the fixture's behavior, not a
+whole-host or arbitrary-media resource guarantee.
+
+Keep input zero for video, with its existing decoder/hardware options and source
+selection. Add input one for the same source path, with explicit bounded decoder
+threads and video/subtitle/data decoding disabled. Map the selected audio ordinal
+from input one. Apply the same source seek and verified-origin translation to both
+inputs. Preserve video preroll for sparse sources; audio uses accurate seeking
+and the existing trim/leading-silence filter sequence. Hardware video options and
+fixture input pacing belong only to the video input. Video-only commands retain
+one input. No second encoder process, execution owner, muxer or publication fence
+is introduced; cancellation still terminates the one process and both reads.
+
+Independent audio input can read ahead and performs additional source I/O. Keep
+decoder threads explicit and verify bounded buffering during paced publication.
+Add native regressions that observe two increasing, independently decodable joint
+prefixes while the presentation is dynamic and the producer remains active.
+Decode the initial audio prefix as actual silence, retain complete final video
+and audio tails, and record publication times, audio/video lead and process memory.
+Check cancellation of the same producer. Existing native default-track,
+delay/origin, video-only and paced sparse tests must pass with the new input maps;
+update only command identity expectations, not their media or timing criteria.
+
+Re-run the full affected backend selection, PHPStan, Deptrac and all seven browser
+scenarios after this architectural change. Earlier backend/static passes and the
+fresh browser pass remain evidence for their recorded revisions, not acceptance
+of the revised producer. Review this amendment before implementation.
