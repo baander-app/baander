@@ -164,6 +164,54 @@ final class SegmentEncoderMediaTest extends TestCase
         self::assertSame([], glob($this->directory . '/*.tmp'));
     }
 
+    public function testVideoRawPresentationTimestampsMatchEditedTimelineForOneFrameTail(): void
+    {
+        $source = $this->directory.'/source.mkv';
+        $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+            '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=30',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+            '-t', '18.033334', '-c:v', 'ffv1', '-threads', '1', '-c:a', 'pcm_s16le', $source]);
+        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
+        $this->runMedia($encoder->buildStreamArgs($source, $tier, '', $this->directory, 2,
+            audioFilters: 'aformat=channel_layouts=stereo'));
+        $presentation = (new PublishedPresentationReader())->read($this->directory);
+        self::assertNotNull($presentation);
+        self::assertTrue($presentation->complete);
+        $video = $presentation->track(MediaTrack::Video);
+        $audio = $presentation->track(MediaTrack::Audio);
+        self::assertNotNull($video);
+        self::assertNotNull($audio);
+        self::assertCount(2, $video->segments);
+        foreach ($video->segments as $index => $segment) {
+            $combined = $this->directory.'/video-'.$index.'.mp4';
+            file_put_contents($combined, file_get_contents($this->directory.'/'.$video->initFile)
+                .file_get_contents($this->directory.'/'.$segment->file));
+            $edited = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_entries',
+                'stream=has_b_frames:packet=pts,duration', '-of', 'json', $combined]), true, 512, JSON_THROW_ON_ERROR);
+            $raw = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-ignore_editlist', '1',
+                '-show_entries', 'packet=pts,duration', '-of', 'json', $combined]), true, 512, JSON_THROW_ON_ERROR);
+            self::assertGreaterThan(0, (int) $edited['streams'][0]['has_b_frames'], 'The producer must retain reordered video frames.');
+            self::assertCount($index === 0 ? 180 : 1, $edited['packets']);
+            self::assertSame(array_column($edited['packets'], 'pts'), array_column($raw['packets'], 'pts'),
+                'Raw fragment PTS and the edit-list-adjusted samples must share the timeline used by HLS and MediaSource.');
+            $decoded = $this->directory.'/video-'.$index.'.raw';
+            $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
+                '-i', $combined, '-map', '0:v:0', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', $decoded]);
+            self::assertSame(($index === 0 ? 180 : 1) * 6144, filesize($decoded), 'The final one-frame fragment must decode independently.');
+        }
+        self::assertSame(0, $video->segments[0]->start - $video->presentationTimeOffset);
+        self::assertSame(6 * $video->timescale, $video->segments[1]->start - $video->presentationTimeOffset);
+        self::assertEqualsWithDelta(6 + 1 / 30, $video->end(), 1 / $video->timescale);
+        $combinedAudio = $this->directory.'/audio.mp4';
+        file_put_contents($combinedAudio, file_get_contents($this->directory.'/'.$audio->initFile)
+            .file_get_contents($this->directory.'/'.$audio->segments[0]->file));
+        $audioProbe = json_decode($this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_entries',
+            'packet=pts', '-of', 'json', $combinedAudio]), true, 512, JSON_THROW_ON_ERROR);
+        self::assertLessThan(0, (int) $audioProbe['packets'][0]['pts'], 'AAC preroll must remain before its first presentation sample.');
+    }
+
     /** @return iterable<string, array{string, string, int, bool}> */
     public static function mediaProfiles(): iterable
     {

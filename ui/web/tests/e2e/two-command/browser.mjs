@@ -28,7 +28,7 @@ await context.addInitScript(() => {
   const ranges = value => Array.from({ length: value.length }, (_, index) => [value.start(index), value.end(index)])
   window.__twoCommandMediaState = element => ({
     at: Date.now(), probe: element.dataset.twoCommandProbe === 'true',
-    time: element.currentTime, paused: element.paused, ready: element.readyState,
+    time: element.currentTime, paused: element.paused, ended: element.ended, playbackRate: element.playbackRate, ready: element.readyState,
     seeking: element.seeking, network: element.networkState,
     duration: Number.isFinite(element.duration) ? element.duration : null,
     buffered: ranges(element.buffered), seekable: ranges(element.seekable),
@@ -103,7 +103,7 @@ await context.addInitScript(() => {
     }
     return removeAttribute.call(this, name)
   }
-  for (const name of ['loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'playing', 'pause', 'seeking', 'seeked', 'waiting', 'stalled', 'timeupdate', 'error', 'emptied']) {
+  for (const name of ['loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'playing', 'pause', 'seeking', 'seeked', 'waiting', 'stalled', 'timeupdate', 'error', 'emptied', 'ended']) {
     document.addEventListener(name, event => {
       if (!(event.target instanceof HTMLVideoElement)) return
       const events = window.__twoCommandMediaEvents
@@ -144,6 +144,7 @@ const capabilityRenewals = []
 const progressOutages = []
 const statusOutages = []
 const seekOutages = []
+const movieCompletions = []
 const signingRequests = new WeakMap()
 const attachedCapabilities = new Map()
 function capabilityEvidence(url) {
@@ -247,7 +248,7 @@ async function savePlaybackTimeline() {
   try {
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
     await writeFile(`${evidence}/playback-timeline.json`, JSON.stringify({
-      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, mediaEvents: [...previousMediaEvents, ...mediaEvents],
+      playbackSnapshots, playbackControls, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions, mediaEvents: [...previousMediaEvents, ...mediaEvents],
     }, null, 2))
   } finally {
     savingTimeline = false
@@ -623,191 +624,207 @@ async function proveProgressOutages(owner) {
     assert.equal(seekCount(), seeksBefore, 'A progress outage must not submit source seeks')
   }
   const positionRoute = `**/api/transcode/sessions/${owner.sessionId}/position`
-  for (const mode of ['before-forwarding', 'accepted-response-loss']) {
-    let passed = false
-    for (let attempt = 1; attempt <= 3 && !passed; attempt++) {
-      let baseline
-      let before
-      await waitFor(async () => {
-        unchangedExecution()
-        const state = await mediaState()
-        const capability = attachedCapabilities.get(attachmentNumber)
-        if (!state.connected || state.paused || state.ready < 2 || state.seeking || state.error !== null
-          || state.decodedFrames <= 0 || !snapshot?.ready || snapshot.status !== 'running'
-          || !capability || new URL(capability.url).searchParams.get('set') !== snapshot.renditionSet
-          || !currentSource(state)) return false
-        if (baseline?.attachment !== attachmentNumber) baseline = { attachment: attachmentNumber, ...state }
-        if (state.time > baseline.time + 0.2 && state.decodedFrames > baseline.decodedFrames) before = state
-        return Boolean(before)
-      }, 'decoded running media before a progress transport failure')
-      const originalAttachment = attachmentNumber
-      const renditionSet = snapshot.renditionSet
-      const proof = { mode, attempt, status: 'observing', startedAt: Date.now(), attachment: originalAttachment,
-        renditionSet, before: { time: before.time, decodedFrames: before.decodedFrames } }
-      progressOutages.push(proof)
-      let routeError
-      let failedRequest
-      let failureObserved = false
-      let finalBaseline
-      const pendingRoutes = new Set()
-      const requestFailed = request => {
-        if (request === failedRequest) {
-          failureObserved = true
-          proof.failureObservedAt = Date.now()
-        }
-      }
-      const interceptProgress = route => {
-        const task = (async () => {
-          const request = route.request()
-          const payload = request.method() === 'POST' ? request.postDataJSON() : null
-          if (payload?.action !== 'progress') {
-            await route.continue()
-            return
-          }
-          const submitted = { at: Date.now(), position: payload.position,
-            generation: payload.generation, revision: payload.revision }
-          if (!failedRequest) {
-            failedRequest = request
-            proof.fault = submitted
-            if (mode === 'accepted-response-loss') {
-              assert(snapshot.position < submitted.position,
-                'The lost-response progress cursor must advance the previously observed canonical position')
-              proof.canonicalBefore = { at: Date.now(), position: snapshot.position, revision: snapshot.revision }
-              const acceptanceDeadline = submitted.at + 4000
-              const response = await route.fetch({ timeout: remaining(3500) })
-              proof.accepted = { at: Date.now(), status: response.status() }
-              await response.dispose()
-              assert.equal(proof.accepted.status, 200, 'The lost progress response must come from the real server')
-              assert(Date.now() < acceptanceDeadline, 'Real progress forwarding must leave time to observe server acceptance')
-              await until(() => {
-                if (superseded()) return true
-                const canonical = playbackSnapshots.find(item => item.accepted && item.at >= proof.accepted.at
-                  && item.jobId === owner.jobId && item.sessionId === owner.sessionId
-                  && item.generation === owner.generation && item.status === 'running'
-                  && item.renditionSet === renditionSet && item.position >= submitted.position
-                  && item.revision > submitted.revision)
-                if (canonical) proof.acceptedCanonical = { at: canonical.at,
-                  position: canonical.position, revision: canonical.revision }
-                return Boolean(canonical)
-              }, 'authenticated state to prove the lost-response progress write was applied',
-              remaining(acceptanceDeadline - Date.now()))
-            }
-            await route.abort('failed')
-            proof.abortedAt = Date.now()
-            if (mode === 'accepted-response-loss') assert(proof.abortedAt - submitted.at < 4500,
-              'Forwarding, canonical acceptance and response loss must finish below the client timeout')
-          } else {
-            const response = await route.fetch({ timeout: remaining(4500) })
-            if (response.status() === 200 && !proof.success) {
-              proof.success = { ...submitted, responseAt: Date.now(), status: response.status() }
-            }
-            await route.fulfill({ response })
-          }
-        })().catch(async error => {
-          routeError = error
-          await route.abort().catch(() => {})
-        })
-        pendingRoutes.add(task)
-        task.finally(() => pendingRoutes.delete(task))
-        return task
-      }
-      const freshPublications = () => playbackSnapshots.filter(item => item.accepted && item.ready
-        && item.at >= proof.startedAt && item.jobId === owner.jobId && item.sessionId === owner.sessionId
-        && item.generation === owner.generation)
-      const publicationChange = () => freshPublications().find(item => item.renditionSet !== renditionSet)
-      const checkMediaEvents = async () => {
-        const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
-        const changed = publicationChange()
-        const boundary = changed ? changed.receivedAt ?? changed.at : Infinity
-        assert(!mediaEvents.some(event => !event.probe && event.at >= proof.startedAt
-          && (event.event === 'error' || (event.event === 'emptied' && event.at < boundary))),
-        'A progress failure must not tear down decoded media before a fresh publication change')
-      }
-      const superseded = () => {
-        unchangedExecution()
-        if (routeError) throw routeError
-        if (proof.preserved) return false
-        const changed = publicationChange()
-        if (!changed) return false
-        proof.status = 'superseded-by-publication'
-        proof.publication = { at: changed.at, renditionSet: changed.renditionSet }
-        return true
-      }
-      page.on('requestfailed', requestFailed)
-      await page.route(positionRoute, interceptProgress)
-      try {
+  await page.evaluate(() => {
+    window.__twoCommandSigningReceipts = []
+    window.__twoCommandObserveSigningReceipts = true
+  })
+  try {
+    for (const mode of ['before-forwarding', 'accepted-response-loss']) {
+      let passed = false
+      for (let attempt = 1; attempt <= 3 && !passed; attempt++) {
+        let baseline
+        let before
         await waitFor(async () => {
-          await checkMediaEvents()
-          if (superseded()) return true
-          if (!failureObserved) return false
-          const sampledAttachment = attachmentNumber
+          unchangedExecution()
           const state = await mediaState()
-          if (superseded()) {
-            await checkMediaEvents()
-            return true
+          const capability = attachedCapabilities.get(attachmentNumber)
+          if (!state.connected || state.paused || state.ready < 2 || state.seeking || state.error !== null
+            || state.decodedFrames <= 0 || !snapshot?.ready || snapshot.status !== 'running'
+            || !capability || new URL(capability.url).searchParams.get('set') !== snapshot.renditionSet
+            || !currentSource(state)) return false
+          if (baseline?.attachment !== attachmentNumber) baseline = { attachment: attachmentNumber, ...state }
+          if (state.time > baseline.time + 0.2 && state.decodedFrames > baseline.decodedFrames) before = state
+          return Boolean(before)
+        }, 'decoded running media before a progress transport failure')
+        const originalAttachment = attachmentNumber
+        const originalCapability = attachedCapabilities.get(originalAttachment)
+        const renditionSet = snapshot.renditionSet
+        const proof = { mode, attempt, status: 'observing', startedAt: Date.now(), attachment: originalAttachment,
+          renditionSet, before: { time: before.time, decodedFrames: before.decodedFrames } }
+        progressOutages.push(proof)
+        let routeError
+        let failedRequest
+        let failureObserved = false
+        let finalBaseline
+        let browserPublications = []
+        const pendingRoutes = new Set()
+        const requestFailed = request => {
+          if (request === failedRequest) {
+            failureObserved = true
+            proof.failureObservedAt = Date.now()
           }
-          if (sampledAttachment !== attachmentNumber) return false
-          assert.equal(state.error, null, 'A progress failure must not report a media error')
-          if (!proof.preserved) {
-            assert.equal(attachmentNumber, originalAttachment, 'A progress failure must initially retain its attachment')
-            assert.equal(state.source, before.source, 'A progress failure must initially retain its media source')
-            assert(state.connected && !state.paused && state.ready >= 2 && !state.seeking,
-              'A failed progress request must leave decoded running media usable')
-            proof.faultBaseline ??= { at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
-            if (!(state.time > proof.faultBaseline.time + 0.2
-              && state.decodedFrames > proof.faultBaseline.decodedFrames)) return false
-            proof.preserved = { at: Date.now(), attachment: originalAttachment, renditionSet,
-              time: state.time, decodedFrames: state.decodedFrames }
-          }
-          const publications = freshPublications()
+        }
+        const interceptProgress = route => {
+          const task = (async () => {
+            const request = route.request()
+            const payload = request.method() === 'POST' ? request.postDataJSON() : null
+            if (payload?.action !== 'progress') {
+              await route.continue()
+              return
+            }
+            const submitted = { at: Date.now(), position: payload.position,
+              generation: payload.generation, revision: payload.revision }
+            if (!failedRequest) {
+              failedRequest = request
+              proof.fault = submitted
+              if (mode === 'accepted-response-loss') {
+                assert(snapshot.position < submitted.position,
+                  'The lost-response progress cursor must advance the previously observed canonical position')
+                proof.canonicalBefore = { at: Date.now(), position: snapshot.position, revision: snapshot.revision }
+                const acceptanceDeadline = submitted.at + 4000
+                const response = await route.fetch({ timeout: remaining(3500) })
+                proof.accepted = { at: Date.now(), status: response.status() }
+                await response.dispose()
+                assert.equal(proof.accepted.status, 200, 'The lost progress response must come from the real server')
+                assert(Date.now() < acceptanceDeadline, 'Real progress forwarding must leave time to observe server acceptance')
+                await until(() => {
+                  if (superseded()) return true
+                  const canonical = playbackSnapshots.find(item => item.accepted && item.at >= proof.accepted.at
+                    && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+                    && item.generation === owner.generation && item.status === 'running'
+                    && item.renditionSet === renditionSet && item.position >= submitted.position
+                    && item.revision > submitted.revision)
+                  if (canonical) proof.acceptedCanonical = { at: canonical.at,
+                    position: canonical.position, revision: canonical.revision }
+                  return Boolean(canonical)
+                }, 'authenticated state to prove the lost-response progress write was applied',
+                remaining(acceptanceDeadline - Date.now()))
+              }
+              await route.abort('failed')
+              proof.abortedAt = Date.now()
+              if (mode === 'accepted-response-loss') assert(proof.abortedAt - submitted.at < 4500,
+                'Forwarding, canonical acceptance and response loss must finish below the client timeout')
+            } else {
+              const response = await route.fetch({ timeout: remaining(4500) })
+              if (response.status() === 200 && !proof.success) {
+                proof.success = { ...submitted, responseAt: Date.now(), status: response.status() }
+              }
+              await route.fulfill({ response })
+            }
+          })().catch(async error => {
+            routeError = error
+            await route.abort().catch(() => {})
+          })
+          pendingRoutes.add(task)
+          task.finally(() => pendingRoutes.delete(task))
+          return task
+        }
+        const freshCanonical = () => playbackSnapshots.filter(item => item.accepted && item.ready
+          && item.at >= proof.startedAt && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+          && item.generation === owner.generation)
+        const publicationChange = () => browserPublications.find(item => item.renditionSet !== renditionSet)
+        const checkMediaEvents = async () => {
+          const capabilities = [...attachedCapabilities.values()]
+          const { events, receipts } = await page.evaluate(() => ({
+            events: window.__twoCommandMediaEvents ?? [], receipts: window.__twoCommandSigningReceipts ?? [],
+          }))
+          browserPublications = receipts.filter(item => item.receivedAt >= proof.startedAt && item.ready
+            && item.jobId === owner.jobId && item.sessionId === owner.sessionId && item.generation === owner.generation)
+          proof.publications = browserPublications
+          const changed = publicationChange()
+          const boundary = changed ? changed.receivedAt : Infinity
+          assert(!events.some(event => !event.probe && event.at >= proof.startedAt
+            && (event.event === 'error' || (event.event === 'emptied' && event.at < boundary))),
+          'A progress failure must not tear down decoded media before a fresh publication change')
+          proof.sourceDetachments = qualifySourceDetachments(events.filter(event => !event.probe
+            && event.at >= proof.startedAt && event.event === 'source-detached'),
+          capabilities, browserPublications, originalCapability)
           let previousSet = renditionSet
-          let previousAttachmentAt = attachedCapabilities.get(originalAttachment).at
-          for (const [number, capability] of attachedCapabilities) {
-            if (number <= originalAttachment) continue
+          let previousAttachmentAt = originalCapability.at
+          for (const capability of capabilities) {
+            if (capability.attachment <= originalAttachment) continue
             const set = new URL(capability.url).searchParams.get('set')
-            assert(set !== previousSet && publications.some(item => item.renditionSet === set
-              && (item.receivedAt ?? item.at) > previousAttachmentAt
-              && (item.receivedAt ?? item.at) <= capability.at),
+            assert(set !== previousSet && browserPublications.some(item => item.renditionSet === set
+              && item.receivedAt > previousAttachmentAt && item.receivedAt <= capability.at),
             'Every post-failure replacement must follow an authenticated rendition change')
             previousSet = set
             previousAttachmentAt = capability.at
           }
-          if (attachmentNumber === originalAttachment) assert.equal(state.source, before.source,
-            'An unchanged attachment must retain its decoded media source')
-          if (!proof.success || proof.success.position <= proof.fault.position) return false
-          const capability = attachedCapabilities.get(attachmentNumber)
-          const delivered = capability && new URL(capability.url).searchParams.get('set') === snapshot.renditionSet
-            && mediaResponses.some(item => item.attachment === attachmentNumber && item.status === 200
-              && item.path.endsWith('/master.m3u8'))
-            && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
-              && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
-          if (!(state.connected && !state.paused && state.ready >= 2 && !state.seeking && currentSource(state)
-            && snapshot?.ready && snapshot.status === 'running' && delivered)) return false
-          if (finalBaseline?.attachment !== attachmentNumber) finalBaseline = { at: Date.now(),
-            attachment: attachmentNumber, time: state.time, decodedFrames: state.decodedFrames }
-          const canonical = publications.find(item => item.at >= proof.success.responseAt
-            && item.status === 'running' && item.renditionSet === snapshot.renditionSet
-            && item.position >= proof.success.position)
-          if (!(state.time > finalBaseline.time + 0.2 && state.decodedFrames > finalBaseline.decodedFrames
-            && state.time > before.time + 1 && canonical)) return false
-          proof.canonical = { at: canonical.at, position: canonical.position, revision: canonical.revision }
-          proof.finalBaseline = finalBaseline
-          proof.after = { at: Date.now(), attachment: attachmentNumber, renditionSet: snapshot.renditionSet,
-            time: state.time, decodedFrames: state.decodedFrames }
-          proof.status = 'passed'
-          passed = true
+          return proof.sourceDetachments.every(item => item.successorAttachment !== null)
+        }
+        const superseded = () => {
+          unchangedExecution()
+          if (routeError) throw routeError
+          if (proof.preserved) return false
+          const changed = publicationChange()
+          if (!changed) return false
+          proof.status = 'superseded-by-publication'
+          proof.publication = { receivedAt: changed.receivedAt, renditionSet: changed.renditionSet }
           return true
-        }, `${mode} progress failure to preserve decoding and recover genuine writes`)
-      } finally {
-        await page.unroute(positionRoute, interceptProgress)
-        await Promise.all([...pendingRoutes])
-        page.off('requestfailed', requestFailed)
+        }
+        page.on('requestfailed', requestFailed)
+        await page.route(positionRoute, interceptProgress)
+        try {
+          await waitFor(async () => {
+            await checkMediaEvents()
+            if (superseded()) return true
+            if (!failureObserved) return false
+            const sampledAttachment = attachmentNumber
+            const state = await mediaState()
+            const mediaQualified = await checkMediaEvents()
+            if (superseded()) return true
+            if (sampledAttachment !== attachmentNumber) return false
+            assert.equal(state.error, null, 'A progress failure must not report a media error')
+            if (!proof.preserved) {
+              assert.equal(attachmentNumber, originalAttachment, 'A progress failure must initially retain its attachment')
+              assert.equal(state.source, before.source, 'A progress failure must initially retain its media source')
+              assert(state.connected && !state.paused && state.ready >= 2 && !state.seeking,
+                'A failed progress request must leave decoded running media usable')
+              proof.faultBaseline ??= { at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
+              if (!(state.time > proof.faultBaseline.time + 0.2
+                && state.decodedFrames > proof.faultBaseline.decodedFrames)) return false
+              proof.preserved = { at: Date.now(), attachment: originalAttachment, renditionSet,
+                time: state.time, decodedFrames: state.decodedFrames }
+            }
+            if (attachmentNumber === originalAttachment) assert.equal(state.source, before.source,
+              'An unchanged attachment must retain its decoded media source')
+            if (!mediaQualified || !proof.success || proof.success.position <= proof.fault.position) return false
+            const capability = attachedCapabilities.get(attachmentNumber)
+            const delivered = capability && new URL(capability.url).searchParams.get('set') === snapshot.renditionSet
+              && mediaResponses.some(item => item.attachment === attachmentNumber && item.status === 200
+                && item.path.endsWith('/master.m3u8'))
+              && ['video', 'audio'].every(track => mediaResponses.some(item => item.attachment === attachmentNumber
+                && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')))
+            if (!(state.connected && !state.paused && state.ready >= 2 && !state.seeking && currentSource(state)
+              && snapshot?.ready && snapshot.status === 'running' && delivered)) return false
+            if (finalBaseline?.attachment !== attachmentNumber) finalBaseline = { at: Date.now(),
+              attachment: attachmentNumber, time: state.time, decodedFrames: state.decodedFrames }
+            const canonical = freshCanonical().find(item => item.at >= proof.success.responseAt
+              && item.status === 'running' && item.renditionSet === snapshot.renditionSet
+              && item.position >= proof.success.position)
+            if (!(state.time > finalBaseline.time + 0.2 && state.decodedFrames > finalBaseline.decodedFrames
+              && state.time > before.time + 1 && canonical)) return false
+            proof.canonical = { at: canonical.at, position: canonical.position, revision: canonical.revision }
+            proof.finalBaseline = finalBaseline
+            proof.after = { at: Date.now(), attachment: attachmentNumber, renditionSet: snapshot.renditionSet,
+              time: state.time, decodedFrames: state.decodedFrames }
+            proof.status = 'passed'
+            passed = true
+            return true
+          }, `${mode} progress failure to preserve decoding and recover genuine writes`)
+        } finally {
+          await page.unroute(positionRoute, interceptProgress)
+          await Promise.all([...pendingRoutes])
+          page.off('requestfailed', requestFailed)
+        }
+        await waitFor(checkMediaEvents, 'every progress source detachment to receive its authenticated successor master')
+        if (routeError) throw routeError
+        await recordClientControl(`progress-outage-${mode}-${proof.status}`, proof.startedAt, { attempt })
       }
-      await checkMediaEvents()
-      if (routeError) throw routeError
-      await recordClientControl(`progress-outage-${mode}-${proof.status}`, proof.startedAt, { attempt })
+      assert(passed, `Progress outage ${mode} did not retain a stable rendition set within three attempts`)
     }
-    assert(passed, `Progress outage ${mode} did not retain a stable rendition set within three attempts`)
+  } finally {
+    await page.evaluate(() => { window.__twoCommandObserveSigningReceipts = false })
   }
 }
 
@@ -878,6 +895,7 @@ async function proveStatusOutages(owner) {
         && item.at >= proof.startedAt && item.jobId === owner.jobId && item.sessionId === owner.sessionId
         && item.generation === owner.generation)
       const checkMedia = async () => {
+        const capabilities = [...attachedCapabilities.values()]
         const { events, receipts } = await page.evaluate(() => ({
           events: window.__twoCommandMediaEvents ?? [], receipts: window.__twoCommandSigningReceipts ?? [],
         }))
@@ -891,11 +909,11 @@ async function proveStatusOutages(owner) {
         'A status transport failure must not cause a media error or unexplained teardown')
         proof.sourceDetachments = qualifySourceDetachments(events.filter(event => !event.probe
           && event.at >= proof.startedAt && event.event === 'source-detached'),
-        [...attachedCapabilities.values()], fresh, originalCapability)
+        capabilities, fresh, originalCapability)
         let previousSet = renditionSet
         let previousAt = originalCapability.at
-        for (const [number, capability] of attachedCapabilities) {
-          if (number <= originalAttachment) continue
+        for (const capability of capabilities) {
+          if (capability.attachment <= originalAttachment) continue
           const set = new URL(capability.url).searchParams.get('set')
           assert(set !== previousSet && fresh.some(item => item.renditionSet === set
             && item.receivedAt > previousAt && item.receivedAt <= capability.at),
@@ -1155,6 +1173,260 @@ async function seekSourceAndDecode(owner, position, action, paused = false) {
   owner.generation = snapshot.generation
   await recordClientControl(action, started, { requested })
   return requested
+}
+
+async function proveMovieCompletion() {
+  const proof = { startedAt: Date.now() }
+  movieCompletions.push(proof)
+  const deadline = proof.startedAt + 60000
+  const remaining = () => {
+    assert(Date.now() < deadline, 'Movie completion proof exceeded its total time budget')
+    return Math.max(1, deadline - Date.now())
+  }
+  const waitFor = (check, description) => until(check, description, remaining())
+  const sample = async () => {
+    const attachment = attachmentNumber
+    const state = await mediaState()
+    return attachment === attachmentNumber ? { attachment, state } : null
+  }
+  const owner = ownedPlayback()
+  const sourceEnd = snapshot.duration
+  assert(Number.isFinite(sourceEnd) && sourceEnd > 30, 'Completion requires the known full source duration')
+  const controlsStart = playbackControls.length
+  const controls = () => playbackControls.slice(controlsStart)
+  const acceptSeek = async (target, generation) => {
+    let submission
+    let acknowledgement
+    await waitFor(async () => {
+      submission = controls().find(item => item.action === 'seek' && item.position === target)
+      if (!submission) return false
+      assert.equal(submission.generation, generation, 'The seek must submit its currently owned generation')
+      assert.equal(typeof submission.requestId, 'string', 'Each logical seek must retain its request identity')
+      const receipts = await page.evaluate(() => window.__twoCommandSeekReceipts ?? [])
+      acknowledgement = receipts.find(item => item.requestId === submission.requestId)
+      if (!acknowledgement) return false
+      assert.equal(acknowledgement.acceptedGeneration, generation + 1, 'The actual seek ACK must advance its submitted generation once')
+      return true
+    }, 'the actual source seek acknowledgement')
+    return { submission, acknowledgement, preparing: [] }
+  }
+  const readyExecution = seek => {
+    const accepted = seek.acknowledgement.acceptedGeneration
+    assert.equal(snapshot.jobId, owner.jobId, 'Seek execution must retain the owned job')
+    assert.equal(snapshot.sessionId, owner.sessionId, 'Seek execution must retain the owned session')
+    const canonical = playbackSnapshots.filter(item => item.accepted && item.at >= seek.submission.at
+      && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+      && (item.generation === accepted || item.generation === accepted + 1))
+    seek.preparing = canonical.filter(item => !item.ready).map(item => ({ at: item.at,
+      requestedAt: item.requestedAt, ...safePlayback(item) }))
+    if (!snapshot.ready || (snapshot.generation !== accepted && snapshot.generation !== accepted + 1)) return false
+    const ready = canonical.findLast(item => item.ready && item.generation === snapshot.generation)
+    if (!ready) return false
+    seek.ready = { at: ready.at, requestedAt: ready.requestedAt, ...safePlayback(ready) }
+    return true
+  }
+  const routePattern = `**/api/transcode/sessions/${owner.sessionId}/position`
+  let droppedPause = null
+  let failureObservedAt = null
+  let routeError = null
+  const pendingRoutes = new Set()
+  const failed = request => {
+    if (request === droppedPause) failureObservedAt = Date.now()
+  }
+  const intercept = route => {
+    const task = (async () => {
+      const request = route.request()
+      const payload = request.method() === 'POST' ? request.postDataJSON() : null
+      if (payload?.action !== 'pause' || droppedPause) { await route.continue(); return }
+      const state = await mediaState()
+      assert(state.ended, 'Only the genuine native ending pause may be interrupted')
+      assert(Math.abs(payload.position - sourceEnd) <= 0.1, 'Ending pause must use the full source end')
+      droppedPause = request
+      proof.droppedPause = { at: Date.now(), position: payload.position, revision: payload.revision }
+      await route.abort('failed')
+    })().catch(async error => { routeError = error; await route.abort().catch(() => {}) })
+    pendingRoutes.add(task)
+    task.finally(() => pendingRoutes.delete(task))
+  }
+  const assertOwner = generation => {
+    if (routeError) throw routeError
+    samePlayback(owner, generation)
+  }
+  page.on('requestfailed', failed)
+  await page.route(routePattern, intercept)
+  await page.evaluate(() => {
+    window.__twoCommandSeekReceipts = []
+    window.__twoCommandObserveSeekReceipts = true
+  })
+  shortSigningLifetime = true
+  try {
+    const requested = await commitSourceSeek(sourceEnd - 12)
+    proof.tailSeek = await acceptSeek(requested, owner.generation)
+    await waitFor(async () => {
+      const sampled = await sample()
+      if (!sampled) return false
+      const { state } = sampled
+      return readyExecution(proof.tailSeek) && currentSource(state)
+        && !state.paused && !state.ended && !state.seeking && state.error === null
+        && state.ready >= 2 && state.decodedFrames > 0
+        && snapshot.startTime + state.time >= requested && snapshot.startTime + state.time < sourceEnd - 1
+    }, 'the real tail seek to decode before natural completion')
+    owner.generation = snapshot.generation
+    assertOwner(owner.generation)
+    let initialSample
+    await waitFor(async () => {
+      initialSample = await sample()
+      return initialSample && !initialSample.state.ended && !initialSample.state.paused && initialSample.state.decodedFrames > 0
+    }, 'a stable attached tail decoder baseline')
+    const playing = initialSample.state
+    proof.tail = { requested, sourceEnd, generation: owner.generation, attachment: initialSample.attachment,
+      startTime: snapshot.startTime, time: playing.time, decodedFrames: playing.decodedFrames }
+    let ended
+    let completedAttachment
+    let tailBaseline = { attachment: initialSample.attachment, time: playing.time, decodedFrames: playing.decodedFrames, source: playing.source }
+    await waitFor(async () => {
+      assertOwner(owner.generation)
+      const sampled = await sample()
+      if (!sampled) return false
+      const { state, attachment } = sampled
+      assert.equal(state.error, null, 'Tail playback must remain free of media errors')
+      assert.equal(state.playbackRate, 1, 'Natural tail completion must run at normal speed')
+      if (!state.ended) {
+        if (tailBaseline.attachment !== attachment) {
+          tailBaseline = { attachment, time: state.time, decodedFrames: state.decodedFrames, source: state.source }
+        }
+        return false
+      }
+      assert(state.paused && !state.seeking && state.source === tailBaseline.source, 'Completion must belong to the current stopped attachment')
+      assert(Math.abs(snapshot.startTime + state.time - sourceEnd) <= 0.1, 'Natural completion must reach the full source end')
+      assert(Math.abs(state.time - state.duration) <= 0.1, 'The actual media timeline must reach its end')
+      assert(tailBaseline.attachment === attachment && state.time > tailBaseline.time
+        && state.decodedFrames > tailBaseline.decodedFrames, 'The completing attachment must decode advancing tail frames')
+      proof.tail.baseline = { ...tailBaseline, source: new URL(tailBaseline.source).pathname }
+      completedAttachment = attachment
+      ended = state
+      return true
+    }, 'actual natural movie completion')
+    await waitFor(async () => {
+      const events = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
+      proof.endedEvent = events.findLast(event => !event.probe && event.event === 'ended'
+        && event.at >= proof.startedAt && event.ended && event.source === new URL(ended.source).pathname
+        && Math.abs(event.time - ended.time) <= 0.1)
+      return Boolean(proof.endedEvent)
+    }, 'the genuine native ended event')
+    assert.equal(attachmentNumber, completedAttachment, 'The ended event must retain its sampled attachment')
+    const capability = attachedCapabilities.get(completedAttachment)
+    assert(capability?.expires && Date.now() < (capability.expires + 1) * 1000
+      && capability.expires * 1000 - Date.now() <= 12000,
+      'The actually attached completion capability must have a bounded short lifetime')
+    const signedCompletion = playbackSnapshots.findLast(item => item.accepted && item.capability === capability.capability)
+    assert(signedCompletion && signedCompletion.jobId === owner.jobId && signedCompletion.sessionId === owner.sessionId
+      && signedCompletion.generation === owner.generation, 'Completed capability must belong to the owned execution')
+    const completedSet = new URL(capability.url).searchParams.get('set')
+    assert(completedSet, 'Completed capability must retain its signed rendition set')
+    proof.completed = { at: Date.now(), attachment: completedAttachment, startTime: snapshot.startTime, renditionSet: completedSet, jobId: owner.jobId, sessionId: owner.sessionId, generation: owner.generation,
+      time: ended.time, duration: ended.duration, decodedFrames: ended.decodedFrames,
+      pausedFrame: ended.pausedFrame, expires: capability.expires, capability: capability.capability }
+    proof.finalResources = []
+    await waitFor(() => {
+      proof.finalResources = ['video', 'audio'].map(track => {
+        const playlists = manifestEvidence.filter(item => item.attachment === completedAttachment
+          && item.path.includes(`/tracks/${track}/`) && item.body.includes('#EXT-X-ENDLIST'))
+        for (const playlist of playlists) {
+          const resource = playlist.body.split('\n').filter(line => line && !line.startsWith('#')).at(-1)
+          if (!resource) continue
+          const url = new URL(resource, 'https://media.baander.app')
+          const match = /^\/api\/transcode\/([^/]+)\/tracks\/(video|audio)\/segment\.m4s$/.exec(url.pathname)
+          if (!match || !completedSet.split(',').includes(`${match[1]}.${url.searchParams.get('generation')}`)) continue
+          const response = mediaResponses.find(item => item.attachment === completedAttachment && item.status === 200
+            && item.path === url.pathname && item.generation === url.searchParams.get('generation')
+            && item.index === url.searchParams.get('index'))
+          if (response) return { track, playlist: playlist.path, path: response.path,
+            generation: response.generation, index: response.index, at: response.at }
+        }
+        return null
+      }).filter(Boolean)
+      return proof.finalResources.length === 2
+    }, 'completed current-set audio/video playlists and delivered final fragments')
+    await waitFor(async () => {
+      assertOwner(owner.generation)
+      const sampled = await sample()
+      assert(sampled, 'The completed attachment must remain stable during observation')
+      const { state } = sampled
+      assert.equal(sampled.attachment, completedAttachment, 'Polling and expiry must preserve the completed attachment')
+      assert(state.ended && state.paused && !state.seeking && state.error === null,
+        'Fresh running state must never restart a completed movie')
+      assert(Math.abs(state.time - ended.time) <= 0.1, 'The completed source cursor must remain fixed')
+      assert.equal(controls().filter(item => item.action === 'seek').length, 1, 'Completion must not create additional seeks')
+      const polls = playbackSnapshots.filter(item => item.accepted && item.requestedAt > failureObservedAt
+        && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+        && item.generation === owner.generation && item.status === 'running')
+      proof.runningPolls = polls.slice(-2).map(item => ({ at: item.at, requestedAt: item.requestedAt,
+        generation: item.generation, revision: item.revision, status: item.status }))
+      return failureObservedAt && polls.length >= 2 && Date.now() > (capability.expires + 1) * 1000
+    }, 'completed playback to remain stopped across failed pause, fresh running polls and actual capability expiry')
+    assert.equal(controls().filter(item => item.action === 'pause').length, 1, 'Natural completion must issue one ending pause')
+    proof.heldUntil = Date.now()
+    shortSigningLifetime = false
+    const replayStarted = Date.now()
+    await video.evaluate(element => {
+      window.__twoCommandReplayPlay = { requestedAt: Date.now(), settled: false }
+      element.play().then(() => {
+        window.__twoCommandReplayPlay = { ...window.__twoCommandReplayPlay, settled: true, at: Date.now() }
+      }, error => {
+        window.__twoCommandReplayPlay = { ...window.__twoCommandReplayPlay, settled: true, at: Date.now(), error: error.name }
+      })
+    })
+    proof.replaySeek = await acceptSeek(0, owner.generation)
+    let replayBaseline
+    let replayGeneration
+    await waitFor(async () => {
+      if (routeError) throw routeError
+      proof.replayPlay = await page.evaluate(() => window.__twoCommandReplayPlay)
+      assert(!proof.replayPlay.error || proof.replayPlay.error === 'AbortError',
+        `Native replay Play failed unexpectedly: ${proof.replayPlay.error}`)
+      const sampled = await sample()
+      if (!sampled) return false
+      const { state } = sampled
+      if (replayGeneration !== undefined) assertOwner(replayGeneration)
+      if (!readyExecution(proof.replaySeek) || !currentSource(state)
+        || state.paused || state.ended || state.seeking || state.error !== null || state.ready < 2
+        || state.decodedFrames <= 0) return false
+      assert.equal(snapshot.startTime, 0, 'Replay must attach the full source beginning')
+      replayGeneration ??= snapshot.generation
+      if (!replayBaseline || replayBaseline.attachment !== attachmentNumber) {
+        replayBaseline = { attachment: attachmentNumber, at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
+        return false
+      }
+      if (!proof.replayPlay.settled || state.time <= replayBaseline.time + 1
+        || state.decodedFrames <= replayBaseline.decodedFrames) return false
+      proof.replay = { startedAt: replayStarted, baseline: replayBaseline, at: Date.now(),
+        attachment: attachmentNumber, generation: snapshot.generation, startTime: snapshot.startTime,
+        time: state.time, decodedFrames: state.decodedFrames }
+      return true
+    }, 'native Play to replay a new source-zero execution with advancing decoded frames')
+    assertOwner(replayGeneration)
+    const seeks = controls().filter(item => item.action === 'seek')
+    assert.deepEqual(seeks.map(item => item.position), [requested, 0], 'Tail setup and explicit source-zero replay must be the only seeks')
+    assert.equal(controls().filter(item => item.action === 'pause').length, 1, 'Replay retirement must not echo another pause')
+    assert(controls().filter(item => item.action === 'resume').length <= 1, 'Replay may resume at most once')
+    for (const track of ['video', 'audio']) {
+      assert(mediaResponses.some(item => {
+        const match = /^\/api\/transcode\/([^/]+)\/tracks\/(video|audio)\/segment\.m4s$/.exec(item.path)
+        return item.at >= replayStarted && item.attachment === attachmentNumber && item.status === 200
+          && match?.[2] === track && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
+      }), `Replay must receive actual current-set ${track}`)
+    }
+    proof.controls = controls().filter(item => item.action !== 'progress')
+    proof.finishedAt = Date.now()
+  } finally {
+    shortSigningLifetime = false
+    await page.evaluate(() => { window.__twoCommandObserveSeekReceipts = false })
+    await page.unroute(routePattern, intercept)
+    await Promise.allSettled([...pendingRoutes])
+    page.off('requestfailed', failed)
+    await savePlaybackTimeline()
+  }
 }
 
 async function proveSeekOutages(owner, expectedPosition) {
@@ -1539,6 +1811,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
           && snapshot.renditionSet.split(',').includes(`${match[1]}.${item.generation}`)
       }), `Recovered playback must receive ${track} from the current signed rendition set`)
     }
+    await proveMovieCompletion()
   } else if (phase === 'complete') {
     assert.deepEqual(phases, ['authenticated', 'attached', ...(phases.includes('client-controls') ? ['client-controls'] : []), 'sought-paused', 'web-restarted', 'worker-contained', 'worker-recovered'])
   } else {
@@ -1546,7 +1819,7 @@ async function checkpoint({ phase, baseUrl, credentials }) {
   }
   phases.push(phase)
   // No credentials or signed URLs are written to the evidence artifact.
-  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages }, null, 2))
+  await writeFile(`${evidence}/result.json`, JSON.stringify({ browser: browserInfo, phases, generation: snapshot?.generation, mediaResponses, nativeResponseEvidence, clientControls, subtitleObservations, networkInterruptions, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions }, null, 2))
   return { phase, passed: true }
 }
 
@@ -1563,7 +1836,7 @@ const server = createServer(async (request, response) => {
     const playback = snapshot ? safePlayback(snapshot) : null
     const mediaEvents = await page.evaluate(() => window.__twoCommandMediaEvents ?? []).catch(() => [])
     await writeFile(`${evidence}/failure.json`, JSON.stringify({
-      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages,
+      browser: browserInfo, error: error.message, state, playback, playbackSnapshots, clientControls, subtitleObservations, networkInterruptions, mediaEvents: [...previousMediaEvents, ...mediaEvents], mediaResponses, apiResponses, nativeResponseEvidence, manifestEvidence, mediaRequestOrder, capabilityRenewals, progressOutages, statusOutages, seekOutages, movieCompletions,
     }, null, 2))
     await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
     response.writeHead(500, { 'Content-Type': 'application/json' })

@@ -2889,4 +2889,291 @@ describe('useBaanderPlayer authorization', () => {
     expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(0)
     unmount()
   })
+
+  describe('movie completion and replay', () => {
+    const setupCompletion = async ({ status = 'running', position = 162, nativeEnd = 17.92, lostPause = false } = {}) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-10-24T10:00:00Z'))
+      let signed = { url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 3}`, jobId: 'job', renditionSet: 'job.5',
+        sessionId: 'owned-session', generation: 5, revision: 5, ready: true, position, status, startTime: 162, duration: 180 }
+      post.mockImplementation((_path: string, payload: { action?: string, position: number }) => {
+        if (!payload.action) return Promise.resolve({ data: { ...signed, url: `/manifest?exp=${Math.floor(Date.now() / 1000) + 3}` } })
+        if (payload.action === 'pause' && lostPause) return Promise.reject(new AxiosError('offline', 'ERR_NETWORK'))
+        signed = { ...signed, position: payload.position, revision: signed.revision + 1,
+          ...(payload.action === 'seek' ? { generation: signed.generation + 1, startTime: payload.position,
+            renditionSet: `job.${signed.generation + 1}` } : {}),
+          ...(payload.action === 'pause' ? { status: 'paused' } : payload.action === 'resume' ? { status: 'running' } : {}) }
+        return Promise.resolve({ data: { data: { acceptedGeneration: signed.generation } } })
+      })
+      const containerRef = { current: document.createElement('div') }
+      const onStateChange = vi.fn()
+      const hook = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onStateChange }))
+      await act(async () => {})
+      const video = containerRef.current.querySelector('video')!
+      let paused = status === 'paused'
+      let ended = false
+      Object.defineProperty(video, 'paused', { configurable: true, get: () => paused })
+      Object.defineProperty(video, 'ended', { configurable: true, get: () => ended })
+      Object.defineProperty(video, 'duration', { configurable: true, value: nativeEnd })
+      Object.defineProperty(video, 'seekable', { configurable: true, value: { length: 1, start: () => 0, end: () => nativeEnd } })
+      vi.mocked(video.play).mockImplementation(async () => { paused = false })
+      vi.mocked(video.pause).mockImplementation(() => { paused = true })
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      const finish = async () => {
+        video.currentTime = nativeEnd
+        paused = true
+        ended = true
+        await act(async () => {
+          video.dispatchEvent(new Event('timeupdate'))
+          video.dispatchEvent(new Event('pause'))
+          video.dispatchEvent(new Event('ended'))
+        })
+      }
+      const replay = async (events: string[]) => {
+        video.currentTime = 0
+        paused = false
+        ended = false
+        await act(async () => events.forEach(event => video.dispatchEvent(new Event(event))))
+      }
+      return { ...hook, video, finish, replay, onStateChange, controls: () => post.mock.calls.filter(call => call[1].action).map(call => ({ ...call[1] })),
+        update: (data: Partial<typeof signed>) => { signed = { ...signed, ...data } } }
+    }
+
+    it('settles rounded natural EOF once with an exact ending pause', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      expect(player.result.current.currentTime).toBe(180)
+      expect(player.result.current.state).toBe('ended')
+      expect(player.controls()).toEqual([{ action: 'pause', position: 180 }])
+      await act(async () => player.video.dispatchEvent(new Event('ended')))
+      expect(player.controls()).toHaveLength(1)
+      player.unmount()
+    })
+
+    it('keeps a completed frame through lost ending pause, publication changes and capability expiry', async () => {
+      const player = await setupCompletion({ lostPause: true })
+      await player.finish()
+      vi.mocked(player.video.play).mockClear()
+      player.update({ renditionSet: 'expanded', revision: 6, position: 170 })
+      await act(async () => vi.advanceTimersByTimeAsync(10000))
+      expect(player.video.play).not.toHaveBeenCalled()
+      expect(attachments).toHaveLength(1)
+      expect(player.result.current.currentTime).toBe(180)
+      expect(player.result.current.state).toBe('ended')
+      expect(player.onStateChange.mock.calls.filter(([state]) => state === 'ended')).toHaveLength(1)
+      expect(player.controls()).toEqual([{ action: 'pause', position: 180 }])
+      player.unmount()
+    })
+
+    it.each([['seeking', 'play'], ['play', 'seeking']])('replays from source zero when native events arrive as %s then %s', async (first, second) => {
+      const player = await setupCompletion()
+      await player.finish()
+      await player.replay([first, second])
+      expect(player.controls()).toEqual([
+        { action: 'pause', position: 180 },
+        { action: 'seek', position: 0, generation: 5, requestId: expect.any(String) },
+        { action: 'resume', position: 0 },
+      ])
+      expect(attachments.at(-1)?.position).toBe(0)
+      player.unmount()
+    })
+
+    it('replays a restored canonical paused EOF through the hook play method', async () => {
+      const player = await setupCompletion({ status: 'paused', position: 180 })
+      await act(async () => player.result.current.play())
+      expect(player.controls()).toEqual([
+        { action: 'seek', position: 0, generation: 5, requestId: expect.any(String) },
+        { action: 'resume', position: 0 },
+      ])
+      player.unmount()
+    })
+
+    it('does not send an unnecessary resume after an uncertain ending pause reconciles running', async () => {
+      const player = await setupCompletion({ lostPause: true })
+      await player.finish()
+      await player.replay(['play', 'seeking'])
+      expect(player.controls()).toEqual([
+        { action: 'pause', position: 180 },
+        { action: 'seek', position: 0, generation: 5, requestId: expect.any(String) },
+      ])
+      player.unmount()
+    })
+
+    it('treats paused native seeking after completion as a new explicit source target', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      player.video.currentTime = 5
+      await act(async () => player.video.dispatchEvent(new Event('seeking')))
+      expect(player.controls().filter(control => control.action === 'seek')).toEqual([
+        { action: 'seek', position: 167, generation: 5, requestId: expect.any(String) },
+      ])
+      player.unmount()
+    })
+
+    it.each(['generation', 'owner'])('allows an authoritative %s change to supersede completion', async change => {
+      const player = await setupCompletion()
+      await player.finish()
+      player.update({ generation: 6, renditionSet: 'job.6', revision: 7, position: 30, startTime: 30, status: 'running',
+        ...(change === 'owner' ? { sessionId: 'replacement-session', jobId: 'replacement-job' } : {}) })
+      vi.mocked(player.video.play).mockClear()
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(attachments).toHaveLength(2)
+      expect(player.video.play).toHaveBeenCalled()
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(30)
+      player.unmount()
+    })
+
+    it('honors canonical cancellation of the completed execution', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      player.update({ status: 'cancelled', ready: false, revision: 7 })
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(player.video.getAttribute('src')).toBe('')
+      expect(player.result.current.state).toBe('ended')
+      player.unmount()
+    })
+
+    it('keeps the tail stopped when replay is queued behind an unresolved ending pause', async () => {
+      const player = await setupCompletion()
+      const implementation = post.getMockImplementation()!
+      let settlePause!: () => void
+      let acceptSeek!: () => void
+      post.mockImplementation((path: string, payload: { action?: string, position: number }) => {
+        if (payload.action === 'pause') return new Promise(resolve => {
+          settlePause = () => resolve(implementation(path, payload))
+        })
+        if (payload.action === 'seek') return new Promise(resolve => {
+          acceptSeek = () => resolve(implementation(path, payload))
+        })
+        return implementation(path, payload)
+      })
+      await player.finish()
+      await player.replay(['play', 'seeking'])
+      await act(async () => player.video.dispatchEvent(new Event('pause')))
+      vi.mocked(player.video.play).mockClear()
+      await act(async () => settlePause())
+      expect(player.video.play).not.toHaveBeenCalled()
+      expect(player.video.paused).toBe(true)
+      expect(player.controls().map(control => control.action)).toEqual(['pause', 'seek'])
+      await act(async () => acceptSeek())
+      expect(player.controls().map(control => control.action)).toEqual(['pause', 'seek', 'resume'])
+      player.unmount()
+    })
+
+    it.each(['hook', 'native'])('preserves newer pause and %s play intent without restarting a retiring replay attachment', async gesture => {
+      const player = await setupCompletion()
+      await player.finish()
+      const implementation = post.getMockImplementation()!
+      let accept!: () => void
+      post.mockImplementation((path: string, payload: { action?: string, position: number }) => {
+        if (payload.action === 'seek') return new Promise(resolve => {
+          accept = () => resolve(implementation(path, payload))
+        })
+        return implementation(path, payload)
+      })
+      await player.replay(['play', 'seeking'])
+      await act(async () => player.video.dispatchEvent(new Event('pause')))
+      await act(async () => player.result.current.pause())
+      vi.mocked(player.video.play).mockClear()
+      if (gesture === 'hook') await act(async () => player.result.current.play())
+      else await player.replay(['play'])
+      expect(player.video.paused).toBe(true)
+      expect(player.video.play).not.toHaveBeenCalled()
+      if (gesture === 'native') await act(async () => player.video.dispatchEvent(new Event('pause')))
+      await act(async () => accept())
+      expect(player.controls().map(control => [control.action, control.position])).toEqual([
+        ['pause', 180], ['seek', 0], ['resume', 0], ['pause', 0], ['resume', 0],
+      ])
+      expect(player.video.paused).toBe(false)
+      player.unmount()
+    })
+
+    it('stops the retiring tail while native replay acceptance is pending without echoing pause', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      const implementation = post.getMockImplementation()!
+      let accept!: () => void
+      post.mockImplementation((path: string, payload: { action?: string, position: number }) => {
+        if (payload.action === 'seek') return new Promise(resolve => {
+          accept = () => resolve(implementation(path, payload))
+        })
+        return implementation(path, payload)
+      })
+      await player.replay(['play', 'seeking'])
+      expect(player.video.paused).toBe(true)
+      await act(async () => player.video.dispatchEvent(new Event('pause')))
+      expect(player.controls().map(control => control.action)).toEqual(['pause', 'seek'])
+      await act(async () => accept())
+      expect(player.controls().map(control => control.action)).toEqual(['pause', 'seek', 'resume'])
+      player.unmount()
+    })
+
+    it('preserves newer seek and pause intent while replay acceptance is pending', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      const implementation = post.getMockImplementation()!
+      let accept!: () => void
+      post.mockImplementation((path: string, payload: { action?: string, position: number }) => {
+        if (payload.action === 'seek' && payload.position === 0) return new Promise(resolve => {
+          accept = () => resolve(implementation(path, payload))
+        })
+        return implementation(path, payload)
+      })
+      await player.replay(['seeking', 'play'])
+      await act(async () => {
+        player.result.current.seekTo(60)
+        player.result.current.pause()
+      })
+      expect(player.result.current.pendingSeekPosition).toBe(60)
+      await act(async () => accept())
+      expect(player.controls().map(control => [control.action, control.position])).toEqual([
+        ['pause', 180], ['seek', 0], ['resume', 0], ['seek', 60], ['pause', 60],
+      ])
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(60)
+      expect(player.video.paused).toBe(true)
+      player.unmount()
+    })
+
+    it.each(['refusal', 'media error'])('does not let a late ended event overwrite %s handling', async failure => {
+      const player = await setupCompletion()
+      if (failure === 'refusal') {
+        const implementation = post.getMockImplementation()!
+        post.mockImplementation((path: string, payload: { action?: string, position: number }) => {
+          if (payload.action === 'pause') return Promise.reject(new AxiosError('refused', 'ERR_BAD_REQUEST'))
+          return implementation(path, payload)
+        })
+        await player.finish()
+      } else {
+        Object.defineProperty(player.video, 'error', { configurable: true, value: { code: 3 } })
+        await act(async () => player.video.dispatchEvent(new Event('error')))
+      }
+      await act(async () => player.video.dispatchEvent(new Event('ended')))
+      expect(player.result.current.state).toBe('error')
+      player.unmount()
+    })
+
+    it('does not recognize a short presentation as source completion', async () => {
+      const player = await setupCompletion({ nativeEnd: 10 })
+      await player.finish()
+      expect(player.result.current.currentTime).toBe(172)
+      expect(player.controls()).toEqual([{ action: 'pause', position: 172 }])
+      player.unmount()
+    })
+
+    it('lets a newer source seek supersede completion and ignores its retiring ended event', async () => {
+      const player = await setupCompletion()
+      await player.finish()
+      await act(async () => player.result.current.seekTo(60))
+      await act(async () => player.video.dispatchEvent(new Event('ended')))
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(60)
+      expect(player.controls().filter(control => control.action === 'seek')).toEqual([
+        { action: 'seek', position: 60, generation: 5, requestId: expect.any(String) },
+      ])
+      player.unmount()
+    })
+  })
+
 })

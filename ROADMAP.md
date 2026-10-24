@@ -1328,3 +1328,116 @@ HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH EOF and the
 separate native pressure observer remain unqualified. Existing application
 databases, Redis and media storage were not reused or reset. This checkpoint
 includes no push or feature merge.
+
+### Natural movie completion and source-zero replay — 2026-10-24
+
+A completed owned movie remains stopped at the full source end across ordinary
+polling, optional publication and capability expiry, including when its ending
+pause was lost before reaching the server. That local completion guard does not
+claim server acceptance or persistence across a new player instance. Explicit
+native Play starts one source-zero seek through the bounded delivery protocol,
+then resumes as needed. Newer seeks, playback intent and authoritative ownership
+or execution changes retain their existing lifecycle fences.
+
+The production fixture adds a bounded normal-speed tail completion and replay
+proof after worker recovery, retaining all eight phases and existing deadlines.
+It checks genuine ended, final audio/video resources, a dropped ending pause,
+fresh canonical running polls and actual attached-capability expiry before native
+source-zero replay. The testing guide documents these checks.
+
+Production testing exposed a lower-level EOF stall despite both ENDLIST playlists
+and final audio/video fragments being delivered. The Chromium run stopped at
+media position 29.963906 of 30.033333 seconds and failed after 579.96 seconds;
+verified cleanup and the failed receipt remain under
+`var/test-runs/movie-completion-replay-chromium`. An isolated producer comparison
+reproduced the stall in Chromium and Firefox without the player hook, lease
+expiry or attachment replacement. The video edit-list offset shifted the samples
+seen by MSE relative to HLS fragment timestamps. Signed composition offsets now
+remove that discrepancy while preserving AAC priming. Both controlled browsers
+reached genuine native EOF at 30.033333 seconds with 331 frames; their presented
+audio/video ranges and AAC payloads matched the unchanged-producer baseline.
+Evidence and diagnostic variants remain under
+`var/test-runs/movie-completion-replay-eof-probe`.
+
+The native gray-video consumer separately duplicated initial frames through
+FFmpeg's implicit constant-frame-rate normalization. Its measurement now rebases
+timestamps and passes frames through without duplication. The controlled check
+retained identical PCM and copied-packet CRC hashes. Final progressive acceptance
+produced 480 full HLS frames, 479 static DASH frames within the existing 480±1
+bound, and exact 312-frame 13-second prefixes, preserving live/completed comparison
+checks. These results do not establish byte-exact source decoding or full live
+FFmpeg DASH EOF. Consumer probe and native receipts remain under
+`var/test-runs/movie-completion-replay-gates`, including
+`consumer-measurement-probe/results.jsonl` and
+`backend/20261024-113833-0e6e035c/native/progressive-media-after-stop/`.
+
+Final frontend verification passed 225 tests across four suites: 210 hook tests
+including all 191 existing cases and 19 additions, nine adapter, two import and
+four overlay tests. The initial unchanged-source regressions failed in five cases
+with two passing and 191 skipped. Further held-ack retirement, queued-pause and
+repeated-Play regressions failed before their fixes. Backend verification passed
+29 tests with 11,437 assertions: 28 unit/native tests with 7,073 assertions plus
+the progressive test with 4,364. Typechecking, production build, asset verification
+and browser/runner syntax passed. Lint reported zero errors and eight existing
+warnings outside the changed files. Full PHPStan passed; Deptrac reported zero
+violations, warnings and errors with 484 existing skipped violations.
+`var/test-runs/movie-completion-replay-gates/verification-summary.json` records the
+checks. The verified image uses application source `180f2e31`, including player
+repair `d57b6592` and producer repair `6ae7a030`; final browser fixture is `460e67c4`.
+
+A second run failed an existing progress observer before the new completion check;
+its misleadingly named directory
+`var/test-runs/movie-completion-replay-chromium-accepted` retains the failure and
+verified cleanup. Source removal preceded Node's changed-set response callback
+by 11 milliseconds; a matching successor and continued decoding suggested an
+observation race, but no exact browser receipt had been captured. The final
+fixture uses its existing browser XHR-DONE receipt and per-detachment causal
+checks, with capability metadata captured before the atomic browser observation.
+The failed run is not acceptance evidence; final qualification uses actual
+browser receipt ordering.
+
+A third failed run, `var/test-runs/movie-completion-replay-chromium-verified`,
+reached genuine EOF, dropped the ending pause at 180.021 seconds and held the
+completed attachment through fresh running polls and actual capability expiry.
+Replay submitted one source-zero seek and decoded generation 18 from source zero;
+the fixture incorrectly required generation 17 and timed out after 577.240
+seconds, with verified cleanup. The established backend contract acknowledges
+the changed seek as generation 17, then lets a fresh worker claim advance it once
+to 18 at the same control revision. The fixture now matches the acknowledgement
+to its request identity and target, permits that one claim increment and records
+the decoded generation separately. No backend behavior changed for this finding;
+the 60-second scenario limit remains.
+
+Chromium 148.0.7778.96 passed all eight phases in 574.686211 seconds, within the
+600-second deadline, with verified cleanup under
+`var/test-runs/movie-completion-replay-chromium-qualified`. Its completion/replay
+scenario took 41.921 seconds within the 60-second bound. A slider seek to source
+169 attached generation 16 from source start 150 and reached genuine EOF at local
+30.033333 with 84 frames. The one ending pause at source 180.021 was dropped;
+two fresh running polls and actual capability expiry left the movie stopped.
+Native replay submitted one seek to zero, acknowledged as generation 17 and
+decoded as generation 18. The new attachment advanced from local 0.019343 and
+five frames to 1.085885 and 38 frames. Its only non-progress controls were the
+tail seek, ending pause and source-zero replay seek. The run retained 42 client
+control records and four subtitle observations, with two superseded progress
+observations recorded.
+
+Firefox 150.0.2 passed all eight phases in 575.887414 seconds, with verified
+cleanup under `var/test-runs/movie-completion-replay-firefox`. Its 41.959-second
+completion/replay scenario reached genuine EOF at local 30.033333 with 83 frames.
+The dropped ending pause at source 180.021, fresh running polls and actual
+capability expiry kept the completed attachment stopped. Its only non-progress
+controls were likewise seek 169, pause 180.021 and seek zero. Replay was
+acknowledged as generation 17 and decoded as generation 18 from source zero,
+advancing from local 0.040689 and one frame to 1.052176 and 32 frames. The run
+retained 40 client-control records and four subtitle observations. Both engines
+passed the existing status, seek, renewal and progress checks; their
+`acceptance-summary.json` receipts retain final-resource, polling, capability and
+replay evidence.
+
+The completion proof covers a normal-speed tail after a real source seek, not
+uninterrupted full-movie playback or byte-exact source decoding.
+Safari/native HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH
+EOF and the separate native pressure observer remain unqualified. Existing
+application databases, Redis and media storage and the user's original videos
+were not changed. This checkpoint includes no push or feature merge.

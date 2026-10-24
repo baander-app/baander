@@ -824,6 +824,19 @@ artifacts. Run the local engine checks sequentially as well; use
 `BAANDER_TEST_ARTIFACTS` to keep their evidence separate. CI configuration alone
 is not evidence that either browser passed.
 
+After worker recovery, a 60-second completion/replay check seeks near the known
+source end through the real source slider and plays the tail at normal speed.
+It requires a genuine native ended event, completed current-set audio/video
+playlists and delivered final fragments. The ending pause is dropped before
+forwarding; at least two fresh canonical running polls and the attached signed
+capability's actual expiry must leave the same completed frame and cursor stopped.
+Native Play must then submit one source-zero seek, attach a new execution and
+receive current-generation media with advancing time and raw frame counts. The
+check does not force the clock to EOF, synthesize ended or accelerate playback.
+It qualifies completion after a user seek, not uninterrupted full-source playback
+or byte-exact decoding. The eight phases, phase deadlines and 600-second outer
+deadline remain unchanged.
+
 The production fixture also submits a captured old-generation native seek after
 an explicit paused seek, while the worker is live and while it is absent. It must
 leave desired position, execution generation and control revision unchanged. This

@@ -164,8 +164,8 @@ final class ProgressiveMediaPublicationTest extends TestCase
         $limit = $duration === null ? [] : ['-t', (string) $duration];
         return ['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-y', '-threads', '1', '-filter_threads', '1',
             ...$inputOptions, '-headers', 'X-Baander-Test-Consumer: ' . $name . "\r\n", '-i', $url,
-            ...$limit, '-map', '0:v:0', '-vf', 'scale=16:16', '-c:v', 'rawvideo', '-threads:v', '1',
-            '-pix_fmt', 'gray', '-flush_packets', '1', '-f', 'rawvideo', $prefix . '.gray',
+            ...$limit, '-map', '0:v:0', '-vf', 'scale=16:16,setpts=PTS-STARTPTS', '-c:v', 'rawvideo', '-threads:v', '1',
+            '-pix_fmt', 'gray', '-fps_mode', 'passthrough', '-flush_packets', '1', '-f', 'rawvideo', $prefix . '.gray',
             ...$limit, '-map', '0:a:0', '-c:a', 'pcm_s16le', '-ac', '2', '-ar', '48000', '-flush_packets', '1', '-f', 's16le', $prefix . '.pcm',
             ...$limit, '-map', '0', '-c', 'copy', '-flush_packets', '1', '-f', 'framecrc', $prefix . '.framecrc'];
     }
