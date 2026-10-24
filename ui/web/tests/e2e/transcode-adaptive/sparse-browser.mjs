@@ -5,9 +5,10 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek'].includes(fixture.scenario))
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek'].includes(fixture.scenario))
 const matroska = fixture.scenario.startsWith('matroska-delayed-')
-const ordinary = fixture.scenario.startsWith('ordinary-delayed-')
+const defaultAudio = fixture.scenario.startsWith('default-audio-')
+const ordinary = defaultAudio || fixture.scenario.startsWith('ordinary-delayed-')
 const delayed = matroska || ordinary
 const hasSubtitles = fixture.hasSubtitles
 assert.equal(hasSubtitles, matroska)
@@ -22,6 +23,19 @@ if (ordinary) {
   assert.equal(fixture.sourceAudioFirstPts, 8)
   assert.equal(fixture.sourceDuration, 30)
   assert.deepEqual(fixture.expectedCues, [])
+}
+if (defaultAudio) {
+  assert.equal(fixture.selectedAudioOrdinal, 1)
+  assert.equal(fixture.selectedAudioGlobalIndex, 2)
+  assert.deepEqual(fixture.sourceAudioStreams.map(stream => stream.index), [1, 2])
+  assert.equal(fixture.sourceAudioStreams[0].disposition.default, 0)
+  assert.equal(fixture.sourceAudioStreams[1].disposition.default, 1)
+  assert.equal(fixture.selectedAudio.language, 'dan')
+  assert.equal(fixture.selectedAudio.channels, 6)
+  assert.equal(fixture.selectedAudio.sampleRate, 48000)
+  assert.equal(fixture.selectedAudio.channelLayout, '5.1(side)')
+  assert.equal(fixture.expectedAudioFrequency, 880)
+  assert.equal(fixture.rejectedAudioFrequency, 220)
 }
 assert.equal(fixture.audioProfile, 'streaming_stereo')
 assert.equal(fixture.sourceFrameRate, ordinary ? 25 : 0.1)
@@ -197,8 +211,9 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(({ manifest, hasSubtitles }) => {
+  await page.evaluate(({ manifest, hasSubtitles, defaultAudio }) => {
     window.adaptiveManifest = manifest
+    window.adaptiveFrequencyAnalysis = defaultAudio
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
     window.sparseCueEvents = []
@@ -334,7 +349,7 @@ try {
       }
     }
     callbackId = video.requestVideoFrameCallback(observe)
-  }, { manifest: fixture.manifestUrl, hasSubtitles })
+  }, { manifest: fixture.manifestUrl, hasSubtitles, defaultAudio })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -405,6 +420,11 @@ try {
   assert(master, 'Retain the signed production master playlist')
   assert.equal(master.body.split('\n').filter(line => line.startsWith('#EXT-X-STREAM-INF:')).length, 2)
   assert(master.body.includes('mp4a.40.2'))
+  if (defaultAudio) {
+    const audioDeclarations = master.body.split('\n').filter(line => line.startsWith('#EXT-X-MEDIA:TYPE=AUDIO,'))
+    assert.equal(audioDeclarations.length, 1, 'The selected source must retain one canonical published audio rendition')
+    assert(/(?:^|,)LANGUAGE="dan"(?:,|$)/.test(audioDeclarations[0]), 'The production master must advertise selected Danish dialogue')
+  }
   const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:')
     && (!delayed || /\/tracks\/(?:video|audio)\//.test(new URL(manifest.url).pathname)))
   if (delayed) {
@@ -423,6 +443,32 @@ try {
   assert(delivered.some(request => request.track === 'video'))
   assert(delivered.some(request => request.track === 'audio'))
   assert(delivered.filter(request => request.track === 'audio').every(request => request.jobId === fixture.canonicalAudioJobId))
+  if (defaultAudio) {
+    const observations = [...new Map(samples.flatMap(sample => sample.audio).map(audio => [audio.at, audio])).values()]
+      .filter(audio => audio.time >= fixture.expectedAudioDelay + 0.5 && audio.rms > 0.001)
+    assert(observations.length > 0, 'Measure the audible source identity after the selected dialogue begins')
+    assert.equal(typeof state.audioContextSampleRate, 'number')
+    for (const audio of observations) {
+      assert.equal(audio.sampleRate, state.audioContextSampleRate)
+      assert(Number.isFinite(audio.frequencyBinHz) && audio.frequencyBinHz > 0)
+      assert(Number.isFinite(audio.dominantFrequency) && Math.abs(audio.dominantFrequency - fixture.expectedAudioFrequency) <= audio.frequencyBinHz * 1.5,
+        `The browser must hear selected dialogue near 880 Hz, observed ${audio.dominantFrequency} Hz`)
+      assert(Math.abs(audio.dominantFrequency - fixture.rejectedAudioFrequency) > audio.frequencyBinHz * 1.5,
+        'The commentary tone must not become the dominant audible source')
+    }
+    const windows = [
+      { name: 'post-onset', start: fixture.expectedAudioDelay + 0.5, end: fixture.expectedAudioDelay + 1.5 },
+      { name: 'middle-hold', start: fixture.expectedDuration * 0.55, end: fixture.expectedDuration * 0.55 + 1 },
+      { name: 'late-tail', start: fixture.expectedDuration - 2, end: fixture.expectedDuration - 0.25 },
+    ].map(window => {
+      const measured = observations.filter(audio => audio.time >= window.start && audio.time <= window.end)
+      assert(measured.length >= 3, `Retain several actual frequency measurements in the ${window.name} window`)
+      return { ...window, samples: measured.map(audio => ({ at: audio.at, time: audio.time, frequency: audio.dominantFrequency,
+        binHz: audio.frequencyBinHz, sampleRate: audio.sampleRate, rms: audio.rms })) }
+    })
+    receipt.audioIdentity = { expectedFrequency: 880, rejectedFrequency: 220, toleranceBins: 1.5,
+      audioContextSampleRate: state.audioContextSampleRate, audibleSamples: observations.length, windows }
+  }
   if (delayed) {
     const silence = samples.filter(sample => sample.time >= 0.25 && sample.time < fixture.expectedAudioDelay - 0.25 && sample.audio.length > 0)
     assert(silence.length >= 3, 'Observe the played initial silence before the delayed audio begins')

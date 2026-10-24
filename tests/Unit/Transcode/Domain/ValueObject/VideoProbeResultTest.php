@@ -11,6 +11,57 @@ use PHPUnit\Framework\TestCase;
 
 class VideoProbeResultTest extends TestCase
 {
+    /** @param list<bool> $defaults */
+    #[DataProvider('sourceAudioDefaults')]
+    public function testSourceAudioSelectionKeepsOrdinalsAndCanonicalAttributes(array $defaults, ?int $expected): void
+    {
+        $streams = [];
+        foreach ($defaults as $ordinal => $default) {
+            $streams[] = ['index' => 4 + $ordinal * 3, 'codec_type' => 'audio',
+                'codec_name' => $ordinal === 0 ? 'aac' : 'pcm_s16le',
+                'channels' => $ordinal === 0 ? 1 : 6, 'channel_layout' => $ordinal === 0 ? 'mono' : '5.1(side)',
+                'sample_rate' => $ordinal === 0 ? '44100' : '48000', 'disposition' => ['default' => $default],
+                'tags' => ['language' => $ordinal === 0 ? 'eng' : 'dan']];
+        }
+        $probe = VideoProbeResult::fromProbeOutput(['streams' => $streams]);
+        $serialized = $probe->jsonSerialize();
+        $serialized['audioChannels'] = 9;
+        $serialized['audioCodec'] = 'stale';
+        $serialized['audioSampleRate'] = 12345;
+        $serialized['audioChannelLayout'] = 'stale';
+        $direct = new VideoProbeResult(0, 0, 0, 0, null, null, null, 0, 'unknown',
+            9, 'stale', 12345, false, $probe->audioStreams, audioChannelLayout: 'stale');
+        foreach ([$probe, VideoProbeResult::fromSerialized($serialized), $direct] as $candidate) {
+            self::assertSame($expected, $candidate->selectedAudioStreamOrdinal());
+            self::assertSame($defaults, array_map(static fn ($stream) => $stream->isDefault, $candidate->audioStreams));
+            self::assertSame(array_column($streams, 'codec_name'), array_map(static fn ($stream) => $stream->codec, $candidate->audioStreams));
+            if ($expected === null) {
+                self::assertNull($candidate->selectedAudioStream());
+                self::assertFalse($candidate->hasAudio());
+                continue;
+            }
+            $selected = $candidate->selectedAudioStream();
+            self::assertNotNull($selected);
+            self::assertSame($candidate->audioStreams[$expected], $selected);
+            self::assertSame($expected === 0 ? 'eng' : 'dan', $selected->language);
+            self::assertSame($selected->channels, $candidate->audioChannels);
+            self::assertSame($selected->codec, $candidate->audioCodec);
+            self::assertSame($selected->sampleRate, $candidate->audioSampleRate);
+            self::assertSame($selected->channelLayout, $candidate->audioChannelLayout);
+            self::assertNotSame($streams[$expected]['index'], $expected);
+        }
+    }
+
+    /** @return iterable<string, array{list<bool>, ?int}> */
+    public static function sourceAudioDefaults(): iterable
+    {
+        yield 'later default' => [[false, true], 1];
+        yield 'no defaults' => [[false, false], 0];
+        yield 'multiple defaults' => [[true, true], 0];
+        yield 'later multiple defaults' => [[false, true, true], 1];
+        yield 'no audio' => [[], null];
+    }
+
     /** @return array<string, mixed> */
     private static function anchoredMovie(): array
     {

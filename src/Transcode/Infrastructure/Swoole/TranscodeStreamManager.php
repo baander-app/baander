@@ -78,6 +78,7 @@ final class TranscodeStreamManager
         bool $hasAudio = true,
         float $sourceFrameRate = 0.0,
         ?float $sourceTimestampOrigin = null,
+        int $audioStreamOrdinal = 0,
     ): string {
         $jobId = $job->getId();
         $jobKey = $jobId->toString();
@@ -101,6 +102,7 @@ final class TranscodeStreamManager
             $videoFilters,
             $outputDir,
             $startSegment,
+            audioStreamIndex: $audioStreamOrdinal,
             audioProfile: $audioProfile,
             audioFilters: $audioFilters,
             hasAudio: $hasAudio,

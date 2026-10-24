@@ -122,6 +122,23 @@ final class AdaptiveDeliveryTest extends TestCase
         rmdir($this->root);
     }
 
+    public function testBothMovieManifestsDescribeTheDefaultSourceAudioLanguage(): void
+    {
+        foreach ($this->jobs as $job) {
+            $job->updateProbeData(['audioStreams' => [
+                ['language' => 'eng', 'codec' => 'aac', 'channels' => 1, 'sampleRate' => 44100, 'isDefault' => false],
+                ['language' => 'dan', 'codec' => 'pcm_s16le', 'channels' => 6, 'sampleRate' => 48000, 'isDefault' => true],
+            ]]);
+        }
+        $master = $this->master($this->sign(true)['url']);
+        self::assertStringContainsString('TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="dan"', $master);
+        self::assertSame(1, substr_count($master, 'TYPE=AUDIO,'));
+        self::assertStringNotContainsString('LANGUAGE="eng"', $master);
+        $dash = $this->dash($this->sign(true, 'manifest.mpd')['url']);
+        self::assertStringContainsString('lang="dan"', $dash);
+        self::assertStringNotContainsString('lang="eng"', $dash);
+    }
+
     public function testEveryManifestDescendantRetainsTheAuthenticatedParentExpiry(): void
     {
         $primary = array_values($this->jobs)[0];

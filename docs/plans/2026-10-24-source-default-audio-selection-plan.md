@@ -118,7 +118,15 @@ thirty-/24-second playback, eight-/two-second silence, native frame/colour clock
 signed fresh delivery, growing publication, stable targets, one attachment and
 bounded capture cleanup. Keep existing subtitle and adaptive assertions intact.
 
-Retain old-code native and browser failures and repaired receipts. Run focused
+Retain the actual prior-code manager/encoder failure and repaired native receipts.
+For the browser negative control, restore only the prior producer's ordinal-zero
+mapping and first-track filter chain in a disposable fixture copy. Keep source
+preflight, current metadata and browser assertions unchanged; retain the exact
+override and commands. This verifies the browser oracle against the demonstrated
+old producer behavior, not against an entire old application stack. Do not add a
+permanent compatibility method or testing switch. Independent review approved
+this distinction because the old probe API cannot run the new fixture unchanged.
+Run focused
 selection/worker/manifest tests, then the full Transcode selection in the CI image,
 full PHPStan and Deptrac, both new browser scenarios, an ordinary delayed-audio
 control and the existing Matroska subtitle control. Run the ordinary adaptive
