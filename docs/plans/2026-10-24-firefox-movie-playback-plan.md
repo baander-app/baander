@@ -61,6 +61,19 @@ a focused failing regression and independent review before implementation.
 Unavailable codecs or an unsupported environment are failures to qualify, not
 permission to skip media assertions or silently select a different engine.
 
+The first Firefox run reached the correct paused seek with ready media and a
+visibly decoded frame, but its raw playback-quality frame count remained zero.
+Retain that failed receipt. An isolated real-engine probe must establish a direct
+paused-frame observation before changing the fixture. Keep the raw frame counter
+and all running-playback growth assertions unchanged. A separate paused-frame
+proof may use a real frame callback or fresh canvas readback of the product video;
+it must identify the current element, source and local cursor, require positive
+dimensions and decoded test-pattern pixels, and exclude stale evidence after a
+source replacement or seek. Fresh synchronous readback avoids cached evidence;
+stored callback evidence needs explicit source and seek invalidation. No playback
+or synthetic counter may manufacture that paused proof. Existing pause, error,
+seekability, canonical generation and delivered-resource checks still apply.
+
 Add a blocking Firefox run to the existing CI workflow after the Chromium run,
 using the same built worker image and distinct artifact directories. Execute the
 two local acceptance runs sequentially to avoid contention. Preserve disposable
