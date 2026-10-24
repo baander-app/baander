@@ -824,6 +824,20 @@ artifacts. Run the local engine checks sequentially as well; use
 `BAANDER_TEST_ARTIFACTS` to keep their evidence separate. CI configuration alone
 is not evidence that either browser passed.
 
+Each subtitle-continuity scenario selects its choice once through the TextTrack
+API, then only observes modes and active cues. The nondefault Forced track must remain
+exclusively showing through a source seek and paused capability renewal; Off must
+leave every subtitle track disabled through a paused seek and running renewal.
+Selection follows the source stream key, preserving identity between tracks that
+share a language. The remembered choice belongs to the current movie playback
+owner and is not durable across page reloads. If a chosen track is temporarily
+absent, captions stay off while its identity is retained.
+
+Screenshots support inspection, but these checks do not automate the native
+caption menu or prove caption pixels. Safari/native HLS remains unqualified.
+Choosing Off when every available track is already disabled creates no observable
+TextTrack mode change; in that case an absent-track preference remains retained.
+
 After worker recovery, a 60-second completion/replay check seeks near the known
 source end through the real source slider and plays the tail at normal speed.
 It requires a genuine native ended event, completed current-set audio/video
