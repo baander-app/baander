@@ -23,14 +23,15 @@ use Symfony\Component\Process\Process;
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
 $scenario = getenv('BAANDER_ADAPTIVE_SCENARIO') ?: 'adaptive';
-if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek'], true)) {
+if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek', 'short-audio-fresh', 'short-audio-seek'], true)) {
     throw new RuntimeException('Unknown adaptive browser scenario: ' . $scenario);
 }
 $matroska = str_starts_with($scenario, 'matroska-delayed-');
 $defaultAudio = str_starts_with($scenario, 'default-audio-');
-$ordinary = $defaultAudio || str_starts_with($scenario, 'ordinary-delayed-');
+$shortAudio = str_starts_with($scenario, 'short-audio-');
+$ordinary = $shortAudio || $defaultAudio || str_starts_with($scenario, 'ordinary-delayed-');
 $sparse = $matroska || str_starts_with($scenario, 'sparse-');
-$delayedAudio = $matroska || $ordinary;
+$delayedAudio = $matroska || ($ordinary && !$shortAudio);
 $hasSubtitles = $matroska;
 $sourceStartTime = str_ends_with($scenario, '-seek') ? 6 : 0;
 $directory = AdaptiveBrowserFixture::directory();
@@ -54,7 +55,14 @@ $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
 if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
     throw new RuntimeException('The browser qualification requires FFmpeg 5: ' . (string) $version);
 }
-if ($defaultAudio) {
+if ($shortAudio) {
+    $source = $directory . '/source.mov';
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+        '-f', 'lavfi', '-i', 'color=c=red:size=1280x720:rate=25,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)',
+        '-f', 'lavfi', '-i', 'sine=frequency=880:sample_rate=48000:duration=4',
+        '-map', '0:v', '-map', '1:a', '-t', '30', '-c:v', 'libx264', '-threads', '1', '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p', '-bf', '0', '-g', '25', '-c:a', 'pcm_s16le', $source]);
+} elseif ($defaultAudio) {
     $source = $directory . '/source.mov';
     $dialogue = implode('|', array_fill(0, 6, '0.05*sin(2*PI*880*t)'));
     $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
@@ -140,8 +148,39 @@ if ($ordinary) {
     $sourceAudioFirstPts = isset($audioPacketProbe['packets'][0]['pts_time']) ? (float) $audioPacketProbe['packets'][0]['pts_time'] : null;
     if (($audioPacketProbe['packets'][0]['stream_index'] ?? null) !== $rawAudioStreams[$selectedAudioOrdinal]['index']
         || $probe->sourceTimestampOrigin !== null || $probe->framerate !== 25.0 || $sourceVideoFirstPts !== 0.0
-        || $sourceAudioFirstPts !== 8.0 || abs($probe->duration - 30.0) > 0.01 || $probe->subtitleStreams !== []) {
-        throw new RuntimeException('The ordinary fixture must verify video zero, twenty-five fps, audio eight, no anchor and no subtitles.');
+        || $sourceAudioFirstPts !== ($shortAudio ? 0.0 : 8.0) || abs($probe->duration - 30.0) > 0.01 || $probe->subtitleStreams !== []) {
+        throw new RuntimeException('The ordinary fixture must verify video zero, twenty-five fps, the intended audio start, no anchor and no subtitles.');
+    }
+}
+$sourceAudioEnd = null;
+$sourceAudioPacketCount = null;
+$sourceAudioPacketsAfterStart = null;
+if ($shortAudio) {
+    $packetArguments = ['/usr/bin/ffprobe', '-v', 'error', '-select_streams', 'a:' . $selectedAudioOrdinal, '-show_packets',
+        '-show_entries', 'packet=stream_index,pts_time,duration_time', '-of', 'json', $source];
+    $packetProbe = json_decode($run($packetArguments), true, 512, JSON_THROW_ON_ERROR);
+    AdaptiveBrowserFixture::writeJson($directory . '/source-audio-all-packets.json', $packetProbe);
+    AdaptiveBrowserFixture::writeJson($directory . '/source-audio-all-packets-command.json', $packetArguments);
+    $packets = $packetProbe['packets'] ?? [];
+    if ($packets === [] || count($packets) > 512) throw new RuntimeException('The four-second audio source must have a bounded nonempty packet list.');
+    $sourceAudioEnd = 0.0;
+    $sourceAudioPacketCount = count($packets);
+    $sourceAudioPacketsAfterStart = 0;
+    foreach ($packets as $packet) {
+        if (($packet['stream_index'] ?? null) !== $rawAudioStreams[$selectedAudioOrdinal]['index']
+            || !is_numeric($packet['pts_time'] ?? null) || !is_numeric($packet['duration_time'] ?? null)) {
+            throw new RuntimeException('Every short-source audio packet must expose its selected index and real timing.');
+        }
+        $start = (float) $packet['pts_time'];
+        $duration = (float) $packet['duration_time'];
+        if (!is_finite($start) || !is_finite($duration) || $start < 0 || $duration <= 0) {
+            throw new RuntimeException('Short-source audio packet timing must be finite and nonnegative.');
+        }
+        $sourceAudioEnd = max($sourceAudioEnd, $start + $duration);
+        if ($start + $duration > $sourceStartTime + 0.000001) $sourceAudioPacketsAfterStart++;
+    }
+    if (abs($sourceAudioEnd - 4.0) > 0.0001 || ($sourceStartTime > 0 && $sourceAudioPacketsAfterStart !== 0)) {
+        throw new RuntimeException('The source soundtrack must end at four seconds with no packets remaining after the six-second restart.');
     }
 }
 $generator = new Generator();
@@ -219,9 +258,11 @@ try {
         'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
         'sourceTimestampOrigin' => $probe->sourceTimestampOrigin, 'rawSourceDuration' => $rawProbe['format']['duration'] ?? null,
         'expectedAudioDelay' => $delayedAudio ? 8 - $sourceStartTime : 0,
+        'sourceAudioEnd' => $sourceAudioEnd, 'sourceAudioPacketCount' => $sourceAudioPacketCount,
+        'sourceAudioPacketsAfterStart' => $sourceAudioPacketsAfterStart, 'expectedAudibleUntil' => $shortAudio ? max(0, 4 - $sourceStartTime) : null,
         'selectedAudioOrdinal' => $selectedAudioOrdinal, 'selectedAudioGlobalIndex' => $rawAudioStreams[$selectedAudioOrdinal]['index'],
         'selectedAudio' => $selectedAudio->jsonSerialize(), 'sourceAudioStreams' => $rawAudioStreams,
-        'expectedAudioFrequency' => $defaultAudio ? 880 : null, 'rejectedAudioFrequency' => $defaultAudio ? 220 : null,
+        'expectedAudioFrequency' => ($defaultAudio || $shortAudio) ? 880 : null, 'rejectedAudioFrequency' => $defaultAudio ? 220 : null,
         'sourceDuration' => $probe->duration, 'sourceVideoFirstPts' => $sourceVideoFirstPts, 'sourceAudioFirstPts' => $sourceAudioFirstPts,
         'hasSubtitles' => $hasSubtitles,
         'expectedCues' => $hasSubtitles ? ($sourceStartTime > 0

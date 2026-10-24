@@ -96,7 +96,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             '-ac' => (string) $profile->channelCount,
             '-ar' => (string) $profile->sampleRate,
             '-threads:a' => '1',
-            '-af' => 'volume=0.5,aresample=first_pts=0,apad',
+            '-af' => 'volume=0.5,aresample=first_pts=0,apad=packet_size=1024',
             '-dash_segment_type' => 'mp4',
             '-format_options' => 'movflags=+negative_cts_offsets',
             '-adaptation_sets' => 'id=0,streams=v id=1,streams=a',
@@ -266,7 +266,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             '-ac' => (string) $profile->channelCount,
             '-ar' => (string) $profile->sampleRate,
             '-threads:a' => '1',
-            '-af' => 'atrim=start=0,volume=0.5,aresample=first_pts=0,apad',
+            '-af' => 'atrim=start=0,volume=0.5,aresample=first_pts=0,apad=packet_size=1024',
         ] as $option => $expected) {
             $index = array_search($option, $args, true);
             self::assertNotFalse($index, $option);
@@ -326,7 +326,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertNotContains('-noaccurate_seek', $args);
         }
         $expectedAudio = $seeking ? 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters) : $audioFilters;
-        $expectedAudio = ($expectedAudio === '' ? '' : $expectedAudio . ',') . 'aresample=first_pts=0,apad';
+        $expectedAudio = ($expectedAudio === '' ? '' : $expectedAudio . ',') . 'aresample=first_pts=0,apad=packet_size=1024';
         if ($hasAudio) {
             self::assertSame($expectedAudio, $args[array_search('-af', $args, true) + 1]);
             self::assertStringNotContainsString('asetpts', $expectedAudio);
@@ -419,7 +419,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertSame(sprintf('%.6f', -($origin + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
         }
         if ($start > 0) {
-            self::assertSame('atrim=start=0,aresample=first_pts=0,apad', $args[array_search('-af', $args, true) + 1]);
+            self::assertSame('atrim=start=0,aresample=first_pts=0,apad=packet_size=1024', $args[array_search('-af', $args, true) + 1]);
         }
         self::assertSame('fps=1:start_time=0:round=up', $args[array_search('-vf', $args, true) + 1]);
     }
@@ -446,7 +446,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
                 $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
                     startSegment: $start, audioProfile: $profile, audioFilters: $filters,
                     sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);
-                self::assertSame(($start === 0 ? '' : 'atrim=start=0,') . $filters . ',aresample=first_pts=0,apad',
+                self::assertSame(($start === 0 ? '' : 'atrim=start=0,') . $filters . ',aresample=first_pts=0,apad=packet_size=1024',
                     $args[array_search('-af', $args, true) + 1]);
                 self::assertSame($encoder, $args[array_search('-c:a', $args, true) + 1]);
                 self::assertSame((string) $profile->sampleRate, $args[array_search('-ar', $args, true) + 1]);
@@ -458,10 +458,10 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $fresh = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             sourceFrameRate: 0.1, sourceTimestampOrigin: 0.0);
-        self::assertSame('aresample=first_pts=0,apad', $fresh[array_search('-af', $fresh, true) + 1]);
+        self::assertSame('aresample=first_pts=0,apad=packet_size=1024', $fresh[array_search('-af', $fresh, true) + 1]);
         $seek = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
-        self::assertSame('atrim=start=0,aresample=first_pts=0,apad', $seek[array_search('-af', $seek, true) + 1]);
+        self::assertSame('atrim=start=0,aresample=first_pts=0,apad=packet_size=1024', $seek[array_search('-af', $seek, true) + 1]);
         $videoOnly = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: 1, audioFilters: 'aformat=channel_layouts=stereo', hasAudio: false,
             sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
@@ -476,7 +476,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             startSegment: $start, audioFilters: $filters, hasAudio: $hasAudio, sourceFrameRate: 25.0);
         if ($hasAudio) {
             self::assertContains('-shortest', $args);
-            self::assertSame(($filters === '' ? '' : $filters . ',') . 'aresample=first_pts=0,apad',
+            self::assertSame(($filters === '' ? '' : $filters . ',') . 'aresample=first_pts=0,apad=packet_size=1024',
                 $args[array_search('-af', $args, true) + 1]);
             self::assertSame('aac', $args[array_search('-c:a', $args, true) + 1]);
             self::assertSame('48000', $args[array_search('-ar', $args, true) + 1]);

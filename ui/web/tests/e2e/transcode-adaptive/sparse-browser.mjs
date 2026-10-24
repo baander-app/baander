@@ -5,11 +5,12 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek'].includes(fixture.scenario))
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek', 'short-audio-fresh', 'short-audio-seek'].includes(fixture.scenario))
 const matroska = fixture.scenario.startsWith('matroska-delayed-')
 const defaultAudio = fixture.scenario.startsWith('default-audio-')
-const ordinary = defaultAudio || fixture.scenario.startsWith('ordinary-delayed-')
-const delayed = matroska || ordinary
+const shortAudio = fixture.scenario.startsWith('short-audio-')
+const ordinary = shortAudio || defaultAudio || fixture.scenario.startsWith('ordinary-delayed-')
+const delayed = matroska || (ordinary && !shortAudio)
 const hasSubtitles = fixture.hasSubtitles
 assert.equal(hasSubtitles, matroska)
 if (matroska) {
@@ -20,9 +21,17 @@ if (delayed) assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTim
 if (ordinary) {
   assert.equal(fixture.sourceTimestampOrigin, null)
   assert.equal(fixture.sourceVideoFirstPts, 0)
-  assert.equal(fixture.sourceAudioFirstPts, 8)
+  assert.equal(fixture.sourceAudioFirstPts, shortAudio ? 0 : 8)
   assert.equal(fixture.sourceDuration, 30)
   assert.deepEqual(fixture.expectedCues, [])
+}
+if (shortAudio) {
+  assert.equal(fixture.expectedAudioDelay, 0)
+  assert(Math.abs(fixture.sourceAudioEnd - 4) <= 0.0001)
+  assert(fixture.sourceAudioPacketCount > 0 && fixture.sourceAudioPacketCount <= 512)
+  assert.equal(fixture.expectedAudibleUntil, Math.max(0, 4 - fixture.sourceStartTime))
+  if (fixture.sourceStartTime > 0) assert.equal(fixture.sourceAudioPacketsAfterStart, 0)
+  assert.equal(fixture.expectedAudioFrequency, 880)
 }
 if (defaultAudio) {
   assert.equal(fixture.selectedAudioOrdinal, 1)
@@ -211,9 +220,9 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(({ manifest, hasSubtitles, defaultAudio }) => {
+  await page.evaluate(({ manifest, hasSubtitles, defaultAudio, shortAudio }) => {
     window.adaptiveManifest = manifest
-    window.adaptiveFrequencyAnalysis = defaultAudio
+    window.adaptiveFrequencyAnalysis = defaultAudio || shortAudio
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
     window.sparseCueEvents = []
@@ -349,7 +358,7 @@ try {
       }
     }
     callbackId = video.requestVideoFrameCallback(observe)
-  }, { manifest: fixture.manifestUrl, hasSubtitles, defaultAudio })
+  }, { manifest: fixture.manifestUrl, hasSubtitles, defaultAudio, shortAudio })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -411,10 +420,16 @@ try {
     assert(frames.length >= (ordinary ? (sourceEnd - sourceBegin) * 25 * 0.6 : sourceEnd - sourceBegin - 2), `Retain native displayed ${color} frames throughout its hold`)
     assert(frames.some(frame => frame.sourceTime < sourceBegin + (ordinary ? 0.15 : 1.15)), `Observe the beginning of ${color}`)
     assert(frames.some(frame => frame.sourceTime >= sourceEnd - (ordinary ? 0.15 : 1.15)), `Observe the tail of ${color}`)
-    const audibleFrames = delayed
-      ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
-    assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
-      && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} after audio onset must coincide with recent audible samples`)
+    if (shortAudio) {
+      const silentFrames = frames.filter(frame => frame.clock >= fixture.expectedAudibleUntil + 0.25)
+      assert(silentFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms < 0.001
+        && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} after the source soundtrack ends must coincide with measured silence`)
+    } else {
+      const audibleFrames = delayed
+        ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
+      assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
+        && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} after audio onset must coincide with recent audible samples`)
+    }
   }
   const master = manifests.find(manifest => manifest.body.includes('#EXT-X-STREAM-INF:'))
   assert(master, 'Retain the signed production master playlist')
@@ -426,8 +441,8 @@ try {
     assert(/(?:^|,)LANGUAGE="dan"(?:,|$)/.test(audioDeclarations[0]), 'The production master must advertise selected Danish dialogue')
   }
   const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:')
-    && (!delayed || /\/tracks\/(?:video|audio)\//.test(new URL(manifest.url).pathname)))
-  if (delayed) {
+    && (!(delayed || shortAudio) || /\/tracks\/(?:video|audio)\//.test(new URL(manifest.url).pathname)))
+  if (delayed || shortAudio) {
     for (const track of ['video', 'audio']) assert(media.some(manifest => manifest.url.includes(`/tracks/${track}/`)))
   }
   assert(media.some(manifest => !manifest.body.includes('#EXT-X-ENDLIST')), 'Retain a growing playlist')
@@ -443,6 +458,43 @@ try {
   assert(delivered.some(request => request.track === 'video'))
   assert(delivered.some(request => request.track === 'audio'))
   assert(delivered.filter(request => request.track === 'audio').every(request => request.jobId === fixture.canonicalAudioJobId))
+  if (shortAudio) {
+    assert.equal(state.audioContextState, 'running', 'Silent-tail measurements require the actual audio context to remain running')
+    const observations = [...new Map(samples.flatMap(sample => sample.audio).map(audio => [audio.at, audio])).values()]
+    const played = observations.filter(audio => audio.time >= 0.25 && audio.time <= fixture.expectedDuration - 0.1)
+    const silence = played.filter(audio => audio.time >= fixture.expectedAudibleUntil + 0.25)
+    assert(silence.length >= 20, 'Observe the padded soundtrack throughout the played silent tail')
+    assert(silence.every(audio => audio.rms < 0.001), 'The soundtrack after its original end must remain near-silent')
+    const silentWindows = [
+      { name: 'red-tail', start: Math.max(0.25, fixture.expectedAudibleUntil + 0.25), end: 10 - fixture.sourceStartTime - 0.25 },
+      { name: 'green-hold', start: 10 - fixture.sourceStartTime + 0.25, end: 20 - fixture.sourceStartTime - 0.25 },
+      { name: 'blue-tail', start: 20 - fixture.sourceStartTime + 0.25, end: fixture.expectedDuration - 0.25 },
+      { name: 'final-cursor', start: fixture.expectedDuration - 0.5, end: fixture.expectedDuration - 0.1 },
+    ].map(window => {
+      const measured = silence.filter(audio => audio.time >= window.start && audio.time <= window.end)
+      assert(measured.length >= 3 && new Set(measured.map(audio => Math.floor(audio.time * 20))).size >= 3,
+        `Measure actual silence at several advancing native positions in the ${window.name} interval`)
+      return { ...window, samples: measured.length, firstTime: measured[0].time, lastTime: measured.at(-1).time,
+        distinctNativePositions: new Set(measured.map(audio => Math.floor(audio.time * 20))).size,
+        peakRms: Math.max(...measured.map(audio => audio.rms)) }
+    })
+    const audible = played.filter(audio => audio.time < fixture.expectedAudibleUntil - 0.25)
+    if (fixture.expectedAudibleUntil > 0) {
+      assert(audible.length >= 10 && audible.every(audio => audio.rms > 0.001), 'The original soundtrack must remain audible before it ends')
+      for (const audio of audible) {
+        assert(Number.isFinite(audio.dominantFrequency) && Number.isFinite(audio.frequencyBinHz) && audio.frequencyBinHz > 0
+          && Math.abs(audio.dominantFrequency - 880) <= audio.frequencyBinHz * 1.5, 'The original audible interval must retain its 880 Hz tone')
+      }
+    } else {
+      assert(state.phaseAudioPeak < 0.001, 'The entire sought playback phase must remain near-silent')
+      assert(played.length >= 20 && played.every(audio => audio.rms < 0.001), 'A restart after every original audio packet must remain silent throughout')
+    }
+    receipt.shortAudio = { sourceEnd: fixture.sourceAudioEnd, audibleUntil: fixture.expectedAudibleUntil,
+      firstAudibleTime: observations.find(audio => audio.rms > 0.001)?.time ?? null,
+      lastAudibleTime: observations.filter(audio => audio.rms > 0.001).at(-1)?.time ?? null,
+      audibleSamples: audible.length, silentSamples: silence.length, silentWindows,
+      toneSamples: audible.map(audio => ({ time: audio.time, frequency: audio.dominantFrequency, binHz: audio.frequencyBinHz, rms: audio.rms })) }
+  }
   if (defaultAudio) {
     const observations = [...new Map(samples.flatMap(sample => sample.audio).map(audio => [audio.at, audio])).values()]
       .filter(audio => audio.time >= fixture.expectedAudioDelay + 0.5 && audio.rms > 0.001)

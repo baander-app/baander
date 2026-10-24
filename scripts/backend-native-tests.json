@@ -70,6 +70,7 @@
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderAudioDelayMediaTest.php": "Owns real FFmpeg producers and HLS decoders to verify ordinary movie audio onset and complete tails.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderAudioProfileMediaTest.php": "Owns real FFmpeg producers and independent fragment decoders for AAC and Opus publication.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderDefaultAudioMediaTest.php": "Owns real movie producers and fragment/HLS decoders to verify source audio selection, tone identity and timing.",
+  "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderShortAudioMediaTest.php": "Owns real FFmpeg producers and independent video/PCM decoders to verify playback through silent movie tails.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderSparseMediaTest.php": "Owns real FFmpeg sparse movie producers and independent fragment/HLS decoders.",
   "tests/Unit/Transcode/Infrastructure/FFmpeg/SegmentEncoderTimestampOriginMediaTest.php": "Owns real Matroska producers, timestamp probes, subtitle extraction and independent media decoders.",
   "tests/Unit/Transcode/Infrastructure/Swoole/SegmentAvailabilityTableTest.php": "native shared table/channel/process-pool wrapper",

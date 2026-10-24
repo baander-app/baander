@@ -10,12 +10,12 @@ esac
 scenario="${BAANDER_TEST_VIDEO_SCENARIO:-adaptive}"
 case "$scenario" in
     adaptive) browser_script=browser.mjs; browser_timeout=195 ;;
-    sparse-fresh|sparse-seek|matroska-delayed-fresh|matroska-delayed-seek|ordinary-delayed-fresh|ordinary-delayed-seek|default-audio-fresh|default-audio-seek)
+    sparse-fresh|sparse-seek|matroska-delayed-fresh|matroska-delayed-seek|ordinary-delayed-fresh|ordinary-delayed-seek|default-audio-fresh|default-audio-seek|short-audio-fresh|short-audio-seek)
         if [ "$audio_profile" != streaming_stereo ]; then
-            echo 'Sparse and delayed movie scenarios require streaming_stereo.' >&2; exit 1
+            echo 'Sparse, delayed and source-audio movie scenarios require streaming_stereo.' >&2; exit 1
         fi
         browser_script=sparse-browser.mjs; browser_timeout=135 ;;
-    *) echo 'BAANDER_TEST_VIDEO_SCENARIO must be adaptive, sparse-fresh, sparse-seek, matroska-delayed-fresh, matroska-delayed-seek, ordinary-delayed-fresh, ordinary-delayed-seek, default-audio-fresh or default-audio-seek.' >&2; exit 1 ;;
+    *) echo 'BAANDER_TEST_VIDEO_SCENARIO must be adaptive, sparse-fresh, sparse-seek, matroska-delayed-fresh, matroska-delayed-seek, ordinary-delayed-fresh, ordinary-delayed-seek, default-audio-fresh, default-audio-seek, short-audio-fresh or short-audio-seek.' >&2; exit 1 ;;
 esac
 artifacts="${BAANDER_TEST_ARTIFACTS:-$PWD/var/test-runs/transcode-adaptive-browser-$(date +%s)-$$}"
 mkdir -p "$artifacts"

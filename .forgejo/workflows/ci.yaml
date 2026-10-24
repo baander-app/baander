@@ -128,6 +128,15 @@ jobs:
                         bash scripts/test-transcode-adaptive-browser.sh || exit "$?"
                     done
 
+            -   name: Movie playback through silent audio tails
+                run: |
+                    for scenario in short-audio-fresh short-audio-seek; do
+                      BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                      BAANDER_TEST_VIDEO_SCENARIO="$scenario" \
+                      BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/transcode-$scenario" \
+                        bash scripts/test-transcode-adaptive-browser.sh || exit "$?"
+                    done
+
             -   name: Build production worker image
                 run: |
                     docker buildx build --target worker --load \
