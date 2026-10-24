@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\ColorSpace;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\ToneMapMethod;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\VideoFilterBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class VideoFilterBuilderTest extends TestCase
@@ -51,14 +53,15 @@ final class VideoFilterBuilderTest extends TestCase
         $this->assertStringNotContainsString('fps', $filter);
     }
 
-    public function testTonemapSkipsForSdrContent(): void
+    #[DataProvider('sdrColorSpaces')]
+    public function testTonemapSkipsForSdrContent(ColorSpace $colorSpace): void
     {
         $probe = new VideoProbeResult(
             duration: 100.0,
             width: 1920,
             height: 1080,
             framerate: 24.0,
-            colorSpace: new ColorSpace('bt709', 'bt709', 'bt709'),
+            colorSpace: $colorSpace,
             colorRange: 'tv',
             pixFmt: 'yuv420p',
             videoBitrate: 5_000_000,
@@ -71,7 +74,17 @@ final class VideoFilterBuilderTest extends TestCase
 
         $filter = VideoFilterBuilder::create()->tonemap($probe, ToneMapMethod::Hable)->build();
 
-        $this->assertStringNotContainsString('zscale', $filter);
+        self::assertSame(ToneMapMethod::None, VideoProcessingRules::resolveToneMapMethod($probe, QualityTier::p720()));
+        self::assertSame('', $filter);
+    }
+
+    /** @return iterable<string, array{ColorSpace}> */
+    public static function sdrColorSpaces(): iterable
+    {
+        yield 'BT.709' => [ColorSpace::bt709()];
+        foreach (['bt709', 'bt2020-10', 'bt2020-12', 'unknown', ''] as $transfer) {
+            yield 'BT.2020 ' . ($transfer === '' ? 'empty' : $transfer) => [new ColorSpace('bt2020', $transfer, 'bt2020nc')];
+        }
     }
 
     public function testTonemapAddsFiltersForHdrContent(): void

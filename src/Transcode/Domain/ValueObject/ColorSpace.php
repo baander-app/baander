@@ -8,7 +8,6 @@ use JsonSerializable;
 
 final readonly class ColorSpace implements JsonSerializable
 {
-    private const HDR_PRIMARIES = ['bt2020', 'smpte2084'];
     private const HDR_TRANSFERS = ['smpte2084', 'arib-std-b67', 'pq', 'hlg'];
 
     public function __construct(
@@ -75,8 +74,7 @@ final readonly class ColorSpace implements JsonSerializable
 
     public function isHdr(): bool
     {
-        return in_array($this->primaries, self::HDR_PRIMARIES, true)
-            || in_array($this->transfer, self::HDR_TRANSFERS, true);
+        return in_array($this->transfer, self::HDR_TRANSFERS, true);
     }
 
     public function equals(self $other): bool
