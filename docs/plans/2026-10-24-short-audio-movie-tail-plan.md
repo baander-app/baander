@@ -171,8 +171,9 @@ Keep input zero for video, with its existing decoder/hardware options and source
 selection. Add input one for the same source path, with explicit bounded decoder
 threads and video/subtitle/data decoding disabled. Map the selected audio ordinal
 from input one. Apply the same source seek and verified-origin translation to both
-inputs. Preserve video preroll for sparse sources; audio uses accurate seeking
-and the existing trim/leading-silence filter sequence. Hardware video options and
+inputs. Both readers preserve the established sparse preroll and early-seek guard;
+audio retains the existing trim/leading-silence filter sequence. Ordinary input
+seeking remains accurate. Hardware video options and
 fixture input pacing belong only to the video input. Video-only commands retain
 one input. No second encoder process, execution owner, muxer or publication fence
 is introduced; cancellation still terminates the one process and both reads.
@@ -191,3 +192,22 @@ Re-run the full affected backend selection, PHPStan, Deptrac and all seven brows
 scenarios after this architectural change. Earlier backend/static passes and the
 fresh browser pass remain evidence for their recorded revisions, not acceptance
 of the revised producer. Review this amendment before implementation.
+
+Clock qualification corrected the initial proposal that audio should always seek
+accurately. The combined native run passed the new progressive/cancellation and
+default-track cases but failed twelve existing anchored Matroska seek cases
+(45 tests, 5,844 assertions). FFmpeg's automatic accurate-seek trim operates before
+the user filters and conflicts with the explicit source-relative timestamp shift.
+Disabling that trim restores the intended tone; resetting timestamps or changing
+the expected onset would conceal the error. A 720p audio-first source also confirms
+that the independent audio input needs the existing early sparse seek guard to
+avoid losing packets before the first nominal video-frame boundary.
+
+The correction applies the same input timing policy to both readers. If the video
+input omits an early anchored sparse seek, the audio input also starts at the
+beginning with the common negative offset. When a sparse input does seek, both
+retain preroll with `-noaccurate_seek`, and audio's existing `atrim=start=0` removes
+only negative local samples. Eight diagnostic controls verify origins zero/four,
+six-/24-second starts, AAC/Opus, matched audio and the audio-first source, with the
+expected two-second/near-zero onsets and complete tails. Preserve these receipts
+and rerun the unchanged native timing assertions before acceptance.
