@@ -145,6 +145,7 @@ const progressOutages = []
 const statusOutages = []
 const seekOutages = []
 const movieCompletions = []
+let movieEndpointProof = null
 const signingRequests = new WeakMap()
 const attachedCapabilities = new Map()
 function capabilityEvidence(url) {
@@ -1664,6 +1665,180 @@ async function proveSeekOutages(owner, expectedPosition) {
   }
 }
 
+async function proveMovieEndpoint(baseUrl, credentials) {
+  assert.equal(credentials.scenario, 'movie-endpoint')
+  assert.deepEqual(credentials.endpoint, { videoEnd: 42, containerEnd: 48 })
+  const sourceEnd = credentials.endpoint.videoEnd
+  const proof = { startedAt: Date.now(), oracle: credentials.endpoint, seeks: [], replays: [] }
+  movieEndpointProof = proof
+  const deadline = proof.startedAt + 80000
+  const remaining = () => {
+    assert(Date.now() < deadline, 'Movie endpoint proof exceeded its total time budget')
+    return deadline - Date.now()
+  }
+  const waitFor = (check, description) => until(check, description, remaining())
+  const persist = () => writeFile(`${evidence}/movie-endpoint.json`, JSON.stringify(proof, null, 2))
+  const safeMedia = state => ({ ...state, source: state.source ? new URL(state.source).pathname : null })
+  await page.goto(`${baseUrl}/movies/${credentials.moviePublicId}`)
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  video = await page.locator('video').elementHandle()
+  assert(video, 'The actual movie page must attach its product player')
+  await waitFor(async () => {
+    const state = await mediaState()
+    return snapshot?.ready && state.connected && !state.paused && state.ready >= 2
+      && state.time > 0.25 && state.decodedFrames > 0 && state.error === null && currentSource(state)
+  }, 'the actual movie player to decode its signed source')
+  const timeline = page.getByRole('slider', { name: 'Seek movie' })
+  proof.initial = { at: Date.now(), playback: safePlayback(snapshot),
+    signing: playbackSnapshots.filter(item => item.accepted).map(item => ({ at: item.at, ...safePlayback(item) })),
+    slider: { max: await timeline.getAttribute('max'), value: await timeline.inputValue(),
+      valueText: await timeline.getAttribute('aria-valuetext') }, media: safeMedia(await mediaState()) }
+  // Retain the real old-resolver response and range before the endpoint assertion can fail.
+  await persist()
+  assert.equal(snapshot.duration, sourceEnd, 'Actual signing duration must describe the selected video endpoint')
+  assert.equal(Number(proof.initial.slider.max), sourceEnd, 'The real movie slider must stop at the selected video endpoint')
+  const owner = ownedPlayback()
+  await page.evaluate(() => {
+    window.__twoCommandSeekReceipts = []
+    window.__twoCommandObserveSeekReceipts = true
+  })
+  const acceptSeek = async (position, startedAt, previousGeneration) => {
+    let submission
+    let acknowledgement
+    await waitFor(async () => {
+      submission = playbackControls.find(item => item.at >= startedAt && item.action === 'seek' && item.position === position)
+      if (!submission) return false
+      assert.equal(submission.generation, previousGeneration)
+      const receipts = await page.evaluate(() => window.__twoCommandSeekReceipts)
+      acknowledgement = receipts.find(item => item.requestId === submission.requestId)
+      if (!acknowledgement) return false
+      assert.equal(acknowledgement.acceptedGeneration, previousGeneration + 1)
+      return true
+    }, `the real endpoint seek to ${position} to receive its owned generation acknowledgement`)
+    const before = playbackSnapshots.findLast(item => item.accepted && item.at <= submission.at
+      && item.jobId === owner.jobId && item.sessionId === owner.sessionId && item.generation === previousGeneration)
+    assert(before, 'Each endpoint seek must retain its preceding canonical revision')
+    const seek = { position, submission, acknowledgement, before: { at: before.at, ...safePlayback(before) } }
+    proof.seeks.push(seek)
+    return seek
+  }
+  const waitReady = async (seek, predicate) => {
+    const accepted = seek.acknowledgement.acceptedGeneration
+    await waitFor(async () => {
+      assert.equal(snapshot.jobId, owner.jobId, 'Seek restoration must retain the owned job')
+      assert.equal(snapshot.sessionId, owner.sessionId, 'Seek restoration must retain the canonical session')
+      assert(snapshot.generation <= accepted + 1, 'Seek restoration must reject unrelated execution generations')
+      if (!snapshot.ready || (snapshot.generation !== accepted && snapshot.generation !== accepted + 1)) return false
+      const canonical = playbackSnapshots.filter(item => item.accepted
+        && item.requestedAt >= seek.submission.at && item.at >= seek.acknowledgement.receivedAt
+        && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+        && (item.generation === accepted || item.generation === accepted + 1))
+      const intent = canonical.find(item => item.position === seek.position && item.revision > seek.before.revision)
+      if (!intent) return false
+      const ready = canonical.findLast(item => item.ready && item.generation === snapshot.generation
+        && item.revision >= intent.revision)
+      if (!ready || snapshot.revision < intent.revision) return false
+      assert.equal(snapshot.duration, sourceEnd)
+      const state = await mediaState()
+      if (!state.connected || state.error !== null || state.seeking || !currentSource(state)) return false
+      if (!predicate(state)) return false
+      seek.intent = { at: intent.at, requestedAt: intent.requestedAt, ...safePlayback(intent) }
+      seek.ready = { at: ready.at, requestedAt: ready.requestedAt, ...safePlayback(ready) }
+      seek.decodedGeneration = snapshot.generation
+      seek.restored = { at: Date.now(), playback: safePlayback(snapshot), media: safeMedia(state) }
+      return true
+    }, `the accepted endpoint seek to ${seek.position} to restore real media`)
+    owner.generation = seek.decodedGeneration
+    await persist()
+  }
+  const replay = async reason => {
+    const startedAt = Date.now()
+    const generation = owner.generation
+    await video.evaluate(element => {
+      window.__twoCommandEndpointPlay = { settled: false }
+      element.play().then(() => { window.__twoCommandEndpointPlay = { settled: true } }, error => {
+        window.__twoCommandEndpointPlay = { settled: true, error: error.name }
+      })
+    })
+    const seek = await acceptSeek(0, startedAt, generation)
+    let baseline
+    await waitReady(seek, state => {
+      if (state.paused || state.ended || state.ready < 2 || snapshot.startTime !== 0 || state.decodedFrames <= 0) return false
+      if (!baseline || baseline.attachment !== attachmentNumber) {
+        baseline = { attachment: attachmentNumber, time: state.time, decodedFrames: state.decodedFrames }
+        return false
+      }
+      return state.time > baseline.time + 1 && state.decodedFrames > baseline.decodedFrames
+    })
+    const play = await page.evaluate(() => window.__twoCommandEndpointPlay)
+    assert(play.settled && (!play.error || play.error === 'AbortError'), 'Native Play must settle while source-zero replay decodes')
+    assert.equal(snapshot.status, 'running')
+    for (const track of ['video', 'audio']) {
+      assert(mediaResponses.some(item => item.at >= startedAt && item.attachment === attachmentNumber
+        && item.status === 200 && item.track === track && item.path.endsWith('/segment.m4s')),
+      'Replay must receive current signed audio and video media')
+    }
+    proof.replays.push({ reason, startedAt, baseline, seek })
+    await persist()
+  }
+  try {
+    await pausePlayback(owner, 'endpoint-before-exact-seek', remaining())
+    const exactStarted = Date.now()
+    await timeline.focus()
+    await timeline.press('End')
+    const exact = await acceptSeek(sourceEnd, exactStarted, owner.generation)
+    await waitReady(exact, state => state.paused && snapshot.status === 'paused' && state.ready >= 2
+      && Math.abs(snapshot.startTime + state.time - sourceEnd) <= 0.1)
+    await waitFor(async () => Number(await timeline.inputValue()) === sourceEnd,
+      'exact-end restoration to retain the global slider endpoint')
+    await replay('exact-end')
+    const tailStarted = Date.now()
+    const requested = await commitSourceSeek(sourceEnd - 12)
+    const tail = await acceptSeek(requested, tailStarted, owner.generation)
+    await waitReady(tail, state => !state.paused && state.ready >= 2 && state.decodedFrames > 0
+      && snapshot.startTime + state.time >= requested && snapshot.status === 'running')
+    const baseline = { attachment: attachmentNumber, ...(await mediaState()) }
+    let ended
+    await waitFor(async () => {
+      samePlayback(owner)
+      const state = await mediaState()
+      assert.equal(state.error, null)
+      assert.equal(state.playbackRate, 1)
+      if (!state.ended || !state.paused || state.seeking) return false
+      assert.equal(attachmentNumber, baseline.attachment, 'Natural endpoint completion must retain its owned attachment')
+      assert(Math.abs(snapshot.startTime + state.time - sourceEnd) <= 0.1)
+      assert(Math.abs(state.time - state.duration) <= 0.1, 'Natural completion must reach the native presentation end')
+      assert(state.time > baseline.time && state.decodedFrames > baseline.decodedFrames,
+        'Natural completion must decode advancing tail frames')
+      ended = state
+      return true
+    }, 'natural playback to reach the actual selected video endpoint')
+    await waitFor(async () => {
+      const events = await page.evaluate(() => window.__twoCommandMediaEvents ?? [])
+      return events.some(event => !event.probe && event.event === 'ended' && event.at >= tailStarted
+        && event.ended && Math.abs(event.time - ended.time) <= 0.1)
+    }, 'the genuine native endpoint event')
+    await waitFor(() => snapshot.status === 'paused' && Math.abs(snapshot.position - sourceEnd) <= 0.1,
+      'canonical completion to pause the source at its exact video endpoint')
+    const endingPauses = playbackControls.filter(item => item.at >= tailStarted && item.action === 'pause')
+    assert.equal(endingPauses.length, 1, 'Natural completion must submit one canonical ending pause')
+    assert.equal(endingPauses[0].position, sourceEnd)
+    proof.natural = { baseline: safeMedia(baseline), ended: safeMedia(ended),
+      playback: safePlayback(snapshot), endingPause: endingPauses[0] }
+    await replay('natural-end')
+    samePlayback(owner)
+    proof.controls = playbackControls.filter(item => item.at >= proof.startedAt && item.action !== 'progress')
+    assert.deepEqual(proof.controls.filter(item => item.action === 'seek').map(item => item.position),
+      [sourceEnd, 0, requested, 0], 'Exact-end and natural-end proofs must each replay through one source-zero seek')
+    proof.finishedAt = Date.now()
+    proof.elapsedMs = proof.finishedAt - proof.startedAt
+    await persist()
+    await savePlaybackTimeline()
+  } finally {
+    await page.evaluate(() => { window.__twoCommandObserveSeekReceipts = false })
+  }
+}
+
 async function checkpoint({ phase, baseUrl, credentials }) {
   if (phase === 'authenticated') {
     browserInfo.capabilities = await page.evaluate(() => {
@@ -1682,6 +1857,14 @@ async function checkpoint({ phase, baseUrl, credentials }) {
     await page.locator('#password').fill(credentials.password)
     await page.locator('button[type=submit]').click()
     await page.waitForURL(url => url.pathname !== '/login')
+  } else if (phase === 'movie-endpoint') {
+    assert.deepEqual(phases, ['authenticated'])
+    await proveMovieEndpoint(baseUrl, credentials)
+  } else if (phase === 'endpoint-complete') {
+    assert.deepEqual(phases, ['authenticated', 'movie-endpoint'])
+    assert(movieEndpointProof?.finishedAt, 'Endpoint teardown requires completed exact and natural replay proofs')
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await page.locator('video').waitFor({ state: 'detached' })
   } else if (phase === 'attached') {
     await page.goto(`${baseUrl}/movies/${credentials.moviePublicId}`)
     await page.getByRole('button', { name: 'Play', exact: true }).click()

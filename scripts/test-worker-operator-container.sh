@@ -18,6 +18,15 @@ media_observation="${BAANDER_TEST_MEDIA_CONTROL_OBSERVATION:-0}"
     echo 'BAANDER_TEST_MEDIA_CONTROL_OBSERVATION must be 0 or 1.' >&2; exit 2;
 }
 browser_client_controls="${BAANDER_TEST_BROWSER_CLIENT_CONTROLS:-0}"
+movie_endpoint="${BAANDER_TEST_MOVIE_ENDPOINT:-0}"
+[[ "$movie_endpoint" = 0 || "$movie_endpoint" = 1 ]] || {
+    echo 'BAANDER_TEST_MOVIE_ENDPOINT must be 0 or 1.' >&2; exit 2;
+}
+if [ "$movie_endpoint" = 1 ] && { [ "${BAANDER_TEST_TWO_COMMAND:-0}" != 1 ] || [ ! -x "${BAANDER_TEST_TWO_COMMAND_CHECKPOINT:-}" ] \
+    || [ "$browser_client_controls" != 0 ] || [ "$media_observation" != 0 ] \
+    || [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}${BAANDER_TEST_WORKER_LIFECYCLE_PHASE:-}" ]; }; then
+    echo 'Movie endpoint qualification requires only two-command mode and an executable browser checkpoint.' >&2; exit 2
+fi
 [[ "$browser_client_controls" = 0 || "$browser_client_controls" = 1 ]] || {
     echo 'BAANDER_TEST_BROWSER_CLIENT_CONTROLS must be 0 or 1.' >&2; exit 2;
 }
@@ -444,6 +453,7 @@ docker_local run --rm --name "$run_id-prepare" --network "$run_id" --env-file "$
     --mount "type=volume,source=$state_volume,target=/var/www/html/var/transcode_state,volume-nocopy" \
     --mount "type=volume,source=$secrets_volume,target=/var/www/html/config/secrets,readonly,volume-nocopy" \
     -e BAANDER_TEST_TWO_COMMAND="$two_command" \
+    -e BAANDER_TEST_MOVIE_ENDPOINT="$movie_endpoint" \
     --entrypoint /bin/sh "$image_id" -c '
         set -eu
         php -d memory_limit=512M bin/console cache:clear --env=prod --no-debug
@@ -562,15 +572,25 @@ start_web() {
 if [ "$two_command" = 1 ]; then
     start_web
     docker_local exec "$web_name" cat /var/www/html/storage/two-command/state.json > "$artifacts/catalog.json"
-    python3 - "$artifacts/browser.json" "$artifacts/catalog.json" <<'PYLOGIN'
+    if [ "$movie_endpoint" = 1 ]; then
+        mkdir -p "$artifacts/source"
+        for evidence_file in endpoint-source.json endpoint-source-probe.json; do
+            docker_local cp "$web_name:/var/www/html/storage/two-command/$evidence_file" "$artifacts/source/$evidence_file"
+        done
+    fi
+    python3 - "$artifacts/browser.json" "$artifacts/catalog.json" "$movie_endpoint" <<'PYLOGIN'
 import json, os, sys
 fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 with os.fdopen(fd, 'w') as stream:
     catalog = json.load(open(sys.argv[2]))
-    json.dump(dict(email='two-command-admin@baander.app', password='Two-command-drill-only-123!', moviePublicId=catalog['movie'], videoPublicId=catalog['video'], expectedSeekPosition=30), stream)
+    credentials = dict(email='two-command-admin@baander.app', password='Two-command-drill-only-123!', moviePublicId=catalog['movie'], videoPublicId=catalog['video'], expectedSeekPosition=30)
+    if sys.argv[3] == '1':
+        assert catalog['scenario'] == 'movie-endpoint'
+        credentials.update(scenario=catalog['scenario'], endpoint=catalog['endpoint'])
+    json.dump(credentials, stream)
 PYLOGIN
     checkpoint authenticated
-    if [ -z "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
+    if [ "$movie_endpoint" != 1 ] && [ -z "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then
         combined_phase absent
         snapshot web "$web_name" web-without-worker
     fi
@@ -653,6 +673,28 @@ PYAUTOSCALING
 if [ -n "$lifecycle_phase" ]; then
     source tests/Fixtures/Worker/lifecycle-checkpoint.sh
     lifecycle_checkpoint
+    exit 0
+fi
+if [ "$movie_endpoint" = 1 ]; then
+    checkpoint movie-endpoint
+    snapshot worker "$worker_name" endpoint-worker-before-retirement
+    docker_local top "$worker_name" -eo pid,ppid,args > "$artifacts/endpoint-worker-host-pids.txt"
+    host_identities capture < "$artifacts/endpoint-worker-host-pids.txt" > "$artifacts/endpoint-host-identities.json"
+    checkpoint endpoint-complete
+    operator recover 0
+    operator recover 0
+    operator status 0
+    python3 - "$work/status.json" <<'PYENDPOINTRETIRE'
+import json, sys
+result = json.load(open(sys.argv[1]))['result']
+assert result['manifestMatches'] is True and result['retirement'] == 'completed', result
+assert result['reservation'] == 'none', result
+assert set(result['units']) == {'control', 'execution'}, result
+assert all(unit['removed'] for unit in result['units'].values()), result
+PYENDPOINTRETIRE
+    cp "$work/status.json" "$artifacts/endpoint-retirement.json"
+    host_identities verify < "$artifacts/endpoint-host-identities.json" > "$artifacts/endpoint-containment.json"
+    echo 'PASS: movie endpoint playback completed and both worker units retired.'
     exit 0
 fi
 if [ -n "${BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT:-}${BAANDER_TEST_AUTOSCALING_CHECKPOINT:-}" ]; then

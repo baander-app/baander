@@ -535,24 +535,57 @@ $client = static fn (): StreamClient => new StreamClient($manager, EMAIL,
 $result = [];
 if ($mode === 'prepare') {
     ensure(is_dir(ROOT) || mkdir(ROOT, 0750, true), 'Cannot create scratch state.');
-    foreach (['Dialogue', 'Forced', 'Unlabelled'] as $title) {
-        file_put_contents(ROOT . '/' . $title . '.srt', "1\n00:00:00,000 --> 00:00:15,000\n$title early\n\n2\n00:00:15,000 --> 00:00:40,000\n$title late\n\n3\n00:01:30,000 --> 00:02:30,000\n$title sought\n");
+    $movieEndpoint = getenv('BAANDER_TEST_MOVIE_ENDPOINT') === '1';
+    $catalogDuration = 180.0;
+    if ($movieEndpoint) {
+        $sourceCommand = ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+            '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=25:duration=42',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=48',
+            '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2',
+            '-pix_fmt', 'yuv420p', '-bf', '0', '-c:a', 'pcm_s16le', VIDEO];
+        command($sourceCommand, 90);
+        $probeCommand = ['ffprobe', '-v', 'error', '-show_format', '-show_streams', '-show_packets',
+            '-show_entries', 'packet=stream_index,pts_time,duration_time', '-of', 'json', VIDEO];
+        $probeProcess = new Process($probeCommand, timeout: 30);
+        $probeProcess->mustRun();
+        file_put_contents(ROOT . '/endpoint-source-probe.json', $probeProcess->getOutput());
+        $sourceProbe = json_decode($probeProcess->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        $catalogDuration = (float) $sourceProbe['format']['duration'];
+        $sourceEnds = [];
+        $sourcePacketCounts = [];
+        foreach ($sourceProbe['packets'] as $packet) {
+            $index = (int) $packet['stream_index'];
+            $end = (float) $packet['pts_time'] + (float) $packet['duration_time'];
+            $sourceEnds[$index] = max($sourceEnds[$index] ?? 0.0, $end);
+            $sourcePacketCounts[$index] = ($sourcePacketCounts[$index] ?? 0) + 1;
+        }
+        ensure(array_column($sourceProbe['streams'], 'codec_type') === ['video', 'audio'], 'Endpoint source must contain only movie video and audio.');
+        ensure(abs($catalogDuration - 48.0) < 0.01, 'Endpoint source container must retain the longer soundtrack.');
+        ensure(abs($sourceEnds[0] - 42.0) < 0.01 && abs($sourceEnds[1] - 48.0) < 0.01, 'Independently probed packet ends must distinguish movie video from audio.');
+        ensure($sourcePacketCounts[0] === 1050, 'Endpoint source must retain every twenty-five-fps video frame.');
+        file_put_contents(ROOT . '/endpoint-source.json', json_encode(['sourceCommand' => $sourceCommand,
+            'probeCommand' => $probeCommand, 'packetEnds' => $sourceEnds, 'packetCounts' => $sourcePacketCounts,
+            'catalogDuration' => $catalogDuration], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
+    } else {
+        foreach (['Dialogue', 'Forced', 'Unlabelled'] as $title) {
+            file_put_contents(ROOT . '/' . $title . '.srt', "1\n00:00:00,000 --> 00:00:15,000\n$title early\n\n2\n00:00:15,000 --> 00:00:40,000\n$title late\n\n3\n00:01:30,000 --> 00:02:30,000\n$title sought\n");
+        }
+        command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=180',
+            '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=180',
+            '-i', ROOT . '/Dialogue.srt', '-i', ROOT . '/Forced.srt', '-i', ROOT . '/Unlabelled.srt',
+            '-map', '0:v', '-map', '1:a', '-map', '2:s', '-map', '3:s', '-map', '4:s',
+            '-metadata:s:s:0', 'language=eng', '-metadata:s:s:0', 'title=Dialogue', '-disposition:s:0', 'default',
+            '-metadata:s:s:1', 'language=eng', '-metadata:s:s:1', 'title=Forced', '-disposition:s:1', 'forced',
+            '-metadata:s:s:2', 'language=', '-metadata:s:s:2', 'title=Unlabelled', '-disposition:s:2', '0',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-c:s', 'srt', '-t', '180', VIDEO], 150);
     }
-    command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30:duration=180',
-        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=180',
-        '-i', ROOT . '/Dialogue.srt', '-i', ROOT . '/Forced.srt', '-i', ROOT . '/Unlabelled.srt',
-        '-map', '0:v', '-map', '1:a', '-map', '2:s', '-map', '3:s', '-map', '4:s',
-        '-metadata:s:s:0', 'language=eng', '-metadata:s:s:0', 'title=Dialogue', '-disposition:s:0', 'default',
-        '-metadata:s:s:1', 'language=eng', '-metadata:s:s:1', 'title=Forced', '-disposition:s:1', 'forced',
-        '-metadata:s:s:2', 'language=', '-metadata:s:s:2', 'title=Unlabelled', '-disposition:s:2', '0',
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-c:s', 'srt', '-t', '180', VIDEO], 150);
     command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1800', '-ac', '2', '-ar', '44100', '-threads', '1', '-c:a', 'flac', AUDIO], 60);
     $library = new LibraryEntity('Two command music', 'two-command-music', '/media/source', 'music', 'local');
     $movies = new LibraryEntity('Two command movies', 'two-command-movies', '/media/source', 'movie', 'local');
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
     $song = new SongEntity(new PublicId(), $album, 'Worker audio', AUDIO, (int) filesize(AUDIO), 'audio/flac');
     $video = new VideoEntity(new PublicId(), VIDEO, hash_file('sha256', VIDEO));
-    $video->setDuration(180); $video->setWidth(1280); $video->setHeight(720); $video->setFramerate(30);
+    $video->setDuration((int) round($catalogDuration)); $video->setWidth(1280); $video->setHeight(720); $video->setFramerate($movieEndpoint ? 25 : 30);
     $movie = new MovieEntity(new PublicId(), $movies, 'Two command playback');
     $movieVideo = new MovieVideoEntity($movie, $video);
     $imageRoot = ROOT;
@@ -563,7 +596,12 @@ if ($mode === 'prepare') {
     $image->setAlbum($album);
     foreach ([$library, $movies, $album, $song, $video, $movie, $movieVideo, $image] as $entity) { $manager->persist($entity); }
     $manager->flush();
-    save(['video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()]);
+    $prepared = ['video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
+    if ($movieEndpoint) {
+        $prepared['scenario'] = 'movie-endpoint';
+        $prepared['endpoint'] = ['videoEnd' => 42, 'containerEnd' => 48];
+    }
+    save($prepared);
     $result = state();
 } elseif ($mode === 'absent') {
     $state = state(); $auth = $client();

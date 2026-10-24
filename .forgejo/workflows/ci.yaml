@@ -170,6 +170,14 @@ jobs:
                     BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
                       bash scripts/test-two-command-deployment-container.sh
 
+            -   name: Selected video endpoint through movie completion and replay
+                run: |
+                    BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_BROWSER_ENGINE=chromium \
+                    BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/movie-endpoint-chromium" \
+                      bash scripts/test-movie-endpoint-browser.sh
+
             -   name: Independent web and worker media ownership in Firefox
                 run: |
                     BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
