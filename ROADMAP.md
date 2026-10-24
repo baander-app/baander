@@ -1600,3 +1600,62 @@ repair. These cases do not establish formal CMAF conformance or qualify hardware
 selection or alternate movie tracks. Existing application databases, Redis and
 the user's original videos were untouched. This checkpoint includes no push or
 feature merge.
+
+### Automatic movie quality switching — 2026-10-24
+
+The separate Chromium qualification exercises the installed HLS.js player through
+the production playback adapter while independently encoded 360p and 720p
+presentations grow. Production filters, segment commands, presentation reading,
+signed delivery and manifest generation supply actual media. In-memory repository
+and ownership doubles replace persistent application setup. This change adds
+qualification fixtures, a runner and CI wiring; production playback is unchanged.
+
+The final fixture uses 144 seconds at 24 fps, delays the high producer by six
+seconds and applies 20, 1.8 and 20 Mbit/s to browser response bodies. The browser
+attaches once with ordinary adapter configuration, without assigning HLS levels
+or overriding its estimator. The phases retain 65-, 65- and 90-second bounds
+within the 180-second browser deadline. Independent code and simplification
+review found no defects.
+
+Final acceptance passed in 115.607 seconds with Chromium 148.0.7778.96, HLS.js
+1.7.3 and FFmpeg 5.1.9 at source revision `a159601a`. Ordered high-to-low-to-high
+presentation reached source positions 6.730667, 24.442667 and 90.632 seconds,
+with dimensions 1280×720, 640×360 and 1280×720 and decoded frame counts 166,
+592 and 2,181. Every phase had a fresh signed video request and positive local
+audio evidence. One attachment remained active without media or transport errors.
+Both producers remained active and incomplete; low/high published video edges
+advanced from 24/18 to 42/36 and then 108/102 seconds. Three completed constrained
+video bodies measured 1.795356, 1.650213 and 1.621244 Mbit/s. Playback recorded
+one 3.5451-second rebuffer at source position 17.92 seconds, then resumed; this
+is adaptation evidence, not a stall-free playback claim.
+
+The first calibration failed because the harness bundle could not load. The
+second proved high-to-low presentation but reached its 65-second recovery bound
+at source position 89.891 seconds before the completed high fragment covering
+seconds 90–96 could display; it recorded 3.566 seconds of rebuffering. Extending
+the source from 120 to 144 seconds and recovery to 90 seconds retained the
+180-second browser bound. The run under `var/test-runs/movie-adaptive-final`
+reached all three transitions but failed its strict transport assertion on an
+implicit favicon request aborted by Chromium. Its cleanup passed and it recorded
+3.5481 seconds of rebuffering. The fixture now supplies an inline icon. These
+failed receipts remain separate from final acceptance.
+
+Nonbrowser verification at `bb0e41b8` passed 93 backend tests with 709 assertions
+across six files and 241 frontend tests across four suites. Frontend typechecking
+and strict fixture-entry typechecking passed. Full PHPStan reported no errors;
+Deptrac reported zero violations, warnings and errors with 484 existing skipped
+violations. Shell syntax and CI YAML checks passed. Since those gates, only the
+inline fixture icon and plan receipt changed; code and static checks were not
+repeated. The backend receipt is
+`var/test-runs/movie-adaptive-gates/backend/20261024-143931-2acab7ab`;
+`var/test-runs/movie-adaptive-gates/verification-summary.json` records the checkpoint.
+
+Final browser evidence is under `var/test-runs/movie-adaptive-acceptance`;
+bounded calibration receipts remain under `var/test-runs/movie-adaptive-calibration`
+and `var/test-runs/movie-adaptive-calibration-2`.
+The runner verified cleanup of its containers. The testing guide records the
+command and boundary: the selected native encode/delivery/adapter path in
+Chromium. Whole-application lifecycle, other browsers, every network profile,
+DASH switching, hardware, HDR, alternate audio and formal CMAF conformance remain
+outside this acceptance. Existing application databases, Redis and the user's
+original media were untouched. This checkpoint includes no push or feature merge.

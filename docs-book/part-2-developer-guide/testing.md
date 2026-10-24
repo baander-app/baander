@@ -1008,8 +1008,55 @@ Inspect `playback-timeline.json` and the browser's `result.json` or `failure.jso
 for committed slider positions, snapshots, control timings, network failures and
 media events. These client checks remain separate from the saturated-control
 drill; a production browser result does not qualify that pressure fixture.
-Hardware acceleration, ABR switching, cache-sweep policy and measured FLAC DSP CPU
-cost remain separate qualification work.
+Hardware acceleration, cache-sweep policy and measured FLAC DSP CPU cost remain
+separate qualification work. Automatic movie quality switching uses the separate
+gate below.
+
+### Automatic movie quality switching
+
+Run the separate Chromium gate against the CI image after installing the pinned
+web dependencies and Playwright image:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local bash scripts/test-transcode-adaptive-browser.sh
+```
+
+The fixture generates a moving 144-second, 24-fps source with audio and
+independently encodes 360p and 720p through the production filters and segment
+command builder. Both presentations grow during playback; the high producer starts
+six seconds later so its published edge lags. Production presentation reading,
+signed media delivery and manifest generation serve the actual playback adapter.
+In-memory repository and ownership doubles supply fixture state without
+application database or Redis access.
+
+The browser changes response-body throughput from 20 to 1.8 and back to 20 Mbit/s
+without setting an HLS level or changing the adapter's estimator or buffering
+configuration. The three phases have individual bounds of 65, 65 and 90 seconds
+within a 180-second browser deadline. Producers have 174-second bounds within
+the fixture supervisor's 240-second deadline. Fixture telemetry uses a separate
+Node loopback connection, outside the browser's constrained transport.
+
+Each phase requires a fresh signed video request followed by recent native
+presentation at its rendition, increasing decoded frames and source time, and a
+positive local audio signal. Ordered 720p-to-360p-to-720p presentation must use
+one attachment and canonical audio while both producers remain active and
+publication edges advance. Completed signed video bodies of at least 128 KiB
+and 0.5 seconds, transferred entirely within the constrained phase, must remain
+within 1.3 times its configured rate; at least one must reach 0.25 times that rate.
+These bounds account for transport-event batching and concurrent audio.
+
+Receipts retain body-transfer observations, requests, publication edges, media
+events, buffering periods, screenshots and traces. The gate reports rebuffering;
+it does not require stall-free playback. Download cancellation during an
+intentional adaptation is evaluated separately from HTTP or other request failure.
+Set `BAANDER_TEST_ARTIFACTS` to select the evidence directory. The runner retains
+failure evidence and verifies removal of its containers.
+
+This gate qualifies Chromium adaptation through native encoding, production
+signed delivery and the playback adapter. It does not requalify the whole
+application lifecycle, other browsers, every network profile, DASH switching,
+hardware, HDR, alternate audio or formal CMAF conformance. Existing application
+databases, Redis and original media are outside the fixture.
 
 ### Ordinary worker autoscaling qualification
 

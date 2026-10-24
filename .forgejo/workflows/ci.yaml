@@ -83,6 +83,11 @@ jobs:
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                       bash scripts/test-transcode-publication-browser.sh
 
+            -   name: Automatic movie quality switching
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                      bash scripts/test-transcode-adaptive-browser.sh
+
             -   name: Build production worker image
                 run: |
                     docker buildx build --target worker --load \
