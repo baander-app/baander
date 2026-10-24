@@ -83,6 +83,11 @@ using AacDecoderState = struct AacDecoderState_ {
                          480 for the low-delay object types */
   int aot;            /* object type of the stream (AacObjectType), 0 before any */
   int eld_downscale;  /* AAC-ELD downscaled playout factor: 1, 2 or 4 */
+  /* The error resilience tools the configuration of an error resilient
+   * stream switches on: virtual codebook 11 in the section data, RVLC
+   * coded scalefactors and reordered spectral data. */
+  int section_resilience, scalefactor_resilience, spectral_resilience;
+  int rvlc_recovered; /* a channel of this block needed the backward RVLC pass */
   int blocks_decoded; /* raw data blocks decoded or concealed since creation or reset */
   AacMdct mdct_eld;   /* AAC-ELD: the transform of the (downscaled) output frame */
   AacLayout layout;   /* element to channel assignment */

@@ -90,10 +90,9 @@ bool asc_supported(const AacAsc* asc, int rate_index) {
     return false;
   }
   if (aac_aot_is_er(asc->aot)) {
-    /* The resilience tools (virtual codebooks, RVLC, HCR) are not
-     * decoded, and the fixed element order needs a channel configuration. */
-    if (asc->section_resilience || asc->scalefactor_resilience || asc->spectral_resilience ||
-        asc->channel_config < 1 || asc->channel_config > 7) {
+    /* The fixed element order of the error resilient syntax needs a
+     * channel configuration. */
+    if (asc->channel_config < 1 || asc->channel_config > 7) {
       return false;
     }
   }
@@ -145,6 +144,12 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   if (ret) {
     return ret;
   }
+  /* The error resilience tools of an error resilient stream (the flags
+   * mean nothing to the plain syntax). */
+  const bool er = aac_aot_is_er(asc->aot);
+  s->section_resilience = er && asc->section_resilience;
+  s->scalefactor_resilience = er && asc->scalefactor_resilience;
+  s->spectral_resilience = er && asc->spectral_resilience;
   ret = set_frame_length(s, asc->frame_length);
   if (ret) {
     return ret;

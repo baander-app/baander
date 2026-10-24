@@ -32,6 +32,14 @@ void aac_bitreader_byte_align(AacBitReader* r);
  * the sign bits of unsigned books and the escape sequences of book 11.
  * Returns 0 or AAC_ERR_DECODE. */
 int aac_bitreader_read_huffman(AacBitReader* r, int codebook, int* out);
+/* Bit-serial walk through the decoding tree of a spectral codebook 1..11,
+ * for readers that take the bits from elsewhere (the reordered spectral
+ * data): `node` starts at 0 and each step with the next bit returns the
+ * next node (> 0), a leaf as -(index + 1), or 0 for a codeword that is
+ * not in the table.  aac_huffman_leaf gives the dim values of a leaf: the
+ * magnitudes of an unsigned book, the signed values of a signed one. */
+int aac_huffman_step(int codebook, int node, int bit);
+const int8_t* aac_huffman_leaf(int codebook, int index);
 /* Returns the scalefactor DPCM difference (-60..60), or AAC_SF_INVALID on an
  * invalid codeword. */
 int aac_bitreader_read_scalefactor(AacBitReader* r);

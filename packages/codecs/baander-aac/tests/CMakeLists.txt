@@ -24,6 +24,7 @@ set(TEST_SOURCES
     test_eld_sbr.cpp
     test_dsp.cpp
     test_allocation.cpp
+    test_er.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

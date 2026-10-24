@@ -229,6 +229,15 @@ int aac_bitreader_read_huffman(AacBitReader* r, int cb, int* out) {
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
+int aac_huffman_step(int cb, int node, int bit) {
+  if (cb < 1 || cb > AAC_NUM_CODEBOOKS || node < 0 || node >= g_spec_trees[cb].nodes) {
+    return 0;
+  }
+  return g_spec_trees[cb].child[node][bit & 1];
+}
+
+const int8_t* aac_huffman_leaf(int cb, int index) { return g_spec_values[cb][index]; }
+
 int aac_bitreader_read_scalefactor(AacBitReader* r) {
   const int idx = lookup_decode(&g_sf_lookup, &g_sf_tree, r);
   if (idx < 0) {

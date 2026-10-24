@@ -429,4 +429,152 @@ static bool run_command(const std::string& cmd) {
   return system((cmd + " > /dev/null 2>&1").c_str()) == 0;
 }
 
+/* ── a minimal MP4 file ────────────────────────────────────────── */
+
+static void put32(std::vector<uint8_t>& v, uint32_t x) {
+  for (int s = 24; s >= 0; s -= 8) {
+    v.push_back((uint8_t)(x >> s));
+  }
+}
+
+static void put16(std::vector<uint8_t>& v, uint32_t x) {
+  v.push_back((uint8_t)(x >> 8));
+  v.push_back((uint8_t)x);
+}
+
+static std::vector<uint8_t> box(const char* type, const std::vector<uint8_t>& payload,
+                                int full = -1, uint32_t flags = 0) {
+  std::vector<uint8_t> v;
+  put32(v, (uint32_t)(8 + payload.size() + (full >= 0 ? 4 : 0)));
+  v.insert(v.end(), type, type + 4);
+  if (full >= 0) {
+    put32(v, ((uint32_t)full << 24) | flags);
+  }
+  v.insert(v.end(), payload.begin(), payload.end());
+  return v;
+}
+
+static std::vector<uint8_t> descriptor(uint8_t tag, const std::vector<uint8_t>& payload) {
+  std::vector<uint8_t> v = {tag, 0x80, 0x80, 0x80, (uint8_t)payload.size()};
+  v.insert(v.end(), payload.begin(), payload.end());
+  return v;
+}
+
+static std::vector<uint8_t> cat(std::initializer_list<std::vector<uint8_t>> parts) {
+  std::vector<uint8_t> v;
+  for (const auto& p : parts) {
+    v.insert(v.end(), p.begin(), p.end());
+  }
+  return v;
+}
+
+/* A minimal MP4 file around raw access units: FFmpeg reads the
+ * AudioSpecificConfig of a low-delay stream from the esds box (its LOAS
+ * demuxer leaves the sample rate of error resilient streams unset). */
+static std::vector<uint8_t> mp4_file(const std::vector<std::vector<uint8_t>>& aus,
+                                     const std::vector<uint8_t>& asc, int frame, int rate,
+                                     int channels) {
+  const uint32_t n = (uint32_t)aus.size();
+  const uint32_t duration = n * (uint32_t)frame;
+  std::vector<uint8_t> dcd_payload = {0x40, 0x15, 0, 0, 0};
+  put32(dcd_payload, 0);
+  put32(dcd_payload, 0);
+  const std::vector<uint8_t> dcd = descriptor(0x04, cat({dcd_payload, descriptor(0x05, asc)}));
+  const std::vector<uint8_t> es = descriptor(0x03, cat({{0, 0, 0}, dcd, descriptor(0x06, {2})}));
+  std::vector<uint8_t> mp4a_payload(6, 0);
+  put16(mp4a_payload, 1);
+  mp4a_payload.insert(mp4a_payload.end(), 8, 0);
+  put16(mp4a_payload, (uint32_t)channels);
+  put16(mp4a_payload, 16);
+  put32(mp4a_payload, 0);
+  put32(mp4a_payload, (uint32_t)rate << 16);
+  const std::vector<uint8_t> mp4a = box("mp4a", cat({mp4a_payload, box("esds", es, 0)}));
+  std::vector<uint8_t> v;
+  put32(v, 1);
+  const std::vector<uint8_t> stsd = box("stsd", cat({v, mp4a}), 0);
+  v.clear();
+  put32(v, 1);
+  put32(v, n);
+  put32(v, (uint32_t)frame);
+  const std::vector<uint8_t> stts = box("stts", v, 0);
+  v.clear();
+  put32(v, 1);
+  put32(v, 1);
+  put32(v, n);
+  put32(v, 1);
+  const std::vector<uint8_t> stsc = box("stsc", v, 0);
+  v.clear();
+  put32(v, 0);
+  put32(v, n);
+  for (const auto& au : aus) {
+    put32(v, (uint32_t)au.size());
+  }
+  const std::vector<uint8_t> stsz = box("stsz", v, 0);
+  std::vector<uint8_t> matrix;
+  for (uint32_t x : {0x10000u, 0u, 0u, 0u, 0x10000u, 0u, 0u, 0u, 0x40000000u}) {
+    put32(matrix, x);
+  }
+  std::vector<uint8_t> ftyp_payload = {'i', 's', 'o', 'm'};
+  put32(ftyp_payload, 0x200);
+  for (const char* b : {"isom", "iso2", "mp41"}) {
+    ftyp_payload.insert(ftyp_payload.end(), b, b + 4);
+  }
+  const std::vector<uint8_t> ftyp = box("ftyp", ftyp_payload);
+  auto moov = [&](uint32_t offset) {
+    std::vector<uint8_t> co;
+    put32(co, 1);
+    put32(co, offset);
+    const std::vector<uint8_t> stbl =
+        box("stbl", cat({stsd, stts, stsc, stsz, box("stco", co, 0)}));
+    std::vector<uint8_t> dref_payload;
+    put32(dref_payload, 1);
+    const std::vector<uint8_t> dinf =
+        box("dinf", box("dref", cat({dref_payload, box("url ", {}, 0, 1)}), 0));
+    const std::vector<uint8_t> minf = box("minf", cat({box("smhd", {0, 0, 0, 0}, 0), dinf, stbl}));
+    std::vector<uint8_t> hdlr_payload(4, 0);
+    hdlr_payload.insert(hdlr_payload.end(), {'s', 'o', 'u', 'n'});
+    hdlr_payload.insert(hdlr_payload.end(), 12, 0);
+    const char* handler = "SoundHandler";
+    hdlr_payload.insert(hdlr_payload.end(), handler, handler + strlen(handler) + 1);
+    std::vector<uint8_t> mdhd_payload;
+    put32(mdhd_payload, 0);
+    put32(mdhd_payload, 0);
+    put32(mdhd_payload, (uint32_t)rate);
+    put32(mdhd_payload, duration);
+    put16(mdhd_payload, 0x55c4);
+    put16(mdhd_payload, 0);
+    const std::vector<uint8_t> mdia =
+        box("mdia", cat({box("mdhd", mdhd_payload, 0), box("hdlr", hdlr_payload, 0), minf}));
+    const uint32_t ms = (uint32_t)((uint64_t)duration * 1000 / rate);
+    std::vector<uint8_t> tkhd_payload;
+    for (uint32_t x : {0u, 0u, 1u, 0u, ms, 0u, 0u}) {
+      put32(tkhd_payload, x);
+    }
+    put16(tkhd_payload, 0);
+    put16(tkhd_payload, 0);
+    put16(tkhd_payload, 0x100);
+    put16(tkhd_payload, 0);
+    tkhd_payload.insert(tkhd_payload.end(), matrix.begin(), matrix.end());
+    put32(tkhd_payload, 0);
+    put32(tkhd_payload, 0);
+    const std::vector<uint8_t> trak = box("trak", cat({box("tkhd", tkhd_payload, 0, 3), mdia}));
+    std::vector<uint8_t> mvhd_payload;
+    for (uint32_t x : {0u, 0u, 1000u, ms, 0x10000u}) {
+      put32(mvhd_payload, x);
+    }
+    put16(mvhd_payload, 0x100);
+    mvhd_payload.insert(mvhd_payload.end(), 10, 0);
+    mvhd_payload.insert(mvhd_payload.end(), matrix.begin(), matrix.end());
+    mvhd_payload.insert(mvhd_payload.end(), 24, 0);
+    put32(mvhd_payload, 2);
+    return box("moov", cat({box("mvhd", mvhd_payload, 0), trak}));
+  };
+  const size_t offset = ftyp.size() + moov(0).size() + 8;
+  std::vector<uint8_t> mdat_payload;
+  for (const auto& au : aus) {
+    mdat_payload.insert(mdat_payload.end(), au.begin(), au.end());
+  }
+  return cat({ftyp, moov((uint32_t)offset), box("mdat", mdat_payload)});
+}
+
 #endif /* BAANDER_AAC_TEST_UTIL_H */

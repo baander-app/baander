@@ -2,6 +2,7 @@
 
 #include "asc.h"
 #include "channel_map.h"
+#include "er.h"
 
 #include <algorithm>
 #include <cmath>
@@ -206,14 +207,19 @@ int decode_spectral_data(AacBitReader* r, AacChannelStream* cs) {
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < ics->max_sfb; b++) {
       const int cb = cs->band_type[g * ics->max_sfb + b];
-      if (cb == 0 || cb >= AAC_CB_NOISE) {
+      if (!aac_cb_is_spectral(cb)) {
         continue;
       }
-      const int dim = aac_codebook_info[cb].dim;
+      /* A virtual codebook (16..31) reads with the escape codebook and
+       * checks its magnitude limit. */
+      const int book = aac_cb_huffman_book(cb);
+      const int dim = aac_codebook_info[book].dim;
       for (int w = 0; w < ics->group_len[g]; w++) {
         int* q = cs->quant + (win + w) * 128;
         for (int k = off[b]; k < off[b + 1]; k += dim) {
-          if (aac_bitreader_read_huffman(r, cb, q + k) != 0) {
+          const int ret = book == cb ? aac_bitreader_read_huffman(r, cb, q + k)
+                                     : aac_er_read_vcb11(r, cb, q + k);
+          if (ret != 0) {
             return AAC_ERR_DECODE;
           }
         }
@@ -236,10 +242,29 @@ int decode_ics(AacDecoderState* s, AacBitReader* r, AacChannelStream* cs, int co
   if (!common_window && (ret = decode_ics_info(s, r, &cs->ics)) != 0) {
     return ret;
   }
-  if ((ret = decode_section_data(r, cs)) != 0) {
+  /* The error resilience tools replace the section, scalefactor and
+   * spectral syntax when the configuration switches them on. */
+  ret = er && s->section_resilience ? aac_er_read_section_data(r, &cs->ics, cs->band_type)
+                                    : decode_section_data(r, cs);
+  if (ret != 0) {
     return ret;
   }
-  if ((ret = decode_scalefactors(r, cs, global_gain)) != 0) {
+  if (er && s->scalefactor_resilience) {
+    int outcome = AAC_RVLC_OK;
+    ret = aac_er_read_rvlc_scalefactors(r, &cs->ics, cs->band_type, global_gain, cs->sf, &outcome);
+    if (ret != 0) {
+      return ret;
+    }
+    if (outcome == AAC_RVLC_RECOVERED) {
+      /* Damaged scalefactor data that the backward pass and the
+       * interpolation filled in: the frame plays, as a concealed one,
+       * when concealment is on. */
+      if (s->conceal_mode == AAC_CONCEAL_OFF) {
+        return AAC_ERR_DECODE;
+      }
+      s->rvlc_recovered = 1;
+    }
+  } else if ((ret = decode_scalefactors(r, cs, global_gain)) != 0) {
     return ret;
   }
   PulseData pulse = {};
@@ -262,7 +287,17 @@ int decode_ics(AacDecoderState* s, AacBitReader* r, AacChannelStream* cs, int co
   if (er && cs->tns_present && (ret = decode_tns_data(r, &cs->ics, &cs->tns)) != 0) {
     return ret;
   }
-  if ((ret = decode_spectral_data(r, cs)) != 0) {
+  if (er && s->spectral_resilience) {
+    const int length = (int)aac_bitreader_read(r, 14); /* length_of_reordered_spectral_data */
+    const int longest = (int)aac_bitreader_read(r, 6); /* length_of_longest_codeword */
+    if (r->overread) {
+      return AAC_ERR_DECODE;
+    }
+    ret = aac_er_read_hcr(r, &cs->ics, cs->band_type, length, longest, cs->quant);
+  } else {
+    ret = decode_spectral_data(r, cs);
+  }
+  if (ret != 0) {
     return ret;
   }
   for (int i = 0; i < (pulse_present ? pulse.num_pulse : 0); i++) {
@@ -488,6 +523,8 @@ struct MsMask {
   int used[AAC_MAX_BANDS];
 };
 
+bool is_noise_or_intensity(int cb) { return cb >= AAC_CB_NOISE && cb <= AAC_CB_INTENSITY; }
+
 void apply_ms(AacChannelStream* l, AacChannelStream* r, const MsMask* ms) {
   const AacIcsInfo* ics = &l->ics;
   const int* off = ics->swb_offset;
@@ -495,8 +532,10 @@ void apply_ms(AacChannelStream* l, AacChannelStream* r, const MsMask* ms) {
   for (int g = 0; g < ics->num_window_groups; g++) {
     for (int b = 0; b < ics->max_sfb; b++) {
       const int idx = g * ics->max_sfb + b;
-      if (!ms->used[idx] || l->band_type[idx] >= AAC_CB_NOISE ||
-          r->band_type[idx] >= AAC_CB_NOISE) {
+      /* Noise and intensity bands are not M/S coded; a zero band is,
+       * and a virtual codebook band is spectral data like any other. */
+      if (!ms->used[idx] || is_noise_or_intensity(l->band_type[idx]) ||
+          is_noise_or_intensity(r->band_type[idx])) {
         continue;
       }
       for (int w = 0; w < ics->group_len[g]; w++) {
@@ -1516,6 +1555,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->has_sbr = 0;
   s->has_ps = 0;
   s->last_concealed = 0;
+  s->rvlc_recovered = 0;
   s->num_crc_regions = 0;
   aac_drc_frame_begin(&s->drc);
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
@@ -1593,7 +1633,7 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
     }
     damaged = !any;
   }
-  if (damaged || p.damaged_sbr) {
+  if (damaged || p.damaged_sbr || s->rvlc_recovered) {
     s->last_concealed = 1;
     s->concealed_frames++;
   }
