@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -68,6 +70,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains('error', $args);
         self::assertContains('-f', $args);
         self::assertContains('dash', $args);
+        self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
         self::assertSame('6', $args[array_search('-seg_duration', $args, true) + 1]);
         self::assertSame('1', $args[array_search('-hls_playlist', $args, true) + 1]);
         self::assertSame('id=0,streams=v id=1,streams=a', $args[array_search('-adaptation_sets', $args, true) + 1]);
@@ -77,6 +80,38 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains('0:V:0', $args);
         self::assertContains('0:a:0', $args);
         self::assertContains('aac', $args);
+    }
+
+    #[DataProvider('audioProfiles')]
+    public function testAudioProfileUsesItsEncoderAndSettingsWithMp4Dash(AudioProfile $profile, string $encoder): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            audioProfile: $profile, audioFilters: 'volume=0.5');
+
+        foreach ([
+            '-c:a' => $encoder,
+            '-b:a' => (string) $profile->bitrate,
+            '-ac' => (string) $profile->channelCount,
+            '-ar' => (string) $profile->sampleRate,
+            '-threads:a' => '1',
+            '-af' => 'volume=0.5',
+            '-dash_segment_type' => 'mp4',
+            '-format_options' => 'movflags=+negative_cts_offsets',
+            '-adaptation_sets' => 'id=0,streams=v id=1,streams=a',
+        ] as $option => $expected) {
+            $index = array_search($option, $args, true);
+            self::assertNotFalse($index, $option);
+            self::assertSame($expected, $args[$index + 1], $option);
+        }
+    }
+
+    /** @return iterable<string, array{AudioProfile, string}> */
+    public static function audioProfiles(): iterable
+    {
+        yield 'Opus stereo' => [AudioProfile::opusStereo(), 'libopus'];
+        yield 'AAC stereo' => [AudioProfile::streamingStereo(), 'aac'];
+        yield 'AAC mobile mono' => [AudioProfile::mobileMono(), 'aac'];
+        yield 'AAC surround' => [AudioProfile::streaming51(), 'aac'];
     }
 
     public function testVideoOrdinalCountsOnlyNonAttachedVideoStreams(): void
@@ -211,6 +246,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertNotContains('-c:a', $args);
         self::assertNotContains('-b:a', $args);
         self::assertNotContains('-af', $args);
+        self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
         self::assertSame('id=0,streams=v', $args[array_search('-adaptation_sets', $args, true) + 1]);
     }
 

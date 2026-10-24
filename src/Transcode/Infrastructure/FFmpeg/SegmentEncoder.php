@@ -178,15 +178,15 @@ final class SegmentEncoder
         }
 
         if ($hasAudio) {
-            // Audio codec: AAC stereo, matching the existing audio delivery.
+            $audioProfile ??= AudioProfile::streamingStereo();
             $args[] = '-c:a';
-            $args[] = ($audioProfile ?? AudioProfile::streamingStereo())->codec;
+            $args[] = $audioProfile->codec === 'opus' ? 'libopus' : $audioProfile->codec;
             $args[] = '-b:a';
-            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->bitrate;
+            $args[] = (string) $audioProfile->bitrate;
             $args[] = '-ac';
-            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->channelCount;
+            $args[] = (string) $audioProfile->channelCount;
             $args[] = '-ar';
-            $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->sampleRate;
+            $args[] = (string) $audioProfile->sampleRate;
         }
         $args[] = '-threads:v';
         $args[] = '2';
@@ -214,6 +214,7 @@ final class SegmentEncoder
         // Signed composition offsets avoid video edit-list shifts in HLS tracking while retaining AAC priming.
         array_push($args,
             '-f', 'dash', '-seg_duration', (string) $segmentDuration,
+            '-dash_segment_type', 'mp4',
             '-format_options', 'movflags=+negative_cts_offsets',
             '-use_template', '1', '-use_timeline', '1',
             '-hls_playlist', '1', '-hls_master_name', 'master.m3u8',

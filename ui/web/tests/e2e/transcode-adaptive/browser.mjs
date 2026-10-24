@@ -5,6 +5,8 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
+const expectedAudioCodec = { streaming_stereo: 'mp4a.40.2', opus_stereo: 'opus' }[fixture.audioProfile]
+assert(expectedAudioCodec, 'The fixture must identify its requested audio profile')
 const evidence = '/work/evidence'
 await mkdir(evidence, { recursive: true })
 const started = Date.now()
@@ -27,6 +29,7 @@ let status
 let state
 let requests = []
 const receipt = { ...versions, browser: browser.version(), ffmpeg: fixture.ffmpegVersion,
+  audioProfile: fixture.audioProfile, expectedAudioCodec,
   expectedDuration: fixture.expectedDuration, frameRate: fixture.frameRate,
   settings: { generousBitsPerSecond: 20000000, constrainedBitsPerSecond: 1800000,
     deadlineSeconds: 180,
@@ -143,6 +146,8 @@ function verifyGrowing(previous) {
     const current = status.tiers[fixture.tiers[tier].name]
     assert.equal(current.producerRunning, true, `${tier} producer must still be running`)
     assert.equal(current.complete, false)
+    assert.equal(current.audioCodec, expectedAudioCodec, 'Native audio must match the requested profile')
+    assert.equal(current.audioMimeType, 'audio/mp4', 'Native audio must use the published MP4 container')
     if (previous && current.videoEnd <= previous.tiers[fixture.tiers[tier].name].videoEnd) advanced = false
   }
   return advanced && status.tiers[fixture.tiers.low.name].videoEnd > status.tiers[fixture.tiers.high.name].videoEnd
@@ -227,7 +232,10 @@ try {
     bandwidth: Number(/(?:^|[:,])BANDWIDTH=(\d+)/.exec(line)?.[1]),
     width: Number(/RESOLUTION=(\d+)x(\d+)/.exec(line)?.[1]),
     height: Number(/RESOLUTION=(\d+)x(\d+)/.exec(line)?.[2]),
+    codecs: /CODECS="([^"]+)"/.exec(line)?.[1].split(',') ?? [],
   }))
+  assert(advertised.length === 2 && advertised.every(level => level.codecs.includes(expectedAudioCodec)),
+    'Every served HLS variant must declare the requested native audio codec')
   const lowBandwidth = advertised.find(level => level.height === fixture.tiers.low.height)?.bandwidth
   const highBandwidth = advertised.find(level => level.height === fixture.tiers.high.height)?.bandwidth
   assert(lowBandwidth < receipt.settings.constrainedBitsPerSecond && highBandwidth > receipt.settings.constrainedBitsPerSecond,

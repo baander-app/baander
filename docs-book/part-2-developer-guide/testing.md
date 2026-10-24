@@ -519,6 +519,15 @@ source must fail the required video mapping and publish no movie fragments.
 These cases qualify native source selection through publication; they do not add
 browser playback acceptance or establish CMAF conformance.
 
+`SegmentEncoderAudioProfileMediaTest` covers Opus and AAC on fresh 14-second
+output and the eight-second tail from source second six. Each case requires
+closed MP4 video/audio tracks with continuous native timelines, checks the actual
+MPD and initialized codec, and independently decodes every published fragment.
+Audio must retain stereo at 48 kHz. Decoded duration allows 50 ms per fragment
+and 100 ms overall for priming and padding. Video colour markers and audio
+frequency changes distinguish the requested source interval from an incorrect
+restart; positive audio energy and changing video frames are required.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each
@@ -1020,6 +1029,21 @@ web dependencies and Playwright image:
 ```bash
 BAANDER_TEST_IMAGE=baander-ci:local bash scripts/test-transcode-adaptive-browser.sh
 ```
+
+The default `BAANDER_TEST_AUDIO_PROFILE=streaming_stereo` uses AAC. Select the
+accepted Opus profile explicitly:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_AUDIO_PROFILE=opus_stereo \
+  bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Other profile names fail before container creation. CI runs AAC and Opus
+sequentially with separate evidence directories. Readiness records the requested
+profile; browser receipts also retain the observed native codec. Both the signed
+HLS master declaration and the published audio must agree with that selection.
+The same adaptation, signal, throughput, identity and transport checks apply to
+both profiles.
 
 The fixture generates a moving 144-second, 24-fps source with audio and
 independently encodes 360p and 720p through the production filters and segment

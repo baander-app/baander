@@ -83,10 +83,14 @@ jobs:
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                       bash scripts/test-transcode-publication-browser.sh
 
-            -   name: Automatic movie quality switching
+            -   name: Automatic movie quality switching with AAC and Opus
                 run: |
-                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                      bash scripts/test-transcode-adaptive-browser.sh
+                    for profile in streaming_stereo opus_stereo; do
+                      BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                      BAANDER_TEST_AUDIO_PROFILE="$profile" \
+                      BAANDER_TEST_ARTIFACTS="$PWD/var/test-runs/transcode-adaptive-$profile" \
+                        bash scripts/test-transcode-adaptive-browser.sh || exit "$?"
+                    done
 
             -   name: Build production worker image
                 run: |

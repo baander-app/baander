@@ -20,6 +20,11 @@ use Symfony\Component\Process\Process;
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
 $directory = AdaptiveBrowserFixture::directory();
+$audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_stereo') {
+    'streaming_stereo' => AudioProfile::streamingStereo(),
+    'opus_stereo' => AudioProfile::opusStereo(),
+    default => throw new RuntimeException('The adaptive fixture supports only streaming_stereo and opus_stereo.'),
+};
 if (is_file($directory . '/state.serialized') || is_file($directory . '/ready.json')) {
     throw new RuntimeException('Use a fresh disposable adaptive directory for each qualification.');
 }
@@ -45,7 +50,8 @@ assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
 $encoder = new SegmentEncoder($ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $origin = 'http://adaptive.baander.app:18778';
-$state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(), 'jobs' => []];
+$state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(),
+    'audioProfile' => $audioProfile->name, 'jobs' => []];
 $owner = Uuid::generate();
 $commands = $readyTiers = $pairs = [];
 foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label => $tier) {
@@ -53,11 +59,11 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
     $output = $directory . '/' . $state['videoId'] . '/' . $tier->name . '/job-' . $job->getId() . '/generation-1';
     mkdir($output, 0750, true);
     AdaptiveBrowserFixture::writeJson($output . '/generation.json', ['schemaVersion' => 2, 'generation' => 1,
-        'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => 'aac',
-        'audioProfile' => AudioProfile::streamingStereo()->jsonSerialize(), 'duration' => $probe->duration,
+        'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => $audioProfile->codec,
+        'audioProfile' => $audioProfile->jsonSerialize(), 'duration' => $probe->duration,
         'startTime' => 0, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
-        audioFilters: $encoder->buildAudioFiltersForProfile($probe, AudioProfile::streamingStereo()), hasAudio: true);
+        audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true);
     $input = array_search('-i', $arguments, true);
     if ($input === false) {
         throw new RuntimeException('The encoder omitted its source.');
@@ -98,6 +104,7 @@ try {
     } while (true);
     AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'manifestUrl' => $manifest,
         'expectedDuration' => $probe->duration, 'frameRate' => $probe->framerate, 'ffmpegVersion' => $version,
+        'audioProfile' => $audioProfile->name,
         'tiers' => $readyTiers, 'canonicalAudioJobId' => $readyTiers['low']['jobId']]);
     $startedAt = null;
     while (!$stopping && microtime(true) < $deadline) {
