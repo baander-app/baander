@@ -1,7 +1,7 @@
 ---
 title: Preserve sparse movie frames during publication and seeking
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -219,3 +219,41 @@ the existing reverse bound. Retain callback presentation metadata, native clock
 progress, full held-frame coverage, recent audio, signed delivery and natural end
 checks. This changes the test observer; it does not change playback or encoders.
 The rejected run remains under `browser-sparse-fresh-final` in phase evidence.
+
+## Verification checkpoint
+
+The production and native-test revision is 938572a4; observer revision 55bc6c00
+changes only the browser assertion and its plan documentation. The backend source,
+tests and native registration are identical between those revisions. The final
+focused native selection passes 55 tests and 1,682 assertions, including fourteen
+media cases. Both paced cases fail against the preceding buffering behavior.
+H.264 first publishes at 10.3104 seconds and advances again at 20.2918; HEVC does
+so at 10.5095 and 20.2899. Both retain the complete thirty-second tail.
+
+The full Transcode selection passes 950 tests and 13,654 assertions across 78
+files: 915 tests and 11,832 assertions in the ordinary lane, and 35 tests and
+1,822 assertions in the native lane. Full PHPStan reports no errors. Deptrac
+reports no violations, warnings or errors, with 484 existing skipped violations.
+Shell, browser syntax, CI YAML and native registration checks pass.
+
+Fresh sparse Chromium playback completes naturally at 30.015999 seconds with
+thirty decoded frames; the six-second restart completes at 24.016 seconds with
+24 decoded frames. Both preserve the source colours, audible samples, signed
+uncached delivery, stable target and one attachment without media or transport
+errors. Fresh playback records two resumed buffer pauses of 3.451 and 7.0371
+seconds; the restart records one of 6.9517 seconds. These paced fixtures establish
+correct resumed content and natural completion, not uninterrupted playback.
+
+The ordinary adaptive AAC control also passes: Chromium presents 720p, 360p and
+720p again with positive audio in every phase. Its one 3.5438-second buffer pause
+resumes at the same source position. All three browser runs use Chromium
+148.0.7778.96, HLS.js 1.7.3, Playwright 1.60.0 and CI FFmpeg 5.1.9-0+deb12u1;
+their cleanup receipts pass.
+
+`var/test-runs/sparse-movie-gates/verification-summary.json` records the complete
+checkpoint and exact source revisions. Native observations are in
+`native-final-evidence.json`; paired buffering controls are in
+`buffering-calibration.json`. Original failures remain available. ROADMAP.md and
+the testing guide record delivered scope and the separate unresolved Matroska
+origin finding. Independent code and simplification review found no remaining
+blocker. Changes remain local to this plan branch, with no merge or push.

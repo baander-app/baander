@@ -528,6 +528,29 @@ and 100 ms overall for priming and padding. Video colour markers and audio
 frequency changes distinguish the requested source interval from an incorrect
 restart; positive audio energy and changing video frames are required.
 
+`SegmentEncoderSparseMediaTest` covers 14 sparse movie cases. Software H.264
+and HEVC retain the covering red, green or blue source frame on fresh output
+and restarts at source seconds six and 24. Other cases cover fractional cadence,
+a nonintegral final hold, video-only output including a silent six-second restart,
+and audio delayed by eight seconds in MOV. Independent fragment and HLS decoding
+checks continuous timelines, zero-based one-second video timestamps, the complete
+held-frame sequence and positive audio signal. Every growing playlist prefix and
+completed playlist must retain the seven-second target. Two paced H.264/HEVC
+cases require independently decodable video and audio, followed by a larger video
+publication edge while the encoder remains running and the presentation remains
+incomplete. The later edge must arrive before second 29 of a thirty-second paced
+input, leaving a one-second margin before EOF to exclude final-flush output.
+Each producer has a 45-second process bound.
+
+The sparse path applies only to finite positive probed rates below one fps and
+normalizes video to one fps. Transitions round upward so future content is not
+shown early; terminal extension must be nonnegative and less than one second,
+with a small numerical tolerance. Delayed-audio tests require approximately two
+seconds of remaining delay after a six-second restart. Their indexed MOV source
+establishes video origin zero. This does not establish a general repair for
+Matroska sources whose reported start time disagrees with their video packets,
+or arbitrary variable-rate gaps.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each
@@ -1081,6 +1104,37 @@ signed delivery and the playback adapter. It does not requalify the whole
 application lifecycle, other browsers, every network profile, DASH switching,
 hardware, HDR, alternate audio or formal CMAF conformance. Existing application
 databases, Redis and original media are outside the fixture.
+
+### Sparse movie playback
+
+Use the same runner and dependencies with an explicit sparse scenario and AAC:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_VIDEO_SCENARIO=sparse-fresh \
+BAANDER_TEST_AUDIO_PROFILE=streaming_stereo bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Set `BAANDER_TEST_VIDEO_SCENARIO=sparse-seek` to restart at source second six.
+The default scenario remains `adaptive`; unknown names and sparse scenarios with
+Opus fail before container creation. CI runs both sparse scenarios separately.
+
+The fixture generates a thirty-second 0.1-fps movie with three held colour frames
+and AAC audio. The production probe, encoder, signed delivery and HLS adapter
+must preserve red until source second ten, green until twenty and blue through
+the natural end. The seek case retains red through local second four and green
+through fourteen, then blue to its 24-second end. Native displayed-frame colour
+samples must coincide with recent audio signal while the clock advances.
+Independent canvas colours are checked against both presented-frame time and the
+audio-backed playback clock, with a 50 ms transition tolerance. Fresh signed
+resources, one attachment, no media or transport errors and stable
+seven-second media targets are required. Each scenario has a 120-second browser
+deadline and retains growing and completed playlists, samples, screenshots,
+versions and cleanup receipts.
+
+These checks qualify the selected sparse software source and Chromium HLS path.
+They do not certify arbitrary variable-rate input, every source container,
+hardware, other browsers, DASH browser playback, formal CMAF conformance or the
+whole application lifecycle.
 
 ### Ordinary worker autoscaling qualification
 

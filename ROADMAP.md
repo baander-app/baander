@@ -1725,3 +1725,91 @@ playback. Other browsers, hardware, alternate audio tracks, general Opus
 conformance, DASH browser playback and formal CMAF conformance remain outside
 this acceptance. Existing application databases, Redis and the user's original
 media were untouched. This checkpoint includes no push or feature merge.
+
+### Sparse movie publication and held-frame seeking — 2026-10-24
+
+Movie publication normalizes finite positive probed rates below one fps to one
+fps while retaining six-second segmentation and the stable seven-second HLS
+target. Initial launches, replacement generations and worker recovery carry the
+probed rate to the encoder. Sparse restarts retain the covering source frame and
+trim audio preroll without rebasing positive delay. This path disables B-frames,
+uses one input decoding thread and disables software H.264/HEVC rate-control
+lookahead while preserving HEVC's existing thread bounds. Other rates keep their
+command behavior. No API, schema, subtitle or playlist target changed.
+
+Transitions round upward so future content is not presented early. The complete
+tail remains, with nonnegative extension below one second for nonintegral holds.
+Fourteen native cases cover H.264/HEVC, restarts, fractional cadence, silent
+seeking and delayed audio. Independent fragment and HLS decoding checks held-frame
+colours, zero-based video ticks, timelines, audio delay and the constant target.
+Fresh output retains ten frames of each colour; seeking to six retains four red,
+ten green and ten blue, and seeking to 24 retains six blue. The 0.7-fps source's
+4.285714-second duration becomes five seconds without truncation.
+
+The original comparison failed with seven errors and 14 failures across 48 tests
+and 560 assertions, with no warnings. The first browser attempt then exposed
+publication arriving only at EOF. Two paced native cases failed against that
+intermediate encoder with 32 assertions under
+`var/test-runs/sparse-movie-gates/buffering-red`. Final focused verification at
+production revision `938572a4` passed 55 tests with 1,682 assertions, including
+all 14 media cases. Paced H.264/HEVC first published playable video/audio at
+10.3104/10.5095 seconds and advanced their video edge at 20.2918/20.2899, before
+the required 29-second bound of a thirty-second paced source. Processes remain
+bounded to 45 seconds. Receipts are under
+`var/test-runs/sparse-movie-gates/native-buffering-green`, with decoded and paced
+observations in `var/test-runs/sparse-movie-gates/native-final-evidence.json`.
+
+The full Transcode selection passed 950 tests with 13,654 assertions across 78
+files: 915 with 11,832 assertions in the ordinary lane and 35 with 1,822 in the
+native lane. The focused cases are included. Its receipt is
+`var/test-runs/sparse-movie-gates/backend-final/20261024-160415-63ab1d12`.
+Production source, tests and native registration are identical between that
+`938572a4` backend run and observer revision `55bc6c00`.
+
+Full PHPStan reported no errors. Deptrac reported zero violations, warnings and
+errors with 484 existing skipped violations.
+
+Fresh sparse browser acceptance passed in 52.726 seconds at `55bc6c00` with
+Chromium 148.0.7778.96, Playwright 1.60.0, HLS.js 1.7.3 and FFmpeg
+5.1.9-0+deb12u1. It reached natural end at 30.015999 seconds with 30 decoded
+frames. One attachment remained free of media or transport errors. Playback resumed after pauses of 3.451 seconds at source
+5.994667 and 7.0371 seconds at 12.010666. Cleanup passed; its receipt is
+`var/test-runs/sparse-movie-gates/browser-sparse-fresh-verified`.
+
+Sparse seek acceptance passed in 46.394 seconds with a 24.016-second natural
+end, 24 decoded frames and four red, ten green and ten blue captured frames.
+It retained one attachment without media or transport errors and resumed unchanged
+after a 6.9517-second pause at local second 5.994667. Its receipt and verified
+cleanup are under `var/test-runs/sparse-movie-gates/browser-sparse-seek-verified`.
+These measured pauses preclude a smooth-playback claim.
+
+The unchanged adaptive AAC control also passed in 115.501 seconds, presenting
+720p-to-360p-to-720p at source positions 6.469333, 24.672 and 90.547976 seconds,
+with 160, 597 and 2,178 decoded frames and positive audio in each phase. It
+retained one attachment without errors and resumed at source 17.92 after a
+3.5438-second pause. Its receipt is
+`var/test-runs/sparse-movie-gates/browser-adaptive-verified`. All three browser
+cleanup checks passed; only the pre-existing nginx, PostgreSQL and Redis containers
+remain. `var/test-runs/sparse-movie-gates/verification-summary.json` records the
+final source revisions, versions and gate observations.
+
+The failed `browser-sparse-fresh-final` receipt records an observer rejecting a
+one-frame timestamp lead during resume while both clocks showed green. Reviewed
+observer `55bc6c00` permits that bounded lead and independently checks canvas
+colour against both clocks within a 50 ms transition tolerance.
+
+The delayed sparse Matroska reproduction remains separately open: FFprobe reports
+format and video origin eight seconds despite video packets at zero, ten and
+twenty. Delay proof uses indexed MOV with video origin zero and audio starting at
+eight seconds, retaining roughly two seconds of delay after a six-second restart.
+Generic Matroska origin handling is not repaired. The earlier sparse-CFR
+publication failure is repaired for the qualified sources; arbitrary
+variable-rate gaps remain outside this evidence.
+
+Evidence is under `var/test-runs/sparse-movie-gates`; the testing guide records
+checks and commands. Acceptance covers selected software publication, seeking and
+Chromium HLS. It does not certify every source container, hardware, other
+browsers, DASH browser playback, formal CMAF conformance or the whole application
+lifecycle.
+Existing application databases, Redis and original media were untouched. This
+checkpoint includes no push or feature merge.
