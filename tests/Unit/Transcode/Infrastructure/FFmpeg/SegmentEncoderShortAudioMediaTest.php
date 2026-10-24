@@ -46,6 +46,177 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    #[DataProvider('pacedAudioProfiles')]
+    public function testExhaustedAudioPublishesTwoPlayablePrefixesBeforePacedVideoEnds(string $profileName): void
+    {
+        $this->observePacedMovie($profileName, false);
+    }
+
+    public function testCancellingThePacedProducerTerminatesBothSourceReads(): void
+    {
+        $this->observePacedMovie('streaming_stereo', true);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pacedAudioProfiles(): iterable
+    {
+        yield 'AAC progressive silence' => ['streaming_stereo'];
+        yield 'Opus progressive silence' => ['opus_stereo'];
+    }
+
+    private function observePacedMovie(string $profileName, bool $cancel): void
+    {
+        $this->artifactName = 'short-audio-paced-'.$profileName.($cancel ? '-cancel' : '');
+        $source = $this->createSource(0.0, 4.0, false, false, 30.0);
+        $json = $this->runMedia(FFprobeArguments::video($source));
+        file_put_contents($this->directory.'/production-probe.json', $json);
+        $probe = VideoProbeResult::fromProbeOutput(json_decode($json, true, 512, JSON_THROW_ON_ERROR));
+        self::assertEqualsWithDelta(30.0, $probe->duration, 0.002);
+        self::assertNull($probe->sourceTimestampOrigin);
+        $sourceAudio = $this->packets($source, 'a:0');
+        $lastSourceAudio = $sourceAudio[array_key_last($sourceAudio)];
+        self::assertEqualsWithDelta(4.0, (float) $lastSourceAudio['pts_time'] + (float) $lastSourceAudio['duration_time'], 0.002);
+        $profile = AudioProfile::fromString($profileName);
+        $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
+        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $output = $this->directory.'/output';
+        mkdir($output);
+        $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output, 1,
+            audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
+            hasAudio: true, sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin,
+            audioStreamIndex: $probe->selectedAudioStreamOrdinal());
+        $input = array_search('-i', $arguments, true);
+        self::assertIsInt($input);
+        array_splice($arguments, $input, 0, ['-re']);
+        self::assertSame(2, count(array_keys($arguments, '-i', true)));
+        file_put_contents($this->directory.'/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
+        $process = new Process($arguments);
+        $process->setTimeout(35);
+        $reader = new PublishedPresentationReader();
+        $started = hrtime(true);
+        $prefixes = [];
+        $previousEdges = null;
+        $lastPlayableVideo = 0.0;
+        $lastPlayableAudio = 0.0;
+        $peakRss = 0;
+        $maxLead = 0.0;
+        $cancelled = false;
+        $process->start();
+        $pid = $process->getPid();
+        self::assertIsInt($pid);
+        try {
+            do {
+                $process->checkTimeout();
+                $running = $process->isRunning();
+                $status = @file_get_contents('/proc/'.$pid.'/status');
+                if (is_string($status) && preg_match('/^VmRSS:\s+(\d+)\s+kB$/m', $status, $match) === 1) {
+                    $peakRss = max($peakRss, (int) $match[1] * 1024);
+                }
+                $presentation = $reader->read($output);
+                $video = $presentation?->tracks['video'] ?? null;
+                $audio = $presentation?->tracks['audio'] ?? null;
+                $elapsed = (hrtime(true) - $started) / 1_000_000_000;
+                $edges = [$video?->end(), $audio?->end(), $presentation?->complete, $running];
+                if ($edges !== $previousEdges) {
+                    $this->observation(['elapsed' => $elapsed, 'running' => $running,
+                        'complete' => $presentation?->complete, 'videoEdge' => $video?->end(),
+                        'audioEdge' => $audio?->end(), 'rssBytes' => $peakRss]);
+                    if (is_file($output.'/manifest.mpd')) {
+                        copy($output.'/manifest.mpd', $this->directory.'/native-prefix-'.count($prefixes).'-'.(int) ($elapsed * 1000).'.mpd');
+                    }
+                    $previousEdges = $edges;
+                }
+                if ($video !== null && $audio !== null) {
+                    $maxLead = max($maxLead, abs($audio->end() - $video->end()));
+                }
+                // The two-second margin excludes EOF flushing; it is not a playback startup SLA.
+                if ($running && $presentation !== null && !$presentation->complete && $video !== null && $audio !== null
+                    && $elapsed < 22.0 && count($prefixes) < 2
+                    && $video->end() > $lastPlayableVideo && $audio->end() > $lastPlayableAudio) {
+                    foreach ([$video, $audio] as $track) {
+                        $combined = $this->directory.'/playable-prefix-'.count($prefixes).'-'.$track->kind->value.'.mp4';
+                        $bytes = file_get_contents($output.'/'.$track->initFile);
+                        foreach ($track->segments as $segment) {
+                            $bytes .= file_get_contents($output.'/'.$segment->file);
+                        }
+                        file_put_contents($combined, $bytes);
+                        if ($track->kind === MediaTrack::Video) {
+                            self::assertCount((int) round($track->end() * 25), $this->decodeVideo($combined));
+                        } else {
+                            $pcm = $this->decodeAudio($combined);
+                            self::assertEqualsWithDelta($track->end(), strlen($pcm) / 4 / 48_000, 0.05);
+                            self::assertLessThan(0.0005, $this->rms($pcm, 0, strlen($pcm) / 4 / 48_000),
+                                'The independently decoded active audio prefix must already contain silence.');
+                        }
+                    }
+                    self::assertTrue($process->isRunning(), 'Both prefix decodes must finish while the producer is active.');
+                    $prefixes[] = ['elapsed' => $elapsed, 'videoEdge' => $video->end(), 'audioEdge' => $audio->end()];
+                    $lastPlayableVideo = $video->end();
+                    $lastPlayableAudio = $audio->end();
+                    if ($cancel) {
+                        $children = @file_get_contents('/proc/'.$pid.'/task/'.$pid.'/children');
+                        self::assertSame('', trim(is_string($children) ? $children : ''));
+                        $cancelStarted = hrtime(true);
+                        $process->stop(1.0);
+                        $stopElapsed = (hrtime(true) - $cancelStarted) / 1_000_000_000;
+                        self::assertLessThan(2.0, $stopElapsed);
+                        self::assertFalse($process->isRunning());
+                        self::assertFileDoesNotExist('/proc/'.$pid.'/stat', 'Cancelling the one producer must release both input reads.');
+                        $this->observation(['cancelledPid' => $pid, 'stopElapsed' => $stopElapsed]);
+                        $cancelled = true;
+                        break;
+                    }
+                }
+                if ($running) {
+                    usleep(100_000);
+                }
+            } while ($running);
+            self::assertGreaterThan(0, $peakRss, 'The Linux native lane must record producer memory.');
+            self::assertLessThan(256 * 1024 * 1024, $peakRss, 'This bounded 64-pixel fixture must not accumulate unbounded media buffers.');
+            self::assertLessThanOrEqual(7.0, $maxLead, 'Closed audio and video publication must remain within one fragment of each other.');
+            if ($cancel) {
+                self::assertTrue($cancelled, 'Cancellation must be exercised on a growing playable presentation.');
+                return;
+            }
+            self::assertTrue($process->isSuccessful(), $process->getErrorOutput());
+            self::assertCount(2, $prefixes, 'Two independently playable joint prefixes must advance before paced video EOF.');
+            $presentation = $reader->read($output);
+            self::assertNotNull($presentation);
+            self::assertTrue($presentation->complete);
+            self::assertTrue($presentation->covers(23.9, true, 24.0));
+            self::assertTrue($presentation->covers(24.0, true, 24.0));
+            foreach ($presentation->tracks as $track) {
+                self::assertGreaterThanOrEqual(23.998, $track->end());
+                self::assertLessThan(24.06, $track->end());
+                $segments = [];
+                foreach ($track->segments as $segment) {
+                    $segments[$segment->ordinal] = ['url' => $segment->file, 'duration' => $segment->duration / $track->timescale];
+                }
+                $playlist = $output.'/'.$track->kind->value.'.m3u8';
+                $manifest = (new ManifestGenerator())->generateMediaManifest($track->initFile, $segments, true);
+                self::assertStringContainsString("#EXT-X-TARGETDURATION:7\n", $manifest);
+                file_put_contents($playlist, $manifest);
+                if ($track->kind === MediaTrack::Video) {
+                    self::assertSame([...array_fill(0, 25, 0), ...array_fill(0, 575, 2)], $this->decodeVideo($playlist));
+                } else {
+                    $pcm = $this->decodeAudio($playlist);
+                    self::assertGreaterThanOrEqual(23.998, strlen($pcm) / 4 / 48_000);
+                    self::assertLessThan(24.06, strlen($pcm) / 4 / 48_000);
+                    $this->assertAudioContent($pcm, 0.0, 0.0);
+                }
+            }
+        } finally {
+            if ($process->isRunning()) {
+                $process->stop(1.0);
+            }
+            file_put_contents($this->directory.'/paced-stderr.log', $process->getErrorOutput());
+            $this->observation(['elapsed' => (hrtime(true) - $started) / 1_000_000_000,
+                'exitCode' => $process->getExitCode(), 'prefixes' => $prefixes, 'peakRssBytes' => $peakRss,
+                'maxClosedAudioVideoLead' => $maxLead, 'cancelled' => $cancelled]);
+        }
+    }
+
     #[DataProvider('shortAudioMovies')]
     public function testMoviesPublishRealSilenceAfterSelectedSourceAudioEnds(
         string $profileName,
@@ -133,7 +304,7 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
                 $maps[] = $spawner->command[$index + 1];
             }
         }
-        self::assertSame(['0:V:0', '0:a:'.$ordinal], $maps);
+        self::assertSame(['0:V:0', '1:a:'.$ordinal], $maps);
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation);
         self::assertTrue($presentation->complete);
@@ -227,11 +398,11 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         yield 'encoded AAC source exhausted before restart' => ['streaming_stereo', 2, 0.0, 4.0, false, true];
     }
 
-    private function createSource(float $audioStart, float $audioLength, bool $secondAudio, bool $encodedSource): string
+    private function createSource(float $audioStart, float $audioLength, bool $secondAudio, bool $encodedSource, float $videoDuration = 14.0): string
     {
         $source = $this->directory.'/source.mov';
         $args = ['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-filter_threads', '1',
-            '-f', 'lavfi', '-i', 'color=red:s=64x64:r=25:d=14,drawbox=color=blue:t=fill:enable=gte(t\,7)'];
+            '-f', 'lavfi', '-i', sprintf('color=red:s=64x64:r=25:d=%.9f,drawbox=color=blue:t=fill:enable=gte(t\,7)', $videoDuration)];
         if ($secondAudio) {
             array_push($args, '-f', 'lavfi', '-i', 'sine=frequency=220:sample_rate=48000:duration=14');
         }

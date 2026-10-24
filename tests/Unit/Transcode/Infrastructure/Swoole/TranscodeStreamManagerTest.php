@@ -90,8 +90,8 @@ final class TranscodeStreamManagerTest extends TestCase
     public function testSourceAudioOrdinalReachesEncoderMapping(): void
     {
         $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '', audioStreamOrdinal: 1);
-        self::assertContains('0:a:1', $this->spawner->lastCommand);
-        self::assertNotContains('0:a:0', $this->spawner->lastCommand);
+        self::assertContains('1:a:1', $this->spawner->lastCommand);
+        self::assertNotContains('1:a:0', $this->spawner->lastCommand);
     }
 
     public function testOpaqueNativeAttemptCarriesNoLocalProcessDescriptors(): void

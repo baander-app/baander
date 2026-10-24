@@ -193,12 +193,27 @@ final class SegmentEncoder
         $args[] = '-i';
         $args[] = $sourcePath;
 
+        // Independent audio EOF lets silence publish before video finishes; matching video preroll preserves their common clock.
+        if ($hasAudio) {
+            array_push($args, '-threads', '2', '-vn', '-sn', '-dn');
+            if ($sourceTimestampOrigin !== null) {
+                array_push($args, '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
+            }
+            if ($seekInput) {
+                array_push($args, '-ss', sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $sourceStart));
+                if ($sparse) {
+                    $args[] = '-noaccurate_seek';
+                }
+            }
+            array_push($args, '-i', $sourcePath);
+        }
+
         // One encoder process produces separate video and available audio tracks.
         $args[] = '-map';
         $args[] = sprintf('0:V:%d', $videoStreamIndex);
         if ($hasAudio) {
             $args[] = '-map';
-            $args[] = sprintf('0:a:%d', $audioStreamIndex);
+            $args[] = sprintf('1:a:%d', $audioStreamIndex);
         }
 
         if ($encoderFlags !== '') {

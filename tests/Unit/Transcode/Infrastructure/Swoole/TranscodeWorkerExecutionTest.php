@@ -263,8 +263,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->worker->run($this->current, static fn(): bool => false);
         self::assertCount(3, $this->spawner->commands);
         foreach ($this->spawner->commands as $index => $command) {
-            self::assertContains('0:a:1', $command);
-            self::assertNotContains('0:a:0', $command);
+            self::assertContains('1:a:1', $command);
+            self::assertNotContains('1:a:0', $command);
             $filters = $command[array_search('-af', $command, true) + 1];
             self::assertStringContainsString('pan=stereo', $filters);
             self::assertStringContainsString('0.1847*SL', $filters);
@@ -366,7 +366,12 @@ final class TranscodeWorkerExecutionTest extends TestCase
             self::assertSame('1', $command[array_search('-seek_timestamp', $command, true) + 1]);
             self::assertSame(sprintf('%.6f', -(4 + $sourceStart)), $command[array_search('-itsoffset', $command, true) + 1]);
             if ($index > 0) {
-                self::assertNotContains('-ss', $command);
+                $inputs = array_keys($command, '-i', true);
+                $videoInput = array_slice($command, 0, $inputs[0] + 2);
+                $audioInput = array_slice($command, $inputs[0] + 2, $inputs[1] - $inputs[0]);
+                self::assertNotContains('-ss', $videoInput);
+                self::assertNotContains('-ss', $audioInput);
+                self::assertNotContains('-noaccurate_seek', $audioInput);
                 self::assertNotContains('-noaccurate_seek', $command);
                 self::assertStringStartsWith('atrim=start=0', $command[array_search('-af', $command, true) + 1]);
             }
@@ -720,7 +725,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $metadata = json_decode(file_get_contents($this->job->getOutputDirectory().'/generation.json'), true, flags: JSON_THROW_ON_ERROR);
         self::assertNull($metadata['audioCodec']);
         self::assertNotContains('-c:a', $this->spawner->commands[0]);
-        self::assertNotContains('0:a:0', $this->spawner->commands[0]);
+        self::assertNotContains('1:a:0', $this->spawner->commands[0]);
+        self::assertCount(1, array_keys($this->spawner->commands[0], '-i', true));
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
     }
 
@@ -911,7 +917,7 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
     {
         $command = $this->commands[array_key_last($this->commands)];
         $directory = dirname($command[array_key_last($command)]);
-        PublishedPresentationFixture::write($directory, $count, $this->publishAudio ?? in_array('0:a:0', $command, true), $complete ?? !$this->running);
+        PublishedPresentationFixture::write($directory, $count, $this->publishAudio ?? array_any($command, static fn (string $argument): bool => preg_match('/^1:a:[0-9]+$/D', $argument) === 1), $complete ?? !$this->running);
         file_put_contents($directory . '/init-0.mp4', $this->initBytes);
     }
     public function status(mixed $handle): array { ($this->onRunning)?->__invoke(); return ['state' => $this->running ? 'running' : 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '', 'error' => null]; }
