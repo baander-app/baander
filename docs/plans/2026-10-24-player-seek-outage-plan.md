@@ -1,7 +1,7 @@
 ---
 title: Recover uncertain source seeks with bounded idempotent delivery
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -52,8 +52,8 @@ a read started after that response before assigning a generation to any unsent
 successor. The read must match the owned job and session, report running or paused
 status while the hook remains active and nonterminal, and respect existing monotonic
 generation/revision and request-order fences. Signing does not expose the runtime
-outcome; do not infer one from publication readiness. Never
-use an echoed response position as proof of application. A fresh read after a
+outcome; do not infer one from publication readiness. Never use an echoed response
+position as proof of application. A fresh read after a
 client timeout alone does not close delivery uncertainty: the original request
 could still commit after that read.
 
@@ -90,8 +90,8 @@ Preserve paused status across seek recovery. A native seek can remain unfinished
 when its requested media is unavailable; recovery must not wait forever for that
 native seek to complete before restoring an owned canonical cursor. Actively cancel
 or replace that unfinished seek while preserving seekable-target checks and native
-feedback suppression. Newer local
-intent, stale completions, owner replacement and unmount must remain fenced.
+feedback suppression. Newer local intent, stale completions, owner replacement
+and unmount must remain fenced.
 
 ## Implementation and verification
 
@@ -142,3 +142,27 @@ Apply prose-fix to changed documentation and commit the completed phase locally.
 Independent source and backend/browser reviews approved this plan with the
 ownership, first-response, fallback-intent and publication-readiness clarifications
 included above.
+
+## Completion evidence
+
+Implementation `1f8b0a07` and browser fixture `29d187d7` passed independent review.
+The final CI run passed 206 tests across four suites, including 191 player-hook
+tests. Regression runs first demonstrated ten seek-recovery failures, one repeated
+native-rollback failure, three stale-completion failures, four cancellation
+failures and two fallback-ordering failures. Typechecking, the production build,
+asset verification and browser/runner syntax checks passed. Lint reported zero
+errors and eight existing warnings outside the changed files.
+
+The production worker image built from `29d187d7` passed all eight lifecycle
+phases in Chromium 148.0.7778.96. Loss before forwarding produced two identical
+transport attempts and one generation advance. Accepted-response loss produced
+an identical resend without acknowledgement, a fresh owned read, then only the
+latest queued target with a new identity; two logical seeks advanced two
+generations. Both cases restored decoded paused media and resumed playback.
+Existing capability renewal, progress/status loss, subtitle, offline, remount,
+restart and worker recovery checks also passed. Cleanup was verified.
+
+Gate evidence is under `var/test-runs/player-seek-outage-gates`, including
+`verification-summary.json`. Production receipts and `acceptance-summary.json`
+are under `var/test-runs/player-seek-outage-production`. ROADMAP.md records the
+measured results and remaining qualification limits. No merge or push was made.
