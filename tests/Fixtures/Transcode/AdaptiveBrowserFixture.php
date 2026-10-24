@@ -69,6 +69,7 @@ final class AdaptiveBrowserFixture
             $tiers[$name] = ['jobId' => $entry['job']->getPublicId()->toString(),
                 'videoSegments' => count($video->segments ?? []), 'audioSegments' => count($audio->segments ?? []),
                 'videoEnd' => $video?->end() ?? 0, 'audioEnd' => $audio?->end() ?? 0,
+                'audioCodec' => $audio?->codec, 'audioMimeType' => $audio?->representationAttributes['mimeType'] ?? null,
                 'complete' => $presentation->complete ?? false,
                 'producerRunning' => $producer['running'] ?? false, 'producerExitCode' => $producer['exitCode'] ?? null];
         }
@@ -100,7 +101,7 @@ final class AdaptiveBrowserFixture
                 if ($entry['job']->getId()->equals($id)) {
                     $presentation = (new PublishedPresentationReader())->read($entry['directory']);
                     return new TranscodeRuntimeSnapshot($id, $entry['sessionId'], 'browser-fixture',
-                        new DesiredTranscodeState(AudioProfile::streamingStereo(), 'running', 0), 1, 1, 1,
+                        new DesiredTranscodeState(AudioProfile::fromString($state['audioProfile']), 'running', 0), 1, 1, 1,
                         $presentation?->complete ? 'complete' : 'ready', $entry['directory'], null, true);
                 }
             }
