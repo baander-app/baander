@@ -2,13 +2,28 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { chromium } from 'playwright-core'
+import { chromium, firefox } from 'playwright-core'
 
 const evidence = '/work/evidence'
-await mkdir(evidence, { recursive: true })
-const browser = await chromium.launch({ channel: 'chromium', headless: true, args: ['--mute-audio'] })
-const browserInfo = { engine: 'chromium', version: browser.version() }
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const requestedEngine = process.env.BAANDER_TEST_BROWSER_ENGINE ?? 'chromium'
+const browserInfo = { engine: requestedEngine, version: null }
+let browser
+let context
+try {
+  assert(['chromium', 'firefox'].includes(requestedEngine), `Unsupported browser engine: ${requestedEngine}`)
+  await mkdir(evidence, { recursive: true })
+  const engine = requestedEngine === 'firefox' ? firefox : chromium
+  browser = await engine.launch(requestedEngine === 'chromium'
+    ? { channel: 'chromium', headless: true, args: ['--mute-audio'] } : { headless: true })
+  browserInfo.engine = engine.name()
+  browserInfo.version = browser.version()
+  context = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+} catch (error) {
+  await mkdir(evidence, { recursive: true })
+  await writeFile(`${evidence}/failure.json`, JSON.stringify({ requestedEngine, browser: browserInfo, error: error.message }, null, 2))
+  if (browser) await browser.close().catch(() => {})
+  throw error
+}
 await context.addInitScript(() => {
   const ranges = value => Array.from({ length: value.length }, (_, index) => [value.start(index), value.end(index)])
   window.__twoCommandMediaState = element => ({
@@ -1299,8 +1314,17 @@ async function proveSeekOutages(owner, expectedPosition) {
 
 async function checkpoint({ phase, baseUrl, credentials }) {
   if (phase === 'authenticated') {
-    assert(await page.evaluate(() => document.createElement('video').canPlayType('application/vnd.apple.mpegurl')),
-      'The browser must provide native HLS decoding')
+    browserInfo.capabilities = await page.evaluate(() => {
+      const video = document.createElement('video')
+      const h264 = 'video/mp4; codecs="avc1.42E01E"'
+      const aac = 'audio/mp4; codecs="mp4a.40.2"'
+      return { nativeHls: video.canPlayType('application/vnd.apple.mpegurl'),
+        h264: video.canPlayType(h264), aac: video.canPlayType(aac),
+        mseVideo: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(h264),
+        mseAudio: typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(aac) }
+    })
+    assert(browserInfo.capabilities.mseVideo && browserInfo.capabilities.mseAudio,
+      'The browser must provide H.264 and AAC Media Source Extensions for the product HLS player')
     await page.goto(`${baseUrl}/login`)
     await page.locator('#email').fill(credentials.email)
     await page.locator('#password').fill(credentials.password)
@@ -1315,13 +1339,13 @@ async function checkpoint({ phase, baseUrl, credentials }) {
       const state = await mediaState()
       return state.connected && !state.paused && state.ready >= 2 && state.time > 1
         && state.decodedFrames > 0 && state.error === null && snapshot?.ready
-    }, 'native HLS to decode and advance')
+    }, 'the product HLS player to decode and advance')
     const owner = ownedPlayback()
     const initial = await mediaState()
     const publishedEnd = snapshot.startTime + Math.max(...initial.seekable.map(range => range[1]), 0)
     const target = Math.min(snapshot.duration - 18, Math.max(90, publishedEnd + 24))
     assert(target > publishedEnd + 6, 'The fixture must leave source media beyond the currently published native window')
-    assert(initial.source.startsWith('blob:'), 'Pinned Chromium must use the supported MSE HLS path')
+    assert(initial.source.startsWith('blob:'), 'The selected browser must use the supported MSE HLS path')
     assert(initial.seekable.length > 0, 'MSE must expose an actual published seekable window')
     const requested = await seekSourceAndDecode(owner, target, 'source-seek-beyond-window')
     assert(requested > publishedEnd, 'The movie source control must seek beyond the old native window')

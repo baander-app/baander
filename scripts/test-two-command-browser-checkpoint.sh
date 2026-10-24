@@ -32,12 +32,17 @@ if [ "$phase" = cleanup ]; then
     fi
     exit 0
 fi
+case "${BAANDER_TEST_BROWSER_ENGINE:-chromium}" in
+    chromium|firefox) ;;
+    *) echo 'BAANDER_TEST_BROWSER_ENGINE must be chromium or firefox.' >&2; exit 64 ;;
+esac
 if [ "$phase" = authenticated ]; then
     printf '%s\n' 'WARNING: Playback tests can produce audible tones or media through your speakers/headphones. Lower or mute system output before running; tests may change player volume.' >&2
     test ! -e "$container_file"
     container="baander-two-command-browser-$(date +%s)-$$"
     printf '%s\n' "$container" > "$container_file"
     docker create --name "$container" --network host --memory=2g --pids-limit=256 \
+        -e BAANDER_TEST_BROWSER_ENGINE="${BAANDER_TEST_BROWSER_ENGINE:-chromium}" \
         --entrypoint node mcr.microsoft.com/playwright:v1.60.0-noble /work/browser.mjs >/dev/null
     workspace="$(mktemp -d /tmp/baander-browser-checkpoint.XXXXXXXX)"
     mkdir -p "$workspace/node_modules"
