@@ -197,3 +197,8 @@ This is a browser-fixture change only. Review it before implementation, preserve
 all existing assertions and deadlines, and rerun both full browser lifecycles.
 The verified worker image can be reused when application-source parity with its
 recorded revision is checked.
+
+Independent review approved the observer repair before implementation and its
+final causal checks afterward. Progress and status observations both snapshot
+attachment capabilities before reading browser events and receipts, so a later
+master request is checked in the next observation instead of against older data.
