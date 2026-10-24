@@ -1,7 +1,7 @@
 ---
 title: Preserve SDR color when a movie uses BT.2020 primaries
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -98,3 +98,40 @@ documentation, preserve historical entries and commit the verified phase locally
 Independent review approved this plan before implementation. Absent primaries
 use the existing probe fallback, and native comparisons must use the same pixel
 format and range with samples inside patch boundaries.
+
+## Delivered checkpoint
+
+Source revision `0f4fd7ad` removes primaries from the HDR predicate and adds
+regressions for classification, probe reconstruction, filter selection and native
+fragment output. Independent review approved the final change after adding a
+published-duration assertion that distinguishes a fresh encode from a nonzero
+source start.
+
+The authoritative CI selection passed 108 tests with 7,173 assertions across six
+files. This includes the focused domain/filter cases (62 tests, 175 assertions)
+and native colour cases (six tests, 180 assertions); these are subsets, not
+additional totals. Full PHPStan passed without errors. Deptrac reported zero
+violations, warnings and errors, with 484 existing baseline violations skipped.
+The CI runtime used PHP 8.5.2 and FFmpeg 5.1.9-0+deb12u1.
+
+Before the repair, all four native SDR cases changed neutral gray from 126 to 90.
+Afterward, all 16 interior Y/U/V samples in each case matched the independently
+decoded source exactly, preserving gray at 126 and retaining the source primaries,
+transfer, matrix and range. H.264 and HEVC both passed for fresh 6.5-second output
+and the 0.5-second tail starting at source second six. PQ and HLG still selected
+Hable and produced decodable output with BT.709 metadata; these cases do not
+certify HDR reference quality or display gamut.
+
+Receipts, commands, native probes and samples are retained under
+`var/test-runs/movie-sdr-color-gates/`. Its `verification-summary.json` records the
+source revision and gate counts, and `final-native-evidence.json` records sample,
+duration and output metadata checks. The authoritative suite receipt is
+`backend/20261024-135032-21b6369f/ordinary.log` beneath that directory.
+The testing guide and ROADMAP.md record the delivered behavior and limits.
+
+Browser lifecycles were not repeated for this native pipeline change. Frontend,
+HTTP delivery and manifest code did not change; earlier browser receipts remain
+historical evidence. General HDR quality, display gamut, Dolby Vision, hardware
+acceleration, ABR switching, Safari/native HLS and formal CMAF conformance remain
+outside this checkpoint. The original videos and existing application data were
+untouched. This phase is committed locally without a merge or push.

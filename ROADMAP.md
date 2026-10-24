@@ -1505,3 +1505,46 @@ HLS, formal CMAF conformance, DASH subtitles, full live FFmpeg DASH EOF and the
 separate native pressure observer remain unqualified. Existing application data
 and the user's original videos were untouched. This checkpoint includes no push
 or feature merge.
+
+### SDR colour with BT.2020 primaries — 2026-10-24
+
+Movie HDR classification now follows recognized PQ/HLG transfers and their
+existing aliases, rather than primaries alone. BT.2020 with an SDR transfer no
+longer selects HDR tone mapping. Missing or unknown transfer metadata does not
+trigger HDR classification based on primaries alone. Existing probing, metadata
+serialization and SDR processing remain intact; wide-gamut SDR is not retagged
+or converted to BT.709. PQ/HLG still selects
+the existing Hable software path targeting BT.709. No API, schema, frontend,
+manifest or HTTP delivery behavior changed.
+
+Four native SDR cases failed before the repair: neutral gray changed from source
+luma 126 to 90. Afterward all six native colour cases passed with 180 assertions.
+They cover H.264 with BT.709 SDR transfer and HEVC with BT.2020-10 SDR transfer,
+each on fresh 6.5-second output and a 0.5-second tail starting at source second
+six, plus H.264 PQ and HLG. Independently decoded interior Y/U/V samples matched SDR source
+samples exactly across all 16 sampled values in each of the four SDR cases,
+within the unchanged three-code-value test bound. Output retained BT.2020
+primaries, original transfer, BT.2020 nonconstant-luminance matrix and limited
+range. PQ/HLG output decoded successfully with Hable selected and BT.709
+metadata; this is software-path evidence, not HDR reference
+certification. Source, commands, probes and samples remain under
+`var/test-runs/movie-sdr-color-gates/native-red` and
+`var/test-runs/movie-sdr-color-gates/native-green`.
+
+Focused domain verification passed 62 tests with 175 assertions after the repair;
+unchanged-source comparison produced 17 failures across 62 tests with 129
+assertions. The authoritative six-file CI selection passed 108 tests with 7,173
+assertions, including those focused domain and native cases. Its receipt is
+`var/test-runs/movie-sdr-color-gates/backend/20261024-135032-21b6369f/ordinary.log`.
+The CI image `404457894d6d` used PHP 8.5.2 and FFmpeg 5.1.9-0+deb12u1. Full PHPStan
+reported no errors; Deptrac reported zero violations, warnings and errors with
+484 existing skipped violations.
+`var/test-runs/movie-sdr-color-gates/verification-summary.json` records the final checkpoint at source revision `0f4fd7ad`.
+
+The testing guide documents the native colour comparisons and their limits.
+Browser lifecycles were not repeated because frontend, HTTP delivery and manifests
+were unchanged; earlier browser receipts are historical, not new colour acceptance.
+These cases do not qualify general HDR quality, display gamut, Dolby Vision or
+hardware acceleration. The user's original videos lack this colour combination
+and were untouched. Existing application databases, Redis and media storage were
+not reused or reset. This checkpoint includes no push or feature merge.
