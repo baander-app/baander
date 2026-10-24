@@ -1194,6 +1194,37 @@ async function proveMovieCompletion() {
   assert(Number.isFinite(sourceEnd) && sourceEnd > 30, 'Completion requires the known full source duration')
   const controlsStart = playbackControls.length
   const controls = () => playbackControls.slice(controlsStart)
+  const acceptSeek = async (target, generation) => {
+    let submission
+    let acknowledgement
+    await waitFor(async () => {
+      submission = controls().find(item => item.action === 'seek' && item.position === target)
+      if (!submission) return false
+      assert.equal(submission.generation, generation, 'The seek must submit its currently owned generation')
+      assert.equal(typeof submission.requestId, 'string', 'Each logical seek must retain its request identity')
+      const receipts = await page.evaluate(() => window.__twoCommandSeekReceipts ?? [])
+      acknowledgement = receipts.find(item => item.requestId === submission.requestId)
+      if (!acknowledgement) return false
+      assert.equal(acknowledgement.acceptedGeneration, generation + 1, 'The actual seek ACK must advance its submitted generation once')
+      return true
+    }, 'the actual source seek acknowledgement')
+    return { submission, acknowledgement, preparing: [] }
+  }
+  const readyExecution = seek => {
+    const accepted = seek.acknowledgement.acceptedGeneration
+    assert.equal(snapshot.jobId, owner.jobId, 'Seek execution must retain the owned job')
+    assert.equal(snapshot.sessionId, owner.sessionId, 'Seek execution must retain the owned session')
+    const canonical = playbackSnapshots.filter(item => item.accepted && item.at >= seek.submission.at
+      && item.jobId === owner.jobId && item.sessionId === owner.sessionId
+      && (item.generation === accepted || item.generation === accepted + 1))
+    seek.preparing = canonical.filter(item => !item.ready).map(item => ({ at: item.at,
+      requestedAt: item.requestedAt, ...safePlayback(item) }))
+    if (!snapshot.ready || (snapshot.generation !== accepted && snapshot.generation !== accepted + 1)) return false
+    const ready = canonical.findLast(item => item.ready && item.generation === snapshot.generation)
+    if (!ready) return false
+    seek.ready = { at: ready.at, requestedAt: ready.requestedAt, ...safePlayback(ready) }
+    return true
+  }
   const routePattern = `**/api/transcode/sessions/${owner.sessionId}/position`
   let droppedPause = null
   let failureObservedAt = null
@@ -1223,14 +1254,19 @@ async function proveMovieCompletion() {
   }
   page.on('requestfailed', failed)
   await page.route(routePattern, intercept)
+  await page.evaluate(() => {
+    window.__twoCommandSeekReceipts = []
+    window.__twoCommandObserveSeekReceipts = true
+  })
   shortSigningLifetime = true
   try {
     const requested = await commitSourceSeek(sourceEnd - 12)
+    proof.tailSeek = await acceptSeek(requested, owner.generation)
     await waitFor(async () => {
       const sampled = await sample()
       if (!sampled) return false
       const { state } = sampled
-      return snapshot?.ready && snapshot.generation === owner.generation + 1 && currentSource(state)
+      return readyExecution(proof.tailSeek) && currentSource(state)
         && !state.paused && !state.ended && !state.seeking && state.error === null
         && state.ready >= 2 && state.decodedFrames > 0
         && snapshot.startTime + state.time >= requested && snapshot.startTime + state.time < sourceEnd - 1
@@ -1341,7 +1377,9 @@ async function proveMovieCompletion() {
         window.__twoCommandReplayPlay = { ...window.__twoCommandReplayPlay, settled: true, at: Date.now(), error: error.name }
       })
     })
+    proof.replaySeek = await acceptSeek(0, owner.generation)
     let replayBaseline
+    let replayGeneration
     await waitFor(async () => {
       if (routeError) throw routeError
       proof.replayPlay = await page.evaluate(() => window.__twoCommandReplayPlay)
@@ -1350,10 +1388,12 @@ async function proveMovieCompletion() {
       const sampled = await sample()
       if (!sampled) return false
       const { state } = sampled
-      if (!snapshot?.ready || snapshot.generation !== owner.generation + 1 || !currentSource(state)
+      if (replayGeneration !== undefined) assertOwner(replayGeneration)
+      if (!readyExecution(proof.replaySeek) || !currentSource(state)
         || state.paused || state.ended || state.seeking || state.error !== null || state.ready < 2
         || state.decodedFrames <= 0) return false
       assert.equal(snapshot.startTime, 0, 'Replay must attach the full source beginning')
+      replayGeneration ??= snapshot.generation
       if (!replayBaseline || replayBaseline.attachment !== attachmentNumber) {
         replayBaseline = { attachment: attachmentNumber, at: Date.now(), time: state.time, decodedFrames: state.decodedFrames }
         return false
@@ -1365,7 +1405,7 @@ async function proveMovieCompletion() {
         time: state.time, decodedFrames: state.decodedFrames }
       return true
     }, 'native Play to replay a new source-zero execution with advancing decoded frames')
-    assertOwner(owner.generation + 1)
+    assertOwner(replayGeneration)
     const seeks = controls().filter(item => item.action === 'seek')
     assert.deepEqual(seeks.map(item => item.position), [requested, 0], 'Tail setup and explicit source-zero replay must be the only seeks')
     assert.equal(controls().filter(item => item.action === 'pause').length, 1, 'Replay retirement must not echo another pause')
@@ -1381,6 +1421,7 @@ async function proveMovieCompletion() {
     proof.finishedAt = Date.now()
   } finally {
     shortSigningLifetime = false
+    await page.evaluate(() => { window.__twoCommandObserveSeekReceipts = false })
     await page.unroute(routePattern, intercept)
     await Promise.allSettled([...pendingRoutes])
     page.off('requestfailed', failed)
