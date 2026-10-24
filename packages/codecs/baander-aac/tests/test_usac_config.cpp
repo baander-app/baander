@@ -475,7 +475,7 @@ std::vector<uint8_t> preroll_payload(const std::vector<uint8_t>& au, int* ext_le
   CHECK(aac_bitreader_read(&r, 1) == 1, "IPF independent");
   CHECK(aac_bitreader_read(&r, 1) == 1, "pre-roll present");
   CHECK(aac_bitreader_read(&r, 1) == 0, "explicit length");
-  const int len = (int)aac_usac_escaped_value(&r, 8, 16, 0);
+  const int len = aac_usac_ext_payload_length(&r);
   *ext_len = len;
   std::vector<uint8_t> payload((size_t)len);
   for (int i = 0; i < len; i++) {
@@ -491,9 +491,9 @@ void test_preroll_parse(const std::vector<Stream>& streams) {
     int ext_len, config_len, frames, au0, au1;
   };
   const Expect expect[] = {
-      {"usac_music_48000_16000.loas", 318, 77, 2, 52, 180},
-      {"usac_music_48000_48000.loas", 615, 78, 2, 271, 257},
-      {"usac_music_48000_96000.loas", 287, 73, 1, 207, 0},
+      {"usac_music_48000_16000.loas", 316, 77, 2, 52, 180},
+      {"usac_music_48000_48000.loas", 613, 78, 2, 271, 257},
+      {"usac_music_48000_96000.loas", 285, 73, 1, 207, 0},
       {"usac_speech_48000_64000.loas", 246, 65, 1, 176, 0},
   };
   static AacUsacPreroll p; /* large: the access unit buffer */

@@ -137,6 +137,10 @@ using AacUsacConfig = struct AacUsacConfig_ {
   uint8_t raw[AAC_USAC_MAX_CONFIG_BYTES];
 };
 
+/* usacExtElementPayloadLength of a UsacExtElement (Table 21): 8 bits,
+ * plus a 16-bit value less 2 when they read 255. */
+int aac_usac_ext_payload_length(AacBitReader* r);
+
 /* escapedValue(nBits1, nBits2, nBits3) of ISO/IEC 23003-3 5.2. */
 unsigned aac_usac_escaped_value(AacBitReader* r, int bits1, int bits2, int bits3);
 

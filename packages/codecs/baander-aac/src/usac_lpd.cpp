@@ -417,6 +417,28 @@ void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_le
   aac_usac_lpd_fac_to_fd_gain(ch, fac_q, fac_length, frame_length, 0);
 }
 
+int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
+                        int frame_length) {
+  if (fac_length <= 0 || fac_length > LPD_MAX_LFAC || fac_length % 8 != 0) {
+    return AAC_ERR_DECODE;
+  }
+  LpdFacData d;
+  const int err = lpd_read_fac(r, 1, fac_length, &d);
+  if (err) {
+    return err;
+  }
+  AacUsacLpdChannel* c = ch->lpd;
+  if (!c || c->frame_length != frame_length) {
+    return AAC_OK; /* nothing to cancel against */
+  }
+  int q[LPD_MAX_LFAC];
+  for (int i = 0; i < fac_length / 8; i++) {
+    lpd_avq_decode(&d.blk[i], q + 8 * i);
+  }
+  aac_usac_lpd_fac_to_fd_gain(ch, q, fac_length, frame_length, d.gain_index);
+  return AAC_OK;
+}
+
 /* ── concealment ────────────────────────────────────────────────── */
 
 /* The last excitation is repeated with the last pitch lag and a gain

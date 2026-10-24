@@ -19,6 +19,17 @@
  * lands in the decoder's channel buffers in layout order, output_frame_
  * length samples per channel, with the loudness and DRC gains applied. */
 
+
+/* usacExtElementPayloadLength (ISO/IEC 23003-3 Table 21): 8 bits, and
+ * when they read 255 a 16-bit value less 2 is added. */
+int aac_usac_ext_payload_length(AacBitReader* r) {
+  int len = (int)aac_bitreader_read(r, 8);
+  if (len == 255) {
+    len += (int)aac_bitreader_read(r, 16) - 2;
+  }
+  return len;
+}
+
 namespace {
 
 /* Element type of the layout for a USAC channel element. */
@@ -259,7 +270,7 @@ int decode_ext_element(AacDecoderState* s, AacUsacState* u, int index, int indep
     }
     len = ec->ext_default_length;
   } else {
-    len = (int)aac_usac_escaped_value(r, 8, 16, 0);
+    len = aac_usac_ext_payload_length(r);
   }
   if (ec->ext_payload_frag) {
     return AAC_ERR_UNSUPPORTED;

@@ -45,6 +45,13 @@ void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_le
 void aac_usac_lpd_fac_to_fd_gain(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
                                  int frame_length, int fac_gain_index);
 
+/* An FD frame after an LPD frame carries fac_data(): fac_gain (7 bits)
+ * and fac_length lattice-coded coefficients.  Reads it from the stream
+ * and adds the FAC synthesis to ch->overlap; the FD module calls this
+ * when fac_data_present is set.  Returns AAC_OK or AAC_ERR_DECODE. */
+int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
+                        int frame_length);
+
 /* Concealment of a lost LPD frame: repeats the last excitation with
  * decaying gain and keeps the contract. */
 void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out);
