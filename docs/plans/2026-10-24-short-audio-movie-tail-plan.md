@@ -132,9 +132,10 @@ currently records the eighteen-second container duration. A reliable selected-vi
 endpoint requires its own probe, serialization, coordinate and consumer review;
 passing container duration as a video limit would not repair this case.
 
-Paired unchanged `c86bfd71` and candidate commands confirm this longer-audio gap
-predates the repair. Both AAC and Opus preserve all 350 video frames with identical
-decoded RGB and retain the source tone through second 17.5. Both reject exact video
+Paired unchanged `c86bfd71` and initial shared-input candidate commands confirm
+this longer-audio gap predates the repair. Both AAC and Opus preserve all 350 video
+frames with identical decoded RGB and retain the source tone through second 17.5.
+Both reject exact video
 end coverage. AAC decoded duration is unchanged; Opus gains one twenty-millisecond
 packet. All processes finish in under half a second. These receipts remain under
 `var/test-runs/short-audio-tail-gates/paired-long-audio/`, alongside the failed native
@@ -211,3 +212,43 @@ only negative local samples. Eight diagnostic controls verify origins zero/four,
 six-/24-second starts, AAC/Opus, matched audio and the audio-first source, with the
 expected two-second/near-zero onsets and complete tails. Preserve these receipts
 and rerun the unchanged native timing assertions before acceptance.
+
+The final dual-input longer-audio audit distinguishes producer behavior from
+source-duration inference. Video ends at fourteen seconds with all 350 frames;
+AAC ends at 14.016 seconds and Opus at fourteen, both retaining the source tone.
+Coverage at the video endpoint now passes. The probe still reports the eighteen-
+second container duration, and coverage at that declared endpoint fails. The
+remaining roadmap task is therefore the selected-video endpoint and its consumer
+clock contract. Evidence is retained under
+`var/test-runs/short-audio-tail-gates/final-dual-input-long-audio/`.
+
+## Browser transport observation amendment
+
+The final default-audio fresh control stopped at source second 24.13 because the
+observer treated a normal rendition replacement as a transport failure. The
+canceled 720p fragment has a successful, uncached, signed 360p replacement for the
+same 24–30 second interval. The replacement begins 12.668 milliseconds later and
+completes with HTTP 200; presented frames change to 360p at timestamp 24 without a
+clock reset, media error or new attachment. This receipt proves the replacement,
+not the unobserved remainder of playback. Retain it and its transport analysis.
+
+Apply the existing adaptive test's bounded cancellation policy to this observer.
+Only explicitly canceled video media requests with `net::ERR_ABORTED` may wait for
+final classification. All other network, init, audio, playlist, HTTP and blocked
+requests remain immediate failures. At natural completion, every deferred request
+must have one clear completed, uncached, signed replacement from a different known
+rendition in the same authenticated set and generation, covering the same native
+source interval within the bounded overlap/timing allowance. Retain both server
+receipts and transfer timestamps. Reject unmatched, ambiguous, stale, cached,
+wrong-interval, same-rendition or merely started replacements.
+
+Use a small pure helper with focused Node tests for valid replacement and each
+invalid category, including timing boundaries. The existing runner must copy that
+exact helper and CI must run its tests. Preserve all playback, frame, colour,
+clock, audio, source identity and full-tail assertions and the final deadline.
+Do not change production playback or encoding, lock quality, or ignore aborts
+globally. Complete a new default-audio fresh browser run after the observer change.
+The six passing controls on the same production revision retain their stronger
+no-abort evidence; the existing adaptive control already checks valid replacements.
+
+Independent review approved this observation change before implementation.
