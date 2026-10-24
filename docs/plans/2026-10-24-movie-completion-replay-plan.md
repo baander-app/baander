@@ -113,3 +113,51 @@ changed documentation and commit the completed work locally.
 
 Independent review approved the ownership, completion, replay and verification
 contract before implementation, including the existing deadline boundary.
+
+## Native HLS completion repair
+
+The first Chromium deployment run passed the preceding six phases but could not
+reach native EOF in the added completion check. Both final audio/video fragments
+were delivered with ENDLIST. The failure and verified cleanup remain under
+`var/test-runs/movie-completion-replay-chromium`; its 579.96-second runtime stayed
+within the unchanged outer deadline.
+
+An isolated reproduction uses the production SegmentEncoder command builder and
+a reconstructed synthetic MKV source. It reproduces the stall without the hook,
+renewal or attachment replacement. Audio reports EOS; video does not, so HLS.js
+never calls MediaSource.endOfStream. The final one-frame video's raw presentation
+timestamps run from 30.066667 to 30.1 seconds, while Chromium's buffered samples
+end at 30.033333. The video init segment has an edit-list media time of 1024 at
+15360 ticks per second. Chromium applies that two-frame adjustment; HLS.js's
+fragment tracking uses raw composition timestamps. Retain the reconstructed
+media, init/fragment inspection and browser traces under
+`var/test-runs/movie-completion-replay-eof-probe`. This is a producer-equivalent
+reproduction, not the deleted production generation's exact bytes.
+
+Extend this phase to correct the producer's composition timestamps through the
+DASH muxer's MP4 format options. The candidate is
+`-format_options movflags=+negative_cts_offsets`: signed composition offsets make
+the video edit-list media time zero while preserving its presented timeline.
+Compare native EOS with the unchanged producer before implementation. Keep AAC
+encoder preroll and audio packet timing intact; disabling edit lists globally is
+a diagnostic comparison, not the intended fix. Preserve B-frames, genuine native
+EOF and the existing duration tolerance. Do not fabricate completion, pad the
+manifest or increase deadlines to make acceptance pass.
+
+A backend worker owns SegmentEncoder and its argument/native media regressions;
+the lead owns the plan, integration and authoritative checks. Read backend
+architecture and port rules. No application port, API, persistence or schema
+change is needed. First reproduce the raw-versus-edited video timestamp mismatch
+in a native regression, including a nonzero-origin one-frame tail. Verify that
+signed offsets remove it and preserve AAC preroll, independent fragment decoding,
+segment boundaries and publication behavior. Run the affected native media,
+stream-argument and publication suites in the CI image, plus applicable static
+gates. Keep the existing frontend gates unless source changes require a rerun.
+Rebuild the worker image from the verified producer and repeat the full Chromium
+and Firefox lifecycle runs, preserving all eight phases and assertions. Record
+the failure, producer repair and measured final acceptance in ROADMAP.md.
+
+Independent review approved this addendum before backend implementation. Isolated
+Chromium and Firefox comparisons reached genuine native EOF with negative CTS
+offsets while retaining the baseline presented audio/video ranges and identical
+AAC payloads. The unchanged producer stalled in both browsers.
