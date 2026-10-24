@@ -12,8 +12,24 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-No further implementation task is selected here. Historical unchecked items,
-old plan limitations and incomplete experiments do not authorize work. The retained
+Select the demonstrated selected-video endpoint problem next. The final movie
+producer now retains fourteen-second video and bounded audio for an eighteen-
+second soundtrack, with actual video-end coverage passing. The probe/DTO still
+records eighteen seconds, so consumer coverage at that container-derived end
+fails. Evidence is under
+`var/test-runs/short-audio-tail-gates/final-dual-input-long-audio`. Review probe,
+serialization, source coordinates and consumers before implementation; a container
+duration is not a verified selected-video endpoint.
+
+A separate bounded observer diagnostic remains: retain the failing callback and
+native snapshot metadata plus entry/constructor clocks before the unchanged
+assertion, to test the unproven capture-race hypothesis. The retained 24.64 versus
+24.60 mismatch is not fixed by a passing rerun and does not qualify universal
+observer stability. Evidence is under
+`var/test-runs/short-audio-tail-gates/browser-final-v3-default-audio-fresh`.
+
+Historical unchecked items, old plan limitations and incomplete experiments do
+not authorize other work. The retained
 [plans](docs/plans/) supply design context; reconcile them with current callers and
 behavior before proposing a change. This applies to older cache/sweep, segmenter,
 FLAC/DSP and secondary-client plans as well as developer tooling.
@@ -2087,3 +2103,112 @@ HLS. Interactive audio switching, arbitrary discontinuities, additional source
 origins, hardware, other browsers, DASH browser playback and formal CMAF
 conformance remain unqualified. Existing application services and original media
 were untouched. No merge or push is included.
+
+### Silent movie tails and progressive audio EOF — 2026-10-24
+
+For selected audio ending at or before video, movie encoding appends
+`apad=packet_size=1024` after existing normalization and uses output `-shortest`.
+Actual silent samples cover the remaining video, including seeks with no source
+audio packets. One FFmpeg process reads video from input zero and selected audio
+from an independent unpaced input one with explicit decoder threads. Both retain
+the same source clock, verified-origin offset, sparse early-seek guard and preroll
+policy; ordinary seeking stays accurate. Audio EOF can therefore reach padding
+while video still publishes. Video-only output retains one input and no audio
+options; subtitle helpers do not determine duration. No API or schema changed.
+
+The `c86bfd71` CI audit reproduced missing final audio coverage and a null sought
+presentation despite a zero FFmpeg exit. The prior fresh browser control passed
+thirty-second playback with 750 decoded frames; Chromium can continue silently
+after audio EOF. The prior exhausted-audio seek instead failed readiness with no
+frames despite both producers exiting zero. Both controls and their cleanup are
+retained; the fresh control is not negative evidence.
+
+The first padding candidate passed completed-media/backend/static checks but its
+sought browser reached joint readiness only after encoding finished. That failed
+progressive receipt remains separate from final acceptance. An always-accurate
+independent-audio proposal then failed twelve existing anchored seek cases;
+restoring the established sparse preroll/early-seek policy retained their timing
+assertions. The matched AAC packet-size correction and earlier failed native and
+shared-input attempts remain under the artifact root.
+
+At final producer `0e63a4e2`, 45 focused native tests passed with 6,495 assertions,
+including fourteen short-audio cases plus existing default/origin controls.
+Paced AAC/Opus joint edges appeared at 8.009936/8.010126 seconds and advanced at
+13.991192/13.991112, while the producer and presentation remained active. Both
+retained 24 seconds/600 video frames and silent PCM lasting 24.021333/24.0135
+seconds. Cancellation stopped and reaped the same process in 0.015940 seconds.
+Memory and edge-skew samples are fixture measurements, not general resource
+qualification. `native-progressive-final` retains these receipts.
+
+Full final backend verification at `0e63a4e2` passed 1,112 tests with 29,554
+assertions across 84 files: 1,015 tests/12,619 assertions in the ordinary lane
+and 97/16,935 in the native lane. It includes
+Transcode units, ProgressiveMediaPublication integration and paced sparse cases.
+The receipt is `backend-final/20261024-205516-3ca775a9`. Full PHPStan passed;
+Deptrac reported zero violations, warnings and errors with 484 baseline skips.
+
+Final short-audio fresh playback passed in 39.443 seconds, ending at 30.015999
+seconds with 750 decoded frames and 737 captures. Thirty-five audible samples
+preceded the tail and 257 silent measurements followed. Every required silent
+window had zero measured RMS. Seek-six passed in 33.309 seconds at its
+24-second end with 600 frames, 595 captures, zero audible samples and 238
+silent samples. Their captures all closed and cleanup passed. Both establish
+complete playback and measured silence; native/worker checks establish
+encoded-tail and cursor coverage.
+
+Observer `992b6c24` passed 55 Node replacement-classification tests, syntax and
+CI configuration checks and independent review. Its first default-fresh run then
+failed a separate existing timestamp assertion: snapshot 24.64 versus callback
+24.60 at sequence 607. All 608 frames closed with cleanup passing; no transport
+or media error or source reset was observed. Failing timing details were not
+retained, so separately sampled APIs suggest a race without proving it. The
+failure and read-only analysis remain under
+`browser-final-v3-default-audio-fresh/frame-capture-analysis.json`.
+
+Exactly one unchanged diagnostic rerun passed at `992b6c24` in 39.357 seconds,
+ending at 30.015999 with 750 decoded frames and 742 captures, all closed with no
+pending copies or capture errors. Selected dialogue retained 216 audible samples,
+882.861328125 Hz in all three required windows and onset at 8.221333 seconds.
+Cleanup passed. No deferred or accepted cancellations occurred in this run:
+positive replacement classification is qualified by the 55 Node tests, not an
+exercised abort in this successful browser receipt. The strict success is under
+`browser-final-v4-default-audio-fresh`.
+
+Capture reliability remains an explicit limitation. A successful strict rerun
+does not repair the mismatch or establish universal observer stability. A bounded
+follow-up must retain failing metadata and entry/constructor clocks before the
+unchanged assertion and test the race hypothesis. The selected-video endpoint
+remains the next main implementation task.
+
+The six strict final controls at `0e63a4e2` include default seek, ordinary
+delayed fresh, Matroska subtitle fresh and adaptive switching. A default fresh
+attempt stopped at 24.13 on a canceled 720p fragment despite a signed uncached
+360p replacement for the same interval and actual presented 360p frames. It
+does not qualify the unobserved tail. Reviewed observer classification requires
+a complete same-set/generation/interval replacement at natural end and retains
+all content, clock, silence and tail assertions. Other request failures remain
+immediate. All seven final browser receipts and cleanup checks passed across
+production `0e63a4e2` and observer `992b6c24`. They used Chromium
+148.0.7778.96, Playwright 1.60.0, HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1. The
+ordinary/default-delay, Matroska subtitle and adaptive controls retain their
+bounded evidence; no smooth-playback or full adaptive-source-tail claim is
+added. `var/test-runs/short-audio-tail-gates/acceptance-summary.json` records
+all final receipts and the separate unresolved capture limit.
+
+Final producer longer-audio evidence refines the next task: fourteen-second video
+retains all 350 frames; AAC audio ends at 14.016 and Opus at fourteen, with correct
+tone and actual video-end coverage passing. The probe/DTO still reports the
+longer eighteen-second container duration, and coverage there fails. Earlier
+shared-input paired failures describe those attempts only. The selected follow-up
+is the selected-video endpoint and consumer clock contract, reviewed across
+probing, serialization and coordinates before implementation. Final evidence is
+under `final-dual-input-long-audio/summary.json`.
+
+Evidence is under `var/test-runs/short-audio-tail-gates`. Acceptance covers selected
+software movie encoding, native AAC/Opus and Chromium HLS; it does not qualify
+arbitrary discontinuities, additional origins, hardware, other browsers, DASH
+browser playback or formal CMAF conformance. Existing services and original
+media were untouched; only pre-existing services remained after cleanup.
+Independent code/simplification review, runner syntax/configuration, prose audits,
+local links and whitespace checks passed. The new browser scenarios and serial
+native class are wired into CI. No merge or push is included.

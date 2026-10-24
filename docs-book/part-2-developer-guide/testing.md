@@ -593,6 +593,26 @@ audio options. HLS therefore receives actual silent samples before the intended
 tone instead of relying on an MP4 edit list. The audio-only transcoder is outside
 this movie-path normalization.
 
+For the qualified cases where selected audio ends at or before video,
+`apad=packet_size=1024` follows normalization and output `-shortest` bounds padding
+to the finite video. When selected source audio ends early, real silence must
+cover the remaining video, including sought output with no source audio packets
+left. The producer must terminate without losing the video tail. Video-only
+commands omit both padding and `-shortest`; separate subtitle helpers do not set
+duration. A longer soundtrack's selected-video endpoint remains a separate
+contract.
+
+One FFmpeg process reads the same source through two inputs when audio exists.
+Video input zero retains hardware options, fixture pacing and source selection;
+unpaced audio input one has two decoder threads and disables video, subtitle and
+data decoding. The selected audio ordinal maps from input one. Both readers
+share the logical source position, verified-origin
+translation and established sparse early-seek/preroll rules. Ordinary seeking
+remains accurate, while sparse audio retains the same preroll as video before
+existing trimming. Independent audio EOF lets padding publish playable fragments
+while video remains active. Video-only commands retain one input; cancellation
+stops the one process and both source reads.
+
 `SegmentEncoderAudioDelayMediaTest` covers sixteen ordinary 25-fps MOV cases
 with video beginning at zero and no verified source origin. H.264/HEVC output
 and AAC/Opus profiles cover fresh output and six-/24-second restarts of a
@@ -628,6 +648,25 @@ and timing together. Fixture preflight verifies actual defaults and layouts:
 MOV PCM supplies the marked-default cases, and Matroska FLAC preserves an
 explicitly absent default. The chosen audio keeps its own timestamps and existing
 leading-silence normalization; video-origin qualification remains independent.
+
+`SegmentEncoderShortAudioMediaTest` drives the real probe, stream manager,
+encoder and presentation reader with fourteen-second video and short source
+audio. Independent video-fragment and full HLS PCM decoding require complete
+decoded video, including frame count, colour sequence and track duration, plus
+tone before the audio boundary and measured silence through the tail.
+AAC/Opus fresh output and exhausted-audio seeks, leading delay plus trailing
+silence, a selected second track ending before an unselected track and matched
+audio controls check selection, coverage and bounded termination.
+An encoded AAC source control verifies a restart after its final source packet.
+Two paced AAC/Opus cases require increasing, independently decodable joint
+video/audio prefixes while the presentation remains dynamic and the producer
+runs, followed by complete final tails. A cancellation case stops the same
+producer after playable prefixes appear. Receipts retain publication timing,
+closed audio/video lead and process memory; these fixture measurements do not
+establish general resource guarantees. A separate longer-soundtrack audit shows
+the final producer reaches the actual video endpoint, while the probe still
+records the longer container duration. Consumer duration and source-coordinate
+qualification remain a separate follow-up.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
@@ -1196,24 +1235,48 @@ Set `BAANDER_TEST_VIDEO_SCENARIO=sparse-seek` to restart at source second six.
 The default scenario remains `adaptive`; unknown names and sparse scenarios with
 Opus fail before container creation. CI runs both sparse scenarios separately.
 
-The fixture generates a thirty-second 0.1-fps movie with three held colour frames
-and AAC audio. The production probe, encoder, signed delivery and HLS adapter
-must preserve red until source second ten, green until twenty and blue through
-the natural end. The seek case retains red through local second four and green
-through fourteen, then blue to its 24-second end. Native displayed-frame colour
-samples must coincide with recent audio signal while the clock advances.
-Cropped native frame colours are checked against both presented-frame time and
-the callback-entry audio-backed playback clock, with a 50 ms transition tolerance.
-Fresh signed resources, one attachment, no media or transport errors and stable
-seven-second media targets are required. Each scenario has a 120-second browser
-deadline and retains growing and completed playlists, samples, screenshots,
-versions and cleanup receipts.
+The fixture generates a thirty-second 0.1-fps movie with three held colour
+frames and AAC audio. The production probe, encoder, signed delivery and HLS
+adapter must preserve red until source second ten, green until twenty and blue
+through the natural end. The seek case retains red through local second four
+and green through fourteen, then blue to its 24-second end. Native
+displayed-frame colour samples must coincide with recent audio signal while the
+clock advances. Cropped native frame colours are checked against both
+presented-frame time and the callback-entry audio-backed playback clock, with a
+50 ms transition tolerance. Fresh signed resources, one attachment, no media
+errors or unexplained request failures and stable seven-second media targets
+are required. Each scenario has a 120-second browser deadline and retains
+growing and completed playlists, samples, screenshots, versions and cleanup
+receipts.
 
 The observer copies a centered two-by-two RGBA crop from each owned `VideoFrame`,
 checking its native timestamp against callback presentation time. Completed
 samples are published in callback order, with at most four copies outstanding;
 overflow and capture errors fail the gate. Natural-end evidence cancels callbacks
 and drains copies before it is frozen. Each frame must close exactly once.
+
+Observer reliability remains bounded by its retained receipts. One run rejected
+a native snapshot timestamp of 24.64 seconds against a 24.60-second callback.
+These APIs sample separately, but the failing timing details were not retained, so
+a capture race remains unproven. A strict passing run does not establish
+universal capture stability or fix that mismatch. The bounded diagnostic follow-up
+is to retain failing callback/snapshot metadata and entry/constructor clocks
+before the unchanged assertion, then test the hypothesis without weakening it.
+
+Only explicitly canceled video media requests with `net::ERR_ABORTED` may wait
+for classification at natural completion. Server receipts and transfer timing
+must establish a completed, uncached, signed replacement from a different known
+rendition in the same authenticated set and generation, covering the same native
+source interval. Unmatched, ambiguous, stale, cached, wrong-interval or unfinished
+replacements fail; other request failures fail immediately. Full playback and
+content assertions remain required. The retained strict default-audio rerun had
+no deferred cancellations; its positive classification branch is covered by Node
+tests, not an exercised abort in that successful browser run. Run the pure
+replacement-classification tests with:
+
+```bash
+node --test ui/web/tests/e2e/transcode-adaptive/video-cancellation.test.mjs
+```
 
 These checks qualify the selected sparse software source and Chromium HLS path.
 They do not certify arbitrary variable-rate input, every source container,
@@ -1268,14 +1331,15 @@ MOV with video starting at zero, audio at source second eight, no verified
 origin and no embedded subtitles. The fixture verifies that absence explicitly;
 Matroska scenarios keep their signed subtitle assertions.
 
-Fresh and restarted playback must retain the red/green/blue source intervals and
-natural thirty-/24-second tails. Near-silent samples must precede local audio
-onset at eight/two seconds, followed by positive signal through the later holds.
-Growing publication, signed uncached resources, canonical audio, stable targets,
-one attachment and no media or transport errors remain required. These scenarios
-qualify the selected software movie path and Chromium HLS. They do not certify
-arbitrary timestamp discontinuities, new source-origin handling, hardware, other
-browsers, DASH browser playback or formal CMAF conformance.
+Fresh and restarted playback must retain the red/green/blue source intervals
+and natural thirty-/24-second tails. Near-silent samples must precede local
+audio onset at eight/two seconds, followed by positive signal through the later
+holds. Growing publication, signed uncached resources, canonical audio, stable
+targets, one attachment and no media errors or unexplained request failures
+remain required. These scenarios qualify the selected software movie path and
+Chromium HLS. They do not certify arbitrary timestamp discontinuities, new
+source-origin handling, hardware, other browsers, DASH browser playback or
+formal CMAF conformance.
 
 ### Source default audio playback
 
@@ -1303,6 +1367,32 @@ first-track filter chain in a disposable copy, preserving current preflight,
 metadata and assertions. It tests the oracle against the demonstrated producer
 behavior; it does not run an entire old application stack. This selection adds
 no interactive audio controls or new source-origin qualification.
+
+### Movie playback after source audio ends
+
+Use the isolated runner with AAC and the short-audio source:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_VIDEO_SCENARIO=short-audio-fresh \
+BAANDER_TEST_AUDIO_PROFILE=streaming_stereo bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Set `BAANDER_TEST_VIDEO_SCENARIO=short-audio-seek` for the six-second restart,
+where no source audio remains. The thirty-second 25-fps source retains its full
+colour intervals and thirty-/24-second natural tails. Fresh playback must contain
+the tone before the source audio ends and measured silence afterward; sought
+playback must remain silent throughout. Fixture metadata records selected audio
+start/end independently of video duration. Existing audible-per-hold checks remain
+in force for other scenarios.
+
+Native and worker checks establish encoded audio tail and cursor coverage;
+browser checks establish complete playback and measured silence. The browser
+gate retains growing publication, signed fresh resources, stable targets, one
+attachment and bounded frame-capture cleanup. Native readiness and coverage
+requirements remain unchanged.
+These cases qualify the selected software movie path and Chromium HLS, not
+arbitrary discontinuities, additional source origins, hardware, other browsers,
+DASH browser playback or formal CMAF conformance.
 
 ### Ordinary worker autoscaling qualification
 

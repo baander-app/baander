@@ -1,7 +1,7 @@
 ---
 title: Preserve movie playback after source audio ends
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -252,3 +252,49 @@ The six passing controls on the same production revision retain their stronger
 no-abort evidence; the existing adaptive control already checks valid replacements.
 
 Independent review approved this observation change before implementation.
+
+## Completion checkpoint and remaining limits
+
+The final producer at `0e63a4e2` passes 45 focused native tests with 6,495
+assertions, including fourteen short-audio cases and the existing default-track
+and source-origin controls. Paced AAC/Opus output publishes two advancing,
+independently decoded joint prefixes while encoding remains active. Both retain
+all 600 sought video frames and silent audio through the 24-second tail.
+Cancellation stops and reaps the same process. The full affected backend selection
+passes 1,112 tests with 29,554 assertions across 84 files: ordinary 1,015/12,619
+and native 97/16,935. Full PHPStan passes; Deptrac reports zero violations,
+warnings and errors with 484 existing baseline skips.
+
+The observer-only revision `992b6c24` passes all 55 replacement-evidence Node
+tests and independent code review. JavaScript syntax, runner shell syntax and CI
+YAML checks pass. Its production and PHP test trees are unchanged from
+`0e63a4e2`. The helper admits only a fully validated replacement for the exact
+abandoned server receipt; the final browser run contains no canceled request and
+therefore does not itself exercise that exception.
+
+Seven required browser scenarios have passing receipts and verified
+cleanup. Short-audio fresh, short-audio seek, default-audio seek, ordinary delayed
+fresh, Matroska delayed/subtitle fresh and adaptive switching pass at
+`0e63a4e2`. Default-audio fresh passes at `992b6c24` in 39.357 seconds, reaching
+30.015999 seconds with all 750 decoded frames, correct selected audio and 742
+closed captures. Short-audio fresh and seek retain their complete thirty-/24-second
+tails with 750/600 frames and measured silence through the final cursor.
+
+An earlier default-audio fresh attempt on the same observer revision failed when
+snapshot sequence 607 carried timestamp 24.64 while its callback reported 24.60.
+All 608 constructed captures closed; there were no reported transport or media
+errors, seeks or attachment resets. Separate callback and snapshot sampling makes
+a capture race plausible, but the failing sample discarded timing needed to prove
+that attribution. Exactly one unchanged diagnostic rerun produced the passing
+receipt above. No timing assertion was relaxed and no capture-race repair is
+claimed. Retain the failed receipt and analysis under
+`browser-final-v3-default-audio-fresh`; a bounded observer follow-up must preserve
+failing callback/construction timing before changing its measurement contract.
+
+`var/test-runs/short-audio-tail-gates/acceptance-summary.json` records the final
+revision-specific evidence, retained failed attempts and unresolved limits.
+`ROADMAP.md` records this delivery and selects the demonstrated selected-video
+endpoint/consumer-duration problem next: fourteen-second output covers its actual
+end, while the probe/DTO still declares the longer eighteen-second container
+duration. Acceptance remains limited to the paths stated above. Changes are
+committed locally; merge and push remain separate requests.
