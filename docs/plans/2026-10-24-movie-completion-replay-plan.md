@@ -168,5 +168,6 @@ implicit constant-frame-rate duplication. The first repaired-producer run kept
 the first image. Verify the raw-output measurement against retained media before
 adjusting that fixture. Limit any repair to the gray-video consumer's timestamp
 origin and frame synchronization; keep copied packet CRCs, PCM output, strict
-480/312 frame counts, duration limits and live-versus-completed equality checks.
+480-frame full-output checks with their existing one-frame tolerance, exact
+312-frame prefix checks, duration limits and live-versus-completed equality checks.
 Do not change the producer or increase count tolerances for this observation.
