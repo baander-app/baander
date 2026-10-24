@@ -369,8 +369,9 @@ void test_raw_au_path(const std::vector<Stream>& streams) {
   CHECK(aac_decoder_set_frame_length(dec, 960) == AAC_ERR_STATE, "frame length fixed by USAC");
   int program = 0;
   int gain = 1;
-  CHECK(aac_decoder_loudness(dec, &program, &gain) == AAC_OK && program == INT32_MIN && gain == 0,
-        "loudness readback from the stub");
+  /* the stream declares -14.25 LUFS; the default request normalises to -24 */
+  CHECK(aac_decoder_loudness(dec, &program, &gain) == AAC_OK && program == -1425 && gain == -975,
+        "loudness readback %d %d", program, gain);
   CHECK(aac_decoder_set_loudness(dec, 1, -2300) == AAC_OK, "set loudness");
   CHECK(aac_decoder_set_loudness(dec, 1, -900) == AAC_ERR_INVALID_ARG, "loudness range");
   CHECK(aac_decoder_set_drc_effect(dec, AAC_DRC_EFFECT_NIGHT, 1, 100, 50) == AAC_OK, "effect");

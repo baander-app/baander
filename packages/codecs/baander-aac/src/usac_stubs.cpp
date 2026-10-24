@@ -3,7 +3,6 @@
 #include <new>
 
 #include "sbr.h"
-#include "unidrc.h"
 #include "usac_fd.h"
 #include "usac_lpd.h"
 
@@ -137,63 +136,3 @@ void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFram
   (void)out;
 }
 
-/* ── unidrc.h ──────────────────────────────────────────────────── */
-
-struct AacUniDrc_ {
-  AacUniDrcRequest request;
-  int sample_rate, channels, frame_length;
-};
-
-AacUniDrc* aac_unidrc_create(void) { return new (std::nothrow) AacUniDrc_(); }
-
-void aac_unidrc_destroy(AacUniDrc* d) { delete d; }
-
-void aac_unidrc_reset(AacUniDrc* d) { (void)d; }
-
-int aac_unidrc_set_config(AacUniDrc* d, const uint8_t* unidrc_config, int config_len,
-                          const uint8_t* loudness_info_set, int loudness_len) {
-  (void)d;
-  (void)unidrc_config;
-  (void)config_len;
-  (void)loudness_info_set;
-  (void)loudness_len;
-  return AAC_OK;
-}
-
-void aac_unidrc_set_stream(AacUniDrc* d, int sample_rate, int channels, int frame_length) {
-  d->sample_rate = sample_rate;
-  d->channels = channels;
-  d->frame_length = frame_length;
-}
-
-void aac_unidrc_set_request(AacUniDrc* d, const AacUniDrcRequest* req) { d->request = *req; }
-
-int aac_unidrc_read_gain(AacUniDrc* d, AacBitReader* r, int payload_bits, int indep) {
-  (void)d;
-  (void)indep;
-  aac_bitreader_skip(r, payload_bits);
-  return r->overread ? AAC_ERR_DECODE : AAC_OK;
-}
-
-void aac_unidrc_no_gain(AacUniDrc* d) { (void)d; }
-
-void aac_unidrc_apply(AacUniDrc* d, float* const* ch, int channels, int frame_length) {
-  (void)d;
-  (void)ch;
-  (void)channels;
-  (void)frame_length;
-}
-
-void aac_unidrc_status(const AacUniDrc* d, int* program_loudness_x100, int* norm_gain_db_x100,
-                       int* drc_set_id) {
-  (void)d;
-  if (program_loudness_x100) {
-    *program_loudness_x100 = INT32_MIN;
-  }
-  if (norm_gain_db_x100) {
-    *norm_gain_db_x100 = 0;
-  }
-  if (drc_set_id) {
-    *drc_set_id = -1;
-  }
-}
