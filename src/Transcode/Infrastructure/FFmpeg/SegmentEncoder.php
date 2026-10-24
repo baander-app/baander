@@ -151,6 +151,9 @@ final class SegmentEncoder
                 $audioFilters = 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters);
             }
         }
+        if ($hasAudio && $sourceTimestampOrigin !== null) {
+            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0';
+        }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
         $x265Limits = 'pools=2:frame-threads=2:log-level=error';

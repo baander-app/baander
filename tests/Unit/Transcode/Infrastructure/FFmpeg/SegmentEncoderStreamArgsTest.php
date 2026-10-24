@@ -413,7 +413,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertSame(sprintf('%.6f', -($origin + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
         }
         if ($start > 0) {
-            self::assertSame('atrim=start=0', $args[array_search('-af', $args, true) + 1]);
+            self::assertSame('atrim=start=0' . ($origin === null ? '' : ',aresample=first_pts=0'), $args[array_search('-af', $args, true) + 1]);
         }
         self::assertSame('fps=1:start_time=0:round=up', $args[array_search('-vf', $args, true) + 1]);
     }
@@ -429,6 +429,38 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         yield 'fractional interval later seek' => [4.0, 0.3, 1, true];
         yield 'no origin retains fast seek' => [null, 0.1, 1, true];
         yield 'fresh output stays unseeked' => [4.0, 0.1, 0, false];
+    }
+
+    #[DataProvider('audioProfiles')]
+    public function testAnchoredAudioPadsItsClockAfterExistingProcessing(AudioProfile $profile, string $encoder): void
+    {
+        $filters = 'loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-21.0:measured_TP=-5.0:measured_LRA=2.0:measured_thresh=-31.0:offset=0.0:linear=true,aformat=channel_layouts=stereo';
+        foreach ([0.0, 4.0] as $origin) {
+            foreach ([0, 1] as $start) {
+                $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+                    startSegment: $start, audioProfile: $profile, audioFilters: $filters,
+                    sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);
+                self::assertSame(($start === 0 ? '' : 'atrim=start=0,') . $filters . ',aresample=first_pts=0',
+                    $args[array_search('-af', $args, true) + 1]);
+                self::assertSame($encoder, $args[array_search('-c:a', $args, true) + 1]);
+                self::assertSame((string) $profile->sampleRate, $args[array_search('-ar', $args, true) + 1]);
+            }
+        }
+    }
+
+    public function testAnchoredAudioCreatesSilenceFilterWithEmptyChainAndOmitsItWithoutAudio(): void
+    {
+        $fresh = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            sourceFrameRate: 0.1, sourceTimestampOrigin: 0.0);
+        self::assertSame('aresample=first_pts=0', $fresh[array_search('-af', $fresh, true) + 1]);
+        $seek = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
+        self::assertSame('atrim=start=0,aresample=first_pts=0', $seek[array_search('-af', $seek, true) + 1]);
+        $videoOnly = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: 1, audioFilters: 'aformat=channel_layouts=stereo', hasAudio: false,
+            sourceFrameRate: 0.1, sourceTimestampOrigin: 4.0);
+        self::assertNotContains('-af', $videoOnly);
+        self::assertNotContains('-c:a', $videoOnly);
     }
 
     public function testAbsentOriginPreservesSparseArgumentsAndExplicitZeroDoesNot(): void
