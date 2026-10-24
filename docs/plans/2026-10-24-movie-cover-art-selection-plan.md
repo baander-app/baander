@@ -1,7 +1,7 @@
 ---
 title: Exclude attached cover art from movie video selection
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -90,3 +90,39 @@ named after this plan; no merge or push is included.
 Independent review approved the plan before implementation. The deployed FFmpeg
 selector excludes attached-picture flags specifically; the probe must use the
 same boundary, and native assertions must distinguish movie motion from artwork.
+
+## Delivered checkpoint
+
+Source revision `767156b7` aligns probe metadata and the movie encoder on the first
+video stream without the attached-picture disposition. The existing first-video
+ordering among ordinary tracks and serialized metadata shape remain unchanged.
+The positional probe fallback no longer treats explicitly typed audio or artwork
+as movie video.
+
+The corrected focused regressions failed against the original source: 48 tests,
+628 assertions and 11 failures, including both cover-first native cases and
+cover-only acceptance. After the repair, all 48 tests passed with 987 assertions.
+The complete Transcode unit selection then passed 905 tests with 11,667 assertions
+across 76 files: 888 ordinary cases with 11,604 assertions and 17 isolated native
+cases with 63 assertions. The focused 48 cases are included in that total.
+
+For both cover-first and cover-last inputs, independent fragment decoding produced
+140 distinct movie frames over 14 seconds. Starting at source second six produced
+80 distinct frames over eight seconds. Every output remained 64 by 64 at ten
+frames per second. Cover-only input now exits with a failed required video mapping
+and publishes no initialization or media fragments. These checks reject successful
+empty publication, static artwork and an ignored seek.
+
+Receipts and retained media are under `var/test-runs/movie-cover-art-gates/`.
+The authoritative suite run is `backend/20261024-141127-968e97d5`, and
+`native-evidence.json` records independently checked frame counts, durations and
+output metadata. The CI image uses PHP 8.5.2 and FFmpeg 5.1.9-0+deb12u1.
+Full PHPStan passed without errors. Deptrac reported zero violations, warnings
+and errors, with 484 existing baseline violations skipped. Independent code and
+simplification review found no further changes needed.
+
+The testing guide and roadmap describe native source selection through fragment
+publication. Browser lifecycles were not rerun; this phase does not establish new
+browser playback acceptance, hardware qualification or CMAF conformance. Existing
+application data and the user's original videos were untouched. The changes are
+committed locally without a feature merge or push.

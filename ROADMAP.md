@@ -1548,3 +1548,55 @@ These cases do not qualify general HDR quality, display gamut, Dolby Vision or
 hardware acceleration. The user's original videos lack this colour combination
 and were untouched. Existing application databases, Redis and media storage were
 not reused or reset. This checkpoint includes no push or feature merge.
+
+### Movie selection with attached cover art — 2026-10-24
+
+The movie probe and encoder now select the first video stream without an
+attached-picture disposition. The encoder's video index is an ordinal within that
+eligible set. Cover art preceding a movie no longer supplies its dimensions,
+codec or frame rate or replaces its frames. Typed audio and artwork cannot enter
+the probe's positional fallback. Empty probe defaults, audio/subtitle discovery
+and ordinary-video ordering remain intact. Cover-only input has no movie
+dimensions or codec and fails the required video mapping instead of publishing
+artwork.
+
+The generated cover-first MP4 reproduced the original failure in FFmpeg 5.1.9:
+the parser selected 32-by-32 MJPEG artwork at 90,000 fps, while encoding exited
+zero with an empty initialization file and no media segments. The repaired native
+cases require actual movie output for both cover-first and cover-last ordering,
+each with fresh 14-second output and an eight-second tail from source second six.
+Independent decoding of every published fragment verifies movie dimensions,
+frame rate and duration, with 140 distinct movie frames for each fresh source
+and 80 for each sought tail. The fifth case exits with status 1 and publishes
+no fragments for cover-only input. Commands, probes, publication files and decoded
+observations are retained under `var/test-runs/movie-cover-art-gates`.
+
+The focused CI comparison failed in 11 of 48 cases before the repair, with
+628 assertions: eight unit regressions and the cover-first fresh, cover-first
+seek and cover-only native cases. Afterward all 48 cases passed with 987
+assertions, including the five native cases. Definitive receipts are retained
+under `var/test-runs/movie-cover-art-gates/native-red` and
+`var/test-runs/movie-cover-art-gates/native-green`.
+
+The authoritative full Transcode unit selection passed 905 tests with 11,667
+assertions across 76 files: 888 tests in the ordinary lane with 11,604 assertions
+and 17 in the native lane with 63 assertions. It includes the focused cases above.
+The receipt is `var/test-runs/movie-cover-art-gates/backend/20261024-141127-968e97d5`,
+including `ordinary.log`, `native.log` and `run/finalize.json`. Source revision is
+`767156b7`; `var/test-runs/movie-cover-art-gates/native-evidence.json` records
+the decoded frame and refusal observations.
+
+Full PHPStan reported no errors. Deptrac reported zero violations, warnings and
+errors with 484 existing skipped violations.
+`var/test-runs/movie-cover-art-gates/verification-summary.json` records the
+final checkpoint.
+
+Independent code and simplification review found no defects.
+
+The testing guide documents native selection coverage and its limits. Browser
+lifecycles were not repeated because frontend, HTTP delivery and manifests were
+unchanged; earlier browser receipts are historical, not new acceptance for this
+repair. These cases do not establish formal CMAF conformance or qualify hardware
+selection or alternate movie tracks. Existing application databases, Redis and
+the user's original videos were untouched. This checkpoint includes no push or
+feature merge.
