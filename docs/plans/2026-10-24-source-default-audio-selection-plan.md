@@ -1,7 +1,7 @@
 ---
 title: Respect source default audio in movie playback
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -145,3 +145,38 @@ hardware, other browsers, DASH browser playback or formal CMAF conformance.
 Independent plan review approved the scope and shared accessors before
 implementation, including constructor consistency, absent selection for no audio
 and measured browser tone identity across the audible interval.
+
+## Verification checkpoint
+
+The implementation and independent code/simplification review are complete.
+The full Transcode CI selection passed at `630623a3`: 1,088 tests and 23,651
+assertions across 82 files. This includes the new native selection regression;
+its focused run passed 12 tests and 1,707 assertions. After PHPStan identified
+six redundant nullsafe operators before null coalescing, `e2bc3fc3` replaced
+them with equivalent property access. Independent review confirmed the unchanged
+behavior. The 105 affected CI tests passed with 911 assertions on that revision,
+followed by full PHPStan and Deptrac with no errors or violations. Deptrac retained
+484 existing baseline skips. Syntax, configuration and runner-preflight checks
+also passed.
+
+All five final Chromium HLS scenarios passed on `e2bc3fc3`: default-audio fresh
+and seek, ordinary delayed-audio fresh, Matroska delayed-audio fresh with subtitles,
+and adaptive switching. The default-audio cases reached their complete 30-/24-second
+tails with 750/600 decoded frames. Measured dialogue onset was 8.242667/2.109947
+seconds; both cases retained 216 audible observations and measured 882.861328125 Hz
+in all three required windows using the actual 44,100 Hz AudioContext. This is the
+analyser bin for the expected 880 Hz tone within the required 1.5-bin tolerance.
+Every captured frame was closed, with zero pending captures or observer errors.
+Adaptive playback switched 720p to 360p and back to 720p while retaining one
+attachment and canonical audio; this control does not claim a complete movie tail.
+All five container cleanup receipts passed.
+
+The producer-only negative control failed at the intended frequency assertion:
+215.33203125 Hz commentary was observed instead of 880 Hz dialogue. It reached
+30 seconds and 750 decoded frames before the assertion, and cleanup passed.
+The exact disposable override and its limited scope are retained alongside the
+actual prior-code manager/encoder audit. Evidence is under
+`var/test-runs/source-default-audio-gates/` and
+`var/test-runs/source-default-audio-audit/`; `ROADMAP.md` records the delivered
+scope and verification. Existing application containers and original user media
+were left untouched. Merge and push remain separate requests.
