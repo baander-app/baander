@@ -149,7 +149,11 @@ final class SegmentEncoder
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
-        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], ['pools=2:frame-threads=2:log-level=error', 'lp=2:fast-decode=1'], $encoderFlags);
+        $x265Limits = 'pools=2:frame-threads=2:log-level=error';
+        if ($sparse && $this->encoderProfile->encoder === 'libx265') {
+            $x265Limits .= ':rc-lookahead=0';
+        }
+        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], [$x265Limits, 'lp=2:fast-decode=1'], $encoderFlags);
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
@@ -159,7 +163,7 @@ final class SegmentEncoder
             '-loglevel',
             'error',
             '-y',
-            '-threads', '2',
+            '-threads', $sparse ? '1' : '2',
             '-filter_threads', '1',
             '-filter_complex_threads', '1',
         ];
@@ -190,6 +194,9 @@ final class SegmentEncoder
         }
         if ($sparse) {
             array_push($args, '-bf:v', '0');
+            if ($this->encoderProfile->encoder === 'libx264') {
+                array_push($args, '-rc-lookahead:v', '0');
+            }
         }
 
         if ($hasAudio) {

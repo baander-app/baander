@@ -39,6 +39,113 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
+    #[DataProvider('pacedEncoders')]
+    public function testSparseMoviesPublishGrowingPlayableTracksBeforeEncoderExit(string $encoderName): void
+    {
+        $this->artifactName = 'sparse-paced-'.$encoderName;
+        $source = $this->createSource(0.1, 30.0, true, 0.0);
+        $probe = VideoProbeResult::fromProbeOutput($this->probe($source));
+        self::assertEqualsWithDelta(0.1, $probe->framerate, 0.0001);
+        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
+            $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
+        $profile = AudioProfile::streamingStereo();
+        $output = $this->directory.'/output';
+        mkdir($output);
+        $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
+            $output, audioProfile: $profile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
+            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate);
+        $inputIndex = array_search('-i', $arguments, true);
+        self::assertIsInt($inputIndex);
+        array_splice($arguments, $inputIndex, 0, ['-re']);
+        file_put_contents($this->directory.'/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
+        $process = new Process($arguments);
+        $process->setTimeout(45);
+        $started = hrtime(true);
+        $firstEdge = null;
+        $firstPlayableElapsed = null;
+        $growthElapsed = null;
+        $growing = false;
+        $previousState = null;
+        $snapshot = 0;
+        $reader = new PublishedPresentationReader();
+        $process->start();
+        try {
+            do {
+                $process->checkTimeout();
+                $running = $process->isRunning();
+                $presentation = $reader->read($output);
+                $video = $presentation?->tracks['video'] ?? null;
+                $audio = $presentation?->tracks['audio'] ?? null;
+                $edge = $video?->end();
+                $state = [$running, $presentation?->complete, $edge, $audio?->end()];
+                if ($state !== $previousState) {
+                    $this->observation(['elapsed' => (hrtime(true) - $started) / 1_000_000_000,
+                        'running' => $running, 'complete' => $presentation?->complete,
+                        'videoEdge' => $edge, 'audioEdge' => $audio?->end()]);
+                    if (is_file($output.'/manifest.mpd')) {
+                        copy($output.'/manifest.mpd', $this->directory.'/native-prefix-'.++$snapshot.'.mpd');
+                    }
+                    $previousState = $state;
+                }
+                if ($running && $presentation !== null && !$presentation->complete && $video !== null && $audio !== null) {
+                    if ($firstEdge === null) {
+                        $firstEdge = $edge;
+                        $firstPlayableElapsed = (hrtime(true) - $started) / 1_000_000_000;
+                        foreach ([$video, $audio] as $track) {
+                            $segment = $track->segments[0];
+                            $combined = $this->directory.'/paced-first-'.$track->kind->value.'.mp4';
+                            file_put_contents($combined, file_get_contents($output.'/'.$track->initFile)
+                                .file_get_contents($output.'/'.$segment->file));
+                            if ($track->kind === MediaTrack::Video) {
+                                self::assertNotEmpty($this->decodeVideo($combined));
+                            } else {
+                                self::assertNotEmpty($this->decodeAudio($combined));
+                            }
+                        }
+                        self::assertTrue($process->isRunning(), 'The first playable fragments must precede encoder exit.');
+                    } elseif ($edge > $firstEdge && $process->isRunning()) {
+                        $elapsed = (hrtime(true) - $started) / 1_000_000_000;
+                        // The one-second margin before the paced 30-second EOF excludes encoder flushes.
+                        if ($elapsed < 29.0) {
+                            $growthElapsed ??= $elapsed;
+                            $growing = true;
+                        }
+                    }
+                }
+                if ($running) {
+                    usleep(100_000);
+                }
+            } while ($running);
+            self::assertTrue($process->isSuccessful(), $process->getOutput().$process->getErrorOutput());
+            self::assertNotNull($firstEdge, 'A paced sparse movie must publish independently playable video and audio before encoder exit.');
+            self::assertTrue($growing, 'The published video edge must increase again before paced source EOF, while the encoder is running and the presentation is incomplete.');
+            $completed = $reader->read($output);
+            self::assertNotNull($completed);
+            self::assertTrue($completed->complete);
+            self::assertEqualsWithDelta(30.0, $completed->tracks['video']->end(), 0.002);
+            self::assertEqualsWithDelta(30.0, $completed->tracks['audio']->end(), 0.05);
+        } finally {
+            if ($process->isRunning()) {
+                $process->stop(0.5);
+            }
+            file_put_contents($this->directory.'/paced-stdout.log', $process->getOutput());
+            file_put_contents($this->directory.'/paced-stderr.log', $process->getErrorOutput());
+            $this->observation(['elapsed' => (hrtime(true) - $started) / 1_000_000_000,
+                'exitCode' => $process->getExitCode(), 'firstPlayableEdge' => $firstEdge,
+                'firstPlayableElapsed' => $firstPlayableElapsed, 'growthElapsed' => $growthElapsed,
+                'grewBeforeExit' => $growing]);
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pacedEncoders(): iterable
+    {
+        yield 'H.264 paced publication' => ['libx264'];
+        yield 'HEVC paced publication' => ['libx265'];
+    }
+
     #[DataProvider('sparseMovies')]
     public function testSparseMoviesRetainHeldFramesAndPublishDecodablePlaylists(
         string $encoderName,

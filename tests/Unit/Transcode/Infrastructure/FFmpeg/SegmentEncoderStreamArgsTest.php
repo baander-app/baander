@@ -330,6 +330,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('mp4', $args[array_search('-dash_segment_type', $args, true) + 1]);
         self::assertSame('movflags=+negative_cts_offsets', $args[array_search('-format_options', $args, true) + 1]);
         self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
+        self::assertSame('1', $args[array_search('-threads', $args, true) + 1]);
     }
 
     /** @return iterable<string, array{string, float, ?int, string, string, bool}> */
@@ -340,6 +341,39 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         yield 'seek prefixes existing chain' => ['libx264', 0.1, 1, 'yadif,scale=-2:720', 'aformat=channel_layouts=stereo', true];
         yield 'seek creates trim filter' => ['libx265', 1 / 12, 3, '', '', true];
         yield 'seek video only' => ['libx264', 0.1, 1, 'scale=-2:720', 'unused', false];
+    }
+
+    #[DataProvider('sparseEncoderCodecs')]
+    public function testSparseLookaheadSettingsStayWithinTheirSoftwareEncoder(string $codec): void
+    {
+        $args = $this->encoder(codec: $codec)->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            sourceFrameRate: 0.1);
+        if ($codec === 'libx264') {
+            $lookahead = array_search('-rc-lookahead:v', $args, true);
+            self::assertNotFalse($lookahead);
+            self::assertSame('0', $args[$lookahead + 1]);
+            self::assertGreaterThan(array_search('-c:v', $args, true), $lookahead);
+        } else {
+            self::assertNotContains('-rc-lookahead:v', $args);
+        }
+        if ($codec === 'libx265') {
+            self::assertSame(1, count(array_keys($args, '-x265-params', true)));
+            $parameters = $args[array_search('-x265-params', $args, true) + 1];
+            self::assertSame('pools=2:frame-threads=2:log-level=error:rc-lookahead=0:no-sao=1:no-deblock=1:no-scenecut=1:keyint=180:min-keyint=180', $parameters);
+        } else {
+            self::assertNotContains('-x265-params', $args);
+        }
+        if ($codec === 'libsvtav1') {
+            self::assertStringContainsString('lp=2:fast-decode=1', $args[array_search('-svtav1-params', $args, true) + 1]);
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function sparseEncoderCodecs(): iterable
+    {
+        foreach (['libx264', 'libx265', 'h264_nvenc', 'hevc_vaapi', 'libsvtav1'] as $codec) {
+            yield $codec => [$codec];
+        }
     }
 
     public function testProbeFieldOrderEnablesDeinterlacing(): void

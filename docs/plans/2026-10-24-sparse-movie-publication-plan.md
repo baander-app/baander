@@ -188,3 +188,16 @@ browser scenarios and an ordinary adaptive control after the final change.
 
 Independent review approved this bounded extension. The exact settings remain
 subject to CI-runtime calibration and focused review before production edits.
+
+CI calibration and independent review approved sparse input decoding with one
+thread, libx264 output rc-lookahead zero and libx265 rc-lookahead zero in its
+existing parameter list. Ordinary input decoding remains at two threads; x265's
+pool and frame-thread bounds remain unchanged. Each controlled repair published
+six seconds of video at about 11.5 seconds and twelve seconds at about 21.2,
+before completion at about 31.3. The baseline waited until the final flush.
+
+The paced tests require their second advancing edge before elapsed second 29
+of a thirty-second real-time input. This conservative margin excludes an EOF
+flush that briefly leaves the process running and the MPD dynamic; it is not a
+subsecond startup guarantee. Commands, effective encoder logs and observed edges
+are retained under the phase calibration directory.
