@@ -29,6 +29,7 @@ final readonly class VideoProbeResult implements JsonSerializable
         public array $audioStreams = [],
         public array $subtitleStreams = [],
         public string $audioChannelLayout = '',
+        public ?float $sourceTimestampOrigin = null,
     ) {
     }
 
@@ -91,8 +92,10 @@ final readonly class VideoProbeResult implements JsonSerializable
         $fieldOrder = $videoStream['field_order'] ?? '';
         $isInterlaced = in_array($fieldOrder, ['tt', 'bb', 'tb', 'bt'], true);
 
+        $sourceTimestampOrigin = self::verifiedSourceTimestampOrigin($format, $videoStream, $raw['packets'] ?? []);
+
         return new self(
-            duration: (float) ($format['duration'] ?? 0.0),
+            duration: (float) ($format['duration'] ?? 0.0) - ($sourceTimestampOrigin ?? 0.0),
             width: (int) ($videoStream['width'] ?? 0),
             height: (int) ($videoStream['height'] ?? 0),
             framerate: self::parseFramerate($videoStream['r_frame_rate'] ?? null),
@@ -108,6 +111,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             audioStreams: $audioStreams,
             subtitleStreams: $subtitleStreams,
             audioChannelLayout: (string) ($audioStream['channel_layout'] ?? ''),
+            sourceTimestampOrigin: $sourceTimestampOrigin,
         );
     }
 
@@ -158,24 +162,70 @@ final readonly class VideoProbeResult implements JsonSerializable
             audioStreams: $audioStreams,
             subtitleStreams: $subtitleStreams,
             audioChannelLayout: (string) ($data['audioChannelLayout'] ?? ''),
+            sourceTimestampOrigin: self::nonnegativeTimestamp($data['sourceTimestampOrigin'] ?? null),
         );
     }
 
-    private static function parseFramerate(?string $rate): float
+    /**
+     * @param array<string, mixed> $format
+     * @param array<string, mixed> $videoStream
+     */
+    private static function verifiedSourceTimestampOrigin(array $format, array $videoStream, mixed $packets): ?float
     {
-        if ($rate === null || $rate === '') {
+        $formatName = $format['format_name'] ?? null;
+        $rate = self::parseFramerate($videoStream['r_frame_rate'] ?? null);
+        $start = self::nonnegativeTimestamp($format['start_time'] ?? null);
+        $end = self::nonnegativeTimestamp($format['duration'] ?? null);
+        if (!is_string($formatName) || !in_array('matroska', explode(',', $formatName), true)
+            || ($videoStream['codec_type'] ?? null) !== 'video'
+            || ($videoStream['codec_name'] ?? null) !== 'h264' || ($videoStream['has_b_frames'] ?? null) !== 0
+            || !is_finite($rate) || $rate <= 0.0 || $rate >= 1.0
+            || !is_int($videoStream['index'] ?? null) || $videoStream['index'] < 0 || $start === null || $end === null
+            || !is_array($packets) || !array_is_list($packets) || count($packets) > 128) {
+            return null;
+        }
+        foreach ($packets as $packet) {
+            if (!is_array($packet) || ($packet['stream_index'] ?? null) !== $videoStream['index']) {
+                continue;
+            }
+            $origin = self::nonnegativeTimestamp($packet['pts_time'] ?? null);
+            $flags = $packet['flags'] ?? null;
+            if ($origin === null || !is_string($flags) || !str_contains($flags, 'K') || str_contains($flags, 'D')
+                || $end <= $origin || $start < $origin || ($start === $origin && $origin === 0.0)) {
+                return null;
+            }
+            return $origin;
+        }
+        return null;
+    }
+
+    private static function nonnegativeTimestamp(mixed $value): ?float
+    {
+        if ((!is_int($value) && !is_float($value) && !is_string($value)) || !is_numeric($value)) {
+            return null;
+        }
+        $timestamp = (float) $value;
+        return is_finite($timestamp) && $timestamp >= 0.0 ? $timestamp : null;
+    }
+
+    private static function parseFramerate(mixed $rate): float
+    {
+        if (!is_string($rate) || $rate === '') {
             return 0.0;
         }
 
         if (str_contains($rate, '/')) {
             $parts = explode('/', $rate);
+            if (count($parts) !== 2 || !is_numeric($parts[0]) || !is_numeric($parts[1])) {
+                return 0.0;
+            }
             $numerator = (float) $parts[0];
-            $denominator = (float) ($parts[1] ?? 1);
+            $denominator = (float) $parts[1];
 
             return $denominator > 0 ? $numerator / $denominator : 0.0;
         }
 
-        return (float) $rate;
+        return is_numeric($rate) ? (float) $rate : 0.0;
     }
 
     public function isHdr(): bool
@@ -236,6 +286,7 @@ final readonly class VideoProbeResult implements JsonSerializable
     {
         return [
             'duration' => $this->duration,
+            'sourceTimestampOrigin' => $this->sourceTimestampOrigin,
             'width' => $this->width,
             'height' => $this->height,
             'framerate' => $this->framerate,

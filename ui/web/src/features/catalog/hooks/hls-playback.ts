@@ -1,4 +1,5 @@
 import type Hls from 'hls.js'
+import { observeNativeSubtitleTiming } from './native-subtitle-timing'
 import { observeSubtitleSelection, type SubtitlePreference } from './subtitle-selection'
 
 export type { SubtitlePreference } from './subtitle-selection'
@@ -16,10 +17,13 @@ interface AttachmentOptions {
 export function attachHlsPlayback({ video, url, position, onError, onReady, getSubtitlePreference, onSubtitlePreferenceChange }: AttachmentOptions) {
   let disposed = false
   let player: Hls | null = null
+  let disposeSubtitleTiming: (() => void) | null = null
   let subtitles: ReturnType<typeof observeSubtitleSelection> | null = null
   const active = () => !disposed
   const dispose = () => {
     if (disposed) return
+    disposeSubtitleTiming?.()
+    disposeSubtitleTiming = null
     subtitles?.dispose()
     subtitles = null
     disposed = true
@@ -29,6 +33,8 @@ export function attachHlsPlayback({ video, url, position, onError, onReady, getS
   }
   const fail = (failure?: 'network') => {
     if (!active()) return
+    disposeSubtitleTiming?.()
+    disposeSubtitleTiming = null
     subtitles?.dispose()
     subtitles = null
     disposed = true
@@ -55,6 +61,7 @@ export function attachHlsPlayback({ video, url, position, onError, onReady, getS
       else fail()
       return
     }
+    disposeSubtitleTiming = observeNativeSubtitleTiming(video)
     const instance = new HlsPlayer({
       autoStartLoad: false,
       startPosition: position,

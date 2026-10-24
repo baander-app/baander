@@ -179,7 +179,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $filters = $this->segmentEncoder->buildVideoFilters($probe, $tier);
                         $audioFilters = $this->segmentEncoder->buildAudioFiltersForProfile($probe, $active->runtime->desired->audioProfile);
                         $this->assertCurrent($active, $local, $stopRequested);
-                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $probe->hasAudio(), $probe->framerate);
+                        $this->streamManager->startStream($job, $source, $tier, $filters, $start, $output, $active->runtime->desired->audioProfile, $audioFilters, $active->runtime->generation, $probe->hasAudio(), $probe->framerate, $probe->sourceTimestampOrigin);
                         $this->assertCurrent($active, $local, $stopRequested);
                         $generation = $active->runtime->generation;
                         $paused = $throttled = $ready = $finished = false;
@@ -212,7 +212,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     if ($output === null || $scoped === null) {
                         throw new RuntimeException('Generation output has not initialized.');
                     }
-                    $this->pollSubtitles($active, $job, $source, $scoped, $start * SegmentEncoder::getSegmentDuration(), $subtitleQueue, $subtitleActive, $subtitleDeadline);
+                    $this->pollSubtitles($active, $job, $source, $scoped, $start * SegmentEncoder::getSegmentDuration(), $probe->sourceTimestampOrigin, $subtitleQueue, $subtitleActive, $subtitleDeadline);
                     $publication = $this->streamManager->publication($jobId);
                     if (!$nativeClockCaptured && $publication !== null && !$publication->complete
                         && isset($publication->mpdAttributes['availabilityStartTime'])) {
@@ -451,7 +451,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
      * @param list<SubtitleTrackInfo> $queue
      * @param array<string, SubtitleTrackInfo> $active
      */
-    private function pollSubtitles(TranscodeExecutionClaim $claim, TranscodeJob $job, string $source, TranscodeStoragePortInterface $storage, float $startTime, array &$queue, array &$active, int $deadline): void
+    private function pollSubtitles(TranscodeExecutionClaim $claim, TranscodeJob $job, string $source, TranscodeStoragePortInterface $storage, float $startTime, ?float $sourceTimestampOrigin, array &$queue, array &$active, int $deadline): void
     {
         if (($queue !== [] || $active !== []) && hrtime(true) >= $deadline) {
             $this->processPool->shutdown();
@@ -473,7 +473,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         while ($active === [] && $queue !== []) {
             $track = array_shift($queue);
             $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $track->trackKey(), 'full');
-            $key = $this->processPool->extractSubtitles($job, $source, $track->index, $path, $claim->runtime->generation, $startTime);
+            $key = $this->processPool->extractSubtitles($job, $source, $track->index, $path, $claim->runtime->generation, $startTime, $sourceTimestampOrigin);
             $active[$key] = $track;
         }
     }

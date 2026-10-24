@@ -551,6 +551,41 @@ establishes video origin zero. This does not establish a general repair for
 Matroska sources whose reported start time disagrees with their video packets,
 or arbitrary variable-rate gaps.
 
+`SegmentEncoderTimestampOriginMediaTest` covers 19 sparse Matroska source-origin
+cases through software H.264/HEVC output. Verified origins zero and four, delayed
+and matched audio, fresh output and restarts at source seconds six and 24 must
+retain the full colour holds, duration, audio delay and subtitle source interval.
+Three audio-first cases require the first movie packet after packet sixteen and
+within the bounded 128-packet prefix. Independent fragment/HLS decoding and
+production subtitle extraction check media clocks and embedded cues. Two Opus
+cases supplement the AAC controls. Complete HLS audio decoding must retain the
+full presentation duration, near-silent initial samples and audible tone onset;
+a correct MPD delay or MP4 edit list alone cannot satisfy this check.
+
+The shared video probe reads at most 128 packets across all streams. Origin
+evidence comes only from the first observed packet of the selected non-attached
+movie stream. The qualified source is Matroska H.264 with explicitly zero B-frames
+and finite positive cadence below one fps. Its first packet must be a key packet
+without a discard flag and have finite nonnegative PTS; reported format start
+must be at or after that PTS and format duration must be greater. A mismatched
+reported start or positive verified origin selects an explicit common timestamp
+anchor. Matched zero origins keep the existing path.
+
+For this Matroska path, duration is normalized once by subtracting the verified
+origin. Media encoding seeks in absolute timestamps and shifts video and audio
+by the same origin-plus-source-position offset. Subtitle extraction subtracts
+only the origin; existing timeline rebasing then applies the requested seek.
+With a verified anchor, a positive sparse restart before one nominal frame
+interval reads from the file beginning instead of input seeking, preserving
+leading physical audio while retaining the requested offset and trimming. Later
+restarts keep fast input seeking. The nominal interval is not a proof of general
+variable-rate behavior. Anchored audio then materializes its remaining delay as
+encoded silence after trimming and profile filters, without asynchronous
+resampling or a new timestamp anchor. HLS therefore receives actual silent
+samples before the intended tone instead of relying on an MP4 edit list.
+Missing movie-packet evidence, malformed metadata, negative origins, B-frame
+sources, other containers and general variable-rate gaps remain unqualified.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each
@@ -1135,6 +1170,39 @@ These checks qualify the selected sparse software source and Chromium HLS path.
 They do not certify arbitrary variable-rate input, every source container,
 hardware, other browsers, DASH browser playback, formal CMAF conformance or the
 whole application lifecycle.
+
+### Delayed Matroska playback
+
+Select the verified Matroska-origin scenario with AAC:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_VIDEO_SCENARIO=matroska-delayed-fresh \
+BAANDER_TEST_AUDIO_PROFILE=streaming_stereo bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Set `BAANDER_TEST_VIDEO_SCENARIO=matroska-delayed-seek` for the six-second restart.
+Both require `streaming_stereo` and retain the sparse runner's bounds, signed
+uncached resources, stable targets, one attachment and natural completion checks.
+CI runs each scenario with separate evidence.
+
+The source has a verified four-second video origin and audio delayed eight
+seconds relative to it. Source-relative duration must remain thirty seconds,
+or 24 after seeking. Near-silent samples precede audio onset at local second
+eight or two respectively; positive audio must follow and remain present during
+later colour holds. Signed embedded subtitles must reach the real text track:
+fresh cues run at seconds two to four and twelve to fourteen; the seek removes
+the first and places the later cue at six to eight. Tests check cue activation
+and clearance as well as the served files. A 100 ms observer samples actual
+native active cues, cue identity, track mode and times; raw cue-change events
+remain diagnostic evidence. A separate seek after natural completion checks
+backward re-entry with the same cue objects and unchanged selection and count.
+
+The HLS attachment refreshes native activity if a showing subtitle or caption
+cue remains active more than 100 ms after its end while the video is not seeking.
+It removes and re-adds the same cue object without changing cue times or mode;
+disposal and fatal failure remove the attachment's timing listener. Native HLS
+fallback keeps its existing behavior. These cases qualify the verified
+packet-origin contract, not arbitrary Matroska origins or missing prefix evidence.
 
 ### Ordinary worker autoscaling qualification
 

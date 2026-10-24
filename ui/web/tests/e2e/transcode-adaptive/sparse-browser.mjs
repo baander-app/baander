@@ -5,7 +5,13 @@ import { chromium } from 'playwright-core'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
 const versions = JSON.parse(await readFile('/work/versions.json', 'utf8'))
-assert(['sparse-fresh', 'sparse-seek'].includes(fixture.scenario))
+assert(['sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'].includes(fixture.scenario))
+const delayed = fixture.scenario.startsWith('matroska-delayed-')
+if (delayed) {
+  assert.equal(fixture.sourceTimestampOrigin, 4)
+  assert.equal(Number(fixture.rawSourceDuration), 34)
+  assert.equal(fixture.expectedAudioDelay, 8 - fixture.sourceStartTime)
+}
 assert.equal(fixture.audioProfile, 'streaming_stereo')
 assert.equal(fixture.sourceFrameRate, 0.1)
 const evidence = '/work/evidence'
@@ -25,6 +31,8 @@ const network = []
 const manifests = []
 const samples = []
 const colorFrames = []
+const subtitleFiles = []
+const subtitleScreenshots = []
 let status
 let requests = []
 let state
@@ -50,12 +58,13 @@ await page.route('**/*', async route => {
 const pendingManifests = new Set()
 page.on('response', response => {
   if (response.status() >= 400) failures.push({ kind: 'http-error', url: response.url(), status: response.status() })
-  if (!response.url().includes('.m3u8') || response.status() !== 200) return
+  if ((!response.url().includes('.m3u8') && !response.url().includes('.vtt')) || response.status() !== 200) return
   const pending = (async () => {
     try {
       const body = await response.text()
       assert(manifests.length < 150, 'Playlist evidence exceeded its bound')
-      manifests.push({ at: Date.now(), url: response.url(), body })
+      const collection = response.url().includes('.vtt') ? subtitleFiles : manifests
+      collection.push({ at: Date.now(), url: response.url(), body })
     } catch (error) { failures.push({ kind: 'playlist-body', message: error.message }) }
   })()
   pendingManifests.add(pending)
@@ -83,7 +92,10 @@ const json = (path, method = 'GET', expectedStatus = 200) => new Promise((resolv
   request.on('error', reject)
   request.end()
 })
-const snapshot = () => page.evaluate(() => ({ ...window.adaptiveState(), colorFrames: [...window.sparseColorFrames] }))
+const snapshot = () => page.evaluate(() => ({ ...window.adaptiveState(), colorFrames: [...window.sparseColorFrames],
+  cueEvents: [...window.sparseCueEvents], cueSamples: [...window.sparseCueSamples],
+  textTracks: Array.from(document.querySelector('#video').textTracks).map(track => window.sparseTrackState(track)),
+}))
 const poll = async (check, description, timeout = 120000) => {
   const end = Math.min(deadline, Date.now() + timeout)
   while (Date.now() < end) {
@@ -135,10 +147,44 @@ try {
   assert.equal(versions.hls, '1.7.3')
   assert.equal(versions.playwright, '1.60.0')
   await page.goto(`${fixture.origin}/__adaptive/`)
-  await page.evaluate(manifest => {
+  await page.evaluate(({ manifest, delayed }) => {
     window.adaptiveManifest = manifest
     window.sparseColorFrames = []
     const video = document.querySelector('#video')
+    window.sparseCueEvents = []
+    window.sparseCueSamples = []
+    const cueIds = new WeakMap()
+    let nextCueId = 0
+    window.sparseCueState = cue => {
+      if (!cueIds.has(cue)) cueIds.set(cue, ++nextCueId)
+      return { id: cueIds.get(cue), start: cue.startTime, end: cue.endTime, text: cue.text }
+    }
+    const trackIds = new WeakMap()
+    let nextTrackId = 0
+    window.sparseTrackState = track => {
+      if (!trackIds.has(track)) trackIds.set(track, ++nextTrackId)
+      return { id: trackIds.get(track), mode: track.mode,
+        cues: Array.from(track.cues ?? []).map(cue => window.sparseCueState(cue)),
+        active: Array.from(track.activeCues ?? []).map(cue => window.sparseCueState(cue)) }
+    }
+    window.sparseObserveCues = true
+    if (delayed) {
+      video.textTracks.addEventListener('addtrack', event => {
+        const track = event.track
+        track.mode = 'showing'
+        track.addEventListener('cuechange', () => {
+          window.sparseCueEvents.push({ at: performance.now(), time: video.currentTime, trackId: window.sparseTrackState(track).id,
+            active: Array.from(track.activeCues ?? []).map(cue => window.sparseCueState(cue)) })
+        })
+      })
+      setInterval(() => {
+        if (!window.sparseObserveCues) return
+        if (window.sparseCueSamples.length >= 1250) throw new Error('Native subtitle observations exceeded their bound')
+        window.sparseCueSamples.push({ at: performance.now(), time: video.currentTime,
+          tracks: Array.from(video.textTracks).map(track => window.sparseTrackState(track)),
+        })
+      }, 100)
+    }
     const canvas = document.createElement('canvas')
     canvas.width = canvas.height = 1
     const canvasContext = canvas.getContext('2d', { willReadFrequently: true })
@@ -151,7 +197,7 @@ try {
       video.requestVideoFrameCallback(observe)
     }
     video.requestVideoFrameCallback(observe)
-  }, fixture.manifestUrl)
+  }, { manifest: fixture.manifestUrl, delayed })
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')
@@ -168,9 +214,21 @@ try {
     const recentAudio = state.audio.filter(audio => state.at - audio.at < 1000)
     samples.push({ at: state.at, time: state.time, decodedFrames: state.decodedFrames,
       audio: recentAudio, ended: state.ended })
+    if (delayed) {
+      for (const [index, cue] of fixture.expectedCues.entries()) {
+        const phase = state.time >= cue.start + 0.25 && state.time < cue.end - 0.05 ? 'active'
+          : state.time >= cue.end + 0.25 && state.time <= cue.end + 0.75 ? 'cleared' : null
+        if (!phase || subtitleScreenshots.some(item => item.cue === cue.text && item.phase === phase)) continue
+        const file = `subtitle-${index + 1}-${phase}.png`
+        await page.screenshot({ path: `${evidence}/${file}` })
+        subtitleScreenshots.push({ cue: cue.text, phase, localTime: state.time, file })
+      }
+    }
     if (state.ended) return true
     return false
   }, 'natural completion of the complete held-frame movie')
+  await page.evaluate(() => { window.sparseObserveCues = false })
+  receipt.naturalEnd = Object.freeze(structuredClone(state))
   status = await json('/__adaptive/status')
   requests = await json('/__adaptive/requests')
   await Promise.all([...pendingManifests])
@@ -188,14 +246,20 @@ try {
     assert(frames.length >= sourceEnd - sourceBegin - 2, `Retain native displayed ${color} frames throughout its hold`)
     assert(frames.some(frame => frame.sourceTime < sourceBegin + 1.15), `Observe the beginning of ${color}`)
     assert(frames.some(frame => frame.sourceTime >= sourceEnd - 1.15), `Observe the tail of ${color}`)
-    assert(frames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
-      && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} must coincide with recent audible samples`)
+    const audibleFrames = delayed
+      ? frames.filter(frame => frame.clock >= fixture.expectedAudioDelay + 0.25) : frames
+    assert(audibleFrames.some(frame => samples.some(sample => sample.audio.some(audio => audio.rms > 0.001
+      && Math.abs(audio.at - frame.at) < 500))), `Decoded ${color} after audio onset must coincide with recent audible samples`)
   }
   const master = manifests.find(manifest => manifest.body.includes('#EXT-X-STREAM-INF:'))
   assert(master, 'Retain the signed production master playlist')
   assert.equal(master.body.split('\n').filter(line => line.startsWith('#EXT-X-STREAM-INF:')).length, 2)
   assert(master.body.includes('mp4a.40.2'))
-  const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:'))
+  const media = manifests.filter(manifest => manifest.body.includes('#EXT-X-TARGETDURATION:')
+    && (!delayed || /\/tracks\/(?:video|audio)\//.test(new URL(manifest.url).pathname)))
+  if (delayed) {
+    for (const track of ['video', 'audio']) assert(media.some(manifest => manifest.url.includes(`/tracks/${track}/`)))
+  }
   assert(media.some(manifest => !manifest.body.includes('#EXT-X-ENDLIST')), 'Retain a growing playlist')
   for (const manifest of media) assert.equal(/#EXT-X-TARGETDURATION:(\d+)/.exec(manifest.body)?.[1], '7')
   const delivered = requests.filter(request => /\/(?:init\.mp4|segment\.m4s)(?:\?|$)/.test(request.path))
@@ -209,16 +273,119 @@ try {
   assert(delivered.some(request => request.track === 'video'))
   assert(delivered.some(request => request.track === 'audio'))
   assert(delivered.filter(request => request.track === 'audio').every(request => request.jobId === fixture.canonicalAudioJobId))
+  if (delayed) {
+    const silence = samples.filter(sample => sample.time >= 0.25 && sample.time < fixture.expectedAudioDelay - 0.25 && sample.audio.length > 0)
+    assert(silence.length >= 3, 'Observe the played initial silence before the delayed audio begins')
+    assert(silence.every(sample => sample.audio.every(audio => audio.rms < 0.001)), 'Initial audio must remain near-silent')
+    const onset = samples.find(sample => sample.audio.some(audio => audio.rms > 0.001))
+    assert(onset && onset.time >= fixture.expectedAudioDelay - 0.15 && onset.time <= fixture.expectedAudioDelay + 0.75,
+      'Measured audio must begin at its intended source-relative delay')
+    assert(master.body.includes('TYPE=SUBTITLES'), 'The production master must advertise embedded subtitles')
+    const subtitleManifests = manifests.filter(manifest => manifest.url.includes('/subtitles/'))
+    assert(subtitleManifests.length > 0 && subtitleFiles.length > 0, 'The real HLS adapter must load signed subtitles')
+    for (const manifest of subtitleManifests) {
+      const url = new URL(manifest.url)
+      assert.equal(url.searchParams.get('generation'), '1')
+      assert(url.searchParams.has('sig') && url.searchParams.has('exp'))
+      assert.equal(Number(/#EXT-X-TARGETDURATION:(\d+)/.exec(manifest.body)?.[1]), fixture.expectedDuration)
+      assert.equal(Number(/#EXTINF:([\d.]+)/.exec(manifest.body)?.[1]), fixture.expectedDuration)
+    }
+    for (const file of subtitleFiles) {
+      const url = new URL(file.url)
+      assert.equal(url.searchParams.get('generation'), '1')
+      assert(url.searchParams.has('sig') && url.searchParams.has('exp'))
+      const transfer = network.find(item => item.url === file.url && item.finished && item.status === 200)
+      assert(transfer && !transfer.fromDiskCache && !transfer.fromServiceWorker)
+      const served = requests.find(request => new URL(request.path, fixture.origin).href === file.url)
+      assert(served?.closed && served.status === 200, 'Subtitle bytes must come from the current closed generation file')
+    }
+    const cues = state.textTracks.flatMap(track => track.cues)
+    assert.equal(cues.length, fixture.expectedCues.length, 'Every retained cue must have exactly one native object')
+    for (const expected of fixture.expectedCues) {
+      assert(cues.some(cue => cue.text === expected.text && Math.abs(cue.start - expected.start) < 0.05
+        && Math.abs(cue.end - expected.end) < 0.05), `The real text track must expose ${expected.text} at the local source time`)
+      const cue = cues.find(cue => cue.text === expected.text)
+      const owner = state.textTracks.find(track => track.cues.some(candidate => candidate.id === cue.id))
+      const activeAt = sample => sample.tracks.some(track => track.id === owner.id && track.mode === 'showing' && track.active.some(active => active.id === cue.id))
+      const active = state.cueSamples.find(activeAt)
+      assert(active && active.time >= expected.start - 0.15 && active.time <= expected.start + 0.75,
+        `The real text track must activate ${expected.text} at its local cue time`)
+      assert(state.cueSamples.some(sample => sample.time >= expected.end - 0.05 && sample.time <= expected.end + 0.75
+        && !activeAt(sample)), `The text track must clear ${expected.text} at its end`)
+      for (const sample of state.cueSamples) {
+        if (sample.time >= expected.start - 0.15) {
+          const track = sample.tracks.find(track => track.id === owner.id)
+          assert(track && track.mode === 'showing', 'The selected native subtitle track must stay present and showing')
+          assert.deepEqual(track.cues, owner.cues, 'Native cue identity, count and timestamps must remain unchanged through playback')
+        }
+        if (sample.time < expected.start - 0.15 || sample.time > expected.end + 0.75) {
+          assert(!activeAt(sample), `The native track must not display ${expected.text} outside its cue interval`)
+        }
+        if (sample.time >= expected.start + 0.75 && sample.time < expected.end - 0.05) {
+          assert(activeAt(sample), `The native track must retain ${expected.text} through its intended interval`)
+        }
+      }
+    }
+    assert.deepEqual([...new Set(cues.map(cue => cue.text))].sort(), fixture.expectedCues.map(cue => cue.text).sort(),
+      'Only the source-relative retained cues may reach the real text track')
+    assert.equal(subtitleScreenshots.length, fixture.expectedCues.length * 2, 'Retain visible and cleared subtitle screenshots for every cue')
+    receipt.audioDelay = { expected: fixture.expectedAudioDelay, observedOnset: onset.time, silentSamples: silence.length }
+    receipt.subtitles = { files: subtitleFiles, manifests: subtitleManifests, cues, events: state.cueEvents, nativeSamples: state.cueSamples, screenshots: subtitleScreenshots }
+  }
   await page.screenshot({ path: `${evidence}/complete.png` })
+  if (delayed) {
+    receipt.subtitleSeekProof = []
+    for (const expected of fixture.expectedCues) {
+      const proof = await page.evaluate(async expected => {
+        const video = document.querySelector('#video')
+        video.pause()
+        const track = Array.from(video.textTracks).find(track => track.mode === 'showing')
+        const original = Array.from(track.cues ?? []).find(cue => cue.text === expected.text)
+        const originalState = window.sparseCueState(original)
+        const seek = time => new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Subtitle seek verification exceeded two seconds')), 2000)
+          video.addEventListener('seeked', () => { clearTimeout(timeout); setTimeout(resolve, 100) }, { once: true })
+          video.currentTime = time
+        })
+        const capture = () => ({ time: video.currentTime, trackId: window.sparseTrackState(track).id, mode: track.mode,
+          active: Array.from(track.activeCues ?? []).map(cue => ({ ...window.sparseCueState(cue), sameOriginalObject: cue === original })),
+          cues: Array.from(track.cues ?? []).map(cue => window.sparseCueState(cue)),
+          originalObjectCount: Array.from(track.cues ?? []).filter(cue => cue === original).length })
+        await seek(expected.start + 0.5)
+        const backward = capture()
+        await seek(expected.end)
+        const exactEnd = capture()
+        await seek(expected.end + 1)
+        return { original: originalState, backward, exactEnd, pastEnd: capture(), adapter: window.adaptiveState() }
+      }, expected)
+      receipt.subtitleSeekProof.push(proof)
+      assert(proof.backward.active.some(cue => cue.id === proof.original.id && cue.sameOriginalObject),
+        'Backward seeking must reactivate the same native cue object')
+      assert(!proof.pastEnd.active.some(cue => cue.id === proof.original.id), 'Seeking past the cue must clear its native active state')
+      for (const observation of [proof.backward, proof.exactEnd, proof.pastEnd]) {
+        assert.equal(observation.trackId, state.textTracks.find(track => track.cues.some(cue => cue.id === proof.original.id)).id)
+        assert.equal(observation.mode, 'showing')
+        assert.equal(observation.originalObjectCount, 1)
+        assert.deepEqual(observation.cues, state.textTracks.flatMap(track => track.cues), 'Seeking must retain cue identities and original timestamps')
+      }
+      assert.equal(proof.adapter.attachments, 1)
+      assert.equal(proof.adapter.sourceChanges, 1)
+      assert.equal(proof.adapter.sameVideo, true)
+      assert.deepEqual(proof.adapter.errors, [])
+      assert.equal(proof.adapter.mediaError, null)
+      await page.screenshot({ path: `${evidence}/subtitle-${proof.original.id}-after-seek.png` })
+    }
+    assert.deepEqual(failures, [], 'Subtitle seek verification must preserve successful transport and playback')
+  }
   Object.assign(receipt, { passed: true, final: state, producer: status })
 } catch (error) {
-  Object.assign(receipt, { passed: false, error: error.stack, final: await snapshot().catch(() => null), producer: status })
+  Object.assign(receipt, { passed: false, error: error.stack, final: receipt.naturalEnd ?? await snapshot().catch(() => null), producer: status })
   await page.screenshot({ path: `${evidence}/failure.png` }).catch(() => {})
   process.exitCode = 1
 } finally {
   requests = await json('/__adaptive/requests').catch(() => requests)
   await Promise.all([...pendingManifests])
-  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, failures })
+  Object.assign(receipt, { elapsedSeconds: (Date.now() - started) / 1000, colorFrames, samples, requests, network, manifests, subtitleFiles, failures })
   await writeFile(`${evidence}/result.json`, JSON.stringify(receipt, null, 2))
   await context.tracing.stop({ path: `${evidence}/trace.zip` })
   await browser.close()

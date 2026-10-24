@@ -14,17 +14,21 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\HLS\WebVttTimeline;
 use PHPUnit\Framework\MockObject\Generator\Generator;
 use Symfony\Component\Process\Process;
 
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
 $scenario = getenv('BAANDER_ADAPTIVE_SCENARIO') ?: 'adaptive';
-if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek'], true)) {
+if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek'], true)) {
     throw new RuntimeException('Unknown adaptive browser scenario: ' . $scenario);
 }
 $sparse = $scenario !== 'adaptive';
-$sourceStartTime = $scenario === 'sparse-seek' ? 6 : 0;
+$matroska = str_starts_with($scenario, 'matroska-delayed-');
+$sourceStartTime = str_ends_with($scenario, '-seek') ? 6 : 0;
 $directory = AdaptiveBrowserFixture::directory();
 $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_stereo') {
     'streaming_stereo' => AudioProfile::streamingStereo(),
@@ -46,14 +50,37 @@ $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
 if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
     throw new RuntimeException('The browser qualification requires FFmpeg 5: ' . (string) $version);
 }
-$source = $directory . '/source.mp4';
-$run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1', '-filter_complex_threads', '1',
-    '-f', 'lavfi', '-i', $sparse
-        ? 'color=c=red:size=1280x720:rate=1/10,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)'
-        : 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
-    '-t', $sparse ? '30' : '144', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-g', '24', '-c:a', 'aac', $source]);
-$rawProbe = json_decode($run(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $source]), true, 512, JSON_THROW_ON_ERROR);
+if ($matroska) {
+    $captions = $directory . '/captions.srt';
+    file_put_contents($captions, "1\n00:00:02,000 --> 00:00:04,000\nEarly source cue\n\n2\n00:00:12,000 --> 00:00:14,000\nLater source cue\n");
+    $base = $directory . '/source-zero.mkv';
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+        '-f', 'lavfi', '-i', 'color=c=red:size=1280x720:rate=1/10,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)',
+        '-itsoffset', '8', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=22',
+        '-map', '0:v', '-map', '1:a', '-t', '30',
+        '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-bf', '0', '-g', '1',
+        '-c:a', 'pcm_s16le', $base]);
+    $source = $directory . '/source.mkv';
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-copyts', '-i', $base, '-i', $captions,
+        '-map', '0', '-map', '1:0', '-c', 'copy', '-output_ts_offset', '4', '-avoid_negative_ts', 'disabled',
+        '-metadata:s:s:0', 'language=eng', '-disposition:s:0', 'default', $source]);
+} else {
+    $source = $directory . '/source.mp4';
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1', '-filter_complex_threads', '1',
+        '-f', 'lavfi', '-i', $sparse
+            ? 'color=c=red:size=1280x720:rate=1/10,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)'
+            : 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+        '-t', $sparse ? '30' : '144', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-g', '24', '-c:a', 'aac', $source]);
+}
+$probeArguments = FFprobeArguments::video($source);
+$rawProbe = json_decode($run($probeArguments), true, 512, JSON_THROW_ON_ERROR);
+AdaptiveBrowserFixture::writeJson($directory . '/source-probe.json', $rawProbe);
+AdaptiveBrowserFixture::writeJson($directory . '/source-probe-command.json', $probeArguments);
 $probe = VideoProbeResult::fromProbeOutput($rawProbe);
+if ($matroska && ($probe->sourceTimestampOrigin !== 4.0 || abs($probe->duration - 30.0) > 0.01
+    || abs((float) ($rawProbe['format']['duration'] ?? 0) - 34.0) > 0.01)) {
+    throw new RuntimeException('The delayed Matroska fixture must verify origin four and a thirty-second source timeline.');
+}
 $generator = new Generator();
 $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
@@ -67,6 +94,7 @@ $owner = Uuid::generate();
 $commands = $readyTiers = $pairs = [];
 foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label => $tier) {
     $job = TranscodeJob::create($state['videoId'], $tier, $directory, $owner);
+    $job->updateProbeData($probe->jsonSerialize());
     $output = $directory . '/' . $state['videoId'] . '/' . $tier->name . '/job-' . $job->getId() . '/generation-1';
     mkdir($output, 0750, true);
     AdaptiveBrowserFixture::writeJson($output . '/generation.json', ['schemaVersion' => 2, 'generation' => 1,
@@ -74,8 +102,18 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
         'audioProfile' => $audioProfile->jsonSerialize(), 'duration' => $probe->duration,
         'startTime' => $sourceStartTime, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
-        startSegment: $scenario === 'sparse-seek' ? 1 : null, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
-        sourceFrameRate: $probe->framerate);
+        startSegment: $sourceStartTime > 0 ? 1 : null, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
+        sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin);
+    if ($matroska) {
+        $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
+        $subtitleDirectory = $output . '/subtitles/' . $track->trackKey();
+        mkdir($subtitleDirectory, 0750, true);
+        $extracted = $directory . '/subtitle-source-' . $tier->name . '.vtt';
+        $subtitleArguments = FFmpegArguments::subtitleExtraction($source, $track->index, $extracted, $probe->sourceTimestampOrigin);
+        $run($subtitleArguments);
+        (new WebVttTimeline())->rebase($extracted, $subtitleDirectory . '/full.vtt', $sourceStartTime);
+        AdaptiveBrowserFixture::writeJson($directory . '/subtitle-command-' . $tier->name . '.json', $subtitleArguments);
+    }
     $input = array_search('-i', $arguments, true);
     if ($input === false) {
         throw new RuntimeException('The encoder omitted its source.');
@@ -116,6 +154,11 @@ try {
     } while (true);
     AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'manifestUrl' => $manifest,
         'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
+        'sourceTimestampOrigin' => $probe->sourceTimestampOrigin, 'rawSourceDuration' => $rawProbe['format']['duration'] ?? null,
+        'expectedAudioDelay' => $matroska ? 8 - $sourceStartTime : 0,
+        'expectedCues' => $matroska ? ($sourceStartTime > 0
+            ? [['start' => 6, 'end' => 8, 'text' => 'Later source cue']]
+            : [['start' => 2, 'end' => 4, 'text' => 'Early source cue'], ['start' => 12, 'end' => 14, 'text' => 'Later source cue']]) : [],
         'sourceFrameRate' => $probe->framerate, 'sourceStartTime' => $sourceStartTime, 'scenario' => $scenario, 'ffmpegVersion' => $version,
         'audioProfile' => $audioProfile->name,
         'tiers' => $readyTiers, 'canonicalAudioJobId' => $readyTiers['low']['jobId']]);

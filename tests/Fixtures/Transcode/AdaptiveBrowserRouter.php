@@ -94,6 +94,17 @@ try {
             $response = new Response($bytes === false ? '' : $bytes, $bytes === false ? 503 : 200,
                 ['Content-Type' => $track === MediaTrack::Video ? 'video/mp4' : 'audio/mp4', 'Retry-After' => '2']);
         }
+    } elseif (preg_match('~^/api/transcode/([^/]+)/subtitles/(s[0-9]+)/(media\.m3u8|full\.vtt)$~D', $path, $matches) === 1) {
+        [, $jobId, $language, $resource] = $matches;
+        $trackName = 'subtitle';
+        if ($resource === 'media.m3u8') {
+            $response = $manifests->subtitleManifest($jobId, $language, $request);
+        } else {
+            $signed->validate($request);
+            $file = $streaming->getSubtitleSegmentPath(PublicId::fromString($jobId), $language, 'full', $request->query->getInt('generation'));
+            $closed = $file !== null && is_file($file);
+            $response = new Response($closed ? file_get_contents($file) : '', $closed ? 200 : 404, ['Content-Type' => 'text/vtt']);
+        }
     } else {
         $response = new Response('Not found', 404);
     }

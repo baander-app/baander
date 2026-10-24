@@ -138,7 +138,11 @@ final class SegmentEncoder
         string $audioFilters = '',
         bool $hasAudio = true,
         float $sourceFrameRate = 0.0,
+        ?float $sourceTimestampOrigin = null,
     ): array {
+        if ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0)) {
+            throw new \InvalidArgumentException('Invalid source timestamp origin.');
+        }
         $sparse = is_finite($sourceFrameRate) && $sourceFrameRate > 0.0 && $sourceFrameRate < 1.0;
         $seeking = $startSegment !== null && $startSegment > 0;
         if ($sparse) {
@@ -146,6 +150,9 @@ final class SegmentEncoder
             if ($seeking && $hasAudio) {
                 $audioFilters = 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters);
             }
+        }
+        if ($hasAudio && $sourceTimestampOrigin !== null) {
+            $audioFilters = ($audioFilters === '' ? '' : $audioFilters . ',') . 'aresample=first_pts=0';
         }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
@@ -170,9 +177,14 @@ final class SegmentEncoder
 
         array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
-        if ($seeking) {
+        $sourceStart = $seeking ? $startSegment * self::SEGMENT_DURATION : 0.0;
+        $seekInput = $seeking && !($sourceTimestampOrigin !== null && $sparse && $sourceStart < 1 / $sourceFrameRate);
+        if ($sourceTimestampOrigin !== null) {
+            array_push($args, '-copyts', '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
+        }
+        if ($seekInput) {
             $args[] = '-ss';
-            $args[] = sprintf('%.6f', $startSegment * self::SEGMENT_DURATION);
+            $args[] = sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $sourceStart);
             if ($sparse) {
                 $args[] = '-noaccurate_seek';
             }

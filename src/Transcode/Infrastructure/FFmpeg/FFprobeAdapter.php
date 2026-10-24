@@ -24,7 +24,7 @@ final class FFprobeAdapter
         }
 
         $result = ProcessExecutor::exec(
-            [$this->ffprobePath, '-threads', '2', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', $sourcePath],
+            FFprobeArguments::video($sourcePath, $this->ffprobePath),
             60,
         );
 

@@ -11,6 +11,163 @@ use PHPUnit\Framework\TestCase;
 
 class VideoProbeResultTest extends TestCase
 {
+    /** @return array<string, mixed> */
+    private static function anchoredMovie(): array
+    {
+        return ['format' => ['format_name' => 'matroska,webm', 'start_time' => '12', 'duration' => '34'],
+            'streams' => [['index' => 2, 'codec_type' => 'video', 'codec_name' => 'h264', 'has_b_frames' => 0, 'r_frame_rate' => '1/10']],
+            'packets' => [['stream_index' => 2, 'pts_time' => '4', 'flags' => 'K_']]];
+    }
+
+    public function testVerifiedOriginNormalizesDurationOnceAcrossSerialization(): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput(self::anchoredMovie());
+        foreach ([$probe, VideoProbeResult::fromSerialized($probe->jsonSerialize())] as $result) {
+            self::assertSame(4.0, $result->sourceTimestampOrigin);
+            self::assertSame(30.0, $result->duration);
+        }
+        self::assertNull(VideoProbeResult::fromSerialized(['duration' => 34])->sourceTimestampOrigin);
+    }
+
+    public function testMatchedPositiveOriginStillNormalizesContainerEnd(): void
+    {
+        $raw = self::anchoredMovie();
+        $raw['format']['start_time'] = '4';
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame(4.0, $probe->sourceTimestampOrigin);
+        self::assertSame(30.0, $probe->duration);
+    }
+
+    public function testZeroPacketOriginOverridesLaterReportedOrigin(): void
+    {
+        $raw = self::anchoredMovie();
+        $raw['packets'][0]['pts_time'] = '0';
+        $raw['format']['duration'] = '30';
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame(0.0, $probe->sourceTimestampOrigin);
+        self::assertSame(30.0, $probe->duration);
+    }
+
+    public function testOriginEvidenceUsesSelectedMovieAndItsFirstPacket(): void
+    {
+        $raw = self::anchoredMovie();
+        array_unshift($raw['streams'], ['index' => 0, 'codec_type' => 'video', 'codec_name' => 'mjpeg', 'disposition' => ['attached_pic' => 1]]);
+        array_unshift($raw['packets'], ['stream_index' => 0, 'pts_time' => '0', 'flags' => 'K_']);
+        $raw['packets'][] = ['stream_index' => 2, 'pts_time' => '0', 'flags' => 'K_'];
+        self::assertSame(4.0, VideoProbeResult::fromProbeOutput($raw)->sourceTimestampOrigin);
+        $raw['packets'][1]['flags'] = '__';
+        self::assertNull(VideoProbeResult::fromProbeOutput($raw)->sourceTimestampOrigin);
+    }
+
+    /** @param array<string, mixed> $raw */
+    #[DataProvider('unverifiedOriginEvidence')]
+    public function testUnverifiedEvidenceKeepsDurationAndNoOrigin(array $raw): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertNull($probe->sourceTimestampOrigin);
+        self::assertSame((float) ($raw['format']['duration'] ?? 0), $probe->duration);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function unverifiedOriginEvidence(): iterable
+    {
+        foreach ([
+            'other format' => ['format', 'format_name', 'mov,mp4'],
+            'missing format' => ['format', 'format_name', null],
+            'bad format name' => ['format', 'format_name', []],
+            'missing start' => ['format', 'start_time', null],
+            'malformed start' => ['format', 'start_time', 'unknown'],
+            'nonfinite start' => ['format', 'start_time', INF],
+            'start before packet' => ['format', 'start_time', '3'],
+            'end at packet' => ['format', 'duration', '4'],
+            'nonfinite end' => ['format', 'duration', INF],
+            'malformed end' => ['format', 'duration', 'unknown'],
+            'missing end' => ['format', 'duration', null],
+            'missing B frame count' => ['video', 'has_b_frames', null],
+            'B frames' => ['video', 'has_b_frames', 2],
+            'other codec' => ['video', 'codec_name', 'hevc'],
+            'ordinary rate' => ['video', 'r_frame_rate', '1/1'],
+            'unknown rate' => ['video', 'r_frame_rate', '0/0'],
+            'negative rate' => ['video', 'r_frame_rate', '-1/10'],
+            'malformed rate' => ['video', 'r_frame_rate', []],
+            'malformed rational numerator' => ['video', 'r_frame_rate', '1garbage/10'],
+            'malformed rational denominator' => ['video', 'r_frame_rate', '1/10garbage'],
+            'extra rational part' => ['video', 'r_frame_rate', '1/10/2'],
+            'malformed decimal rate' => ['video', 'r_frame_rate', '0.1garbage'],
+            'nonfinite rate' => ['video', 'r_frame_rate', '1e999'],
+            'missing stream index' => ['video', 'index', null],
+            'negative stream index' => ['video', 'index', -1],
+            'untyped stream' => ['video', 'codec_type', null],
+            'wrong packet stream' => ['packet', 'stream_index', 1],
+            'missing PTS' => ['packet', 'pts_time', null],
+            'negative PTS' => ['packet', 'pts_time', '-1'],
+            'nonfinite PTS' => ['packet', 'pts_time', INF],
+            'malformed PTS' => ['packet', 'pts_time', []],
+            'not key' => ['packet', 'flags', '__'],
+            'discarded key' => ['packet', 'flags', 'KD'],
+            'missing flags' => ['packet', 'flags', null],
+        ] as $name => [$part, $key, $value]) {
+            $raw = self::anchoredMovie();
+            if ($part === 'format') {
+                $raw['format'][$key] = $value;
+            } elseif ($part === 'video') {
+                $raw['streams'][0][$key] = $value;
+            } else {
+                $raw['packets'][0][$key] = $value;
+            }
+            yield $name => [$raw];
+        }
+        $raw = self::anchoredMovie();
+        $raw['packets'] = [];
+        yield 'missing selected packet in prefix' => [$raw];
+        $raw['packets'] = 'invalid';
+        yield 'malformed packet list' => [$raw];
+        $raw = self::anchoredMovie();
+        $raw['packets'] = [2 => $raw['packets'][0]];
+        yield 'nonlist packet evidence' => [$raw];
+        $raw = self::anchoredMovie();
+        $selected = $raw['packets'][0];
+        $raw['packets'] = array_fill(0, 128, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        $raw['packets'][] = $selected;
+        yield 'selected packet beyond bounded prefix' => [$raw];
+        $raw['packets'][0] = $selected;
+        yield 'oversized prefix with selected packet inside bound' => [$raw];
+        $raw['packets'] = array_fill(0, 128, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        yield 'missing selected packet across full bounded prefix' => [$raw];
+        $raw = self::anchoredMovie();
+        $raw['format']['start_time'] = '0';
+        $raw['packets'][0]['pts_time'] = '0';
+        yield 'matched zero origin' => [$raw];
+    }
+
+    public function testFirstSelectedMoviePacketAtPrefixBoundaryQualifies(): void
+    {
+        $raw = self::anchoredMovie();
+        $selected = $raw['packets'][0];
+        $raw['packets'] = array_fill(0, 127, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        $raw['packets'][] = $selected;
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame(4.0, $probe->sourceTimestampOrigin);
+        self::assertSame(30.0, $probe->duration);
+    }
+
+    public function testMissingPtsCannotUseDecodeTimestampAsOrigin(): void
+    {
+        $raw = self::anchoredMovie();
+        unset($raw['packets'][0]['pts_time']);
+        $raw['packets'][0]['dts_time'] = '4';
+        self::assertNull(VideoProbeResult::fromProbeOutput($raw)->sourceTimestampOrigin);
+    }
+
+    public function testMalformedSerializedOriginsDoNotChangeNormalizedDuration(): void
+    {
+        foreach ([-1, INF, -INF, NAN, [], 'unknown'] as $origin) {
+            $probe = VideoProbeResult::fromSerialized(['duration' => 30.0, 'sourceTimestampOrigin' => $origin]);
+            self::assertNull($probe->sourceTimestampOrigin);
+            self::assertSame(30.0, $probe->duration);
+        }
+    }
+
     public function testFromProbeOutputWithCompleteData(): void
     {
         $raw = [

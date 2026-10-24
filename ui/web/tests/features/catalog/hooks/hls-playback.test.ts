@@ -328,3 +328,72 @@ describe('caption selection across attachments', () => {
     expect(remove).toHaveBeenCalledTimes(3)
   })
 })
+
+describe('native subtitle timing attachment lifecycle', () => {
+  it.each(['dispose', 'fatal'] as const)('releases the owned timing listener before %s destruction', async retirement => {
+    const { options, dispose } = setup()
+    const add = vi.spyOn(options.video, 'addEventListener')
+    const remove = vi.spyOn(options.video, 'removeEventListener')
+    await settle()
+    const instance = mock.instances[0]
+    const callbacks = add.mock.calls.filter(([event]) => event === 'timeupdate')
+    expect(callbacks).toHaveLength(1)
+    instance.destroy.mockImplementation(() => {
+      expect(remove.mock.calls.filter(([event]) => event === 'timeupdate')).toEqual([['timeupdate', callbacks[0][1]]])
+      options.video.dispatchEvent(new Event('timeupdate'))
+    })
+    if (retirement === 'fatal') instance.listeners.error('error', { fatal: true })
+    else dispose()
+    dispose()
+    expect(remove.mock.calls.filter(([event]) => event === 'timeupdate')).toHaveLength(1)
+    expect(instance.destroy).toHaveBeenCalledOnce()
+  })
+
+  it('does not install a timing listener after lazy attachment cancellation', async () => {
+    const { options, dispose } = setup()
+    const add = vi.spyOn(options.video, 'addEventListener')
+    dispose()
+    await settle()
+    expect(add.mock.calls.filter(([event]) => event === 'timeupdate')).toEqual([])
+  })
+
+  it.each(['maybe', ''] as const)('keeps native fallback timing unchanged for capability %s', async capability => {
+    mock.supported = false
+    vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue(capability)
+    const { options, dispose } = setup()
+    const add = vi.spyOn(options.video, 'addEventListener')
+    const remove = vi.spyOn(options.video, 'removeEventListener')
+    await settle()
+    dispose()
+    expect(add.mock.calls.filter(([event]) => event === 'timeupdate')).toEqual([])
+    expect(remove.mock.calls.filter(([event]) => event === 'timeupdate')).toEqual([])
+  })
+
+  it('refreshes cues while leaving the established subtitle selection owner unchanged', async () => {
+    const { tracks, options, remembered } = captions('s3')
+    const dispose = attachHlsPlayback(options)
+    await settle()
+    tracks.replace(defaultTracks())
+    mock.instances[0].listeners.parsed()
+    await settle()
+    const selected = tracks[1]
+    let owner: TextTrack | null = selected
+    const cue = { startTime: 2, endTime: 4, get track() { return owner } } as TextTrackCue
+    let active: TextTrackCue[] = [cue]
+    Object.defineProperties(selected, {
+      cues: { value: [cue] },
+      activeCues: { get: () => active },
+      removeCue: { value: vi.fn(() => { owner = null; active = [] }) },
+      addCue: { value: vi.fn(() => { owner = selected }) },
+    })
+    options.video.currentTime = 5
+    options.video.dispatchEvent(new Event('timeupdate'))
+    await settle()
+    expect(selected.removeCue).toHaveBeenCalledExactlyOnceWith(cue)
+    expect(selected.addCue).toHaveBeenCalledExactlyOnceWith(cue)
+    expect(tracks.modes()).toEqual(['disabled', 'showing'])
+    expect(remembered()).toBe('s3')
+    expect(options.onSubtitlePreferenceChange).not.toHaveBeenCalled()
+    dispose()
+  })
+})
