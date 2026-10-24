@@ -32,6 +32,8 @@
         "src/er_hcr.cpp",
         "src/sbr_dec.cpp",
         "src/ps_dec.cpp",
+        "src/mps212.cpp",
+        "src/mps212_tables.cpp",
         "src/psycho.cpp",
         "src/encoder_tools.cpp",
         "src/afterburner.cpp",

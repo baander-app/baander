@@ -2,7 +2,6 @@
 #include <cstring>
 #include <new>
 
-#include "mps212.h"
 #include "sbr.h"
 #include "unidrc.h"
 #include "usac_fd.h"
@@ -137,48 +136,6 @@ void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFram
   (void)in;
   (void)out;
 }
-
-/* ── mps212.h ──────────────────────────────────────────────────── */
-
-struct AacMps212State_ {
-  int stereo_config_index;
-};
-
-AacMps212State* aac_mps212_create(const AacUsacMps212Config* cfg, int stereo_config_index,
-                                  int frame_length, int output_frame_length, int sample_rate) {
-  (void)cfg;
-  (void)frame_length;
-  (void)output_frame_length;
-  (void)sample_rate;
-  auto* s = new (std::nothrow) AacMps212State_();
-  if (s) {
-    s->stereo_config_index = stereo_config_index;
-  }
-  return s;
-}
-
-void aac_mps212_destroy(AacMps212State* s) { delete s; }
-
-void aac_mps212_reset(AacMps212State* s) { (void)s; }
-
-int aac_mps212_read(AacMps212State* s, AacBitReader* r, int indep) {
-  (void)s;
-  (void)r;
-  (void)indep;
-  return AAC_ERR_UNSUPPORTED;
-}
-
-void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float* residual,
-                      AacUsacQmfFrame* left, AacUsacQmfFrame* right) {
-  (void)s;
-  (void)residual;
-  if (left != dmx) {
-    *left = *dmx;
-  }
-  *right = *dmx;
-}
-
-void aac_mps212_conceal(AacMps212State* s) { (void)s; }
 
 /* ── unidrc.h ──────────────────────────────────────────────────── */
 

@@ -83,8 +83,9 @@ void read_sbr_config(AacBitReader* r, AacUsacSbrConfig* c) {
   }
 }
 
-/* Mps212Config() (Table 12). */
-void read_mps212_config(AacBitReader* r, int stereo_config_index, AacUsacMps212Config* m) {
+/* Mps212Config() (Table 12).  Returns AAC_ERR_DECODE for the reserved
+ * bsFreqRes 0 (no parameter band count). */
+int read_mps212_config(AacBitReader* r, int stereo_config_index, AacUsacMps212Config* m) {
   m->freq_res = (int)aac_bitreader_read(r, 3);
   m->fixed_gain_dmx = (int)aac_bitreader_read(r, 3);
   m->temp_shape_config = (int)aac_bitreader_read(r, 2);
@@ -103,6 +104,7 @@ void read_mps212_config(AacBitReader* r, int stereo_config_index, AacUsacMps212C
   if (m->temp_shape_config == 2) {
     m->env_quant_mode = (int)aac_bitreader_read(r, 1);
   }
+  return m->freq_res == 0 ? AAC_ERR_DECODE : AAC_OK;
 }
 
 /* `len` whole bytes into `out` (capacity `cap`); AAC_ERR_UNSUPPORTED when
@@ -131,7 +133,10 @@ int read_channel_element_config(AacBitReader* r, const AacUsacConfig* c, AacUsac
   if (e->type == AAC_USAC_CPE) {
     e->stereo_config_index = c->sbr_ratio_index > 0 ? (int)aac_bitreader_read(r, 2) : 0;
     if (e->stereo_config_index > 0) {
-      read_mps212_config(r, e->stereo_config_index, &e->mps);
+      const int ret = read_mps212_config(r, e->stereo_config_index, &e->mps);
+      if (ret) {
+        return ret;
+      }
     }
   }
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
