@@ -127,13 +127,28 @@ class VideoProbeResultTest extends TestCase
         yield 'nonlist packet evidence' => [$raw];
         $raw = self::anchoredMovie();
         $selected = $raw['packets'][0];
-        $raw['packets'] = array_fill(0, 16, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        $raw['packets'] = array_fill(0, 128, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
         $raw['packets'][] = $selected;
         yield 'selected packet beyond bounded prefix' => [$raw];
+        $raw['packets'][0] = $selected;
+        yield 'oversized prefix with selected packet inside bound' => [$raw];
+        $raw['packets'] = array_fill(0, 128, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        yield 'missing selected packet across full bounded prefix' => [$raw];
         $raw = self::anchoredMovie();
         $raw['format']['start_time'] = '0';
         $raw['packets'][0]['pts_time'] = '0';
         yield 'matched zero origin' => [$raw];
+    }
+
+    public function testFirstSelectedMoviePacketAtPrefixBoundaryQualifies(): void
+    {
+        $raw = self::anchoredMovie();
+        $selected = $raw['packets'][0];
+        $raw['packets'] = array_fill(0, 127, ['stream_index' => 1, 'pts_time' => '4', 'flags' => 'K_']);
+        $raw['packets'][] = $selected;
+        $probe = VideoProbeResult::fromProbeOutput($raw);
+        self::assertSame(4.0, $probe->sourceTimestampOrigin);
+        self::assertSame(30.0, $probe->duration);
     }
 
     public function testMissingPtsCannotUseDecodeTimestampAsOrigin(): void

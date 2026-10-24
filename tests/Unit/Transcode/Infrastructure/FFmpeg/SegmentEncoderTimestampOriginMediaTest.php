@@ -48,9 +48,29 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
         float $origin,
         int $startSegment,
         float $audioDelay,
+        bool $lateMoviePacket = false,
     ): void {
-        $this->artifactName = sprintf('timestamp-origin-%s-%s-%d-delay-%s', $encoderName, $origin, $startSegment, $audioDelay);
-        $source = $this->createSource($origin, $audioDelay);
+        $this->artifactName = sprintf('timestamp-origin-%s-%s-%d-delay-%s%s', $encoderName, $origin, $startSegment, $audioDelay,
+            $lateMoviePacket ? '-audio-first' : '');
+        $source = $this->createSource($origin, $audioDelay, $lateMoviePacket);
+        if ($lateMoviePacket) {
+            $json = $this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_packets', '-read_intervals', '%+#128',
+                '-show_entries', 'packet=stream_index,pts_time,flags', '-of', 'json', $source]);
+            file_put_contents($this->directory.'/source-packet-prefix.json', $json);
+            $prefix = json_decode($json, true, 512, JSON_THROW_ON_ERROR)['packets'];
+            $firstMovieOrdinal = null;
+            foreach ($prefix as $index => $packet) {
+                if ($packet['stream_index'] === 0) {
+                    $firstMovieOrdinal = $index + 1;
+                    self::assertEqualsWithDelta($origin, (float) $packet['pts_time'], 0.002);
+                    break;
+                }
+            }
+            self::assertNotNull($firstMovieOrdinal, 'The bounded prefix must contain the actual first movie packet.');
+            self::assertGreaterThan(16, $firstMovieOrdinal);
+            self::assertLessThanOrEqual(128, $firstMovieOrdinal);
+            $this->observation(['firstMoviePacketOrdinal' => $firstMovieOrdinal, 'packetPrefixCount' => count($prefix)]);
+        }
         $raw = json_decode($this->runMedia(FFprobeArguments::video($source)), true, 512, JSON_THROW_ON_ERROR);
         file_put_contents($this->directory.'/production-probe.json', json_encode($raw, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
         $videoPackets = $this->packets($source, 'V:0');
@@ -182,7 +202,7 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
             'timestamps' => $timestamps, 'markers' => $markers, 'expectedMarkers' => $expectedMarkers]);
     }
 
-    /** @return iterable<string, array{string, float, int, float}> */
+    /** @return iterable<string, array{0: string, 1: float, 2: int, 3: float, 4?: bool}> */
     public static function timestampOrigins(): iterable
     {
         foreach (['libx264', 'libx265'] as $encoder) {
@@ -194,17 +214,24 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
         }
         yield 'matched positive origin fresh' => ['libx264', 4.0, 0, 0.0];
         yield 'matched positive origin restart' => ['libx264', 4.0, 1, 0.0];
+        yield 'audio-first fresh' => ['libx264', 4.0, 0, 8.0, true];
+        yield 'audio-first restart' => ['libx264', 4.0, 1, 8.0, true];
+        yield 'audio-first final hold' => ['libx264', 4.0, 4, 8.0, true];
     }
 
-    private function createSource(float $origin, float $audioDelay): string
+    private function createSource(float $origin, float $audioDelay, bool $lateMoviePacket): string
     {
         $base = $this->directory.'/base.mkv';
-        $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
-            '-f', 'lavfi', '-i', 'color=c=red:s=64x64:r=0.1,drawbox=x=0:y=0:w=iw:h=ih:color=green:t=fill:enable=eq(n\,1),drawbox=x=0:y=0:w=iw:h=ih:color=blue:t=fill:enable=gte(n\,2)',
+        $filter = $lateMoviePacket
+            ? 'color=c=red:size=1280x720:rate=1/10,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)'
+            : 'color=c=red:s=64x64:r=0.1,drawbox=x=0:y=0:w=iw:h=ih:color=green:t=fill:enable=eq(n\,1),drawbox=x=0:y=0:w=iw:h=ih:color=blue:t=fill:enable=gte(n\,2)';
+        $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-filter_threads', '1',
+            '-f', 'lavfi', '-i', $filter,
             '-itsoffset', (string) $audioDelay, '-f', 'lavfi', '-i',
             sprintf('sine=frequency=440:sample_rate=48000:duration=%.9f', 30 - $audioDelay),
-            '-t', '30', '-c:v', 'libx264', '-threads', '1', '-preset', 'ultrafast', '-g', '1',
-            '-bf', '0', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', '-ac', '2', $base]);
+            '-map', '0:v', '-map', '1:a', '-t', '30', '-c:v', 'libx264', '-threads', $lateMoviePacket ? '2' : '1',
+            '-preset', 'ultrafast', '-g', '1', '-bf', '0', '-pix_fmt', 'yuv420p',
+            '-c:a', 'pcm_s16le', '-ac', $lateMoviePacket ? '1' : '2', $base]);
         $cues = $this->directory.'/cues.srt';
         file_put_contents($cues, "1\n00:00:02,000 --> 00:00:04,000\nEARLY\n\n2\n00:00:12,000 --> 00:00:14,000\nLATE\n");
         $source = $this->directory.'/source.mkv';

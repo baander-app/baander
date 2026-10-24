@@ -181,7 +181,7 @@ final readonly class VideoProbeResult implements JsonSerializable
             || ($videoStream['codec_name'] ?? null) !== 'h264' || ($videoStream['has_b_frames'] ?? null) !== 0
             || !is_finite($rate) || $rate <= 0.0 || $rate >= 1.0
             || !is_int($videoStream['index'] ?? null) || $videoStream['index'] < 0 || $start === null || $end === null
-            || !is_array($packets) || !array_is_list($packets) || count($packets) > 16) {
+            || !is_array($packets) || !array_is_list($packets) || count($packets) > 128) {
             return null;
         }
         foreach ($packets as $packet) {

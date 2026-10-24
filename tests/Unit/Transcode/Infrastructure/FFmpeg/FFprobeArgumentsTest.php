@@ -14,7 +14,7 @@ final class FFprobeArgumentsTest extends TestCase
     public function testVideoProbeKeepsMetadataAndBoundsPacketEvidence(): void
     {
         self::assertSame(['/custom/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
-            '-show_format', '-show_streams', '-show_packets', '-read_intervals', '%+#16',
+            '-show_format', '-show_streams', '-show_packets', '-read_intervals', '%+#128',
             '-show_entries', 'packet=stream_index,pts_time,flags', '/movie with spaces.mkv'],
             FFprobeArguments::video('/movie with spaces.mkv', '/custom/ffprobe'));
         self::assertSame('/usr/bin/ffprobe', FFprobeArguments::video('/movie.mkv')[0]);

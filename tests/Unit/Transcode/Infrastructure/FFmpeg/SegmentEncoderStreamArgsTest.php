@@ -385,13 +385,50 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertLessThan($input, array_search('-copyts', $args, true));
             self::assertSame('1', $args[array_search('-seek_timestamp', $args, true) + 1]);
             self::assertSame(sprintf('%.6f', -(4 + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
-            if ($start === 0) {
+            if ($start < 2) {
                 self::assertNotContains('-ss', $args);
+                self::assertNotContains('-noaccurate_seek', $args);
             } else {
                 self::assertSame(sprintf('%.6f', 4 + $start * 6), $args[array_search('-ss', $args, true) + 1]);
                 self::assertContains('-noaccurate_seek', $args);
             }
         }
+    }
+
+    #[DataProvider('originSeekBoundaries')]
+    public function testVerifiedOriginSeeksOnlyAfterFirstFrameInterval(?float $origin, float $rate, int $start, bool $inputSeek): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+            startSegment: $start, sourceFrameRate: $rate, sourceTimestampOrigin: $origin);
+        if ($inputSeek) {
+            self::assertSame(sprintf('%.6f', ($origin ?? 0.0) + $start * 6), $args[array_search('-ss', $args, true) + 1]);
+            self::assertContains('-noaccurate_seek', $args);
+        } else {
+            self::assertNotContains('-ss', $args);
+            self::assertNotContains('-noaccurate_seek', $args);
+        }
+        if ($origin !== null) {
+            self::assertContains('-copyts', $args);
+            self::assertSame('1', $args[array_search('-seek_timestamp', $args, true) + 1]);
+            self::assertSame(sprintf('%.6f', -($origin + $start * 6)), $args[array_search('-itsoffset', $args, true) + 1]);
+        }
+        if ($start > 0) {
+            self::assertSame('atrim=start=0', $args[array_search('-af', $args, true) + 1]);
+        }
+        self::assertSame('fps=1:start_time=0:round=up', $args[array_search('-vf', $args, true) + 1]);
+    }
+
+    /** @return iterable<string, array{?float, float, int, bool}> */
+    public static function originSeekBoundaries(): iterable
+    {
+        yield 'zero origin before second frame' => [0.0, 0.1, 1, false];
+        yield 'positive origin before second frame' => [4.0, 0.1, 1, false];
+        yield 'fractional interval before second frame' => [4.0, 0.15, 1, false];
+        yield 'equal first frame interval' => [4.0, 1 / 6, 1, true];
+        yield 'later source seek' => [4.0, 0.1, 2, true];
+        yield 'fractional interval later seek' => [4.0, 0.3, 1, true];
+        yield 'no origin retains fast seek' => [null, 0.1, 1, true];
+        yield 'fresh output stays unseeked' => [4.0, 0.1, 0, false];
     }
 
     public function testAbsentOriginPreservesSparseArgumentsAndExplicitZeroDoesNot(): void

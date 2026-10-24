@@ -175,10 +175,11 @@ final class SegmentEncoder
         array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
         $sourceStart = $seeking ? $startSegment * self::SEGMENT_DURATION : 0.0;
+        $seekInput = $seeking && !($sourceTimestampOrigin !== null && $sparse && $sourceStart < 1 / $sourceFrameRate);
         if ($sourceTimestampOrigin !== null) {
             array_push($args, '-copyts', '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
         }
-        if ($seeking) {
+        if ($seekInput) {
             $args[] = '-ss';
             $args[] = sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $sourceStart);
             if ($sparse) {

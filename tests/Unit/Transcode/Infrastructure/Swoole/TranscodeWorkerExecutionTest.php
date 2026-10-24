@@ -307,7 +307,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
             self::assertSame('1', $command[array_search('-seek_timestamp', $command, true) + 1]);
             self::assertSame(sprintf('%.6f', -(4 + $sourceStart)), $command[array_search('-itsoffset', $command, true) + 1]);
             if ($index > 0) {
-                self::assertSame('10.000000', $command[array_search('-ss', $command, true) + 1]);
+                self::assertNotContains('-ss', $command);
+                self::assertNotContains('-noaccurate_seek', $command);
+                self::assertStringStartsWith('atrim=start=0', $command[array_search('-af', $command, true) + 1]);
             }
             $metadata = json_decode(file_get_contents(dirname($command[array_key_last($command)]) . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
             self::assertSame($sourceStart, (float) $metadata['startTime']);
