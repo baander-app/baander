@@ -193,14 +193,19 @@ final class SegmentEncoder
         $args[] = '-i';
         $args[] = $sourcePath;
 
-        // Independent audio EOF lets silence publish before video finishes; matching video preroll preserves their common clock.
+        // Independent audio EOF lets silence publish before video ends. Sparse
+        // video cues can follow newer audio packets, so retain one frame interval
+        // of audio preroll without changing the generation's clock.
         if ($hasAudio) {
+            $audioStart = $sparse && $seeking ? max(0.0, $sourceStart - 1 / $sourceFrameRate) : $sourceStart;
             array_push($args, '-threads', '2', '-vn', '-sn', '-dn');
             if ($sourceTimestampOrigin !== null) {
                 array_push($args, '-seek_timestamp', '1', '-itsoffset', sprintf('%.6f', -($sourceTimestampOrigin + $sourceStart)));
+            } elseif ($audioStart < $sourceStart) {
+                array_push($args, '-itsoffset', sprintf('%.6f', -($sourceStart - $audioStart)));
             }
-            if ($seekInput) {
-                array_push($args, '-ss', sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $sourceStart));
+            if ($audioStart > 0.0) {
+                array_push($args, '-ss', sprintf('%.6f', ($sourceTimestampOrigin ?? 0.0) + $audioStart));
                 if ($sparse) {
                     $args[] = '-noaccurate_seek';
                 }

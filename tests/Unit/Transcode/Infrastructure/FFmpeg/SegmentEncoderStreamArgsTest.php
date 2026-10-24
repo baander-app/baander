@@ -50,7 +50,14 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     }
 
     #[DataProvider('independentAudioInputs')]
-    public function testAudioInputSharesVideoSeekAndPrerollWithoutSharingDecoderOptions(?float $origin, float $rate, int $start, bool $videoSeeks): void
+    public function testAudioPrerollPreservesItsClockWithoutChangingVideoSeek(
+        ?float $origin,
+        float $rate,
+        int $start,
+        bool $videoSeeks,
+        ?float $audioSeek,
+        ?float $audioOffset,
+    ): void
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: $start, audioStreamIndex: 2, sourceFrameRate: $rate, sourceTimestampOrigin: $origin);
@@ -69,11 +76,19 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertContains('0:V:0', $args);
         self::assertContains('1:a:2', $args);
         self::assertSame($videoSeeks, in_array('-ss', $video, true));
-        self::assertSame($videoSeeks && $rate < 1, in_array('-noaccurate_seek', $audio, true));
+        self::assertSame($audioSeek !== null && $rate > 0 && $rate < 1, in_array('-noaccurate_seek', $audio, true));
         if ($videoSeeks) {
-            self::assertSame(sprintf('%.6f', ($origin ?? 0) + $start * 6), $audio[array_search('-ss', $audio, true) + 1]);
+            self::assertSame(sprintf('%.6f', ($origin ?? 0) + $start * 6), $video[array_search('-ss', $video, true) + 1]);
+        }
+        if ($audioSeek !== null) {
+            self::assertSame(sprintf('%.6f', $audioSeek), $audio[array_search('-ss', $audio, true) + 1]);
         } else {
             self::assertNotContains('-ss', $audio);
+        }
+        if ($audioOffset !== null) {
+            self::assertSame(sprintf('%.6f', $audioOffset), $audio[array_search('-itsoffset', $audio, true) + 1]);
+        } else {
+            self::assertNotContains('-itsoffset', $audio);
         }
         self::assertSame($origin === null ? 0 : 1, count(array_keys($args, '-copyts', true)));
         foreach ([$video, $audio] as $input) {
@@ -81,22 +96,39 @@ final class SegmentEncoderStreamArgsTest extends TestCase
                 self::assertSame('1', $input[array_search('-seek_timestamp', $input, true) + 1]);
                 self::assertSame(sprintf('%.6f', -($origin + $start * 6)), $input[array_search('-itsoffset', $input, true) + 1]);
             } else {
-                self::assertNotContains('-itsoffset', $input);
                 self::assertNotContains('-seek_timestamp', $input);
             }
         }
+        if ($origin === null) {
+            self::assertNotContains('-itsoffset', $video);
+        }
+        self::assertStringNotContainsString('asetpts', implode(',', $args));
+        if ($rate > 0 && $rate < 1 && $start > 0) {
+            self::assertSame('atrim=start=0,aresample=first_pts=0,apad=packet_size=1024', $args[array_search('-af', $args, true) + 1]);
+        }
     }
 
-    /** @return iterable<string, array{?float, float, int, bool}> */
+    /** @return iterable<string, array{?float, float, int, bool, ?float, ?float}> */
     public static function independentAudioInputs(): iterable
     {
-        yield 'ordinary fresh' => [null, 25.0, 0, false];
-        yield 'ordinary seek' => [null, 25.0, 2, true];
-        yield 'sparse fresh anchored' => [4.0, 0.1, 0, false];
-        yield 'sparse early anchored seek retains video preroll' => [4.0, 0.1, 1, false];
-        yield 'sparse later anchored seek' => [4.0, 0.1, 4, true];
-        yield 'sparse unanchored seek' => [null, 0.1, 1, true];
-        yield 'explicit zero anchored early seek' => [0.0, 0.1, 1, false];
+        yield 'ordinary fresh' => [null, 25.0, 0, false, null, null];
+        yield 'ordinary seek' => [null, 25.0, 2, true, 12.0, null];
+        yield 'ordinary anchored seek' => [4.0, 25.0, 2, true, 16.0, -16.0];
+        yield 'sparse fresh anchored' => [4.0, 0.1, 0, false, null, -4.0];
+        yield 'sparse fresh unanchored' => [null, 0.1, 0, false, null, null];
+        yield 'sparse early anchored seek retains video preroll' => [4.0, 0.1, 1, false, null, -10.0];
+        yield 'sparse second interval anchored seek' => [4.0, 0.1, 2, true, 6.0, -16.0];
+        yield 'sparse later anchored seek' => [4.0, 0.1, 4, true, 18.0, -28.0];
+        yield 'sparse early unanchored seek reads audio from beginning' => [null, 0.1, 1, true, null, -6.0];
+        yield 'sparse second interval unanchored seek' => [null, 0.1, 2, true, 2.0, -10.0];
+        yield 'sparse later unanchored seek' => [null, 0.1, 4, true, 14.0, -10.0];
+        yield 'explicit zero anchored early seek' => [0.0, 0.1, 1, false, null, -6.0];
+        yield 'explicit zero anchored late seek' => [0.0, 0.1, 4, true, 14.0, -24.0];
+        yield 'exact first interval anchored omits audio seek' => [4.0, 1 / 6, 1, true, null, -10.0];
+        yield 'exact first interval unanchored omits audio seek' => [null, 1 / 6, 1, true, null, -6.0];
+        yield 'shorter sparse interval' => [null, 0.5, 1, true, 4.0, -2.0];
+        yield 'one fps does not add preroll' => [null, 1.0, 1, true, 6.0, null];
+        yield 'unknown fps does not add preroll' => [null, 0.0, 1, true, 6.0, null];
     }
 
     public function testSoftwareEncoderBoundsItsInternalWorkerPool(): void
@@ -308,6 +340,32 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('h264', $video[array_search('-c:v', $video, true) + 1]);
         foreach (['-hwaccel', '-hwaccel_device', '-hwaccel_output_format', '-c:v'] as $flag) {
             self::assertNotContains($flag, $audio);
+        }
+    }
+
+    public function testSparseAudioPrerollDoesNotChangeVideoOnlyOrHardwareInputOptions(): void
+    {
+        $profile = new EncoderProfile(HardwareAccelerator::Vaapi, 'hevc_vaapi', 'h264', 'vaapi',
+            '/dev/dri/device with spaces', 'vaapi');
+        $encoder = new SegmentEncoder(
+            $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class),
+            $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class),
+            $profile,
+        );
+        foreach ([null, 4.0] as $origin) {
+            $args = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+                startSegment: 4, audioStreamIndex: 2, sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);
+            $videoOnly = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
+                startSegment: 4, hasAudio: false, sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);
+            self::assertSame(self::inputArguments($videoOnly, 0), self::inputArguments($args, 0));
+            self::assertCount(1, array_keys($videoOnly, '-i', true));
+            self::assertNotContains('-af', $videoOnly);
+            $offset = $origin === null ? ['-itsoffset', '-10.000000'] : ['-seek_timestamp', '1', '-itsoffset', '-28.000000'];
+            self::assertSame(['-threads', '2', '-vn', '-sn', '-dn', ...$offset,
+                '-ss', $origin === null ? '14.000000' : '18.000000', '-noaccurate_seek', '-i', '/source.mkv'],
+                self::inputArguments($args, 1));
+            self::assertContains('1:a:2', $args);
+            self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
         }
     }
 
@@ -589,7 +647,10 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame($args, $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: null));
         self::assertNotContains('-copyts', $args);
-        self::assertNotContains('-itsoffset', $args);
+        self::assertNotContains('-itsoffset', self::inputArguments($args, 0));
+        $audio = self::inputArguments($args, 1);
+        self::assertNotContains('-ss', $audio);
+        self::assertSame('-6.000000', $audio[array_search('-itsoffset', $audio, true) + 1]);
         self::assertNotContains('-seek_timestamp', $args);
         $zero = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: 1, sourceFrameRate: 0.1, sourceTimestampOrigin: 0.0);
