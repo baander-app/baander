@@ -1,7 +1,7 @@
 ---
 title: Qualify automatic movie quality switching during growing publication
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -147,3 +147,33 @@ check on Chromium's implicit favicon request, which the fixture answered with HT
 204. Its retained receipt records an aborted icon fetch, no player error, and
 3.548 seconds of rebuffering after the bandwidth drop. An inline fixture icon
 removes that unrelated request; the signed-media transport assertions stay intact.
+
+## Delivered checkpoint
+
+The browser gate passed at source revision `a159601a` with Chromium
+148.0.7778.96, HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1. It displayed
+720p, 360p and 720p at source positions 6.731, 24.443 and 90.632 seconds,
+respectively, reaching 2,181 decoded frames in 115.607 seconds of observation.
+Each phase had positive audio signal. Playback used one attachment with no player
+or transport errors. Both producers remained active and incomplete; their video
+publication edges advanced from 24/18 to 42/36 and 108/102 seconds for low/high.
+The three qualifying constrained video transfers measured 1.795, 1.650 and
+1.621 Mbit/s. One buffering pause lasted 3.545 seconds at source second 17.92;
+playback resumed at the same source position. Cleanup verified removal of the
+fixture containers. The receipt is
+`var/test-runs/movie-adaptive-acceptance/result.json`.
+
+At source revision `bb0e41b8`, the relevant backend selection passed 93 tests
+with 709 assertions across six files, and the frontend selection passed 241 tests
+across four suites. Frontend and strict fixture-entry type checks passed. Full
+PHPStan reported no errors. Deptrac reported zero violations, warnings and errors
+with 484 existing skipped violations. Shell syntax and workflow YAML checks
+passed. Only the inline fixture icon and plan documentation changed before the
+browser acceptance run. Independent code and simplification review approved the
+implementation and the icon repair without remaining findings.
+`var/test-runs/movie-adaptive-gates/verification-summary.json` records these
+checks and the retained failed calibration receipts.
+
+The runner is wired into CI, and the testing guide and ROADMAP.md record its scope
+and verification. Production behavior is unchanged. The branch remains local;
+this checkpoint includes no merge or push.
