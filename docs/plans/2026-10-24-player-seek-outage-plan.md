@@ -78,10 +78,12 @@ server request has stopped. A later committed generation still arrives through
 normal polling and its generation fence prevents stale work from replacing newer
 accepted work.
 
-A new gesture during fallback waits as one coalesced unsent target with a new
-intent revision. Assign its generation only after a fresh owned read; never inherit
-the abandoned UUID or generation. Canonical restoration must not clear that newer
-pending UI target. This is a new explicit command, not a retry of the failed chain.
+A new gesture during fallback reserves its control-queue position with a new
+intent revision. Coalesce consecutive unsent seek targets, preserving pause and
+resume commands as ordering boundaries. Assign the generation only after a fresh
+owned read; never inherit the abandoned UUID or generation. Canonical restoration
+must not clear the newer pending UI target. This is a new explicit command, not a
+retry of the failed chain.
 
 Restore the canonical source cursor through the existing source-to-media mapping.
 Preserve paused status across seek recovery. A native seek can remain unfinished
