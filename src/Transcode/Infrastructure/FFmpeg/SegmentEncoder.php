@@ -137,10 +137,23 @@ final class SegmentEncoder
         ?AudioProfile $audioProfile = null,
         string $audioFilters = '',
         bool $hasAudio = true,
+        float $sourceFrameRate = 0.0,
     ): array {
+        $sparse = is_finite($sourceFrameRate) && $sourceFrameRate > 0.0 && $sourceFrameRate < 1.0;
+        $seeking = $startSegment !== null && $startSegment > 0;
+        if ($sparse) {
+            $videoFilters = ($videoFilters === '' ? '' : $videoFilters . ',') . 'fps=1:start_time=0:round=up';
+            if ($seeking && $hasAudio) {
+                $audioFilters = 'atrim=start=0' . ($audioFilters === '' ? '' : ',' . $audioFilters);
+            }
+        }
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
         // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
-        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], ['pools=2:frame-threads=2:log-level=error', 'lp=2:fast-decode=1'], $encoderFlags);
+        $x265Limits = 'pools=2:frame-threads=2:log-level=error';
+        if ($sparse && $this->encoderProfile->encoder === 'libx265') {
+            $x265Limits .= ':rc-lookahead=0';
+        }
+        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], [$x265Limits, 'lp=2:fast-decode=1'], $encoderFlags);
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
 
         $args = [
@@ -150,16 +163,19 @@ final class SegmentEncoder
             '-loglevel',
             'error',
             '-y',
-            '-threads', '2',
+            '-threads', $sparse ? '1' : '2',
             '-filter_threads', '1',
             '-filter_complex_threads', '1',
         ];
 
         array_push($args, ...FFmpegArguments::input($this->encoderProfile));
 
-        if ($startSegment !== null && $startSegment > 0) {
+        if ($seeking) {
             $args[] = '-ss';
             $args[] = sprintf('%.6f', $startSegment * self::SEGMENT_DURATION);
+            if ($sparse) {
+                $args[] = '-noaccurate_seek';
+            }
         }
 
         $args[] = '-i';
@@ -175,6 +191,12 @@ final class SegmentEncoder
 
         if ($encoderFlags !== '') {
             array_push($args, ...FFmpegArguments::flags($encoderFlags));
+        }
+        if ($sparse) {
+            array_push($args, '-bf:v', '0');
+            if ($this->encoderProfile->encoder === 'libx264') {
+                array_push($args, '-rc-lookahead:v', '0');
+            }
         }
 
         if ($hasAudio) {

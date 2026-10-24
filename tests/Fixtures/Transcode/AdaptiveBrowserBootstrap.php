@@ -19,12 +19,21 @@ use Symfony\Component\Process\Process;
 
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
+$scenario = getenv('BAANDER_ADAPTIVE_SCENARIO') ?: 'adaptive';
+if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek'], true)) {
+    throw new RuntimeException('Unknown adaptive browser scenario: ' . $scenario);
+}
+$sparse = $scenario !== 'adaptive';
+$sourceStartTime = $scenario === 'sparse-seek' ? 6 : 0;
 $directory = AdaptiveBrowserFixture::directory();
 $audioProfile = match (getenv('BAANDER_ADAPTIVE_AUDIO_PROFILE') ?: 'streaming_stereo') {
     'streaming_stereo' => AudioProfile::streamingStereo(),
     'opus_stereo' => AudioProfile::opusStereo(),
     default => throw new RuntimeException('The adaptive fixture supports only streaming_stereo and opus_stereo.'),
 };
+if ($sparse && $audioProfile->name !== 'streaming_stereo') {
+    throw new RuntimeException('Sparse browser scenarios require streaming_stereo audio.');
+}
 if (is_file($directory . '/state.serialized') || is_file($directory . '/ready.json')) {
     throw new RuntimeException('Use a fresh disposable adaptive directory for each qualification.');
 }
@@ -39,8 +48,10 @@ if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
 }
 $source = $directory . '/source.mp4';
 $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1', '-filter_complex_threads', '1',
-    '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
-    '-t', '144', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-g', '24', '-c:a', 'aac', $source]);
+    '-f', 'lavfi', '-i', $sparse
+        ? 'color=c=red:size=1280x720:rate=1/10,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)'
+        : 'testsrc2=size=1280x720:rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+    '-t', $sparse ? '30' : '144', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-g', '24', '-c:a', 'aac', $source]);
 $rawProbe = json_decode($run(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $source]), true, 512, JSON_THROW_ON_ERROR);
 $probe = VideoProbeResult::fromProbeOutput($rawProbe);
 $generator = new Generator();
@@ -51,7 +62,7 @@ assert($storagePort instanceof TranscodeStoragePortInterface);
 $encoder = new SegmentEncoder($ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $origin = 'http://adaptive.baander.app:18778';
 $state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(),
-    'audioProfile' => $audioProfile->name, 'jobs' => []];
+    'audioProfile' => $audioProfile->name, 'sourceStartTime' => $sourceStartTime, 'jobs' => []];
 $owner = Uuid::generate();
 $commands = $readyTiers = $pairs = [];
 foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label => $tier) {
@@ -61,9 +72,10 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
     AdaptiveBrowserFixture::writeJson($output . '/generation.json', ['schemaVersion' => 2, 'generation' => 1,
         'videoCodec' => 'h264', 'videoEncoder' => 'libx264', 'audioCodec' => $audioProfile->codec,
         'audioProfile' => $audioProfile->jsonSerialize(), 'duration' => $probe->duration,
-        'startTime' => 0, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
+        'startTime' => $sourceStartTime, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
-        audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true);
+        startSegment: $scenario === 'sparse-seek' ? 1 : null, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
+        sourceFrameRate: $probe->framerate);
     $input = array_search('-i', $arguments, true);
     if ($input === false) {
         throw new RuntimeException('The encoder omitted its source.');
@@ -103,7 +115,8 @@ try {
         usleep(50_000);
     } while (true);
     AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'manifestUrl' => $manifest,
-        'expectedDuration' => $probe->duration, 'frameRate' => $probe->framerate, 'ffmpegVersion' => $version,
+        'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
+        'sourceFrameRate' => $probe->framerate, 'sourceStartTime' => $sourceStartTime, 'scenario' => $scenario, 'ffmpegVersion' => $version,
         'audioProfile' => $audioProfile->name,
         'tiers' => $readyTiers, 'canonicalAudioJobId' => $readyTiers['low']['jobId']]);
     $startedAt = null;
@@ -115,7 +128,7 @@ try {
             $startedAt = microtime(true);
         }
         foreach ($commands as $name => $arguments) {
-            if (!isset($producers[$name]) && $startedAt !== null && microtime(true) >= $startedAt + ($name === '720p' ? 6 : 0)) {
+            if (!isset($producers[$name]) && $startedAt !== null && microtime(true) >= $startedAt + (!$sparse && $name === '720p' ? 6 : 0)) {
                 $producers[$name] = new Process($arguments, timeout: 174);
                 $producers[$name]->start(static function (string $type, string $bytes) use ($directory, $name): void {
                     file_put_contents($directory . '/producer-' . $name . '.log', $bytes, FILE_APPEND);
