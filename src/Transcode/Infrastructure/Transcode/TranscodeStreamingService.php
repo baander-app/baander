@@ -17,6 +17,7 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
@@ -89,7 +90,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         $primaryContext = $primary['context'];
         $audio = $primaryContext['presentation']->track(MediaTrack::Audio);
         $audioGroups = $audio === null ? [] : [[
-            'language' => $primaryJob->getProbeData()['audioStreams'][0]['language'] ?? 'und',
+            'language' => VideoProbeResult::fromSerialized($primaryJob->getProbeData())->selectedAudioStream()->language ?? 'und',
             'name' => 'Audio', 'groupId' => 'audio', 'isDefault' => true,
             'channels' => (string) $primaryContext['runtime']->desired->audioProfile->channelCount,
             'uri' => $this->trackUrl($primaryJob, MediaTrack::Audio, 'media.m3u8', $primaryContext['runtime']->generation, $expiresAt),
@@ -186,7 +187,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         }
         $audioTrack = $primary['context']['presentation']->track(MediaTrack::Audio);
         $audio = $audioTrack === null ? null : $this->dashTrack($primary['job'], $primary['context'], $audioTrack, $expiresAt) + [
-            'language' => $primary['job']->getProbeData()['audioStreams'][0]['language'] ?? 'und',
+            'language' => VideoProbeResult::fromSerialized($primary['job']->getProbeData())->selectedAudioStream()->language ?? 'und',
             'bandwidth' => $primary['context']['runtime']->desired->audioProfile->bitrate,
             'sample_rate' => $primary['context']['runtime']->desired->audioProfile->sampleRate,
             'channels' => $primary['context']['runtime']->desired->audioProfile->channelCount,

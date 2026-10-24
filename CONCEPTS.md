@@ -178,6 +178,16 @@ The primary playback job's audio track shared by the video representations in a
 signed rendition set. Other quality tiers do not become separate audio choices.
 A source without audio has no canonical audio track.
 
+### Source audio selection
+
+The source audio chosen for movie encoding: the first track marked default in
+discovery order, or the first audio track when none is marked. No audio means no
+selection. Its nullable ordinal is a position among audio streams, separate from
+the global FFprobe stream index. The same choice supplies mapping, filter
+attributes and manifest language without reordering discovered tracks. It is
+independent of the selected video's Source timestamp origin and does not add
+interactive track controls.
+
 ### Source position
 
 A playback position measured from the beginning of the source video. Subtracting

@@ -87,6 +87,13 @@ final class TranscodeStreamManagerTest extends TestCase
         self::assertSame(1, $this->spawner->spawnCount);
     }
 
+    public function testSourceAudioOrdinalReachesEncoderMapping(): void
+    {
+        $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '', audioStreamOrdinal: 1);
+        self::assertContains('0:a:1', $this->spawner->lastCommand);
+        self::assertNotContains('0:a:0', $this->spawner->lastCommand);
+    }
+
     public function testOpaqueNativeAttemptCarriesNoLocalProcessDescriptors(): void
     {
         $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '');

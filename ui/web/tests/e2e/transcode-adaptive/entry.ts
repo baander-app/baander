@@ -5,12 +5,23 @@ const originalVideo = video
 const errors: string[] = []
 const events: { name: string; at: number; time: number }[] = []
 const frames: { at: number; time: number; width: number; height: number; phase: string }[] = []
-const audio: { at: number; rms: number; phase: string }[] = []
+interface AudioObservation {
+  at: number
+  time: number
+  rms: number
+  phase: string
+  sampleRate: number
+  dominantFrequency: number | null
+  frequencyBinHz: number | null
+  peakDecibels: number | null
+}
+const audio: AudioObservation[] = []
 let phase = 'startup'
 let attachments = 0
 let readyCount = 0
 let audioContext: AudioContext | undefined
 let analyser: AnalyserNode | undefined
+let frequencyBins: Float32Array<ArrayBuffer> | undefined
 let phaseAudioSamples = 0
 let phaseAudioPeak = 0
 let firstPlayingTime: number | null = null
@@ -43,7 +54,29 @@ setInterval(() => {
   const energy = samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length
   const rms = Math.sqrt(energy)
   phaseAudioPeak = Math.max(phaseAudioPeak, rms)
-  audio.push({ at: performance.now(), rms, phase })
+  const sampleRate = audioContext?.sampleRate ?? 0
+  let dominantFrequency: number | null = null
+  let frequencyBinHz: number | null = null
+  let peakDecibels: number | null = null
+  if (window.adaptiveFrequencyAnalysis && sampleRate > 0) {
+    frequencyBins ??= new Float32Array(analyser.frequencyBinCount)
+    analyser.getFloatFrequencyData(frequencyBins)
+    let peak = -Infinity
+    let peakBin = 0
+    for (let bin = 1; bin < frequencyBins.length; bin++) {
+      if (frequencyBins[bin] > peak) {
+        peak = frequencyBins[bin]
+        peakBin = bin
+      }
+    }
+    frequencyBinHz = sampleRate / analyser.fftSize
+    if (Number.isFinite(peak) && rms > 0.001) {
+      dominantFrequency = peakBin * frequencyBinHz
+      peakDecibels = peak
+    }
+  }
+  audio.push({ at: performance.now(), time: video.currentTime, rms, phase, sampleRate,
+    dominantFrequency, frequencyBinHz, peakDecibels })
   if (audio.length > 30) audio.shift()
   phaseAudioSamples++
 }, 100)
@@ -89,7 +122,7 @@ function adaptiveState() {
     width: video.videoWidth, height: video.videoHeight,
     decodedFrames: video.getVideoPlaybackQuality().totalVideoFrames,
     paused: video.paused, ended: video.ended, playbackRate: video.playbackRate,
-    phaseAudioPeak, phaseAudioSamples, audioContextState: audioContext?.state ?? null,
+    phaseAudioPeak, phaseAudioSamples, audioContextState: audioContext?.state ?? null, audioContextSampleRate: audioContext?.sampleRate ?? null,
     attachments, readyCount, sourceChanges, sameVideo: video === originalVideo && document.querySelector('#video') === originalVideo,
     firstPlayingTime, mediaError: video.error ? { code: video.error.code, message: video.error.message } : null,
     errors: [...errors], events: [...events], frames: [...frames], audio: [...audio],
@@ -99,6 +132,7 @@ function adaptiveState() {
 declare global {
   interface Window {
     adaptiveManifest: string
+    adaptiveFrequencyAnalysis?: boolean
     adaptivePhase: typeof adaptivePhase
     adaptiveState: typeof adaptiveState
   }

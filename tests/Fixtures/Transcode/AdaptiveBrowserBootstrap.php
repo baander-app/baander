@@ -23,11 +23,12 @@ use Symfony\Component\Process\Process;
 require __DIR__ . '/AdaptiveBrowserFixture.php';
 
 $scenario = getenv('BAANDER_ADAPTIVE_SCENARIO') ?: 'adaptive';
-if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek'], true)) {
+if (!in_array($scenario, ['adaptive', 'sparse-fresh', 'sparse-seek', 'matroska-delayed-fresh', 'matroska-delayed-seek', 'ordinary-delayed-fresh', 'ordinary-delayed-seek', 'default-audio-fresh', 'default-audio-seek'], true)) {
     throw new RuntimeException('Unknown adaptive browser scenario: ' . $scenario);
 }
 $matroska = str_starts_with($scenario, 'matroska-delayed-');
-$ordinary = str_starts_with($scenario, 'ordinary-delayed-');
+$defaultAudio = str_starts_with($scenario, 'default-audio-');
+$ordinary = $defaultAudio || str_starts_with($scenario, 'ordinary-delayed-');
 $sparse = $matroska || str_starts_with($scenario, 'sparse-');
 $delayedAudio = $matroska || $ordinary;
 $hasSubtitles = $matroska;
@@ -53,7 +54,17 @@ $version = strtok($run(['/usr/bin/ffmpeg', '-version']), "\n");
 if (!is_string($version) || !str_starts_with($version, 'ffmpeg version 5.')) {
     throw new RuntimeException('The browser qualification requires FFmpeg 5: ' . (string) $version);
 }
-if ($ordinary) {
+if ($defaultAudio) {
+    $source = $directory . '/source.mov';
+    $dialogue = implode('|', array_fill(0, 6, '0.05*sin(2*PI*880*t)'));
+    $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
+        '-f', 'lavfi', '-i', 'color=c=red:size=1280x720:rate=25,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)',
+        '-f', 'lavfi', '-i', 'sine=frequency=220:sample_rate=44100:duration=30',
+        '-itsoffset', '8', '-f', 'lavfi', '-i', 'aevalsrc=' . $dialogue . ':s=48000:d=22:c=5.1(side)',
+        '-map', '0:v', '-map', '1:a', '-map', '2:a', '-t', '30', '-c:v', 'libx264', '-threads', '1', '-preset', 'ultrafast',
+        '-pix_fmt', 'yuv420p', '-bf', '0', '-g', '25', '-c:a', 'pcm_s16le',
+        '-disposition:a:0', '0', '-disposition:a:1', 'default', '-metadata:s:a:0', 'language=eng', '-metadata:s:a:1', 'language=dan', $source]);
+} elseif ($ordinary) {
     $source = $directory . '/source.mov';
     $run(['/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
         '-f', 'lavfi', '-i', 'color=c=red:size=1280x720:rate=25,drawbox=color=green:t=fill:enable=gte(t\,10),drawbox=color=blue:t=fill:enable=gte(t\,20)',
@@ -105,15 +116,30 @@ foreach ($rawProbe['packets'] ?? [] as $packet) {
         break;
     }
 }
+$selectedAudioOrdinal = $probe->selectedAudioStreamOrdinal() ?? throw new RuntimeException('Browser movies must contain source audio.');
+$selectedAudio = $probe->selectedAudioStream() ?? throw new RuntimeException('The selected browser movie audio must exist.');
+$rawAudioStreams = array_values(array_filter($rawProbe['streams'] ?? [], static fn (array $stream): bool => ($stream['codec_type'] ?? null) === 'audio'));
+if ($defaultAudio && (count($rawAudioStreams) !== 2 || $selectedAudioOrdinal !== 1
+    || ($rawAudioStreams[0]['index'] ?? null) !== 1 || ($rawAudioStreams[1]['index'] ?? null) !== 2
+    || (bool) ($rawAudioStreams[0]['disposition']['default'] ?? false) || !(bool) ($rawAudioStreams[1]['disposition']['default'] ?? false)
+    || ($rawAudioStreams[0]['tags']['language'] ?? null) !== 'eng' || ($rawAudioStreams[0]['channels'] ?? null) !== 1
+    || ($rawAudioStreams[0]['channel_layout'] ?? null) !== 'mono'
+    || (int) ($rawAudioStreams[0]['sample_rate'] ?? 0) !== 44100 || (float) ($rawAudioStreams[0]['start_time'] ?? -1) !== 0.0
+    || $selectedAudio->language !== 'dan' || $selectedAudio->channels !== 6 || $selectedAudio->sampleRate !== 48000
+    || $selectedAudio->channelLayout !== '5.1(side)' || !$selectedAudio->isDefault
+    || $probe->audioChannels !== 6 || $probe->audioSampleRate !== 48000 || $probe->audioChannelLayout !== '5.1(side)')) {
+    throw new RuntimeException('The marked Danish surround dialogue must remain audio ordinal one and global stream two after mono English commentary.');
+}
 $sourceAudioFirstPts = null;
 if ($ordinary) {
-    $audioPacketArguments = ['/usr/bin/ffprobe', '-v', 'error', '-select_streams', 'a:0', '-show_packets',
+    $audioPacketArguments = ['/usr/bin/ffprobe', '-v', 'error', '-select_streams', 'a:' . $selectedAudioOrdinal, '-show_packets',
         '-read_intervals', '%+#1', '-show_entries', 'packet=stream_index,pts_time,flags', '-of', 'json', $source];
     $audioPacketProbe = json_decode($run($audioPacketArguments), true, 512, JSON_THROW_ON_ERROR);
     AdaptiveBrowserFixture::writeJson($directory . '/source-audio-packet.json', $audioPacketProbe);
     AdaptiveBrowserFixture::writeJson($directory . '/source-audio-packet-command.json', $audioPacketArguments);
     $sourceAudioFirstPts = isset($audioPacketProbe['packets'][0]['pts_time']) ? (float) $audioPacketProbe['packets'][0]['pts_time'] : null;
-    if ($probe->sourceTimestampOrigin !== null || $probe->framerate !== 25.0 || $sourceVideoFirstPts !== 0.0
+    if (($audioPacketProbe['packets'][0]['stream_index'] ?? null) !== $rawAudioStreams[$selectedAudioOrdinal]['index']
+        || $probe->sourceTimestampOrigin !== null || $probe->framerate !== 25.0 || $sourceVideoFirstPts !== 0.0
         || $sourceAudioFirstPts !== 8.0 || abs($probe->duration - 30.0) > 0.01 || $probe->subtitleStreams !== []) {
         throw new RuntimeException('The ordinary fixture must verify video zero, twenty-five fps, audio eight, no anchor and no subtitles.');
     }
@@ -139,7 +165,7 @@ foreach (['low' => QualityTier::p360(), 'high' => QualityTier::p720()] as $label
         'audioProfile' => $audioProfile->jsonSerialize(), 'duration' => $probe->duration,
         'startTime' => $sourceStartTime, 'nativeAvailabilityStartTime' => gmdate('Y-m-d\TH:i:s\Z')]);
     $arguments = $encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier), $output,
-        startSegment: $sourceStartTime > 0 ? 1 : null, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
+        startSegment: $sourceStartTime > 0 ? 1 : null, audioStreamIndex: $selectedAudioOrdinal, audioProfile: $audioProfile, audioFilters: $encoder->buildAudioFiltersForProfile($probe, $audioProfile), hasAudio: true,
         sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin);
     if ($hasSubtitles) {
         $track = $probe->subtitleStreams[0] ?? throw new RuntimeException('The delayed movie must contain its embedded subtitle.');
@@ -193,6 +219,9 @@ try {
         'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
         'sourceTimestampOrigin' => $probe->sourceTimestampOrigin, 'rawSourceDuration' => $rawProbe['format']['duration'] ?? null,
         'expectedAudioDelay' => $delayedAudio ? 8 - $sourceStartTime : 0,
+        'selectedAudioOrdinal' => $selectedAudioOrdinal, 'selectedAudioGlobalIndex' => $rawAudioStreams[$selectedAudioOrdinal]['index'],
+        'selectedAudio' => $selectedAudio->jsonSerialize(), 'sourceAudioStreams' => $rawAudioStreams,
+        'expectedAudioFrequency' => $defaultAudio ? 880 : null, 'rejectedAudioFrequency' => $defaultAudio ? 220 : null,
         'sourceDuration' => $probe->duration, 'sourceVideoFirstPts' => $sourceVideoFirstPts, 'sourceAudioFirstPts' => $sourceAudioFirstPts,
         'hasSubtitles' => $hasSubtitles,
         'expectedCues' => $hasSubtitles ? ($sourceStartTime > 0

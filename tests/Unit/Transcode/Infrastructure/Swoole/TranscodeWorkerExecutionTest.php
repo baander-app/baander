@@ -59,6 +59,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private ?Closure $onFence = null;
     private float $sourceDuration = 6.0;
     private string $sourceFrameRate = '0/0';
+    /** @var list<array<string, mixed>>|null */
+    private ?array $sourceAudioStreams = null;
     private ?float $sourceTimestampOrigin = null;
     /** @var list<list<string>> */
     private array $probeCommands = [];
@@ -132,7 +134,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
                     'format_name' => 'matroska,webm', 'start_time' => ($this->sourceTimestampOrigin ?? 0.0) + 8.0],
                 'packets' => $this->sourceTimestampOrigin === null ? [] : [['stream_index' => 0, 'pts_time' => $this->sourceTimestampOrigin, 'flags' => 'K_']],
                 'streams' => array_merge([['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'width' => 1280, 'height' => 720, 'r_frame_rate' => $this->sourceFrameRate, 'has_b_frames' => 0]],
-                    $this->sourceHasAudio ? [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000']] : [], $this->subtitleStreams),
+                    $this->sourceHasAudio ? ($this->sourceAudioStreams ?? [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2, 'sample_rate' => '48000']]) : [], $this->subtitleStreams),
             ], JSON_THROW_ON_ERROR)];
         });
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
@@ -227,6 +229,62 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $second = $this->spawner->commands[1];
         self::assertStringContainsString('/generation-2/', $second[array_key_last($second)]);
         self::assertSame('32000', $second[array_search('-b:a', $second, true) + 1]);
+    }
+
+    public function testDefaultAudioReachesInitialSeekReplacementAndRecoveredLaunches(): void
+    {
+        $this->sourceFrameRate = '25/1';
+        $this->sourceAudioStreams = [
+            ['index' => 4, 'codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 1,
+                'sample_rate' => '44100', 'channel_layout' => 'mono', 'disposition' => ['default' => 0]],
+            ['index' => 7, 'codec_type' => 'audio', 'codec_name' => 'pcm_s16le', 'channels' => 6,
+                'sample_rate' => '48000', 'channel_layout' => '5.1(side)', 'disposition' => ['default' => 1]],
+        ];
+        $this->sourceDuration = 60.0;
+        $this->spawner->running = true;
+        $phase = 0;
+        $this->spawner->onRunning = function () use (&$phase): void {
+            if ($phase === 0) {
+                $phase = 1;
+                $this->current = $this->claim(2, 2, position: 24.0);
+            } elseif (count($this->spawner->commands) === 2) {
+                // The owning worker disappears after the replacement was launched.
+                $this->current = null;
+            }
+        };
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertCount(2, $this->spawner->commands);
+        self::assertSame(TranscodeStatus::InProgress, $this->job->getStatus());
+        $this->current = $this->claim(3, 3, position: 24.0);
+        $this->spawner->onRunning = function (): void {
+            $this->current = $this->claim(3, 4, 'cancelled', position: 24.0);
+        };
+        $this->worker->run($this->current, static fn(): bool => false);
+        self::assertCount(3, $this->spawner->commands);
+        foreach ($this->spawner->commands as $index => $command) {
+            self::assertContains('0:a:1', $command);
+            self::assertNotContains('0:a:0', $command);
+            $filters = $command[array_search('-af', $command, true) + 1];
+            self::assertStringContainsString('pan=stereo', $filters);
+            self::assertStringContainsString('0.1847*SL', $filters);
+            self::assertStringContainsString('0.1847*SR', $filters);
+            self::assertStringContainsString('equalizer', $filters);
+            self::assertStringNotContainsString('aresample=48000', $filters);
+            if ($index === 0) {
+                self::assertNotContains('-ss', $command);
+            } else {
+                self::assertSame('6.000000', $command[array_search('-ss', $command, true) + 1]);
+            }
+        }
+        $retained = VideoProbeResult::fromSerialized($this->job->getProbeData());
+        self::assertSame(1, $retained->selectedAudioStreamOrdinal());
+        self::assertSame(6, $retained->audioChannels);
+        self::assertSame('pcm_s16le', $retained->audioCodec);
+        self::assertSame('5.1(side)', $retained->audioChannelLayout);
+        self::assertSame(48000, $retained->audioSampleRate);
+        self::assertNotContains('failed', $this->observed);
+        self::assertContains('cancelled', $this->observed);
+        self::assertSame(0, $this->allocations);
     }
 
     public function testSparseProbeReachesInitialSeekReplacementAndRecoveredLaunches(): void

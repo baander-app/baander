@@ -608,6 +608,27 @@ sample durations and signed composition offsets, with the actual timescale and
 unshifted initialization edit. FFprobe timestamps remain diagnostic evidence;
 subtracting its first reported PTS must not conceal a displaced presentation.
 
+`SegmentEncoderDefaultAudioMediaTest` drives the production probe, stream
+manager, encoder and HLS renderer with distinguishable source audio. Commentary
+is 220 Hz, mono/44.1 kHz/English; later default dialogue is 880 Hz,
+surround/48 kHz/Danish. Selection uses the first marked default in discovery
+order, falling back to the first audio track when none is marked. Multiple
+defaults choose the first marked track; no audio has no selected ordinal.
+The ordinal counts audio streams and does not use the global FFprobe index.
+Discovered order stays intact, while raw/serialized probe reconstruction and
+direct construction derive the same selected codec, channels, sample rate and
+layout for filters and mapping. Native MPD and production HLS/DASH manifest
+checks establish selected language; independent HLS probes check actual codec,
+sample rate and channels alongside decoded tone identity.
+
+Independent fragment and full HLS decoding require the selected tone and complete
+fresh/seek-six tails for AAC and Opus. No-default and multiple-default controls,
+eight-second delayed dialogue and delayed unselected commentary check selection
+and timing together. Fixture preflight verifies actual defaults and layouts:
+MOV PCM supplies the marked-default cases, and Matroska FLAC preserves an
+explicitly absent default. The chosen audio keeps its own timestamps and existing
+leading-silence normalization; video-origin qualification remains independent.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each
@@ -1255,6 +1276,33 @@ one attachment and no media or transport errors remain required. These scenarios
 qualify the selected software movie path and Chromium HLS. They do not certify
 arbitrary timestamp discontinuities, new source-origin handling, hardware, other
 browsers, DASH browser playback or formal CMAF conformance.
+
+### Source default audio playback
+
+Use the isolated runner with the marked-default source and AAC:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci:local BAANDER_TEST_VIDEO_SCENARIO=default-audio-fresh \
+BAANDER_TEST_AUDIO_PROFILE=streaming_stereo bash scripts/test-transcode-adaptive-browser.sh
+```
+
+Set `BAANDER_TEST_VIDEO_SCENARIO=default-audio-seek` for the six-second restart.
+Both scenarios use the thirty-second 25-fps colour source without subtitles.
+Commentary starts at zero; default dialogue starts at source second eight.
+Preflight checks dispositions, the audio ordinal versus global index, selected
+attributes and the dialogue's actual first packet. The selected language must be
+Danish, and measured browser frequency must identify 880 Hz dialogue rather than
+220 Hz commentary at several post-onset and late-hold windows. The tolerance is
+1.5 analyser bins, using the recorded sample rate and FFT resolution.
+
+Complete thirty-/24-second playback, eight-/two-second initial silence,
+frame/colour clocks, growing publication, signed fresh canonical audio, stable
+targets, one attachment and bounded capture cleanup remain required. The browser
+negative control restores only the old producer's ordinal-zero map and
+first-track filter chain in a disposable copy, preserving current preflight,
+metadata and assertions. It tests the oracle against the demonstrated producer
+behavior; it does not run an entire old application stack. This selection adds
+no interactive audio controls or new source-origin qualification.
 
 ### Ordinary worker autoscaling qualification
 

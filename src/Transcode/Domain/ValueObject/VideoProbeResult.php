@@ -8,6 +8,11 @@ use JsonSerializable;
 
 final readonly class VideoProbeResult implements JsonSerializable
 {
+    public int $audioChannels;
+    public string $audioCodec;
+    public int $audioSampleRate;
+    public string $audioChannelLayout;
+
     /**
      * @param array<AudioStreamInfo> $audioStreams All audio streams found by FFprobe
      * @param array<SubtitleTrackInfo> $subtitleStreams All subtitle streams found by FFprobe
@@ -22,15 +27,38 @@ final readonly class VideoProbeResult implements JsonSerializable
         public ?string $pixFmt,
         public int $videoBitrate,
         public string $videoCodec,
-        public int $audioChannels,
-        public string $audioCodec,
-        public int $audioSampleRate,
+        int $audioChannels,
+        string $audioCodec,
+        int $audioSampleRate,
         public bool $isInterlaced,
         public array $audioStreams = [],
         public array $subtitleStreams = [],
-        public string $audioChannelLayout = '',
+        string $audioChannelLayout = '',
         public ?float $sourceTimestampOrigin = null,
     ) {
+        $selected = $this->selectedAudioStream();
+        $this->audioChannels = $selected->channels ?? $audioChannels;
+        $this->audioCodec = $selected->codec ?? $audioCodec;
+        $this->audioSampleRate = $selected->sampleRate ?? $audioSampleRate;
+        $this->audioChannelLayout = $selected->channelLayout ?? $audioChannelLayout;
+    }
+
+    public function selectedAudioStreamOrdinal(): ?int
+    {
+        foreach (array_values($this->audioStreams) as $ordinal => $stream) {
+            if ($stream->isDefault) {
+                return $ordinal;
+            }
+        }
+
+        return $this->audioStreams === [] ? null : 0;
+    }
+
+    public function selectedAudioStream(): ?AudioStreamInfo
+    {
+        $ordinal = $this->selectedAudioStreamOrdinal();
+
+        return $ordinal === null ? null : array_values($this->audioStreams)[$ordinal];
     }
 
     /**

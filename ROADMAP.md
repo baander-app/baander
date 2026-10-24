@@ -12,17 +12,8 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-Select source default audio next. The retained two-tone host calibration selects
-first-track commentary instead of the marked default dialogue, and static
-inspection confirms the movie path uses that first track for encoding, filter
-attributes and manifest language. Proof is under
-`var/test-runs/ordinary-movie-audio-delay-gates/default-audio-follow-up`; it is
-host explicit-map and source inspection evidence, not a live worker or browser
-reproduction. Plan a repair that keeps selection and metadata on the same source
-track. Interactive alternate-track selection remains separate.
-
-Historical unchecked items, old plan limitations and incomplete experiments do
-not authorize other work. The retained
+No further implementation task is selected here. Historical unchecked items,
+old plan limitations and incomplete experiments do not authorize work. The retained
 [plans](docs/plans/) supply design context; reconcile them with current callers and
 behavior before proposing a change. This applies to older cache/sweep, segmenter,
 FLAC/DSP and secondary-client plans as well as developer tooling.
@@ -2009,3 +2000,90 @@ Acceptance covers the selected software movie path and Chromium HLS, excluding
 arbitrary timestamp discontinuities, new source-origin handling, hardware, other
 browsers, DASH browser playback and formal CMAF conformance. Original media and
 existing application services were untouched. No merge or push is included.
+
+### Source default audio selection — 2026-10-24
+
+Movie playback derives one Source audio selection: the first audio track marked
+default in discovery order, otherwise the first audio track. Its nullable audio
+ordinal maps FFmpeg `0:a:N`, separately from global stream indices; no audio means
+no selection. The original list order is preserved. Probe scalar codec, channels,
+sample rate and layout, worker mapping and HLS/DASH language share that choice
+across raw/serialized reconstruction, direct construction, initial launch, seek
+and recovery. Video-origin qualification remains independent, and selected audio
+retains its own timestamps and leading silence. No interactive track controls,
+API, schema or migration are introduced.
+
+The before-code CI audit at `aa2777d4` drove the actual stream manager and encoder.
+Fresh and six-second seek commands selected 220 Hz commentary with mono/44.1 kHz
+attributes and English language instead of the marked 880 Hz, 48 kHz/surround,
+Danish dialogue. Complete fourteen-/eight-second HLS decodes retained the wrong
+tone. `var/test-runs/source-default-audio-audit/summary.json` records that path;
+it extends the earlier host calibration without claiming subscriber recovery
+or browser qualification from the same receipt.
+
+Native fixture preflight first rejected Matroska PCM because its source layout
+metadata was lost. Calibrated MOV PCM preserves layouts for marked-default and
+multiple-default cases; Matroska FLAC preserves explicitly absent defaults.
+Raw disposition/layout assertions were retained. An invalid language expectation
+on a standalone HLS media probe was corrected: native MPD and service/browser
+manifests establish language, while HLS probes check codec, rate and channels.
+Native cases exercise AAC/Opus, no/multiple defaults and independent audio delays.
+
+Final native verification passed twelve tests with 1,707 assertions. Second-
+default output retained Danish 880 Hz dialogue; no/multiple-default controls
+retained the first English 220 Hz track. AAC selected-delay onset was 8.02 seconds
+fresh and 2.02 after seeking; delayed unselected commentary left dialogue near
+zero. Opus and fallback controls retained their bounded onset and complete
+fourteen-/eight-second intervals with codec padding. Failed fixture and observer
+receipts remain separate from `native-green-final`.
+
+The full Transcode CI gate at `630623a3` passed 1,088 tests with 23,651 assertions
+across 82 files: 1,006 with 12,385 in the ordinary lane and 82 with 11,266 in the
+native lane, including the twelve focused cases. The receipt is
+`var/test-runs/source-default-audio-gates/backend/20261024-192222-76247711`.
+Static analysis then identified six redundant null-safe operators. Reviewed
+behavior-equivalent cleanup `e2bc3fc3` retained null-coalescing behavior and passed
+105 affected CI tests with 911 assertions; the full suite was not repeated.
+Full PHPStan passed at that revision; Deptrac reported zero violations, warnings
+and errors with 484 existing skipped violations.
+
+The producer-only negative reached thirty seconds and 750 decoded frames,
+then failed the intended tone assertion: it measured 215.33203125 Hz commentary
+instead of 880 Hz dialogue. All 743 captures closed and cleanup passed. Its
+exact override and evidence are retained under `browser-producer-red`.
+
+All five final Chromium scenarios passed at `e2bc3fc3`. New default-audio fresh
+playback reached thirty seconds/750 decoded frames with onset at 8.242667 after
+33 silent samples; seek-six reached 24 seconds/600 frames with onset at 2.109947
+after seven silent samples. Both retained 216 audible measurements using the
+actual 44.1 kHz AudioContext. All three required windows measured 882.861328125 Hz
+within 1.5 FFT bins of the expected dialogue; fresh window counts were 10/10/18
+and sought counts 10/10/17. Their 735/592 native captures all closed without
+pending copies or capture errors.
+
+The ordinary delayed control retained thirty seconds/750 decoded frames and the
+Matroska control retained thirty seconds/29 captures with subtitle checks passing.
+The adaptive control passed in 115.677 seconds with 720p-to-360p-to-720p at source
+positions 6.594667, 24.610667 and 90.709333. That bounded switch proof does not
+qualify the full 144-second tail. All five cleanup receipts passed; only the
+original nginx, PostgreSQL and Redis containers remained. Browser versions were
+Chromium 148.0.7778.96, Playwright 1.60.0 and HLS.js 1.7.3, with FFmpeg
+5.1.9-0+deb12u1. `var/test-runs/source-default-audio-gates/acceptance-summary.json`
+retains scenario directories, source revisions and measured observations.
+
+The producer-only browser negative restores the old ordinal-zero mapping and
+first-track filters while retaining current fixture preflight and metadata.
+It qualifies the browser oracle against old producer behavior, not a complete
+old-stack reproduction. The testing guide records that boundary and required
+frequency identity alongside silence, complete tails and native-frame checks.
+The shared vocabulary now defines Source audio selection. Independent code and
+simplification review approved the change. CI selects the new browser scenarios
+and registers the native class in its serial lane. Prose audits, local-link and
+whitespace checks passed.
+
+Evidence is under `var/test-runs/source-default-audio-gates`. Acceptance covers
+the selected software movie path, native AAC/Opus, manifest language and Chromium
+HLS. Interactive audio switching, arbitrary discontinuities, additional source
+origins, hardware, other browsers, DASH browser playback and formal CMAF
+conformance remain unqualified. Existing application services and original media
+were untouched. No merge or push is included.
