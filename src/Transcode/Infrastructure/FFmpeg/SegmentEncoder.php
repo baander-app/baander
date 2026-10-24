@@ -121,7 +121,7 @@ final class SegmentEncoder
      * @param string $videoFilters FFmpeg video filter chain (-vf), may be empty
      * @param string $outputDir Directory for segment output
      * @param ?int $startSegment Starting segment number (for seek support)
-     * @param int $videoStreamIndex Source video stream index (default 0)
+     * @param int $videoStreamIndex Ordinal among source video streams excluding attached pictures (default 0)
      * @param int $audioStreamIndex Source audio stream index (default 0)
      * @param bool $hasAudio Whether the source contains an audio stream
      * @return list<string> FFmpeg argument array (bypasses shell entirely via proc_open array form)
@@ -167,7 +167,7 @@ final class SegmentEncoder
 
         // One encoder process produces separate video and available audio tracks.
         $args[] = '-map';
-        $args[] = sprintf('0:v:%d', $videoStreamIndex);
+        $args[] = sprintf('0:V:%d', $videoStreamIndex);
         if ($hasAudio) {
             $args[] = '-map';
             $args[] = sprintf('0:a:%d', $audioStreamIndex);

@@ -48,7 +48,7 @@ final readonly class VideoProbeResult implements JsonSerializable
         foreach ($streams as $stream) {
             $codecType = $stream['codec_type'] ?? '';
 
-            if ($codecType === 'video' && empty($videoStream)) {
+            if ($codecType === 'video' && empty($videoStream) && empty($stream['disposition']['attached_pic'])) {
                 $videoStream = $stream;
             }
 
@@ -66,7 +66,8 @@ final readonly class VideoProbeResult implements JsonSerializable
         }
 
         // Fallback: if no codec_type, use index-based heuristic
-        if (empty($videoStream) && isset($streams[0])) {
+        if (empty($videoStream) && isset($streams[0]) && !isset($streams[0]['codec_type'])
+            && empty($streams[0]['disposition']['attached_pic'])) {
             $videoStream = $streams[0];
         }
         if (empty($audioStream) && isset($streams[1])) {
