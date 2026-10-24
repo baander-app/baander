@@ -74,9 +74,22 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('init-$RepresentationID$.mp4', $args[array_search('-init_seg_name', $args, true) + 1]);
         self::assertSame('track-$RepresentationID$-seg-$Number%05d$.m4s', $args[array_search('-media_seg_name', $args, true) + 1]);
         self::assertSame('/out/p720/manifest.mpd', $args[array_key_last($args)]);
-        self::assertContains('0:v:0', $args);
+        self::assertContains('0:V:0', $args);
         self::assertContains('0:a:0', $args);
         self::assertContains('aac', $args);
+    }
+
+    public function testVideoOrdinalCountsOnlyNonAttachedVideoStreams(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/source.mp4', QualityTier::p720(), '', '/output',
+            videoStreamIndex: 1, audioStreamIndex: 2);
+        $maps = [];
+        foreach ($args as $index => $argument) {
+            if ($argument === '-map') {
+                $maps[] = $args[$index + 1];
+            }
+        }
+        self::assertSame(['0:V:1', '0:a:2'], $maps);
     }
 
     public function testBuildStreamArgsIncludesBitrateFlagsFromTier(): void

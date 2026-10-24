@@ -509,6 +509,16 @@ display-gamut certification, a complete HDR reference-vector suite, Dolby Vision
 or hardware acceleration. Native colour checks do not establish new HTTP or
 browser playback acceptance.
 
+`SegmentEncoderSourceSelectionMediaTest` generates a moving movie with distinct
+attached artwork and checks both cover-first and cover-last stream ordering with
+FFprobe. It runs the production probe, filters and command builder, reads the
+published presentation, then independently decodes each initialization/media pair.
+Fresh 14-second output and the eight-second tail after source second six must
+retain the movie dimensions, frame rate, duration and changing frames. A cover-only
+source must fail the required video mapping and publish no movie fragments.
+These cases qualify native source selection through publication; they do not add
+browser playback acceptance or establish CMAF conformance.
+
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and
 Redis DSNs are exported so nested PHP processes reach the same stack. Each

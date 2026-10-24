@@ -52,6 +52,68 @@ class VideoProbeResultTest extends TestCase
         $this->assertFalse($result->isHdr());
     }
 
+    /** @param list<array<string, mixed>> $streams */
+    #[DataProvider('movieStreamOrders')]
+    public function testMovieMetadataExcludesAttachedPictures(array $streams): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput(['streams' => $streams, 'format' => ['duration' => '14']]);
+        foreach ([$probe, VideoProbeResult::fromSerialized($probe->jsonSerialize())] as $result) {
+            self::assertSame(64, $result->width);
+            self::assertSame(48, $result->height);
+            self::assertSame(10.0, $result->framerate);
+            self::assertSame('h264', $result->videoCodec);
+            self::assertSame(14.0, $result->duration);
+            self::assertFalse($result->isHdr());
+            self::assertSame('yuv420p', $result->pixFmt);
+            self::assertSame('tv', $result->colorRange);
+            self::assertSame('bt709', $result->colorSpace?->transfer);
+            self::assertTrue($result->hasAudio());
+            self::assertSame('dan', $result->audioStreams[0]->language);
+            self::assertSame(9, $result->subtitleStreams[0]->index);
+        }
+    }
+
+    /** @return iterable<string, array{list<array<string, mixed>>}> */
+    public static function movieStreamOrders(): iterable
+    {
+        $movie = ['codec_type' => 'video', 'codec_name' => 'h264', 'width' => 64, 'height' => 48,
+            'r_frame_rate' => '10/1', 'pix_fmt' => 'yuv420p', 'color_range' => 'tv',
+            'color_primaries' => 'bt709', 'color_transfer' => 'bt709', 'color_space' => 'bt709'];
+        $cover = ['codec_type' => 'video', 'codec_name' => 'mjpeg', 'width' => 32, 'height' => 32,
+            'r_frame_rate' => '90000/1', 'color_transfer' => 'smpte2084',
+            'disposition' => ['attached_pic' => 1, 'default' => 1]];
+        $audio = ['codec_type' => 'audio', 'codec_name' => 'aac', 'index' => 7, 'channels' => 2, 'tags' => ['language' => 'dan']];
+        $subtitle = ['codec_type' => 'subtitle', 'codec_name' => 'mov_text', 'index' => 9];
+        yield 'cover before movie' => [[$cover, $movie, $audio, $subtitle]];
+        yield 'cover after movie' => [[$movie, $cover, $audio, $subtitle]];
+        yield 'audio before cover and movie' => [[$audio, $cover, $movie, $subtitle]];
+        yield 'ordinary video without dispositions' => [[$movie, $audio, $subtitle]];
+        $alternative = array_replace($movie, ['width' => 128, 'disposition' => ['default' => 1]]);
+        yield 'first ordinary video stays selected' => [[$cover, $movie, $alternative, $audio, $subtitle]];
+    }
+
+    /** @param list<array<string, mixed>> $streams */
+    #[DataProvider('streamsWithoutMovieVideo')]
+    public function testTypedNonMovieStreamsDoNotBecomeMovieMetadata(array $streams): void
+    {
+        $probe = VideoProbeResult::fromProbeOutput(['streams' => $streams]);
+        self::assertSame(0, $probe->width);
+        self::assertSame(0, $probe->height);
+        self::assertSame(0.0, $probe->framerate);
+        self::assertSame('unknown', $probe->videoCodec);
+    }
+
+    /** @return iterable<string, array{list<array<string, mixed>>}> */
+    public static function streamsWithoutMovieVideo(): iterable
+    {
+        $cover = ['codec_type' => 'video', 'codec_name' => 'mjpeg', 'width' => 32, 'height' => 32,
+            'r_frame_rate' => '90000/1', 'disposition' => ['attached_pic' => 1]];
+        $audio = ['codec_type' => 'audio', 'codec_name' => 'aac', 'channels' => 2];
+        yield 'artwork only' => [[$cover]];
+        yield 'audio only' => [[$audio]];
+        yield 'audio with artwork' => [[$audio, $cover]];
+    }
+
     public function testFromProbeOutputWithMissingStreamDataUsesDefaults(): void
     {
         $raw = [];
