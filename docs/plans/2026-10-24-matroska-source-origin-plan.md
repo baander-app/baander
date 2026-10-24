@@ -153,3 +153,36 @@ Unit controls cover a movie packet at position 128, no movie packet in the prefi
 and rejection of a 129-packet input. A prefix without a verified movie packet
 still supplies no anchor; this amendment does not establish unbounded probing or
 arbitrary-source qualification.
+
+## Audio preceding the first movie packet
+
+The expanded audio-first regression reveals a separate demux seek constraint.
+The video keyframe at timestamp four appears at packet 95, after audio packets
+with timestamps twelve through about fourteen. Seeking to absolute timestamp ten
+selects that video keyframe but skips the physically preceding audio. The video
+correctly retains 24 seconds after a six-second source seek, while audio begins
+at 3.962 seconds instead of approximately two.
+
+A controlled CI run removes only input seeking and keeps timestamp preservation,
+common offset minus ten, video filtering and audio trimming. Reading from the file
+beginning restores audio onset 1.978 seconds and 22.037333 seconds of decoded PCM,
+with the same video colours, local timestamps and full tail. Fast seeks at source
+seconds twelve and 24 preserve all required audio on this exact source, producing
+18- and six-second tails respectively.
+
+For a verified anchor and a sparse restart within the first nominal frame interval
+(S less than 1 divided by source frame rate), read from the file beginning instead
+of issuing input ss/noaccurate_seek. Keep the logical source position S, common
+offset -(O+S) and audio trim unchanged. Retain fast input seeking for later
+positions and all existing behavior without an anchor. The nominal interval is
+not proof of arbitrary VFR timing; qualification remains the reproduced sparse
+constant-rate sources.
+
+Add the actual audio-first final-hold native case alongside fresh and six-second
+restart cases. Unit checks cover the nominal interval threshold, a fractional
+rate, zero and later source positions, and no-anchor command identity. Retain the
+failed native receipt and paired seek controls; do not relax audio onset or end
+assertions to accept missing content.
+
+Independent review approved this measured first-interval guard before its
+implementation, with all timing and complete-tail assertions retained.
