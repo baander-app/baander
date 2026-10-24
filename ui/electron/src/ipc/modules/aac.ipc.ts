@@ -5,6 +5,7 @@ import type {
   AacChannelMode,
   AacConcealment,
   AacDecoderOptions,
+  AacDrcEffect,
   AacDrcProfile,
   AacEncoderOptions,
   AacProfile,
@@ -18,6 +19,9 @@ const MODES = new Set<AacRateControlMode>(['cbr', 'abr', 'cvbr', 'tvbr']);
 const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2', 'ld', 'eld']);
 const LOW_DELAY_PROFILES = new Set<AacProfile>(['ld', 'eld']);
 const DRC_PROFILES = new Set<AacDrcProfile>(['none', 'film-standard', 'film-light', 'music-standard', 'music-light', 'speech']);
+const DRC_EFFECTS = new Set<AacDrcEffect>(['off', 'none', 'night', 'noisy', 'limited', 'lowlevel', 'dialog', 'general']);
+const MIN_TARGET_LUFS = -31;
+const MAX_TARGET_LUFS = -10;
 const MAX_CHANNELS = 8;
 const TRANSPORTS = new Set<AacTransport>(['detect', 'adts', 'loas', 'latm', 'latm-raw', 'raw']);
 const SIGNALINGS = new Set<AacSignaling>(['implicit', 'explicit', 'hierarchical']);
@@ -65,6 +69,16 @@ function drcOption(value: unknown): AacDecoderOptions['drc'] {
     targetRefLevel: refLevel(targetRefLevel, 'targetRefLevel', true),
     heavy: flag(heavy, 'heavy'),
   };
+}
+
+/** USAC loudness normalisation: a flag, or { enabled, targetLufs } with the target in LUFS. */
+function loudnessOption(value: unknown): AacDecoderOptions['loudness'] {
+  if (value === undefined || typeof value === 'boolean') return value;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('loudness');
+  const { enabled, targetLufs } = value as Record<string, unknown>;
+  if (targetLufs !== undefined && !(typeof targetLufs === 'number' && Number.isFinite(targetLufs)
+    && targetLufs >= MIN_TARGET_LUFS && targetLufs <= MAX_TARGET_LUFS)) invalid('targetLufs');
+  return { enabled: flag(enabled, 'enabled'), targetLufs: targetLufs as number | undefined };
 }
 
 function eldDownscale(value: unknown): 1 | 2 | 4 | undefined {
@@ -146,6 +160,11 @@ function decoderOptions(value: unknown): AacDecoderOptions {
     limiter: limiterOption(limiter),
     drc: drcOption(options.drc),
     eldDownscale: eldDownscale(options.eldDownscale),
+    loudness: loudnessOption(options.loudness),
+    drcEffect: oneOf(options.drcEffect, DRC_EFFECTS, 'drcEffect'),
+    albumMode: flag(options.albumMode, 'albumMode'),
+    drcBoost: percent(options.drcBoost, 'drcBoost'),
+    drcCut: percent(options.drcCut, 'drcCut'),
   };
 }
 

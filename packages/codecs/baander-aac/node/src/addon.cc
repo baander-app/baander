@@ -5,6 +5,7 @@
  * keep partial frames between calls. */
 #include <napi.h>
 
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -56,6 +57,11 @@ bool bytes_of(const Napi::Value& v, const uint8_t** data, size_t* size) {
     return true;
   }
   return false;
+}
+
+/* Whether the option is given (present and not undefined). */
+bool option_given(const Napi::Object& o, const char* key) {
+  return o.Has(key) && !o.Get(key).IsUndefined();
 }
 
 int option_int(const Napi::Object& o, const char* key, int fallback) {
@@ -144,9 +150,35 @@ const char* object_type_name(int aot) {
       return "ld";
     case AAC_AOT_ER_ELD:
       return "eld";
+    case AAC_AOT_USAC:
+      return "usac";
     default:
       return "unknown";
   }
+}
+
+/* The MPEG-D DRC effect a decoder option names. */
+bool drc_effect_of(const std::string& name, AacDrcEffect* out) {
+  if (name == "off") {
+    *out = AAC_DRC_EFFECT_OFF;
+  } else if (name == "none") {
+    *out = AAC_DRC_EFFECT_NONE;
+  } else if (name == "night") {
+    *out = AAC_DRC_EFFECT_NIGHT;
+  } else if (name == "noisy") {
+    *out = AAC_DRC_EFFECT_NOISY;
+  } else if (name == "limited") {
+    *out = AAC_DRC_EFFECT_LIMITED;
+  } else if (name == "lowlevel") {
+    *out = AAC_DRC_EFFECT_LOWLEVEL;
+  } else if (name == "dialog") {
+    *out = AAC_DRC_EFFECT_DIALOG;
+  } else if (name == "general") {
+    *out = AAC_DRC_EFFECT_GENERAL;
+  } else {
+    return false;
+  }
+  return true;
 }
 
 bool drc_profile_of(const std::string& name, AacDrcProfile* out) {
@@ -191,6 +223,7 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     return DefineClass(
         env, "AacDecoder",
         {InstanceMethod("decode", &Decoder::Decode), InstanceMethod("reset", &Decoder::Reset),
+         InstanceMethod("loudness", &Decoder::Loudness),
          InstanceAccessor("sampleRate", &Decoder::SampleRate, nullptr),
          InstanceAccessor("coreSampleRate", &Decoder::CoreSampleRate, nullptr),
          InstanceAccessor("channels", &Decoder::Channels, nullptr),
@@ -225,6 +258,14 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
     int target_ref_level = -1;
     bool heavy = false;
     int eld_downscale = 1;
+    bool loudness = false;
+    bool loudness_enabled = true;
+    int target_lufs_x100 = -2400;
+    bool drc_effect = false;
+    AacDrcEffect effect = AAC_DRC_EFFECT_NONE;
+    bool album_mode = false;
+    int drc_boost = 100;
+    int drc_cut = 100;
     if (info.Length() > 0 && info[0].IsObject()) {
       const Napi::Object o = info[0].As<Napi::Object>();
       sample_rate = option_int(o, "sampleRate", sample_rate);
@@ -244,6 +285,45 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
         heavy = option_bool(d, "heavy", false);
       } else {
         drc = option_bool(o, "drc", false);
+      }
+      /* MPEG-D loudness normalisation of USAC streams: `loudness` is a
+       * boolean or { enabled, targetLufs }; the target is given in LUFS
+       * and the decoder takes hundredths. */
+      if (o.Has("loudness") && o.Get("loudness").IsObject()) {
+        const Napi::Object l = o.Get("loudness").As<Napi::Object>();
+        loudness = true;
+        loudness_enabled = option_bool(l, "enabled", true);
+        if (option_given(l, "targetLufs")) {
+          if (!l.Get("targetLufs").IsNumber()) {
+            throw_error(env, "AacDecoder: loudness.targetLufs must be a number");
+            return;
+          }
+          const double lufs = l.Get("targetLufs").As<Napi::Number>().DoubleValue();
+          target_lufs_x100 = static_cast<int>(lufs * 100.0 + (lufs < 0 ? -0.5 : 0.5));
+        }
+      } else if (option_given(o, "loudness")) {
+        loudness = true;
+        loudness_enabled = o.Get("loudness").ToBoolean().Value();
+      }
+      /* The MPEG-D DRC request: the effect by name, album mode, and the
+       * share of the boosting and attenuating gains in percent. */
+      if (option_given(o, "drcEffect")) {
+        drc_effect = true;
+        if (!o.Get("drcEffect").IsString() ||
+            !drc_effect_of(o.Get("drcEffect").As<Napi::String>(), &effect)) {
+          throw_error(env, "AacDecoder: drcEffect must be off, none, night, noisy, limited, "
+                           "lowlevel, dialog or general");
+          return;
+        }
+      }
+      if (option_given(o, "albumMode")) {
+        drc_effect = true;
+        album_mode = o.Get("albumMode").ToBoolean().Value();
+      }
+      drc_effect = drc_effect || option_given(o, "drcBoost") || option_given(o, "drcCut");
+      if (!option_number(env, o, "drcBoost", "AacDecoder: drcBoost", &drc_boost) ||
+          !option_number(env, o, "drcCut", "AacDecoder: drcCut", &drc_cut)) {
+        return;
       }
       channels = option_int(o, "channels", channels);
       if (!transport_of(option_string(o, "transport", "detect"), &transport)) {
@@ -287,6 +367,10 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
         (limiter && (ret = aac_decoder_set_limiter(handle_, 1, attack_ms, release_ms)) < 0) ||
         (drc && (ret = aac_decoder_set_drc(handle_, 1, boost, cut, target_ref_level, heavy ? 1 : 0)) < 0) ||
         (eld_downscale != 1 && (ret = aac_decoder_set_eld_downscale(handle_, eld_downscale)) < 0) ||
+        (loudness && (ret = aac_decoder_set_loudness(handle_, loudness_enabled ? 1 : 0,
+                                                     target_lufs_x100)) < 0) ||
+        (drc_effect && (ret = aac_decoder_set_drc_effect(handle_, effect, album_mode ? 1 : 0,
+                                                         drc_boost, drc_cut)) < 0) ||
         (config && (ret = aac_decoder_set_config(handle_, config, static_cast<int>(config_size))) < 0)) {
       aac_decoder_destroy(handle_);
       handle_ = nullptr;
@@ -360,6 +444,26 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
       aac_decoder_reset(handle_);
     }
     return info.Env().Undefined();
+  }
+
+  /* The MPEG-D loudness state after the last frame: the program loudness
+   * the stream declares in LUFS (null when it declares none, and for
+   * every stream that is not USAC) and the normalisation gain applied in
+   * dB (0 when none is). */
+  Napi::Value Loudness(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    Napi::Object result = Napi::Object::New(env);
+    int program_x100 = INT32_MIN;
+    int gain_x100 = 0;
+    if (handle_ && aac_decoder_loudness(handle_, &program_x100, &gain_x100) < 0) {
+      program_x100 = INT32_MIN;
+      gain_x100 = 0;
+    }
+    result.Set("programLoudness", program_x100 == INT32_MIN
+                                      ? env.Null()
+                                      : Napi::Number::New(env, program_x100 / 100.0));
+    result.Set("normalizationGain", Napi::Number::New(env, gain_x100 / 100.0));
+    return result;
   }
 
   Napi::Value SampleRate(const Napi::CallbackInfo& info) {

@@ -8,6 +8,7 @@
  */
 import type {
   AacChannelMode,
+  AacLoudness,
   AacObjectType,
   AacDecoder,
   AacDecoderOptions,
@@ -46,12 +47,18 @@ export interface AacDecodeResult {
   delay: number;
   hasSbr: boolean;
   hasPs: boolean;
-  /** The object type of the stream: 'lc', 'er-lc', 'ld', 'eld' or 'unknown'. */
+  /** The object type of the stream: 'lc', 'er-lc', 'ld', 'eld', 'usac' or 'unknown'. */
   objectType: AacObjectType;
   /** The program reference level the last frame carried, or -1. */
   programRefLevel: number;
   /** The last frame carried dynamic range control data. */
   hasDrc: boolean;
+  /**
+   * The MPEG-D loudness of a USAC stream: the declared program loudness in
+   * LUFS (null when none, and for every other object type) and the
+   * normalisation gain applied in dB.
+   */
+  loudness: AacLoudness;
   pcm: Float32Array;
 }
 
@@ -207,6 +214,7 @@ function describe(decoder: AacDecoder, pcm: Float32Array): AacDecodeResult {
     objectType: decoder.objectType,
     programRefLevel: decoder.programRefLevel,
     hasDrc: decoder.hasDrc,
+    loudness: decoder.loudness(),
     pcm,
   };
 }

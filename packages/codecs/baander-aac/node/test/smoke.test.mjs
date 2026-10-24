@@ -1,6 +1,7 @@
 /* Encode a synthetic signal, decode it, and check the reconstruction:
  * exercises both classes, chunked input, and the declared delay. */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { AacDecoder, AacEncoder, version } from '../index.js';
@@ -320,4 +321,55 @@ test('writes and applies dynamic range control, and runs the afterburner', () =>
   const out = decodeAll(decoder, burnt, burnt.length);
   assert.equal(decoder.errors, 0);
   assert.ok(snrDb(pcm, out, burner.delay * 2) > 20, 'afterburner stream decodes');
+});
+
+/* A USAC (xHE-AAC) LOAS stream configures the decoder from its
+ * StreamMuxConfig; the core decode is not complete yet, so every frame is
+ * concealed (or, with concealment off, refused as unsupported), while the
+ * configuration and the MPEG-D loudness metadata are read either way. */
+test('reads the configuration and loudness of a USAC stream', () => {
+  const stream = readFileSync(new URL('../../tests/data/usac_music_48000_96000.loas', import.meta.url));
+  const decoder = new AacDecoder({ channels: 0 });
+  assert.equal(decoder.objectType, 'unknown');
+  assert.deepEqual(decoder.loudness(), { programLoudness: null, normalizationGain: 0 });
+
+  const first = decoder.decode(stream.subarray(0, 4000));
+  assert.equal(decoder.objectType, 'usac');
+  assert.equal(decoder.frameSize, 1024);
+  assert.equal(decoder.channels, 2);
+  assert.equal(decoder.streamChannels, 2);
+  assert.equal(decoder.sampleRate, 48000);
+  assert.equal(decoder.errors, 0);
+  assert.ok(decoder.concealedFrames >= 1, 'the frames are concealed today');
+  assert.equal(first.length, decoder.concealedFrames * 1024 * 2, 'one concealed frame per access unit');
+  assert.deepEqual(decoder.loudness(), { programLoudness: -14.25, normalizationGain: -9.75 });
+
+  const rest = decodeAll(decoder, stream.subarray(4000), 4096);
+  assert.equal(rest.length + first.length, decoder.concealedFrames * 1024 * 2);
+  assert.deepEqual(decoder.loudness(), { programLoudness: -14.25, normalizationGain: -9.75 });
+
+  /* With concealment off the unsupported core makes the first decode throw;
+   * the stream configuration has been read by then. */
+  const strict = new AacDecoder({ channels: 0, concealment: 'off' });
+  assert.throws(() => strict.decode(stream.subarray(0, 4000)), /unsupported stream/);
+  assert.equal(strict.objectType, 'usac');
+  assert.equal(strict.loudness().programLoudness, -14.25);
+
+  /* Loudness normalisation off, or a target equal to the program loudness,
+   * applies no gain; the DRC request is accepted without changing it. */
+  for (const options of [{ loudness: false }, { loudness: { targetLufs: -14.25 } }]) {
+    const unity = new AacDecoder({ channels: 0, ...options });
+    unity.decode(stream.subarray(0, 4000));
+    assert.deepEqual(unity.loudness(), { programLoudness: -14.25, normalizationGain: 0 });
+  }
+  const requested = new AacDecoder({ channels: 0, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 50 });
+  requested.decode(stream.subarray(0, 4000));
+  assert.equal(requested.loudness().normalizationGain, -9.75);
+
+  assert.deepEqual(new AacDecoder().loudness(), { programLoudness: null, normalizationGain: 0 });
+  assert.throws(() => new AacDecoder({ drcEffect: 'loud' }), /drcEffect must be/);
+  assert.throws(() => new AacDecoder({ drcBoost: 200 }));
+  assert.throws(() => new AacDecoder({ drcCut: true }), /drcCut must be a number/);
+  assert.throws(() => new AacDecoder({ loudness: { targetLufs: -5 } }));
+  assert.throws(() => new AacDecoder({ loudness: { targetLufs: '-20' } }), /targetLufs must be a number/);
 });

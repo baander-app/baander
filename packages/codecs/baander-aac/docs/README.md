@@ -510,10 +510,18 @@ between calls. The decoder options add `transport` (`detect`, `adts`,
 `transport`, `signaling`, `frameLength`, `crc`, `mpeg2` and `channelMode`
 (`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`), and the encoder exposes
 `config` and the `unitSizes` of its last result, which a packetiser needs
-with the LATM and raw transports. `npm test` runs the binding's smoke
-test. In the Electron app the main-process `AacService` wraps the binding
-behind the `window.electron.aac` bridge (one-shot `decode`/`encode` and
-chunked decoder/encoder sessions).
+with the LATM and raw transports. For USAC streams (`objectType`
+`usac`) the decoder options add `loudness` (`false`, or
+`{ enabled, targetLufs }` with the target in LUFS, -31 to -10; on by
+default at -24), `drcEffect` (`off`, `none`, `night`, `noisy`, `limited`,
+`lowlevel`, `dialog`, `general`), `albumMode`, `drcBoost` and `drcCut`
+(percent), and `decoder.loudness()` reads back the declared program
+loudness in LUFS (`null` when the stream declares none) and the
+normalisation gain in dB after each decode call. `npm test` runs the
+binding's smoke test. In the Electron app the main-process `AacService`
+wraps the binding behind the `window.electron.aac` bridge (one-shot
+`decode`/`encode` and chunked decoder/encoder sessions); every decode
+result carries the `loudness` readback.
 
 ## Testing
 

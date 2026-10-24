@@ -4,8 +4,27 @@ export type AacTransport = 'detect' | 'adts' | 'loas' | 'latm' | 'latm-raw' | 'r
 export type AacSignaling = 'implicit' | 'explicit' | 'hierarchical';
 export type AacConcealment = 'off' | 'noise' | 'interpolate';
 export type AacChannelMode = 'default' | '7.1' | '7.1-front' | '7.1-top' | '7.1-rear';
-export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'unknown';
+/** 'usac' is USAC / xHE-AAC (audio object type 42), decoded only. */
+export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'usac' | 'unknown';
 export type AacDrcProfile = 'none' | 'film-standard' | 'film-light' | 'music-standard' | 'music-light' | 'speech';
+/** The MPEG-D DRC effect requested of a USAC stream; 'none' limits DRC to clipping prevention, 'off' applies none. */
+export type AacDrcEffect = 'off' | 'none' | 'night' | 'noisy' | 'limited' | 'lowlevel' | 'dialog' | 'general';
+
+/** Loudness normalisation of a USAC stream from its MPEG-D loudness metadata. */
+export interface AacLoudnessOptions {
+  /** Default true. */
+  enabled?: boolean;
+  /** Target program loudness in LUFS, -31 to -10. Default -24. */
+  targetLufs?: number;
+}
+
+/** The MPEG-D loudness state of a USAC stream after the last decoded frame. */
+export interface AacLoudness {
+  /** Declared program loudness in LUFS, or null when the stream declares none (and for every other object type). */
+  programLoudness: number | null;
+  /** Normalisation gain applied in dB (0 when none is). */
+  normalizationGain: number;
+}
 
 /** How the decoder applies a stream's MPEG-4 dynamic range control data. */
 export interface AacDrcOptions {
@@ -52,6 +71,16 @@ export interface AacDecoderOptions {
   drc?: boolean | AacDrcOptions;
   /** AAC-ELD playout at 1/2 or 1/4 of the stream's rate. Default 1. */
   eldDownscale?: 1 | 2 | 4;
+  /** USAC loudness normalisation; on by default at -24 LUFS. */
+  loudness?: boolean | AacLoudnessOptions;
+  /** The MPEG-D DRC effect requested of a USAC stream. Default 'none'. */
+  drcEffect?: AacDrcEffect;
+  /** Use the album loudness and DRC gains when the USAC stream has them. */
+  albumMode?: boolean;
+  /** Share of the MPEG-D DRC boosting gains, in percent. Default 100. */
+  drcBoost?: number;
+  /** Share of the MPEG-D DRC attenuating gains, in percent. Default 100. */
+  drcCut?: number;
 }
 
 export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
@@ -111,6 +140,8 @@ export interface AacDecodeResult {
   programRefLevel: number;
   /** The last frame carried dynamic range control data. */
   hasDrc: boolean;
+  /** The MPEG-D loudness of a USAC stream (null program loudness and 0 dB for every other object type). */
+  loudness: AacLoudness;
   /** Interleaved float PCM, full scale 1.0. */
   pcm: Float32Array;
 }

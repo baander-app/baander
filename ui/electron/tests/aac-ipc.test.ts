@@ -50,6 +50,11 @@ test('valid requests reach the service with validated arguments', async () => {
   assert.equal(await invoke('encoder-open', { profile: 'eld', frameLength: 480, ldSbr: { dualRate: false }, afterburner: true, metadata: { drcProfile: 'speech', programRefLevel: 112 } }), 'openEncoder-result');
   assert.deepEqual(given(calls[0]), ['openDecoder', { drc: { cut: 50, targetRefLevel: 100 }, eldDownscale: 2 }]);
   assert.deepEqual(given(calls[1]), ['openEncoder', { profile: 'eld', frameLength: 480, ldSbr: { dualRate: false }, afterburner: true, metadata: { drcProfile: 'speech', programRefLevel: 112 } }]);
+  calls.length = 0;
+  assert.equal(await invoke('decoder-open', { loudness: { enabled: true, targetLufs: -16.5 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 0 }), 'openDecoder-result');
+  assert.equal(await invoke('decode', data, { loudness: false }), 'decode-result');
+  assert.deepEqual(given(calls[0]), ['openDecoder', { loudness: { enabled: true, targetLufs: -16.5 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 0 }]);
+  assert.deepEqual(given(calls[1]), ['decode', data, { loudness: false }]);
 });
 
 test('malformed payloads are rejected before the service is called', async () => {
@@ -73,6 +78,13 @@ test('malformed payloads are rejected before the service is called', async () =>
     ['encode', [pcm, { metadata: { programRefLevel: 128 } }]],
     ['decode', [new Uint8Array(1), { drc: { boost: 101 } }]],
     ['decode', [new Uint8Array(1), { eldDownscale: 3 }]],
+    ['decode', [new Uint8Array(1), { loudness: { targetLufs: -5 } }]],
+    ['decode', [new Uint8Array(1), { loudness: { enabled: 'yes' } }]],
+    ['decode', [new Uint8Array(1), { loudness: [] }]],
+    ['decode', [new Uint8Array(1), { drcEffect: 'loud' }]],
+    ['decode', [new Uint8Array(1), { albumMode: 1 }]],
+    ['decode', [new Uint8Array(1), { drcBoost: 101 }]],
+    ['decode', [new Uint8Array(1), { drcCut: -1 }]],
     ['encode', [pcm, []]],
     ['decoder-decode', ['1', new Uint8Array(1)]],
     ['decoder-decode', [0, new Uint8Array(1)]],

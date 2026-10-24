@@ -12,7 +12,7 @@ test('every AAC bridge method invokes its channel with the arguments as given', 
     ['baander:aac:info', []],
     ['baander:aac:decode', [data, { channels: 2 }]],
     ['baander:aac:encode', [pcm, { sampleRate: 48000, channels: 2, bitrate: 128000 }]],
-    ['baander:aac:decoder-open', [{ sampleRate: 44100 }]],
+    ['baander:aac:decoder-open', [{ sampleRate: 44100, loudness: { targetLufs: -16 }, drcEffect: 'night' }]],
     ['baander:aac:decoder-decode', [3, data]],
     ['baander:aac:decoder-close', [3]],
     ['baander:aac:encoder-open', [{ mode: 'tvbr', quality: 80 }]],
@@ -23,7 +23,7 @@ test('every AAC bridge method invokes its channel with the arguments as given', 
   assert.equal(await aacBridge.info(), 'reply');
   await aacBridge.decode(data, { channels: 2 });
   await aacBridge.encode(pcm, { sampleRate: 48000, channels: 2, bitrate: 128000 });
-  await aacBridge.openDecoder({ sampleRate: 44100 });
+  await aacBridge.openDecoder({ sampleRate: 44100, loudness: { targetLufs: -16 }, drcEffect: 'night' });
   await aacBridge.decodeChunk(3, data);
   await aacBridge.closeDecoder(3);
   await aacBridge.openEncoder({ mode: 'tvbr', quality: 80 });

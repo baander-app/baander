@@ -1,6 +1,6 @@
 /**
  * Native binding of the baander-aac codec (AAC-LC, HE-AAC v1/v2, AAC-LD
- * and AAC-ELD encoder and decoder).
+ * and AAC-ELD encoder and decoder; USAC / xHE-AAC decoder).
  *
  * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS
  * or LOAS stream, LATM elements or raw access units.  Both classes accept
@@ -31,10 +31,18 @@ export type AacConcealment = 'off' | 'noise' | 'interpolate';
 export type AacChannelMode = 'default' | '7.1' | '7.1-front' | '7.1-top' | '7.1-rear';
 /**
  * The object type of a decoded stream: 'lc' covers AAC-LC and the HE-AAC
- * profiles, 'er-lc' the error-resilient AAC-LC syntax, 'ld' AAC-LD and
- * 'eld' AAC-ELD; 'unknown' before the first frame.
+ * profiles, 'er-lc' the error-resilient AAC-LC syntax, 'ld' AAC-LD,
+ * 'eld' AAC-ELD and 'usac' USAC / xHE-AAC (audio object type 42);
+ * 'unknown' before the first frame.
  */
-export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'unknown';
+export type AacObjectType = 'lc' | 'er-lc' | 'ld' | 'eld' | 'usac' | 'unknown';
+/**
+ * The MPEG-D DRC effect a player asks of a USAC stream (ISO/IEC 23003-4):
+ * the stream's DRC sets are matched to it, with the standard's fallback
+ * order when the exact effect is absent. 'none' (the default) applies DRC
+ * only to prevent clipping; 'off' applies no MPEG-D DRC at all.
+ */
+export type AacDrcEffect = 'off' | 'none' | 'night' | 'noisy' | 'limited' | 'lowlevel' | 'dialog' | 'general';
 /**
  * MPEG-4 dynamic range control profiles the encoder writes as metadata:
  * a compression curve of the named character plus the program reference
@@ -61,6 +69,22 @@ export interface AacDrcOptions {
   targetRefLevel?: number;
   /** Apply the DVB heavy compression gains instead of the DRC bands when present. Default false. */
   heavy?: boolean;
+}
+
+/** Loudness normalisation of USAC streams from their MPEG-D loudness metadata. */
+export interface AacLoudnessOptions {
+  /** Normalise the program to `targetLufs`. Default true. */
+  enabled?: boolean;
+  /** Target program loudness in LUFS, -31 to -10. Default -24. */
+  targetLufs?: number;
+}
+
+/** The MPEG-D loudness state of a USAC stream after the last decoded frame. */
+export interface AacLoudness {
+  /** The program loudness the stream declares in LUFS, or null when it declares none (and for every non-USAC stream). */
+  programLoudness: number | null;
+  /** The normalisation gain applied to the output in dB (0 when none is). */
+  normalizationGain: number;
 }
 
 export interface AacMetadataOptions {
@@ -103,6 +127,20 @@ export interface AacDecoderOptions {
    * with correspondingly shorter frames. Default 1.
    */
   eldDownscale?: 1 | 2 | 4;
+  /**
+   * USAC loudness normalisation from the stream's MPEG-D loudness
+   * metadata: on by default at -24 LUFS; `false` leaves the program at
+   * its coded level. Streams without loudness metadata are left as they are.
+   */
+  loudness?: boolean | AacLoudnessOptions;
+  /** The MPEG-D DRC effect requested of a USAC stream. Default 'none'. */
+  drcEffect?: AacDrcEffect;
+  /** Use the album loudness and DRC gains when the USAC stream has them. Default false. */
+  albumMode?: boolean;
+  /** Share of the MPEG-D DRC boosting gains to apply, in percent. Default 100. */
+  drcBoost?: number;
+  /** Share of the MPEG-D DRC attenuating gains to apply, in percent. Default 100. */
+  drcCut?: number;
 }
 
 export declare class AacDecoder {
@@ -118,6 +156,13 @@ export declare class AacDecoder {
   decode(data: Uint8Array | ArrayBuffer): Float32Array;
   /** Drops pending bytes and the error count and starts over, ready for a new stream. */
   reset(): void;
+  /**
+   * The MPEG-D loudness state of a USAC stream after the last decoded
+   * frame: the declared program loudness and the normalisation gain
+   * applied. For every other object type `programLoudness` is null and
+   * the gain 0.
+   */
+  loudness(): AacLoudness;
   /** Sample rate of the output: twice the core rate while SBR is decoded. */
   readonly sampleRate: number;
   /** Sample rate of the core stream. */

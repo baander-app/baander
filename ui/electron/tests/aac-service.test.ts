@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -52,7 +52,33 @@ test('one-shot encode/decode reconstructs the signal', { skip: !available && 'na
   assert.equal(result.streamChannels, 2);
   assert.equal(result.hasSbr, false);
   assert.equal(result.hasPs, false);
+  assert.equal(result.objectType, 'lc');
+  assert.deepEqual(result.loudness, { programLoudness: null, normalizationGain: 0 });
   assert.ok(snrDb(pcm, result.pcm, 2048 * 2) > 30);
+});
+
+// The USAC core is not complete yet: the frames of the stream are concealed
+// while the configuration and the MPEG-D loudness metadata are read.
+test('a USAC stream reports its object type and MPEG-D loudness', { skip: !available && 'native binding not built' }, async () => {
+  const service = new AacService();
+  const stream = readFileSync(join(codec, 'tests/data/usac_music_48000_96000.loas'));
+  const result = await service.decode(stream, { channels: 0 });
+  assert.equal(result.objectType, 'usac');
+  assert.equal(result.sampleRate, 48000);
+  assert.equal(result.channels, 2);
+  assert.equal(result.frameSize, 1024);
+  assert.equal(result.errors, 0);
+  assert.ok(result.concealedFrames >= 1);
+  assert.deepEqual(result.loudness, { programLoudness: -14.25, normalizationGain: -9.75 });
+
+  const session = await service.openDecoder({ channels: 0, loudness: { targetLufs: -14.25 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 50 });
+  const chunk = await service.decodeChunk(session, stream.subarray(0, 4000));
+  assert.equal(chunk.objectType, 'usac');
+  assert.deepEqual(chunk.loudness, { programLoudness: -14.25, normalizationGain: 0 });
+  assert.equal(await service.closeDecoder(session), true);
+
+  await assert.rejects(() => service.openDecoder({ drcEffect: 'loud' as never }), /drcEffect must be/);
+  await assert.rejects(() => service.openDecoder({ loudness: { targetLufs: -5 } }));
 });
 
 test('HE-AAC v2 codes a stereo signal as one channel and decodes it as two', { skip: !available && 'native binding not built' }, async () => {
