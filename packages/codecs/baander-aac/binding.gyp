@@ -40,7 +40,10 @@
         "src/ps_enc.cpp",
         "src/qmf_ld.cpp",
         "src/sbr_ld.cpp",
-        "src/sbr_ld_enc.cpp"
+        "src/sbr_ld_enc.cpp",
+        "src/usac_config.cpp",
+        "src/usac_frame.cpp",
+        "src/usac_stubs.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

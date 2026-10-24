@@ -13,6 +13,8 @@
 #include "mdct.h"
 #include "sbr.h"
 #include "sbr_ld.h"
+#include "unidrc.h"
+#include "usac.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,8 +47,9 @@ using AacDecoderChannel = struct AacDecoderChannel_ {
   AacChannelStream cs;
   float overlap[1024];   /* second half of the previous windowed IMDCT */
   int prev_window_shape; /* window_shape of the previous frame */
-  float output[2048];    /* decoded PCM of the current frame, full scale = 1.0;
-                            2048 samples while SBR is decoded */
+  float output[AAC_USAC_MAX_OUTPUT_FRAME]; /* decoded PCM of the current frame, full scale
+                                              = 1.0; 2048 samples while SBR is decoded, up
+                                              to 4096 for a USAC frame */
   AacConcealChannel conceal; /* the last good spectrum and the state of a fade */
   float eld_overlap[AAC_ELD_OVERLAP]; /* AAC-ELD: windowed output of the last three frames */
 };
@@ -149,6 +152,12 @@ using AacDecoderState = struct AacDecoderState_ {
   /* Dynamic range control: the frame's dynamic_range_info per element and
    * the DVB ancillary data, and the settings of aac_decoder_set_drc. */
   AacDrcDecoder drc;
+  /* USAC: the stream state, created when a configuration names object
+   * type 42 and destroyed with the decoder (or when the object type
+   * changes), and the player's MPEG-D DRC and loudness request, kept here
+   * so that it survives reconfigurations and precedes the stream. */
+  struct AacUsacState_* usac;
+  AacUniDrcRequest unidrc_request;
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);
@@ -184,9 +193,10 @@ int aac_decoder_set_rate_index(AacDecoderState* s, int rate_index);
 int aac_decoder_set_frame_length_internal(AacDecoderState* s, int frame_length);
 
 /* Selects the object type whose syntax and filterbank the following
- * blocks use (AAC_AOT_LC, AAC_AOT_ER_LC, AAC_AOT_ER_LD or AAC_AOT_ER_ELD),
- * resetting the filterbank state when it changes.  Leaving a low-delay
- * type returns the frame length to 1024. */
+ * blocks use (AAC_AOT_LC, AAC_AOT_ER_LC, AAC_AOT_ER_LD, AAC_AOT_ER_ELD or
+ * AAC_AOT_USAC), resetting the filterbank state when it changes.  Leaving
+ * a low-delay type returns the frame length to 1024; leaving USAC drops
+ * the USAC state. */
 int aac_decoder_set_object_type(AacDecoderState* s, int aot);
 
 /* AAC-ELD downscaled playout factor (1, 2 or 4); takes effect for ELD
@@ -211,7 +221,8 @@ static inline int aac_aot_is_er(int aot) {
 }
 
 /* Sample rate of the output: the core rate, doubled while SBR is decoded
- * and divided by the downscale factor of an AAC-ELD stream. */
+ * and divided by the downscale factor of an AAC-ELD stream; the
+ * usacSamplingFrequency of a USAC stream. */
 int aac_decoder_output_rate(const AacDecoderState* s);
 
 /* Selects the layout of a channel configuration (1..7, 11, 12), resetting

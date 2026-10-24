@@ -6,6 +6,7 @@
 #include "aac.h"
 #include "bitstream.h"
 #include "channel_map.h"
+#include "unidrc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -195,6 +196,93 @@ using AacUsacCoreChannel = struct AacUsacCoreChannel_ {
   struct AacUsacFdChannel_* fd;
   struct AacUsacLpdChannel_* lpd;
 };
+
+/* ── The decoder state of a USAC stream ───────────────────────────
+ *
+ * aac_usac_apply_config installs a configuration in the decoder (the
+ * output rate, the layout, object type 42, the frame size) and creates or
+ * rebuilds this state under AacDecoderState.usac; the frame walker
+ * (aac_usac_decode_frame) then decodes UsacFrame() element by element
+ * into the decoder's channel buffers in layout order. */
+struct AacDecoderState_;
+struct AacSbrState_;
+struct AacMps212State_;
+struct AacUniDrc_;
+
+/* One configured element as the frame walker drives it. */
+using AacUsacElement = struct AacUsacElement_ {
+  int type;                /* AAC_USAC_SCE, _CPE, _LFE or _EXT */
+  int layout_index;        /* index in the decoder's layout; -1 for an extension element */
+  int num_core_channels;   /* 1, or 2 for a CPE (the second is the residual with
+                              stereoConfigIndex 2 or 3) */
+  int num_sbr_channels;    /* channels of UsacSbrData: 1 for a downmix, 2 for a pair, 0 none */
+  int num_output_channels; /* 0 for an extension element */
+  int mps_before_sbr;      /* stereoConfigIndex 3: MPS 212 on the core band, SBR on both outputs */
+  AacUsacCoreChannel core[2];
+  struct AacSbrState_* sbr;    /* with sbrRatioIndex > 0 */
+  struct AacMps212State_* mps; /* CPE with stereoConfigIndex > 0 */
+};
+
+/* The audio pre-roll of an immediate playout frame (ID_EXT_ELE_AUDIOPREROLL,
+ * ISO/IEC 23003-3 5.5.2.2, AudioPreRoll()): the configuration the frames
+ * that follow were coded with, and the access units that warm the decoder
+ * up before the frame carrying it. */
+#define AAC_USAC_MAX_EXT_PAYLOAD 8192 /* bytes of one extension element's payload */
+
+using AacUsacPreroll = struct AacUsacPreroll_ {
+  int has_config;
+  AacUsacConfig cfg;
+  int apply_crossfade;
+  int num_frames;
+  int au_offset[AAC_USAC_MAX_PREROLL_FRAMES]; /* each access unit's bytes in `data` */
+  int au_len[AAC_USAC_MAX_PREROLL_FRAMES];
+  uint8_t data[AAC_USAC_MAX_EXT_PAYLOAD]; /* the access units, byte aligned */
+};
+
+using AacUsacState = struct AacUsacState_ {
+  AacUsacConfig cfg;
+  int num_elements;
+  AacUsacElement elem[AAC_USAC_MAX_ELEMENTS];
+  int unidrc_elem; /* the UNI_DRC extension element, -1 without one */
+  struct AacUniDrc_* drc;
+  AacUniDrcRequest request; /* the player's request, re-applied after a reset */
+  int warm;       /* a frame was decoded since the configuration or the last reset */
+  int in_preroll; /* the pre-roll frames of an IPF are being decoded */
+  int indep;      /* usacIndependencyFlag of the last frame */
+  int preroll_frames_decoded; /* pre-roll frames decoded for the last IPF */
+  float core[2][AAC_USAC_MAX_CORE_FRAME]; /* core output of the element being decoded */
+  AacUsacQmfFrame qmf[3];                 /* downmix, left and right of the MPS 212 coupling */
+  uint8_t ext_payload[AAC_USAC_MAX_EXT_PAYLOAD]; /* an extension payload, byte aligned */
+  AacUsacPreroll preroll;
+};
+
+AacUsacState* aac_usac_state_create(void);
+void aac_usac_state_destroy(AacUsacState* u);
+/* Forgets every frame: the next frame decodes the pre-roll of its IPF. */
+void aac_usac_state_reset(AacUsacState* u);
+
+/* Installs `c` in the decoder: the output rate, the layout of the
+ * configuration, object type 42 and the frame size; a configuration equal
+ * to the one in force changes nothing.  Returns AAC_OK, AAC_ERR_UNSUPPORTED
+ * (a rate without tables, a layout the decoder cannot hold) or the error
+ * of a refused step, after which the decoder has no layout. */
+int aac_usac_apply_config(struct AacDecoderState_* s, const AacUsacConfig* c);
+
+/* Decodes one UsacFrame() into s->ch[].output (output_frame_length
+ * samples per channel, in layout order), the pre-roll frames of an IPF
+ * first when the decoder is cold.  Returns AAC_OK, AAC_ERR_DECODE for a
+ * damaged frame (the caller conceals), AAC_ERR_UNSUPPORTED for a tool the
+ * decoder lacks and AAC_ERR_STATE without a configuration. */
+int aac_usac_decode_frame(struct AacDecoderState_* s, AacBitReader* r);
+
+/* Produces one frame of concealed output for a lost frame through the
+ * modules' concealment.  AAC_ERR_STATE without a configuration. */
+int aac_usac_conceal_frame(struct AacDecoderState_* s);
+
+/* Parses the payload of an audio pre-roll extension element (`len`
+ * bytes) and copies its access units out.  More frames than
+ * AAC_USAC_MAX_PREROLL_FRAMES are refused as unsupported. */
+int aac_usac_preroll_parse(const uint8_t* data, int len, AacUsacPreroll* p);
 
 #ifdef __cplusplus
 }

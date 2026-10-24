@@ -450,8 +450,12 @@ bool doubled_output(const AacDecoderState* s) {
   return s->sbr_mode || (s->ld_sbr_mode && s->ld_sbr_dual_rate);
 }
 
-/* Samples per channel of one block in the output. */
+/* Samples per channel of one block in the output; a USAC stream's frame
+ * is its configuration's output frame length. */
 int output_length(const AacDecoderState* s) {
+  if (s->aot == AAC_AOT_USAC && s->usac) {
+    return s->usac->cfg.output_frame_length;
+  }
   return doubled_output(s) ? 2 * core_output_length(s) : core_output_length(s);
 }
 
@@ -937,6 +941,17 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   }
   s->conceal_mode = AAC_CONCEAL_INTERPOLATE;
   aac_drc_decoder_init(&s->drc);
+  s->usac = nullptr;
+  /* The player's defaults for USAC: loudness normalisation to -24 LUFS,
+   * no DRC effect, no album mode, the gains unscaled, the peak limiter
+   * of the loudness normalisation on. */
+  s->unidrc_request.loudness_normalization = 1;
+  s->unidrc_request.target_loudness_x100 = -2400;
+  s->unidrc_request.effect = AAC_DRC_EFFECT_NONE;
+  s->unidrc_request.album_mode = 0;
+  s->unidrc_request.boost_percent = 100;
+  s->unidrc_request.cut_percent = 100;
+  s->unidrc_request.peak_limiter = 1;
   s->last_concealed = 0;
   s->concealed_frames = 0;
   s->conceal_random = kRandomSeed;
@@ -954,6 +969,7 @@ void aac_decoder_state_destroy(AacDecoderState* s) {
     delete s->sbr[i];
     delete s->ld_sbr[i];
   }
+  aac_usac_state_destroy(s->usac);
   delete s;
 }
 
@@ -983,6 +999,9 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   aac_drc_frame_begin(&s->drc);
   if (s->aot == AAC_AOT_ER_ELD) {
     aac_mdct_init(&s->mdct_eld, 2 * core_output_length(s));
+  }
+  if (s->usac) {
+    aac_usac_state_reset(s->usac);
   }
   s->frame_size = output_length(s);
   if (s->limiter_ready) {
@@ -1117,6 +1136,10 @@ int aac_decoder_set_object_type(AacDecoderState* s, int aot) {
   if (aot != AAC_AOT_ER_ELD) {
     drop_ld_sbr(s);
   }
+  if (aot != AAC_AOT_USAC && s->usac) {
+    aac_usac_state_destroy(s->usac);
+    s->usac = nullptr;
+  }
   if (!low_delay && aac_is_low_delay_frame(s->frame_length)) {
     return aac_decoder_set_frame_length_internal(s, AAC_FRAME_SIZE_LONG);
   }
@@ -1133,6 +1156,9 @@ void aac_decoder_set_eld_downscale_internal(AacDecoderState* s, int factor) {
 }
 
 int aac_decoder_output_rate(const AacDecoderState* s) {
+  if (s->aot == AAC_AOT_USAC && s->usac) {
+    return s->usac->cfg.sample_rate;
+  }
   const int core = s->aot == AAC_AOT_ER_ELD ? s->sample_rate / s->eld_downscale : s->sample_rate;
   return doubled_output(s) ? 2 * core : core;
 }
@@ -1576,9 +1602,42 @@ int decode_er_elements(AacDecoderState* s, AacBitReader* r) {
   return 0;
 }
 
+/* One UsacFrame() of a USAC stream (ISO/IEC 23003-3), through the frame
+ * walker: a damaged frame is concealed when concealment is on, an
+ * unsupported tool is refused as it is for the other object types. */
+int decode_usac_frame(AacDecoderState* s, AacBitReader* r) {
+  if (!s->usac || s->layout_source == 0) {
+    return AAC_ERR_STATE;
+  }
+  memset(s->elem_present, 0, sizeof(s->elem_present));
+  s->has_sbr = s->usac->cfg.sbr_ratio_index > 0;
+  s->has_ps = 0;
+  s->num_crc_regions = 0;
+  int ret = aac_usac_decode_frame(s, r);
+  if (ret == AAC_ERR_DECODE && s->conceal_mode != AAC_CONCEAL_OFF) {
+    ret = aac_usac_conceal_frame(s);
+    if (ret) {
+      return ret;
+    }
+    s->last_concealed = 1;
+    s->concealed_frames++;
+  } else if (ret) {
+    return ret;
+  }
+  s->frame_size = output_length(s);
+  s->stream_channels = s->layout.num_channels;
+  s->blocks_decoded++;
+  s->decoded_since_reset = 1;
+  return s->layout.num_channels;
+}
+
 }  // namespace
 
 int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
+  s->last_concealed = 0;
+  if (s->aot == AAC_AOT_USAC) {
+    return decode_usac_frame(s, r);
+  }
   BlockParse p = {};
   p.sniffing = s->layout_source == 0 || s->layout_source == 3;
   p.last_elem = -1;
@@ -1740,6 +1799,19 @@ void aac_decoder_note_lost_block(AacDecoderState* s) {
 int aac_decoder_conceal_block(AacDecoderState* s) {
   if (s->layout_source == 0 || s->rate_index < 0) {
     return AAC_ERR_STATE;
+  }
+  if (s->aot == AAC_AOT_USAC) {
+    const int ret = aac_usac_conceal_frame(s);
+    if (ret) {
+      return ret;
+    }
+    s->frame_size = output_length(s);
+    s->last_concealed = 1;
+    s->concealed_frames++;
+    s->blocks_decoded++;
+    s->decoded_since_reset = 1;
+    s->stream_channels = s->layout.num_channels;
+    return s->layout.num_channels;
   }
   memset(s->elem_present, 0, sizeof(s->elem_present));
   for (int k = 0; k < AAC_MAX_CCE; k++) {

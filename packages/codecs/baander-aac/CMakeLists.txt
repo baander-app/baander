@@ -38,9 +38,10 @@ set(BAAC_AAC_SOURCES
     src/tables.cpp src/aac_cpu.cpp src/dsp.cpp src/fft.cpp src/mdct.cpp
     src/ics.cpp src/bitstream.cpp src/channel_map.cpp src/qmf.cpp src/sbr_tables.cpp src/sbr_freq.cpp src/ps_hybrid.cpp
     src/asc.cpp src/latm.cpp src/transport.cpp src/drc.cpp src/api.cpp
-    src/lowdelay.cpp src/eld_tables.cpp src/qmf_ld.cpp src/sbr_ld.cpp)
+    src/lowdelay.cpp src/eld_tables.cpp src/qmf_ld.cpp src/sbr_ld.cpp src/usac_config.cpp)
 set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/ps_dec.cpp
-    src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp)
+    src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
+    src/usac_frame.cpp src/usac_stubs.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
     src/sbr_ld_enc.cpp)
 

@@ -8,6 +8,7 @@
 #include "bitstream.h"
 #if defined(BAAC_AAC_HAVE_DECODER)
 #include "decoder.h"
+#include "usac.h"
 #endif
 #if defined(BAAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
@@ -82,6 +83,11 @@ void preset_extension(AacDecoderState* s, const AacAsc* asc) {
 /* Whether the decoder handles a configuration's object type and its
  * error resilience and low-delay options. */
 bool asc_supported(const AacAsc* asc, int rate_index) {
+  if (asc->aot == AAC_AOT_USAC) {
+    /* The output rate is the UsacConfig's; the layout is checked when
+     * the configuration is applied. */
+    return aac_asc_rate_index(asc->usac.sample_rate) >= 0;
+  }
   const bool low_delay = asc->aot == AAC_AOT_ER_LD || asc->aot == AAC_AOT_ER_ELD;
   if (asc->aot != AAC_AOT_LC && asc->aot != AAC_AOT_ER_LC && !low_delay) {
     return false;
@@ -143,6 +149,11 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
   const int index = aac_asc_rate_index(asc->sample_rate);
   if (!asc_supported(asc, index)) {
     return AAC_ERR_UNSUPPORTED;
+  }
+  if (asc->aot == AAC_AOT_USAC) {
+    /* USAC: the UsacConfig carries the rate, the layout and the frame
+     * lengths; the USAC decoder installs them. */
+    return aac_usac_apply_config(s, &asc->usac);
   }
   if (asc->sbr_present == 1 && asc->ext_sample_rate != 2 * asc->sample_rate) {
     return AAC_ERR_UNSUPPORTED;

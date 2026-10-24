@@ -242,6 +242,16 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
   if (r->overread || asc->sample_rate == 0) {
     return AAC_ERR_DECODE;
   }
+  if (asc->aot == AAC_AOT_USAC) {
+    /* UsacConfig() (ISO/IEC 23003-3 Table 1) ends the config: the frame
+     * lengths and the output rate come from it. */
+    const int ret = aac_usac_config_read(r, &asc->usac);
+    if (ret) {
+      return ret;
+    }
+    asc->frame_length = asc->usac.frame_length;
+    return AAC_OK;
+  }
   if (asc->aot == AAC_AOT_ER_ELD) {
     if (asc->channel_config == 0) {
       return AAC_ERR_UNSUPPORTED; /* the ELD config carries no program config element */

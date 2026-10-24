@@ -6,6 +6,7 @@
 #include "aac.h"
 #include "bitstream.h"
 #include "channel_map.h"
+#include "usac.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +65,12 @@ using AacAsc = struct AacAsc_ {
   int ld_sbr_crc;           /* ldSbrCrcFlag */
   int num_ld_sbr_headers;   /* one per SCE or CPE of the channel configuration */
   AacSbrLdHeader ld_sbr_header[AAC_ASC_MAX_LD_SBR_HEADERS];
+  /* USAC (audioObjectType 42): the UsacConfig() that follows the channel
+   * configuration.  Its usacSamplingFrequency is the output rate and its
+   * frame lengths replace `frame_length`; `sample_rate` and
+   * `channel_config` above hold the AudioSpecificConfig's own fields.
+   * The writer does not express this type. */
+  AacUsacConfig usac;
 };
 
 /* Fills `asc` with the settings of a plain AAC-LC stream without any
@@ -74,7 +81,8 @@ void aac_asc_init(AacAsc* asc, int sample_rate, int channel_config);
  * at any bit, as in a StreamMuxConfig; the program config element's byte
  * alignment is relative to the config's start) or from whole bytes.
  * Returns 0, AAC_ERR_DECODE for a malformed config or AAC_ERR_UNSUPPORTED
- * for an object type outside the General Audio family and AAC-ELD. */
+ * for an object type outside the General Audio family, AAC-ELD and
+ * USAC. */
 int aac_asc_read(AacBitReader* r, AacAsc* asc);
 int aac_asc_parse(const uint8_t* data, int size, AacAsc* asc);
 

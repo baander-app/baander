@@ -25,6 +25,7 @@ set(TEST_SOURCES
     test_dsp.cpp
     test_allocation.cpp
     test_er.cpp
+    test_usac_config.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

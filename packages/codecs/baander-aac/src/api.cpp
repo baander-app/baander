@@ -326,7 +326,7 @@ int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {
   if (frame_length != AAC_FRAME_SIZE_LONG && frame_length != AAC_FRAME_SIZE_LONG_960) {
     return AAC_ERR_INVALID_ARG;
   }
-  if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
+  if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD || s->aot == AAC_AOT_USAC) {
     return AAC_ERR_STATE;
   }
   return aac_decoder_set_frame_length_internal(s, frame_length);
@@ -502,6 +502,9 @@ int aac_decoder_set_drc(AacDecoderHandle ctx, int enabled, int boost, int cut, i
       target_ref_level > 127) {
     return AAC_ERR_INVALID_ARG;
   }
+  if (s->aot == AAC_AOT_USAC) {
+    return AAC_ERR_UNSUPPORTED; /* USAC streams carry MPEG-D DRC, not dynamic_range_info */
+  }
   s->drc.settings.enabled = enabled ? 1 : 0;
   s->drc.settings.boost = boost;
   s->drc.settings.cut = cut;
@@ -522,6 +525,62 @@ int aac_decoder_has_drc(AacDecoderHandle ctx) {
     return AAC_ERR_INVALID_ARG;
   }
   return static_cast<AacDecoderState*>(ctx)->drc.has_drc;
+}
+
+/* The MPEG-D DRC and loudness request lives in the decoder state and is
+ * handed to the DRC module of the USAC stream when there is one; a
+ * stream configured later takes it from the state. */
+static void forward_unidrc_request(AacDecoderState* s) {
+  if (s->usac) {
+    s->usac->request = s->unidrc_request;
+    aac_unidrc_set_request(s->usac->drc, &s->unidrc_request);
+  }
+}
+
+int aac_decoder_set_loudness(AacDecoderHandle ctx, int enabled, int target_lufs_x100) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (target_lufs_x100 < -3100 || target_lufs_x100 > -1000) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  s->unidrc_request.loudness_normalization = enabled ? 1 : 0;
+  s->unidrc_request.target_loudness_x100 = target_lufs_x100;
+  forward_unidrc_request(s);
+  return AAC_OK;
+}
+
+int aac_decoder_set_drc_effect(AacDecoderHandle ctx, AacDrcEffect effect, int album_mode,
+                               int boost, int cut) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (effect < AAC_DRC_EFFECT_OFF || effect > AAC_DRC_EFFECT_GENERAL || boost < 0 ||
+      boost > 100 || cut < 0 || cut > 100) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  s->unidrc_request.effect = effect;
+  s->unidrc_request.album_mode = album_mode ? 1 : 0;
+  s->unidrc_request.boost_percent = boost;
+  s->unidrc_request.cut_percent = cut;
+  forward_unidrc_request(s);
+  return AAC_OK;
+}
+
+int aac_decoder_loudness(AacDecoderHandle ctx, int* program_loudness_x100,
+                         int* norm_gain_db_x100) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  if (!s->usac || s->aot != AAC_AOT_USAC) {
+    return AAC_ERR_STATE; /* no USAC stream, so no MPEG-D loudness */
+  }
+  int drc_set_id = -1;
+  aac_unidrc_status(s->usac->drc, program_loudness_x100, norm_gain_db_x100, &drc_set_id);
+  return AAC_OK;
 }
 
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps) {
