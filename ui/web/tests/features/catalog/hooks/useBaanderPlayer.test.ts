@@ -1130,10 +1130,10 @@ describe('useBaanderPlayer authorization', () => {
     unmount()
   })
 
-  it.each(['pause', 'resume', 'seek'])('retains existing explicit %s failure behavior for transport errors', async action => {
+  it('retains existing explicit seek failure behavior for transport errors', async () => {
     post.mockImplementation((path: string) => path === '/api/stream/sign'
       ? Promise.resolve({ data: { url: '/manifest', jobId: 'job', renditionSet: 'job.1', sessionId: 'owned-session',
-        generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: action === 'resume' ? 'paused' : 'running' } })
+        generation: 1, revision: 5, ready: true, startTime: 0, duration: 180, position: 0, status: 'running' } })
       : Promise.reject(new AxiosError('Connection lost', 'ERR_NETWORK')))
     const onError = vi.fn()
     const containerRef = { current: document.createElement('div') }
@@ -1141,13 +1141,309 @@ describe('useBaanderPlayer authorization', () => {
     await act(async () => {})
     const video = containerRef.current.querySelector('video')!
     await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
-    if (action === 'pause') await act(async () => result.current.pause())
-    else if (action === 'resume') await act(async () => result.current.play())
-    else await act(async () => result.current.seekTo(42))
+    await act(async () => result.current.seekTo(42))
     expect(attachments[0].dispose).toHaveBeenCalledOnce()
     expect(result.current.state).toBe('error')
     expect(onError).toHaveBeenCalledOnce()
     unmount()
+  })
+
+  describe('uncertain status delivery', () => {
+    const playback = (status: string) => ({ url: '/manifest', jobId: 'job', sessionId: 'owned-session',
+      generation: 4, revision: 10, renditionSet: 'job.4', ready: true, position: 30, startTime: 12, duration: 180, status })
+    const networkError = (code: string) => code === '503'
+      ? Object.assign(new AxiosError('Unavailable'), { response: { status: 503 } }) : new AxiosError('Unavailable', code)
+    const mount = async (initial: string) => {
+      const onError = vi.fn()
+      const containerRef = { current: document.createElement('div') }
+      const hook = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true, onError }))
+      await act(async () => {})
+      const video = containerRef.current.querySelector('video')!
+      let paused = initial === 'paused'
+      Object.defineProperty(video, 'paused', { configurable: true, get: () => paused })
+      vi.mocked(video.play).mockImplementation(async () => {
+        if (!paused) return
+        paused = false
+        video.dispatchEvent(new Event('play'))
+      })
+      vi.mocked(video.pause).mockImplementation(() => {
+        if (paused) return
+        paused = true
+        video.dispatchEvent(new Event('pause'))
+      })
+      await act(async () => video.dispatchEvent(new Event('loadedmetadata')))
+      let time = video.currentTime
+      const assignTime = vi.fn((value: number) => { time = value })
+      Object.defineProperty(video, 'currentTime', { configurable: true, get: () => time, set: assignTime })
+      return { ...hook, video, onError, assignTime, setTime: (value: number) => { time = value } }
+    }
+    const cases = ['native', 'programmatic'].flatMap(gesture => ['pause', 'resume'].flatMap(action =>
+      [false, true].map(accepted => ({ gesture, action, accepted, code: 'ERR_NETWORK' })))).concat(
+      ['ECONNABORTED', 'ETIMEDOUT', '503'].map(code => ({ gesture: 'programmatic', action: 'pause', accepted: false, code })))
+
+    it.each(cases)('reconciles $gesture $action after $code (accepted=$accepted) without replaying or moving the cursor', async ({ gesture, action, accepted, code }) => {
+      vi.useFakeTimers()
+      const initial = action === 'pause' ? 'running' : 'paused'
+      let snapshot = playback(initial)
+      let rejectStatus!: (error: Error) => void
+      post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        if (accepted) snapshot = { ...snapshot, status: action === 'pause' ? 'paused' : 'running',
+          position: payload.position!, revision: snapshot.revision + 1 }
+        return new Promise((_resolve, reject) => { rejectStatus = reject })
+      })
+      const player = await mount(initial)
+      await act(async () => {
+        if (gesture === 'programmatic') {
+          if (action === 'pause') player.result.current.pause()
+          else player.result.current.play()
+        } else if (action === 'pause') player.video.pause()
+        else await player.video.play()
+      })
+      if (action === 'resume') player.setTime(19.25)
+      if (accepted) await act(async () => vi.advanceTimersByTimeAsync(1000))
+      const time = player.video.currentTime
+      await act(async () => rejectStatus(networkError(code)))
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(player.video.paused).toBe(snapshot.status === 'paused')
+      expect(player.video.currentTime).toBe(time)
+      expect(player.assignTime).not.toHaveBeenCalled()
+      expect(post.mock.calls.filter(call => call[1].action).map(call => call[1].action)).toEqual([action])
+      expect(attachments).toHaveLength(1)
+      player.unmount()
+    })
+
+    it.each(['pause', 'resume'])('keeps optimistic %s until a post-failure read succeeds, including unavailable publication', async action => {
+      vi.useFakeTimers()
+      const initial = action === 'pause' ? 'running' : 'paused'
+      const snapshot = playback(initial)
+      let signs = 0
+      let rejectStatus!: (error: Error) => void
+      let resolveOld!: (value: unknown) => void
+      let rejectFresh!: (error: Error) => void
+      let resolveFresh!: (value: unknown) => void
+      post.mockImplementation((path: string) => {
+        if (path !== '/api/stream/sign') return new Promise((_resolve, reject) => { rejectStatus = reject })
+        signs++
+        if (signs === 2) return new Promise(resolve => { resolveOld = resolve })
+        if (signs === 3) return new Promise((_resolve, reject) => { rejectFresh = reject })
+        if (signs === 4) return new Promise(resolve => { resolveFresh = resolve })
+        return Promise.resolve({ data: { ...snapshot } })
+      })
+      const player = await mount(initial)
+      await act(async () => { if (action === 'pause') player.result.current.pause(); else player.result.current.play() })
+      if (action === 'resume') player.setTime(19.25)
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => rejectStatus(networkError('ERR_NETWORK')))
+      expect(signs).toBe(3)
+      await act(async () => resolveOld({ data: snapshot }))
+      expect(player.video.paused).toBe(action === 'pause')
+      await act(async () => rejectFresh(networkError('ERR_NETWORK')))
+      expect(player.video.paused).toBe(action === 'pause')
+      expect(player.onError).not.toHaveBeenCalled()
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => resolveFresh({ data: { ...snapshot, ready: false,
+        url: null, startTime: null, duration: null, renditionSet: '' } }))
+      expect(player.video.paused).toBe(initial === 'paused')
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(player.video.paused).toBe(initial === 'paused')
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      expect(player.assignTime).not.toHaveBeenCalled()
+      expect(post.mock.calls.filter(call => call[1].action).map(call => call[1].action)).toEqual([action])
+      player.unmount()
+    })
+
+    it('keeps a newer queued pause when an uncertain resume read completes late', async () => {
+      vi.useFakeTimers()
+      let snapshot = playback('paused')
+      let rejectResume!: (error: Error) => void
+      let resolveRead!: (value: unknown) => void
+      let acceptPause!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: { action?: string }) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 2) return new Promise(resolve => { resolveRead = resolve })
+          return Promise.resolve({ data: { ...snapshot } })
+        }
+        if (payload.action === 'resume') return new Promise((_resolve, reject) => { rejectResume = reject })
+        return new Promise(resolve => { acceptPause = resolve })
+      })
+      const player = await mount('paused')
+      await act(async () => player.result.current.play())
+      await act(async () => rejectResume(networkError('ERR_NETWORK')))
+      expect(signs).toBe(2)
+      await act(async () => player.result.current.pause())
+      snapshot = { ...snapshot, status: 'running', revision: 11 }
+      await act(async () => resolveRead({ data: snapshot }))
+      expect(player.video.paused).toBe(true)
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      snapshot = { ...snapshot, status: 'paused', revision: 12 }
+      await act(async () => acceptPause({ data: {} }))
+      expect(player.video.paused).toBe(true)
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(post.mock.calls.filter(call => call[1].action).map(call => call[1].action)).toEqual(['resume', 'pause'])
+      expect(player.assignTime).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it.each(['native', 'programmatic'])('delivers a newer %s resume while an uncertain pause has unavailable publication', async gesture => {
+      vi.useFakeTimers()
+      let snapshot = playback('running')
+      let rejectPause!: (error: Error) => void
+      let acceptResume!: (value: unknown) => void
+      let resolveOld!: (value: unknown) => void
+      let rejectFresh!: (error: Error) => void
+      let signs = 0
+      post.mockImplementation((path: string, payload: { action?: string }) => {
+        if (path === '/api/stream/sign') {
+          if (++signs === 1) return Promise.resolve({ data: snapshot })
+          if (signs === 2) return new Promise(resolve => { resolveOld = resolve })
+          if (signs === 3) return new Promise((_resolve, reject) => { rejectFresh = reject })
+          return Promise.resolve({ data: { ...snapshot, ready: false, url: null, startTime: null, duration: null, renditionSet: '' } })
+        }
+        if (payload.action === 'pause') return new Promise((_resolve, reject) => { rejectPause = reject })
+        return new Promise(resolve => { acceptResume = resolve })
+      })
+      const player = await mount('running')
+      await act(async () => player.result.current.pause())
+      snapshot = { ...snapshot, status: 'paused', revision: 11 }
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => rejectPause(networkError('ERR_NETWORK')))
+      await act(async () => resolveOld({ data: { ...snapshot, ready: false,
+        url: null, startTime: null, duration: null, renditionSet: '' } }))
+      await act(async () => rejectFresh(networkError('ERR_NETWORK')))
+      await act(async () => {
+        if (gesture === 'native') await player.video.play()
+        else player.result.current.play()
+      })
+      expect(post.mock.calls.filter(call => call[1].action).map(call => call[1].action)).toEqual(['pause', 'resume'])
+      player.setTime(19.25)
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      expect(player.video.paused).toBe(false)
+      snapshot = { ...snapshot, status: 'running', revision: 12 }
+      post.mockImplementation((path: string) => Promise.resolve(path === '/api/stream/sign' ? { data: snapshot } : { data: {} }))
+      await act(async () => acceptResume({ data: {} }))
+      expect(player.video.paused).toBe(false)
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(player.assignTime).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it.each(['native', 'programmatic'])('does not transfer an old owner pending status to an unavailable replacement owner: %s', async gesture => {
+      vi.useFakeTimers()
+      let replaced = false
+      let rejectOld!: (error: Error) => void
+      post.mockImplementation((path: string) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: replaced
+          ? { ...playback('paused'), jobId: 'replacement-job', sessionId: 'replacement-session', ready: false,
+            url: null, startTime: null, duration: null, renditionSet: '' } : playback('running') })
+        if (path.includes('/owned-session/')) return new Promise((_resolve, reject) => { rejectOld = reject })
+        return Promise.resolve({ data: {} })
+      })
+      const player = await mount('running')
+      await act(async () => player.result.current.pause())
+      replaced = true
+      await act(async () => vi.advanceTimersByTimeAsync(1000))
+      await act(async () => {
+        if (gesture === 'native') await player.video.play()
+        else player.result.current.play()
+      })
+      await act(async () => rejectOld(networkError('ERR_NETWORK')))
+      expect(post.mock.calls.filter(call => call[1].action).map(call => [call[0], call[1].action])).toEqual([
+        ['/api/transcode/sessions/owned-session/position', 'pause'],
+      ])
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(attachments[0].dispose).not.toHaveBeenCalled()
+      expect(player.assignTime).not.toHaveBeenCalled()
+      player.unmount()
+    })
+
+    it('keeps initial unavailable playback from submitting status commands without a pending intent', async () => {
+      post.mockResolvedValue({ data: { ...playback('running'), ready: false,
+        url: null, startTime: null, duration: null, renditionSet: '' } })
+      const containerRef = { current: document.createElement('div') }
+      const { result, unmount } = renderHook(() => useBaanderPlayer({ videoId: 'video', containerRef, autoPlay: true }))
+      await act(async () => {})
+      await act(async () => { result.current.play(); result.current.pause() })
+      expect(post.mock.calls.filter(call => call[1].action)).toHaveLength(0)
+      expect(attachments).toHaveLength(0)
+      unmount()
+    })
+
+    it('retains a queued source seek after an uncertain pause without assigning a reconciliation cursor', async () => {
+      vi.useFakeTimers()
+      let snapshot = playback('running')
+      let rejectPause!: (error: Error) => void
+      post.mockImplementation((path: string, payload: { action?: string, position?: number }) => {
+        if (path === '/api/stream/sign') return Promise.resolve({ data: { ...snapshot } })
+        if (payload.action === 'pause') return new Promise((_resolve, reject) => { rejectPause = reject })
+        snapshot = { ...snapshot, generation: 5, revision: 11, renditionSet: 'job.5', position: payload.position! }
+        return Promise.resolve({ data: { data: { acceptedGeneration: 5 } } })
+      })
+      const player = await mount('running')
+      await act(async () => { player.result.current.pause(); player.result.current.seekTo(60) })
+      await act(async () => rejectPause(networkError('ERR_NETWORK')))
+      expect(player.onError).not.toHaveBeenCalled()
+      expect(player.result.current.pendingSeekPosition).toBe(60)
+      expect(attachments.at(-1)?.position).toBe(48)
+      expect(player.assignTime).not.toHaveBeenCalled()
+      await act(async () => player.video.dispatchEvent(new Event('loadedmetadata')))
+      expect(player.result.current.currentTime).toBe(60)
+      expect(player.result.current.pendingSeekPosition).toBeNull()
+      expect(post.mock.calls.filter(call => call[1].action).map(call => call[1].action)).toEqual(['pause', 'seek'])
+      player.unmount()
+    })
+
+    it.each(['unmounted', 'owner replaced', 'terminal'])('discards uncertain status work after %s', async outcome => {
+      vi.useFakeTimers()
+      let snapshot = playback('paused')
+      let rejectStatus!: (error: Error) => void
+      let resolveRead!: (value: unknown) => void
+      let signs = 0
+      post.mockImplementation((path: string) => {
+        if (path !== '/api/stream/sign') return new Promise((_resolve, reject) => { rejectStatus = reject })
+        if (++signs === 2) return new Promise(resolve => { resolveRead = resolve })
+        return Promise.resolve({ data: { ...snapshot } })
+      })
+      const player = await mount('paused')
+      await act(async () => player.result.current.play())
+      await act(async () => rejectStatus(networkError('ERR_NETWORK')))
+      expect(signs).toBe(2)
+      if (outcome === 'unmounted') player.unmount()
+      else if (outcome === 'terminal') await act(async () => attachments[0].onError())
+      else {
+        snapshot = { ...snapshot, jobId: 'replacement-job', sessionId: 'replacement-session', renditionSet: 'replacement.4' }
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+      }
+      const count = post.mock.calls.length
+      await act(async () => resolveRead({ data: playback('running') }))
+      if (outcome === 'owner replaced') {
+        expect(attachments).toHaveLength(2)
+        expect(attachments[1].dispose).not.toHaveBeenCalled()
+        expect(player.video.paused).toBe(true)
+        expect(player.onError).not.toHaveBeenCalled()
+      } else {
+        await act(async () => vi.advanceTimersByTimeAsync(1000))
+        expect(post).toHaveBeenCalledTimes(count)
+        expect(attachments).toHaveLength(1)
+        expect(player.onError).toHaveBeenCalledTimes(outcome === 'terminal' ? 1 : 0)
+      }
+      if (outcome !== 'unmounted') player.unmount()
+    })
+
+    it.each(['ERR_BAD_OPTION', 'ERR_BAD_REQUEST', 'canceled', '403', 'unrelated'])('retains status failure behavior for %s', async kind => {
+      const failure = kind === '403' ? Object.assign(new AxiosError('Refused'), { response: { status: 403 } })
+        : kind === 'canceled' ? new CanceledError('Canceled') : kind === 'unrelated' ? new Error('Unexpected') : new AxiosError('Invalid', kind)
+      post.mockImplementation((path: string) => path === '/api/stream/sign'
+        ? Promise.resolve({ data: playback('running') }) : Promise.reject(failure))
+      const player = await mount('running')
+      await act(async () => player.result.current.pause())
+      expect(player.onError).toHaveBeenCalledOnce()
+      expect(attachments[0].dispose).toHaveBeenCalledOnce()
+      player.unmount()
+    })
   })
 
   it('keeps one heartbeat in flight and orders a later seek after it', async () => {
