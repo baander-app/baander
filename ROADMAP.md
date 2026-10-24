@@ -12,8 +12,17 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-No further implementation task is selected here. Historical unchecked items,
-old plan limitations and incomplete experiments do not authorize work. The retained
+Select source default audio next. The retained two-tone host calibration selects
+first-track commentary instead of the marked default dialogue, and static
+inspection confirms the movie path uses that first track for encoding, filter
+attributes and manifest language. Proof is under
+`var/test-runs/ordinary-movie-audio-delay-gates/default-audio-follow-up`; it is
+host explicit-map and source inspection evidence, not a live worker or browser
+reproduction. Plan a repair that keeps selection and metadata on the same source
+track. Interactive alternate-track selection remains separate.
+
+Historical unchecked items, old plan limitations and incomplete experiments do
+not authorize other work. The retained
 [plans](docs/plans/) supply design context; reconcile them with current callers and
 behavior before proposing a change. This applies to older cache/sweep, segmenter,
 FLAC/DSP and secondary-client plans as well as developer tooling.
@@ -1900,3 +1909,103 @@ B-frame sources, arbitrary Matroska files, other containers, general variable-ra
 gaps, hardware, other browsers, DASH browser playback and formal CMAF conformance
 remain unqualified. Existing application databases, Redis and original media were
 untouched. This checkpoint includes no push or feature merge.
+
+### Audible delay in ordinary movie playback — 2026-10-24
+
+Every movie with audio now applies initial `first_pts=0` normalization after
+negative-preroll trimming and profile filters. Ordinary sources without a
+verified timestamp anchor receive the same actual leading silent samples as
+anchored sources, preserving the complete audible tail. This does not add an
+origin, copyts, timestamp offsets or absolute seeking to ordinary sources.
+Asynchronous compensation stays disabled; video-only commands and the audio-only
+transcoder retain their behavior. No API, schema or new origin qualification is
+part of this change.
+
+The ordinary 25-fps MOV reproduction previously carried eight seconds of delay
+only in the MPD and an empty initialization edit; HLS played six seconds of tone
+immediately instead of a complete fourteen-second presentation. A six-second
+restart likewise lost the remaining two seconds. New native cases use a
+thirty-second source and independently decode full fragments/HLS PCM, checking
+silence, actual onset, complete tail, continuous tracks and video content. They
+cover H.264/HEVC, AAC/Opus, 44.1 kHz AAC with DRC, and matched PCM/AAC controls,
+including negative source priming and waveform alignment.
+
+The corrected unchanged-encoder comparison against `2f7a055a` produced nine
+audio-delay failures across sixteen tests with 3,928 assertions; seven matched
+or after-onset controls passed. The initial red also included a packet-observer
+error: FFmpeg's reported B-frame PTS carried a demuxer shift absent from native
+MP4 composition times. A reviewed bounded MP4-clock observer now checks actual
+decode/sample/composition timing without subtracting the first observed PTS.
+The original red remains separately retained; the corrected receipt is
+`var/test-runs/ordinary-movie-audio-delay-gates/native-red-clock/phpunit.log`.
+
+The repaired native selection passed 30 tests with 5,672 assertions, including
+the sixteen ordinary cases and fourteen existing sparse cases. Fresh AAC/Opus
+onsets measured about 8.02/8.00 seconds; six-second restart onsets were 2.02/2.00,
+and after-onset restarts began near zero. The 44.1 kHz DRC control retained its
+two-second delay; matched PCM/AAC controls began near zero. Raw MP4 grids retained
+750, 600 and 150 frames with complete 30-, 24- and six-second intervals. Per-case
+fragment/HLS observations are retained under `native-green`.
+
+At implementation `cd6e5595`, the full Transcode CI gate passed 1,068 tests with
+21,750 assertions across 81 files: 998 with 12,191 assertions in the ordinary
+lane and 70 with 9,559 in the native lane. Focused cases are included. The receipt
+is `var/test-runs/ordinary-movie-audio-delay-gates/backend/20261024-183217-37e7ea5c`.
+Full PHPStan passed. Deptrac reported zero violations, warnings and errors with
+484 existing skipped violations. These PHP gates used the unchanged PHP tree;
+subsequent browser instrumentation does not change their source scope. CI now
+selects both ordinary delayed fresh/seek browser scenarios, and the new native
+class is registered in the serial lane. Runner preflight, syntax and workflow
+configuration checks passed. Independent review, prose preservation audits,
+local-link and whitespace checks passed.
+
+Initial browser comparisons observed the old encoder playing tone during its
+first poll but stopped on a frame/current-time assertion. Instrumentation then
+measured synchronous canvas draws stalling for roughly two seconds under both
+encoders. A software-rendering experiment did not remove the stalls and its flag
+was removed. Reviewed native-frame capture uses a centered two-by-two crop,
+unchanged native timestamps, callback-entry clocks, ordered samples and at most
+four outstanding copies, with draining and exact-once frame closure. All colour,
+clock, audio, subtitle, tail and transport assertions remain in force.
+
+The corrected old-encoder browser comparison at observer `d5ae6955` and baseline
+encoder `2f7a055a` reached natural thirty-second completion with 750 decoded
+frames, then failed the intended initial-silence assertion: audible tone arrived
+at the first 0.221333-second poll. Its 740 captured frames all closed with no
+pending copies or capture errors. `browser-red-cropped` supersedes the earlier
+observer failures while retaining their receipts.
+
+All four final browser scenarios passed at `d5ae6955` with Chromium
+148.0.7778.96, Playwright 1.60.0, HLS.js 1.7.3 and FFmpeg 5.1.9-0+deb12u1.
+Ordinary fresh playback reached thirty seconds and 750 decoded frames, with tone
+onset at 8.202667 after 34 silent polls. The six-second restart reached 24 seconds
+and 600 frames, with onset at 2.111271 after seven silent polls. Their 737/592
+captured frames all closed, with no pending copies or capture errors.
+
+The anchored Matroska control retained its thirty-second tail, 30 decoded frames,
+8.096-second audio onset and both native subtitle cues. Backward, exact-end and
+past-end cue identity checks passed. The ordinary adaptive control passed in
+115.515 seconds with high-to-low-to-high presentation and one recovered
+3.5701-second wait during its constrained phase. This is measured recovery,
+not a stall-free playback promise. All four cleanup receipts passed; no owned
+containers remained, only the original nginx, PostgreSQL and Redis services.
+`var/test-runs/ordinary-movie-audio-delay-gates/acceptance-summary.json` records
+the four scenario directories, observations and final acceptance.
+
+Separate proven follow-up: respect a source audio track's default disposition.
+Host FFmpeg explicit-map calibration selected commentary at ordinal zero/global
+index one (220 Hz, not default), while main dialogue at ordinal one/global index
+two (880 Hz) was marked default. Static inspection confirms production's current
+ordinal-zero mapping and first-track filter/language metadata. This is not a live
+worker, CI or browser reproduction. Selection and metadata need to agree on the
+marked default. Proof is retained under
+`var/test-runs/ordinary-movie-audio-delay-gates/default-audio-follow-up`.
+This repair does not select a different track; interactive alternate-track
+selection remains a separate product change.
+
+Evidence is under `var/test-runs/ordinary-movie-audio-delay-gates`. The testing
+guide records universal movie normalization and the new native/browser scenarios.
+Acceptance covers the selected software movie path and Chromium HLS, excluding
+arbitrary timestamp discontinuities, new source-origin handling, hardware, other
+browsers, DASH browser playback and formal CMAF conformance. Original media and
+existing application services were untouched. No merge or push is included.

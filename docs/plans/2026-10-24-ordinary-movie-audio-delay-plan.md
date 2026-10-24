@@ -1,7 +1,7 @@
 ---
 title: Preserve audible delay in ordinary movie playback
 date: 2026-10-24
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -164,3 +164,31 @@ copies before freezing natural-end evidence; close each owned frame exactly once
 on every exit path. Validate crop dimensions and layout. Retain all existing
 frame, colour, clock, audio, tail, subtitle and transport assertions. Rerun the
 old-encoder browser comparison and repaired scenarios with the corrected observer.
+
+## Verification checkpoint
+
+The encoder and native regressions are committed in `cd6e5595`; the reviewed
+browser observer is committed in `d5ae6955`. The corrected old-encoder native run
+has nine expected delay failures and seven passing controls across sixteen tests
+and 3,928 assertions. The corrected browser comparison reaches the full
+thirty-second end and decodes all 750 frames, then fails the initial-silence
+assertion. Both comparisons retain the encoder from `2f7a055a`.
+
+The repaired native selection passes 30 tests and 5,672 assertions. Full Transcode
+verification in the CI image passes 1,068 tests and 21,750 assertions across
+81 files. Full PHPStan passes; Deptrac reports zero violations, warnings and
+errors, retaining 484 existing baseline skips.
+
+All four final browser scenarios pass on `d5ae6955`: ordinary delayed fresh and
+seek, the delayed Matroska subtitle control and ordinary adaptive playback.
+Fresh and seek retain their thirty-/24-second tails and all 750/600 decoded
+frames. Observed audio-onset polls are 8.202667 and 2.111271 seconds. Native
+subtitle timing and identity after seeking pass; adaptive playback completes its
+high/low/high quality transitions. Capture ownership and container cleanup pass.
+Syntax, configuration, runner preflight, prose preservation, link and whitespace
+checks pass, as do independent implementation and simplification reviews.
+
+Receipts are retained under `var/test-runs/ordinary-movie-audio-delay-gates/`,
+including `acceptance-summary.json`, original failed experiments and corrected
+red/green evidence. The roadmap records exact scope and the separate source-audio
+default-disposition follow-up. Delivery is local; merge and push remain separate.
