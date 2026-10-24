@@ -828,7 +828,7 @@ path is not available for the low-delay types. Verification: CTest 28/28 in
 the release and sanitizer builds, FFmpeg decoding the LD, ELD and DRC streams
 at 135 to 137 dB, afterburner gains of 0.6 to 1.0 dB segmental SNR, encode
 1.3 to 2 times and decode 1.1 to 1.9 times faster with byte-identical
-encoder output, the binding's smoke test (9 tests) and the Electron service
+encoder output, the binding's smoke test (10 tests) and the Electron service
 suite (5 tests). A read-only review found fourteen correctness and contract
 findings, all applied. Not run: listening tests, interop for ELD with LD-SBR
 and for the RVLC and HCR tools.

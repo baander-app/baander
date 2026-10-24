@@ -155,3 +155,62 @@ One corruption in thirteen of a short-window LC stream parses as a valid
 frame and is not detected. The 1024-frame encoder output is byte for byte
 what it was before the 960-frame work on every profile and mode checked
 (LC mono, stereo, 5.1, TVBR; HE v1 stereo and mono; HE v2).
+
+## Low delay, dynamics and speed
+
+Measured on 2026-10-24 with FFmpeg 6.1.1 on this machine (a 2.8 GHz
+Xeon, four cores, GCC 13, release build at the AVX2 level).
+
+| Stream | Difference SNR |
+|--------|---------------:|
+| Our AAC-LD 512 (48 kHz mono, 44.1 kHz stereo, 24 kHz mono, 48 kHz 5.1) in MP4, decoded by FFmpeg | 135.9–136.8 dB |
+| Our AAC-ELD 512 (48 kHz stereo, 32 kHz mono, 48 kHz 5.1) and 480 (48 kHz mono), decoded by FFmpeg | 135.4–136.1 dB |
+| A hand-built LD stream switching between the sine and low-overlap windows, decoded by FFmpeg | 136.0 dB |
+| Our stream with DRC metadata, decoded by FFmpeg (which parses the data and does not apply it) against our decode with DRC off | 135.6 dB |
+
+FFmpeg decodes AAC-LD 480 with a 512-line transform, so that case is
+covered by roundtrips only; it has no AAC-ELD with LD-SBR decoder, and
+our LD-SBR filterbank windows and frame grid are our own design where
+the standard's tables were not available, so ELD with LD-SBR is
+verified by roundtrip (low band 21 to 26 dB, the 10 to 16 kHz band
+within 1.5 dB of the source, delays 1923/1827 samples in dual rate and
+962/914 in single rate at 512/480) and is not known to interoperate.
+Low-delay roundtrips at 64 kbit/s per channel reach 30 to 38 dB on
+tones; the ELD downscaled playout agrees with the full-rate decode,
+lowpassed and resampled, at 65 to 74 dB.
+
+The DRC path applies the signalled band gain within 0.1 dB overall and
+per frame on encoder-written metadata (34 quarter-dB steps of cut on a
+-9 dBFS tone with the film standard profile), halves it at 50 percent,
+normalises the reference level to the target (+6.0 dB for 124 against
+100) and applies DVB heavy compression from a hand-built data stream
+element.
+
+Afterburner, segmental SNR on a music-like stereo signal at 44.1 kHz,
+constant bitrate:
+
+| Bitrate | Off | On | Gain | Encode time |
+|--------:|----:|---:|-----:|------------:|
+| 32 kbit/s | 18.6 dB | 19.3 dB | +0.7 dB | +52 % |
+| 48 kbit/s | 18.1 dB | 18.9 dB | +0.8 dB | +87 % |
+| 64 kbit/s | 25.3 dB | 25.9 dB | +0.6 dB | |
+| 96 kbit/s | 26.9 dB | 27.9 dB | +1.0 dB | +109 % |
+
+`baac bench` on a 60 s stereo signal at 48 kHz, realtime factors before
+and after the performance pass (decode times are a few tenths of a
+second and vary by about 20 percent between runs):
+
+| Configuration | Encode before | Encode after | Decode before | Decode after |
+|---------------|--------------:|-------------:|--------------:|-------------:|
+| LC 128 kbit/s | 7.5x | 13.1x | 281x | 509–541x |
+| HE-AAC v1 64 kbit/s | 15.5x | 22.4x | 116x | 191–214x |
+| HE-AAC v2 32 kbit/s | 28.1x | 36.8x | 127x | 232–247x |
+| LC 960 128 kbit/s | 7.3x | 12.0x | 144x | 160–187x |
+| LD 512 64 kbit/s | 9.2x | 13.7x | 344x | 515–634x |
+| ELD 512 64 kbit/s | 8.7x | 12.6x | 298x | 317–454x |
+| LC 48 kbit/s with afterburner | 5.6x | 11.1x | 381x | 472–685x |
+
+Every encoder output is byte for byte what it was before the pass at the
+scalar, SSE2 and AVX2 levels; the LC, LD, ELD and afterburner decodes
+are bit-exact and the HE-AAC decodes differ by at most 2.4e-7 through
+the FFT-form QMF banks.

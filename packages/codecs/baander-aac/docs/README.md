@@ -62,6 +62,32 @@ refused until a frequency-coded frame re-anchors it. Concealed frames are
 counted (`aac_decoder_concealed_frames`, `aac_decoder_last_frame_concealed`);
 with `AAC_CONCEAL_OFF` the frame returns `AAC_ERR_DECODE`.
 
+The error resilient object types (ER AAC-LC, AAC-LD and AAC-ELD) may
+switch on the three error resilience tools in their AudioSpecificConfig,
+and the decoder reads all of them: virtual codebook 11
+(`aacSectionDataResilienceFlag`: five-bit section codebooks, one band
+per escape section, and the virtual codebooks 16 to 31 whose magnitude
+limits expose a damaged escape sequence), reversible variable length
+coded scalefactors (`aacScalefactorDataResilienceFlag`: when the forward
+decoding fails its length and reverse global gain checks, the data is
+decoded backward from its end as well, the consistent prefix and suffix
+are kept and the bands between them interpolated; the frame then counts
+as concealed) and Huffman codeword reordering
+(`aacSpectralDataResilienceFlag`: the presorted codewords are read back
+from their segments, priority codewords first, the rest in alternating
+directions with segment hopping). A value above a virtual codebook's
+limit or an inconsistent reordering conceals the frame, or returns
+`AAC_ERR_DECODE` with concealment off. The tools are decoded only; the
+encoder's low-delay streams do not use them. They were written without
+the standard's text at hand: the virtual codebook limits and the ER
+section syntax are verified end to end (FFmpeg decodes our hand-built ER
+AAC-LC frames to 135 dB), but the RVLC escape codebook is a stand-in
+prefix code rather than the standard's table, and the RVLC field order
+and the reordering rules (presort priority, segment layout, direction
+alternation and hopping) follow our reading of the standard, so streams
+from other encoders that use these two tools are not known to decode
+until the tables and rules are checked against ISO/IEC 14496-3.
+
 A look-ahead peak limiter (`aac_decoder_set_limiter`, off by default)
 keeps the output within full scale after a downmix: the gain ramps down
 over the attack window so that it has reached the needed value when the
@@ -123,6 +149,31 @@ floating point precision (100 to 134 dB difference SNR on HE-AAC v1,
 mono, stereo and 5.1, constant and variable bitrate. The 34-band and
 IPD/OPD paths follow the standard but are not covered by the test
 streams, which FDK encodes with 20 bands and without phase parameters.
+
+The low-delay object types decode too. AAC-LD (object type 23) frames
+carry 512 or 480 samples in one long window with the LD band tables,
+TNS limits and the sine or low-overlap window of ISO/IEC 14496-3 4.6.17;
+AAC-ELD (object type 39) uses the low-overlap filterbank of 4.6.20, whose
+synthesis window spans four frames, and the ELD channel stream syntax
+without window fields, pulse data or gain control. Both use the
+error-resilient framing: the element sequence is fixed by the channel
+configuration, with no element ids and no end marker, so these streams
+need an AudioSpecificConfig (LOAS, LATM or raw access units; ADTS cannot
+carry them). `aac_decoder_object_type` names the type in use.
+`aac_decoder_set_eld_downscale` plays an ELD stream at one half or one
+quarter of its rate with a filterbank of a half or a quarter of the
+length, for devices that cannot run the full rate. An ELD stream whose
+configuration carries LD-SBR has one low-delay SBR state per channel
+element: the `sbr_data` of each element follows the channel elements
+(behind a 10-bit CRC when the config asks for one), and the output
+stage runs the low-delay filterbank, so with dual rate the frame doubles
+and the output rate is twice the core rate, as with HE-AAC. Against
+FFmpeg's decoder our LD and ELD streams agree to floating point
+precision (135 to 137 dB difference SNR); FFmpeg has no ELD-with-SBR
+decoder and our LD-SBR filterbank windows and frame grid are our own
+design where the standard's tables were not available, so LD-SBR
+streams are verified by roundtrip only and their interoperability with
+other decoders is unverified.
 
 ### Encoder
 
@@ -210,6 +261,27 @@ up within one QMF slot in time and within about half a decibel in the
 band levels; an LFE in an HE-AAC layout goes through the same QMF
 resampling with no SBR data.
 
+With `AAC_AOT_ER_LD` or `AAC_AOT_ER_ELD` the encoder codes 512 (480
+through `aac_encoder_set_frame_length`) samples per frame in one long
+window with the LD or ELD filterbank, writes the error-resilient framing
+and defaults to LOAS. Its delay is one frame plus the filterbank's
+overlap: 1024 (960) samples for AAC-LD, 768 (720) for AAC-ELD.
+`aac_encoder_set_ld_sbr` adds LD-SBR to an ELD encoder: with dual rate
+the core runs at half the input rate and a frame is 1024 (960) input
+samples; the SBR headers travel in the AudioSpecificConfig and the
+payloads after the channel elements. The DRC metadata path is not
+available for the low-delay types, whose frames carry no fill elements.
+
+`aac_encoder_set_afterburner` enables a second quantisation pass after
+the rate loop: for every band it measures the real quantisation noise
+against the band's allowance and moves scalefactors one step at a time
+where the noise falls most per bit, paid from the frame's slack in the
+constant-rate modes or from bands with margin in the quality modes,
+re-sectioning the codebooks and counting the bits exactly after every
+move within the scalefactor limits. It raises the segmental SNR by about
+0.6 to 1.0 dB between 32 and 96 kbit/s for roughly twice the encoding
+time; with it off the output is unchanged byte for byte.
+
 ## API
 
 All functions are declared in `include/aac.h` with C linkage.
@@ -236,13 +308,18 @@ int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
 int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
+int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate);
+int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
+int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level);
 ```
 
 - `sample_rate` is one of the twelve AAC rates (8000 to 96000 Hz);
   `channels` is 1 to 8, interleaved in the canonical order (L, R, C, LFE,
   Ls, Rs, then Lc, Rc for 7.1 and Cs as the seventh channel of 6.1);
-  `aot` is `AAC_AOT_LC`, `AAC_AOT_SBR` (HE-AAC v1) or `AAC_AOT_PS`
-  (HE-AAC v2). With SBR the sample rate is twice a core rate the tuning
+  `aot` is `AAC_AOT_LC`, `AAC_AOT_SBR` (HE-AAC v1), `AAC_AOT_PS`
+  (HE-AAC v2), `AAC_AOT_ER_LD` (AAC-LD) or `AAC_AOT_ER_ELD` (AAC-ELD; the
+  low-delay types take 22.05 to 48 kHz, the rates with LD band tables,
+  and channel configurations 1 to 7). With SBR the sample rate is twice a core rate the tuning
   table covers (32000 to 96000 Hz; 22050 and 44100 included); the tuning
   rows span 8 to 160 kbit/s for a mono element and 16 to 256 kbit/s for a
   stereo one, and a bitrate outside them takes the nearest row. HE-AAC v2
@@ -335,6 +412,11 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 - `aac_decoder_set_limiter` takes the attack (look-ahead) and release
   times in milliseconds; the look-ahead must fit 8192 frames at the
   highest output rate, 96 kHz doubled by SBR (about 42 ms).
+- `aac_decoder_object_type` reports the object type of the stream;
+  `aac_decoder_set_eld_downscale` (1, 2 or 4, before the first frame)
+  plays an ELD stream at a fraction of its rate and is refused for a
+  stream with LD-SBR. `aac_decoder_set_frame_length` takes 1024 or 960
+  only: the low-delay frame lengths are signalled by the configuration.
 - `aac_decoder_set_drc` (off by default) takes the boost and cut
   scaling in percent, the target reference level in quarter dB below
   full scale (-1 for no loudness normalisation) and whether DVB heavy
@@ -366,16 +448,32 @@ ctest
 the tests. Options: `BAAC_AAC_BUILD_ENCODER`, `BAAC_AAC_BUILD_DECODER`,
 `BAAC_AAC_BUILD_TESTS`, `BAAC_AAC_BUILD_TOOLS`, `BAAC_AAC_SHARED`.
 
-SIMD: the vector operations dispatch at runtime to SSE2, AVX2 (x86) or
-NEON (ARM); only `src/simd/avx2.cpp` is compiled with AVX2 flags, so the
-library runs on CPUs without it.
+SIMD: the vector operations, the radix-2 FFT stages and the MDCT twiddles
+dispatch at runtime through one function table (`include/aac_dsp.h`) to
+SSE2, AVX2 (x86) or NEON (ARM); only `src/simd/avx2.cpp` is compiled with
+AVX2 flags, so the library runs on CPUs without it. The transform kernels
+compute the same products and sums as the scalar ones, without fused
+multiply-adds, so an encoder produces the same stream on every level;
+`BAAC_AAC_CPU=scalar|sse2|avx2|neon` in the environment caps the level
+for comparisons, and `tests/test_dsp.cpp` checks every kernel of every
+level the machine can run against the scalar one. The decoder's QMF
+banks run their modulation through the FFT; the encoder's keep the direct
+sums. Neither the encoder nor the decoder allocates once it is running
+(`tests/test_allocation.cpp` counts).
 
 ### Command-line tool
 
 ```sh
 baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality]
 baac dec <in.aac> <out.f32le> [rate] [channels]
+baac bench [--seconds N] [--dump DIR] [--only NAME]
 ```
+
+`bench` encodes and decodes a synthetic 60 s stereo signal at 48 kHz
+through AAC-LC (1024 and 960 frames, and with the afterburner), HE-AAC
+v1 and v2, AAC-LD and AAC-ELD and prints the times and realtime factors;
+`--dump` writes each stream and its decode, for a byte-for-byte comparison
+between builds.
 
 Raw PCM is interleaved 32-bit float. With ffmpeg:
 
@@ -419,7 +517,9 @@ chunked decoder/encoder sessions).
 
 ## Testing
 
-`ctest` runs fifteen suites: table consistency (prefix-free, complete
+`ctest` runs twenty-eight suites, and the transform, filterbank and
+roundtrip suites again at every DSP dispatch level this machine can run:
+table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
 Princen-Bradley windows), MDCT against the direct definition and TDAC,
 the QMF banks (every analysis and
@@ -455,7 +555,22 @@ channels and two bands from a hand-built fill element, heavy
 compression from a hand-built data stream element, an HE-AAC stream,
 and FFmpeg decoding our metadata stream without complaint and, since
 its decoder parses but does not apply the gains, matching our decode
-with DRC off at 135 dB). The interop test skips when `ffmpeg` is
+with DRC off at 135 dB), the afterburner (byte identity with it off,
+determinism, the segmental SNR gain per bitrate, the budget limits of
+every rate-control mode, decoding by our decoder and FFmpeg), the
+LD-SBR module (filterbank reconstruction and delay, grid and bitstream
+roundtrips, a coding roundtrip with an ideal core at 512 and 480 in
+dual and single rate), the low-delay types (window and filterbank
+reconstruction, LD and ELD roundtrips at 48 and 32 kHz over LOAS and
+raw access units, downscaled playout against a decimated reference,
+concealment, configuration roundtrips, and FFmpeg decoding our LD and
+ELD streams within float rounding) and ELD with LD-SBR (roundtrips in
+dual and single rate at 512 and 480, delays, concealment of a
+truncated unit and of a CRC-caught payload, the configuration with its
+headers, and byte identity of plain ELD streams against committed
+references), the DSP kernels (every SIMD kernel against its scalar
+version) and allocation (zero heap use in the steady state of every
+profile). The interop test skips when `ffmpeg` is
 not on PATH; otherwise it requires our decoder to match FFmpeg's decode
 of FFmpeg-encoded streams (ADTS and LATM), and FFmpeg to decode our
 streams (ADTS, LOAS with implicit, backward compatible and hierarchical
@@ -475,7 +590,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, SBR and PS decoders, limiter, dynamic range control, psychoacoustics, encoder, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool
 tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
