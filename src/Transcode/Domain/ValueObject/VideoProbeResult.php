@@ -37,10 +37,10 @@ final readonly class VideoProbeResult implements JsonSerializable
         public ?float $sourceTimestampOrigin = null,
     ) {
         $selected = $this->selectedAudioStream();
-        $this->audioChannels = $selected?->channels ?? $audioChannels;
-        $this->audioCodec = $selected?->codec ?? $audioCodec;
-        $this->audioSampleRate = $selected?->sampleRate ?? $audioSampleRate;
-        $this->audioChannelLayout = $selected?->channelLayout ?? $audioChannelLayout;
+        $this->audioChannels = $selected->channels ?? $audioChannels;
+        $this->audioCodec = $selected->codec ?? $audioCodec;
+        $this->audioSampleRate = $selected->sampleRate ?? $audioSampleRate;
+        $this->audioChannelLayout = $selected->channelLayout ?? $audioChannelLayout;
     }
 
     public function selectedAudioStreamOrdinal(): ?int
