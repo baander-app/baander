@@ -36,7 +36,7 @@ describe('HLS attachment ownership', () => {
     const { options, dispose } = setup()
     await settle()
     const instance = mock.instances[0]
-    expect(instance.config).toEqual({ autoStartLoad: false, startPosition: 18 })
+    expect(instance.config).toEqual({ autoStartLoad: false, startPosition: 18, latencyController: undefined })
     expect(instance.attachMedia).toHaveBeenCalledWith(options.video)
     instance.listeners.attached()
     expect(instance.loadSource).toHaveBeenCalledWith(options.url)

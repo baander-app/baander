@@ -55,7 +55,13 @@ export function attachHlsPlayback({ video, url, position, onError, onReady, getS
       else fail()
       return
     }
-    const instance = new HlsPlayer({ autoStartLoad: false, startPosition: position })
+    const instance = new HlsPlayer({
+      autoStartLoad: false,
+      startPosition: position,
+      // Movie playlists grow during encoding; their published edge is not a live
+      // playback target. Source seeks remain owned by the movie player.
+      latencyController: undefined,
+    })
     player = instance
     instance.on(HlsPlayer.Events.ERROR, (_event, data) => {
       if (active() && player === instance && data.fatal) fail(data.type === HlsPlayer.ErrorTypes.NETWORK_ERROR ? 'network' : undefined)

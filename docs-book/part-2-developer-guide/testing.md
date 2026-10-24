@@ -804,6 +804,8 @@ native HLS support separately. Playback uses the product's HLS.js player through
 MSE, without media feature overrides. A capability report or HTTP response does
 not prove decoding: the gate requires current-generation delivered media, decoded
 frames, an advancing clock and real seekable ranges.
+Growing movie playback waits for newly published media rather than moving its
+clock to a live sync point; the source cursor remains authoritative.
 
 Paused restoration retains the browser's raw frame counter. If it is zero, a
 fresh draw of the current video into a 16-by-9 canvas can establish the fixture's
