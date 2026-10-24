@@ -137,3 +137,30 @@ observed timestamp or relax timing tolerances. Keep FFprobe output as diagnostic
 evidence. The native bytes establish the clock; [FFmpeg's demuxer implementation](https://raw.githubusercontent.com/FFmpeg/FFmpeg/n5.1.9/libavformat/mov.c)
 explains the reported shift. Preserve the original red receipt and rerun the
 corrected regression against the unchanged encoder before accepting green output.
+
+## Capturing browser frame colours without blocking playback
+
+The ordinary browser runs exposed synchronous canvas capture stalls. Instrumented
+`drawImage` calls took 2.0–2.375 seconds, while pixel readback took at most 0.1 ms.
+The same stalls occurred with the old and repaired encoders. Disabling GPU
+acceleration did not remove them; retain that failed experiment and remove its
+flag. These observations identify capture overhead, not a general playback or
+timestamp qualification failure.
+
+A short probe in the pinned Chromium captured 149 native 720p frames directly
+through `VideoFrame`. Every native timestamp matched its presentation callback,
+all frames were closed, and copying a centered two-by-two RGBA crop took at most
+1.6 ms. The API works at the existing HTTP fixture origin without extra flags.
+Cropping before RGB conversion avoids converting the entire frame merely to
+observe its colour. The probe and operation timings are retained under
+`var/test-runs/ordinary-movie-audio-delay-gates/video-frame-feasibility/`.
+
+Independent review approved replacing canvas capture with this bounded native
+snapshot observer. Preserve timestamps without overrides, compare them with
+callback presentation time, retain the callback-entry playback clock and copy
+actual pixels. Publish completed samples in callback order, cap outstanding
+copies at four and fail on overflow or capture errors. Cancel callbacks and drain
+copies before freezing natural-end evidence; close each owned frame exactly once
+on every exit path. Validate crop dimensions and layout. Retain all existing
+frame, colour, clock, audio, tail, subtitle and transport assertions. Rerun the
+old-encoder browser comparison and repaired scenarios with the corrected observer.
