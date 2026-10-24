@@ -161,3 +161,12 @@ Independent review approved this addendum before backend implementation. Isolate
 Chromium and Firefox comparisons reached genuine native EOF with negative CTS
 offsets while retaining the baseline presented audio/video ranges and identical
 AAC payloads. The unchanged producer stalled in both browsers.
+
+The progressive native consumer must count decoded source frames without FFmpeg's
+implicit constant-frame-rate duplication. The first repaired-producer run kept
+480 copied HLS video packets but wrote 483 gray frames, including four copies of
+the first image. Verify the raw-output measurement against retained media before
+adjusting that fixture. Limit any repair to the gray-video consumer's timestamp
+origin and frame synchronization; keep copied packet CRCs, PCM output, strict
+480/312 frame counts, duration limits and live-versus-completed equality checks.
+Do not change the producer or increase count tolerances for this observation.
