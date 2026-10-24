@@ -202,3 +202,31 @@ Independent review approved the observer repair before implementation and its
 final causal checks afterward. Progress and status observations both snapshot
 attachment capabilities before reading browser events and receipts, so a later
 master request is checked in the next observation instead of against older data.
+
+## Completed execution restart evidence
+
+The next Chromium run proved natural EOF, the lost ending pause and stopped media
+through fresh running polls and capability expiry. It submitted exactly one
+source-zero replay seek. Canonical state advanced from generation 16 to 17 while
+preparing, then to 18 at the same control revision before decoded replay became
+ready. The fixture required exactly generation 17 and timed out despite running
+source-zero playback. Retain this run and verified cleanup under
+`var/test-runs/movie-completion-replay-chromium-verified`; its name also does not
+indicate final acceptance. Replay became ready about 37.7 seconds into the
+60-second scenario, so the deadline does not need to change.
+
+This is the existing completed-execution restart contract. A changed seek advances
+the control generation and releases a completed owner; a fresh worker claim
+advances the execution generation again. The integration test for restarting
+completed output already covers both transitions. Live-owner seeks can remain in
+the acknowledged generation. No backend repair is required.
+
+Capture actual seek acknowledgements with the fixture's existing browser receipt
+observer. Match each acknowledgement to the submitted request identity and source
+target. Require a ready owned execution at the acknowledged generation or its
+single fresh-claim successor, with the requested source start and advancing
+decoded audio/video delivery. Record the acknowledged and decoded generations
+separately; do not accept arbitrary later generations. Keep the one logical replay
+seek assertion, receipt ownership, pending-intent fences, native Play settlement
+and all time budgets. Review this fixture correction before implementation and
+repeat both full browser lifecycles against the unchanged verified worker image.
