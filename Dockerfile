@@ -634,13 +634,13 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
 
 USER www-data
 
-# Complete development images used by isolated previews and the host controller.
 FROM node:22-bookworm-slim AS dev-tools
 RUN corepack enable && corepack prepare yarn@4.14.1 --activate && mkdir -p /work
 WORKDIR /work
 
 FROM dev AS dev-runtime
 USER root
+RUN printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zz-baander-development-memory.ini
 COPY --chown=www-data:www-data . ${APP_HOME}/
 USER www-data
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-scripts && \

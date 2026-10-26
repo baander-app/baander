@@ -116,6 +116,21 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         });
     }
 
+    public function testPreservesApplicationSigningIdentityAndOriginWithRedaction(): void
+    {
+        $variables = ['VAPID_PRIVATE_KEY' => 'private-vapid', 'VAPID_PUBLIC_KEY' => 'public-vapid',
+            'STREAM_URL_HMAC_SECRET' => 'stream-secret', 'APP_URL' => 'https://workers.baander.app',
+            'DEFAULT_URI' => 'https://workers.baander.app'];
+        $environment = new DeploymentRuntimeEnvironment($variables);
+        ksort($variables);
+        self::assertSame($variables, $environment->variables);
+        self::assertSame(['variables' => array_fill_keys(array_keys($variables), '[redacted]')], $environment->jsonSerialize());
+        $environment->withFile(static function (string $path) use ($variables): void {
+            $lines = array_map(static fn (string $key, string $value): string => $key . '=' . $value . "\n", array_keys($variables), array_values($variables));
+            self::assertSame(implode('', $lines), file_get_contents($path));
+        });
+    }
+
     public function testByteLimitsIncludeKeysEqualsAndNewlines(): void
     {
         // Two encoded lines total 4096 bytes (12 + 14 bytes of key/separators).

@@ -29,7 +29,7 @@ class RecordingRunner:
         elif 'inspect' in arguments and 'network' not in arguments:
             output = json.dumps({'baander-persistent': {'IPAddress': '172.20.0.3'}})
         elif 'network' in arguments and 'inspect' in arguments:
-            owner = 'gateway' if arguments[-1] == 'baander-development-gateway' else 'persistent'
+            owner = 'gateway-' + arguments[-1].removeprefix('baander-development-gateway-') if arguments[-1].startswith('baander-development-gateway-') else 'persistent'
             output = json.dumps([{'Labels': {'app.baander.development.owner': owner}, 'IPAM': {'Config': [{'Subnet': '172.20.0.0/16'}]}}])
         return subprocess.CompletedProcess(arguments, 0, output, '')
 
@@ -95,7 +95,7 @@ class TopologyTest(unittest.TestCase):
         self.assertEqual(preview['worktree'], vite_source['source'])
         self.runtime.prepare(preview, release)
         install = next(arguments for arguments, _ in self.runner.calls if 'install' in arguments)
-        self.assertIn(f'type=bind,src={preview["worktree"]},dst=/work,readonly', install)
+        self.assertIn(f'type=bind,src={preview["worktree"]},dst=/var/www/html,readonly', install)
         self.assertFalse(any(service.get('ports') for service in config['services'].values()))
         self.assertNotIn('gateway', config['services']['app']['networks'])
         self.assertIn('gateway', config['services']['nginx']['networks'])

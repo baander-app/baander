@@ -115,20 +115,41 @@ class Database:
         (directory/'env.json').chmod(0o600)
         model=Runtime(self.store,self.runner).config(instance,release)
         redis_id=(instance.get('adoption',{}).get('containers',{}).get('redis') if not instance.get('ownership_transferred') else None)
-        if redis_id:
-            docker.run('exec',redis_id,'/bin/sh','-ec','export REDISCLI_AUTH="$REDIS_PASSWORD"; exec redis-cli SAVE')
-        else:
-            docker.compose(instance,'exec','-T','redis','/bin/sh','-ec','export REDISCLI_AUTH="$REDIS_PASSWORD"; exec redis-cli SAVE')
+        if not redis_id:
+            redis_id=docker.compose(instance,'ps','-q','redis').stdout.strip()
+        if not redis_id:
+            raise WorkflowError('The recorded Redis container is unavailable for a consistent checkpoint.')
+        directory_response=docker.run('exec',redis_id,'/bin/sh','-ec',
+            'export REDISCLI_AUTH="$REDIS_PASSWORD"; exec redis-cli --raw CONFIG GET dir').stdout.splitlines()
+        if len(directory_response)!=2 or directory_response[0]!='dir' or not (
+                directory_response[1]=='/data' or directory_response[1].startswith('/data/')):
+            raise WorkflowError('Redis persistence is outside its recorded /data mount or cannot be inspected; preserve the original service.')
+        saved=docker.run('exec',redis_id,'/bin/sh','-ec',
+            'export REDISCLI_AUTH="$REDIS_PASSWORD"; exec redis-cli --raw SAVE').stdout.strip()
+        if saved!='OK':
+            raise WorkflowError('Redis did not confirm persistence; preserve the original service.')
+        docker.run('stop','--time','30',redis_id,timeout=45)
+        observed=json.loads(docker.run('inspect',redis_id).stdout)[0]
+        if observed['Id']!=redis_id or observed['State']['Running']:
+            raise WorkflowError('Redis did not stop; writable persistence cannot be checkpointed consistently.')
         snapshots=[]
-        for key in ('redis','var','secrets','media','conversions'):
-            mount=instance.get('state_mounts',{}).get(key)
+        for key in ('redis','var','secrets','storage','conversions','transcode_state'):
+            nested_transcode = (key == 'transcode_state' and instance.get('adoption') and
+                                not instance.get('ownership_transferred') and
+                                key not in instance.get('state_mounts',{}))
+            mount=instance.get('state_mounts',{}).get('var' if nested_transcode else key)
             if mount is None:
                 mount={'type':'volume','source':model['volumes'][key]['name']}
             source=mount['source']
             mount_argument=f"type={mount['type']},src={source},dst=/snapshot,readonly"
             name='baander-checkpoint-'+uuid.uuid4().hex
+            archive_command = 'umask 077; tar -cpf /tmp/state.tar -C /snapshot .'
+            if nested_transcode:
+                archive_command = ('umask 077; if [ -d /snapshot/transcode_state ]; then '
+                                   'tar -cpf /tmp/state.tar -C /snapshot/transcode_state .; '
+                                   'else tar -cpf /tmp/state.tar --files-from /dev/null; fi')
             docker.run('create','--name',name,'--network','none','--user','0:0','--entrypoint','/bin/sh',
-                       '--mount',mount_argument,release['app_image'],'-ec','umask 077; tar -cpf /tmp/state.tar -C /snapshot .')
+                       '--mount',mount_argument,release['app_image'],'-ec',archive_command)
             try:
                 docker.run('start','--attach',name,timeout=None)
                 code=docker.run('inspect','--format','{{.State.ExitCode}}',name).stdout.strip()
@@ -140,14 +161,23 @@ class Database:
                 snapshots.append(key)
             finally:
                 docker.run('rm','--force',name,check=False)
+        with (directory/'database.dump').open('rb') as archive_file:
+            archive_digest=hashlib.file_digest(archive_file,'sha256').hexdigest()
         checkpoint={'directory':str(directory),'catalog':catalog,'state':snapshots,'verified':False,
-                    'postgres_image':instance.get('postgres_image',release['postgres_image'])}
+                    'postgres_image':instance.get('postgres_image',release['postgres_image']),
+                    'target_revision':release['revision'],
+                    'archive_sha256':archive_digest}
         atomic_json(directory/'checkpoint.json',checkpoint)
         return checkpoint
 
     def rehearse(self, instance, release, checkpoint):
         docker=self.docker(instance)
         directory=Path(checkpoint['directory'])
+        with (directory/'database.dump').open('rb') as archive:
+            if hashlib.file_digest(archive,'sha256').hexdigest()!=checkpoint['archive_sha256']:
+                raise WorkflowError('Database archive changed after checkpoint creation.')
+        if checkpoint['target_revision']!=release['revision']:
+            raise WorkflowError('Checkpoint belongs to a different target release.')
         name='baander-rehearsal-'+uuid.uuid4().hex[:16]
         network=name+'-private'
         env=Runtime(self.store,self.runner).environment(instance)
@@ -169,13 +199,23 @@ class Database:
                 if restored.get(key)!=checkpoint['catalog'].get(key):
                     raise WorkflowError('Restored catalog differs from the checkpoint; live migration remains blocked.')
             # No source deployment mounts, queues or Redis are available to this target kernel.
-            for _ in range(2):
-                docker.run('run','--rm','--network',network,'--env','DB_HOST=database','--env','DATABASE_URL',
-                           *[part for key in ('DB_USERNAME','DB_PASSWORD','DB_DATABASE','APP_SECRET') for part in ('--env',key)],
-                           '--mount',f'type=bind,src={directory / "secrets.tar"},dst=/checkpoint/secrets.tar,readonly',
-                           '--entrypoint','/bin/sh',release['app_image'],'-ec',
-                           'mkdir -p config/secrets; tar -xpf /checkpoint/secrets.tar -C config/secrets; exec php bin/console "$@"','rehearsal','doctrine:migrations:migrate','--no-interaction',
-                           env={key:env[key] for key in ('DB_USERNAME','DB_PASSWORD','DB_DATABASE','APP_SECRET')} | {'DATABASE_URL':rehearsal_url},timeout=None)
+            for attempt in range(2):
+                candidate=name+'-app-'+str(attempt)
+                try:
+                    docker.run('create','--name',candidate,'--network',network,'--user','0:0',
+                               '--env','DB_HOST=database','--env','DATABASE_URL','--env','APP_ENV=prod','--env','APP_DEBUG=0',
+                               *[part for key in ('DB_USERNAME','DB_PASSWORD','DB_DATABASE','APP_SECRET') for part in ('--env',key)],
+                               '--entrypoint','/bin/sh',release['app_image'],'-ec',
+                               'mkdir -p config/secrets; tar -xpf /tmp/secrets.tar -C config/secrets; exec php -d memory_limit=512M bin/console "$@"',
+                               'rehearsal','doctrine:migrations:migrate','--no-interaction',
+                               env={key:env[key] for key in ('DB_USERNAME','DB_PASSWORD','DB_DATABASE','APP_SECRET')} | {'DATABASE_URL':rehearsal_url})
+                    docker.run('cp',str(directory/'secrets.tar'),candidate+':/tmp/secrets.tar',timeout=None)
+                    docker.run('start','--attach',candidate,timeout=None)
+                    result=json.loads(docker.run('inspect',candidate).stdout)[0]
+                    if result['State']['ExitCode'] != 0:
+                        raise WorkflowError('Isolated migration rehearsal failed; live migration remains blocked.')
+                finally:
+                    docker.run('rm','--force','--volumes',candidate,check=False)
             checkpoint=dict(checkpoint,verified=True)
             atomic_json(directory/'checkpoint.json',checkpoint)
             return checkpoint
@@ -190,9 +230,9 @@ class Database:
             raise WorkflowError('Unaccounted database writers prevent migration.')
         catalog=self.inspect(instance,release)
         if not catalog['fresh'] and (catalog['pending'] or instance.get('adoption')):
-            if not checkpoint or checkpoint.get('verified') is not True:
+            if not checkpoint or checkpoint.get('verified') is not True or checkpoint.get('target_revision')!=release['revision']:
                 raise WorkflowError('A verified isolated restore and migration rehearsal is required.')
-        instance=dict(instance,phase='database_mutating',target_revision=release.get('revision'))
+        instance=dict(instance,phase='database_mutating',database_mutation_started=True,target_revision=release.get('revision'))
         self.store.save(instance['id'],instance)
         docker=self.docker(instance)
         try:
@@ -203,4 +243,4 @@ class Database:
         catalog=self.inspect(instance,release)
         if catalog['pending']:
             raise WorkflowError('Target migrations remain pending; preserve maintenance state.')
-        return dict(instance,migration_hashes=catalog['migration_hashes'])
+        return dict(instance,migration_hashes=catalog['migration_hashes'],database_mutation_confirmed=True)

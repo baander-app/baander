@@ -12,12 +12,15 @@ from .model import WorkflowError, clean_environment
 class Runner:
     def run(self, arguments: list[str], *, cwd: Path | None = None,
             env: dict[str, str] | None = None, input: str | None = None,
-            timeout: float | None = 120, check: bool = True, log_path: Path | None = None) -> subprocess.CompletedProcess:
+            timeout: float | None = 120, check: bool = True, log_path: Path | None = None, interactive: bool = False) -> subprocess.CompletedProcess:
         environment = clean_environment()
         if env:
             environment.update(env)
         try:
-            if log_path is None:
+            if interactive:
+                result = subprocess.run(arguments, cwd=cwd, env=environment, input=input,
+                                        text=True, timeout=timeout)
+            elif log_path is None:
                 result = subprocess.run(arguments, cwd=cwd, env=environment, input=input,
                                         text=True, capture_output=True, timeout=timeout)
             else:

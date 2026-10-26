@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from dev_environment.build import snapshot_worktree, checkout_revision
+from dev_environment.build import SourceUnavailable, snapshot_worktree, checkout_revision
 from dev_environment.model import WorkflowError
 from dev_environment.process import Runner
 
@@ -62,6 +62,49 @@ class SnapshotTest(unittest.TestCase):
         self.assertEqual(revision, resolved)
         self.assertEqual('original', (managed / 'src/code.py').read_text())
         self.assertEqual('uncommitted', (self.repo / 'src/code.py').read_text())
+
+
+    def test_failed_partial_clone_is_removed_and_same_revision_can_be_retried(self):
+        class InterruptedClone(Runner):
+            def run(inner, arguments, **kwargs):
+                if arguments[:2] == ['git', 'clone']:
+                    partial = Path(arguments[-1])
+                    partial.mkdir()
+                    (partial / 'partial-state').write_text('incomplete transfer')
+                    raise WorkflowError('transport interrupted')
+                return super().run(arguments, **kwargs)
+        managed = self.root / 'managed'
+        with self.assertRaises(SourceUnavailable):
+            checkout_revision(InterruptedClone(), str(self.repo), managed, self.root / 'release')
+        self.assertFalse(managed.exists())
+        self.assertEqual([], list(self.root.glob('.clone-*')))
+        _, revision = checkout_revision(Runner(), str(self.repo), managed, self.root / 'release')
+        self.assertEqual(self.git('rev-parse', 'HEAD'), revision)
+        self.assertEqual('original', (self.root / 'release/src/code.py').read_text())
+
+    def test_transient_fetch_preserves_managed_checkout_and_allows_retry(self):
+        managed = self.root / 'managed'
+        checkout_revision(Runner(), str(self.repo), managed, self.root / 'first')
+        class InterruptedFetch(Runner):
+            def run(inner, arguments, **kwargs):
+                if arguments[:2] == ['git', 'fetch']:
+                    raise WorkflowError('transport interrupted')
+                return super().run(arguments, **kwargs)
+        destination = self.root / 'release'
+        with self.assertRaises(SourceUnavailable):
+            checkout_revision(InterruptedFetch(), str(self.repo), managed, destination)
+        self.assertTrue((managed / '.git').is_dir())
+        self.assertFalse(destination.exists())
+        _, revision = checkout_revision(Runner(), str(self.repo), managed, destination)
+        self.assertEqual(self.git('rev-parse', 'HEAD'), revision)
+
+    def test_wrong_managed_remote_stays_a_deterministic_error(self):
+        managed = self.root / 'managed'
+        checkout_revision(Runner(), str(self.repo), managed, self.root / 'first')
+        with self.assertRaises(WorkflowError) as failure:
+            checkout_revision(Runner(), str(self.root / 'other'), managed, self.root / 'release')
+        self.assertNotIsInstance(failure.exception, SourceUnavailable)
+        self.assertIn('different remote', str(failure.exception))
 
 
 if __name__ == '__main__':

@@ -46,7 +46,9 @@ class Runtime:
         environment.update(APP_URL=origin, DEFAULT_URI=origin, APP_DOMAIN=instance['hostname'],
                            TRUSTED_PROXIES=instance.get('proxy_ip', ''), DISCOVERY_ENABLED='false')
         mounts = [volume('var', '/var/www/html/var'), volume('secrets', '/var/www/html/config/secrets'),
-                  volume('media', '/storage/media'), volume('conversions', '/storage/conversions'),
+                  dict(volume('media', environment.get('MEDIA_STORAGE_PATH', '/storage/media')), read_only=True),
+                  volume('storage', '/var/www/html/storage'), volume('conversions', environment.get('CONVERT_STORAGE_PATH', '/storage/conversions')),
+                  volume('transcode_state', '/var/www/html/var/transcode_state'),
                   volume('public', '/var/www/html/public')]
         for media in instance.get('media', []):
             source = Path(media['source'])
@@ -55,6 +57,8 @@ class Runtime:
                 raise WorkflowError('Configure an existing absolute media directory and absolute container path.')
             if str(target) == '/var/www/html' or str(target).startswith('/var/www/html/') or str(target) in ('/', '/var/run', '/run', '/etc'):
                 raise WorkflowError('Media mount overlaps application or system state.')
+            if str(target) == environment.get('MEDIA_STORAGE_PATH', '/storage/media'):
+                mounts = [mount for mount in mounts if mount['target'] != str(target)]
             mounts.append(bind(source, str(target)))
         services = {
             'app': {'image': release['app_image'], 'environment': environment, 'volumes': mounts,
@@ -64,11 +68,11 @@ class Runtime:
                 'POSTGRES_PASSWORD': environment.get('DB_PASSWORD', 'baander'),
                 'POSTGRES_DB': environment.get('DB_DATABASE', 'baander'),
                 'PGDATA': instance.get('pgdata', '/var/lib/postgresql/data/baanderdev')},
-                'volumes': [volume('database', '/var/lib/postgresql/data')], 'networks': {'private': {'aliases': ['database']}},
+                'volumes': [volume('database', instance.get('postgres_mount_target', '/var/lib/postgresql/data'))], 'networks': {'private': {'aliases': ['database']}},
                 'healthcheck': {'test': ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'],
                                 'interval': '5s', 'timeout': '5s', 'retries': 12}},
             'redis': {'image': release['redis_image'], 'environment': {'REDIS_PASSWORD': environment.get('REDIS_PASSWORD', '')},
-                      'command': ['sh', '-ec', 'exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"'],
+                      'command': ['sh', '-ec', 'exec redis-server --dir /data --appendonly yes --maxmemory-policy noeviction --requirepass "$$REDIS_PASSWORD"'],
                       'volumes': [volume('redis', '/data')], 'networks': {'private': {}}},
             'nginx': {'image': release['nginx_image'], 'environment': {'SERVER_NAME': instance['hostname'],
                       'GATEWAY_ADDRESS': instance.get('gateway', {}).get('ipv4_address', '')}, 'volumes': [
@@ -77,19 +81,31 @@ class Runtime:
                       'networks': {'private': {}, 'gateway': {'aliases': [project + '-frontend']}}},
         }
         if instance['kind'] == 'preview':
+            environment.update(BAANDER_DEV_ORIGIN=origin, APP_ENV='dev', APP_DEBUG='1')
             source = Path(instance['worktree']).resolve()
             mounts.insert(0, bind(source, '/var/www/html'))
             mounts.append(volume('vendor', '/var/www/html/vendor'))
             services['vite'] = {'image': release['tool_image'], 'working_dir': '/var/www/html/ui/web',
                                 'entrypoint': ['yarn'], 'command': ['dev', '--host', '0.0.0.0'],
-                                'environment': {'BAANDER_DEV_ORIGIN': origin},
+                                'environment': {'BAANDER_DEV_ORIGIN': origin,
+                                                'YARN_INSTALL_STATE_PATH': '/var/www/html/ui/web/node_modules/.yarn-install-state.gz'},
                                 'volumes': [bind(source, '/var/www/html'), volume('node_modules', '/var/www/html/ui/web/node_modules'),
                                             volume('public', '/var/www/html/public')], 'networks': {'private': {}}}
+        for key, saved in instance.get('state_mounts', {}).items():
+            service = services['redis'] if key == 'redis' else services['app']
+            defaults = {'var': '/var/www/html/var', 'secrets': '/var/www/html/config/secrets',
+                        'media': environment.get('MEDIA_STORAGE_PATH', '/storage/media'), 'storage': '/var/www/html/storage', 'conversions': environment.get('CONVERT_STORAGE_PATH', '/storage/conversions'), 'redis': '/data',
+                        'transcode_state': '/var/www/html/var/transcode_state'}
+            service['volumes'] = [mount for mount in service['volumes'] if mount['target'] != defaults.get(key)]
+            if saved['type'] == 'bind':
+                service['volumes'].append(bind(saved['source'], saved['target'], key == 'media'))
+            else:
+                service['volumes'].append(dict(volume(key, saved['target']), read_only=True) if key == 'media' else volume(key, saved['target']))
         for service in services.values():
             if 'environment' in service:
                 service['environment'] = {key: str(value).replace('$', '$$')
                                           for key, value in service['environment'].items()}
-        names = ('database', 'redis', 'var', 'secrets', 'media', 'conversions', 'public', 'vendor', 'node_modules')
+        names = ('database', 'redis', 'var', 'secrets', 'media', 'storage', 'conversions', 'transcode_state', 'public', 'vendor', 'node_modules')
         return {'name': project, 'services': services,
                 'networks': {'private': {'name': self.network_name(instance), 'external': True},
                              'gateway': {'external': True, 'name': instance.get('gateway', {}).get('name', GATEWAY_NETWORK)}},
@@ -120,17 +136,17 @@ class Runtime:
                                     release['app_image'], '-ec',
                                     'sha256sum /probe/composer.lock /probe/ui/web/package.json')
             except WorkflowError as error:
-                raise WorkflowError('Preview checkout is unavailable to the selected Docker daemon; use a daemon-visible worktree path or local Docker context.') from error
+                raise WorkflowError('Preview checkout is unavailable to the selected Docker daemon; check daemon path sharing, Unix permissions and SELinux read labels.') from error
             actual = [line.split()[0] for line in result.stdout.splitlines() if line.strip()]
             if actual != expected:
-                raise WorkflowError('Docker sees different preview source at this path; use a daemon-visible worktree path or local Docker context.')
+                raise WorkflowError('Docker sees different preview source at this path; check daemon path sharing, Unix permissions and SELinux read labels.')
         for media in instance.get('media', []):
             source = Path(media['source'])
             if not source.is_absolute() or not source.is_dir():
                 raise WorkflowError('Configure an existing absolute media directory.')
             docker.run('run', '--rm', '--network', 'none', '--entrypoint', '/bin/sh',
                        '--mount', f'type=bind,src={source},dst=/probe,readonly',
-                       release['app_image'], '-ec', 'test -d /probe')
+                       release['app_image'], '-ec', 'test -d /probe && test -r /probe && test -x /probe')
         return dict(instance, network=network, gateway=gateway)
 
     def write(self, instance: dict, release: dict) -> dict:
@@ -162,6 +178,8 @@ class Runtime:
         model = self.config(instance, release)
         destinations = [('public', '/var/www/html/public'),
                         ('var', '/var/www/html/var'),
+                        ('storage', '/var/www/html/storage'), ('conversions', '/storage/conversions'),
+                        ('transcode_state', '/var/www/html/var/transcode_state'),
                         ('secrets', '/var/www/html/config/secrets')]
         if instance['kind'] == 'preview':
             destinations.append(('vendor', '/var/www/html/vendor'))
@@ -173,21 +191,23 @@ class Runtime:
             elif key == 'secrets':
                 script = (f'if [ -z "$(ls -A /seed)" ] && [ -d {source} ]; then '
                           f'cp -a {source}/. /seed/; fi; ')
+            elif key == 'var':
+                script = 'rm -rf /seed/cache; mkdir -p /seed/cache /seed/log; '
             else:
-                script = 'mkdir -p /seed/cache /seed/log; '
-            script += 'chown -R www-data:www-data /seed'
+                script = ''
+            script += 'chown ' + ('-R ' if key in ('public', 'vendor', 'var', 'secrets') else '') + 'www-data:www-data /seed'
             docker.run('run', '--rm', '--network', 'none', '--user', '0:0',
                        '--entrypoint', '/bin/sh', '--mount', f'type=volume,src={name},dst=/seed',
                        release['app_image'], '-ec', script)
         if instance['kind'] == 'preview':
             source = Path(instance['worktree']).resolve()
             modules = model['volumes']['node_modules']['name']
-            docker.run('run', '--rm', '--entrypoint', 'yarn', '--workdir', '/work/ui/web',
-                       '--mount', f'type=bind,src={source},dst=/work,readonly',
-                       '--mount', f'type=volume,src={modules},dst=/work/ui/web/node_modules',
+            docker.run('run', '--rm', '--entrypoint', 'yarn', '--workdir', '/var/www/html/ui/web',
+                       '--mount', f'type=bind,src={source},dst=/var/www/html,readonly',
+                       '--mount', f'type=volume,src={modules},dst=/var/www/html/ui/web/node_modules',
                        '--env', 'YARN_ENABLE_IMMUTABLE_INSTALLS=true',
-                       '--env', 'YARN_INSTALL_STATE_PATH=/work/ui/web/node_modules/.yarn-install-state.gz',
-                       '--env', 'YARN_CACHE_FOLDER=/work/ui/web/node_modules/.yarn-cache',
+                       '--env', 'YARN_INSTALL_STATE_PATH=/var/www/html/ui/web/node_modules/.yarn-install-state.gz',
+                       '--env', 'YARN_CACHE_FOLDER=/var/www/html/ui/web/node_modules/.yarn-cache',
                        release['tool_image'], 'install', '--immutable', timeout=900)
 
     def up(self, instance: dict, release: dict) -> None:

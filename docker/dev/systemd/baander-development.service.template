@@ -1,0 +1,8 @@
+[Unit]
+Description=Update the configured Baander development instance
+
+[Service]
+Type=oneshot
+ExecStart=${COMMAND}
+TimeoutStartSec=infinity
+KillMode=process

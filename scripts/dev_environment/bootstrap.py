@@ -1,6 +1,7 @@
 """Explicit inventory, stable private configuration and fresh-only initialization."""
 from __future__ import annotations
 import base64
+import hashlib
 import json
 import tempfile
 from urllib.parse import quote
@@ -86,9 +87,18 @@ class Bootstrap:
         for variable,key in (('POSTGRES_PASSWORD','DB_PASSWORD'),('POSTGRES_USER','DB_USERNAME'),('POSTGRES_DB','DB_DATABASE')):
             if db_env.get(variable)!=environment.get(key):
                 raise WorkflowError('Selected PostgreSQL identity differs from the adoption configuration.')
-        targets={'var':'/var/www/html/var','secrets':'/var/www/html/config/secrets',
+        self.verify_application_identity(docker,inspections['app'],environment)
+        storage_root=Path('/var/www/html/storage')
+        for key,default in (('MEDIA_STORAGE_PATH','/var/www/html/storage/media'),('CONVERT_STORAGE_PATH','/var/www/html/storage/conversions')):
+            target=Path(environment.get(key,default))
+            if target==storage_root or storage_root in target.parents or target in storage_root.parents:
+                raise WorkflowError('Unsupported adoption topology: '+key+' overlaps writable storage at /var/www/html/storage. Preserve the original deployment and prepare distinct source, conversion and storage paths before adoption.')
+        targets={'var':'/var/www/html/var','secrets':'/var/www/html/config/secrets','storage':str(storage_root),
                  'media':environment.get('MEDIA_STORAGE_PATH','/var/www/html/storage/media'),
                  'conversions':environment.get('CONVERT_STORAGE_PATH','/var/www/html/storage/conversions'),'redis':'/data'}
+        transcode_target='/var/www/html/var/transcode_state'
+        if any(mount['Destination']==transcode_target for mount in inspections['app']['Mounts']):
+            targets['transcode_state']=transcode_target
         state_mounts={}
         volumes=dict(instance.get('volumes',{}),database=db_mount['Name'])
         for key,target in targets.items():
@@ -103,7 +113,7 @@ class Bootstrap:
             if mount['Type']=='volume':
                 docker.run('volume','inspect',mount['Name'])
                 volumes[key]=mount['Name']
-            state_mounts[key]={'type':mount['Type'],'source':mount.get('Name') if mount['Type']=='volume' else str(Path(mount['Source'])/suffix),'target':target}
+            state_mounts[key]={'type':mount['Type'],'source':mount.get('Name') if mount['Type']=='volume' else str(Path(mount['Source'])/suffix),'target':target,**({'read_only':True} if key=='media' else {})}
         media=[{'source':m['Source'],'target':m['Destination']} for m in inspections['app']['Mounts']
                if m['Type']=='bind' and m['Destination'] not in targets.values() and not m['Destination'].startswith('/var/www/html')]
         if 'worker_manifests' not in adoption or not isinstance(adoption['worker_manifests'],list):
@@ -121,8 +131,49 @@ if ($p===false||$q===false||!openssl_sign('adoption',$s,$p,OPENSSL_ALGO_SHA256)|
                    environment.get('OAUTH_PUBLIC_KEY_PATH','/var/www/html/config/secrets/oauth/public.key'))
         return dict(instance,adoption=adoption,adoption_inventory=inspections,volumes=volumes,
                     pgdata=pgdata,postgres_mount_target=db_mount['Destination'],postgres_image=db['Image'],
+                    redis_image=inspections['redis']['Image'],
                     state_mounts=state_mounts,media=media,initialization='adopted',
                     warnings=['An origin change requires login again; passkeys remain bound to their enrolled relying party.'])
+
+    def verify_application_identity(self, docker, app, environment):
+        keys=('APP_SECRET','STREAM_URL_HMAC_SECRET','VAPID_PRIVATE_KEY','VAPID_PUBLIC_KEY')
+        existing={}
+        for entry in app['Config'].get('Env') or []:
+            key,separator,value=entry.partition('=')
+            if separator and key in keys:
+                if key in existing:
+                    raise WorkflowError('Cannot verify duplicate application identity configuration; original services remain unchanged.')
+                existing[key]=value
+        missing=[key for key in keys if key not in existing]
+        observed={key:hashlib.sha256(value.encode()).hexdigest() for key,value in existing.items()}
+        if missing:
+            # Dotenv reads .env.local.php or the effective .env files without booting a kernel.
+            # Only digests leave the selected container; supplied secrets never enter its arguments.
+            probe=r"""$base='/var/www/html';
+require $base.'/vendor/autoload.php';
+(new \Symfony\Component\Dotenv\Dotenv())->bootEnv($base.'/.env');
+$result=[];
+foreach (json_decode($argv[1],true,512,JSON_THROW_ON_ERROR) as $key) {
+    $value=$_SERVER[$key] ?? $_ENV[$key] ?? getenv($key);
+    $result[$key]=is_string($value) && $value!=='' ? hash('sha256',$value) : null;
+}
+echo json_encode($result,JSON_THROW_ON_ERROR);
+"""
+            try:
+                response=docker.run('exec',app['Id'],'php','-d','display_errors=0','-r',probe,json.dumps(missing),timeout=30)
+                digests=json.loads(response.stdout)
+                if not isinstance(digests,dict) or set(digests)!=set(missing):
+                    raise ValueError('incomplete observation')
+                observed.update(digests)
+            except (WorkflowError,ValueError,TypeError):
+                raise WorkflowError('Cannot verify existing application identity; preserve the original services and reconcile configuration.') from None
+        for key in keys:
+            supplied=environment.get(key)
+            digest=observed.get(key)
+            if not isinstance(supplied,str) or not supplied or not isinstance(digest,str) or len(digest)!=64:
+                raise WorkflowError('Cannot verify existing application identity; preserve the original services and reconcile configuration.')
+            if not secrets.compare_digest(hashlib.sha256(supplied.encode()).hexdigest(),digest):
+                raise WorkflowError('Selected application identity differs from the adoption configuration; original services remain unchanged.')
 
     def transfer(self, instance, release, checkpoint):
         Database.quiescent(instance)
@@ -139,7 +190,6 @@ if ($p===false||$q===false||!openssl_sign('adoption',$s,$p,OPENSSL_ALGO_SHA256)|
                 raise WorkflowError('Adoption container identity or mounts changed; preserve the checkpoint and reconcile inventory.')
             if role in ('app','nginx') and actual['State']['Running']:
                 raise WorkflowError('The original app writer and recorded frontend must be stopped before adoption handoff.')
-        # The original cluster is stopped before a second server can mount PGDATA.
         for role in ('postgres','redis'):
             docker.run('stop','--time','60',inventory[role]['Id'],timeout=90)
             actual=json.loads(docker.run('inspect',inventory[role]['Id']).stdout)[0]
@@ -148,21 +198,36 @@ if ($p===false||$q===false||!openssl_sign('adoption',$s,$p,OPENSSL_ALGO_SHA256)|
         mounts=dict(instance['state_mounts'])
         volumes=dict(instance['volumes'])
         for key,mount in list(mounts.items()):
-            if mount['type']!='bind':
+            if mount['type']!='bind' or mount.get('read_only'):
                 continue
             destination=instance['project']+'-adopted-'+key+'-'+Path(checkpoint['directory']).name[:12]
             docker.run('volume','create',destination)
             archive=Path(checkpoint['directory'])/(key+'.tar')
-            docker.run('run','--rm','--network','none','--user','0:0','--entrypoint','/bin/sh',
-                       '--mount',f'type=volume,src={destination},dst=/restore',
-                       '--mount',f'type=bind,src={archive},dst=/checkpoint.tar,readonly',
-                       release['app_image'],'-ec',
-                       'test -z "$(ls -A /restore)"; tar -xpf /checkpoint.tar -C /restore')
+            self.restore_archive(docker,release,destination,archive)
             mounts[key]=dict(mount,type='volume',source=destination)
             volumes[key]=destination
+        if 'transcode_state' not in mounts:
+            transcode=instance['project']+'-adopted-transcode-'+Path(checkpoint['directory']).name[:12]
+            docker.run('volume','create',transcode)
+            self.restore_archive(docker,release,transcode,Path(checkpoint['directory'])/'transcode_state.tar')
+            volumes['transcode_state']=transcode
+            mounts['transcode_state']={'type':'volume','source':transcode,'target':'/var/www/html/var/transcode_state'}
         transferred=dict(instance,state_mounts=mounts,volumes=volumes,ownership_transferred=True)
         self.store.save(instance['id'],transferred)
         return transferred
+
+    def restore_archive(self, docker, release, destination, archive):
+        helper='baander-adoption-copy-'+secrets.token_hex(8)
+        docker.run('create','--name',helper,'--network','none','--user','0:0','--entrypoint','/bin/sh',
+                   '--mount',f'type=volume,src={destination},dst=/restore',release['app_image'],'-ec',
+                   'test -z "$(ls -A /restore)"; tar -xpf /tmp/checkpoint.tar -C /restore')
+        try:
+            docker.run('cp',str(archive),helper+':/tmp/checkpoint.tar',timeout=None)
+            docker.run('start','--attach',helper,timeout=None)
+            if docker.run('inspect','--format','{{.State.ExitCode}}',helper).stdout.strip()!='0':
+                raise WorkflowError('Adoption archive extraction failed; retain the original resources and checkpoint for recovery.')
+        finally:
+            docker.run('rm','--force',helper,check=False)
 
     def initialize(self, instance, release):
         database=Database(self.store,self.runner)
@@ -185,6 +250,8 @@ if ($p===false||$q===false||!openssl_sign('adoption',$s,$p,OPENSSL_ALGO_SHA256)|
         runtime.prepare(instance,release)
         docker=Docker(self.runner,instance['docker'])
         docker.validate()
+        instance=dict(instance,database_mutation_started=True)
+        self.store.save(instance['id'],instance)
         try:
             docker.compose(instance,'run','--rm','--no-deps','app','php','bin/console','app:dev:setup',
                            '--origin=https://'+instance['hostname'],'--no-interaction',timeout=None)

@@ -56,6 +56,10 @@ class StateStore:
         if self.root.is_symlink():
             raise WorkflowError('The development state root must not be a symlink.')
 
+    @property
+    def scope(self) -> str:
+        return hashlib.sha256(str(self.root).encode()).hexdigest()[:12]
+
     @classmethod
     def default(cls) -> StateStore:
         state_home = Path(os.environ.get('XDG_STATE_HOME', str(Path.home() / '.local/state')))

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check remote master for the configured Baander development instance
+
+[Timer]
+OnBootSec=60s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=baander-development.service
+
+[Install]
+WantedBy=timers.target

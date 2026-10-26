@@ -57,26 +57,28 @@ class Gateway:
             docker = Docker(self.runner, instance['docker'])
             docker.validate()
             saved = self.directory / 'state.json'
+            gateway_image = release['nginx_image']
             if saved.exists():
                 record = json.loads(saved.read_text())
+                gateway_image = record['nginx_image']
                 if record['docker'] != instance['docker']:
                     raise WorkflowError('The shared gateway belongs to another Docker target.')
-            network = owned_network(docker, GATEWAY_NETWORK, 'gateway')
+            network = owned_network(docker, GATEWAY_NETWORK + '-' + self.store.scope, 'gateway-' + self.store.scope)
             address = str(ipaddress.ip_network(network['subnet'])[2])
             gateway = dict(network, ipv4_address=address)
             self.configuration.parent.mkdir(mode=0o700, exist_ok=True)
             if not self.configuration.exists():
                 self.configuration.write_text(self.render({}))
-            compose = {'name': 'baander-development-gateway', 'services': {'gateway': {
-                'image': release['nginx_image'], 'ports': ['127.0.0.1:443:443'],
+            compose = {'name': 'baander-development-gateway-' + self.store.scope, 'services': {'gateway': {
+                'image': gateway_image, 'ports': ['127.0.0.1:443:443'],
                 'volumes': [bind(self.configuration.parent, '/etc/nginx/conf.d'),
                             bind(self.directory / 'tls', '/etc/nginx/certificates')],
                 'networks': {'gateway': {'ipv4_address': address}}}},
-                'networks': {'gateway': {'external': True, 'name': GATEWAY_NETWORK}}}
+                'networks': {'gateway': {'external': True, 'name': network['name']}}}
             atomic_json(self.directory / 'compose.json', compose)
-            record = {'docker': instance['docker'], 'project': 'baander-development-gateway',
+            record = {'docker': instance['docker'], 'project': 'baander-development-gateway-' + self.store.scope,
                       'compose_file': str(self.directory / 'compose.json'), 'gateway': gateway,
-                      'nginx_image': release['nginx_image']}
+                      'nginx_image': gateway_image}
             atomic_json(saved, record)
             return gateway
 
@@ -161,7 +163,12 @@ class Host:
     def inspect(self) -> dict:
         if not shutil.which('nmcli'):
             raise WorkflowError('Host setup requires NetworkManager managing DNS; install/configure it explicitly.')
-        result = self.runner.run(['NetworkManager', '--print-config'])
+        manager = shutil.which('NetworkManager')
+        if manager is None and Path('/usr/sbin/NetworkManager').is_file():
+            manager = '/usr/sbin/NetworkManager'
+        if manager is None:
+            raise WorkflowError('The NetworkManager daemon executable is unavailable.')
+        result = self.runner.run([manager, '--print-config'])
         configuration = result.stdout
         if re.search(r'^\s*(dns\s*=\s*none|rc-manager\s*=\s*unmanaged)\s*$', configuration, re.M):
             raise WorkflowError('NetworkManager DNS is disabled; resolve host DNS ownership before setup.')
@@ -193,7 +200,7 @@ class Host:
         ca.mkdir(mode=0o700, parents=True, exist_ok=True)
         environment = {'CAROOT': str(ca)}
         if install_trust:
-            self.runner.run(['mkcert', '-install'], env=environment)
+            self.runner.run(['mkcert', '-install'], env=environment, interactive=True)
         self.runner.run(['mkcert', '-cert-file', str(directory / 'cert.pem'), '-key-file', str(directory / 'key.pem'),
                          'baander.test', '*.baander.test'], env=environment)
         (directory / 'key.pem').chmod(0o600)

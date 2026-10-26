@@ -29,6 +29,8 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
         // config/packages/mailer.yaml builds every email's From header from these; without
         // them a worker's notification email would fall back to noreply@localhost.
         'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',
+        'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET',
+        'APP_URL', 'DEFAULT_URI',
     ];
 
     /** @var array<string,string> */
