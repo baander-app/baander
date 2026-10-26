@@ -117,19 +117,29 @@ class Builder:
         release['app_image'] = self.build(docker, source, 'production' if instance['kind'] == 'persistent' else 'dev-runtime', revision)
         release['worker_image'] = self.build(docker, source, 'worker', revision)
         release['operator_image'] = self.build(docker, source, 'dev-operator', revision)
-        tag = 'baander-development-postgres:' + revision
+        tag = 'baander-development-postgres:' + revision + '-' + source.name
         docker.run('build', '--file', str(source / 'docker/postgres/Dockerfile'), '--tag', tag, str(source / 'docker'), timeout=None, log_path=source.parent / (source.name + '-postgres.log'))
         release['postgres_image'] = self.image_id(docker, tag)
         for key, tag in (('nginx_image', 'nginx:stable-alpine'), ('redis_image', 'redis:7-alpine')):
             docker.run('pull', tag, timeout=300, log_path=source.parent / (source.name + '-' + key + '.log'))
             release[key] = self.image_id(docker, tag)
+        previous = instance.get('release') or {}
+        for key in ('postgres_image', 'redis_image'):
+            release[key] = instance.get(key) or previous.get(key) or release[key]
+        # Pin the final runtime selection before another build replaces revision tags.
+        release['image_pins'] = {}
+        for key in tuple(release):
+            if key.endswith('_image'):
+                pin = 'baander-development-release-' + key.removesuffix('_image') + ':' + instance['project'] + '-' + source.name
+                docker.run('image', 'tag', release[key], pin)
+                release['image_pins'][key] = pin
         return release
 
     def image_id(self, docker: Docker, name: str) -> str:
         return docker.run('image', 'inspect', '--format', '{{.Id}}', name).stdout.strip()
 
     def build(self, docker: Docker, source: Path, target: str, revision: str) -> str:
-        tag = 'baander-development-' + target + ':' + revision
+        tag = 'baander-development-' + target + ':' + revision + '-' + source.name
         docker.run('build', '--target', target, '--build-arg', 'BAANDER_SOURCE_REVISION=' + revision,
                    '--tag', tag, str(source), timeout=None, log_path=source.parent / (source.name + '-' + target + '.log'))
         return self.image_id(docker, tag)

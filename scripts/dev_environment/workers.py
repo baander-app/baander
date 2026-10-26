@@ -58,6 +58,16 @@ class Workers:
             mounts.append({'volume': name, 'target': target, 'role': role, 'readOnly': role == 'source'})
         ipc = instance['project'] + '-ipc-' + boot
         docker.run('volume', 'create', '--label', 'app.baander.development.owner=' + instance['id'], ipc)
+        # This fresh volume bypasses image copy-up in both worker recipes.
+        # Give its private root to the worker user before either unit starts.
+        initialize_ipc = r"""$directory = '/run/baander-worker';
+$user = posix_getpwnam('www-data');
+if ($user === false || !chmod($directory, 0700)
+    || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }"""
+        docker.run('run', '--rm', '--network', 'none', '--read-only', '--user', '0',
+            '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--security-opt', 'no-new-privileges',
+            '--mount', 'type=volume,src=' + ipc + ',dst=/run/baander-worker,volume-nocopy',
+            '--entrypoint', 'php', release['worker_image'], '-r', initialize_ipc)
         manifest = {'version': 5, 'sourceMountPolicy': 'local-development', 'namespace': instance['project'],
                     'bootId': boot, 'daemonId': instance['docker']['daemon_id'], 'imageId': release['worker_image'],
                     'network': Runtime.network_name(instance), 'dockerBinary': '/usr/local/bin/docker',
@@ -92,6 +102,10 @@ foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manife
         result = docker.run(*validation, release['operator_image'], '-r', validator, input=payload, check=False)
         if result.returncode:
             raise WorkflowError('Worker shared storage or runtime configuration is invalid; remove overlapping media paths and reconcile adopted storage before enabling workers.')
+        # Docker's containerd image store can discard an untagged image index
+        # when a later build replaces its revision tag. Keep this boot's controller.
+        docker.run('image', 'tag', release['operator_image'],
+            'baander-development-controller:' + instance['project'] + '-' + boot)
         atomic_json(directory / 'manifest.json', manifest)
         atomic_json(directory / 'credentials.json', credentials)
         instance['workers'] = {'directory': str(directory), 'operator_image': release['operator_image'],
@@ -119,8 +133,11 @@ foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manife
         directory = Path(record['directory'])
         docker = Docker(self.runner, instance['docker'])
         docker.validate()
+        # The trusted controller needs the daemon socket's existing SELinux label.
+        # Never relabel that socket or apply this exception to the worker units.
         arguments = ['run', '--rm', '-i', '--network', Runtime.network_name(instance), '--user', '0',
-                     '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--entrypoint', '/bin/sh',
+                     '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+                     '--security-opt', 'label=disable', '--entrypoint', '/bin/sh',
                      '--mount', 'type=bind,src=' + record['socket'] + ',dst=/var/run/docker.sock',
                      '--tmpfs', '/operator:rw,noexec,nosuid,size=1m,mode=0700']
         documents = {}
@@ -193,6 +210,27 @@ foreach ($documents as $name => $contents) {
         if not instance.get('workers') or instance['workers'].get('phase') == 'retired':
             return
         self.phase(instance, 'retirement_unconfirmed')
+        status = self.invoke(instance, 'status')
+        # Create cannot reach Docker creation before committing its boot reservation.
+        # A failure before that reservation leaves no durable deployment to recover.
+        if (status.get('namespace') == instance.get('project')
+                and status.get('bootId') == instance['workers'].get('boot_id')
+                and status.get('retirement') == 'unregistered'
+                and status.get('reservation') == 'none' and status.get('units') == []):
+            manifest = json.loads((Path(instance['workers']['directory']) / 'manifest.json').read_text())
+            if (manifest.get('namespace') != instance['project']
+                    or manifest.get('bootId') != instance['workers']['boot_id']):
+                raise WorkflowError('Worker cleanup identity differs from the saved manifest.')
+            # Also reject orphaned containers if the deployment journal was lost.
+            docker = Docker(self.runner, instance['docker'])
+            docker.validate()
+            containers = docker.run('ps', '-aq',
+                '--filter', 'label=app.baander.worker.namespace=' + manifest['namespace'],
+                '--filter', 'label=app.baander.worker.boot-id=' + manifest['bootId'])
+            if containers.stdout.strip():
+                raise WorkflowError('Unregistered worker containers require explicit investigation before cleanup.')
+            self.phase(instance, 'retired')
+            return
         result = self.invoke(instance, 'recover')
         if result.get('state') != 'retired':
             raise WorkflowError('Worker retirement was not confirmed; the instance remains blocked.')

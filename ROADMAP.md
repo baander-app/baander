@@ -121,16 +121,29 @@ passed with valid disposable OAuth keys. Deptrac passed with zero violations,
 warnings or errors and 484 skipped violations. These results do not claim a green
 full backend gate.
 
-Guidance and qualification (U7) remain partly delivered. The developer guide,
-operator guidance and agent instructions now share the Make workflow. CI invokes
-component safety drills; this does not implement or prove the complete AE1–AE9
-runtime scenario. Host qualification exits 78 because mkcert is missing; a separate
-read probe found SELinux denial of default container bind access. No host trust,
-DNS configuration, updater or existing user deployment was changed. Full startup,
-unattended timer-to-browser updates, simultaneous previews, queued ingestion and
-original/transcoded playback remain unqualified. Resolve the host prerequisites,
-then finish the disposable integrated acceptance harness and its runtime checks
-before marking this plan complete.
+Delivery repairs, 2026-10-26 (U7): host setup now passes on the supported desktop
+with wildcard loopback DNS, trusted mkcert certificates and SELinux enforcing.
+Explicit path sharing preserves the private CA. The trusted worker controller can
+use the Docker socket, and fresh IPC volumes belong to the worker user. Unique
+build and retention tags keep immutable image IDs available across repeated builds.
+The user timer retains absolute tool paths so Docker credential helpers remain
+available without an interactive shell.
+
+Verification: Python discovered 200 tests; 194 passed and six opt-in Docker cases
+were skipped. The supported-host prerequisite check passed. Actual disposable
+startup and repeat startup reached web and worker readiness with unchanged account,
+library and secret fingerprints. The systemd timer applied two successive master
+commits in order; an intentionally broken build left the previous release serving.
+The independent delivery review returned no code findings. The repaired backend
+fixtures passed 75 focused tests with 2,421 assertions in the CI image.
+
+Guidance and qualification (U7) remain in progress. The integrated harness uses a
+disposable Git remote, separate instance state and generated media; CI selects its
+component-only mode. Schema refusal, simultaneous previews, queued ingestion,
+original/transcoded browser playback, stop/resume races and partial-migration
+recovery remain pending in the current run. The full backend rerun is also pending.
+The original deployment and source media are unchanged. Evidence from this run is
+under `~/.local/state/baander/qualification/delivery-20261026-05/workspace`.
 
 ## Playback investigation and evidence limits
 

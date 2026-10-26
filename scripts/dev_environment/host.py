@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import errno
 import fcntl
 import ipaddress
 import json
@@ -181,9 +182,46 @@ class Host:
         with socket.socket() as listener:
             try:
                 listener.bind(('127.0.0.1', 443))
+            except PermissionError as error:
+                listener.settimeout(1)
+                result = listener.connect_ex(('127.0.0.1', 443))
+                if result == 0:
+                    raise WorkflowError('Loopback port 443 is occupied; stop its owner before first gateway startup.') from error
+                if result != errno.ECONNREFUSED:
+                    raise WorkflowError('Cannot determine whether loopback port 443 is available to Docker.') from error
             except OSError as error:
                 raise WorkflowError('Loopback port 443 is occupied; stop its owner before first gateway startup.') from error
         return {'resolver': 'NetworkManager', 'port': 443, 'hostname': 'baander.test'}
+
+    def share_paths(self, paths: list[Path]) -> None:
+        """Apply shared container labels only after explicit path selection."""
+        ca = (self.store.root / 'host-setup/ca').resolve()
+        sources = []
+        for path in paths:
+            source = path.expanduser().resolve(strict=True)
+            if ca.is_relative_to(source) or source.is_relative_to(ca):
+                raise WorkflowError('A shared path must not expose the private certificate authority.')
+            if not source.is_dir():
+                raise WorkflowError('Select existing directories for container access.')
+            sources.append(source)
+        if not Path('/sys/fs/selinux/enforce').is_file():
+            return
+        executable = shutil.which('chcon')
+        if executable is None:
+            raise WorkflowError('Install chcon before preparing SELinux container access.')
+        ca.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.store.root.chmod(0o700)
+        # New instance directories inherit the shared label; the existing private
+        # CA subtree keeps its own label and is never passed to recursive chcon.
+        self.runner.run([executable, '-t', 'container_file_t', '-l', 's0', str(self.store.root)])
+        gateway = self.store.root / 'gateway'
+        gateway.mkdir(mode=0o700, exist_ok=True)
+        instances = [path for path in self.store.root.iterdir()
+                     if path.name == 'persistent' or re.fullmatch(r'preview-[a-f0-9]{16}', path.name)]
+        for source in [gateway, *instances, *sources]:
+            if source.is_symlink():
+                raise WorkflowError('Refusing to relabel a symlink instance directory.')
+            self.runner.run([executable, '-R', '--no-dereference', '-t', 'container_file_t', '-l', 's0', str(source)], timeout=None)
 
     def instructions(self) -> Path:
         directory = self.store.root / 'host-setup'

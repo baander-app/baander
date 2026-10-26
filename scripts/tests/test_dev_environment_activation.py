@@ -244,6 +244,29 @@ class ActivationSafetyTest(unittest.TestCase):
 
 
 class SupervisorLifetimeTest(unittest.TestCase):
+    def test_generated_service_preserves_absolute_launch_path_without_copying_secrets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            store = StateStore(root / 'state')
+            supervisor = Supervisor(store, Mock())
+            launch_path = '/home/operator/.rd/bin:/opt/a "quote" %name $literal:/opt/back\\slash:/usr/bin:relative::/usr/bin'
+            with patch.dict(os.environ, {'XDG_CONFIG_HOME': str(root / 'config'),
+                    'PATH': launch_path, 'DOCKER_PASSWORD': 'must-not-appear'}):
+                supervisor.install()
+            unit = (root / 'config/systemd/user' / (supervisor.unit + '.service')).read_text()
+            self.assertIn('Environment="PATH=/home/operator/.rd/bin:/opt/a \\"quote\\" %%name $literal:/opt/back\\\\slash:/usr/bin"', unit)
+            self.assertNotIn('relative', unit)
+            self.assertNotIn('must-not-appear', unit)
+            self.assertNotIn('DOCKER_PASSWORD', unit)
+
+    def test_path_without_absolute_entries_or_with_control_characters_is_rejected(self):
+        for launch_path in ('relative::another', '/usr/bin:/opt/bad\nInjected=yes'):
+            with self.subTest(path=launch_path), tempfile.TemporaryDirectory() as temporary:
+                supervisor = Supervisor(StateStore(Path(temporary) / 'state'), Mock())
+                with patch.dict(os.environ, {'XDG_CONFIG_HOME': str(Path(temporary) / 'config'), 'PATH': launch_path}):
+                    with self.assertRaises(WorkflowError):
+                        supervisor.install()
+
     def test_independent_controller_quotes_paths_and_disables_without_stopping_active_service(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

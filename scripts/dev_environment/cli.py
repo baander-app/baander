@@ -42,6 +42,8 @@ def parser() -> argparse.ArgumentParser:
     host = commands.add_parser('host-setup')
     host.add_argument('--install-trust', action='store_true')
     host.add_argument('--inspect', action='store_true')
+    host.add_argument('--share-path', action='append', type=Path, default=[],
+                      help='Explicitly grant containers SELinux access to this directory and managed runtime mounts')
     up = commands.add_parser('up')
     up.add_argument('--instance', choices=['persistent'])
     up.add_argument('--media', action='append', default=[], metavar='SOURCE[=TARGET]')
@@ -152,6 +154,8 @@ def main(arguments: list[str] | None = None) -> int:
             if worktree.returncode == 0:
                 validate_state_root(store, Path(worktree.stdout.strip()))
             host = Host(store, runner)
+            if args.share_path:
+                host.share_paths(args.share_path)
             directory = host.instructions()
             print('Host setup instructions: ' + str(directory / 'README.md'))
             if args.inspect:

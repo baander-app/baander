@@ -43,6 +43,67 @@ class WorkerLifecycleTest(unittest.TestCase):
         self.assertEqual('sha256:saved', saved['operator_image'])
         self.assertEqual('retirement_unconfirmed', saved['phase'])
 
+    def test_unregistered_boot_without_reservation_or_units_can_retire_locally(self):
+        self.instance['project'] = 'owned-worker-project'
+        self.instance['workers']['boot_id'] = 'saved-boot'
+        self.instance['workers']['phase'] = 'create_unconfirmed'
+        status = {'namespace': 'owned-worker-project', 'bootId': 'saved-boot',
+                  'retirement': 'unregistered', 'reservation': 'none', 'units': []}
+        directory = Path(self.temp.name) / 'workers'
+        directory.mkdir()
+        self.instance['workers']['directory'] = str(directory)
+        self.instance['docker'] = {'daemon_id': 'owned-daemon'}
+        atomic_json(directory / 'manifest.json', {'namespace': 'owned-worker-project', 'bootId': 'saved-boot'})
+        with patch('dev_environment.workers.Docker') as factory:
+            docker = factory.return_value
+            docker.run.return_value = subprocess.CompletedProcess([], 0, '', '')
+            with patch.object(self.workers, 'invoke', return_value=status) as invoke:
+                self.workers.retire(self.instance)
+            docker.validate.assert_called_once()
+            docker.run.assert_called_once_with('ps', '-aq',
+                '--filter', 'label=app.baander.worker.namespace=owned-worker-project',
+                '--filter', 'label=app.baander.worker.boot-id=saved-boot')
+        self.assertEqual(['status'], [call.args[1] for call in invoke.call_args_list])
+        self.assertEqual('retired', self.store.load('persistent')['workers']['phase'])
+
+    def test_unregistered_orphan_or_failed_docker_query_blocks_cleanup(self):
+        self.instance['project'] = 'owned-worker-project'
+        self.instance['workers']['boot_id'] = 'saved-boot'
+        self.instance['docker'] = {'daemon_id': 'owned-daemon'}
+        directory = Path(self.temp.name) / 'workers'
+        directory.mkdir()
+        self.instance['workers']['directory'] = str(directory)
+        atomic_json(directory / 'manifest.json', {'namespace': 'owned-worker-project', 'bootId': 'saved-boot'})
+        status = {'namespace': 'owned-worker-project', 'bootId': 'saved-boot',
+                  'retirement': 'unregistered', 'reservation': 'none', 'units': []}
+        for result in (subprocess.CompletedProcess([], 0, 'orphan-id\n', ''), WorkflowError('query failed')):
+            with self.subTest(result=result):
+                self.instance['workers']['phase'] = 'retirement_unconfirmed'
+                with patch('dev_environment.workers.Docker') as factory:
+                    if isinstance(result, Exception):
+                        factory.return_value.run.side_effect = result
+                    else:
+                        factory.return_value.run.return_value = result
+                    with patch.object(self.workers, 'invoke', return_value=status):
+                        with self.assertRaises(WorkflowError):
+                            self.workers.retire(self.instance)
+                self.assertEqual('retirement_unconfirmed', self.store.load('persistent')['workers']['phase'])
+
+    def test_unregistered_cleanup_requires_matching_identity_and_no_reservation_or_units(self):
+        self.instance['project'] = 'owned-worker-project'
+        self.instance['workers']['boot_id'] = 'saved-boot'
+        status = {'namespace': 'owned-worker-project', 'bootId': 'saved-boot',
+                  'retirement': 'unregistered', 'reservation': 'none', 'units': []}
+        for change in ({'namespace': 'different'}, {'bootId': 'different'},
+                       {'retirement': 'pending'}, {'reservation': 'another_boot'},
+                       {'units': {'control': {'createClaimed': True}}}):
+            with self.subTest(change=change):
+                self.instance['workers']['phase'] = 'retirement_unconfirmed'
+                with patch.object(self.workers, 'invoke', side_effect=[
+                        {**status, **change}, {'state': 'retired'}]) as invoke:
+                    self.workers.retire(self.instance)
+                self.assertEqual(['status', 'recover'], [call.args[1] for call in invoke.call_args_list])
+
     def test_success_does_not_claim_readiness_before_observation(self):
         with patch.object(self.workers, 'invoke', return_value={'state': 'created'}) as invoke:
             self.workers.start(self.instance)
@@ -68,6 +129,9 @@ class OperatorTransferTest(unittest.TestCase):
             self.assertEqual('unregistered', result['retirement'])
             self.assertIn('-i', arguments)
             self.assertIn('ALL', arguments)
+            security_options = [arguments[index + 1] for index, argument in enumerate(arguments)
+                                if argument == '--security-opt']
+            self.assertEqual(['no-new-privileges', 'label=disable'], security_options)
             self.assertFalse(any('/input' in argument or 'do-not-print' in argument for argument in arguments))
             self.assertEqual({'private': 'do-not-print'}, json.loads(json.loads(options['input'])['credentials']))
             self.assertIn("fopen('/operator/'", shlex.split(arguments[-3])[2])
@@ -99,6 +163,17 @@ class OperatorTransferTest(unittest.TestCase):
                 docker.run.side_effect = run
                 Workers(store, None).prepare(instance, release)
             manifest = json.loads((Path(instance['workers']['directory']) / 'manifest.json').read_text())
+            docker.run.assert_any_call('image', 'tag', release['operator_image'],
+                'baander-development-controller:' + instance['project'] + '-' + manifest['bootId'])
+            initialization = next(call.args for call in docker.run.call_args_list
+                                  if '--cap-add' in call.args)
+            self.assertEqual('CHOWN', initialization[initialization.index('--cap-add') + 1])
+            self.assertIn('--read-only', initialization)
+            self.assertEqual('none', initialization[initialization.index('--network') + 1])
+            self.assertEqual('type=volume,src=' + manifest['ipcVolume'] +
+                             ',dst=/run/baander-worker,volume-nocopy',
+                             initialization[initialization.index('--mount') + 1])
+            self.assertIn('chmod($directory, 0700)', initialization[-1])
             source = next(mount for mount in manifest['mediaMounts'] if mount['target'] == '/storage/media')
             self.assertEqual({'source': str(library), 'target': '/storage/media', 'role': 'source', 'readOnly': True}, source)
 

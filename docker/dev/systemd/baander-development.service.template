@@ -3,6 +3,7 @@ Description=Update the configured Baander development instance
 
 [Service]
 Type=oneshot
+Environment=${SEARCH_PATH}
 ExecStart=${COMMAND}
 TimeoutStartSec=infinity
 KillMode=process
