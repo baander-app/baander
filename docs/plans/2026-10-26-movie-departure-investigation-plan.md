@@ -97,3 +97,25 @@ Independent review approved this plan before fixture implementation. Begin the
 lease observation after A's final committed progress update, preserve all three
 job/session identities through cancellation, and distinguish B's admission
 refusal from a generic playback timeout.
+
+## Observer correction after the first attempt
+
+The first attempt played A and used Back, then timed out at an observer
+precondition before testing B. It required every published edge to exceed the
+final cursor by 72 seconds within 45 wall-clock seconds. The retained native
+signal logs show 360p stopping after 25.94 seconds and 720p after 56.50 seconds;
+1080p had not stopped before cleanup. Three software tiers share two execution
+CPUs. Cleanup passed, but this attempt does not establish B's startup behavior.
+
+The arithmetic also ignored throttle hysteresis. An encoder that stopped at 72
+seconds ahead need not resume after a late progress update: it resumes only when
+its lead falls to 36 seconds. Its final stopped edge therefore need not remain
+72 seconds beyond the final cursor.
+
+Use the plan's one permitted observer correction and rerun. Keep the same generated
+media commands and production runtime. Observe all three actual native encoders stopped,
+with a bounded 120-second readiness window, then perform the existing thirty-
+second settled-position and lease-renewal observation. Retain process snapshots,
+publication edges and generation-local coordinates on success and failure.
+Require the same stopped process identities after observation. The overall work
+and cleanup budgets remain unchanged; no production threshold is relaxed.
