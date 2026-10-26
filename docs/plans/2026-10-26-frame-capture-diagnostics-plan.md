@@ -1,7 +1,7 @@
 ---
 title: Retain failed native frame-capture diagnostics
 date: 2026-10-26
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -113,3 +113,33 @@ Independent review approved this plan before implementation. Lifecycle tests als
 require detached serialized diagnostics and no successful publication of rejected
 samples. Reserve cleanup time within each invocation's total budget; a timeout or
 unverified cleanup is an infrastructure failure, not a capture result.
+
+## Completion checkpoint
+
+Implementation `54e3711c` retains detached failure diagnostics in the shared
+observer installer. Eight new lifecycle tests and 55 adjacent cancellation tests
+passed: 63 total, with no failures or skips. JS and shell syntax, CI YAML parsing
+and whitespace checks passed. Independent implementation review found no required
+changes. Production code and browser flags are unchanged.
+
+The fixed three-attempt series used Chromium 148.0.7778.96, HLS.js 1.7.3,
+Playwright 1.60.0 and the FFmpeg 5.1.9 CI image. The ordinary attempts completed
+their browser checks in 39.381 and 39.562 seconds, reaching native end 30.015999
+with 750 decoded frames each. Their observers constructed and closed 737 and 736
+frames respectively. The sparse-seek control completed in 46.395 seconds,
+reaching native end 24 with 24 decoded and captured frames, all closed. Whole
+invocations took 48.501, 48.772 and 50.780 seconds, within the reserved budgets.
+
+Each attempt retained one attachment and source change, no capture errors, no
+pending copies and at most one outstanding copy. All three exited successfully
+and verified container cleanup. Source hashes, image identities, revisions,
+versions and individual outcomes remain under
+`var/test-runs/frame-capture-diagnostics/`; `acceptance-summary.json` records the
+combined checkpoint. Original service identities and user media were preserved.
+
+The historical timestamp mismatch did not recur in these three attempts. The
+controlled mismatch test proves that a rejected sample now retains its evidence
+and closes its frame; it does not prove a browser race. The diagnostic delivery
+is complete, while the historical cause remains unresolved. Further capture
+investigation requires new failure evidence or a separately selected task; this
+checkpoint does not authorize indefinite retries or a production repair.

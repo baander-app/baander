@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-24. This roadmap selects useful future work and records unresolved
+Updated: 2026-10-26. This roadmap selects useful future work and records unresolved
 release acceptance. Current behavior and operating contracts belong in the linked
 guides. Git history retains completed milestones and their verification evidence.
 
@@ -12,12 +12,10 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-The remaining selected follow-up is a bounded observer diagnostic: retain the
-failing callback and native snapshot metadata plus entry/constructor clocks before
-the unchanged assertion, to test the unproven capture-race hypothesis. The retained
-24.64 versus 24.60 mismatch is not fixed by a passing rerun and does not qualify
-universal observer stability. Evidence is under
-`var/test-runs/short-audio-tail-gates/browser-final-v3-default-audio-fresh`.
+No further implementation task is selected here. The bounded capture diagnostic
+has been delivered; the historical mismatch's cause remains unresolved. These
+three passing attempts do not qualify universal capture stability or select
+indefinite reruns or another implementation task.
 
 Historical unchecked items, old plan limitations and incomplete experiments do
 not authorize other work. The retained
@@ -2314,3 +2312,63 @@ additional origins, hardware or untested browser/format combinations. Existing
 services and original media were untouched. Runner/configuration checks,
 independent review, prose audits, local links and whitespace checks passed. No
 merge or push is included.
+
+### Failed frame-capture diagnostics — 2026-10-26
+
+The sparse browser observer now retains bounded detached diagnostics before the
+unchanged one-microsecond native/callback timestamp assertion. Failed records
+include callback metadata/sequence, entry and post-constructor performance and
+playback clocks, native timestamp/duration/format/dimensions/visible rectangle
+and available copy-stage clocks. Missing values remain explicit nulls; no live
+frame escapes closure. Constructor, crop and copy failures preserve their
+available stage evidence without pixel copying after a timestamp rejection.
+
+The shared installer preserves callback order, successful sample fields,
+ordered publication, four-frame ownership, two-second draining, 64-error bound
+and exactly-once closure. Diagnostic allocation occurs between clock reads;
+these intervals include observation cost and are not pure constructor timing.
+No production PHP, encoder, player adapter, source-clock or manifest behavior
+is changed. The runner copies the shared module and CI runs the actual
+installer's controlled lifecycle tests.
+
+Implementation `54e3711c` passed eight new Node tests plus 55 adjacent
+replacement-classifier tests: 63 passed with zero failures or skips. Syntax,
+workflow configuration and whitespace checks passed after independent code and
+simplification review. Controlled 24.60/24.64 values remain fatal while their
+serialized diagnostic survives frame closure; they are not a real-browser
+reproduction of the historical mismatch.
+
+Exactly the prescribed two `default-audio-fresh` attempts and one `sparse-seek`
+control passed at `54e3711c`, without extra attempts:
+
+| Attempt | Browser / whole invocation (s) | Natural end (s) / decoded frames | Constructed / closed |
+| --- | --- | --- | --- |
+| Ordinary 1 | 39.381 / 48.501 | 30.015999 / 750 | 737 / 737 |
+| Ordinary 2 | 39.562 / 48.772 | 30.015999 / 750 | 736 / 736 |
+| Sparse seek | 46.395 / 50.780 | 24 / 24 | 24 / 24 |
+
+Every attempt retained zero capture errors, zero pending copies, maximum
+pending one, one attachment and one source change. Failure-record retention was
+exercised by controlled tests only, not by a naturally failing capture in these
+real runs. Each exited zero with verified cleanup within its fixed 180-second
+work and sixty-second cleanup budget. The mismatch did not recur. Chromium
+148.0.7778.96, Playwright 1.60.0 and HLS.js 1.7.3 versions, outcomes and counts
+are retained in
+`var/test-runs/frame-capture-diagnostics/acceptance-summary.json`. Each
+attempt's `provenance.json` under the artifact root records source hashes and
+image IDs. Original service identities remained intact and all owned stacks
+were removed.
+
+The historical sequence-607 capture discrepancy remains causally unresolved.
+Delivering failure evidence and recording a bounded series does not fix the
+24.64/24.60 mismatch, prove a capture race or qualify universal observer
+stability. No tolerance, capture scheduling, browser flags or retries were
+relaxed. Missing future evidence does not select indefinite reruns or
+additional implementation work. The testing guide records diagnostic fields,
+ownership and commands.
+
+Evidence is under `var/test-runs/frame-capture-diagnostics`; all outcomes are
+retained. Existing services and original media remain untouched. Production
+runtime was unchanged; unaffected backend suites were not rerun. Independent
+review, prose audits, local-link and whitespace checks passed. No merge or push
+is included.

@@ -1322,15 +1322,45 @@ The observer copies a centered two-by-two RGBA crop from each owned `VideoFrame`
 checking its native timestamp against callback presentation time. Completed
 samples are published in callback order, with at most four copies outstanding;
 overflow and capture errors fail the gate. Natural-end evidence cancels callbacks
-and drains copies before it is frozen. Each frame must close exactly once.
+and bounds copy draining to two seconds. A drain timeout is fatal, with cleanup
+still recorded. Each frame must close exactly once; at most 64 error records are
+retained.
 
-Observer reliability remains bounded by its retained receipts. One run rejected
-a native snapshot timestamp of 24.64 seconds against a 24.60-second callback.
-These APIs sample separately, but the failing timing details were not retained, so
-a capture race remains unproven. A strict passing run does not establish
-universal capture stability or fix that mismatch. The bounded diagnostic follow-up
-is to retain failing callback/snapshot metadata and entry/constructor clocks
-before the unchanged assertion, then test the hypothesis without weakening it.
+A failed capture retains detached plain-data diagnostics before the unchanged
+one-microsecond timestamp assertion. The record includes callback metadata and
+sequence, entry/post-constructor performance and playback clocks, native
+timestamp in microseconds and seconds, duration, format, dimensions and visible
+rectangle. Constructor failures retain available callback/entry data; crop or
+copy failures also retain constructed-frame fields and available copy-stage
+clocks. Unavailable values are explicit nulls, and no live frame is retained
+after closure. Stage intervals include diagnostic work, so they are not pure
+constructor costs or evidence of timing-neutral observation.
+
+The shared `frame-observer.mjs` installer runs in both the browser and controlled
+Node tests. CI runs its focused lifecycle tests alongside replacement-classifier
+coverage, and the runner copies the same observer into the disposable browser
+workspace. Exercise its mismatch, constructor/copy failure, ordered publication
+and stop/drain behavior with:
+
+```bash
+node --test ui/web/tests/e2e/transcode-adaptive/frame-observer.test.mjs
+```
+
+Observer reliability remains bounded by retained receipts. The historical
+native snapshot of 24.64 seconds versus a 24.60-second callback lacked decisive
+failing timing metadata, so a capture race remains unproven. New diagnostics
+improve future failure evidence; controlled values and passing browser runs do
+not retroactively establish that cause, fix the mismatch or qualify universal
+capture stability. No timestamp tolerance, browser flag or capture retry is
+changed.
+
+The fixed diagnostic series at `54e3711c` recorded exactly two
+`default-audio-fresh` attempts and one `sparse-seek` control. All passed and
+closed all owned frames without capture errors; the historical mismatch did not
+recur. Real-run failure retention was not exercised; only controlled mismatches
+entered that branch. This is bounded negative evidence, with no extra attempts
+or inference about its cause. Exact timings and counts remain in
+`var/test-runs/frame-capture-diagnostics/acceptance-summary.json`.
 
 Only explicitly canceled video media requests with `net::ERR_ABORTED` may wait
 for classification at natural completion. Server receipts and transfer timing
