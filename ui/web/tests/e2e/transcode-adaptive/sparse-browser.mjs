@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { request as httpRequest } from 'node:http'
 import { chromium } from 'playwright-core'
+import { installFrameObserver } from './frame-observer.mjs'
 import { canDeferVideoCancellation, classifyVideoCancellations } from './video-cancellation.mjs'
 
 const fixture = JSON.parse(await readFile('/work/ready.json', 'utf8'))
@@ -268,106 +269,8 @@ try {
         })
       }, 100)
     }
-    const observer = window.sparseFrameObserver = {
-      errors: [], droppedErrors: 0, constructed: 0, closed: 0, pending: 0, maxPending: 0, callbacks: 0, stopped: false,
-    }
-    const ownedFrames = new Set()
-    const pendingCopies = new Set()
-    const completed = new Map()
-    let nextPublished = 0
-    let callbackId
-    const stop = () => {
-      observer.stopped = true
-      if (callbackId !== undefined) video.cancelVideoFrameCallback(callbackId)
-    }
-    const fail = (phase, error, sequence) => {
-      stop()
-      if (observer.errors.length < 64) observer.errors.push({ phase, sequence, message: String(error).slice(0, 1024) })
-      else observer.droppedErrors++
-    }
-    const closeOwned = frame => {
-      if (!ownedFrames.delete(frame)) return
-      try { frame.close(); observer.closed++ } catch (error) { fail('close', error) }
-    }
-    window.sparseStopFrameObserver = async () => {
-      stop()
-      let timeout
-      try {
-        await Promise.race([
-          Promise.all([...pendingCopies]),
-          new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Native frame capture did not drain within two seconds')), 2000) }),
-        ])
-      } catch (error) { fail('drain', error) } finally {
-        clearTimeout(timeout)
-        for (const frame of ownedFrames) closeOwned(frame)
-      }
-      return { ...observer }
-    }
-    const observe = (at, metadata) => {
-      if (observer.stopped) return
-      callbackId = video.requestVideoFrameCallback(observe)
-      const sequence = observer.callbacks++
-      const entryAt = performance.now()
-      const entryClock = video.currentTime
-      let frame
-      let phase = 'constructor'
-      try {
-        if (ownedFrames.size >= 4) throw new Error('Native frame capture exceeded four outstanding snapshots')
-        frame = new VideoFrame(video)
-        ownedFrames.add(frame)
-        observer.constructed++
-        const afterConstructAt = performance.now()
-        const afterConstructClock = video.currentTime
-        phase = 'timestamp'
-        const snapshotTime = frame.timestamp / 1000000
-        if (!Number.isFinite(snapshotTime) || Math.abs(snapshotTime - metadata.mediaTime) > 0.000001) {
-          throw new Error(`Native snapshot timestamp ${snapshotTime} does not match callback ${metadata.mediaTime}`)
-        }
-        phase = 'crop'
-        const visible = frame.visibleRect
-        if (!visible || ![visible.x, visible.y, visible.width, visible.height, frame.codedWidth, frame.codedHeight].every(Number.isInteger)
-          || visible.width < 2 || visible.height < 2) throw new Error('Native snapshot has invalid visible dimensions')
-        const rect = { x: Math.floor((visible.x + visible.width / 2) / 2) * 2,
-          y: Math.floor((visible.y + visible.height / 2) / 2) * 2, width: 2, height: 2 }
-        if (rect.x < visible.x || rect.y < visible.y || rect.x + 2 > visible.x + visible.width
-          || rect.y + 2 > visible.y + visible.height || rect.x < 0 || rect.y < 0
-          || rect.x + 2 > frame.codedWidth || rect.y + 2 > frame.codedHeight) throw new Error('Native snapshot crop exceeds its frame')
-        const options = { format: 'RGBA', colorSpace: 'srgb', rect }
-        if (frame.allocationSize(options) !== 16) throw new Error('Native snapshot crop must occupy sixteen bytes')
-        const pixels = new Uint8Array(16)
-        const record = { sequence, at, time: metadata.mediaTime, clock: entryClock, snapshotTime,
-          presentedFrames: metadata.presentedFrames, presentationTime: metadata.presentationTime,
-          expectedDisplayTime: metadata.expectedDisplayTime,
-          stages: { entryAt, entryClock, afterConstructAt, afterConstructClock } }
-        observer.pending++
-        observer.maxPending = Math.max(observer.pending, observer.maxPending)
-        let task
-        task = (async () => {
-          try {
-            record.stages.copyStartedAt = performance.now()
-            const copying = frame.copyTo(pixels, options)
-            record.stages.afterCopyCallAt = performance.now()
-            const layout = await copying
-            record.stages.completedAt = performance.now()
-            if (layout.length !== 1 || layout[0].offset !== 0 || layout[0].stride !== 8 || pixels.byteLength !== 16) {
-              throw new Error('Native snapshot returned an unexpected RGBA plane layout')
-            }
-            record.rgb = [...pixels.slice(0, 3)]
-            completed.set(sequence, record)
-            while (completed.has(nextPublished)) {
-              window.sparseColorFrames.push(completed.get(nextPublished))
-              completed.delete(nextPublished++)
-            }
-          } catch (error) { fail('copy', error, sequence) } finally { closeOwned(frame) }
-        })().finally(() => { pendingCopies.delete(task); observer.pending-- })
-        pendingCopies.add(task)
-      } catch (error) {
-        fail(phase, error, sequence)
-        if (frame) closeOwned(frame)
-      }
-    }
-    callbackId = video.requestVideoFrameCallback(observe)
   }, { manifest: fixture.manifestUrl, hasSubtitles, defaultAudio, shortAudio })
+  await page.evaluate(installFrameObserver)
   await json('/__adaptive/start', 'POST', 202)
   await poll(async () => {
     status = await json('/__adaptive/status')

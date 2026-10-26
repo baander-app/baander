@@ -78,8 +78,11 @@ jobs:
             -   name: Xdebug runtime contract
                 run: BAANDER_TEST_IMAGE="$CI_IMAGE" bash scripts/test-dev-xdebug-container.sh
 
-            -   name: Browser video replacement evidence
-                run: node --test ui/web/tests/e2e/transcode-adaptive/video-cancellation.test.mjs
+            -   name: Browser frame capture and video replacement evidence
+                run: >-
+                    node --test
+                    ui/web/tests/e2e/transcode-adaptive/frame-observer.test.mjs
+                    ui/web/tests/e2e/transcode-adaptive/video-cancellation.test.mjs
 
             -   name: Progressive DASH browser completion
                 run: |
