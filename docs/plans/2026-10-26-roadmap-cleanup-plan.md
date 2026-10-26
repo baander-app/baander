@@ -1,7 +1,7 @@
 ---
 title: Keep the roadmap focused on current scope and acceptance
 date: 2026-10-26
-status: implemented
+status: reviewed
 execution: documentation
 ---
 
@@ -63,3 +63,37 @@ intentional: those records remain intact at the pinned revision. The only new
 inline tokens identify that revision and its retrieval command. Whitespace and
 independent documentation review passed. No application code changed, application
 suite ran, merge occurred or remote was pushed.
+
+## Follow-on: retire implemented plans
+
+The user extended the cleanup to all implemented plans. Remove the 36 delivered
+October plan files, including this plan when the cleanup is complete. Keep the
+six July plans: FLAC/DSP CPU, React Native styling, React Native/TV tooling,
+long-process segmentation, cache/sweep qualification and Messenger runtime
+hardening retain unfinished or partly superseded commitments. Their historical
+assumptions require reconciliation before reuse; retention does not select work.
+
+The October AAC plan's in-progress label is stale; its feature implementation is
+delivered. Preserve its original 5% HE-AAC CBR target as unqualified by the delivered
+6% gate, alongside the roadmap's existing codec limits. The completed departure
+investigation also has an unresolved product question. Keep that question and the
+missing causal controls in the roadmap rather than retaining a completed plan.
+
+All pre-cleanup plans are recoverable at Git revision
+`55bed615947f673a8f49f900dee8dd6e5da6c5ac`. Replace four roadmap links to removed
+plans with current evidence/guide references or this historical lookup. Repair
+the plan link in `docs/transcode-investigation-2026-10-22.md` without rewriting
+its historical findings. Preserve the six retained plans byte for byte.
+
+The Compound Engineering skills are now available. Review this extension with
+`ce-doc-review` before removing files; execute the documentation work through
+`ce-work`, check `ce-simplify-code` applicability and review the final diff with
+`ce-code-review`. The lead owns all edits, checks and local commits. Prose-fix
+applies to the changed prose. No runtime changes, application suites, merge or
+push belong to this work.
+
+Before completion, inventory all tracked plan files and references, verify the
+pinned history and retained-plan hashes, resolve every remaining local link and
+incoming roadmap anchor, and run whitespace/preservation checks. Record actual
+counts and unresolved boundaries in the roadmap. The final removal includes this
+completed cleanup plan; its reviewed version remains in Git history.
