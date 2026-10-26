@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -35,14 +36,32 @@ final class SetupClientsCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption('origin', null, InputOption::VALUE_REQUIRED, 'Origin for a newly created first-party client', 'https://baander.test');
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
+        $origin = $input->getOption('origin');
+        $parsed = parse_url($origin);
+        if ($parsed === false || !isset($parsed['host'], $parsed['scheme'])
+            || !in_array($parsed['scheme'], ['http', 'https'], true)
+            || (isset($parsed['user']) || isset($parsed['pass'])) || isset($parsed['query']) || isset($parsed['fragment'])
+            || (isset($parsed['path']) && $parsed['path'] !== '' && $parsed['path'] !== '/')
+        ) {
+            $io->error('Provide an HTTP or HTTPS origin without credentials, path, query or fragment.');
+
+            return Command::INVALID;
+        }
+        $origin = rtrim($origin, '/');
         $spa = $this->seedClient(
             'Bånder SPA',
             PublicId::fromString(self::SPA_PUBLIC_ID),
             $io,
+            $origin,
         );
 
         $io->success('The OAuth client is ready.');
@@ -63,7 +82,7 @@ final class SetupClientsCommand extends Command
      * Find-or-create a client by its fixed public ID, so the command is
      * idempotent and safe to run repeatedly (including after a DB reset).
      */
-    private function seedClient(string $name, PublicId $publicId, SymfonyStyle $io): Client
+    private function seedClient(string $name, PublicId $publicId, SymfonyStyle $io, string $origin): Client
     {
         $existing = $this->clientRepository->findClientByPublicId($publicId);
 
@@ -75,7 +94,7 @@ final class SetupClientsCommand extends Command
 
         $client = Client::create(
             name: $name,
-            redirectUris: ['http://localhost'],
+            redirectUris: [$origin],
             firstParty: true,
             passwordClient: true,
             publicId: $publicId,

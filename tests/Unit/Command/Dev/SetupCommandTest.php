@@ -144,6 +144,33 @@ PHP,
         }
     }
 
+    public function testMatchingKeysSurviveResumedSetup(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-resume-' . bin2hex(random_bytes(8));
+        $filesystem = new Filesystem();
+        $filesystem->mkdir([$directory . '/bin', $directory . '/config/secrets/oauth']);
+        $key = openssl_pkey_new(['private_key_bits' => 2048]);
+        self::assertNotFalse($key);
+        openssl_pkey_export($key, $private);
+        $details = openssl_pkey_get_details($key);
+        self::assertNotFalse($details);
+        file_put_contents($directory . '/config/secrets/oauth/private.key', $private);
+        file_put_contents($directory . '/config/secrets/oauth/public.key', $details['key']);
+        $log = $directory . '/commands.jsonl';
+        file_put_contents($directory . '/bin/console', '<?php file_put_contents(' . var_export($log, true) . ', json_encode($argv) . PHP_EOL, FILE_APPEND);');
+        try {
+            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory));
+            self::assertSame(Command::SUCCESS, $tester->execute(['--origin' => 'https://dev.baander.app']));
+            $calls = file_get_contents($log);
+            self::assertIsString($calls);
+            self::assertStringNotContainsString('app:oauth:generate-keys', $calls);
+            self::assertStringContainsString('--origin=https:', $calls);
+            self::assertSame($private, file_get_contents($directory . '/config/secrets/oauth/private.key'));
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     private function createCommand(): SetupCommand
     {
         return new SetupCommand(

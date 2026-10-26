@@ -62,6 +62,24 @@ final class OAuthClientPersistenceTest extends TestCase
         }
     }
 
+    public function testFreshClientUsesInstanceOriginAndResumePreservesItsIdentity(): void
+    {
+        $repository = new ClientRepository($this->manager, new JsonEncoder());
+        $tester = new \Symfony\Component\Console\Tester\CommandTester(new \App\Auth\Interface\Console\SetupClientsCommand($repository));
+        self::assertSame(0, $tester->execute(['--origin' => 'https://dev.baander.app']));
+        $client = $repository->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString(\App\Auth\Interface\Console\SetupClientsCommand::SPA_PUBLIC_ID));
+        self::assertNotNull($client);
+        $id = $client->getId()->toString();
+        self::assertSame(['https://dev.baander.app'], $client->getRedirectUris());
+        self::assertSame(0, $tester->execute(['--origin' => 'https://changed.baander.app']));
+        $this->manager->clear();
+        $retained = $repository->findClientByPublicId($client->getPublicId());
+        self::assertNotNull($retained);
+        self::assertSame($id, $retained->getId()->toString());
+        self::assertSame(['https://dev.baander.app'], $retained->getRedirectUris());
+        self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM oauth_clients'));
+    }
+
     public function testClientSaveLoadAndResavePreservePersistentUuid(): void
     {
         $repository = new ClientRepository($this->manager, new JsonEncoder());

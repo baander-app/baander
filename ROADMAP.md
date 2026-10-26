@@ -76,6 +76,14 @@ drill verified source write refusal, immutable pair creation, real readiness,
 outbox and scheduler effects, retirement and refusal to reuse the same boot.
 Production regression, full backend and integrated workflow gates remain open.
 
+Initialization and database checkpoints, 2026-10-26: added catalog-only history
+inspection, preserved configuration and key resume, explicit adoption inventory,
+and isolated restore/rehearsal helpers. The CI image passed 50 focused tests with
+404 assertions and no skips; 12 Python bootstrap tests and targeted PHPStan passed.
+The disposable PostgreSQL drill verified history refusals, dump/restore, PGroonga
+search, sequence preservation and corrupt archive refusal. Complete adoption and
+update orchestration still require integrated qualification.
+
 ## Playback investigation and evidence limits
 
 **Movie departure:** Back closed the player, but three original producers retained

@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Process\Process;
 
@@ -24,6 +25,10 @@ final class SetupCommand extends Command
         private readonly KernelInterface $kernel,
         private readonly Filesystem $filesystem,
         private readonly string $projectDir,
+        #[Autowire('%env(resolve:OAUTH_PRIVATE_KEY_PATH)%')]
+        private readonly string $privateKeyPath = '',
+        #[Autowire('%env(resolve:OAUTH_PUBLIC_KEY_PATH)%')]
+        private readonly string $publicKeyPath = '',
     ) {
         parent::__construct();
     }
@@ -31,6 +36,7 @@ final class SetupCommand extends Command
     protected function configure(): void
     {
         $this
+            ->addOption('origin', null, InputOption::VALUE_REQUIRED, 'Instance origin for a newly created OAuth client', 'https://baander.test')
             ->addOption('fresh', 'f', InputOption::VALUE_NONE, 'Drop all tables and clear cache before setup')
             ->addOption('skip-keys', 'k', InputOption::VALUE_NONE, 'Skip OAuth key generation')
             ->setHelp('This command bootstraps the development environment.');
@@ -54,6 +60,16 @@ final class SetupCommand extends Command
             $this->clearCache($io);
         }
 
+        if (!$skipKeys) {
+            try {
+                $skipKeys = $this->existingKeysMatch();
+            } catch (\RuntimeException $error) {
+                $io->error($error->getMessage());
+
+                return Command::FAILURE;
+            }
+        }
+
         $io->section('Database Migrations');
         if (!$this->runConsole($io, ['doctrine:migrations:migrate', '--no-interaction'])) {
             return Command::FAILURE;
@@ -67,7 +83,7 @@ final class SetupCommand extends Command
         }
 
         $io->section('OAuth Clients');
-        if (!$this->runConsole($io, ['app:auth:setup-clients', '--no-interaction'])) {
+        if (!$this->runConsole($io, ['app:auth:setup-clients', '--origin=' . $input->getOption('origin'), '--no-interaction'])) {
             return Command::FAILURE;
         }
 
@@ -107,6 +123,32 @@ final class SetupCommand extends Command
         }
 
         $io->text(sprintf('<info>✓</info> %s', implode(' ', $args)));
+
+        return true;
+    }
+
+    private function existingKeysMatch(): bool
+    {
+        $privatePath = $this->privateKeyPath !== '' ? $this->privateKeyPath : $this->projectDir . '/config/secrets/oauth/private.key';
+        $publicPath = $this->publicKeyPath !== '' ? $this->publicKeyPath : $this->projectDir . '/config/secrets/oauth/public.key';
+        $privateExists = file_exists($privatePath) || is_link($privatePath);
+        $publicExists = file_exists($publicPath) || is_link($publicPath);
+        if (!$privateExists && !$publicExists) {
+            return false;
+        }
+        if (!$privateExists || !$publicExists || is_link($privatePath) || is_link($publicPath)) {
+            throw new \RuntimeException('OAuth initialization requires a complete regular key pair. Preserve the existing files and reconcile them before resuming.');
+        }
+        $privatePem = file_get_contents($privatePath);
+        $publicPem = file_get_contents($publicPath);
+        $private = $privatePem === false ? false : openssl_pkey_get_private($privatePem);
+        $public = $publicPem === false ? false : openssl_pkey_get_public($publicPem);
+        if ($private === false || $public === false
+            || !openssl_sign('OAuth initialization key pair', $signature, $private, OPENSSL_ALGO_SHA256)
+            || openssl_verify('OAuth initialization key pair', $signature, $public, OPENSSL_ALGO_SHA256) !== 1
+        ) {
+            throw new \RuntimeException('Existing OAuth keys do not form a matching pair. Preserve them and reconcile initialization.');
+        }
 
         return true;
     }
