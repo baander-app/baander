@@ -34,6 +34,57 @@ final class DeploymentMediaMountsTest extends TestCase
         self::recipe($mounts);
     }
 
+    public function testDevelopmentBindContainmentChecksExactReadOnlySource(): void
+    {
+        $mounts = self::mounts();
+        $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
+        $recipe = self::recipe($mounts, 'local-development');
+        $calls = [];
+        $containment = new DockerWorkerContainment(static function (array $arguments) use (&$calls): string {
+            $calls[] = $arguments;
+            $inspection = self::inspection();
+            $inspection['mounts'][0] = ['Type' => 'bind', 'Source' => '/tmp', 'Destination' => '/media/library', 'RW' => false, 'Propagation' => 'rprivate'];
+            return json_encode($arguments[0] === 'container' ? $inspection : self::volume($arguments[4]), JSON_THROW_ON_ERROR);
+        }, $recipe);
+        $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
+        self::assertCount(3, $calls);
+        foreach (['Source' => '/var/tmp', 'RW' => true, 'Type' => 'volume', 'Propagation' => 'rshared'] as $key => $value) {
+            $rejected = false;
+            $containment = new DockerWorkerContainment(static function (array $arguments) use ($key, $value): string {
+                $inspection = self::inspection();
+                $inspection['mounts'][0] = ['Type' => 'bind', 'Source' => '/tmp', 'Destination' => '/media/library', 'RW' => false, 'Propagation' => 'rprivate'];
+                $inspection['mounts'][0][$key] = $value;
+                return json_encode($arguments[0] === 'container' ? $inspection : self::volume($arguments[4]), JSON_THROW_ON_ERROR);
+            }, $recipe);
+            try {
+                $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
+            } catch (RuntimeException) {
+                $rejected = true;
+            }
+            self::assertTrue($rejected, 'Bind substitution accepted: ' . $key);
+        }
+    }
+
+    public function testDevelopmentBindRejectsWritableDerivedTraversalAndSymlinkSources(): void
+    {
+        $alias = '/tmp/baander-source-alias-' . bin2hex(random_bytes(8));
+        self::assertTrue(symlink('/tmp', $alias));
+        try {
+            foreach ([['source' => '/tmp', 'readOnly' => false], ['source' => '/tmp', 'role' => 'derived', 'readOnly' => false],
+                ['source' => '/tmp/../tmp'], ['source' => '/tmp/'], ['source' => $alias], ['source' => '/does-not-exist.baander.app']] as $changes) {
+                $rejected = false;
+                try {
+                    self::recipe([array_replace(['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'], $changes)], 'local-development');
+                } catch (InvalidArgumentException) {
+                    $rejected = true;
+                }
+                self::assertTrue($rejected);
+            }
+        } finally {
+            unlink($alias);
+        }
+    }
+
     /** @param list<array<string,mixed>> $mounts */
     #[DataProvider('unsafeMounts')]
     public function testRejectsUnsafeTopology(array $mounts): void
@@ -157,8 +208,8 @@ final class DeploymentMediaMountsTest extends TestCase
     }
 
     /** @param list<array<string,mixed>> $mounts */
-    public static function recipe(array $mounts): DeploymentContainerRecipe
+    public static function recipe(array $mounts, string $sourceMountPolicy = 'production'): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', mediaMounts: $mounts);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
     }
 }

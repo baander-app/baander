@@ -9,7 +9,12 @@ cd "$(dirname "$0")/.."
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
     test -f vendor/autoload.php || { echo 'Install Composer dependencies first.' >&2; exit 1; }
 fi
+dev_source_bind="${BAANDER_TEST_DEV_SOURCE_BIND:-0}"
+[[ "$dev_source_bind" = 0 || "$dev_source_bind" = 1 ]] || { echo 'Invalid development source bind mode.' >&2; exit 2; }
 operator_in_container="${BAANDER_TEST_OPERATOR_IN_CONTAINER:-0}"
+if [ "$dev_source_bind" = 1 ] && [ "$operator_in_container" != 1 ]; then
+    echo 'Development source qualification requires the container operator.' >&2; exit 2
+fi
 [[ "$operator_in_container" = 0 || "$operator_in_container" = 1 ]] || {
     echo 'BAANDER_TEST_OPERATOR_IN_CONTAINER must be 0 or 1.' >&2; exit 1;
 }
@@ -176,6 +181,11 @@ cleanup() {
             esac
         done
     done
+    if [ -n "${dev_source_path:-}" ] && [ "$dev_source_path" = "/tmp/$run_id-source" ]; then
+        cleanup_docker run --rm --name "$run_id-host-probe" --network none --user 0 --security-opt label=disable \
+            --mount type=bind,source=/tmp,target=/host-tmp --entrypoint /bin/sh "$base_id" \
+            -c 'rm -rf -- "/host-tmp/$1"' sh "$run_id-source" >/dev/null 2>&1 || cleanup_status=1
+    fi
     # Absence is proved by successful listings, never by a failed inspect.
     for kind in container network volume image; do
         local -n names="${kind}_names"
@@ -282,6 +292,7 @@ cat > "$work/Dockerfile" <<'DOCKERFILE'
 ARG FIXTURE_BASE=scratch
 FROM ${FIXTURE_BASE}
 USER root
+RUN rm -rf /var/www/html/src /var/www/html/tests /var/www/html/config /var/www/html/packages /var/www/html/migrations /var/www/html/bin /var/www/html/templates /var/www/html/public /var/www/html/vendor
 COPY --chown=www-data:www-data checkout/ /var/www/html/
 ARG MEDIA_CONTROL_OBSERVATION=0
 RUN if [ "$MEDIA_CONTROL_OBSERVATION" = 1 ]; then \
@@ -348,6 +359,23 @@ fi
 for volume in "$source_volume" "$storage_volume" "$state_volume" "$secrets_volume" "$ipc_volume"; do
     docker_local volume create --label "app.baander.test.project=$run_id" "$volume" >/dev/null
 done
+operator_source_mounts=()
+if [ "$dev_source_bind" = 1 ]; then
+    # An owned disposable directory on the daemon host; no developer library paths.
+    dev_source_path="/tmp/$run_id-source"
+    docker_local run --rm --name "$run_id-host-probe" --network none --user 0 --security-opt label=disable \
+        --mount type=bind,source=/tmp,target=/host-tmp --entrypoint /bin/sh "$base_id" -c '
+            set -eu
+            mkdir -m 755 "/host-tmp/$1"
+            printf "%s\n" baander-source-readonly > "/host-tmp/$1/receipt.txt"
+            chown www-data:www-data "/host-tmp/$1" "/host-tmp/$1/receipt.txt"
+        ' sh "$run_id-source"
+    # Relabel only this owned disposable directory on SELinux hosts.
+    docker_local run --rm --name "$run_id-host-probe" --network none \
+        --volume "$dev_source_path:/source:z" --entrypoint /bin/sh "$base_id" -c 'test -r /source/receipt.txt'
+    export BAANDER_TEST_DEV_SOURCE_PATH="$dev_source_path"
+    operator_source_mounts=(--mount "type=bind,source=$dev_source_path,target=$dev_source_path,readonly,bind-propagation=rprivate")
+fi
 media_mounts=(--mount "type=volume,source=$source_volume,target=/media/source,readonly,volume-nocopy"
     --mount "type=volume,source=$storage_volume,target=/var/www/html/storage,volume-nocopy"
     --mount "type=volume,source=$state_volume,target=/var/www/html/var/transcode_state,volume-nocopy")
@@ -408,7 +436,7 @@ profile = json.load(open('tests/Fixtures/Worker/autoscaling-profile.json'))
 maximum = int(os.environ.get('BAANDER_TEST_AUTOSCALING_MAXIMUM', profile['maximumConcurrency']))
 assert maximum in (1, 2, 4)
 profile['maximumConcurrency'] = maximum
-manifest = dict(version=4, namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
+manifest = dict(version=5, sourceMountPolicy="production", namespace=namespace, bootId=boot, daemonId=daemon, imageId=image,
     network=network, dockerBinary=binary, dockerEndpoint=endpoint,
     controlMemoryMiB=2944, executionMemoryMiB=4480+320*(maximum-1), controlNanoCpus=1000000000, executionNanoCpus=2000000000,
     controlPidsLimit=129, executionPidsLimit=256+maximum-1, controlCpuSet=cpus[:1], executionCpuSet=cpus[1:3],
@@ -417,6 +445,9 @@ manifest = dict(version=4, namespace=namespace, bootId=boot, daemonId=daemon, im
     mediaMounts=[dict(volume=network+'-source-media', target='/media/source', readOnly=True, role='source'),
         dict(volume=network+'-storage', target='/var/www/html/storage', readOnly=False, role='derived'),
         dict(volume=network+'-media-state', target='/var/www/html/var/transcode_state', readOnly=False, role='derived')])
+if os.environ.get('BAANDER_TEST_DEV_SOURCE_BIND') == '1':
+    manifest['sourceMountPolicy'] = 'local-development'
+    manifest['mediaMounts'][0] = dict(source=os.environ['BAANDER_TEST_DEV_SOURCE_PATH'], target='/media/source', readOnly=True, role='source')
 runtime = dict(APP_ENV='prod', APP_DEBUG='0', APP_SECRET='operator-test-only',
     DATABASE_URL='postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8',
     REDIS_URL='redis://default:test-only@redis:6379', REDIS_PASSWORD='test-only',
@@ -478,7 +509,7 @@ if [ "$operator_in_container" = 1 ]; then
     docker_local run -d --name "$run_id-controller" --network "$run_id-control" --user 0 \
         --cap-drop ALL --security-opt no-new-privileges --security-opt label=disable \
         --mount "type=bind,source=${BAANDER_TEST_DOCKER_SOCKET_PATH:-/var/run/docker.sock},target=/var/run/docker.sock" \
-        --entrypoint /usr/local/bin/php "$controller_id" -r 'while (true) { usleep(100000); }' >/dev/null
+        "${operator_source_mounts[@]}" --entrypoint /usr/local/bin/php "$controller_id" -r 'while (true) { usleep(100000); }' >/dev/null
     # Verify the mounted socket before the first durable creation intent.
     test "$(docker_local exec "$run_id-controller" /usr/local/bin/docker --host unix:///var/run/docker.sock info --format '{{.ID}}')" = "$daemon_id" || {
         echo 'Controller socket reaches a different Docker daemon.' >&2; exit 1;
@@ -613,13 +644,17 @@ assert result['readiness'] == 'not_checked', result
 assert result['autoscaling'] == {'state': 'unavailable'}, result
 assert result['namespace'] == sys.argv[2] and result['bootId'] == sys.argv[3], result
 PY
+operator readiness 1
 # Changing an authorized source volume cannot reuse an existing creation intent.
 cp "$work/manifest.json" "$work/manifest-original.json"
 python3 - "$work/manifest.json" <<'PYDRIFT'
 import json, sys
 path = sys.argv[1]
 manifest = json.load(open(path))
-manifest['mediaMounts'][0]['volume'] += '-drift'
+if 'source' in manifest['mediaMounts'][0]:
+    manifest['mediaMounts'][0]['source'] = '/tmp'
+else:
+    manifest['mediaMounts'][0]['volume'] += '-drift'
 with open(path, 'w') as stream: json.dump(manifest, stream)
 PYDRIFT
 if [ "$operator_in_container" = 1 ]; then
@@ -658,6 +693,27 @@ await_check() {
 }
 await_check ready
 await_check ready "$worker_name"
+operator readiness 0
+python3 - "$work/readiness.json" <<'PYREADY'
+import json, sys
+result = json.load(open(sys.argv[1]))
+assert result['success'] is True and result['result']['readiness'] == 'ready', result
+PYREADY
+if [ "$dev_source_bind" = 1 ]; then
+    # Real kernel read-only enforcement, with the original source left untouched.
+    test "$(docker_local exec "$worker_name" cat /media/source/receipt.txt)" = baander-source-readonly
+    if docker_local exec "$worker_name" sh -c 'echo forbidden > /media/source/baander-readonly-probe'; then
+        echo 'Admitted development source bind allowed a write.' >&2; exit 1
+    fi
+    docker_local inspect "$worker_name" > "$work/dev-inspect.json"
+    python3 - "$work/dev-inspect.json" "$dev_source_path" <<'PYBIND'
+import json, sys
+worker = json.load(open(sys.argv[1]))[0]
+source = next(m for m in worker['Mounts'] if m['Destination'] == '/media/source')
+assert source['Type'] == 'bind' and source['Source'] == sys.argv[2] and source['RW'] is False, source
+assert all(m['Type'] == 'volume' and m['Driver'] == 'local' for m in worker['Mounts'] if m is not source)
+PYBIND
+fi
 await_check verify-outbox
 await_check verify-scheduler
 operator status 0
@@ -775,6 +831,7 @@ PYRECIPE
 fi
 operator recover 0
 operator recover 0
+operator readiness 1
 operator status 0
 python3 - "$work/status.json" <<'PY'
 import json, sys

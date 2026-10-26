@@ -67,7 +67,7 @@ final class DeploymentPairManifestTest extends TestCase
     public static function fields(): array
     {
         return [
-            'version' => 4, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 5, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
             'controlMemoryMiB' => 2944, 'executionMemoryMiB' => 4480,

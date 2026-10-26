@@ -21,12 +21,12 @@ try {
         throw new InvalidArgumentException('CLI invocation required.');
     }
     if (count($arguments) === 2 && $arguments[1] === '--help') {
-        echo "Usage: php bin/worker-deployment.php <create|reconcile-create|start|status|recover> /absolute/manifest.json /absolute/credentials.json\n";
+        echo "Usage: php bin/worker-deployment.php <create|reconcile-create|start|status|readiness|recover> /absolute/manifest.json /absolute/credentials.json\n";
         echo "Use an external deadline. Unconfirmed create/start must be reconciled, never retried automatically.\n";
         exit(0);
     }
     if (count($arguments) !== 4 || !is_string($arguments[1])
-        || !in_array($arguments[1], ['create', 'reconcile-create', 'start', 'status', 'recover'], true)
+        || !in_array($arguments[1], ['create', 'reconcile-create', 'start', 'status', 'readiness', 'recover'], true)
         || !is_string($arguments[2]) || !str_starts_with($arguments[2], '/') || !is_file($arguments[2])
         || !is_string($arguments[3])) {
         throw new InvalidArgumentException('Invalid operator invocation.');
@@ -117,6 +117,11 @@ try {
             $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipes))
                 ->recover($manifest->namespace, $manifest->bootId);
             $result = ['state' => $success ? 'retired' : 'unconfirmed'];
+            break;
+        case 'readiness':
+            (new \App\Shared\Infrastructure\Worker\DeploymentReadiness($connection, $docker->execute(...)))
+                ->verify($manifest, $credentials->runtimeEnvironment);
+            $result = ['state' => 'ready', 'readiness' => 'ready'];
             break;
         case 'status':
             $lease = (new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection))->findForContainment($manifest->namespace);

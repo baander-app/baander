@@ -138,6 +138,14 @@ FORMAT;
         }
         foreach ($expected as $declaration) {
             $actual = $byTarget[$declaration['target']] ?? [];
+            if (isset($declaration['source'])) {
+                DeploymentContainerRecipe::verifySourceDirectory($declaration['source']);
+                if (($actual['Type'] ?? null) !== 'bind' || ($actual['Source'] ?? null) !== $declaration['source']
+                    || ($actual['RW'] ?? null) !== false || ($actual['Propagation'] ?? null) !== 'rprivate') {
+                    throw new RuntimeException('Source bind identity or access differs from admission.');
+                }
+                continue;
+            }
             if (($actual['Type'] ?? null) !== 'volume' || ($actual['Name'] ?? null) !== $declaration['volume']
                 || ($actual['Driver'] ?? null) !== 'local' || ($actual['RW'] ?? null) !== !$declaration['readOnly']) {
                 throw new RuntimeException('Container media volume identity or access mode differs from admission.');

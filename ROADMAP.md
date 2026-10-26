@@ -68,6 +68,14 @@ worker controller. Twenty Python tests pass. Build output is retained in private
 files. Host DNS, TLS, Docker runtime and application qualification remain open;
 these configuration checks do not establish that an instance is usable.
 
+Worker admission, 2026-10-26: manifest version 5 distinguishes production volume
+mounts from explicit local development read-only source binds. Readiness observes
+the admitted processes and lease without submitting work. Focused worker checks
+passed (320 tests, 762 assertions), as did targeted PHPStan. The disposable Docker
+drill verified source write refusal, immutable pair creation, real readiness,
+outbox and scheduler effects, retirement and refusal to reuse the same boot.
+Production regression, full backend and integrated workflow gates remain open.
+
 ## Playback investigation and evidence limits
 
 **Movie departure:** Back closed the player, but three original producers retained

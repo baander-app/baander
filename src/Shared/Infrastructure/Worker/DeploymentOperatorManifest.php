@@ -15,11 +15,11 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 #[Exclude]
 final readonly class DeploymentOperatorManifest
 {
-    private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint', 'ipcVolume'];
+    private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint', 'ipcVolume', 'sourceMountPolicy'];
     private const array INTEGER_FIELDS = ['version', 'controlMemoryMiB', 'executionMemoryMiB', 'controlNanoCpus', 'executionNanoCpus', 'controlPidsLimit', 'executionPidsLimit', 'scheduledConsoleMiB'];
     private const int MIB = 1024 * 1024;
 
-    /** @param list<array{volume:string,target:string,readOnly:bool,role:string}> $mediaMounts */
+    /** @param list<array{volume?:string,source?:string,target:string,readOnly:bool,role:string}> $mediaMounts */
     private function __construct(
         public string $namespace,
         public string $bootId,
@@ -34,6 +34,7 @@ final readonly class DeploymentOperatorManifest
         public string $ipcVolume,
         public array $mediaMounts,
         public WorkerAutoscalingProfile $autoscaling,
+        public string $sourceMountPolicy,
     ) {
         if (!str_starts_with($dockerBinary, '/') || strlen($dockerBinary) > 4096
             || preg_match('/[\x00-\x1f\x7f]/', $dockerBinary) !== 0
@@ -73,8 +74,8 @@ final readonly class DeploymentOperatorManifest
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 4) {
-            throw new InvalidArgumentException('Operator manifest version must be 4.');
+        if (self::integer($fields, 'version') !== 5) {
+            throw new InvalidArgumentException('Operator manifest version must be 5.');
         }
         $budgets = [];
         foreach (DeploymentUnit::cases() as $unit) {
@@ -98,7 +99,7 @@ final readonly class DeploymentOperatorManifest
         return new self(self::string($fields, 'namespace'), self::string($fields, 'bootId'), self::string($fields, 'daemonId'),
             self::string($fields, 'imageId'), self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
             $budgets['control'], $budgets['execution'], self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
-            WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)));
+            WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)), self::string($fields, 'sourceMountPolicy'));
     }
 
     public function recipe(DeploymentUnit $unit, DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
@@ -111,9 +112,9 @@ final readonly class DeploymentOperatorManifest
                 '--scheduled-console-mib=' . ($unit === DeploymentUnit::Control ? 0 : intdiv($this->scheduledConsoleBytes, self::MIB)),
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $environment, $this->mediaMounts);
+            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $environment, $this->mediaMounts, $this->sourceMountPolicy);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
-            throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source volume.');
+            throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }
         $paths = [['/var/www/html/storage', 'derived'], ['/var/www/html/var/transcode_state', 'derived']];
         foreach (['CONVERT_STORAGE_PATH' => 'derived', 'MEDIA_STORAGE_PATH' => 'source'] as $key => $role) {

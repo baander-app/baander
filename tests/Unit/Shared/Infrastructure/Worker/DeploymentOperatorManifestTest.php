@@ -100,6 +100,16 @@ final class DeploymentOperatorManifestTest extends TestCase
             $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']))->createArguments('/tmp/baander-test.env'));
     }
 
+    public function testDevelopmentBindRequiresExplicitPolicyAndCanonicalReadOnlyDirectory(): void
+    {
+        $mounts = self::mounts();
+        $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]));
+        self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
+        $this->expectException(InvalidArgumentException::class);
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]));
+    }
+
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
     private static function mounts(): array
     {
@@ -155,6 +165,8 @@ final class DeploymentOperatorManifestTest extends TestCase
             }
         }
         yield 'unsupported version' => ['version', 1];
+        yield 'obsolete manifest version' => ['version', 4];
+        yield 'unknown source policy' => ['sourceMountPolicy', 'permissive'];
         yield 'unknown argv' => ['command', ['/bin/sh', '-c', 'arbitrary command']];
         yield 'unknown environment' => ['environment', ['APP_SECRET' => 'test-only-secret']];
         yield 'unknown lock path' => ['lockDirectory', '/tmp/other'];
@@ -211,7 +223,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'null' => ['null'];
         yield 'oversized' => [str_repeat(' ', 8193)];
         yield 'excess depth' => [str_repeat('[', 9) . '0' . str_repeat(']', 9)];
-        yield 'numeric overflow' => [str_replace('"version":4', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
+        yield 'numeric overflow' => [str_replace('"version":5', '"version":9223372036854775808', json_encode(self::fields(), JSON_THROW_ON_ERROR))];
     }
 
     /** @param array<string,mixed> $overrides */

@@ -15,7 +15,7 @@ final readonly class DeploymentContainerRecipe
     /** @var list<string> */
     public array $command;
 
-    /** @var list<array{volume:string,target:string,readOnly:bool,role:string}> */
+    /** @var list<array{volume?:string,source?:string,target:string,readOnly:bool,role:string}> */
     public array $mediaMounts;
 
     /** @var list<int> */
@@ -41,6 +41,7 @@ final readonly class DeploymentContainerRecipe
         public string $ipcVolume,
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
+        public string $sourceMountPolicy = 'production',
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         $this->cpuSet = (new DeploymentResourceBudget($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet))->cpuSet;
@@ -70,7 +71,10 @@ final readonly class DeploymentContainerRecipe
             throw new InvalidArgumentException('Deployment command requires an absolute executable and at most 16 KiB of argument bytes.');
         }
         $this->command = $validatedCommand;
-        $this->mediaMounts = self::validateMounts($mediaMounts);
+        if (!in_array($sourceMountPolicy, ['production', 'local-development'], true)) {
+            throw new InvalidArgumentException('Unknown source mount policy.');
+        }
+        $this->mediaMounts = $this->validateMounts($mediaMounts);
         if (in_array($ipcVolume, array_column($this->mediaMounts, 'volume'), true)) {
             throw new InvalidArgumentException('Worker IPC volume cannot alias media storage.');
         }
@@ -84,6 +88,7 @@ final readonly class DeploymentContainerRecipe
             'imageId' => $this->imageId, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
             'unit' => $this->unit->value, 'cpuSet' => $this->cpuSet, 'ipcVolume' => $this->ipcVolume,
+            'sourceMountPolicy' => $this->sourceMountPolicy,
             'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
         ], JSON_THROW_ON_ERROR));
     }
@@ -120,26 +125,39 @@ final readonly class DeploymentContainerRecipe
         $arguments = [];
         foreach ($this->mediaMounts as $mount) {
             $arguments[] = '--mount';
-            $arguments[] = 'type=volume,src=' . $mount['volume'] . ',dst=' . $mount['target']
-                . ($mount['readOnly'] ? ',readonly' : '') . ',volume-nocopy';
+            if (isset($mount['source'])) {
+                self::verifySourceDirectory($mount['source']);
+                $arguments[] = 'type=bind,src=' . $mount['source'] . ',dst=' . $mount['target'] . ',readonly,bind-propagation=rprivate,bind-recursive=readonly';
+            } else {
+                $arguments[] = 'type=volume,src=' . $mount['volume'] . ',dst=' . $mount['target']
+                    . ($mount['readOnly'] ? ',readonly' : '') . ',volume-nocopy';
+            }
         }
         return $arguments;
     }
 
     /**
      * @param array<array-key,mixed> $mounts
-     * @return list<array{volume:string,target:string,readOnly:bool,role:string}>
+     * @return list<array{volume?:string,source?:string,target:string,readOnly:bool,role:string}>
      */
-    private static function validateMounts(array $mounts): array
+    private function validateMounts(array $mounts): array
     {
         if (!array_is_list($mounts) || count($mounts) > 64) {
-            throw new InvalidArgumentException('Media mounts require at most 64 ordered named-volume declarations.');
+            throw new InvalidArgumentException('Media mounts require at most 64 ordered media declarations.');
         }
         $validated = [];
         foreach ($mounts as $mount) {
+            $bind = is_array($mount) && array_key_exists('source', $mount);
+            if ($bind && ($this->sourceMountPolicy !== 'local-development' || ($mount['role'] ?? null) !== 'source'
+                || !is_string($mount['source']))) {
+                throw new InvalidArgumentException('Only local development permits read-only source binds.');
+            }
+            if ($bind) {
+                self::verifySourceDirectory($mount['source']);
+            }
             if (!is_array($mount) || count($mount) !== 4
-                || !is_string($mount['volume'] ?? null)
-                || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $mount['volume']) !== 1
+                || (!$bind && (!is_string($mount['volume'] ?? null)
+                    || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $mount['volume']) !== 1))
                 || !is_string($mount['target'] ?? null) || strlen($mount['target']) > 4096
                 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $mount['target']) !== 1
                 || preg_match('~(?:^|/)\.\.?(?:/|$)~', $mount['target']) !== 0
@@ -147,7 +165,7 @@ final readonly class DeploymentContainerRecipe
                 || !is_bool($mount['readOnly'] ?? null)
                 || $mount['readOnly'] !== ($mount['role'] === 'source')
             ) {
-                throw new InvalidArgumentException('Media mounts require named volumes, canonical targets and read-only source or writable derived access.');
+                throw new InvalidArgumentException('Media mounts require admitted storage, canonical targets and read-only source or writable derived access.');
             }
             $target = $mount['target'];
             foreach (['/bin', '/sbin', '/usr', '/etc', '/dev', '/proc', '/sys', '/run', '/var/run', '/tmp', '/root', '/home'] as $forbidden) {
@@ -165,14 +183,24 @@ final readonly class DeploymentContainerRecipe
             foreach ($validated as $existing) {
                 if ($target === $existing['target'] || str_starts_with($target, $existing['target'] . '/')
                     || str_starts_with($existing['target'], $target . '/')
-                    || ($mount['volume'] === $existing['volume'] && $mount['role'] !== $existing['role'])) {
+                    || (isset($mount['volume'], $existing['volume']) && $mount['volume'] === $existing['volume'] && $mount['role'] !== $existing['role'])) {
                     throw new InvalidArgumentException('Media targets cannot overlap or alias a source volume with writable access.');
                 }
             }
-            $validated[] = ['volume' => $mount['volume'], 'target' => $target, 'readOnly' => $mount['readOnly'], 'role' => $mount['role']];
+            $validated[] = [($bind ? 'source' : 'volume') => $mount[$bind ? 'source' : 'volume'], 'target' => $target, 'readOnly' => $mount['readOnly'], 'role' => $mount['role']];
         }
         usort($validated, static fn (array $left, array $right): int => strcmp($left['target'], $right['target']));
         return $validated;
+    }
+
+    /** The trusted operator sees admitted host directories at their daemon-visible paths. */
+    public static function verifySourceDirectory(string $source): void
+    {
+        clearstatcache(true, $source);
+        if (strlen($source) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_. -]+/)*[A-Za-z0-9_. -]+\z~D', $source) !== 1
+            || preg_match('~(?:^|/)\.\.?(?:/|$)~', $source) !== 0 || !is_dir($source) || realpath($source) !== $source) {
+            throw new InvalidArgumentException('Source binds require an existing canonical absolute directory without symlink aliases.');
+        }
     }
 
 }

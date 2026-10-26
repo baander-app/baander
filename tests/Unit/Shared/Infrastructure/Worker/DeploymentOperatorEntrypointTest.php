@@ -34,7 +34,7 @@ final class DeploymentOperatorEntrypointTest extends TestCase
         self::assertSame(0, $exit);
         self::assertSame('', $stderr);
         self::assertSame(
-            "Usage: php bin/worker-deployment.php <create|reconcile-create|start|status|recover> /absolute/manifest.json /absolute/credentials.json\n"
+            "Usage: php bin/worker-deployment.php <create|reconcile-create|start|status|readiness|recover> /absolute/manifest.json /absolute/credentials.json\n"
             . "Use an external deadline. Unconfirmed create/start must be reconciled, never retried automatically.\n",
             $stdout,
         );
