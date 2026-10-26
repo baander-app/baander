@@ -24,6 +24,26 @@ The optional client value stored in an EQ profile's `deviceId`. It names an audi
 
 The registered client's public ID, carried by OAuth's `client_id`, administration's `clientId` and the access-token JWT's `client_id` claim. It is separate from a token identifier or secret.
 
+## Local development
+
+### Persistent development instance
+
+The configured local Baander instance at `baander.test` that automatically follows
+master. Its libraries, accounts and settings survive ordinary updates. It runs
+independently of source edits and branch switches in development worktrees.
+
+### Worktree preview
+
+A local Baander instance for one development worktree, with its own hostname and
+application state. It supports feature verification without changing the persistent
+development instance or another worktree's preview.
+
+### Preview worker snapshot
+
+The immutable worker build captured from a worktree when its preview is refreshed.
+Live web edits can be newer than this build; preview status identifies the active
+worker snapshot so integrated verification can account for that difference.
+
 ## Web server lifecycle
 
 ### Drain

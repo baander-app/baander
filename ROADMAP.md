@@ -23,6 +23,43 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Local development workflow
+
+The [implementation plan](docs/plans/2026-10-26-1949-feat-local-development-workflow-plan.md)
+define a persistent development instance at `baander.test` that updates
+automatically when master advances, with isolated worktree previews for feature
+verification. Make remains the entry point. Libraries, accounts, settings and
+source media survive ordinary updates; incompatible database changes stop without
+an automatic reset.
+
+The implementation plan is defined; delivery remains open.
+Acceptance covers first and repeat startup, automatic updates and concurrent
+merges, failed updates, database incompatibility, preview isolation, and stopping
+and resuming each environment. The plan's acceptance examples define those cases.
+
+Verification, 2026-10-26: all four Ready for Planning checks passed for 16
+requirements and nine acceptance examples. Five document-review lenses returned
+no findings. All 24 local Markdown links and seven source-file references resolve;
+prose and whitespace checks passed. This checkpoint delivered requirements only;
+no application tests ran and no running environment changed.
+
+Planning checkpoint, 2026-10-26: added seven implementation units and eleven
+technical decisions while preserving all 16 requirements, four product decisions,
+five flows and nine acceptance examples. The plan covers host supervision, worker
+admission, data adoption, automatic updates, previews and runtime qualification.
+All units name dependencies, files, test scenarios and verification outcomes.
+Five implementation-plan review lenses returned no findings; confidence, contract
+preservation, local-link, source-reference, prose and whitespace checks passed.
+No application tests, builds or deployment operations ran. Host qualification and
+the existing database's adoption eligibility remain execution-time checks.
+
+Instance ownership, 2026-10-26: added private atomic state, process-owned lifecycle
+locks, independent updater intent, stable worktree identities and explicit command
+targeting. Status omits saved credentials; a missing preview never selects the
+persistent instance. Nine focused Python tests passed, including cross-process
+locking and sanitized child environments; whitespace checks passed. Runtime setup,
+updates, worker admission, adoption and integrated qualification remain open.
+
 ## Playback investigation and evidence limits
 
 **Movie departure:** Back closed the player, but three original producers retained

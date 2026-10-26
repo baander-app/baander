@@ -22,6 +22,14 @@ help: ## Shows available commands with description
 	@echo "\033[34mList of available commands:\033[39m"
 	@grep -E '^[a-zA-Z-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "[32m%-27s[0m %s\n", $$1, $$2}'
 
+DEV_ENVIRONMENT := python3 scripts/dev-environment.py
+
+dev-status: ## Show the persistent development instance and updater state
+	@$(DEV_ENVIRONMENT) status --instance persistent $(OPTIONS)
+
+preview-status: ## Show this worktree's preview state
+	@$(DEV_ENVIRONMENT) status $(OPTIONS)
+
 COMPOSE_BUILD_ARGS = HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) GITHUB_TOKEN=$(GITHUB_TOKEN) REDIS_PASSWORD=$(REDIS_PASSWORD)
 
 build: build-dev ## Build dev environment (alias)
