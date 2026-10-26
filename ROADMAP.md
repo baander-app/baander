@@ -32,19 +32,19 @@ stopped encoders. The next movie began admission, but the browser test exited
 before its startup outcome, cancellation of the first movie or recovery could be
 captured. Both diagnostic attempts remain nonpassing; both cleaned up successfully.
 
-The [investigation plan](docs/plans/2026-10-26-movie-departure-investigation-plan.md)
-records the observer-timeout hypothesis, missing browser error evidence and
-receipts under `var/test-runs/movie-departure-investigation`. Any later design must
-resolve departure ownership, in-flight startup, rapid reopening and shared
+The detailed investigation remains in [Git history](#completed-work-and-evidence),
+including the observer-timeout hypothesis and missing browser error evidence.
+Receipts are under `var/test-runs/movie-departure-investigation`. Any later design
+must resolve departure ownership, in-flight startup, rapid reopening and shared
 sessions. Unconditional cancellation from React effect cleanup is not prescribed.
 
 **Frame capture:** the historical native timestamp of 24.64 seconds versus a
 24.60-second callback remains unexplained. Failure diagnostics are delivered:
 63 Node tests and the prescribed two ordinary browser runs plus one sparse control
 passed. The mismatch did not recur; these results do not prove its cause or
-universal capture stability. The [diagnostics plan](docs/plans/2026-10-26-frame-capture-diagnostics-plan.md)
-and [sparse playback guide](docs-book/part-2-developer-guide/testing.md#sparse-movie-playback)
-retain the contract and evidence. No tolerance change or further implementation
+universal capture stability. The
+[sparse playback guide](docs-book/part-2-developer-guide/testing.md#sparse-movie-playback)
+retains the contract and evidence. No tolerance change or further implementation
 is selected by this historical failure.
 
 **Qualification boundaries:** bounded adaptation and endpoint proofs do not
@@ -71,8 +71,9 @@ Keep these limits separate from selected work:
 - Native codec acceptance remains conditional on the selected release path.
   [AAC reference coverage](packages/codecs/baander-aac/docs/README.md) does not
   exercise the 34-band and phase decoder paths; listening tests and the HE-AAC
-  IPC/bridge suites were not run in that checkpoint. These limits do not select
-  unused codec work or reopen intentional encoder design decisions.
+  IPC/bridge suites were not run in that checkpoint. The original 5% HE-AAC CBR
+  target was not established by the delivered 6% acceptance gate. These limits
+  do not select unused codec work or reopen intentional encoder design decisions.
 - Other existing limits belong in the [scan guide](docs-book/part-1-operator-guide/commands/app-library-scan.md),
   [Transcode context](docs-book/part-2-developer-guide/contexts/transcode.md) and
   [messaging guide](docs-book/part-2-developer-guide/cqrs-and-messaging.md).
@@ -151,8 +152,15 @@ suite counts, failed attempts, source revisions and receipt paths. Completed
 checkpoints are omitted here; their earlier failed stages do not reopen work
 closed by later evidence.
 
-The two entries below retain destinations linked by the installation guides and
-an existing plan.
+Implemented plans remain recoverable at
+`ef388275de15f5d63af5a7bb1a056ccf20183841`. List them with
+`git ls-tree --name-only ef388275de15f5d63af5a7bb1a056ccf20183841 docs/plans/`,
+then read one with `git show ef388275de15f5d63af5a7bb1a056ccf20183841:<path>`.
+The six remaining plans contain unfinished or partly superseded commitments;
+their retention does not resume deferred work or validate historical assumptions.
+
+The entries below preserve the installation guides' linked checkpoint and a
+compact record of delivered status reconciliation.
 
 ### Source-installation documentation
 
@@ -174,8 +182,8 @@ and environment adaptations.
 
 Status reconciliation was delivered with 169 tests across four frontend suites
 and all eight production browser phases passing. The
-[retained plan](docs/plans/2026-10-24-player-status-outage-plan.md) records the
-contract and verification. Evidence remains under
+[testing guide](docs-book/part-2-developer-guide/testing.md) describes current
+verification; the historical contract remains in Git. Evidence remains under
 `var/test-runs/player-status-outage-gates` and
 `var/test-runs/player-status-outage-production-accepted`; the pinned history
 retains failed attempts and acceptance limits. This completed checkpoint does
@@ -185,8 +193,15 @@ not select more outage work.
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded
 follow-ups while preserving unresolved scope, release budgets and incoming links.
-The full history remains at the pinned revision above. Verification is recorded
-in the [cleanup plan](docs/plans/2026-10-26-roadmap-cleanup-plan.md).
-All 26 local links and three incoming anchor references resolve. Release gates
-and deferred scope are preserved; prose audits and whitespace checks passed.
+The full history remains at the pinned revision above. The first cleanup verified
+26 local links and three incoming anchor references; release gates and deferred
+scope were preserved, and prose audits and whitespace checks passed.
+
+Plan cleanup, 2026-10-26: retired 36 delivered plans, including stale completion
+labels and this cleanup's own plan. Six unfinished or partly superseded July plans
+remain byte-identical. Repaired all five incoming references to retired plans and
+retained the AAC bitrate acceptance gap. Completed history remains recoverable
+from the pinned revisions. All 36 local links in the two edited documents and
+three incoming roadmap anchors resolve; no surviving file references a deleted
+plan. Hash checks, prose audits, independent review and whitespace checks passed.
 No application code changed or application suites ran.

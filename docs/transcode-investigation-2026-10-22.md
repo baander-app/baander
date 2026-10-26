@@ -10,9 +10,10 @@ audio/video decoding in both tested FFmpeg builds; that acceptance remains open.
 
 This investigation follows the active worker through FFmpeg, generation storage,
 signed HLS/DASH delivery and the movie player. It also distinguishes the unwired
-player package from production playback. The
-[implementation plan](plans/2026-10-22-transcode-format-validation-plan.md) records
-scope and review; `ROADMAP.md` records delivered checks and remaining acceptance.
+player package from production playback. Scope and review remain in the
+[plan history](../ROADMAP.md#completed-work-and-evidence). This dated report
+preserves the original investigation; the [roadmap](../ROADMAP.md) records current
+acceptance and the revisions needed to recover completed checks.
 
 ## Defects and repairs
 
