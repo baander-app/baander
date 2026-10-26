@@ -1,7 +1,7 @@
 ---
 title: Qualify movie departure and next-movie startup
 date: 2026-10-26
-status: reviewed
+status: implemented
 execution: code
 ---
 
@@ -119,3 +119,51 @@ second settled-position and lease-renewal observation. Retain process snapshots,
 publication edges and generation-local coordinates on success and failure.
 Require the same stopped process identities after observation. The overall work
 and cleanup budgets remain unchanged; no production threshold is relaxed.
+
+## Investigation checkpoint
+
+The bounded investigation is complete with a partial result. Back leaves the
+three original producers occupying the execution worker's video slots. The full
+next-movie failure and cancellation control remain unqualified; this status does
+not mark a production repair or a passing end-to-end sequence.
+
+The corrected attempt played A with advancing decoded video and nonzero WebAudio
+output, then used the actual Back button. All three native encoders reached
+stopped state after 82.59 seconds of readiness observation. Across 31 subsequent
+samples spanning 30.111 seconds, their original generation-2 ownership remained
+live at source position 4.477333. Lease expiries advanced by 28.50–31.50 seconds.
+Publication stayed incomplete at video edge 78 and audio edge 77.930667. The same
+three native PID/startTicks identities remained stopped before and after that
+window. This establishes abandoned capacity retention beyond two lease periods.
+
+B began admission, but the browser observer terminated before recording its
+startup outcome. The final database snapshot contains B's pending, unclaimed
+360p job just before its five-second admission deadline. Concurrent signing
+refreshes returned not-ready responses. Docker events record the browser
+container exiting 1 and its checkpoint client exiting 137. No completed refusal,
+explicit cancellation or recovered B playback receipt exists. Browser stderr was
+not retained, so the terminating error remains unproved.
+
+Read-only inspection identified an observer failure hypothesis: the inherited
+signing interceptor calls `route.fetch` with a 4500-millisecond timeout and no
+local rejection handler, while startup admission can wait roughly five seconds.
+That timing matches the browser exit but cannot establish its cause without the
+missing error. The product's own signing request has a 5000-millisecond timeout;
+newer polling responses can also supersede an older request's failure. A mounted
+B therefore cannot be assumed terminal before the cancellation control. A new
+reviewed investigation must retain browser termination diagnostics, observe the
+actual startup outcome and control B's mounted/retry state before qualifying the
+causal sequence. The current two-attempt allowance is exhausted. No production
+remediation is selected from this incomplete sequence.
+
+Both attempts and their fixture, browser and runner copies are retained under
+`var/test-runs/movie-departure-investigation/`, together with source hashes,
+image provenance and `investigation-summary.json`. The production runtime matches
+`d78fafbb4981e9d5231d1e5e208675f613b512ed`; derived images replace only the fixture.
+The generated media commands and browser source stayed unchanged between attempts.
+The first attempt exited 1 at its observer precondition; the second exited 137.
+Both cleanup receipts report success. A post-cleanup identity check confirms all
+seven captured worker processes are absent, and the three original service
+container identities are unchanged. Shell, Node and PHP syntax checks and the
+isolated diff whitespace check passed. No application suites were rerun for this
+documentation checkpoint, and no production source or user media was changed.

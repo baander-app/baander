@@ -12,10 +12,13 @@ an actual user workflow: a concrete failure, requested behavior with an existing
 runtime consumer and a demonstrated gap, or a named release decision that existing
 evidence cannot answer. A shipped binary alone does not establish a consumer.
 
-No further implementation task is selected here. The bounded capture diagnostic
-has been delivered; the historical mismatch's cause remains unresolved. These
-three passing attempts do not qualify universal capture stability or select
-indefinite reruns or another implementation task.
+The Back-to-next-movie investigation remains unresolved. Prepare a newly reviewed,
+bounded follow-on scope to capture the browser failure and B's actual startup,
+timeout/admission outcome and mounted/retry state, then complete authenticated
+cancellation and recovery controls. Current evidence confirms retained A ownership
+but does not complete that causal sequence. No production remediation or automatic
+rerun is selected by this partial checkpoint; unconditional React cleanup
+cancellation is not an assumed solution.
 
 Historical unchecked items, old plan limitations and incomplete experiments do
 not authorize other work. The retained
@@ -2372,3 +2375,59 @@ retained. Existing services and original media remain untouched. Production
 runtime was unchanged; unaffected backend suites were not rerun. Independent
 review, prose audits, local-link and whitespace checks passed. No merge or push
 is included.
+
+### Movie departure and next-movie startup investigation — 2026-10-26
+
+The [reviewed
+investigation](docs/plans/2026-10-26-movie-departure-investigation-plan.md)
+used two generated movies and the unchanged production runtime at `d78fafbb`.
+Derived images changed fixtures only; both attempts retain their harness copies
+and provenance under `var/test-runs/movie-departure-investigation`. This is a
+partial investigation result, not a production teardown repair or a completed
+capacity-starvation proof.
+
+Attempt one played A through the real UI and used Back, then failed an observer
+precondition before testing B. Requiring every final edge beyond cursor plus 72
+seconds within 45 wall-clock seconds ignored the 36/72-second throttle
+hysteresis and supplied no wall-time guarantee. The attempt exited one with
+verified cleanup. Independent review approved one observer correction
+preserving source commands, runtime and browser: observe three actual stopped
+encoders with a 120-second readiness bound before the fixed-position lease
+window.
+
+Attempt two met the stopped-process precondition after 82.59 seconds. Across 31
+database samples spanning 30.111 seconds after Back, source position remained
+4.477333 with generation two, live ownership and incomplete video/audio edges
+78/77.930667 seconds. Lease-expiry timestamps advanced 28.5–31.5 seconds.
+Separate native snapshots before and after that window matched the same three
+PID/startTicks identities and showed stopped state T at both boundaries. These
+observations establish retained producer ownership and lease renewal after Back
+across two lease periods.
+
+B's 360p job was pending and unclaimed in the final snapshot, sampled just
+before its five-second admission deadline. No completed B startup outcome,
+authenticated cancellation of A or subsequent recovery was captured. Concurrent
+B refreshes returned HTTP 200 with ready false, so neither terminal refusal nor
+inability to acquire later-freed capacity is established. The next reviewed
+scope must record B's actual mounted/retry state and outcome, rather than
+require a refusal by assumption.
+
+The browser container exited one and its checkpoint client exited 137, recorded
+in `attempt-2/docker-events.json`. Browser stderr was unavailable, leaving the
+cause unresolved. An inherited 4.5-second interception timeout versus roughly
+five-second backend admission is a retained hypothesis, not a demonstrated
+cause. Attempt two's cleanup step exited zero and verified containment despite
+the original exit 137; attempt one's original exit one and cleanup are retained
+too. Seven captured worker PID/start-time identities were absent after cleanup,
+and all three original application service identities were unchanged.
+
+Shell, Node and PHP syntax checks, whitespace checks and independent evidence
+review passed. Prose preservation and local-link audits passed. Both diagnostic
+attempts remain nonpassing; application suites were not rerun for the unchanged
+runtime. No further execution is selected without a newly reviewed scope. The
+missing cancellation/recovery control prevents selecting a remediation
+implementation. Any later design must resolve Back/lifecycle ownership,
+in-flight startup, rapid reopening and shared sessions; cancellation from
+effect cleanup is not prescribed. Existing databases, Redis, services and
+original media were not reset or modified. No production fix, merge or push is
+included.
