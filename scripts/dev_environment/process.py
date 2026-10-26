@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -11,18 +12,25 @@ from .model import WorkflowError, clean_environment
 class Runner:
     def run(self, arguments: list[str], *, cwd: Path | None = None,
             env: dict[str, str] | None = None, input: str | None = None,
-            timeout: float | None = 120, check: bool = True) -> subprocess.CompletedProcess:
+            timeout: float | None = 120, check: bool = True, log_path: Path | None = None) -> subprocess.CompletedProcess:
         environment = clean_environment()
         if env:
             environment.update(env)
         try:
-            result = subprocess.run(arguments, cwd=cwd, env=environment, input=input,
-                                    text=True, capture_output=True, timeout=timeout)
+            if log_path is None:
+                result = subprocess.run(arguments, cwd=cwd, env=environment, input=input,
+                                        text=True, capture_output=True, timeout=timeout)
+            else:
+                descriptor = os.open(log_path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(descriptor, 'w') as output:
+                    result = subprocess.run(arguments, cwd=cwd, env=environment, input=input,
+                                            text=True, stdout=output, stderr=subprocess.STDOUT, timeout=timeout)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise WorkflowError(f'{Path(arguments[0]).name} did not complete; inspect the recorded operation before retrying.') from error
         if check and result.returncode:
             # Command arguments and child output can contain credentials.
-            raise WorkflowError(f'{Path(arguments[0]).name} exited with status {result.returncode}.')
+            detail = f' See {log_path}.' if log_path else ''
+            raise WorkflowError(f'{Path(arguments[0]).name} exited with status {result.returncode}.' + detail)
         return result
 
 

@@ -633,3 +633,22 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
     && chown -R www-data:www-data ${APP_HOME}/var ${APP_HOME}/coverage
 
 USER www-data
+
+# Complete development images used by isolated previews and the host controller.
+FROM node:22-bookworm-slim AS dev-tools
+RUN corepack enable && corepack prepare yarn@4.14.1 --activate && mkdir -p /work
+WORKDIR /work
+
+FROM dev AS dev-runtime
+USER root
+COPY --chown=www-data:www-data . ${APP_HOME}/
+USER www-data
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-scripts && \
+    composer dump-autoload --optimize --no-interaction
+
+FROM production AS dev-operator
+USER root
+COPY --from=docker:29.7.2-cli /usr/local/bin/docker /usr/local/bin/docker
+HEALTHCHECK NONE
+ENTRYPOINT ["php", "/var/www/html/bin/worker-deployment.php"]
+CMD []

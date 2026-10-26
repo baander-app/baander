@@ -22,7 +22,6 @@ def repository_context(runner: Runner, directory: Path) -> tuple[Path, str]:
 
 
 def status(store: StateStore, instance: dict) -> dict:
-    # Publish the operational subset, never the saved environment or credentials.
     return {key: instance.get(key) for key in ('id', 'hostname', 'phase', 'running_revision',
             'detected_revision', 'target_revision', 'worker_snapshot', 'readiness', 'failure')} | {
                 'updater_enabled': store.enabled(instance['id'])}

@@ -26,7 +26,7 @@ trees; they are not acceptance evidence for a new change.
 ## Local development workflow
 
 The [implementation plan](docs/plans/2026-10-26-1949-feat-local-development-workflow-plan.md)
-define a persistent development instance at `baander.test` that updates
+defines a persistent development instance at `baander.test` that updates
 automatically when master advances, with isolated worktree previews for feature
 verification. Make remains the entry point. Libraries, accounts, settings and
 source media survive ordinary updates; incompatible database changes stop without
@@ -59,6 +59,14 @@ targeting. Status omits saved credentials; a missing preview never selects the
 persistent instance. Nine focused Python tests passed, including cross-process
 locking and sanitized child environments; whitespace checks passed. Runtime setup,
 updates, worker admission, adoption and integrated qualification remain open.
+
+Runtime foundation, 2026-10-26: added isolated Compose models, shared HTTPS routing,
+inspectable host setup, daemon-visible path checks, live preview mounts and private
+writable volumes. Release preparation uses an independent master clone or a
+snapshot of worktree edits; image targets include build tools and the trusted
+worker controller. Twenty Python tests pass. Build output is retained in private
+files. Host DNS, TLS, Docker runtime and application qualification remain open;
+these configuration checks do not establish that an instance is usable.
 
 ## Playback investigation and evidence limits
 
