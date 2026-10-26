@@ -16,8 +16,12 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\MetadataSyncOrchestrator;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Support\FinalSchemaBootstrap;
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -32,6 +36,8 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 final class NewAlbumMetadataSyncTest extends KernelTestCase
 {
     private string $libraryDirectory;
+    private ?string $schema = null;
+    private string $searchPath;
 
     protected function setUp(): void
     {
@@ -39,12 +45,18 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         mkdir($this->libraryDirectory . '/Album', 0o777, true);
         file_put_contents($this->libraryDirectory . '/Album/track.flac', 'not really audio');
         self::bootKernel();
+        $this->isolateSchema();
     }
 
     protected function tearDown(): void
     {
         static::getContainer()->get(SystemSettingStoreInterface::class)->delete(MetadataSettingDefinitions::AUTO_SYNC);
         (new Filesystem())->remove($this->libraryDirectory);
+        if ($this->schema !== null) {
+            $connection = static::getContainer()->get(Connection::class);
+            $connection->executeStatement('SET search_path TO ' . $this->searchPath);
+            $connection->executeStatement('DROP SCHEMA ' . $connection->quoteIdentifier($this->schema) . ' CASCADE');
+        }
         static::ensureKernelShutdown();
         parent::tearDown();
     }
@@ -119,6 +131,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         $exitCode = $tester->execute(['library' => $library->getSlug()->toString()]);
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
 
+        static::getContainer()->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $async = static::getContainer()->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);
         $ingest = static::getContainer()->get(FilesDiscoveredHandler::class);
@@ -158,5 +171,16 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
         }
 
         return $syncs;
+    }
+
+    private function isolateSchema(): void
+    {
+        $connection = static::getContainer()->get(Connection::class);
+        $this->searchPath = (string) $connection->fetchOne('SHOW search_path');
+        $this->schema = 'scan_test_' . bin2hex(random_bytes(8));
+        $schema = $connection->quoteIdentifier($this->schema);
+        $connection->executeStatement('CREATE SCHEMA ' . $schema);
+        $connection->executeStatement('SET search_path TO ' . $schema . ', public');
+        FinalSchemaBootstrap::bootstrap($connection);
     }
 }

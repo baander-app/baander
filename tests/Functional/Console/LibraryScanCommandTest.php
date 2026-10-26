@@ -18,6 +18,7 @@ use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -30,6 +31,8 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 final class LibraryScanCommandTest extends KernelTestCase
 {
     private string $libraryDirectory;
+    private ?string $schema = null;
+    private string $searchPath;
 
     protected function setUp(): void
     {
@@ -41,6 +44,11 @@ final class LibraryScanCommandTest extends KernelTestCase
     protected function tearDown(): void
     {
         (new Filesystem())->remove($this->libraryDirectory);
+        if ($this->schema !== null) {
+            $connection = static::getContainer()->get(Connection::class);
+            $connection->executeStatement('SET search_path TO ' . $this->searchPath);
+            $connection->executeStatement('DROP SCHEMA ' . $connection->quoteIdentifier($this->schema) . ' CASCADE');
+        }
         static::ensureKernelShutdown();
         parent::tearDown();
     }
@@ -49,6 +57,7 @@ final class LibraryScanCommandTest extends KernelTestCase
     {
         $kernel = self::bootKernel();
         $container = static::getContainer();
+        $this->isolateSchema();
         $libraries = $container->get(LibraryPortInterface::class);
         $slug = 'cli-scan-' . bin2hex(random_bytes(4));
         $libraries->save(Library::create(
@@ -97,6 +106,7 @@ final class LibraryScanCommandTest extends KernelTestCase
     {
         $kernel = self::bootKernel();
         $container = static::getContainer();
+        $this->isolateSchema();
         $libraries = $container->get(LibraryPortInterface::class);
         $slug = 'cli-cancel-' . bin2hex(random_bytes(4));
         $libraries->save(Library::create(
@@ -160,5 +170,16 @@ final class LibraryScanCommandTest extends KernelTestCase
             $async->getSent(),
             static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,
         )), 'The scan stopped before its first directory.');
+    }
+
+    private function isolateSchema(): void
+    {
+        $connection = static::getContainer()->get(Connection::class);
+        $this->searchPath = (string) $connection->fetchOne('SHOW search_path');
+        $this->schema = 'scan_test_' . bin2hex(random_bytes(8));
+        $schema = $connection->quoteIdentifier($this->schema);
+        $connection->executeStatement('CREATE SCHEMA ' . $schema);
+        $connection->executeStatement('SET search_path TO ' . $schema . ', public');
+        FinalSchemaBootstrap::bootstrap($connection);
     }
 }

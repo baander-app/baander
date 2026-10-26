@@ -52,9 +52,23 @@ final class PublicationWorkflowTest extends TestCase
             self::assertArrayNotHasKey('continue-on-error', $jobs[$job]);
         }
 
-        $publication = $this->step($publisher, 'Build and push production image');
+        $build = $this->step($publisher, 'Build production image');
+        self::assertStringContainsString('--target production', $build['run']);
+        self::assertStringContainsString('--load', $build['run']);
+        self::assertArrayNotHasKey('if', $build);
+
+        $inventory = $this->step($publisher, 'Collect and verify production packaged inventory');
+        self::assertStringContainsString('scripts/collect-packaged-inventory.sh', $inventory['run']);
+        self::assertArrayNotHasKey('if', $inventory);
+        self::assertArrayNotHasKey('continue-on-error', $inventory);
+
+        $publication = $this->step($publisher, 'Push verified production image');
         self::assertSame("forgejo.ref == 'refs/heads/master'", $publication['if']);
-        self::assertStringContainsString('--push', $publication['run']);
+        self::assertStringContainsString('docker push "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}"', $publication['run']);
+        self::assertStringContainsString('docker push "$REGISTRY/$IMAGE_NAME:latest"', $publication['run']);
+        $names = array_column($publisher['steps'], 'name');
+        self::assertLessThan(array_search($inventory['name'], $names, true), array_search($build['name'], $names, true));
+        self::assertLessThan(array_search($publication['name'], $names, true), array_search($inventory['name'], $names, true));
     }
 
     public function testDspGateUsesTheExistingPinnedQualificationRecipe(): void

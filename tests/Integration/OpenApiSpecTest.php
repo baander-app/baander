@@ -472,7 +472,7 @@ final class OpenApiSpecTest extends KernelTestCase
             'GET /api/stream/{jobPublicId}/subtitles/{language}/media.m3u8',  // HLS subtitle manifest
             'GET /api/stream/{jobPublicId}/subtitles/{language}/{segment}.vtt',  // WebVTT subtitle
             'GET /api/transcode/{videoId}/master.m3u8',  // HLS manifest
-            'GET /api/transcode/{jobPublicId}/media.m3u8',  // HLS manifest
+            'GET /api/transcode/{jobPublicId}/tracks/{track}/media.m3u8',  // HLS manifest
             'GET /api/transcode/{videoId}/manifest.mpd',  // DASH manifest
             'GET /api/transcode/{jobPublicId}/init.mp4',  // CMAF init segment
             'GET /api/transcode/{jobPublicId}/seg_{index}.m4s',  // CMAF media segment
