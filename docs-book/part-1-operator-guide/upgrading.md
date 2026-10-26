@@ -10,30 +10,36 @@ lease expiry is insufficient. Resolve these through the old controller while its
 schema is still installed. Preserve the database, pending work and media; no reset
 is required or authorized by this upgrade.
 
-Version 4 manifests require the complete ordinary autoscaling profile. The new
-controller refuses version 3 manifests, including recovery actions; keep the old
-checkout, controller, manifest and credentials available to retire an existing
-version 3 pair before switching code. Confirm both units' retirement and the joint
-reservation release, then create a version 4 manifest with a fresh boot ID and the
-new image. Retire through the old controller explicitly; lease expiry or a stopped
-container is insufficient. Preserve the database, pending work and media. This
-manifest change requires no data reset and provides no compatibility path.
+Version 5 manifests require `sourceMountPolicy` and the complete ordinary
+autoscaling profile. The new controller refuses earlier manifest versions, including
+recovery actions. Keep the old checkout, controller, manifest and credentials to
+retire an existing pair before switching code. Confirm both units' retirement and
+the joint reservation release, then create a version 5 manifest with a fresh boot
+ID, the new image and `sourceMountPolicy: production` for the named-volume recipe.
+Lease expiry or a stopped container is insufficient. Preserve the database, pending
+work and media. This manifest change requires no data reset and provides no
+compatibility path.
+
+Use the `dc` function and private environment file defined in
+[Getting Started](getting-started.md#1-prepare-configuration-and-the-browser-address).
+The development Make lifecycle commands target isolated development instances;
+they do not operate this source installation.
 
 Then run these commands in order:
 
 ```bash
 git pull
-make build
-make start
-make composer-install
-make migrate
+dc build
+dc up -d
+dc exec app composer install --optimize-autoloader
+dc exec app php bin/console doctrine:migrations:migrate --no-interaction
 ```
 
 1. **`git pull`** fetches the latest code.
-2. **`make build`** rebuilds the Docker images if the Dockerfile or installed packages changed.
-3. **`make start`** recreates containers with the new images.
-4. **`make composer-install`** updates PHP dependencies inside the app container.
-5. **`make migrate`** runs pending database migrations.
+2. **`dc build`** rebuilds the Docker images if the Dockerfile or installed packages changed.
+3. **`dc up -d`** recreates containers with the new images.
+4. **`dc exec app composer install --optimize-autoloader`** updates PHP dependencies inside the app container.
+5. **`dc exec app php bin/console doctrine:migrations:migrate --no-interaction`** runs pending database migrations.
 
 These commands update the web/dependency stack. The separately admitted worker
 uses an immutable image and boot identity. Before changing its image or storage
@@ -68,9 +74,10 @@ for the contract and retry behavior.
 
 ## Database Migrations
 
-`make migrate` runs all pending migrations on both the main database and the test database. Always run it after pulling new code, even if you do not expect schema changes -- migrations may contain data transformations or index additions that are not obvious from the file list alone.
-
-If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
+`dc exec app php bin/console doctrine:migrations:migrate --no-interaction` runs
+pending migrations on the configured main database. Run it after pulling new code:
+migrations may contain data transformations or index additions. Test databases
+belong to the separate disposable test coordinator.
 
 Fresh databases start with the transactional migration `Version20261017000000`,
 then apply forward migrations through `Version20261018130000`. The initial
@@ -81,7 +88,7 @@ session/request control receipts; `Version20261017170000` scopes video jobs to
 playback owners without rewriting the initial migration or existing histories.
 `Version20261018130000` imports confirmed singleton retirement history and adds
 the control/execution journals and joint retirement barrier. It is irreversible.
-New deployments require a version 4 manifest with separate budgets, disjoint CPU
+New deployments require a version 5 manifest with separate budgets, disjoint CPU
 sets, a private IPC volume and a complete autoscaling profile; earlier manifest
 versions are refused. Every profile field is fingerprinted in both recipes, so
 changing thresholds or concurrency also requires retirement and a fresh boot.
@@ -121,39 +128,38 @@ specific target and a separate manual operation outside Doctrine migrations.
    the processes that can write to the approved target.
 3. **Recreate only the approved database manually.** Preserve its database creation
    settings. Leave other databases, PostgreSQL volumes, Redis, registry storage
-   and media files untouched. Do not use `make drop-migrate`: it drops both the
-   main and test databases.
+   and media files untouched. Do not use a reset helper that targets more than the approved database.
 4. **Initialize and verify.** Run Doctrine migrations against that empty target,
    then run them again and verify there is no pending work. For the configured
-   main database alone, use `make migrate-no-test` on both runs.
+   main database alone, use `dc exec app php bin/console doctrine:migrations:migrate --no-interaction` on both runs.
 5. **Restore service state.** Restart the services recorded in step 2 and complete
    the [initial setup](getting-started.md#5-initialize-the-main-database-and-authentication) required by the empty
    application database.
 
 ## When to Rebuild Docker Images
 
-`make build` is necessary when any of the following have changed:
+`dc build` is necessary when any of the following have changed:
 
 - The `Dockerfile` or `.dockerignore`
 - PHP extensions (added or removed in the Dockerfile)
 - System packages in the Dockerfile (e.g., `apt-get install`)
 - The base image tag
 
-`make build` uses Docker layer caching, so it is safe to run on every update. It only rebuilds layers that have actually changed.
+`dc build` uses Docker layer caching, so it is safe to run on every update. It only rebuilds layers that have actually changed.
 
 ## Docker Compose Changes
 
-When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), a simple `make restart` is not enough -- Docker Compose needs to recreate the affected containers from scratch.
+When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), a simple `dc restart` is not enough -- Docker Compose needs to recreate the affected containers from scratch.
 
 ```bash
-make down && make start
+dc down && dc up -d
 ```
 
 This stops all containers, removes their network configuration, and starts them fresh with the updated compose file.
 
 ## Stopping and Restarting the Web Server
 
-An update that replaces the app container stops the web server in it, and so do `make stop`, `make restart`, `docker stop` and `docker compose restart app`. Docker sends `SIGTERM` to `app:serve`, and the server drains: it finishes what it can, tells clients to come back, and exits on its own. `SIGINT`, `swoole:server:stop` and `DELETE /api/server` on the internal API server start the same drain. A second stop request during a drain changes nothing, and a worker reload (`PATCH /api/server`) never starts one.
+An update that replaces the app container stops the web server in it, and so do `dc stop`, `dc restart`, `docker stop` and `docker compose restart app`. Docker sends `SIGTERM` to `app:serve`, and the server drains: it finishes what it can, tells clients to come back, and exits on its own. `SIGINT`, `swoole:server:stop` and `DELETE /api/server` on the internal API server start the same drain. A second stop request during a drain changes nothing, and a worker reload (`PATCH /api/server`) never starts one.
 
 ### What the drain does
 
@@ -194,7 +200,7 @@ A token refresh that fails because the server is restarting, with a network erro
 
 ### nginx and a replaced app container
 
-The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container, for example after `make build` and `make start`, can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
+The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container, for example after `dc build` and `dc up -d`, can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
 
 ```bash
 docker exec baander-nginx nginx -s reload
@@ -211,14 +217,14 @@ To check your proxy, copy a stream request from the browser's network tab as a c
 FFmpeg is installed via apt inside the app image (the static-build step is currently disabled). To pick up a new FFmpeg version, rebuild the app image:
 
 ```bash
-make build-clean
-make start
+dc build --no-cache
+dc up -d
 ```
 
 Verify the version after rebuilding:
 
 ```bash
-make exec cmd="ffmpeg -version"
+dc exec app ffmpeg -version
 ```
 
 ## Version Compatibility
@@ -240,9 +246,9 @@ To revert to a previous version:
 2. Rebuild and restart:
 
    ```bash
-   make build
-   make start
-   make composer-install
+   dc build
+   dc up -d
+   dc exec app composer install --optimize-autoloader
    ```
 
 Changing the code does not revert the database schema. The initial migration is

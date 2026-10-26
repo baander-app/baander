@@ -83,3 +83,15 @@ under `.agents/`.
   artifacts (requirement, acceptance-example or decision ids such as `R5`, `AE4`,
   `KTD2`, roadmap item numbers, plan file paths). State the behaviour in plain
   words. Plan ids belong in plans, the roadmap, commit messages and reports.
+
+## Local development instances
+
+Use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
+for host setup and lifecycle. Agent work uses `make preview-up` and the isolated
+URL from `make preview-url`; pass that URL explicitly as `E2E_BASE_URL` for browser
+checks. The `.test` instance names are an explicit exception to the `baander.app`
+fixture rule for this local application browser workflow. Generic Make commands
+target this worktree's preview. Use
+`INSTANCE=persistent` only when work explicitly targets the persistent instance.
+Agent branches must not change its checkout. Refresh workers with `make preview-up`
+after worker code changes. Lifecycle commands retain data; no reset is implied.

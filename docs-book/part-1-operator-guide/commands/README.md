@@ -16,11 +16,11 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The version 4 recipe admits a fixed pair
+locally available immutable image ID. The version 5 recipe admits a fixed pair
 of control and execution containers,
 with separate resource ceilings and disjoint CPU sets. It requires explicitly
-authorized shared media volumes and a private named IPC volume; devices and bind
-mounts are refused.
+authorized shared media volumes and a private named IPC volume. Devices are
+refused; the production source policy also refuses bind mounts.
 
 Build the worker target locally before selecting its immutable image ID:
 
@@ -28,12 +28,13 @@ Build the worker target locally before selecting its immutable image ID:
 docker buildx build --target worker --load -t baander-worker:local .
 ```
 
-The manifest is a JSON object of at most 8192 bytes. Version 4 requires exactly
+The manifest is a JSON object of at most 8192 bytes. Version 5 requires exactly
 these fields, with JSON integers for version and resource values:
 
 ```json
 {
-  "version": 4,
+  "version": 5,
+  "sourceMountPolicy": "production",
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
   "daemonId": "replace-with-docker-info-ID",
@@ -150,6 +151,12 @@ the worker from creating its private boot directory. Read the image's runtime
 identity rather than assuming a numeric UID/GID. Runtime creates boot directories
 with mode `0700` and the native socket with mode `0600`.
 
+`sourceMountPolicy` is required. Use `production` for the named-volume recipe
+shown here. `local-development` also admits canonical, read-only host bind sources
+for the development dispatcher. Bind sources must be visible to the Docker daemon
+and readable under the host's SELinux policy; admission does not relabel paths.
+Derived storage remains named-volume storage under either policy.
+
 Source volumes are read-only in worker; derived volumes are writable. The
 declarations must cover `/var/www/html/storage`,
 `/var/www/html/var/transcode_state` and the configured `CONVERT_STORAGE_PATH`.
@@ -162,7 +169,7 @@ Copy existing media into these volumes explicitly; the development Compose bind
 mounts do not provide this shared topology. Do not reset or replace existing media.
 
 Mount targets cannot overlap or replace code, secrets, operating-system paths or
-worker-private paths. Bind mounts, devices, extra mounts and source volumes
+worker-private paths. Production bind mounts, devices, extra mounts and source volumes
 aliased as writable derived storage are refused. Creation/start/recovery checks
 verify declared names, concrete local-volume mountpoints and access modes. A
 changed recipe requires a fresh admitted deployment.

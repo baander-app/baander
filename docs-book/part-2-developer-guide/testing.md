@@ -1647,7 +1647,9 @@ ignored local `phpunit.xml` or runs the whole functional suite. The Makefile's
 `phpunit`, `paratest`, and `ci` test steps use the same coordinator and tracked
 configuration. `PHPUNIT_OPTIONS` and `PARATEST_OPTIONS` forward test selections;
 use `BAANDER_TEST_PROCESSES` to choose the worker count. Direct `make exec` commands
-require a separately configured development test environment:
+select this worktree's preview and require a separately configured development
+test environment. Prefer the disposable coordinator for database-backed tests;
+these commands do not provision a test database or select the persistent instance:
 
 ```bash
 # Run all tests
@@ -2360,7 +2362,20 @@ yarn test:watch        # Watch mode
 yarn test:coverage     # With coverage
 ```
 
-See the [Frontend Development](frontend-development.md) page for more details.
+For application browser tests, start this worktree's isolated preview and supply
+its URL explicitly:
+
+```bash
+make preview-up
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
+```
+
+The runner does not provision an app or fall back to `baander.test`. Preview source
+media is read-only and writable state is isolated; workers use the snapshot from
+`make preview-up`. The local `.test` preview names are the explicit exception to
+the `baander.app` fixture rule for this application browser workflow. Scripted
+browser-auth and DSP suites retain their own disposable servers.
+See [Frontend Development](frontend-development.md) for more details.
 
 The Electron app has its own Node test suite, run with Node 26:
 

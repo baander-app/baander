@@ -32,7 +32,8 @@ verification. Make remains the entry point. Libraries, accounts, settings and
 source media survive ordinary updates; incompatible database changes stop without
 an automatic reset.
 
-The implementation plan is defined; delivery remains open.
+The controller and command workflow are implemented; integrated runtime acceptance
+remains open.
 Acceptance covers first and repeat startup, automatic updates and concurrent
 merges, failed updates, database incompatibility, preview isolation, and stopping
 and resuming each environment. The plan's acceptance examples define those cases.
@@ -83,6 +84,53 @@ and isolated restore/rehearsal helpers. The CI image passed 50 focused tests wit
 The disposable PostgreSQL drill verified history refusals, dump/restore, PGroonga
 search, sequence preservation and corrupt archive refusal. Complete adoption and
 update orchestration still require integrated qualification.
+
+Automatic updates and recovery, 2026-10-26 (U5): added the independent systemd
+user controller, serialized revision updates, bounded source-download retries,
+maintenance routing, worker retirement and explicit recovery. Stopping retains
+unresolved mutation evidence. Recovery restores recorded dependencies and retains
+confirmed migration hashes; it does not retry uncertain pending migrations.
+Redis confirms persistence inside its recorded mount and stops before its archive
+is captured. Ordinary updates retain the recorded PostgreSQL and Redis images.
+Adoption verifies existing application secrets before saving configuration and preserves separate transcode
+mounts. All nine final-review findings and both follow-up findings were applied.
+
+Preview and command workflow, 2026-10-26 (U6): added preview HTTPS/HMR origins,
+explicit browser targets, current-source static checks and Make command targeting.
+Quoted command arguments reach the selected container without host evaluation.
+Private controller state stays outside worktrees and media mounts. The tools,
+development runtime and operator image builds passed; the frontend build passed
+with 2,919 modules, and focused ESLint passed. Browser integration remains open.
+
+Verification checkpoint, 2026-10-26: Python discovered 187 tests; 181 passed and
+six opt-in Docker cases were skipped in that run. The separate generated-worker
+Docker run passed all 11 cases, including the real parser, both recipes and status
+from private host-owned files. The final PHP environment checks passed 40 tests
+with 62 assertions; focused PHPStan passed. A real isolated identity probe verified
+secret matching and refusal without changing its source configuration. The actual
+checkpoint and rehearsal helpers applied a pending migration on a disposable
+restore and passed a second migration run, leaving source history unchanged.
+The drill also verified PGroonga, sequence state, six writable archives, private
+keys, archive-integrity refusal and Redis AOF recovery with unchanged absolute
+expiry times.
+
+The full backend gate ran 10,754 tests with 117,102 assertions and remained
+nonpassing: five failures reproduced on starting revision `5ca62e5f`; four errors
+passed isolated reruns, but their full-suite causes remain undiagnosed. PHPStan
+passed with valid disposable OAuth keys. Deptrac passed with zero violations,
+warnings or errors and 484 skipped violations. These results do not claim a green
+full backend gate.
+
+Guidance and qualification (U7) remain partly delivered. The developer guide,
+operator guidance and agent instructions now share the Make workflow. CI invokes
+component safety drills; this does not implement or prove the complete AE1–AE9
+runtime scenario. Host qualification exits 78 because mkcert is missing; a separate
+read probe found SELinux denial of default container bind access. No host trust,
+DNS configuration, updater or existing user deployment was changed. Full startup,
+unattended timer-to-browser updates, simultaneous previews, queued ingestion and
+original/transcoded playback remain unqualified. Resolve the host prerequisites,
+then finish the disposable integrated acceptance harness and its runtime checks
+before marking this plan complete.
 
 ## Playback investigation and evidence limits
 

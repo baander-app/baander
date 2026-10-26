@@ -410,7 +410,7 @@ A controller version switch happens only after successful activation and cannot 
 
 ## Verification Contract
 
-Use the testing guide's CI image as the authority for PHP, native and worker checks. New scripts below are planned additions, not commands that exist today.
+Use the testing guide's CI image as the authority for PHP, native and worker checks. The scripts below exist; the execution checkpoint distinguishes component checks from incomplete integrated qualification.
 Run expensive/shared-state drills serially and use disposable Git remotes, databases, media copies and instance state roots.
 
 | Gate | Applies to | Evidence required |
@@ -441,3 +441,18 @@ If host qualification cannot run in CI, keep it as an explicit local acceptance 
 - The canonical guide and agent instructions agree, and ROADMAP records delivered scope, counts, static gates and remaining limitations.
 - Remove abandoned approaches, singleton startup paths superseded by the new workflow, generated secrets and temporary qualification artifacts from the deliverable.
 - Complete phase-boundary simplification and independent code review, apply justified findings, and leave shipping to the user's explicit instruction.
+
+
+## Execution checkpoint — 2026-10-26
+
+Implementation is present on `feat/local-development-workflow`; delivery remains
+incomplete. U1–U6 have component verification, with runtime limits recorded in
+[ROADMAP.md](../../ROADMAP.md#local-development-workflow). U7 supplies guidance,
+component CI drills and a read-only host prerequisite check. Its complete disposable
+AE1–AE9 harness and public-origin runtime proof remain open.
+
+The host check stops because mkcert is missing. Default container bind access is
+also denied by SELinux. No existing user instance or host trust was changed.
+The full backend run remains nonpassing, with baseline failures and isolated rerun
+results recorded in the roadmap. No acceptance example is marked complete solely
+from generated configuration, mocked activation tests or source review.

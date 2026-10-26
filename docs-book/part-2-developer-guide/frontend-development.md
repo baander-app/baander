@@ -96,10 +96,14 @@ utilities or copying current deviations from the design contract.
 ## Dev Server
 
 ```bash
-cd ui/web && yarn dev
+make preview-up
+make preview-url
 ```
 
-Starts Vite on `http://localhost:5174` with HMR. The `vite-plugin-symfony` plugin proxies API requests to the Symfony backend running in Docker.
+The preview runs Vite with HMR behind its HTTPS hostname. Edit `ui/web/` in this
+worktree and open the URL returned by `make preview-url`. Follow the one-time host
+setup in [Development Environment](development-environment.md) first. The preview's
+web source is live; its immutable worker snapshot refreshes on `make preview-up`.
 
 ## Build
 
@@ -211,8 +215,14 @@ cd ui/web && yarn test:coverage  # With coverage report
 Global test setup is in `tests/setup.ts`. This file runs before every test suite and configures matchers and mocks.
 
 Playwright uses `tests/e2e/playwright.config.ts`. Set `E2E_BASE_URL` to an
-explicitly routed disposable app before running `yarn e2e:headless`; the script
-does not provision the app. Follow the test-domain and isolation requirements in
+isolated preview before running `yarn e2e:headless`:
+
+```bash
+make preview-up
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
+```
+
+The script does not provision the app. Follow the test-domain and isolation requirements in
 [AGENTS.md](../../AGENTS.md). Browser tests are separate from the CI web step's
 lint, Vitest, build, and build-verification checks.
 

@@ -219,6 +219,12 @@ jobs:
                       -m unittest discover -s scripts/tests -p test_retain_build_evidence.py
                     bash scripts/test-worker-operator-cleanup.sh
 
+            -   name: Development instance safety and source admission
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                      bash scripts/test-dev-environment-container.sh
+
             -   name: Backend stack isolation
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \

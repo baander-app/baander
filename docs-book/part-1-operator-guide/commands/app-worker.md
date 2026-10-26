@@ -6,7 +6,7 @@ coordination. Execution runs resident ordinary `async` consumers, one separate
 `scheduler` consumer and the native execution daemon.
 Native probes, encoders, CPU helpers and scheduled console children run in
 execution. The host `bin/worker-deployment.php` supplies the options from a version
-4 manifest; see [Worker deployment](README.md#worker-deployment).
+5 manifest; see [Worker deployment](README.md#worker-deployment).
 
 ## Quick start
 
@@ -35,7 +35,7 @@ php bin/console app:worker --no-interaction --deployment=worker.baander.app --bo
 | `--memory-mib` | — | Required unit ceiling: at least 2944 MiB for control or `4160 + 320 * (maximumConcurrency - 1)` MiB plus the scheduled console reservation for execution |
 | `--pids-limit` | — | Required unit PID capacity: at least 129 for control or `256 + maximumConcurrency - 1` for execution; at most 4096 |
 | `--scheduled-console-mib` | `0` | Execution reservation for one synchronous scheduled console child; `0` disables it, otherwise at least 320 MiB; control requires `0` |
-| `--autoscaling-profile` | — | Required complete JSON profile from the version 4 manifest; all fields bind both unit recipes |
+| `--autoscaling-profile` | — | Required complete JSON profile from the version 5 manifest; all fields bind both unit recipes |
 | `--lock-dir` | `/tmp/baander-worker-locks` | Private unit lock directory |
 | `--ipc-dir` | `/run/baander-worker` | Private IPC directory shared by the pair |
 

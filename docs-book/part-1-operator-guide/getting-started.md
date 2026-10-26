@@ -29,7 +29,7 @@ FFmpeg, Node and Corepack are supplied by the app image. The web frontend select
 its Yarn version from the repository's `packageManager` field.
 
 Read [Worker deployment](commands/README.md#worker-deployment) before provisioning
-storage or choosing host resources. Its version-4 procedure is authoritative for
+storage or choosing host resources. Its version-5 procedure is authoritative for
 the worker manifest, credentials, volume ownership and admission checks.
 
 ## Installation
@@ -280,7 +280,7 @@ proxy trust setting.
 
 Follow [Worker deployment](commands/README.md#worker-deployment) to build the worker
 image, prepare its private IPC volume and credentials, and create and start the
-version-4 deployment from the host. Use the network and media volumes prepared above;
+version-5 deployment from the host. Use the network and media volumes prepared above;
 the host and worker database URLs must reach the same migrated database. Supply the
 same application secret and Redis credentials through the worker credentials file.
 Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`.

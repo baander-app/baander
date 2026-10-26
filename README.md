@@ -139,6 +139,13 @@ The backend uses PHP, Symfony and Swoole; the web client uses React and TypeScri
 The HTTP API connects the web interface to library management, catalog queries,
 playback and account services.
 
+For local development, complete the one-time DNS and certificate setup in the
+[development environment guide](docs-book/part-2-developer-guide/development-environment.md),
+then use `make dev-up`, `make dev-down`, `make dev-status`, `make preview-up` and
+`make preview-down`. The persistent `baander.test` instance follows remote `master`;
+a preview runs the current worktree with separate writable state. Host runtime
+qualification remains pending; the guide records the prerequisites and known blockers.
+
 Start with the [developer guide](docs-book/part-2-developer-guide/README.md) for the
 architecture and API references, then use the [development environment guide](docs-book/part-2-developer-guide/development-environment.md)
 and [frontend guide](docs-book/part-2-developer-guide/frontend-development.md) for
