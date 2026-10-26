@@ -80,7 +80,7 @@ What the app actually does is hand-rolled `StyleSheet.create` across 61 files, w
 
 **Outside this work's scope**
 
-- `ui/android` — the second RN app, which also carries unused NativeWind — is not touched.
+- `ui/android` — the second RN app, which carried unused NativeWind — was outside this plan's scope. It was removed at the user's request on 2026-10-26.
 - Runtime/user-toggleable theming (dark/light) — tokens stay static and dark-only.
 - Animated styles — the factory produces static style maps; existing `Animated.Value` and reanimated usages are unchanged.
 - Adopting an external styling library (unistyles, CSS-in-JS) — rejected in favor of a local factory.
@@ -89,7 +89,7 @@ What the app actually does is hand-rolled `StyleSheet.create` across 61 files, w
 
 **Deferred for later**
 
-- Hoisting the factory and theme into `@baander/shared` for both RN apps (built extraction-ready now; lift when `ui/android` adopts).
+- Hoisting the factory and theme into `@baander/shared` for both RN apps was deferred pending adoption by `ui/android`. That app was removed on 2026-10-26, so extraction for it is no longer planned; the factory remains extraction-ready.
 - Aligning `src/shared/theme` with the `ui/design-tokens` build pipeline and repairing `DESIGN.md` drift (see Outstanding Questions).
 
 ### Dependencies / Assumptions

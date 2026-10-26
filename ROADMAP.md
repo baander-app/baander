@@ -139,9 +139,11 @@ when checking that deployment decision.
 
 ## Deferred scope
 
-React Native and Android remain deferred at the user's request (2026-10-05).
-Resume their feature, API and tooling reconciliation only when the user resumes
-that work. Historical mobile failures do not select a task or a new CI lane.
+React Native work, including the Android and Android TV targets in `ui/rn`,
+remains deferred at the user's request (2026-10-05). The separate `ui/android`
+application was removed at the user's request on 2026-10-26. Resume feature, API
+and tooling reconciliation for `ui/rn` only when the user resumes that work.
+Historical mobile failures do not select a task or a new CI lane.
 
 ## Completed work and evidence
 
@@ -156,7 +158,7 @@ Implemented plans remain recoverable at
 `ef388275de15f5d63af5a7bb1a056ccf20183841`. List them with
 `git ls-tree --name-only ef388275de15f5d63af5a7bb1a056ccf20183841 docs/plans/`,
 then read one with `git show ef388275de15f5d63af5a7bb1a056ccf20183841:<path>`.
-The six remaining plans contain unfinished or partly superseded commitments;
+The six plans retained by that cleanup contain unfinished or partly superseded commitments;
 their retention does not resume deferred work or validate historical assumptions.
 
 The entries below preserve the installation guides' linked checkpoint and a
@@ -199,9 +201,24 @@ scope were preserved, and prose audits and whitespace checks passed.
 
 Plan cleanup, 2026-10-26: retired 36 delivered plans, including stale completion
 labels and this cleanup's own plan. Six unfinished or partly superseded July plans
-remain byte-identical. Repaired all five incoming references to retired plans and
+were retained byte-identical. Repaired all five incoming references to retired plans and
 retained the AAC bitrate acceptance gap. Completed history remains recoverable
 from the pinned revisions. All 36 local links in the two edited documents and
 three incoming roadmap anchors resolve; no surviving file references a deleted
 plan. Hash checks, prose audits, independent review and whitespace checks passed.
 No application code changed or application suites ran.
+
+Android app removal, 2026-10-26: removed the standalone `ui/android` application
+and its 52 tracked files, including its package manifest and lockfile. The known
+ignored Yarn install state was removed with the directory. Both frontend CI event
+filters dropped `ui/android/**`; the parsed workflow and all other workflow bytes
+are unchanged. The older styling plan now treats the removed app and its proposed
+shared-theme adoption as historical scope.
+
+Verification preserved the paths, contents and modes of all 1,394 tracked files
+in `ui/rn`, `ui/shared`, `ui/web` and `ui/electron`, including the surviving Android
+and Android TV targets. The reference audit found no active consumer of the removed
+package. All 24 local Markdown links resolve; prose, independent review and
+whitespace checks passed.
+No application tests or builds ran because surviving executable consumers and CI
+jobs were unchanged. React Native work remains deferred.
