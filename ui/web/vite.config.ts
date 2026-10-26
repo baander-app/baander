@@ -8,6 +8,14 @@ import { mkdirSync } from 'node:fs';
 
 const WORKER_SRC = resolve(__dirname, 'src/features/player/services/auth-stream-worker.ts');
 const WORKER_DEST = resolve(__dirname, '../../public/auth-stream-worker.js');
+const devOrigin = process.env.BAANDER_DEV_ORIGIN
+  ? new URL(process.env.BAANDER_DEV_ORIGIN)
+  : undefined;
+
+if (devOrigin && (devOrigin.protocol !== 'https:' || devOrigin.username || devOrigin.password
+  || devOrigin.pathname !== '/' || devOrigin.search || devOrigin.hash || devOrigin.port)) {
+  throw new Error('BAANDER_DEV_ORIGIN must be an HTTPS origin on port 443.');
+}
 
 function compileWorker() {
   mkdirSync(resolve(__dirname, '../../public'), { recursive: true });
@@ -44,6 +52,7 @@ export default defineConfig({
   plugins: [react(),
     symfonyPlugin({
       viteDevServerHostname: 'localhost',
+      originOverride: devOrigin?.origin,
     }),
     copyServiceWorker(),
   ],
@@ -66,6 +75,17 @@ export default defineConfig({
     host: '0.0.0.0',
     cors: true,
     port: 5174,
+    strictPort: true,
+    ...(devOrigin && {
+      allowedHosts: [devOrigin.hostname],
+      origin: devOrigin.origin,
+      hmr: {
+        protocol: 'wss',
+        host: devOrigin.hostname,
+        clientPort: 443,
+        path: '/__vite_hmr',
+      },
+    }),
   },
   test: {
     exclude: [...configDefaults.exclude, 'tests/e2e/**'],

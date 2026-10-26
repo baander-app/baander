@@ -1,249 +1,101 @@
-export WEB_PORT_HTTP=80
-export WEB_PORT_SSL=443
-export XDEBUG_CONFIG=main
-export XDEBUG_VERSION=3.5.0
-
-# Determine if .env file exist
-ifneq ("$(wildcard .env)","")
-	include .env
-endif
-
-HOST_UID := $(shell id -u)
-HOST_GID := $(shell id -g)
-PHP_USER := -u www-data
-INTERACTIVE := $(shell [ -t 0 ] && echo 1)
-ERROR_ONLY_FOR_HOST = @printf "\033[33mThis command for host machine\033[39m\n"
-
-ifndef INSIDE_DOCKER_CONTAINER
-	INSIDE_DOCKER_CONTAINER = 0
-endif
-
-help: ## Shows available commands with description
-	@echo "\033[34mList of available commands:\033[39m"
-	@grep -E '^[a-zA-Z-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "[32m%-27s[0m %s\n", $$1, $$2}'
-
+.DEFAULT_GOAL := help
 DEV_ENVIRONMENT := python3 scripts/dev-environment.py
+DEV_TARGET = $(if $(INSTANCE),--instance $(INSTANCE),)
+DEV_MEDIA = $(if $(MEDIA),--media "$(MEDIA)",)
+STATIC_CHECK := python3 scripts/check-backend-container.py
+STATIC_IMAGE = $(if $(BAANDER_TEST_IMAGE),--image "$(BAANDER_TEST_IMAGE)",)
+override cmd := $(value cmd)
+export cmd
+INSIDE_DOCKER_CONTAINER ?= 0
+ERROR_ONLY_FOR_HOST = @echo "Run this command on the host."
 
-dev-status: ## Show the persistent development instance and updater state
+help: ## List available commands
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "%-25s %s\n", $$1, $$2}' Makefile
+
+dev-host-setup: ## Write one-time DNS/trust instructions; OPTIONS=--install-trust installs certificates
+	@$(DEV_ENVIRONMENT) host-setup $(OPTIONS)
+
+dev-up: ## Start or resume baander.test and enable automatic master updates
+	@$(DEV_ENVIRONMENT) up --instance persistent $(DEV_MEDIA) $(OPTIONS)
+
+dev-down: ## Disable automatic updates and stop baander.test, retaining data
+	@$(DEV_ENVIRONMENT) down --instance persistent
+
+dev-status: ## Show persistent instance revision, readiness and update state
 	@$(DEV_ENVIRONMENT) status --instance persistent $(OPTIONS)
 
-preview-status: ## Show this worktree's preview state
+dev-update: ## Check remote master now; OPTIONS=--retry retries a failed build
+	@$(DEV_ENVIRONMENT) update --instance persistent $(OPTIONS)
+
+dev-recover: ## Reconcile a blocked attempt after database history has been checked
+	@$(DEV_ENVIRONMENT) recover --instance persistent
+
+preview-up: ## Start this worktree's preview and refresh its worker snapshot
+	@$(DEV_ENVIRONMENT) up $(DEV_MEDIA) $(OPTIONS)
+
+preview-down: ## Stop this worktree's preview, retaining its data
+	@$(DEV_ENVIRONMENT) down
+
+preview-status: ## Show this worktree's preview and worker snapshot
 	@$(DEV_ENVIRONMENT) status $(OPTIONS)
 
-COMPOSE_BUILD_ARGS = HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) GITHUB_TOKEN=$(GITHUB_TOKEN) REDIS_PASSWORD=$(REDIS_PASSWORD)
+preview-url: ## Print the ready isolated URL for browser verification
+	@$(DEV_ENVIRONMENT) url
 
-build: build-dev ## Build dev environment (alias)
+build build-dev build-clean build-all start: preview-up
+stop down: preview-down
+restart restart-app: ## Refresh this preview; INSTANCE=persistent targets baander.test explicitly
+	@$(DEV_ENVIRONMENT) restart $(DEV_TARGET)
 
-build-dev: ## Build dev environment
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@$(COMPOSE_BUILD_ARGS) docker compose --progress=plain -f docker-compose.yml build
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
+ssh: ## Open a shell in this preview (INSTANCE=persistent selects baander.test)
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) -- bash
 
-build-prod: ## Build production image
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@$(COMPOSE_BUILD_ARGS) docker compose --progress=plain -f docker-compose.yml build --target production
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
+ssh-root: ## Open a root shell in the selected instance
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --user root -- bash
 
-build-clean: ## Build dev environment without cache
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@$(COMPOSE_BUILD_ARGS) docker compose --progress=plain -f docker-compose.yml build --no-cache
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
+ssh-nginx: ## Open a shell in the selected instance frontend
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --service nginx -- /bin/sh
 
-# build-ffmpeg: disabled — using apt ffmpeg for now
-# cd docker/ffmpeg && docker build --progress=plain --tag martinjuul/ffmpeg-baander-static:latest .
-
-build-all: build-clean ## Build full dev environment
-
-start: ## Start dev environment
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose -f docker-compose.yml up -d
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-stop: ## Stop dev environment containers
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) docker compose -f docker-compose.yml stop
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-down: ## Stop and remove dev environment containers, networks
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose -f docker-compose.yml down
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-restart: stop start ## Stop and start dev environment
-
-env-dev: ## Creates config for dev environment
-	@make exec cmd="cp ./.env.example ./.env"
-
-restart-app: ## Restart app container
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose restart app
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-ssh: ## Get bash inside app container
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose exec $(OPTION_T) $(PHP_USER) app bash
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-ssh-root: ## Get bash as root user inside app container
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose  exec $(OPTION_T) app bash
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-ssh-nginx: ## Get bash inside nginx docker container
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose  exec nginx /bin/sh
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-exec:
+exec: ## Run cmd in this preview; INSTANCE=persistent is required for baander.test
 ifeq ($(INSIDE_DOCKER_CONTAINER), 1)
-	@$$cmd
+	@python3 -c 'import os, shlex; command = shlex.split(os.environ["cmd"]); os.execvp(command[0], command)'
 else
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose exec $(OPTION_T) $(PHP_USER) app $$cmd
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --command-env cmd
 endif
 
 exec-bash:
 ifeq ($(INSIDE_DOCKER_CONTAINER), 1)
-	@bash -c "$(cmd)"
+	@bash -c "$$cmd"
 else
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose  exec $(OPTION_T) $(PHP_USER) app bash -c "$(cmd)"
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --shell-command-env cmd
 endif
 
 exec-by-root:
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@HOST_UID=$(HOST_UID) HOST_GID=$(HOST_GID) WEB_PORT_HTTP=$(WEB_PORT_HTTP) WEB_PORT_SSL=$(WEB_PORT_SSL) XDEBUG_CONFIG=$(XDEBUG_CONFIG) XDEBUG_VERSION=$(XDEBUG_VERSION) REDIS_PASSWORD=$(REDIS_PASSWORD) docker compose  exec $(OPTION_T) app $$cmd
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
+	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --user root --command-env cmd
 
-composer-install-no-dev: ## Installs composer no-dev dependencies
-	@make exec-bash cmd="COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-dev"
+logs: ## Follow logs for the selected instance
+	@$(DEV_ENVIRONMENT) logs $(DEV_TARGET) --follow
 
-composer-install: ## Installs composer dependencies
-	@make exec-bash cmd="COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader"
+logs-nginx: ## Follow frontend logs for the selected instance
+	@$(DEV_ENVIRONMENT) logs $(DEV_TARGET) --service nginx --follow
 
-composer-update: ## Updates composer dependencies
-	@make exec-bash cmd="COMPOSER_MEMORY_LIMIT=-1 composer update"
+migrate migrate-dev migrate-no-test: ## Migrate the selected preview database
+	@$(MAKE) exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
 
-key-generate: ## (Legacy) APP_SECRET is managed in .env — no console command needed
-	@echo "APP_SECRET is configured in .env. No generate command needed for Symfony."
+composer-install:
+	@$(MAKE) exec cmd="composer install --optimize-autoloader"
 
-info: ## Shows PHP and Symfony version
-	@make exec cmd="php --version"
-	@make exec cmd="php bin/console about"
-	@make exec cmd="composer --version"
+composer-install-no-dev:
+	@$(MAKE) exec cmd="composer install --optimize-autoloader --no-dev"
 
-config-check: ## Validate application configuration
-	@make exec cmd="php bin/console app:config:validate"
+composer-update:
+	@$(MAKE) exec cmd="composer update"
 
-logs: ## Shows logs from the app container. Use ctrl+c in order to exit
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs -f baander-app
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
+info:
+	@$(MAKE) exec cmd="php bin/console about"
 
-logs-nginx: ## Shows logs from the nginx container. Use ctrl+c in order to exit
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs -f baander-nginx
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-HL := ./hl
-
-hl-logs: ## Show app container logs piped through hl (highlighted JSON/logfmt)
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs --since 1h baander-app 2>&1 | $(HL) -s -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-f: ## Follow app container logs piped through hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs -f baander-app 2>&1 | $(HL) -F -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-nginx: ## Show nginx container logs piped through hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs --since 1h baander-nginx 2>&1 | $(HL) -s -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-nginx-f: ## Follow nginx container logs piped through hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs -f baander-nginx 2>&1 | $(HL) -F -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-all: ## Show logs from all containers piped through hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker compose logs --since 1h 2>&1 | $(HL) -s -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-all-f: ## Follow logs from all containers piped through hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker compose logs -f 2>&1 | $(HL) -F -L
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-error: ## Show only error-level app logs via hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs --since 1h baander-app 2>&1 | $(HL) -s -L -l error
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-hl-logs-warn: ## Show warnings and above from app logs via hl
-ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
-	@docker logs --since 1h baander-app 2>&1 | $(HL) -s -L -l warning
-else
-	$(ERROR_ONLY_FOR_HOST)
-endif
-
-drop-migrate: ## Drops databases and runs all migrations for the main/test databases
-	@make exec cmd="php bin/console doctrine:database:drop --force"
-	@make exec cmd="php bin/console doctrine:database:create"
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
-	@make exec cmd="php bin/console doctrine:database:drop --force --env=test"
-	@make exec cmd="php bin/console doctrine:database:create --env=test"
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction --env=test"
-
-migrate-no-test: ## Runs all migrations for main database
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
-
-migrate: ## Runs all migrations for main/test databases
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction --env=test"
-
-migrate-dev: ## Runs all migrations for main database only
-	@make exec cmd="php bin/console doctrine:migrations:migrate --no-interaction"
+config-check:
+	@$(MAKE) exec cmd="php bin/console app:config:validate"
 
 phpunit: ## Runs isolated backend tests with coverage
 	@bash scripts/test-backend-container.sh $(PHPUNIT_OPTIONS) --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
@@ -252,7 +104,7 @@ paratest: ## Runs isolated backend tests with ParaTest
 	@bash scripts/test-backend-container.sh $(PARATEST_OPTIONS)
 
 phpstan: ## Runs PHPStan static analysis
-	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G $(PHPSTAN_OPTIONS)"
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- php ./vendor/bin/phpstan analyse --memory-limit=1G $(PHPSTAN_OPTIONS)
 
 phpstan-baseline: ## Generates PHPStan baseline for existing errors
 	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G --generate-baseline phpstan-baseline.neon"
@@ -275,21 +127,12 @@ source-docs:
 docs: ## Generate documentation site from source code and docs-book/
 	@make exec-bash cmd="php bin/console app:generate-docs"
 
-ci: ## Run full CI pipeline (lint, static analysis, architecture, tests)
-	@echo "\033[34m[ci] composer validate\033[39m"
-	@make exec cmd="composer validate --no-check-version"
-	@echo "\033[34m[ci] composer normalize --dry-run\033[39m"
-	@make exec cmd="composer normalize --dry-run"
-	@echo "\033[34m[ci] phpstan\033[39m"
-	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress"
-	@echo "\033[34m[ci] deptrac\033[39m"
-	@make exec cmd="vendor/bin/deptrac analyse --no-cache --no-progress"
-	@echo "\033[34m[ci] phpunit\033[39m"
+ci: ## Run static and backend checks in disposable CI containers
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer validate --no-check-version
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer normalize --dry-run
+	@$(MAKE) phpstan
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- vendor/bin/deptrac analyse --no-cache --no-progress
 	@$(MAKE) phpunit
-	@echo "\033[32m[ci] All checks passed.\033[39m"
-
-swoole-dev: ## Clear cache and start Swoole dev server (foreground)
-	@make exec-bash cmd="docker exec baander-app php bin/dev-server"
 
 # ── Profiling (reli-prof) ────────────────────────────────────────────────────
 
@@ -334,3 +177,5 @@ ifeq ($(INSIDE_DOCKER_CONTAINER), 0)
 else
 	$(ERROR_ONLY_FOR_HOST)
 endif
+
+.PHONY: help dev-host-setup dev-up dev-down dev-status dev-update dev-recover preview-up preview-down preview-status preview-url start stop down restart restart-app exec exec-bash exec-by-root ssh ssh-root ssh-nginx logs logs-nginx migrate migrate-dev migrate-no-test phpunit phpstan ci

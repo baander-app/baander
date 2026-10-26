@@ -1,3 +1,6 @@
+parameters:
+    baander.vite_default_origin: 'http://localhost:5174'
+
 pentatrion_vite:
     build_directory: '.'
-    proxy_origin: 'http://localhost:5174'
+    proxy_origin: '%env(default:baander.vite_default_origin:BAANDER_DEV_ORIGIN)%'
