@@ -1,7 +1,7 @@
 ---
 title: Keep the roadmap focused on current scope and acceptance
 date: 2026-10-26
-status: reviewed
+status: implemented
 execution: documentation
 ---
 
@@ -45,3 +45,21 @@ is recoverable at the pinned revision. Run whitespace checks and inspect the
 simplified document as a whole. No application suite is needed for this
 prose-only change. Record the delivered cleanup and actual checks in the roadmap,
 then commit locally as Martin Christiansen.
+
+## Delivery checkpoint
+
+The roadmap now has 192 lines, down from 2,433. Complementary read-only audits
+covered the complete historical document and reconciled superseded failures with
+later evidence. Review refinements preserve lease renewal explicitly, distinguish
+bounded endpoint/adaptation evidence from full-source playback and retain the
+general HDR qualification limit alongside delivered software colour checks.
+
+All 26 retained local links and three incoming references resolve. The Registry
+release block and deferred-client scope remain unchanged; application gates are
+unchanged except for removal of the completed packaging checkpoint. The pinned
+Git document matches the audit baseline byte for byte. Prose-audit deletions of
+historical numbers, inline tokens, headings and the capture-results table are
+intentional: those records remain intact at the pinned revision. The only new
+inline tokens identify that revision and its retrieval command. Whitespace and
+independent documentation review passed. No application code changed, application
+suite ran, merge occurred or remote was pushed.
