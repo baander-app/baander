@@ -59,6 +59,11 @@ synchronization and lock contention pass. PHP 8.3 rejection was checked separate
 PHP and Bash syntax, prose and whitespace checks pass. The full runner's unchanged
 Emscripten stages were not rebuilt. Workflow migration (U2–U8) remains open.
 
+Foundation simplification, 2026-10-27: five review lenses retained all proof tests
+and safety checks. Named the per-turn pipe-read bound and removed redundant build
+comments. All 48 tests and 137 assertions, focused PHPStan, and whitespace checks
+pass after the change.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

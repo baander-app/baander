@@ -13,8 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libonig-dev libssl-dev libxml2-dev libyaml-dev libzip-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP publishes SHA-256 in its release index; PECL archives are pinned to the
-# verified release downloads for Swoole and YAML.
 RUN curl -fsSL "https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz" -o /tmp/php.tar.xz \
     && echo "${PHP_SHA256}  /tmp/php.tar.xz" | sha256sum -c - \
     && mkdir /tmp/php \
@@ -56,7 +54,6 @@ RUN curl -fsSL "https://pecl.php.net/get/yaml-${YAML_VERSION}.tgz" -o /tmp/yaml.
     && echo 'extension=yaml.so' > /opt/php/etc/conf.d/yaml.ini \
     && rm -rf /tmp/yaml /tmp/yaml.tgz
 
-# This target exercises the runner's PHP environment without the Emscripten build.
 FROM debian:trixie-slim AS tooling
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

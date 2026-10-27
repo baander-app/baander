@@ -12,6 +12,7 @@ final class RunningProcess
 {
     private const float TERMINATION_GRACE = 0.25;
     private const float PIPE_DRAIN_GRACE = 0.25;
+    private const int MAX_BYTES_PER_DRAIN = 262_144;
 
     /** @var resource */
     private $process;
@@ -211,8 +212,7 @@ final class RunningProcess
         if (!isset($this->pipes[$descriptor])) {
             return;
         }
-        // Bound each turn so a continuously writing child cannot starve deadlines.
-        $chunk = stream_get_contents($this->pipes[$descriptor], 262_144);
+        $chunk = stream_get_contents($this->pipes[$descriptor], self::MAX_BYTES_PER_DRAIN);
         if ($chunk !== false && $chunk !== '') {
             if ($this->spec->logPath === null) {
                 if ($descriptor === 1) {
