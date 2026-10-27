@@ -171,6 +171,17 @@ Tooling PHPStan, formatting across 274 files, syntax checks across 278 changed P
 files, changed Bash syntax, prose preservation and whitespace checks pass.
 Runtime, host lifecycle and full backend acceptance remain open.
 
+Development runtime checkpoint, 2026-10-27: the disposable database drill passes,
+and all six live Docker recipe cases pass with 64 assertions and no skips.
+Worker-source qualification exposed a missing `postgres` alias on the controller's
+network. Restoring the original alias fixes database resolution; the uninstrumented
+drill then passes worker creation, outbox and scheduler effects, exact retirement
+and refusal to reuse the same boot. Both drills restore their container, network
+and volume inventories. The new command-boundary regression fails without the
+alias and passes with it: one test, five assertions. Focused formatting, PHPStan
+and independent review pass. The combined cleanup and network suite passes 38
+tests and 380 assertions. Longer runtime, host lifecycle and backend gates remain open.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

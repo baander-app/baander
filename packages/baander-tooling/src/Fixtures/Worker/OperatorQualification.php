@@ -521,6 +521,8 @@ final class OperatorQualification
             $s['runId'] . '-postgres',
             '--network',
             $s['runId'] . '-control',
+            '--network-alias',
+            'postgres',
             ...$limits,
             '--memory',
             '4g',
