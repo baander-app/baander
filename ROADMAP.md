@@ -117,6 +117,14 @@ Integrated verification remains open: the host package update interrupted the
 Python-free run, and the refreshed-image runtime drills, host lifecycle, final
 inventory checks and independent code review still need their final receipts.
 
+Integration repairs, 2026-10-27: restored the declared development dependency for
+the existing `composer normalize` gate. Normalization preserves the Symfony 8.0
+constraint range; every existing production and development lock entry remains
+unchanged. The manifest and normalization checks pass. The complete runtime fixture
+suite passes 169 tests and 678 assertions; all 272 scoped PHP files pass formatting.
+The Python-free test image now includes FFmpeg for the audio verifier, and the proxy
+test build includes the OpenSSL headers required to compile Swoole.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

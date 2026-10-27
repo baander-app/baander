@@ -1,9 +1,7 @@
 {
   "name": "martinjuul/baander",
-  "type": "project",
   "license": "Apache-2.0",
-  "minimum-stability": "dev",
-  "prefer-stable": true,
+  "type": "project",
   "require": {
     "php": ">=8.5",
     "ext-ctype": "*",
@@ -44,31 +42,31 @@
     "swoole-bundle/swoole-bundle": "@dev",
     "swoole-bundle/z-engine": "dev-8.5_fixes as 8.5.2",
     "swoole/ide-helper": "@dev",
-    "symfony/asset": "8.0.*",
-    "symfony/cache": "8.0.*",
-    "symfony/console": "8.0.*",
-    "symfony/doctrine-messenger": "8.0.*",
-    "symfony/dotenv": "8.0.*",
-    "symfony/expression-language": "8.0.*",
+    "symfony/asset": "~8.0.0",
+    "symfony/cache": "~8.0.0",
+    "symfony/console": "~8.0.0",
+    "symfony/doctrine-messenger": "~8.0.0",
+    "symfony/dotenv": "~8.0.0",
+    "symfony/expression-language": "~8.0.0",
     "symfony/flex": "^2.10",
-    "symfony/framework-bundle": "8.0.*",
-    "symfony/http-client": "8.0.*",
-    "symfony/mailer": "8.0.*",
-    "symfony/messenger": "8.0.*",
+    "symfony/framework-bundle": "~8.0.0",
+    "symfony/http-client": "~8.0.0",
+    "symfony/mailer": "~8.0.0",
+    "symfony/messenger": "~8.0.0",
     "symfony/monolog-bundle": "^4.0.2",
-    "symfony/notifier": "8.0.*",
+    "symfony/notifier": "~8.0.0",
     "symfony/psr-http-message-bridge": "^7.4.8",
-    "symfony/rate-limiter": "8.0.*",
-    "symfony/redis-messenger": "8.0.*",
-    "symfony/runtime": "8.0.*",
-    "symfony/security-bundle": "8.0.*",
-    "symfony/serializer": "8.0.*",
-    "symfony/translation": "8.0.*",
-    "symfony/twig-bundle": "8.0.*",
-    "symfony/uid": "8.0.*",
-    "symfony/validator": "8.0.*",
-    "symfony/workflow": "8.0.*",
-    "symfony/yaml": "8.0.*",
+    "symfony/rate-limiter": "~8.0.0",
+    "symfony/redis-messenger": "~8.0.0",
+    "symfony/runtime": "~8.0.0",
+    "symfony/security-bundle": "~8.0.0",
+    "symfony/serializer": "~8.0.0",
+    "symfony/translation": "~8.0.0",
+    "symfony/twig-bundle": "~8.0.0",
+    "symfony/uid": "~8.0.0",
+    "symfony/validator": "~8.0.0",
+    "symfony/workflow": "~8.0.0",
+    "symfony/yaml": "~8.0.0",
     "tsduck/php": "@dev",
     "upscale/swoole-reflection": "dev-reflection-fix as 3.3.0",
     "web-auth/webauthn-lib": "^5.3.3"
@@ -79,44 +77,18 @@
     "brianium/paratest": "^7.22.4",
     "dama/doctrine-test-bundle": "dev-master",
     "deptrac/deptrac": "^4.6.1",
+    "ergebnis/composer-normalize": "^2.54",
     "php-cs-fixer/shim": "^3.95",
     "phpstan/phpstan": "^2.1.55",
     "phpstan/phpstan-doctrine": "^2.0.22",
     "phpstan/phpstan-symfony": "^2.0.18",
     "phpunit/phpunit": "^13.1.11",
     "reliforp/reli-prof": "^0.12.0",
-    "symfony/browser-kit": "8.0.*",
-    "symfony/phpunit-bridge": "8.0.*",
-    "symfony/stopwatch": "8.0.*",
-    "symfony/web-profiler-bundle": "8.0.*",
+    "symfony/browser-kit": "~8.0.0",
+    "symfony/phpunit-bridge": "~8.0.0",
+    "symfony/stopwatch": "~8.0.0",
+    "symfony/web-profiler-bundle": "~8.0.0",
     "zenstruck/foundry": "^2.10.1"
-  },
-  "config": {
-    "allow-plugins": {
-      "cweagans/composer-patches": true,
-      "php-http/discovery": true,
-      "symfony/flex": true,
-      "symfony/runtime": true,
-      "tbachert/spi": true
-    },
-    "bump-after-update": true,
-    "sort-packages": true,
-    "platform": {
-      "ext-swoole": "6.2.0"
-    }
-  },
-  "autoload": {
-    "psr-4": {
-      "App\\": "src/"
-    }
-  },
-  "autoload-dev": {
-    "classmap": [
-      "scripts/tests/php/"
-    ],
-    "psr-4": {
-      "App\\Tests\\": "tests/"
-    }
   },
   "replace": {
     "symfony/polyfill-ctype": "*",
@@ -130,64 +102,16 @@
     "symfony/polyfill-php83": ">=1.31.0",
     "symfony/polyfill-php84": "*"
   },
-  "scripts": {
-    "tooling:autoload": [
-      "@composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins",
-      "@composer --working-dir=relay install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins"
-    ],
-    "test:tooling": [
-      "@tooling:autoload",
-      "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --exclude-group registry-python-subject"
-    ],
-    "analyse:tooling": [
-      "@tooling:autoload",
-      "@php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G"
-    ],
-    "auto-scripts": {
-      "cache:clear": "symfony-cmd",
-      "assets:install %PUBLIC_DIR%": "symfony-cmd"
-    },
-    "post-install-cmd": [
-      "@auto-scripts"
-    ],
-    "post-update-cmd": [
-      "@auto-scripts"
-    ],
-    "deptrac": "deptrac analyse",
-    "deptrac:baseline": "deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml",
-    "deptrac:graph": "deptrac analyse --formatter=graphviz --output=deptrac-graph.dot",
-    "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
-    "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
-    "check:tooling-format": "@php vendor/bin/php-cs-fixer check --config=.php-cs-fixer.tooling.php --using-cache=no",
-    "test:registry-subjects": [
-      "@tooling:autoload",
-      "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --group registry-python-subject"
-    ]
-  },
   "conflict": {
     "symfony/symfony": "*"
-  },
-  "extra": {
-    "symfony": {
-      "allow-contrib": false,
-      "require": "8.0.*"
-    },
-    "patches": {
-      "swoole-bundle/z-engine": {
-        "PHP 8.5 ZTS init + typed properties": "patches/swoole-bundle-z-engine-php85-zts-init.patch"
-      },
-      "symfony/redis-messenger": {
-        "Keep delayed deliveries recoverable until stream insertion succeeds": "patches/symfony-redis-messenger-recoverable-delays.patch"
-      }
-    }
   },
   "repositories": [
     {
       "type": "path",
       "url": "./packages/baander-tooling",
       "options": {
-        "symlink": true,
         "reference": "config",
+        "symlink": true,
         "versions": {
           "baander/tooling": "dev-main"
         }
@@ -223,5 +147,83 @@
         "symlink": true
       }
     }
-  ]
+  ],
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "App\\Tests\\": "tests/"
+    },
+    "classmap": [
+      "scripts/tests/php/"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "cweagans/composer-patches": true,
+      "ergebnis/composer-normalize": true,
+      "php-http/discovery": true,
+      "symfony/flex": true,
+      "symfony/runtime": true,
+      "tbachert/spi": true
+    },
+    "bump-after-update": true,
+    "platform": {
+      "ext-swoole": "6.2.0"
+    },
+    "sort-packages": true
+  },
+  "extra": {
+    "patches": {
+      "swoole-bundle/z-engine": {
+        "PHP 8.5 ZTS init + typed properties": "patches/swoole-bundle-z-engine-php85-zts-init.patch"
+      },
+      "symfony/redis-messenger": {
+        "Keep delayed deliveries recoverable until stream insertion succeeds": "patches/symfony-redis-messenger-recoverable-delays.patch"
+      }
+    },
+    "symfony": {
+      "allow-contrib": false,
+      "require": "8.0.*"
+    }
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "@auto-scripts"
+    ],
+    "post-update-cmd": [
+      "@auto-scripts"
+    ],
+    "analyse:tooling": [
+      "@tooling:autoload",
+      "@php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G"
+    ],
+    "auto-scripts": {
+      "cache:clear": "symfony-cmd",
+      "assets:install %PUBLIC_DIR%": "symfony-cmd"
+    },
+    "check:tooling-format": "@php vendor/bin/php-cs-fixer check --config=.php-cs-fixer.tooling.php --using-cache=no",
+    "deptrac": "deptrac analyse",
+    "deptrac:baseline": "deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml",
+    "deptrac:graph": "deptrac analyse --formatter=graphviz --output=deptrac-graph.dot",
+    "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
+    "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
+    "test:registry-subjects": [
+      "@tooling:autoload",
+      "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --group registry-python-subject"
+    ],
+    "test:tooling": [
+      "@tooling:autoload",
+      "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --exclude-group registry-python-subject"
+    ],
+    "tooling:autoload": [
+      "@composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins",
+      "@composer --working-dir=relay install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins"
+    ]
+  }
 }
