@@ -99,6 +99,9 @@
             "ref": "3a6673f248f8fc1dd364dadfef4c5b381d1efab6"
         }
     },
+    "php-cs-fixer/shim": {
+        "version": "3.95.27"
+    },
     "php-http/discovery": {
         "version": "1.20",
         "recipe": {
