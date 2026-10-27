@@ -116,7 +116,7 @@ abstract class AuthMailTestCase extends TestCase
             }
         };
 
-        return new AfterResponseMailer($transport, $twig, $this->translator, $settings, $this->requestStack, new Logger('test', [$this->logs]), 'Baander');
+        return new AfterResponseMailer($transport, $twig, $this->translator, $settings, $this->requestStack, new Logger('test', [$this->logs]), 'Bånder');
     }
 
     /**

@@ -52,8 +52,11 @@ final class TotpControllerTest extends TestCase
         // Provisioning URI should start with otpauth://totp/
         $this->assertStringStartsWith('otpauth://totp/', $data['data']['provisioningUri']);
 
-        // URI should contain the issuer and user email
-        $this->assertStringContainsString('Baander', $data['data']['provisioningUri']);
+        $uri = $data['data']['provisioningUri'];
+        $this->assertSame('/Bånder:' . $user->getEmail(), rawurldecode((string) parse_url($uri, PHP_URL_PATH)));
+        parse_str((string) parse_url($uri, PHP_URL_QUERY), $parameters);
+        $this->assertSame('Bånder', $parameters['issuer']);
+        $this->assertSame($data['data']['secret'], $parameters['secret']);
     }
 
     // ---------------------------------------------------------------

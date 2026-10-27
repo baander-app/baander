@@ -9,7 +9,7 @@ use OTPHP\TOTP;
 final class TotpService
 {
     public function __construct(
-        private readonly string $issuer = 'Baander',
+        private readonly string $issuer = 'Bånder',
         private readonly int $window = 1,
     ) {
     }
@@ -48,7 +48,6 @@ final class TotpService
     {
         $totp = TOTP::create($secret);
         $totp->setLabel($email);
-        // issuer should be set from configuration; using a default for now
         $totp->setIssuer($this->issuer);
 
         return $totp->getProvisioningUri();

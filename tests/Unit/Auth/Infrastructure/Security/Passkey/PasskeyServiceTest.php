@@ -40,7 +40,7 @@ final class PasskeyServiceTest extends TestCase
     {
         return new PasskeyService(
             appDomain: 'localhost',
-            appName: 'Test App',
+            appName: 'Bånder',
             timeout: 60000,
             authenticatorAttachment: '',
             userVerification: 'preferred',
@@ -63,7 +63,7 @@ final class PasskeyServiceTest extends TestCase
         $this->service = $this->createService();
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
+            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
@@ -88,7 +88,7 @@ final class PasskeyServiceTest extends TestCase
     public function testStoreAndRetrieveChallengeFromCache(): void
     {
         $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
+            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
@@ -121,7 +121,7 @@ final class PasskeyServiceTest extends TestCase
 
         $service = new PasskeyService(
             appDomain: 'localhost',
-            appName: 'Test App',
+            appName: 'Bånder',
             timeout: 60000,
             authenticatorAttachment: '',
             userVerification: 'preferred',
@@ -147,7 +147,7 @@ final class PasskeyServiceTest extends TestCase
         $this->service = $this->createService();
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
+            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
@@ -202,7 +202,7 @@ final class PasskeyServiceTest extends TestCase
 
         $freshService = new PasskeyService(
             appDomain: 'localhost',
-            appName: 'Test App',
+            appName: 'Bånder',
             timeout: 60000,
             authenticatorAttachment: '',
             userVerification: 'preferred',
@@ -255,7 +255,7 @@ final class PasskeyServiceTest extends TestCase
 
         $freshService = new PasskeyService(
             appDomain: 'localhost',
-            appName: 'Test App',
+            appName: 'Bånder',
             timeout: 60000,
             authenticatorAttachment: '',
             userVerification: 'preferred',
@@ -282,7 +282,7 @@ final class PasskeyServiceTest extends TestCase
         $this->service = $this->createService();
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
-            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
+            rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Bånder', id: 'localhost'),
             user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
@@ -356,7 +356,7 @@ final class PasskeyServiceTest extends TestCase
         $this->assertNotEmpty($result['challengeKey']);
         $this->assertNotEmpty($result['options']['challenge']);
         $this->assertSame('localhost', $result['options']['rp']['id']);
-        $this->assertSame('Test App', $result['options']['rp']['name']);
+        $this->assertSame('Bånder', $result['options']['rp']['name']);
         $this->assertSame('sssssssssssssssssssss', base64_decode(strtr($result['options']['user']['id'], '-_', '+/'), true));
     }
 

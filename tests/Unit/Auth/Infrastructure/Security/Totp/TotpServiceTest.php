@@ -13,7 +13,7 @@ final class TotpServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->service = new TotpService(issuer: 'TestApp', window: 1);
+        $this->service = new TotpService();
     }
 
     public function testGenerateSecretReturnsBase32(): void
@@ -37,8 +37,10 @@ final class TotpServiceTest extends TestCase
         $uri = $this->service->getProvisioningUri($secret, 'user@baander.app');
 
         $this->assertStringStartsWith('otpauth://totp/', $uri);
-        $this->assertStringContainsString('user%40baander.app', $uri);
-        $this->assertStringContainsString('issuer=TestApp', $uri);
+        $this->assertSame('/Bånder:user@baander.app', rawurldecode((string) parse_url($uri, PHP_URL_PATH)));
+        parse_str((string) parse_url($uri, PHP_URL_QUERY), $parameters);
+        $this->assertSame('Bånder', $parameters['issuer']);
+        $this->assertSame($secret, $parameters['secret']);
     }
 
     public function testVerifyCodeAcceptsValidWindow(): void

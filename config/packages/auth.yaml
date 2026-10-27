@@ -113,7 +113,7 @@ parameters:
     # --- TOTP (Two-Factor Authentication) ---
 
     # Issuer name displayed in authenticator apps.
-    auth.totp.issuer: 'Baander'
+    auth.totp.issuer: '%app.name%'
 
     # Number of 30-second periods to allow for clock skew (0 = exact match only).
     auth.totp.window: 1

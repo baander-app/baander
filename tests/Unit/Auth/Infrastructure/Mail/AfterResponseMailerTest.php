@@ -64,7 +64,7 @@ final class AfterResponseMailerTest extends AuthMailTestCase
         $this->mailer()->send($this->email());
 
         self::assertCount(1, $this->sent);
-        self::assertSame('Reset your Baander password', $this->sent[0]->getSubject());
+        self::assertSame('Reset your Bånder password', $this->sent[0]->getSubject());
         self::assertTrue($this->logs->hasWarningThatContains('Email language could not be resolved; sending in English.'));
         $this->assertLogsHoldNeither(self::TOKEN, 'alice@baander.app');
     }

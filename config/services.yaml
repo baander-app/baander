@@ -6,7 +6,7 @@ imports:
 parameters:
     env(WEBHOOK_LAN_ALLOWLIST): ''
     app.domain: '%env(APP_DOMAIN)%'
-    app.name: '%env(APP_NAME)%'
+    app.name: 'Bånder'
     swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
     app.swoole.dbal.ping_interval: 10
     app.swoole.dbal.check_active_transactions: true
@@ -400,6 +400,7 @@ services:
     App\Auth\Interface\Controller\Totp\TotpController:
         arguments:
             $cache: '@cache.tags'
+            $appName: '%app.name%'
 
     App\Auth\Interface\Controller\OAuth\JwksController:
         arguments:

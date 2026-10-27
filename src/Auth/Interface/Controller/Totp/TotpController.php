@@ -35,6 +35,7 @@ final class TotpController
         private readonly TotpVerifierInterface $totpVerifier,
         private readonly CacheInterface $cache,
         private readonly MessageBusInterface $commandBus,
+        private readonly string $appName,
     ) {
     }
 
@@ -49,7 +50,7 @@ final class TotpController
                     properties: [
                         new OA\Property(property: 'data', properties: [
                             new OA\Property(property: 'secret', type: 'string', example: 'JBSWY3DPEHPK3PXP'),
-                            new OA\Property(property: 'provisioningUri', type: 'string', example: 'otpauth://totp/Baander:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Baander'),
+                            new OA\Property(property: 'provisioningUri', type: 'string', example: 'otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder'),
                         ], type: 'object'),
                     ],
                     type: 'object',
@@ -208,10 +209,10 @@ final class TotpController
     {
         return sprintf(
             'otpauth://totp/%s:%s?secret=%s&issuer=%s',
-            rawurlencode('Baander'),
+            rawurlencode($this->appName),
             rawurlencode($email),
             $secret,
-            rawurlencode('Baander'),
+            rawurlencode($this->appName),
         );
     }
 }

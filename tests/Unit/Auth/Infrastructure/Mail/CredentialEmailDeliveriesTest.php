@@ -19,7 +19,7 @@ final class CredentialEmailDeliveriesTest extends AuthMailTestCase
 
         self::assertCount(1, $this->sent);
         $email = $this->sent[0];
-        self::assertSame('Reset your Baander password', $email->getSubject());
+        self::assertSame('Reset your Bånder password', $email->getSubject());
         $link = 'https://baander.app/reset-password#token=' . self::TOKEN;
         self::assertStringContainsString($link, (string) $email->getTextBody());
         self::assertStringContainsString('href="' . $link . '"', (string) $email->getHtmlBody());
@@ -35,7 +35,7 @@ final class CredentialEmailDeliveriesTest extends AuthMailTestCase
         self::assertCount(1, $this->sent);
         $email = $this->sent[0];
         self::assertSame('alice@baander.app', $email->getTo()[0]->getAddress());
-        self::assertSame('Verify your email address for Baander', $email->getSubject());
+        self::assertSame('Verify your email address for Bånder', $email->getSubject());
         $link = 'https://baander.app/verify-email#token=' . self::TOKEN;
         self::assertStringContainsString($link, (string) $email->getTextBody());
         self::assertStringContainsString('href="' . $link . '"', (string) $email->getHtmlBody());
@@ -59,9 +59,9 @@ final class CredentialEmailDeliveriesTest extends AuthMailTestCase
         $mailer->onKernelTerminate($this->terminate($request));
 
         self::assertCount(2, $this->sent);
-        self::assertSame('Nulstil din adgangskode til Baander', $this->sent[0]->getSubject());
+        self::assertSame('Nulstil din adgangskode til Bånder', $this->sent[0]->getSubject());
         self::assertStringContainsString('udløber om 1 minut.', (string) $this->sent[0]->getTextBody());
-        self::assertSame('Bekræft din e-mailadresse til Baander', $this->sent[1]->getSubject());
+        self::assertSame('Bekræft din e-mailadresse til Bånder', $this->sent[1]->getSubject());
         self::assertStringContainsString('udløber om 1 time.', (string) $this->sent[1]->getTextBody());
         self::assertStringContainsString('<html lang="da">', (string) $this->sent[1]->getHtmlBody());
         self::assertSame('en', $this->translator->getLocale(), 'The shared translator keeps its locale.');
@@ -75,7 +75,7 @@ final class CredentialEmailDeliveriesTest extends AuthMailTestCase
         (new MailerEmailVerificationDelivery($this->mailer(), 'https://baander.app'))
             ->deliver($user, self::TOKEN, new \DateTimeImmutable('+24 hours'));
 
-        self::assertSame('ยืนยันที่อยู่อีเมลของคุณสำหรับ Baander', $this->sent[0]->getSubject());
+        self::assertSame('ยืนยันที่อยู่อีเมลของคุณสำหรับ Bånder', $this->sent[0]->getSubject());
         self::assertStringContainsString('24 ชั่วโมง', (string) $this->sent[0]->getTextBody());
         self::assertStringContainsString('<html lang="th">', (string) $this->sent[0]->getHtmlBody());
     }

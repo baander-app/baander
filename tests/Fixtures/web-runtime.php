@@ -38,7 +38,7 @@ const MAIL_USER = 'web-runtime-dansk@baander.app';
 const STREAM_USER = 'web-runtime-admin@baander.app';
 // The administrators the script creates: an admin and a super-admin.
 const ADMINS = ['web-runtime-admin@baander.app', 'web-runtime-super-admin@baander.app'];
-// translations/auth+intl-icu.da.yaml, password_reset_email.subject, with APP_NAME as {app}.
+// translations/auth+intl-icu.da.yaml, password_reset_email.subject, with Bånder as {app}.
 const DANISH_RESET_SUBJECT = 'Nulstil din adgangskode til Bånder';
 const SAFARI_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
 
