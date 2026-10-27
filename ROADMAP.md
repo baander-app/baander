@@ -23,6 +23,34 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Fixed product name
+
+The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
+defines Bånder as the fixed app display name, removes operator naming overrides,
+and aligns email, passkey, TOTP and native app labels while preserving technical
+identifiers and credential data. The three implementation units are complete.
+
+Planning checkpoint, 2026-10-27: five requirements and three implementation units
+specify the affected files, dependencies and verification scenarios. Source paths
+and plan structure were checked; the new integration test is explicitly planned.
+All six document-review lenses returned no findings. Prose and whitespace checks
+passed. No application tests or builds ran.
+
+Delivery checkpoint, 2026-10-27: the CI-image backend selection passed 46 tests
+and 234 assertions: 36 unit tests, three production-configuration cases and seven
+TOTP controller cases. Missing, empty and conflicting naming variables were first
+shown to fail against the old wiring, then passed with fixed branding. The final
+three-case configuration run also verified fixed sender names through the mail
+listeners while preserving the configured sender address. PHPStan
+reported no errors; Deptrac reported zero violations, warnings or errors, with 484
+existing baseline skips. Native JSON, YAML, plist and storyboard checks passed and
+confirmed unchanged technical identifiers. React Native typechecking reports the
+same 278 diagnostics before and after the label edits; no new diagnostics were
+introduced. Native builds were not run, and the tvOS target remains an unverified
+starter template. Documentation prose, naming-reference and whitespace checks
+passed. Simplification and independent code review are complete with no unresolved
+findings.
+
 ## Local development workflow
 
 The [implementation plan](docs/plans/2026-10-26-1949-feat-local-development-workflow-plan.md)

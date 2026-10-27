@@ -198,9 +198,9 @@ network respectively. The controller URL and credentials file stay on the host.
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
 Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
-`REDIS_PASSWORD`, `MAILER_DSN`,
-`MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME`; without the last two, email a worker sends comes from
-`noreply@localhost`. Values cannot contain
+`REDIS_PASSWORD`, `MAILER_DSN` and `MAIL_FROM_ADDRESS`. Without `MAIL_FROM_ADDRESS`,
+email a worker sends comes from `noreply@localhost`. The sender name is always
+Bånder. Values cannot contain
 line breaks and their complete env-file is limited to 4 KiB.
 
 Worker credentials admit only canonical Redis URL forms that preserve the

@@ -250,7 +250,6 @@ APP_ENV=prod
 APP_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
 APP_URL=https://baander.app
 APP_DOMAIN=baander.app
-APP_NAME=Bånder
 DEFAULT_URI=https://baander.app
 
 DATABASE_URL="postgresql://baander:<strong_password>@database:5432/baander?serverVersion=18&charset=utf8"

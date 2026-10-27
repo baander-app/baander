@@ -6,13 +6,15 @@ Behavior that an administrator may want to change while the server runs, such as
 
 ## Application
 
+The application name is fixed as Bånder. Environment variables cannot change the
+name shown in emails, passkey prompts or TOTP enrollment.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. |
 | `APP_SECRET` | — | One cryptographic secret for Symfony security components and encrypted webhook signing secrets. Generate a unique value for each deployment; use the [offline rotation procedure](security.md#rotating-app_secret) to change it. |
 | `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation. |
 | `APP_DOMAIN` | `localhost` | Domain name displayed or used in API responses. |
-| `APP_NAME` | `Bånder` | Human-readable application name. Used in notification emails and TOTP issuer display. |
 
 ## Database
 
@@ -135,9 +137,8 @@ The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party c
 |----------|---------|-------------|
 | `MAILER_DSN` | `smtp://localhost:1025` | Mailer transport DSN. Required for email features (password reset, email verification, notifications). Use your provider's SMTP URL in production. |
 | `MAIL_FROM_ADDRESS` | `noreply@localhost` | From address for outgoing email. |
-| `MAIL_FROM_NAME` | `Bånder` | From name for outgoing email. |
 
-`config/packages/mailer.yaml` builds the `From` header of every outgoing email from `MAIL_FROM_NAME` and `MAIL_FROM_ADDRESS`. Mail servers often reject a sender address whose domain they cannot verify, so use an address at a domain your SMTP provider is allowed to send for. The test environment replaces `MAILER_DSN` with `null://null`, so tests never send real mail.
+`config/packages/mailer.yaml` builds the `From` header with the fixed name Bånder and the address from `MAIL_FROM_ADDRESS`. Mail servers often reject a sender address whose domain they cannot verify, so use an address at a domain your SMTP provider is allowed to send for. The test environment replaces `MAILER_DSN` with `null://null`, so tests never send real mail.
 
 ## External APIs
 
@@ -151,7 +152,6 @@ All API keys are optional — Baander works without them, but metadata enrichmen
 | `SPOTIFY_CLIENT_ID` | — | Spotify API client ID for album art and metadata. |
 | `SPOTIFY_CLIENT_SECRET` | — | Spotify API client secret. |
 | `TASTE_DIVE_API_KEY` | — | TasteDive API key for music recommendations. |
-| `MUSICBRAINZ_APP_NAME` | `Bånder` | Application name sent in MusicBrainz API requests (required by their terms of service). |
 | `MUSICBRAINZ_VERSION` | `1.0.0` | Application version sent in MusicBrainz API requests. |
 | `MUSICBRAINZ_CONTACT` | `noreply@localhost` | Contact email sent in MusicBrainz API requests. |
 

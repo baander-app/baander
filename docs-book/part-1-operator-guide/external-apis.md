@@ -6,7 +6,7 @@ Baander enriches your media library by querying external metadata services. No A
 
 | API | Role | Env Vars | What It Provides |
 |-----|------|----------|------------------|
-| MusicBrainz | Primary (required) | `MUSICBRAINZ_APP_NAME`, `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` | Artist names, MBIDs, release groups, recordings, tags |
+| MusicBrainz | Primary (required) | `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` | Artist names, MBIDs, release groups, recordings, tags |
 | Discogs | Fallback | `DISCOGS_TOKEN` | Release info, genres, styles, cover art URLs |
 | Last.fm | Optional | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Artist bios, similar artists, tags, top tracks |
 | Spotify | Integrated, unused | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Not currently consumed by any service |
@@ -42,7 +42,7 @@ For details on how scans are triggered and what happens to new music, see [Libra
 
 ## Configuration
 
-Set the environment variables listed above in your `.env` file or deployment configuration. MusicBrainz requires an app name, version, and contact email (these identify your Baander instance to the MusicBrainz API per their terms of service). The rest are standard API keys.
+Set the environment variables listed above in your `.env` file or deployment configuration. The MusicBrainz adapter sends a fixed application name in its User-Agent header; operators cannot rename it. The rest are standard API keys.
 
 See [Configuration](configuration.md) for the full variable reference with defaults.
 
@@ -50,7 +50,7 @@ See [Configuration](configuration.md) for the full variable reference with defau
 
 Each service requires registration on its own platform:
 
-- **MusicBrainz** -- Create an account at [musicbrainz.org](https://musicbrainz.org), then set `MUSICBRAINZ_APP_NAME` to your instance name, `MUSICBRAINZ_VERSION` to your Baander version, and `MUSICBRAINZ_CONTACT` to an email address where MusicBrainz can reach you.
+- **MusicBrainz** -- Create an account at [musicbrainz.org](https://musicbrainz.org), then set `MUSICBRAINZ_VERSION` to your Baander version, and `MUSICBRAINZ_CONTACT` to an email address where MusicBrainz can reach you.
 - **Discogs** -- Generate a personal access token at [discogs.com/settings/developers](https://www.discogs.com/settings/developers).
 - **Last.fm** -- Register an API application at [last.fm/api/account/create](https://www.last.fm/api/account/create). You will receive both an API key and a shared secret.
 - **Spotify** -- Create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard). Not needed unless a future release activates the Spotify adapter.
