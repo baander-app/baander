@@ -64,6 +64,16 @@ and safety checks. Named the per-turn pipe-read bound and removed redundant buil
 comments. All 48 tests and 137 assertions, focused PHPStan, and whitespace checks
 pass after the change.
 
+Development ownership checkpoint (U2), 2026-10-27: ported saved-state identity,
+host setup, Docker targeting, gateway ownership and controller supervision.
+Publication preserves saved JSON shapes and updater intent, including a concurrent
+disable. The combined foundation and ownership suites pass in the application CI
+image: 78 tests and 229 assertions. The new tooling runtime also passes the 30
+ownership tests and 92 assertions without Python; focused CI-image PHPStan passes.
+Existing Python characterization passed 17 tests before cutover. All supervision
+checks used disposable state and fake services. The public controller and its
+Python modules remain until the complete lifecycle switches in U3.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
