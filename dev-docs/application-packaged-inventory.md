@@ -8,8 +8,10 @@ component coverage can be compared from observations.
 
 ## Build and collect locally
 
-Use a clean checkout of the committed source, Docker with Buildx, Bash, Python 3.11 or later,
-and enough temporary disk space for an exported image and its extracted filesystem.
+Use a clean checkout of the committed source, Docker with Buildx, Bash, PHP 8.5 or later
+with Swoole, Composer, and enough temporary disk space for an exported image and its
+extracted filesystem. Install the standalone tooling dependencies with
+`composer --working-dir=scripts install --no-dev` before collecting an inventory.
 Run these commands from the repository root:
 
 ```sh

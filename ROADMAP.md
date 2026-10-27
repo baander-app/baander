@@ -162,6 +162,15 @@ regression also passes without Python, pcntl or posix: one test, eight assertion
 Formatting and PHPStan pass; focused independent review has no open findings.
 The longer worker, web and development lifecycle gates remain pending.
 
+Source audit checkpoint, 2026-10-27: only the two excluded shipped Python files
+remain, with unchanged bytes. Active workflow callers and dependency declarations
+have no unclassified Python dependency. Composer loads the tooling package from
+`packages/baander-tooling/src`; the inventory guide now names its PHP and Composer
+prerequisites. All 57 checked relative links in changed active documentation resolve.
+Tooling PHPStan, formatting across 274 files, syntax checks across 278 changed PHP
+files, changed Bash syntax, prose preservation and whitespace checks pass.
+Runtime, host lifecycle and full backend acceptance remain open.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
