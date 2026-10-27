@@ -23,6 +23,42 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## PHP-first testing and development tooling
+
+The [implementation plan](docs/plans/2026-10-27-1812-refactor-php-first-development-tooling-plan.md)
+defines complete Python removal from repository-owned testing and development
+workflows, using PHP for workflow logic and Bash for short launchers and shell
+operations. Hosts require PHP 8.5+ with Swoole. Shipped backup and operator
+implementations and third-party toolchain internals remain outside scope.
+Implementation planning and document review are complete; implementation remains open.
+
+Requirements checkpoint, 2026-10-27: all four Ready for Planning checks passed
+for 13 requirements and six acceptance examples. Independent source verification
+confirmed eight grounding claims, and a separate readiness check found no material
+issues. All three plan links and 15 source references resolve; prose preservation
+and whitespace checks passed. This checkpoint delivered requirements only;
+no application tests, static-analysis suites, builds or environment operations ran.
+
+Planning checkpoint, 2026-10-27: added eight implementation units and nine technical
+decisions, preserving all 13 requirements and six acceptance examples. The plan
+specifies standalone bootstrap, process and state ownership, execution runtimes,
+copied-controller replacement, and separate verification of excluded Python
+subjects. Confidence checks passed, and all five document-review lenses returned
+no findings. Contract preservation, local links, source references, prose and
+whitespace checks passed. No application tests, static-analysis suites, builds or
+environment operations ran.
+
+Foundation checkpoint (U1), 2026-10-27: added standalone PHP runtime checks,
+command parsing, durable state helpers and process ownership. The runner image
+now builds pinned PHP 8.5.2, Swoole 6.2.0 and YAML 2.3.0 on Debian trixie.
+All 48 tooling tests and 137 assertions pass in both the application CI image
+and the new tooling image, which contains no Python, pcntl or posix. The CI-image
+tooling PHPStan gate passes. Real child processes verify signals, deadlines,
+concurrent streams, descendant cleanup and bounded-memory logs; native directory
+synchronization and lock contention pass. PHP 8.3 rejection was checked separately.
+PHP and Bash syntax, prose and whitespace checks pass. The full runner's unchanged
+Emscripten stages were not rebuilt. Workflow migration (U2–U8) remains open.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

@@ -1,0 +1,8 @@
+parameters:
+    level: 6
+    paths:
+        - scripts/tooling
+        - scripts/tests/php
+    bootstrapFiles:
+        - vendor/autoload.php
+        - scripts/tooling/bootstrap.php

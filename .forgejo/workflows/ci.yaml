@@ -219,6 +219,13 @@ jobs:
                       -m unittest discover -s scripts/tests -p test_retain_build_evidence.py
                     bash scripts/test-worker-operator-cleanup.sh
 
+            -   name: PHP tooling regressions
+                run: |
+                    docker run --rm --network none -e XDEBUG_MODE=off "$CI_IMAGE" \
+                      php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist
+                    docker run --rm --network none -e XDEBUG_MODE=off "$CI_IMAGE" \
+                      php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G --no-progress
+
             -   name: Development instance safety and source admission
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \

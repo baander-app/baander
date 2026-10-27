@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="scripts/tests/php/bootstrap.php" colors="true" cacheDirectory="var/phpunit-tooling" failOnWarning="true" failOnRisky="true">
+    <testsuites>
+        <testsuite name="Tooling">
+            <directory suffix="Test.php">scripts/tests/php</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
