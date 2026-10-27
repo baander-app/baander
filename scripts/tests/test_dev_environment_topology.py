@@ -51,6 +51,21 @@ class TopologyTest(unittest.TestCase):
         directory = self.store._prepare('persistent')
         (directory / 'env.json').write_text(json.dumps({'APP_SECRET': 'secret', 'REDIS_PASSWORD': 'pass'}))
 
+    def test_postgres_parent_volume_is_explicit_without_moving_retained_database(self):
+        postgres = self.runtime.config(self.instance, self.release)['services']['postgres']
+        self.assertEqual('/var/lib/postgresql/data/baanderdev', postgres['environment']['PGDATA'])
+        self.assertEqual([{'type': 'volume', 'source': 'database', 'target': '/var/lib/postgresql/data'}],
+                         postgres['volumes'])
+        self.assertEqual(['/var/lib/postgresql:rw,noexec,nosuid,size=1m,mode=0755'], postgres['tmpfs'])
+        for target in ('/var/lib/postgresql', '/var/lib'):
+            with self.subTest(target=target):
+                adopted = dict(self.instance, postgres_mount_target=target,
+                               pgdata=target + '/retained-cluster')
+                postgres = self.runtime.config(adopted, self.release)['services']['postgres']
+                self.assertEqual(target + '/retained-cluster', postgres['environment']['PGDATA'])
+                self.assertNotIn('tmpfs', postgres)
+                self.assertEqual(target, postgres['volumes'][0]['target'])
+
     def test_stopping_uses_recorded_context_and_never_removes_data(self):
         instance = self.runtime.write(self.instance, self.release)
         self.runtime.down(instance)

@@ -80,6 +80,11 @@ class Runtime:
                           dict(volume('public', '/var/www/html/public'), read_only=True)],
                       'networks': {'private': {}, 'gateway': {'aliases': [project + '-frontend']}}},
         }
+        postgres_target = Path(instance.get('postgres_mount_target', '/var/lib/postgresql/data'))
+        if not Path('/var/lib/postgresql').is_relative_to(postgres_target):
+            # PostgreSQL 18 declares this parent as a volume. Cover its unused
+            # root explicitly while preserving the retained child data layout.
+            services['postgres']['tmpfs'] = ['/var/lib/postgresql:rw,noexec,nosuid,size=1m,mode=0755']
         if instance['kind'] == 'preview':
             environment.update(BAANDER_DEV_ORIGIN=origin, APP_ENV='dev', APP_DEBUG='1')
             source = Path(instance['worktree']).resolve()

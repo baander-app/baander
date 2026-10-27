@@ -175,7 +175,7 @@ cleanup() {
             case "$kind" in
                 container)
                     if [ -z "${container_ids[$name]:-}" ]; then cleanup_status=1; continue; fi
-                    cleanup_docker container rm -f "${container_ids[$name]}" >/dev/null 2>&1 || cleanup_status=1 ;;
+                    cleanup_docker container rm -f --volumes "${container_ids[$name]}" >/dev/null 2>&1 || cleanup_status=1 ;;
                 image) cleanup_docker image rm -f "$name" >/dev/null 2>&1 || cleanup_status=1 ;;
                 network|volume) cleanup_docker "$kind" rm "$name" >/dev/null 2>&1 || cleanup_status=1 ;;
             esac

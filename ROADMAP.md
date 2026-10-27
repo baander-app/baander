@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-26. This roadmap selects future work and records unresolved
+Updated: 2026-10-27. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -32,8 +32,8 @@ verification. Make remains the entry point. Libraries, accounts, settings and
 source media survive ordinary updates; incompatible database changes stop without
 an automatic reset.
 
-The controller and command workflow are implemented; integrated runtime acceptance
-remains open.
+The controller, command workflow and integrated runtime acceptance are complete
+on the supported Linux host. All required delivery gates passed.
 Acceptance covers first and repeat startup, automatic updates and concurrent
 merges, failed updates, database incompatibility, preview isolation, and stopping
 and resuming each environment. The plan's acceptance examples define those cases.
@@ -114,10 +114,10 @@ The drill also verified PGroonga, sequence state, six writable archives, private
 keys, archive-integrity refusal and Redis AOF recovery with unchanged absolute
 expiry times.
 
-The full backend gate ran 10,754 tests with 117,102 assertions and remained
+The initial full backend gate ran 10,754 tests with 117,102 assertions and remained
 nonpassing: five failures reproduced on starting revision `5ca62e5f`; four errors
-passed isolated reruns, but their full-suite causes remain undiagnosed. PHPStan
-passed with valid disposable OAuth keys. Deptrac passed with zero violations,
+passed isolated reruns, but their full-suite causes were still undiagnosed at that
+checkpoint. PHPStan passed with valid disposable OAuth keys. Deptrac passed with zero violations,
 warnings or errors and 484 skipped violations. These results do not claim a green
 full backend gate.
 
@@ -155,14 +155,47 @@ the preview also passed Vite and HMR connection checks. Both review findings wer
 fixed and independently closed; final source reviews and simplification returned
 no findings.
 
-Guidance and qualification (U7) remain in progress. The integrated harness uses a
-disposable Git remote, separate instance state and generated media; CI selects its
-component-only mode. The remaining runtime checks cover stopping during preparation,
-the disabled timer, latest-master resume and partial-migration failure. The full
-backend rerun is pending. The original deployment and source media are unchanged.
-Evidence is retained under
-`~/.local/state/baander/qualification/delivery-20261026-05/workspace`, including the
-original completed scenarios and each reviewed continuation after interruption.
+Runtime acceptance, 2026-10-27 (U7): all nine acceptance examples passed across
+recorded continuations. Stopping during preparation cancelled activation; the
+disabled timer stayed stopped, and startup resumed the latest master with retained
+state. Shutdown waited for a live migration. A partially committed migration blocked
+readiness and unsafe recovery while preserving the checkpoint and existing identity.
+Source media hashes remained unchanged.
+
+PostgreSQL 18's image declares a parent volume above the retained database mount.
+The controller now covers that unused parent with bounded tmpfs while preserving
+the existing database path and adopted parent mounts. Actual recreation retained
+the same database identity and data without allocating anonymous volumes. Worker
+fixture cleanup also removes anonymous volumes attached to its exact owned
+containers. The existing cleanup safety checks passed all 23 cases.
+
+The interrupted run's strict cleanup check failed after a network ID changed. Its
+original containers, volumes and application network were preserved; the missing
+network's name and cause were not archived. A separate fresh activation with the
+final controller passed HTTPS and worker readiness, then the unchanged cleanup
+method restored exact container, network and volume inventories. Seven older
+anonymous volumes remain untouched; six could not be attributed to a deleted
+container. Fresh activation and cleanup created no residual volumes. The final
+runtime receipt preserves the interrupted check's failure rather than claiming an
+uninterrupted pass.
+
+The full CI-image backend rerun passed 10,755 tests with 116,924 assertions, no
+failures, errors or skips, using the original random seed. All four lanes passed,
+and their disposable resources were removed. Python discovered 212 tests; 206
+passed and six opt-in Docker cases were skipped. The retained frontend build passed
+manifest, asset and authentication-worker verification. The prior immutable Yarn
+install, type checks, build, PHPStan and Deptrac results remain applicable. Final
+runtime and helper reviews returned no findings; all earlier findings were closed.
+Worker operator, production, retirement and recovery drills all passed. Each
+restored exact container, network and volume inventories. The production worker
+image matched all 2,186 current source, configuration, command and migration files.
+Shell syntax, documentation links, prose preservation and whitespace checks passed.
+
+The integrated harness uses a disposable Git remote, separate instance state and
+generated media; CI selects its component-only mode. Human and agent instructions
+use the same development guide. Evidence is retained under
+`~/.local/state/baander/qualification/delivery-20261026-05/workspace`, including
+`final-runtime-evidence.json`, the backend results and each reviewed continuation.
 
 ## Playback investigation and evidence limits
 

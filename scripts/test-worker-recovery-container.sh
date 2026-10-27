@@ -7,7 +7,7 @@ run_id="baander-recovery-$(date +%s)-$$"
 pg_id=''
 cleanup() {
     for owned_id in "$pg_id"; do
-        if [ -n "$owned_id" ]; then docker rm -f "$owned_id" >/dev/null 2>&1 || true; fi
+        if [ -n "$owned_id" ]; then docker rm -f --volumes "$owned_id" >/dev/null 2>&1 || true; fi
     done
 }
 trap cleanup EXIT

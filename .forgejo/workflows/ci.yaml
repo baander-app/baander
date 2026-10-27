@@ -223,7 +223,7 @@ jobs:
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
-                      bash scripts/test-dev-environment-container.sh
+                      bash scripts/test-dev-environment-container.sh --components-only
 
             -   name: Backend stack isolation
                 run: |

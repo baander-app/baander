@@ -40,11 +40,19 @@ first gateway startup. Host setup writes inspectable files; it does not install 
 configuration for you.
 
 The Docker daemon must see every source and state bind path. On SELinux hosts,
-grant containers read access to the selected worktree, media and state directories,
-and write access to the state directories that containers update. Configure access
-for those selected paths; do not relabel the home directory as a whole. The workflow
-does not silently relabel directories or disable SELinux. Resolve denied access
-before starting it. A remote daemon cannot read a client-only checkout path.
+prepare the selected worktree and media directories explicitly:
+
+```bash
+make dev-host-setup OPTIONS="--share-path /absolute/path/to/worktree --share-path /absolute/path/to/media"
+```
+
+This applies shared container labels to those directories and the managed runtime
+mounts. It preserves the private CA's separate label and rejects paths that would
+expose it. Root-owned generated files can require an administrator to apply the
+same `chcon -R --no-dereference -t container_file_t -l s0` command to the selected
+worktree. Do not relabel the home directory as a whole. Ordinary startup does not
+relabel user directories or disable SELinux. A remote daemon cannot read a
+client-only checkout path.
 
 ## Everyday commands
 
@@ -69,9 +77,12 @@ The persistent updater is a systemd user timer named
 controller state directories from sharing a timer. Inspect installed timers with
 `systemctl --user list-timers 'baander-development-*'`.
 It checks remote `master` every 60 seconds while enabled. Its controller and clone
-live outside worktrees. The user manager must remain available for checks to run;
+live outside worktrees. The service retains the absolute executable search paths
+from `dev-up`, including Docker credential helpers; remote access must work without
+an interactive prompt. The user manager must remain available for checks to run;
 the workflow does not enable login lingering. A stopped instance stays stopped
-until `make dev-up` enables it again.
+until `make dev-up` enables it again. If the daemon stops a ready instance, the
+enabled timer can restore its retained release and admit a fresh worker boot.
 
 Updates prepare immutable images before stopping writers. Migration checks run
 before advancing the instance, and readiness includes the worker pair. A blocked
@@ -86,6 +97,8 @@ close-write events; atomic saves and configuration changes can require
 `make restart-app` or `make preview-up`. Workers run immutable code captured by the most recent
 `make preview-up`; run that command again after worker changes. Preview PostgreSQL,
 Redis, secrets, caches and generated media are separate from the persistent instance.
+Startup creates empty mount directories in the checkout; dependencies and runtime
+contents live in the preview volumes.
 
 ```bash
 make preview-up
@@ -188,13 +201,41 @@ re-enrolling passkeys.
 
 ## Runtime qualification
 
-Implementation and automated checks do not establish that a particular host meets
-these prerequisites. The implementation session could not complete a fresh runtime
-qualification: mkcert was absent and SELinux denied default container bind reads.
-A diagnostic read with container labeling disabled isolated the latter cause; that
-is not the workflow's operating configuration. No existing persistent instance was
-changed. Full startup, automatic updating and browser/media verification on a
-qualified host remain pending.
+Run the integrated acceptance harness on a host that has completed DNS, trust and
+SELinux setup. It needs unused loopback port 443, enough Docker capacity for three
+instances, host FFmpeg/ffprobe, Python's `cryptography` package, and the web
+workspace's installed Playwright package and Chromium browser.
+
+Select a new workspace and a separate state directory outside the checkout:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci-qualified:local \
+BAANDER_TEST_POSTGRES_IMAGE=baander-database:latest \
+BAANDER_QUALIFICATION_WORKSPACE=/absolute/private/qualification/workspace \
+BAANDER_QUALIFICATION_STATE_ROOT=/absolute/private/qualification/state \
+bash scripts/test-dev-environment-container.sh
+```
+
+Select locally built CI and extension-capable PostgreSQL images for the first two
+variables. The integrated scenarios build their application releases from a
+throwaway Git remote seeded from the current committed revision. The controller
+runs from the current checkout. The harness copies the trusted leaf certificate
+and public CA from the default host state; it never copies the CA private key.
+Use `BAANDER_QUALIFICATION_HOST_STATE_ROOT` when host setup used another state root.
+
+The harness checks repeated startup, unattended master updates, build and schema
+failures, two simultaneous previews, stop/resume races, queued ingestion and
+complete original/transcoded playback. It enables audio transcoding only on its
+disposable instances. Browser checks follow UI links, use normal certificate
+verification and require the preview's HTTPS HMR connection. A successful run removes
+its owned runtime resources and retains evidence in the workspace. A failed run
+disables its timer, preserves resources and writes `failure-context.json` for
+inspection. Source media hashes and unrelated Docker inventories are checked.
+
+CI runs `bash scripts/test-dev-environment-container.sh --components-only` for
+component safety and worker source-admission checks. Those checks do not qualify
+the host or replace the integrated run. Current delivery evidence is recorded in
+[ROADMAP.md](../../ROADMAP.md#local-development-workflow).
 
 ## Agent instructions
 

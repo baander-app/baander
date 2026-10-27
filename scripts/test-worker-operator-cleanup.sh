@@ -136,7 +136,7 @@ docker_local() { "$docker_binary" "$@"; }
             assert final['calls'][0] == ['unpause', hashlib.sha256(b'fixture-redis').hexdigest()], final['calls']
         for call in final['calls']:
             if call[:3] == ['container', 'rm', '-f']:
-                assert len(call[3]) == 64 and all(c in '0123456789abcdef' for c in call[3]), call
+                assert len(call[-1]) == 64 and all(c in '0123456789abcdef' for c in call[-1]), call
         for kind in owned:
             assert 'unrelated-' + kind in final['resources'][kind], (mode, kind, 'unrelated resource removed')
         if mode in ['clean', 'absent', 'checkpoint', 'paused-clean', 'paused-error']:
