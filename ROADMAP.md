@@ -136,6 +136,32 @@ The full Python-free run exposed the same missing notices in Docker build contex
 638 tests, 2,759 assertions, one failure and seven environment-specific skips.
 The Docker exclusion is repaired; refreshed-image verification remains pending.
 
+Tooling acceptance checkpoint, 2026-10-27: the refreshed application CI image and
+the image without Python, pcntl or posix both pass 639 tests and 2,770 assertions.
+Seven cases are skipped in each: six development Docker cases await their live
+run, and the clang-19 case is covered by the separate native static qualification.
+That static gate passes all three translation units and both negative controls,
+with 371 components and seven upstream notices verified. Refreshed production
+and worker inventories both pass integrity verification: each contains 76,906
+files, 636 Debian packages, 152 Composer packages, 14 native components and 2,067
+evidence records. Redistribution remains unqualified with 5,443 review gaps; the
+additional gap concerns ownership of the retained upstream `vendor/xdg-open` file.
+The independent review's publication-contract finding is repaired, and its
+focused follow-up review reports no further findings. Runtime and host lifecycle
+qualification, the complete backend coverage run and final cleanup remain open.
+
+Runtime fixture repairs, 2026-10-27: proxy workspaces and supervisor logs now use
+private directories. The legacy worker drill restores application ownership of
+its disposable staged checkout and collects supervisor logs before cleanup,
+including cancellation and deadline paths. Docker-context, DNS, proxy,
+containment, retirement, recovery, runtime and command drills all pass; the runtime
+check observes the full 90-second stale-heartbeat window and recovery. Owned
+resources are removed. Focused checks pass 38 tests and 163 assertions, including
+a real SIGTERM regression that fails when cleanup-mode entry is removed. That
+regression also passes without Python, pcntl or posix: one test, eight assertions.
+Formatting and PHPStan pass; focused independent review has no open findings.
+The longer worker, web and development lifecycle gates remain pending.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

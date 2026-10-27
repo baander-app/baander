@@ -49,7 +49,7 @@ final class ProxyQualification
                         $container,
                         'sh',
                         '-ec',
-                        'mkdir -p /tmp/ws-proxy/repository; tar -xf /tmp/proxy.tar -C /tmp/ws-proxy/repository; rm /tmp/proxy.tar',
+                        'mkdir -m 0700 -p /tmp/ws-proxy /tmp/ws-proxy/repository; tar -xf /tmp/proxy.tar -C /tmp/ws-proxy/repository; rm /tmp/proxy.tar',
                     ],
                     timeout: 10,
                 );

@@ -151,11 +151,14 @@ final class LegacyRuntime
                     ],
                     $directory,
                 );
+                $docker->run(['exec', '--user', '0', $id . '-app', 'chown', '-R', 'www-data:www-data', $directory]);
             }
             $runtime->run(
                 [
                     ...$docker->commandPrefix(),
                     'exec',
+                    '-e',
+                    'BAANDER_TEST_ARTIFACTS=/tmp/' . $id . '-supervisor',
                     $id . '-app',
                     'php',
                     'tests/Fixtures/Worker/legacy-runtime.php',
@@ -167,6 +170,19 @@ final class LegacyRuntime
             echo file_get_contents($resources->artifacts . '/runtime.log');
             return 0;
         } finally {
+            $runtime->cleaning = true;
+            try {
+                $collected = $docker->run(
+                    ['cp', $id . '-app:/tmp/' . $id . '-supervisor', $resources->artifacts . '/supervisor'],
+                    check: false,
+                    timeout: 15,
+                );
+                if ($collected->exitCode !== 0) {
+                    fwrite(STDERR, 'Supervisor log collection failed: ' . $collected->stderr . "\n");
+                }
+            } catch (\Throwable $error) {
+                fwrite(STDERR, 'Supervisor log collection failed: ' . $error->getMessage() . "\n");
+            }
             $resources->close();
         }
     }

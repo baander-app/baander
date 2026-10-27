@@ -42,6 +42,7 @@ final class LegacySupervisor
     {
         Runtime::require($arguments === [], 'Legacy Supervisor fixture takes no arguments');
         $runtime = new Runtime($root, 300);
+        $artifacts = Runtime::artifacts($root, 'legacy-supervisor');
         $command = [PHP_BINARY, 'tests/Fixtures/messaging-runtime.php'];
         $await = static function (string $mode, int $seconds, array $values = []) use ($runtime, $command): void {
             $runtime->await(
@@ -63,7 +64,7 @@ final class LegacySupervisor
             $supervisor = $runtime->start(
                 ['supervisord', '-c', '/tmp/worker-supervisord.conf'],
                 timeout: 280,
-                logPath: '/tmp/worker-supervisord.log',
+                logPath: $artifacts . '/supervisord.log',
                 terminationGrace: 40,
             );
             $await('ready', 30);
