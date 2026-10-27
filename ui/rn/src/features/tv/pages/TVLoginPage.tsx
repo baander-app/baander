@@ -68,7 +68,7 @@ export function TVLoginPage() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Welcome to Baander</Text>
+      <Text style={styles.title}>Welcome to Bånder</Text>
       <Text style={styles.subtitle}>Enter your server details to get started</Text>
 
       {error && <Text style={styles.error}>{error}</Text>}

@@ -41,7 +41,7 @@ export function LoginPage({ onSwitchToRegister }: LoginPageProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Baander</Text>
+      <Text style={styles.title}>Bånder</Text>
 
       {!serverUrl && (
         <TextInput
