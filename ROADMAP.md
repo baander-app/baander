@@ -137,13 +137,32 @@ commits in order; an intentionally broken build left the previous release servin
 The independent delivery review returned no code findings. The repaired backend
 fixtures passed 75 focused tests with 2,421 assertions in the CI image.
 
+Restart and preview repairs, 2026-10-27 (U7): the updater checks exact owned
+container state before skipping an unchanged release. Stopped instances restore
+retained artifacts through worker retirement and fresh admission. A transient
+restoration preflight failure remains retryable. Functional readiness fluctuations
+do not replace running worker boots. Fresh previews create empty checkout mount
+points before mounting their private writable volumes; symlinks and parent-path
+escapes are refused before directory creation.
+
+Verification: all 211 Python tests completed; 205 passed and six opt-in Docker
+cases were skipped. Actual timer recovery preserved the revision, account/library
+fingerprints and source media while replacing the old worker boot. Two simultaneous
+previews passed isolated scans and retained stop/resume. Queued ingestion and exact
+original plus Opus responses reached decoder EOF at eight seconds. Both browser
+origins passed trusted HTTPS, login, UI navigation and native playback completion;
+the preview also passed Vite and HMR connection checks. Both review findings were
+fixed and independently closed; final source reviews and simplification returned
+no findings.
+
 Guidance and qualification (U7) remain in progress. The integrated harness uses a
 disposable Git remote, separate instance state and generated media; CI selects its
-component-only mode. Schema refusal, simultaneous previews, queued ingestion,
-original/transcoded browser playback, stop/resume races and partial-migration
-recovery remain pending in the current run. The full backend rerun is also pending.
-The original deployment and source media are unchanged. Evidence from this run is
-under `~/.local/state/baander/qualification/delivery-20261026-05/workspace`.
+component-only mode. The remaining runtime checks cover stopping during preparation,
+the disabled timer, latest-master resume and partial-migration failure. The full
+backend rerun is pending. The original deployment and source media are unchanged.
+Evidence is retained under
+`~/.local/state/baander/qualification/delivery-20261026-05/workspace`, including the
+original completed scenarios and each reviewed continuation after interruption.
 
 ## Playback investigation and evidence limits
 

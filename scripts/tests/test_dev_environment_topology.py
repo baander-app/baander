@@ -84,6 +84,7 @@ class TopologyTest(unittest.TestCase):
                        project='baander-preview-0123456789abcdef', hostname='p0123456789abcdef.baander.test',
                        worktree=str(Path(self.temporary.name) / 'live-worktree'))
         self.store._prepare(preview['id']).joinpath('env.json').write_text('{}')
+        Path(preview['worktree']).mkdir()
         release = dict(self.release, source=str(Path(self.temporary.name) / 'immutable-snapshot'))
         config = self.runtime.config(preview, release)
         mounts = config['services']['app']['volumes']
@@ -94,11 +95,37 @@ class TopologyTest(unittest.TestCase):
                            if mount['target'] == '/var/www/html')
         self.assertEqual(preview['worktree'], vite_source['source'])
         self.runtime.prepare(preview, release)
+        for relative in ('vendor', 'var', 'storage', 'config/secrets', 'ui/web/node_modules'):
+            self.assertTrue((Path(preview['worktree']) / relative).is_dir(), relative)
+        self.assertEqual([], list((Path(preview['worktree']) / 'ui/web/node_modules').iterdir()))
         install = next(arguments for arguments, _ in self.runner.calls if 'install' in arguments)
         self.assertIn(f'type=bind,src={preview["worktree"]},dst=/var/www/html,readonly', install)
         self.assertFalse(any(service.get('ports') for service in config['services'].values()))
         self.assertNotIn('gateway', config['services']['app']['networks'])
         self.assertIn('gateway', config['services']['nginx']['networks'])
+
+    def test_preview_mountpoints_refuse_symlinked_checkout_directories(self):
+        source = Path(self.temporary.name) / 'checkout'
+        outside = Path(self.temporary.name) / 'unrelated'
+        source.mkdir()
+        outside.mkdir()
+        (source / 'ui').symlink_to(outside, target_is_directory=True)
+        preview = dict(self.instance, kind='preview', worktree=str(source))
+        with self.assertRaisesRegex(WorkflowError, 'symlink'):
+            self.runtime.prepare(preview, self.release)
+        self.assertEqual([], list(outside.iterdir()))
+        self.assertFalse(any('run' in arguments for arguments, _ in self.runner.calls))
+
+    def test_preview_mountpoints_cannot_escape_checkout_through_parent_segments(self):
+        source = Path(self.temporary.name) / 'checkout'
+        source.mkdir()
+        environment = self.store.directory(self.instance['id']) / 'env.json'
+        environment.write_text(json.dumps({'CONVERT_STORAGE_PATH': '/var/www/html/../outside-preview'}))
+        preview = dict(self.instance, kind='preview', worktree=str(source))
+        with self.assertRaisesRegex(WorkflowError, 'parent'):
+            self.runtime.prepare(preview, self.release)
+        self.assertFalse((source.parent / 'outside-preview').exists())
+        self.assertFalse(any('run' in arguments for arguments, _ in self.runner.calls))
 
     def test_generated_volume_refresh_removes_old_files_and_preserves_identity(self):
         self.runtime.prepare(self.instance, self.release)

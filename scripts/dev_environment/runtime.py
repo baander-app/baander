@@ -166,6 +166,32 @@ class Runtime:
         atomic_json(path, self.config(instance, release))
         return dict(instance, compose_file=str(path))
 
+    def running(self, instance: dict) -> bool:
+        """Observe owned container presence without treating health as restart authority."""
+        docker = Docker(self.runner, instance['docker'])
+        docker.validate()
+        services = {'app', 'nginx', 'postgres', 'redis'}
+        if instance['kind'] == 'preview':
+            services.add('vite')
+        identifiers = docker.compose(instance, 'ps', '--all', '--quiet', *sorted(services)).stdout.split()
+        if not identifiers:
+            return False
+        containers = json.loads(docker.run('inspect', *identifiers).stdout)
+        observed = set()
+        running = True
+        for container in containers:
+            labels = container['Config']['Labels']
+            service = labels.get('com.docker.compose.service')
+            if (labels.get('com.docker.compose.project') != instance['project']
+                    or service not in services or service in observed):
+                raise WorkflowError('Runtime observation does not identify the owned service set.')
+            observed.add(service)
+            state = container['State']['Running']
+            if not isinstance(state, bool):
+                raise WorkflowError('Runtime container state was not confirmed.')
+            running = running and state
+        return observed == services and running
+
     def dependencies(self, instance: dict) -> None:
         docker = Docker(self.runner, instance['docker'])
         docker.validate()
@@ -176,6 +202,24 @@ class Runtime:
         docker = Docker(self.runner, instance['docker'])
         docker.validate()
         model = self.config(instance, release)
+        if instance['kind'] == 'preview':
+            root = Path(instance['worktree']).resolve(strict=True)
+            container_root = Path('/var/www/html')
+            targets = {Path(mount['target']).relative_to(container_root)
+                       for service in model['services'].values() for mount in service.get('volumes', [])
+                       if mount['type'] == 'volume' and Path(mount['target']).is_relative_to(container_root)}
+            # Docker cannot create nested volume mountpoints through a read-only bind.
+            # Only empty directories belong in the checkout; contents stay in volumes.
+            for target in targets:
+                if '..' in target.parts:
+                    raise WorkflowError('Preview volume mountpoints must not contain parent segments.')
+                for part in (target, *target.parents):
+                    if (root / part).is_symlink():
+                        raise WorkflowError('Preview volume mountpoint contains a symlink; use checkout directories.')
+                if (root / target).exists() and not (root / target).is_dir():
+                    raise WorkflowError('Preview volume mountpoint is not a directory.')
+            for target in targets:
+                (root / target).mkdir(parents=True, exist_ok=True)
         destinations = [('public', '/var/www/html/public'),
                         ('var', '/var/www/html/var'),
                         ('storage', '/var/www/html/storage'), ('conversions', '/storage/conversions'),

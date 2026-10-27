@@ -65,10 +65,27 @@ class ActivationSafetyTest(unittest.TestCase):
         self.updater.runtime.write.return_value = {}
         self.updater.runtime.ready.return_value = {'http_ready': True}
         self.updater.workers = Mock()
+        self.updater.runtime.running.return_value = True
+        self.updater.workers.running.return_value = True
         self.updater.gateway = Mock()
         self.updater.database.inspect = Mock(return_value={'fresh': False, 'pending': ['next']})
         self.updater.database.checkpoint = Mock(return_value={'target_revision': 'new', 'verified': False})
         self.updater.database.rehearse = Mock(return_value={'target_revision': 'new', 'verified': True})
+
+    def test_host_restart_restores_dependencies_before_inspection_and_retires_before_fresh_boot(self):
+        self.updater.database.inspect.return_value = {'fresh': False, 'pending': []}
+        self.updater.runtime.running.return_value = False
+        events = Mock()
+        for name, operation in (('dependencies', self.updater.runtime.dependencies),
+                ('inspect', self.updater.database.inspect), ('retire', self.updater.workers.retire),
+                ('prepare', self.updater.workers.prepare), ('start', self.updater.workers.start)):
+            events.attach_mock(operation, name)
+        self.updater.update('persistent')
+        names = [call[0] for call in events.mock_calls]
+        self.assertLess(names.index('dependencies'), names.index('inspect'))
+        self.assertLess(names.index('retire'), names.index('prepare'))
+        self.assertLess(names.index('prepare'), names.index('start'))
+        self.assertEqual('ready', self.store.load('persistent')['phase'])
 
     def test_incompatible_candidate_preserves_previous_runtime_and_revision(self):
         self.updater.database.inspect.side_effect = WorkflowError('incompatible history')

@@ -23,6 +23,70 @@ class UpdateIntentTest(unittest.TestCase):
         self.updater.head = Mock(return_value='new')
         self.updater.builder = Mock()
         self.updater.activate = Mock()
+        self.updater.runtime = Mock()
+        self.updater.workers = Mock()
+        self.updater.runtime.running.return_value = True
+        self.updater.workers.running.return_value = True
+
+    def test_healthy_unchanged_release_is_observed_without_build_or_activation(self):
+        self.updater.head.return_value = 'old'
+        self.updater.update('persistent', automatic=True)
+        self.updater.runtime.running.assert_called_once()
+        self.updater.workers.running.assert_called_once()
+        self.updater.runtime.ready.assert_not_called()
+        self.updater.workers.invoke.assert_not_called()
+        self.updater.builder.prepare.assert_not_called()
+        self.updater.activate.assert_not_called()
+
+    def test_transient_functional_readiness_failure_does_not_replace_running_boot(self):
+        self.updater.head.return_value = 'old'
+        self.updater.runtime.ready.side_effect = WorkflowError('transient web failure')
+        self.updater.workers.invoke.side_effect = WorkflowError('transient worker readiness')
+        self.updater.update('persistent', automatic=True)
+        self.updater.runtime.ready.assert_not_called()
+        self.updater.workers.invoke.assert_not_called()
+        self.updater.builder.prepare.assert_not_called()
+        self.updater.activate.assert_not_called()
+        self.assertEqual(self.instance, {key: value for key, value in self.store.load('persistent').items()
+                                        if key != 'detected_revision'})
+
+    def test_stopped_unchanged_release_resumes_retained_artifacts_without_rebuilding(self):
+        self.updater.head.return_value = 'old'
+        self.updater.runtime.running.return_value = False
+        self.updater.update('persistent', automatic=True)
+        self.updater.builder.prepare.assert_not_called()
+        instance, release = self.updater.activate.call_args.args
+        self.assertEqual({'revision': 'old'}, release)
+        self.assertIsNone(instance['readiness'])
+
+    def test_stale_worker_readiness_is_not_republished_after_resume_preflight_failure(self):
+        self.updater.head.return_value = 'old'
+        self.updater.workers.running.return_value = False
+        def fail(instance, release):
+            self.updater.save(instance, phase='preflight')
+            raise WorkflowError('dependency unavailable')
+        self.updater.activate.side_effect = fail
+        with self.assertRaises(WorkflowError):
+            self.updater.update('persistent', automatic=True)
+        saved = self.store.load('persistent')
+        self.assertIsNone(saved['readiness'])
+        self.assertNotEqual('ready', saved['phase'])
+        self.updater.builder.prepare.assert_not_called()
+
+    def test_transient_retained_release_preflight_failure_retries_on_next_automatic_tick(self):
+        self.updater.head.return_value = 'old'
+        self.updater.runtime.running.return_value = False
+        def fail(instance, release):
+            self.updater.save(instance, phase='preflight')
+            raise WorkflowError('dependency unavailable')
+        self.updater.activate.side_effect = fail
+        with self.assertRaises(WorkflowError):
+            self.updater.update('persistent', automatic=True)
+        self.updater.activate.side_effect = None
+        self.updater.builder.prepare.return_value = {'revision': 'old'}
+        self.updater.update('persistent', automatic=True)
+        self.assertEqual(2, self.updater.activate.call_count)
+        self.assertIsNone(self.store.load('persistent').get('failed_revision'))
 
     def test_queued_automatic_update_observes_disabled_intent(self):
         self.store.set_enabled('persistent', False)

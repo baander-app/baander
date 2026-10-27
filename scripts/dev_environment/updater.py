@@ -64,17 +64,23 @@ class Updater:
                 observation.update(failure=None, failure_stage=None)
             if any(key not in instance or instance[key] != value for key, value in observation.items()):
                 self.save(instance, **observation)
-            if detected and not retry:
-                if instance.get('running_revision') == detected and instance.get('phase') == 'ready':
-                    return
-                if instance.get('failed_revision') == detected:
-                    return
+            if detected and not retry and instance.get('failed_revision') == detected:
+                return
+            retained_release = None
+            if instance.get('phase') == 'ready' and instance.get('running_revision'):
+                if self.runtime.running(instance) and self.workers.running(instance):
+                    if detected == instance.get('running_revision') and not retry:
+                        return
+                else:
+                    self.save(instance, readiness=None)
+                    if detected == instance.get('running_revision') and not retry:
+                        retained_release = instance.get('release')
             previous_phase = instance.get('phase')
             was_ready = previous_phase == 'ready' and bool(instance.get('running_revision')) and bool(instance.get('readiness'))
             self.save(instance, phase='preparing', target_revision=detected, failure=None,
                       database_mutation_started=False, database_mutation_confirmed=False)
             try:
-                release = self.builder.prepare(instance)
+                release = retained_release if retained_release is not None else self.builder.prepare(instance)
             except SourceUnavailable:
                 instance = self.store.load(identity)
                 delay = min(300, max(60, instance.get('retry_delay', 30) * 2))
@@ -88,7 +94,7 @@ class Updater:
                 raise
             self.save(instance, target_revision=release['revision'], prepared_release=release, retry_delay=0, next_check_at=0, failure_stage=None)
             if instance['kind'] == 'persistent' and not self.store.enabled(identity):
-                self.save(instance, phase='ready' if instance.get('running_revision') else 'stopped')
+                self.save(instance, phase='ready' if was_ready else 'stopped')
                 return
             try:
                 self.activate(instance, release)
@@ -96,7 +102,8 @@ class Updater:
                 current = self.store.load(identity)
                 if current.get('phase') == 'preflight':
                     self.save(current, phase='ready' if was_ready else ('stopped' if previous_phase == 'stopped' else 'preparation_failed'),
-                              failed_revision=release['revision'], failure='Candidate preflight failed; existing data and runtime were not changed.')
+                              failed_revision=None if retained_release is not None else release['revision'],
+                              failure='Release preflight failed; existing data and runtime were not changed.')
                 elif current.get('phase') == 'checkpointing' and current.get('release'):
                     try:
                         current.update(self.runtime.write(current, current['release']))
@@ -165,10 +172,9 @@ class Updater:
             catalog = self.database.inspect(instance, release)
             self.freeze_adoption(instance)
         elif previous:
-            if instance.get('readiness') is None:
-                instance.update(self.runtime.write(instance, previous))
-                self.runtime.dependencies(instance)
-                self.gateway.start()
+            instance.update(self.runtime.write(instance, previous))
+            self.runtime.dependencies(instance)
+            self.gateway.start()
             catalog = self.database.inspect(instance, release)
             self.freeze(instance)
         else:

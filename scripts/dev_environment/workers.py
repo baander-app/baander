@@ -179,6 +179,39 @@ foreach ($documents as $name => $contents) {
         except (ValueError, KeyError, TypeError) as error:
             raise WorkflowError('Worker ' + action + ' was not confirmed; inspect status and use explicit recovery.') from error
 
+    def running(self, instance: dict) -> bool:
+        """Observe the current boot pair without probing transient functional health."""
+        record = instance.get('workers')
+        if not record:
+            return False
+        manifest = json.loads((Path(record['directory']) / 'manifest.json').read_text())
+        if manifest['namespace'] != instance['project'] or manifest['bootId'] != record['boot_id']:
+            raise WorkflowError('Worker observation identity differs from the saved manifest.')
+        docker = Docker(self.runner, instance['docker'])
+        docker.validate()
+        identifiers = docker.run('ps', '--all', '--quiet', '--no-trunc',
+            '--filter', 'label=app.baander.worker.namespace=' + manifest['namespace'],
+            '--filter', 'label=app.baander.worker.boot-id=' + manifest['bootId']).stdout.split()
+        if not identifiers:
+            return False
+        containers = json.loads(docker.run('inspect', *identifiers).stdout)
+        observed = set()
+        running = True
+        for container in containers:
+            labels = container['Config']['Labels']
+            role = labels.get('app.baander.worker.role')
+            if (labels.get('app.baander.worker.namespace') != manifest['namespace']
+                    or labels.get('app.baander.worker.boot-id') != manifest['bootId']
+                    or role not in ('control', 'execution') or role in observed
+                    or container['Image'] != manifest['imageId']):
+                raise WorkflowError('Worker observation does not identify the recorded boot pair.')
+            observed.add(role)
+            state = container['State']['Running']
+            if not isinstance(state, bool):
+                raise WorkflowError('Worker container state was not confirmed.')
+            running = running and state
+        return observed == {'control', 'execution'} and running
+
     def phase(self, instance: dict, phase: str) -> None:
         instance['workers']['phase'] = phase
         self.store.save(instance['id'], instance)
