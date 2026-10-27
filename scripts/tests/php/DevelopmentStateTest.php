@@ -176,9 +176,16 @@ final class DevelopmentStateTest extends TestCase
         $runner = new class extends Runner {
             /** @var list<non-empty-list<string>> */
             public array $seen = [];
-            public function run(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null,
-                ?float $timeout = 120, bool $check = true, ?string $logPath = null, bool $interactive = false): \Baander\Tooling\Process\ProcessResult
-            {
+            public function run(
+                array $arguments,
+                ?string $cwd = null,
+                ?array $env = null,
+                ?string $input = null,
+                ?float $timeout = 120,
+                bool $check = true,
+                ?string $logPath = null,
+                bool $interactive = false,
+            ): \Baander\Tooling\Process\ProcessResult {
                 $this->seen[] = $arguments;
                 return new \Baander\Tooling\Process\ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
             }

@@ -15,14 +15,15 @@ final class RuntimeTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function testCoreHelperUsesStandaloneBootstrap(): void
+    public function testCoreHelperUsesComposerWithoutTheApplicationKernel(): void
     {
         [$status, $output] = $this->withoutConfiguration(
             'Requirements::check(false); echo json_encode(['
-            . 'class_exists("Composer\\\\Autoload\\\\ClassLoader", false)]);',
+            . 'class_exists("Composer\\\\Autoload\\\\ClassLoader", false), '
+            . 'class_exists("App\\\\Kernel", false), class_exists("Symfony\\\\Component\\\\Dotenv\\\\Dotenv", false)]);',
         );
         self::assertSame(0, $status, $output);
-        self::assertSame('[false]', $output);
+        self::assertSame('[true,false,false]', $output);
     }
 
     public function testMissingSwooleFailsBeforeStateChange(): void
@@ -52,7 +53,7 @@ final class RuntimeTest extends TestCase
     /** @return array{int, string} */
     private function withoutConfiguration(string $body): array
     {
-        $loader = dirname(__DIR__, 2) . '/tooling/bootstrap.php';
+        $loader = dirname(__DIR__, 2) . '/bootstrap.php';
         $source = 'require ' . var_export($loader, true) . '; '
             . 'use Baander\\Tooling\\Runtime\\Requirements; '
             . $body;

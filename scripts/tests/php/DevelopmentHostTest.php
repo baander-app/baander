@@ -38,11 +38,20 @@ final class DevelopmentHostTest extends TestCase
 
     private function system(bool $selinux = false, bool $occupied = false): HostSystem
     {
-        return new class($selinux, $occupied) extends HostSystem {
+        return new class ($selinux, $occupied) extends HostSystem {
             public function __construct(private bool $selinux, private bool $occupied) {}
-            public function executable(string $name): string { return '/fake/' . $name; }
-            public function selinuxEnabled(): bool { return $this->selinux; }
-            public function resolverOwned(): bool { return true; }
+            public function executable(string $name): string
+            {
+                return '/fake/' . $name;
+            }
+            public function selinuxEnabled(): bool
+            {
+                return $this->selinux;
+            }
+            public function resolverOwned(): bool
+            {
+                return true;
+            }
             public function assertPortAvailable(): void
             {
                 if ($this->occupied) {
@@ -72,8 +81,14 @@ final class DevelopmentHostTest extends TestCase
     public function testPrivilegedPortWithoutBindPermissionIsAvailableWhenConnectionIsRefused(): void
     {
         $system = new class extends HostSystem {
-            protected function bindPort(): int { return 13; }
-            protected function connectPort(): int { return 111; }
+            protected function bindPort(): int
+            {
+                return 13;
+            }
+            protected function connectPort(): int
+            {
+                return 111;
+            }
         };
         $system->assertPortAvailable();
         $this->addToAssertionCount(1);
@@ -82,8 +97,14 @@ final class DevelopmentHostTest extends TestCase
     public function testPrivilegedPortWithExistingListenerIsRefused(): void
     {
         $system = new class extends HostSystem {
-            protected function bindPort(): int { return 13; }
-            protected function connectPort(): int { return 0; }
+            protected function bindPort(): int
+            {
+                return 13;
+            }
+            protected function connectPort(): int
+            {
+                return 0;
+            }
         };
         $this->expectExceptionMessage('occupied');
         $system->assertPortAvailable();
@@ -92,8 +113,14 @@ final class DevelopmentHostTest extends TestCase
     public function testAddressInUseIsRefusedWithoutFallbackConnection(): void
     {
         $system = new class extends HostSystem {
-            protected function bindPort(): int { return 98; }
-            protected function connectPort(): int { throw new \LogicException('Unexpected connection probe'); }
+            protected function bindPort(): int
+            {
+                return 98;
+            }
+            protected function connectPort(): int
+            {
+                throw new \LogicException('Unexpected connection probe');
+            }
         };
         $this->expectExceptionMessage('occupied');
         $system->assertPortAvailable();
@@ -221,8 +248,15 @@ final class DevelopmentHostTest extends TestCase
         } catch (WorkflowError $error) {
             self::assertStringContainsString('hostname', $error->getMessage());
         }
-        $runner = new DevCoreRunner(static fn (array $arguments): ProcessResult => new ProcessResult(0, null, false, false,
-            '[{"Labels":{"app.baander.development.owner":"foreign"},"IPAM":{"Config":[{"Subnet":"172.20.0.0/24"}]}}]', '', 0));
+        $runner = new DevCoreRunner(static fn(array $arguments): ProcessResult => new ProcessResult(
+            0,
+            null,
+            false,
+            false,
+            '[{"Labels":{"app.baander.development.owner":"foreign"},"IPAM":{"Config":[{"Subnet":"172.20.0.0/24"}]}}]',
+            '',
+            0,
+        ));
         $this->expectExceptionMessage('not owned');
         Gateway::ownedNetwork(new \Baander\Tooling\Development\Docker($runner, ['executable' => '/fake/docker', 'context' => 'selected']), 'network', 'owned');
     }

@@ -47,10 +47,26 @@ final class Environment
      */
     public static function clean(?array $source = null): array
     {
-        $allowed = ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE',
-            'SSH_AUTH_SOCK', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS',
-            'SSL_CERT_FILE', 'SSL_CERT_DIR', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
-            'http_proxy', 'https_proxy', 'no_proxy'];
+        $allowed = [
+            'PATH',
+            'HOME',
+            'USER',
+            'LOGNAME',
+            'LANG',
+            'LC_ALL',
+            'LC_CTYPE',
+            'SSH_AUTH_SOCK',
+            'XDG_RUNTIME_DIR',
+            'DBUS_SESSION_BUS_ADDRESS',
+            'SSL_CERT_FILE',
+            'SSL_CERT_DIR',
+            'HTTP_PROXY',
+            'HTTPS_PROXY',
+            'NO_PROXY',
+            'http_proxy',
+            'https_proxy',
+            'no_proxy',
+        ];
         return array_intersect_key($source ?? getenv(), array_flip($allowed));
     }
 

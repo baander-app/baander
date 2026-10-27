@@ -23,6 +23,9 @@ switch ($argv[1]) {
         echo hash('sha256', stream_get_contents(STDIN));
         break;
     case 'sleep':
+        if (isset($argv[2])) {
+            file_put_contents($argv[2], 'ready');
+        }
         usleep(30_000_000);
         break;
     case 'descendant':

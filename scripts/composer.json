@@ -1,0 +1,27 @@
+{
+  "name": "baander/development-tooling",
+  "description": "Standalone testing and development workflow tooling",
+  "type": "project",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5",
+    "baander/tooling": "dev-main"
+  },
+  "config": {
+    "allow-plugins": false,
+    "sort-packages": true
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../packages/baander-tooling",
+      "options": {
+        "symlink": true,
+        "reference": "config",
+        "versions": {
+          "baander/tooling": "dev-main"
+        }
+      }
+    }
+  ]
+}

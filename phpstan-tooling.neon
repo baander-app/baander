@@ -1,8 +1,17 @@
 parameters:
     level: 6
     paths:
-        - scripts/tooling
-        - scripts/tests/php
+        - packages/baander-tooling/src
+        - scripts
+        - relay/tests
+        - relay/tools
+        - .agents/skills/prose-fix/scripts
+    excludePaths:
+        analyseAndScan:
+            - scripts/vendor
+            - scripts/backend-test-runner.php
+            - scripts/e2e-ingest-video.php
+            - scripts/retain-build-evidence.php
+            - scripts/web-runtime
     bootstrapFiles:
         - vendor/autoload.php
-        - scripts/tooling/bootstrap.php

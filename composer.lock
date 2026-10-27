@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0e77358e93a6df2a8be5de96327b7859",
+    "content-hash": "28eb4e6bfe8215e9024554acf5d74e29",
     "packages": [
         {
             "name": "beberlei/assert",
@@ -12535,6 +12535,32 @@
             }
         },
         {
+            "name": "baander/tooling",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "./packages/baander-tooling",
+                "reference": "da740528a9201e6a3bcb18f95fac13b397ebfdb5"
+            },
+            "require": {
+                "php": ">=8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Baander\\Tooling\\": "src/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Testing and development workflow library for Baander",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "brianium/paratest",
             "version": "v7.22.4",
             "source": {
@@ -13557,6 +13583,64 @@
                 "source": "https://github.com/phar-io/version/tree/3.2.1"
             },
             "time": "2022-02-21T01:04:05+00:00"
+        },
+        {
+            "name": "php-cs-fixer/shim",
+            "version": "v3.95.27",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/PHP-CS-Fixer/shim.git",
+                "reference": "cba177ed1173161a9e46d46c7bf3cf614ce66277"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/PHP-CS-Fixer/shim/zipball/cba177ed1173161a9e46d46c7bf3cf614ce66277",
+                "reference": "cba177ed1173161a9e46d46c7bf3cf614ce66277",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-tokenizer": "*",
+                "php": "^7.4 || ^8.0"
+            },
+            "replace": {
+                "friendsofphp/php-cs-fixer": "self.version"
+            },
+            "suggest": {
+                "ext-dom": "For handling output formats in XML",
+                "ext-mbstring": "For handling non-UTF8 characters."
+            },
+            "bin": [
+                "php-cs-fixer",
+                "php-cs-fixer.phar"
+            ],
+            "type": "application",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Dariusz Rumiński",
+                    "email": "dariusz.ruminski@gmail.com"
+                }
+            ],
+            "description": "A tool to automatically fix PHP code style",
+            "support": {
+                "issues": "https://github.com/PHP-CS-Fixer/shim/issues",
+                "source": "https://github.com/PHP-CS-Fixer/shim/tree/v3.95.27"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/keradus",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-09-22T09:55:22+00:00"
         },
         {
             "name": "php-di/invoker",
@@ -16270,6 +16354,7 @@
     "minimum-stability": "dev",
     "stability-flags": {
         "baander/phpstan-rules": 20,
+        "baander/tooling": 20,
         "dama/doctrine-test-bundle": 20,
         "swoole-bundle/swoole-bundle": 20,
         "swoole-bundle/z-engine": 20,

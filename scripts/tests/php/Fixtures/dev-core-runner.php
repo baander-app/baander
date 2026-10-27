@@ -15,9 +15,16 @@ final class DevCoreRunner extends Runner
     /** @param (\Closure(non-empty-list<string>):?ProcessResult)|null $callback */
     public function __construct(private readonly ?\Closure $callback = null) {}
 
-    public function run(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null,
-        ?float $timeout = 120, bool $check = true, ?string $logPath = null, bool $interactive = false): ProcessResult
-    {
+    public function run(
+        array $arguments,
+        ?string $cwd = null,
+        ?array $env = null,
+        ?string $input = null,
+        ?float $timeout = 120,
+        bool $check = true,
+        ?string $logPath = null,
+        bool $interactive = false,
+    ): ProcessResult {
         $this->calls[] = compact('arguments', 'env', 'timeout', 'interactive');
         if ($this->callback !== null) {
             $result = ($this->callback)($arguments);

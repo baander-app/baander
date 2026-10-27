@@ -17,6 +17,8 @@ docs/html/
 /public/bundles/
 /var/
 /vendor/
+/scripts/vendor/
+/relay/vendor/
 ###< symfony/framework-bundle ###
 
 ###> symfony/phpunit-bridge ###

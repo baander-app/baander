@@ -628,6 +628,7 @@ RUN umask 077 && mkdir -p ${APP_HOME}/config/secrets/oauth \
 # Give them the same memory ceiling as the sharded runner, and leave writable
 # cache and coverage directories for the unprivileged test process.
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress \
+    && composer tooling:autoload \
     && mkdir -p ${APP_HOME}/coverage \
     && printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zzzz-baander-ci-memory.ini \
     && chown -R www-data:www-data ${APP_HOME}/var ${APP_HOME}/coverage
@@ -644,7 +645,8 @@ RUN printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zz-baander-developm
 COPY --chown=www-data:www-data . ${APP_HOME}/
 USER www-data
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress --no-scripts && \
-    composer dump-autoload --optimize --no-interaction
+    composer dump-autoload --optimize --no-interaction && \
+    composer tooling:autoload
 
 FROM production AS dev-operator
 USER root

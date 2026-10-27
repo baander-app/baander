@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require dirname(__DIR__, 3) . '/tooling/bootstrap.php';
+require dirname(__DIR__, 3) . '/bootstrap.php';
 
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;

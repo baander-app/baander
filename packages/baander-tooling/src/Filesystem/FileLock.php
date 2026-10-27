@@ -7,10 +7,9 @@ namespace Baander\Tooling\Filesystem;
 final class FileLock
 {
     /** @param resource|null $stream */
-    private function __construct(private $stream)
-    {
-    }
+    private function __construct(private $stream) {}
 
+    #[\NoDiscard]
     public static function acquire(string $path, bool $nonBlocking = true): self
     {
         PrivateDirectory::assertNoSymlinks($path);

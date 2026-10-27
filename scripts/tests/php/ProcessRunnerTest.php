@@ -15,7 +15,8 @@ final class ProcessRunnerTest extends TestCase
         $arguments = ['', 'literal space', '"quote"', '$dollar;command', "new\nline"];
         $result = new ProcessRunner()->run(new ProcessSpec(
             argv: [PHP_BINARY, __DIR__ . '/Fixtures/process-child.php', 'echo', ...$arguments],
-            cwd: '/tmp', environment: ['BAANDER_PROCESS_TEST' => 'explicit'],
+            cwd: '/tmp',
+            environment: ['BAANDER_PROCESS_TEST' => 'explicit'],
         ));
         self::assertSame(7, $result->exitCode);
         self::assertNull($result->signal);
@@ -49,7 +50,7 @@ final class ProcessRunnerTest extends TestCase
     {
         $runner = new ProcessRunner();
         $process = $runner->start(new ProcessSpec(argv: $this->child('sleep')));
-        \Swoole\Timer::after(40, static fn () => $process->cancel(2));
+        \Swoole\Timer::after(40, static fn() => $process->cancel(2));
         $result = $runner->wait($process);
         self::assertTrue($result->cancelled);
         self::assertSame(2, $result->signal);
@@ -80,6 +81,32 @@ final class ProcessRunnerTest extends TestCase
             self::assertStringContainsString('argv', file_get_contents($path));
             self::assertSame('', $result->stdout);
             self::assertSame('', $result->stderr);
+        } finally {
+            unlink($path);
+            rmdir($directory);
+        }
+    }
+
+    public function testAppendLogPreservesDiagnosticsAcrossCommands(): void
+    {
+        $directory = '/tmp/u1-process-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $path = $directory . '/process.log';
+        file_put_contents($path, "setup\n");
+        try {
+            $runner = new ProcessRunner();
+            foreach (['first', 'second'] as $marker) {
+                $result = $runner->run(new ProcessSpec(
+                    argv: [PHP_BINARY, '-r', 'echo $argv[1], "\n";', $marker],
+                    logPath: $path,
+                    appendLog: true,
+                ));
+                self::assertSame(0, $result->exitCode);
+                self::assertSame('', $result->stdout);
+                self::assertSame('', $result->stderr);
+            }
+            self::assertSame("setup\nfirst\nsecond\n", file_get_contents($path));
+            self::assertSame(0600, fileperms($path) & 0777);
         } finally {
             unlink($path);
             rmdir($directory);
@@ -140,7 +167,7 @@ final class ProcessRunnerTest extends TestCase
         self::assertSame('', $reported['result']['stderr']);
     }
 
-    public function testStandaloneRunnerLoadsNoOptionalProcessExtensionsOrVendor(): void
+    public function testStandaloneRunnerLoadsNoOptionalProcessExtensions(): void
     {
         $runner = new ProcessRunner();
         $baseline = $runner->run(new ProcessSpec(argv: [PHP_BINARY, '-n', '-r', 'echo json_encode(get_loaded_extensions());']));
@@ -232,6 +259,161 @@ final class ProcessRunnerTest extends TestCase
                 unlink($path);
             }
             rmdir($directory);
+        }
+    }
+
+    public function testWorkflowSignalsSurviveNestedWaitsAndBetweenCommandCheckpoints(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(argv: [PHP_BINARY, __DIR__ . '/Fixtures/process-runner.php', 'scope-between'], timeout: 3));
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        $reported = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(15, $reported['between']);
+        self::assertSame(15, $reported['latched']);
+        self::assertTrue($reported['result']['cancelled']);
+        self::assertSame(2, $reported['result']['signal']);
+    }
+
+    public function testCleanupCanFinishDespiteRepeatedWorkflowSignals(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(argv: [PHP_BINARY, __DIR__ . '/Fixtures/process-runner.php', 'scope-cleanup'], timeout: 3));
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        $reported = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertTrue($reported['cancelled']);
+        self::assertSame(15, $reported['latched']);
+        self::assertSame(0, $reported['result']['exitCode']);
+        self::assertFalse($reported['result']['cancelled']);
+        self::assertSame('cleaned', $reported['result']['stdout']);
+    }
+
+    public function testClosingSignalScopesRestoresOuterOwnershipAndRemovesFinalHandlers(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(argv: [PHP_BINARY, __DIR__ . '/Fixtures/process-runner.php', 'scope-close'], timeout: 3));
+        self::assertSame(15, $result->signal, $result->stderr);
+        $reported = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([2], $reported['seen']);
+        self::assertSame(0, $reported['timers']);
+    }
+
+    public function testSeparateLogsPreserveStreamIdentityAndAppendPolicy(): void
+    {
+        $directory = '/tmp/u1-process-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $stdout = $directory . '/stdout';
+        $stderr = $directory . '/stderr';
+        file_put_contents($stdout, "old stdout\n");
+        file_put_contents($stderr, "old stderr\n");
+        try {
+            $runner = new ProcessRunner();
+            foreach ([false, true] as $append) {
+                $result = $runner->run(new ProcessSpec(
+                    argv: [PHP_BINARY, '-r', 'echo "jsonl\n"; fwrite(STDERR, "diagnostic\n");'],
+                    logPath: $stdout,
+                    appendLog: $append,
+                    stderrLogPath: $stderr,
+                ));
+                self::assertSame(0, $result->exitCode);
+                self::assertSame('', $result->stdout);
+                self::assertSame('', $result->stderr);
+            }
+            self::assertSame("jsonl\njsonl\n", file_get_contents($stdout));
+            self::assertSame("diagnostic\ndiagnostic\n", file_get_contents($stderr));
+            self::assertSame(0600, fileperms($stdout) & 0777);
+            self::assertSame(0600, fileperms($stderr) & 0777);
+        } finally {
+            unlink($stdout);
+            unlink($stderr);
+            rmdir($directory);
+        }
+    }
+
+    public function testStderrCanStreamToALogWhileStdoutRemainsCaptured(): void
+    {
+        $directory = '/tmp/u1-process-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $stderr = $directory . '/stderr';
+        try {
+            $result = new ProcessRunner()->run(new ProcessSpec(
+                argv: [PHP_BINARY, '-r', 'echo "jsonl\n"; fwrite(STDERR, "diagnostic\n");'],
+                stderrLogPath: $stderr,
+            ));
+            self::assertSame(0, $result->exitCode);
+            self::assertSame("jsonl\n", $result->stdout);
+            self::assertSame('', $result->stderr);
+            self::assertSame("diagnostic\n", file_get_contents($stderr));
+        } finally {
+            unlink($stderr);
+            rmdir($directory);
+        }
+    }
+
+    public function testAliasedStreamLogsAreRejectedBeforeExistingContentIsTruncated(): void
+    {
+        $directory = '/tmp/u1-process-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $path = $directory . '/stdout';
+        file_put_contents($path, 'preserved');
+        link($path, $directory . '/hardlink');
+        symlink($path, $directory . '/symlink');
+        try {
+            foreach ([$path, $directory . '/hardlink', $directory . '/symlink'] as $stderr) {
+                try {
+                    new ProcessRunner()->run(new ProcessSpec(argv: $this->child('echo'), logPath: $path, stderrLogPath: $stderr));
+                    self::fail('Aliased stream logs must be rejected.');
+                } catch (\RuntimeException) {
+                    self::assertSame('preserved', file_get_contents($path));
+                }
+            }
+        } finally {
+            unlink($directory . '/symlink');
+            unlink($directory . '/hardlink');
+            unlink($path);
+            rmdir($directory);
+        }
+    }
+
+    public function testTerminationGraceAllowsTimeoutAndCancellationCleanupToFinish(): void
+    {
+        foreach ([true, false] as $timeout) {
+            $runner = new ProcessRunner();
+            $process = $runner->start(new ProcessSpec(
+                argv: ['bash', '-c', "trap 'sleep 0.4; printf cleaned; exit 0' TERM; while true; do sleep 0.02; done"],
+                processGroup: true,
+                timeout: $timeout ? 0.1 : null,
+                terminationGrace: 0.7,
+            ));
+            if (!$timeout) {
+                \Swoole\Timer::after(100, static fn() => $process->cancel());
+            }
+            $result = $runner->wait($process);
+            self::assertSame($timeout, $result->timedOut);
+            self::assertSame(!$timeout, $result->cancelled);
+            self::assertSame('cleaned', $result->stdout);
+            self::assertSame(0, $result->exitCode);
+            self::assertGreaterThan(0.4, $result->duration);
+            self::assertLessThan(2, $result->duration);
+        }
+    }
+
+    public function testSuccessfulGroupsDoNotWaitForTheCancellationGrace(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(
+            argv: [PHP_BINARY, '-r', 'exit(0);'],
+            processGroup: true,
+            terminationGrace: 2,
+        ));
+        self::assertSame(0, $result->exitCode);
+        self::assertLessThan(1.5, $result->duration);
+    }
+
+    public function testTerminationGraceRejectsNonFiniteAndNegativeValues(): void
+    {
+        foreach ([-0.1, INF, NAN] as $grace) {
+            try {
+                new ProcessSpec(argv: [PHP_BINARY, '-r', 'exit(0);'], terminationGrace: $grace);
+                self::fail('An invalid termination grace must be rejected.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('finite nonnegative', $error->getMessage());
+            }
         }
     }
 

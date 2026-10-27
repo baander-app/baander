@@ -74,6 +74,21 @@ Existing Python characterization passed 17 tests before cutover. All supervision
 checks used disposable state and fake services. The public controller and its
 Python modules remain until the complete lifecycle switches in U3.
 
+Tooling package and readability checkpoint, 2026-10-27: moved reusable PHP into
+`packages/baander-tooling/src` as the local `baander/tooling` Composer package.
+The application and standalone scripts projects use Composer path repositories;
+command entrypoints remain under `scripts/`. A fresh scripts-only installation
+loads the package after relocation without application dependencies. Copied
+controllers preserve the package link and execute without the source checkout.
+The PHP 8.5 pass expands compressed code and uses pipes for sequential
+transformations. Scoped PHP-CS-Fixer commands make the formatting reproducible.
+The foundation and ownership suite passes in the Python-free tooling image:
+91 tests and 297 assertions, including separate stderr logs and bounded
+cancellation grace. Focused development checks pass 160 tests and 661
+assertions, with six Docker qualification cases still pending; inventory checks
+pass 76 tests and 281 assertions. Tooling PHPStan passes. These checks do not
+complete the remaining workflow migration or integrated acceptance.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

@@ -28,13 +28,46 @@ final class DevelopmentSupervisorTest extends TestCase
         $this->previousConfig = getenv('XDG_CONFIG_HOME');
         $this->previousPath = getenv('PATH');
         putenv('XDG_CONFIG_HOME=' . $this->root . '/config');
-        mkdir($this->root . '/source/scripts/tooling', 0700, true);
+        mkdir($this->root . '/source/scripts', 0700, true);
         mkdir($this->root . '/source/docker/dev/systemd', 0700, true);
-        file_put_contents($this->root . '/source/scripts/dev-environment.php', '<?php echo "controller";');
-        file_put_contents($this->root . '/source/scripts/tooling/bootstrap.php', '<?php // isolated loader');
+        file_put_contents($this->root . '/source/scripts/dev-environment.php', <<<'PHP'
+<?php
+require __DIR__ . '/bootstrap.php';
+Baander\Tooling\Runtime\Requirements::check(false);
+if (($argv[1] ?? '') === '--probe-package') {
+    $runner = new Baander\Tooling\Process\ProcessRunner();
+    $result = $runner->run(new Baander\Tooling\Process\ProcessSpec(argv: [PHP_BINARY, '-r', 'echo "package-helper";'], processGroup: true));
+    echo json_encode(['stdout' => $result->stdout, 'exit' => $result->exitCode, 'source' => new ReflectionClass($runner)->getFileName()], JSON_THROW_ON_ERROR);
+} else {
+    echo 'controller';
+}
+PHP);
+        copy(dirname(__DIR__, 2) . '/bootstrap.php', $this->root . '/source/scripts/bootstrap.php');
+        $repository = dirname(__DIR__, 3);
+        $this->copyFixtureTree($repository . '/packages/baander-tooling', $this->root . '/source/packages/baander-tooling');
+        $this->copyFixtureTree($repository . '/scripts/vendor', $this->root . '/source/scripts/vendor');
         file_put_contents($this->root . '/source/docker/dev/private.key', 'do-not-copy');
         foreach (['baander-development.service.template', 'baander-development.timer'] as $name) {
             copy(dirname(__DIR__, 3) . '/docker/dev/systemd/' . $name, $this->root . '/source/docker/dev/systemd/' . $name);
+        }
+    }
+
+    private function copyFixtureTree(string $source, string $destination): void
+    {
+        mkdir($destination, 0700, true);
+        foreach (scandir($source) ?: [] as $name) {
+            if ($name === '.' || $name === '..') {
+                continue;
+            }
+            $from = $source . '/' . $name;
+            $to = $destination . '/' . $name;
+            if (is_link($from)) {
+                symlink('../../../packages/baander-tooling', $to);
+            } elseif (is_dir($from)) {
+                $this->copyFixtureTree($from, $to);
+            } else {
+                copy($from, $to);
+            }
         }
     }
 
@@ -75,7 +108,16 @@ final class DevelopmentSupervisorTest extends TestCase
         $controller = $this->store->root . '/controller/scripts/dev-environment.php';
         $unit = (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.service');
         self::assertFileExists($controller);
-        self::assertFileExists(dirname($controller) . '/tooling/bootstrap.php');
+        self::assertFileExists(dirname($controller) . '/bootstrap.php');
+        self::assertFileExists($this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php');
+        self::assertSame('../../../packages/baander-tooling', readlink(dirname($controller) . '/vendor/baander/tooling'));
+        rename($this->root . '/source', $this->root . '/source-offline');
+        self::assertFileExists(dirname($controller) . '/vendor/autoload.php');
+        self::assertSame('controller', new Runner()->run([PHP_BINARY, '-n', $controller])->stdout);
+        $probe = json_decode(new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('package-helper', $probe['stdout']);
+        self::assertSame(0, $probe['exit']);
+        self::assertSame($this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php', $probe['source']);
         self::assertFileDoesNotExist(dirname($controller) . '/dev-environment.py');
         self::assertDirectoryDoesNotExist(dirname($controller) . '/dev_environment');
         self::assertFileDoesNotExist($this->store->root . '/controller/docker/dev/private.key');
@@ -83,6 +125,36 @@ final class DevelopmentSupervisorTest extends TestCase
         self::assertStringContainsString(Supervisor::systemdArgument($controller), $unit);
         self::assertStringNotContainsString($this->root . '/source', $unit);
         self::assertStringContainsString('Unit=' . $supervisor->unit . '.service', (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.timer'));
+    }
+
+    public function testOnlyTheDeclaredComposerPackageLinkCanEnterThePayload(): void
+    {
+        $link = $this->root . '/source/scripts/vendor/baander/tooling';
+        unlink($link);
+        mkdir($this->root . '/unexpected-package', 0700);
+        symlink($this->root . '/unexpected-package', $link);
+        $this->expectException(WorkflowError::class);
+        $this->expectExceptionMessage('symlink controller payload');
+        $this->supervisor($this->runner())->install();
+    }
+
+    public function testRepeatedInstallRetainsTheValidatedPackageLink(): void
+    {
+        $supervisor = $this->supervisor($this->runner());
+        $supervisor->install();
+        $supervisor->install();
+        self::assertSame(
+            realpath($this->store->root . '/controller/packages/baander-tooling'),
+            realpath($this->store->root . '/controller/scripts/vendor/baander/tooling'),
+        );
+    }
+
+    public function testOtherVendorSymlinksAreRejectedEvenWhenTheyPointToThePackage(): void
+    {
+        symlink($this->root . '/source/packages/baander-tooling', $this->root . '/source/scripts/vendor/unexpected-package');
+        $this->expectException(WorkflowError::class);
+        $this->expectExceptionMessage('symlink controller payload');
+        $this->supervisor($this->runner())->install();
     }
 
     public function testSearchPathPreservesAbsoluteEntriesWithoutSecrets(): void

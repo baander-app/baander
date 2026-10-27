@@ -15,7 +15,7 @@ final class StateStore
     public function __construct(string $root)
     {
         $this->root = Environment::absolutePath($root);
-        $this->guard(fn () => PrivateDirectory::assertNoSymlinks($this->root));
+        $this->guard(fn() => PrivateDirectory::assertNoSymlinks($this->root));
     }
 
     public function scope(): string
@@ -34,14 +34,14 @@ final class StateStore
             throw new WorkflowError('Invalid development instance identifier.');
         }
         $directory = $this->root . '/' . $instanceId;
-        $this->guard(fn () => PrivateDirectory::assertNoSymlinks($directory));
+        $this->guard(fn() => PrivateDirectory::assertNoSymlinks($directory));
         return $directory;
     }
 
     private function prepare(string $instanceId): string
     {
         $directory = $this->directory($instanceId);
-        $this->guard(fn () => PrivateDirectory::prepare($directory));
+        $this->guard(fn() => PrivateDirectory::prepare($directory));
         return $directory;
     }
 
@@ -49,11 +49,11 @@ final class StateStore
     public function load(string $instanceId): ?array
     {
         $path = $this->directory($instanceId) . '/state.json';
-        $this->guard(fn () => PrivateDirectory::assertNoSymlinks($path));
+        $this->guard(fn() => PrivateDirectory::assertNoSymlinks($path));
         if (!file_exists($path)) {
             return null;
         }
-        $value = $this->guard(fn () => AtomicFile::readJson($path));
+        $value = $this->guard(fn() => AtomicFile::readJson($path));
         if (($value['id'] ?? null) !== $instanceId) {
             throw new WorkflowError('Instance identity does not match; preserve saved state for recovery.');
         }
@@ -90,8 +90,16 @@ final class StateStore
      */
     private function preserveObjects(array $value, mixed $template): array
     {
-        $maps = ['environment', 'migration_hashes', 'image_pins', 'state_mounts', 'volumes',
-            'adoption_inventory', 'containers', 'extensions'];
+        $maps = [
+            'environment',
+            'migration_hashes',
+            'image_pins',
+            'state_mounts',
+            'volumes',
+            'adoption_inventory',
+            'containers',
+            'extensions',
+        ];
         foreach ($value as $key => $item) {
             if (!is_array($item)) {
                 continue;
@@ -109,17 +117,17 @@ final class StateStore
 
     public function setEnabled(string $instanceId, bool $enabled): void
     {
-        $this->guard(fn () => AtomicFile::writeJson($this->prepare($instanceId) . '/intent.json', ['enabled' => $enabled]));
+        $this->guard(fn() => AtomicFile::writeJson($this->prepare($instanceId) . '/intent.json', ['enabled' => $enabled]));
     }
 
     public function enabled(string $instanceId): bool
     {
         $path = $this->directory($instanceId) . '/intent.json';
-        $this->guard(fn () => PrivateDirectory::assertNoSymlinks($path));
+        $this->guard(fn() => PrivateDirectory::assertNoSymlinks($path));
         if (!file_exists($path)) {
             return false;
         }
-        $value = $this->guard(fn () => AtomicFile::readJson($path));
+        $value = $this->guard(fn() => AtomicFile::readJson($path));
         if (!is_bool($value['enabled'] ?? null)) {
             throw new WorkflowError('Invalid updater intent; inspect saved state before continuing.');
         }
@@ -128,7 +136,7 @@ final class StateStore
 
     public function lock(string $instanceId, bool $blocking = true): FileLock
     {
-        return $this->guard(fn () => FileLock::acquire($this->prepare($instanceId) . '/operation.lock', !$blocking));
+        return $this->guard(fn() => FileLock::acquire($this->prepare($instanceId) . '/operation.lock', !$blocking));
     }
 
     /** @return array<string,mixed> */

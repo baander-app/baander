@@ -9,8 +9,11 @@ use Baander\Tooling\Filesystem\PrivateDirectory;
 
 final class Host
 {
-    public function __construct(private readonly StateStore $store, private readonly Runner $runner,
-        private readonly HostSystem $system = new HostSystem()) {}
+    public function __construct(
+        private readonly StateStore $store,
+        private readonly Runner $runner,
+        private readonly HostSystem $system = new HostSystem(),
+    ) {}
 
     /** @return array<string,mixed> */
     public function inspect(): array
@@ -89,7 +92,7 @@ final class Host
     {
         $directory = $this->store->root . '/host-setup';
         PrivateDirectory::prepare($directory);
-        $source = dirname(__DIR__, 3) . '/docker/dev/host-setup';
+        $source = dirname(__DIR__, 4) . '/docker/dev/host-setup';
         foreach (['10-baander-dns.conf', 'baander.conf', 'README.md'] as $name) {
             $content = file_get_contents($source . '/' . $name);
             if ($content === false) {
@@ -113,8 +116,15 @@ final class Host
         foreach (['cert.pem', 'key.pem'] as $name) {
             PrivateDirectory::assertNoSymlinks($directory . '/' . $name);
         }
-        $this->runner->run(['mkcert', '-cert-file', $directory . '/cert.pem', '-key-file', $directory . '/key.pem',
-            'baander.test', '*.baander.test'], env: $environment);
+        $this->runner->run([
+            'mkcert',
+            '-cert-file',
+            $directory . '/cert.pem',
+            '-key-file',
+            $directory . '/key.pem',
+            'baander.test',
+            '*.baander.test',
+        ], env: $environment);
         if (!chmod($directory . '/key.pem', 0600)) {
             throw new WorkflowError('Cannot make the gateway private key private.');
         }

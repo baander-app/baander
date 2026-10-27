@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require dirname(__DIR__, 3) . '/tooling/bootstrap.php';
+require dirname(__DIR__, 3) . '/bootstrap.php';
 
 $argv = $_SERVER['argv'];
 

@@ -18,6 +18,7 @@ node_modules
 **/node_modules
 **/.yarn/install-state.gz
 vendor
+**/vendor
 var/
 .env.local
 .env.*.local

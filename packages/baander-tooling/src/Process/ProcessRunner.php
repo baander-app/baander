@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Baander\Tooling\Process;
 
 use InvalidArgumentException;
-use Swoole\Event;
-use Swoole\Process;
 use Swoole\Timer;
 
 final class ProcessRunner
@@ -22,6 +20,7 @@ final class ProcessRunner
         $this->owned = new \WeakMap();
     }
 
+    #[\NoDiscard]
     public function start(ProcessSpec $spec): RunningProcess
     {
         $process = new RunningProcess($spec);
@@ -42,11 +41,12 @@ final class ProcessRunner
         }
         $forward = function (int $signal): void {
             foreach ($this->processes as $running) {
-                $running->cancel($signal);
+                if (!$running->ignoresCancellation()) {
+                    $running->cancel($signal);
+                }
             }
         };
-        Process::signal(2, $forward);
-        Process::signal(15, $forward);
+        $signals = new SignalScope($forward);
         $failure = null;
         $timer = Timer::tick(5, function () use (&$failure): void {
             try {
@@ -62,7 +62,7 @@ final class ProcessRunner
         });
         try {
             do {
-                Event::dispatch();
+                $signals->dispatch();
                 if ($failure !== null) {
                     throw $failure;
                 }
@@ -77,13 +77,7 @@ final class ProcessRunner
             throw $error;
         } finally {
             Timer::clear($timer);
-            Process::signal(2, null);
-            Process::signal(15, null);
-            // Finalize an idle reactor explicitly to avoid Swoole's deprecated
-            // implicit shutdown pump. Leave timers owned by the caller intact.
-            if (Timer::stats()['num'] === 0) {
-                Event::wait();
-            }
+            $signals->close();
         }
     }
 }

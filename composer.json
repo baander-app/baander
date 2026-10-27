@@ -75,12 +75,14 @@
   },
   "require-dev": {
     "baander/phpstan-rules": "@dev",
+    "baander/tooling": "dev-main",
+    "brianium/paratest": "^7.22.4",
+    "dama/doctrine-test-bundle": "dev-master",
     "deptrac/deptrac": "^4.6.1",
+    "php-cs-fixer/shim": "^3.95",
     "phpstan/phpstan": "^2.1.55",
     "phpstan/phpstan-doctrine": "^2.0.22",
     "phpstan/phpstan-symfony": "^2.0.18",
-    "brianium/paratest": "^7.22.4",
-    "dama/doctrine-test-bundle": "dev-master",
     "phpunit/phpunit": "^13.1.11",
     "reliforp/reli-prof": "^0.12.0",
     "symfony/browser-kit": "8.0.*",
@@ -109,6 +111,9 @@
     }
   },
   "autoload-dev": {
+    "classmap": [
+      "scripts/tests/php/"
+    ],
     "psr-4": {
       "App\\Tests\\": "tests/"
     }
@@ -126,6 +131,12 @@
     "symfony/polyfill-php84": "*"
   },
   "scripts": {
+    "tooling:autoload": "@composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-scripts --no-plugins",
+    "test:tooling": [
+      "@tooling:autoload",
+      "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist"
+    ],
+    "analyse:tooling": "@php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G",
     "auto-scripts": {
       "cache:clear": "symfony-cmd",
       "assets:install %PUBLIC_DIR%": "symfony-cmd"
@@ -139,7 +150,9 @@
     "deptrac": "deptrac analyse",
     "deptrac:baseline": "deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml",
     "deptrac:graph": "deptrac analyse --formatter=graphviz --output=deptrac-graph.dot",
-    "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json"
+    "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
+    "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
+    "check:tooling-format": "@php vendor/bin/php-cs-fixer check --config=.php-cs-fixer.tooling.php --using-cache=no"
   },
   "conflict": {
     "symfony/symfony": "*"
@@ -159,6 +172,17 @@
     }
   },
   "repositories": [
+    {
+      "type": "path",
+      "url": "./packages/baander-tooling",
+      "options": {
+        "symlink": true,
+        "reference": "config",
+        "versions": {
+          "baander/tooling": "dev-main"
+        }
+      }
+    },
     {
       "type": "path",
       "url": "./packages/baander-phpstan-rules",

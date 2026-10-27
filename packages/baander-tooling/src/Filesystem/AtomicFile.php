@@ -70,7 +70,12 @@ final class AtomicFile
     public static function writeJson(string $path, array $value): void
     {
         try {
-            $json = json_encode(self::sorted($value), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            $json = $value
+                |> self::sorted(...)
+                |> (static fn(array $sorted): string => json_encode(
+                    $sorted,
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+                ));
         } catch (\JsonException $error) {
             throw new \RuntimeException("Cannot encode saved state: {$path}", previous: $error);
         }

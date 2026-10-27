@@ -10,8 +10,8 @@ use Swoole\Process;
 
 final class RunningProcess
 {
-    private const float TERMINATION_GRACE = 0.25;
     private const float PIPE_DRAIN_GRACE = 0.25;
+    private const float DESCENDANT_GRACE = 0.25;
     private const int MAX_BYTES_PER_DRAIN = 262_144;
 
     /** @var resource */
@@ -20,6 +20,8 @@ final class RunningProcess
     private array $pipes;
     /** @var resource|null */
     private $log = null;
+    /** @var resource|null */
+    private $stderrLog = null;
     private float $started;
     private ?float $stopping = null;
     private ?float $exited = null;
@@ -39,18 +41,43 @@ final class RunningProcess
     public function __construct(private readonly ProcessSpec $spec)
     {
         $this->started = self::now();
-        if ($spec->logPath !== null) {
-            $this->openLog($spec->logPath);
+        try {
+            if ($spec->logPath !== null) {
+                $this->log = $this->openLog($spec->logPath);
+            }
+            if ($spec->stderrLogPath !== null) {
+                $this->stderrLog = $this->openLog($spec->stderrLogPath);
+            }
+            if ($this->log !== null && $this->stderrLog !== null) {
+                $stdout = fstat($this->log);
+                $stderr = fstat($this->stderrLog);
+                if ($stdout === false || $stderr === false || ($stdout['dev'] === $stderr['dev'] && $stdout['ino'] === $stderr['ino'])) {
+                    throw new RuntimeException('Separate process logs must refer to different files.');
+                }
+            }
+            if (!$spec->appendLog) {
+                foreach ([$this->log, $this->stderrLog] as $log) {
+                    if ($log !== null && !ftruncate($log, 0)) {
+                        throw new RuntimeException('Cannot truncate private process log.');
+                    }
+                }
+            }
+        } catch (\Throwable $error) {
+            $this->closeLog();
+            throw $error;
         }
         $descriptors = $spec->passthrough
             ? [0 => STDIN, 1 => STDOUT, 2 => STDERR]
             : [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $argv = $spec->argv;
         if ($spec->processGroup) {
-            $argv = ['setsid', 'bash', dirname(__DIR__) . '/process-group.sh', ...$argv];
+            $argv = ['setsid', 'bash', dirname(__DIR__, 2) . '/resources/process-group.sh', ...$argv];
             $descriptors[3] = ['pipe', 'w'];
             $descriptors[4] = ['pipe', 'r'];
         }
+        // Swoole's signalfd blocks these signals in the parent. exec preserves
+        // that mask, so reset and unblock them before invoking the child.
+        $argv = ['env', '--default-signal=INT,TERM', '--', ...$argv];
         $process = proc_open($argv, $descriptors, $pipes, $spec->cwd, $spec->environment, ['bypass_shell' => true]);
         if ($process === false) {
             $this->closeLog();
@@ -72,6 +99,12 @@ final class RunningProcess
                 throw $error;
             }
         }
+    }
+
+    /** @internal */
+    public function ignoresCancellation(): bool
+    {
+        return $this->spec->ignoreCancellation;
     }
 
     public function cancel(int $signal = 15): void
@@ -131,14 +164,20 @@ final class RunningProcess
             $this->timedOut = true;
             $this->stop(15);
         }
-        if ($this->stopping !== null && !$this->killed && $now - $this->stopping >= self::TERMINATION_GRACE) {
-            $this->sendSignal(9);
-            $this->killed = true;
+        if ($this->stopping !== null && !$this->killed) {
+            $killAt = $this->stopping + $this->spec->terminationGrace;
+            if ($this->exited !== null) {
+                $killAt = min($killAt, $this->exited + self::DESCENDANT_GRACE);
+            }
+            if ($now >= $killAt) {
+                $this->sendSignal(9);
+                $this->killed = true;
+            }
         }
         if ($this->exited !== null) {
             $drained = !isset($this->pipes[1]) && !isset($this->pipes[2]);
             $groupSettled = $this->group === null || $this->killed;
-            if (($drained && $groupSettled) || $now - $this->exited >= self::PIPE_DRAIN_GRACE + self::TERMINATION_GRACE) {
+            if (($drained && $groupSettled) || $now - $this->exited >= self::PIPE_DRAIN_GRACE + min(self::DESCENDANT_GRACE, $this->spec->terminationGrace)) {
                 if ($this->group !== null && !$this->killed) {
                     $this->sendSignal(9);
                 }
@@ -190,6 +229,9 @@ final class RunningProcess
 
     private function sendSignal(int $signal): void
     {
+        if ($this->group === null && $this->exited !== null) {
+            return;
+        }
         // A group can disappear between observing its leader and escalation.
         // Consume only this call's warning; other failures remain actionable.
         $warning = '';
@@ -214,17 +256,18 @@ final class RunningProcess
         }
         $chunk = stream_get_contents($this->pipes[$descriptor], self::MAX_BYTES_PER_DRAIN);
         if ($chunk !== false && $chunk !== '') {
-            if ($this->spec->logPath === null) {
+            $log = $descriptor === 2 && $this->stderrLog !== null ? $this->stderrLog : $this->log;
+            if ($log === null && $this->spec->logPath === null && ($descriptor === 1 || $this->spec->stderrLogPath === null)) {
                 if ($descriptor === 1) {
                     $this->stdout .= $chunk;
                 } else {
                     $this->stderr .= $chunk;
                 }
             }
-            if ($this->log !== null) {
+            if ($log !== null) {
                 $remaining = $chunk;
                 while ($remaining !== '') {
-                    $written = fwrite($this->log, $remaining);
+                    $written = fwrite($log, $remaining);
                     if ($written === false || $written === 0) {
                         $this->closeLog();
                         throw new RuntimeException('Cannot write process log.');
@@ -274,20 +317,20 @@ final class RunningProcess
         }
     }
 
-    private function openLog(string $path): void
+    /** @return resource */
+    private function openLog(string $path)
     {
         PrivateDirectory::ensure(dirname($path));
         PrivateDirectory::assertNoSymlinks($path);
         $mask = umask(0077);
         try {
-            $log = fopen($path, 'c+b');
+            $log = fopen($path, $this->spec->appendLog ? 'a+b' : 'c+b');
         } finally {
             umask($mask);
         }
         if ($log === false) {
             throw new RuntimeException('Cannot open process log: ' . $path);
         }
-        $this->log = $log;
         $opened = fstat($log);
         $named = lstat($path);
         $owner = stat('/proc/self');
@@ -295,21 +338,25 @@ final class RunningProcess
             || $opened['ino'] !== $named['ino'] || $opened['dev'] !== $named['dev']
             || ($opened['mode'] & 0170000) !== 0100000 || $opened['uid'] !== $owner['uid']
         ) {
-            $this->closeLog();
+            fclose($log);
             throw new RuntimeException('Process log must be an owned regular file: ' . $path);
         }
-        if (!chmod($path, 0600) || !ftruncate($log, 0)) {
-            $this->closeLog();
+        if (!chmod($path, 0600)) {
+            fclose($log);
             throw new RuntimeException('Cannot prepare private process log: ' . $path);
         }
+        return $log;
     }
 
     private function closeLog(): void
     {
-        if (is_resource($this->log)) {
-            fclose($this->log);
+        foreach ([$this->log, $this->stderrLog] as $log) {
+            if (is_resource($log)) {
+                fclose($log);
+            }
         }
         $this->log = null;
+        $this->stderrLog = null;
     }
 
     /** @internal Release a child when its owner's wait fails. */
@@ -317,7 +364,7 @@ final class RunningProcess
     {
         $this->cancel();
         $this->closeLog();
-        $deadline = self::now() + 1;
+        $deadline = self::now() + max(1, $this->spec->terminationGrace + self::PIPE_DRAIN_GRACE + 0.25);
         while ($this->result === null && self::now() < $deadline) {
             $this->pump();
             usleep(1000);

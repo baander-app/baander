@@ -88,14 +88,27 @@ final class Gateway
                 AtomicFile::write($this->configuration, $this->render([]));
             }
             $project = 'baander-development-gateway-' . $this->store->scope();
-            $compose = ['name' => $project, 'services' => ['gateway' => ['image' => $image,
-                'ports' => ['127.0.0.1:443:443'], 'volumes' => [self::bind(dirname($this->configuration), '/etc/nginx/conf.d'),
-                    self::bind($this->directory . '/tls', '/etc/nginx/certificates')],
-                'networks' => ['gateway' => ['ipv4_address' => $address]]]],
-                'networks' => ['gateway' => ['external' => true, 'name' => $network['name']]]];
+            $compose = [
+                'name' => $project,
+                'services' => ['gateway' => [
+                    'image' => $image,
+                    'ports' => ['127.0.0.1:443:443'],
+                    'volumes' => [
+                        self::bind(dirname($this->configuration), '/etc/nginx/conf.d'),
+                        self::bind($this->directory . '/tls', '/etc/nginx/certificates'),
+                    ],
+                    'networks' => ['gateway' => ['ipv4_address' => $address]],
+                ]],
+                'networks' => ['gateway' => ['external' => true, 'name' => $network['name']]],
+            ];
             AtomicFile::writeJson($this->directory . '/compose.json', $compose);
-            $record = ['docker' => $instance['docker'], 'project' => $project,
-                'compose_file' => $this->directory . '/compose.json', 'gateway' => $gateway, 'nginx_image' => $image];
+            $record = [
+                'docker' => $instance['docker'],
+                'project' => $project,
+                'compose_file' => $this->directory . '/compose.json',
+                'gateway' => $gateway,
+                'nginx_image' => $image,
+            ];
             AtomicFile::writeJson($saved, $record);
             return $gateway;
         } finally {
@@ -106,8 +119,13 @@ final class Gateway
     /** @return array<string,mixed> */
     private static function bind(string $source, string $target): array
     {
-        return ['type' => 'bind', 'source' => str_replace('$', '$$', $source), 'target' => $target,
-            'read_only' => true, 'bind' => ['create_host_path' => false]];
+        return [
+            'type' => 'bind',
+            'source' => str_replace('$', '$$', $source),
+            'target' => $target,
+            'read_only' => true,
+            'bind' => ['create_host_path' => false],
+        ];
     }
 
     public function start(): void
@@ -139,7 +157,7 @@ final class Gateway
     /** @param array<string,array<string,mixed>> $routes */
     public function render(array $routes): string
     {
-        $template = (string) file_get_contents(dirname(__DIR__, 3) . '/docker/dev/gateway.conf.template');
+        $template = (string) file_get_contents(dirname(__DIR__, 4) . '/docker/dev/gateway.conf.template');
         $servers = [];
         ksort($routes);
         foreach ($routes as $hostname => $route) {
@@ -195,8 +213,19 @@ final class Gateway
             AtomicFile::write($candidate, $this->render($routes));
             $docker = new Docker($this->runner, $record['docker']);
             $docker->validate();
-            $docker->run(['run', '--rm', '--network', 'none', '--mount', 'type=bind,src=' . $candidate . ',dst=/etc/nginx/conf.d/default.conf,readonly',
-                '--mount', 'type=bind,src=' . $this->directory . '/tls,dst=/etc/nginx/certificates,readonly', $record['nginx_image'], 'nginx', '-t']);
+            $docker->run([
+                'run',
+                '--rm',
+                '--network',
+                'none',
+                '--mount',
+                'type=bind,src=' . $candidate . ',dst=/etc/nginx/conf.d/default.conf,readonly',
+                '--mount',
+                'type=bind,src=' . $this->directory . '/tls,dst=/etc/nginx/certificates,readonly',
+                $record['nginx_image'],
+                'nginx',
+                '-t',
+            ]);
             $old = (string) file_get_contents($this->configuration);
             AtomicFile::write($this->configuration, (string) file_get_contents($candidate));
             try {

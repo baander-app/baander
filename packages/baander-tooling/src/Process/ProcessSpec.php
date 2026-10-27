@@ -19,5 +19,13 @@ final readonly class ProcessSpec
         public ?string $logPath = null,
         public bool $passthrough = false,
         public bool $processGroup = false,
-    ) {}
+        public bool $ignoreCancellation = false,
+        public bool $appendLog = false,
+        public ?string $stderrLogPath = null,
+        public float $terminationGrace = 0.25,
+    ) {
+        if (!is_finite($terminationGrace) || $terminationGrace < 0) {
+            throw new \InvalidArgumentException('Process termination grace must be finite nonnegative seconds.');
+        }
+    }
 }
