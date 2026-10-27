@@ -1,5 +1,6 @@
 {
   "name": "martinjuul/baander",
+  "description": "Self-hosted media library and streaming server.",
   "license": "Apache-2.0",
   "type": "project",
   "require": {

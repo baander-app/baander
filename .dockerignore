@@ -26,6 +26,7 @@ node_modules
 **/.yarn/install-state.gz
 vendor
 **/vendor
+!relay/third_party/inventory/go/licenses/**
 var/
 .env.local
 .env.*.local

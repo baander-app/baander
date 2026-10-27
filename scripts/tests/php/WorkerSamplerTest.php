@@ -178,9 +178,39 @@ final class WorkerSamplerTest extends TestCase
             self::assertSame(str_repeat('a', 64), $ready['containerId']);
             self::assertSame(str_repeat('b', 64), $ready['clockContainerId']);
             self::assertSame('docker-daemon-php-monotonic', $ready['clockSource']);
-            $commands = str_replace('\\/', '/', file_get_contents($directory . '/commands.jsonl'));
-            self::assertStringContainsString('/proc/[0-9]*', $commands);
-            self::assertStringContainsString('smaps_rollup', $commands);
+            $commands = file($directory . '/commands.jsonl', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)
+                |> (static fn(array $lines): array => array_map(
+                    static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR),
+                    $lines,
+                ));
+            $executions = [];
+            foreach ($commands as $arguments) {
+                if (in_array($arguments[0] ?? '', ['--host', '--context'], true)) {
+                    $arguments = array_slice($arguments, 2);
+                }
+                if (($arguments[0] ?? '') === 'exec') {
+                    $executions[] = $arguments;
+                }
+            }
+            self::assertCount(2, $executions);
+            $collectors = $executions
+                |> (static fn(array $commands): array => array_filter(
+                    $commands,
+                    static fn(array $arguments): bool => ($arguments[1] ?? '') === '--user',
+                ))
+                |> array_values(...);
+            self::assertCount(1, $collectors);
+            self::assertSame(
+                ['exec', '--user', 'postgres', str_repeat('a', 64), 'sh', '-ec'],
+                array_slice($collectors[0], 0, 6),
+            );
+            self::assertCount(7, $collectors[0]);
+            self::assertStringContainsString('/proc/[0-9]*', $collectors[0][6]);
+            self::assertStringContainsString('smaps_rollup', $collectors[0][6]);
+            self::assertContains(
+                ['exec', str_repeat('b', 64), 'php', '-r', 'echo hrtime(true) / 1e9;'],
+                $executions,
+            );
             unlink($directory . '/ready.json');
             $failed = $runner->run($command, env: array_replace($environment, ['WORKER_SAMPLER_EMPTY' => '1']), check: false);
             self::assertSame(1, $failed->exitCode);

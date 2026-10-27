@@ -125,6 +125,17 @@ suite passes 169 tests and 678 assertions; all 272 scoped PHP files pass formatt
 The Python-free test image now includes FFmpeg for the audio verifier, and the proxy
 test build includes the OpenSSL headers required to compile Swoole.
 
+Integration contract repairs, 2026-10-27: added the missing root Composer
+description and updated the surviving publication workflow tests to execute the
+PHP launcher. The publication suite passes 42 tests and 338 assertions. Sampler
+checks now assert the exact immutable database and clock container identifiers;
+all seven sampler tests and 36 assertions pass. Source snapshots retain Go license
+notices under upstream `vendor` directories while excluding Composer dependencies;
+the source suite passes 11 tests and 41 assertions, with formatting and PHPStan clean.
+The full Python-free run exposed the same missing notices in Docker build contexts:
+638 tests, 2,759 assertions, one failure and seven environment-specific skips.
+The Docker exclusion is repaired; refreshed-image verification remains pending.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

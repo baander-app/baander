@@ -75,6 +75,24 @@ final class DevelopmentBuildTest extends TestCase
         Source::snapshotWorktree($this->runner, $this->repo, $this->root . '/snapshot');
     }
 
+    public function testSnapshotRetainsGoVendorNoticesWithoutComposerDependencies(): void
+    {
+        $notice = 'relay/third_party/inventory/go/licenses/toolchain/src/vendor/golang.org/x/tools/LICENSE';
+        $dependencies = ['vendor/autoload.php', 'scripts/vendor/autoload.php', 'relay/vendor/autoload.php'];
+        foreach ([$notice, ...$dependencies] as $relative) {
+            $path = $this->repo . '/' . $relative;
+            mkdir(dirname($path), 0700, true);
+            file_put_contents($path, $relative);
+        }
+
+        $snapshot = $this->root . '/snapshot';
+        Source::snapshotWorktree($this->runner, $this->repo, $snapshot);
+        self::assertSame($notice, file_get_contents($snapshot . '/' . $notice));
+        foreach ($dependencies as $relative) {
+            self::assertFileDoesNotExist($snapshot . '/' . $relative);
+        }
+    }
+
     public function testSnapshotIncludesOnlyTheExecutableProseAuditWithinAgentFiles(): void
     {
         $relative = '.agents/skills/prose-fix/scripts/audit_rewrite.php';

@@ -107,9 +107,12 @@ final class PublicationWorkflowTest extends TestCase
             $this->step($existing, 'Install parser fuzz toolchain')['run'],
             $this->step($job, 'Install parser fuzz toolchain')['run'],
         );
-        self::assertSame('python3 relay/tests/test_qualification_runner.py', $this->step($job, 'Verify qualification orchestration')['run']);
+        self::assertSame(
+            $this->step($existing, 'Prepare standalone PHP tooling')['run'],
+            $this->step($job, 'Prepare standalone PHP tooling')['run'],
+        );
         $run = $this->step($job, 'Qualify five-voter Registry');
-        self::assertSame('bash scripts/test-registry.sh fuzz', $run['run']);
+        self::assertSame('REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh fuzz', $run['run']);
         self::assertSame('5', $run['env']['REGISTRY_CLUSTER_NODES']);
         self::assertSame('10000', $run['env']['REGISTRY_FUZZ_RUNS']);
         self::assertSame('120', $run['env']['REGISTRY_FUZZ_SECONDS']);
@@ -138,7 +141,7 @@ final class PublicationWorkflowTest extends TestCase
         self::assertSame(2, $process->getExitCode(), $process->getErrorOutput());
         self::assertStringContainsString('REGISTRY_FULL_DISK_ROOT', $process->getErrorOutput());
         self::assertStringNotContainsString('curl ', $this->registryCalls());
-        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.php', $this->registryCalls());
     }
 
     #[DataProvider('requiredRegistryModeProvider')]
@@ -148,9 +151,9 @@ final class PublicationWorkflowTest extends TestCase
         $process->run();
 
         self::assertSame(43, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('validate_root', $this->registryCalls());
+        self::assertStringContainsString('validateRoot', $this->registryCalls());
         self::assertStringNotContainsString('curl ', $this->registryCalls());
-        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.php', $this->registryCalls());
     }
 
     #[DataProvider('requiredRegistryModeProvider')]
@@ -161,16 +164,16 @@ final class PublicationWorkflowTest extends TestCase
 
         self::assertSame(47, $process->getExitCode(), $process->getErrorOutput());
         $calls = $this->registryCalls();
-        self::assertStringContainsString('validate_root', $calls);
-        self::assertStringContainsString('test_storage_cleanup.py', $calls);
-        self::assertStringContainsString('run_storage_contract.py', $calls);
+        self::assertStringContainsString('validateRoot', $calls);
+        self::assertStringContainsString('test_storage_cleanup.php', $calls);
+        self::assertStringContainsString('run_storage_contract.php', $calls);
         self::assertStringContainsString('--storage-root /run/baander-registry-full-disk', $calls);
         self::assertStringContainsString('--rqlited ', $calls);
         self::assertStringContainsString('--server ', $calls);
-        self::assertStringContainsString('run_restore_contract.py', $calls);
-        self::assertLessThan(strpos($calls, 'curl '), strpos($calls, 'validate_root'));
-        self::assertLessThan(strpos($calls, 'run_storage_contract.py'), strpos($calls, 'run_restore_contract.py'));
-        self::assertStringNotContainsString('run_load_smoke.py', $calls);
+        self::assertStringContainsString('run_restore_contract.php', $calls);
+        self::assertLessThan(strpos($calls, 'curl '), strpos($calls, 'validateRoot'));
+        self::assertLessThan(strpos($calls, 'run_storage_contract.php'), strpos($calls, 'run_restore_contract.php'));
+        self::assertStringNotContainsString('run_load_smoke.php', $calls);
         self::assertStringNotContainsString('qualification passed', $process->getOutput());
     }
 
@@ -181,8 +184,8 @@ final class PublicationWorkflowTest extends TestCase
         $process->run();
 
         self::assertSame(49, $process->getExitCode(), $process->getErrorOutput());
-        self::assertStringContainsString('test_storage_cleanup.py', $this->registryCalls());
-        self::assertStringNotContainsString('run_storage_contract.py', $this->registryCalls());
+        self::assertStringContainsString('test_storage_cleanup.php', $this->registryCalls());
+        self::assertStringNotContainsString('run_storage_contract.php', $this->registryCalls());
         self::assertStringNotContainsString('qualification passed', $process->getOutput());
     }
 
@@ -214,7 +217,7 @@ final class PublicationWorkflowTest extends TestCase
         (new Filesystem())->mkdir([$tools, $this->directory . '/scripts', $this->directory . '/sdk']);
         file_put_contents($this->directory . '/sdk/emsdk_env.sh', '');
         $log = $this->directory . '/calls';
-        foreach (['yarn', 'corepack', 'docker', 'node', 'bash', 'python3'] as $tool) {
+        foreach (['yarn', 'corepack', 'docker', 'node', 'bash', 'php'] as $tool) {
             $script = <<<'SH'
 #!/bin/sh
 printf '%s %s\n' "$(basename "$0")" "$*" >> "$CALL_LOG"
@@ -331,10 +334,14 @@ SH;
             'client drift' => ['frontend-quality', 'Web checks', 'yarn generate:check'],
             'Deptrac' => ['quality-gate', 'Deptrac', 'vendor/bin/deptrac analyse'],
             'backend unit' => ['quality-gate', 'PHPUnit with coverage', 'scripts/test-backend-container.sh'],
-            'backend runner' => ['quality-gate', 'Backend runner regressions', 'python3 -m unittest discover -s scripts/tests'],
-            'backend isolation' => ['quality-gate', 'Backend stack isolation', 'scripts/test-backend-stack-isolation.py'],
+            'backend runner' => ['quality-gate', 'Backend runner regressions', 'scripts/tests/php/RetainBuildEvidenceTest.php'],
+            'PHP tooling format' => ['quality-gate', 'PHP tooling regressions', 'composer check:tooling-format'],
+            'PHP tooling unit' => ['quality-gate', 'PHP tooling regressions', '--exclude-group registry-python-subject'],
+            'PHP tooling subject' => ['quality-gate', 'PHP tooling regressions', '--group registry-python-subject'],
+            'PHP tooling static' => ['quality-gate', 'PHP tooling regressions', 'php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon'],
+            'backend isolation' => ['quality-gate', 'Backend stack isolation', 'php scripts/test-backend-stack-isolation.php'],
             'Messenger without Swoole' => ['quality-gate', 'Messenger without Swoole', 'scripts/test-backend-container.sh'],
-            'coverage integrity' => ['quality-gate', 'Extract coverage metrics', 'scripts/validate-backend-coverage.py'],
+            'coverage integrity' => ['quality-gate', 'Extract coverage metrics', 'php scripts/validate-backend-coverage.php'],
             'web unit' => ['frontend-quality', 'Web checks', 'yarn test'],
             'browser auth' => ['frontend-quality', 'Native browser authentication transport', 'yarn test:browser-auth'],
             'browser audio' => ['frontend-quality', 'Native browser audio graph', 'yarn test:audio-graph'],
@@ -382,20 +389,61 @@ SH;
     private function registryRecipe(string $mode, bool $configured, int $validationExit = 0, int $storageHelperExit = 0): Process
     {
         $tools = $this->directory . '/tools';
-        (new Filesystem())->mkdir([$tools, $this->directory . '/scripts']);
-        copy(dirname(__DIR__, 5) . '/scripts/test-registry.sh', $this->directory . '/scripts/test-registry.sh');
+        $root = dirname(__DIR__, 5);
+        (new Filesystem())->mkdir([$tools, $this->directory . '/scripts', $this->directory . '/relay/tests']);
+        foreach (['test-registry.sh', 'test-registry.php', 'bootstrap.php'] as $name) {
+            copy($root . '/scripts/' . $name, $this->directory . '/scripts/' . $name);
+        }
+        symlink($root . '/scripts/vendor', $this->directory . '/scripts/vendor');
+        // Keep the real launcher and orchestrator; isolate the dedicated mount and harness processes.
+        $bootstrap = <<<'PHP'
+<?php
+namespace Baander\RegistryTests;
+final class BoundedStorage
+{
+    public static function validateRoot(string $root): array
+    {
+        file_put_contents(getenv('CALL_LOG'), 'validateRoot ' . $root . "\n", FILE_APPEND);
+        $status = (int) getenv('VALIDATION_EXIT');
+        if ($status !== 0) {
+            throw new \RuntimeException('Unsafe storage fixture.', $status);
+        }
+        return [];
+    }
+}
+PHP;
+        file_put_contents(
+            $this->directory . '/relay/tests/bootstrap.php',
+            $bootstrap . "\nrequire " . var_export($root . '/relay/tests/bootstrap.php', true) . ";\n",
+        );
+        $contract = <<<'PHP'
+<?php
+$name = basename(__FILE__);
+file_put_contents(getenv('CALL_LOG'), $name . ' ' . implode(' ', array_slice($argv, 1)) . "\n", FILE_APPEND);
+exit(match ($name) {
+    'test_storage_cleanup.php' => (int) getenv('STORAGE_HELPER_EXIT'),
+    'run_storage_contract.php' => 47,
+    default => 0,
+});
+PHP;
+        foreach ([
+            'test_cluster_cleanup',
+            'test_storage_cleanup',
+            'run_rqlite_contract',
+            'run_transport_contract',
+            'run_http_contract',
+            'run_cluster_contract',
+            'run_restore_contract',
+            'run_storage_contract',
+            'run_load_smoke',
+        ] as $name) {
+            file_put_contents($this->directory . '/relay/tests/' . $name . '.php', $contract);
+        }
         $stub = <<<'SH'
 #!/bin/bash
 tool="${0##*/}"
 printf '%s %s\n' "$tool" "$*" >> "$CALL_LOG"
 case "$tool" in
-    python3)
-        case "$*" in
-            *validate_root*) exit "$VALIDATION_EXIT" ;;
-            *test_storage_cleanup.py*) exit "$STORAGE_HELPER_EXIT" ;;
-            *run_storage_contract.py*) exit 47 ;;
-        esac
-        ;;
     tar)
         if [[ "$*" == *openssl.tar.gz* ]]; then
             mkdir -p "$4/openssl-3.5.3"

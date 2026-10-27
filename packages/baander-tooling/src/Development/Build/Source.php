@@ -40,8 +40,12 @@ final class Source
         $digest = hash_init('sha256');
         foreach ($names as $name) {
             $base = basename($name);
+            $excluded = array_intersect(self::EXCLUDED, explode('/', $name));
+            if (str_starts_with($name, 'relay/third_party/inventory/go/licenses/')) {
+                $excluded = array_diff($excluded, ['vendor']);
+            }
             if ($name === '' || str_starts_with($name, '/') || in_array('..', explode('/', $name), true)
-                || ($name !== self::PROSE_AUDIT && array_intersect(self::EXCLUDED, explode('/', $name)) !== [])
+                || ($name !== self::PROSE_AUDIT && $excluded !== [])
                 || str_starts_with($name, 'config/secrets/') || $name === 'auth.json'
                 || (str_starts_with($base, '.env') && str_contains($base, '.local'))
                 || (str_starts_with($name, 'docker/dev/') && str_ends_with($name, '.key'))) {
