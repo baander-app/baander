@@ -1,7 +1,9 @@
-# Allowlist: local SQLite, credentials, logs and PHP never enter build context.
+# Selected build inputs and qualification tooling; local data and secrets stay out.
 **
 !CMakeLists.txt
 !LICENSE.md
+!composer.json
+!composer.lock
 !cpp/
 !cpp/**
 !include/
@@ -9,11 +11,24 @@
 !third_party/
 !third_party/**
 !docker/
-!docker/Dockerfile
-!docker/rqlite.Dockerfile
-!docker/rqlite-entrypoint.sh
-!docker/backup.Dockerfile
+!docker/**
 !backup/
 !backup/registry_backup.py
 !tools/
-!tools/packaged_inventory.py
+!tools/packaged_inventory.php
+!tools/inventory/
+!tools/inventory/**
+!tools/issue_enrollment.py
+!tests/
+!tests/*.php
+!tests/*.cpp
+!tests/Support/
+!tests/Support/*.php
+!tests/parser_corpus/
+!tests/parser_corpus/**
+!vendor/
+!vendor/*.php
+!vendor/composer/
+!vendor/composer/*.php
+!vendor/composer/*.json
+!vendor/composer/LICENSE

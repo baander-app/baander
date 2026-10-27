@@ -70,10 +70,10 @@ Run the bundled audit for each rewritten file, resolving the script path relativ
 to this skill directory rather than assuming the shell is in it:
 
 ```text
-python "<skill-dir>/scripts/audit_rewrite.py" "<baseline.md>" "<edited.md>"
+php "<skill-dir>/scripts/audit_rewrite.php" "<baseline.md>" "<edited.md>"
 ```
 
-Use the available Python interpreter (`python`, `python3`, or `py`). The script
+Use PHP 8.5 or newer. The script
 reports inline-code token and number multisets, normative-word counts, selected
 structural lines, and section-sign counts. It returns zero even when differences
 exist: read the output, not just the exit status or final delta count.
@@ -86,7 +86,7 @@ structural report and need review rather than automatic rejection.
 The audit does not prove semantic equivalence or fully check code-block contents,
 names, links, paths, or reference targets. Inspect the diff and compare protected
 content directly. Equal word counts can hide a moved negation or a stronger rule.
-If Python is unavailable, perform these comparisons manually and disclose that the
+If PHP is unavailable, perform these comparisons manually and disclose that the
 script was not run.
 
 Re-read the result as a reader: the explanation should be clearer, every claim

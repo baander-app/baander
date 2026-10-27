@@ -10,7 +10,7 @@ ARG TOOLING_BUILD_JOBS=4
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         autoconf build-essential ca-certificates curl pkg-config xz-utils \
-        libonig-dev libssl-dev libxml2-dev libyaml-dev libzip-dev zlib1g-dev \
+        libffi-dev libonig-dev libsqlite3-dev libssl-dev libxml2-dev libyaml-dev libzip-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL "https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz" -o /tmp/php.tar.xz \
@@ -22,9 +22,9 @@ RUN curl -fsSL "https://www.php.net/distributions/php-${PHP_VERSION}.tar.xz" -o 
         --with-config-file-path=/opt/php/etc --with-config-file-scan-dir=/opt/php/etc/conf.d \
         --disable-all --enable-cli --disable-cgi --disable-phpdbg \
         --enable-ctype --enable-dom --enable-fileinfo --enable-filter \
-        --enable-mbstring --enable-phar --enable-simplexml --enable-sockets \
+        --enable-mbstring --enable-pdo --enable-phar --enable-simplexml --enable-sockets \
         --enable-tokenizer --enable-xml --enable-xmlreader --enable-xmlwriter \
-        --with-libxml --with-openssl --with-zip --with-zlib \
+        --with-ffi --with-libxml --with-openssl --with-pdo-sqlite --with-sqlite3 --with-zip --with-zlib \
     && make -j"${TOOLING_BUILD_JOBS}" \
     && make install \
     && mkdir -p /opt/php/etc/conf.d \
@@ -57,7 +57,7 @@ RUN curl -fsSL "https://pecl.php.net/get/yaml-${YAML_VERSION}.tgz" -o /tmp/yaml.
 FROM debian:trixie-slim AS tooling
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        bash ca-certificates libonig5 libssl3t64 libstdc++6 libxml2 \
+        bash ca-certificates git make openssl libffi8 libonig5 libsqlite3-0 libssl3t64 libstdc++6 libxml2 \
         libyaml-0-2 libzip5 util-linux zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
@@ -66,7 +66,7 @@ COPY --from=composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b9
 ENV PATH="/opt/php/bin:${PATH}"
 
 RUN php -v && php --ri swoole && php --ri yaml \
-    && php -r 'foreach (["dom", "mbstring", "openssl", "sockets", "tokenizer", "xml", "xmlwriter", "zip"] as $extension) { if (!extension_loaded($extension)) { throw new RuntimeException("Missing extension: " . $extension); } }'
+    && php -r 'foreach (["dom", "ffi", "mbstring", "openssl", "pdo_sqlite", "sockets", "sqlite3", "tokenizer", "xml", "xmlwriter", "zip"] as $extension) { if (!extension_loaded($extension)) { throw new RuntimeException("Missing extension: " . $extension); } }'
 
 FROM tooling AS runner
 

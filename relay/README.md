@@ -56,6 +56,22 @@ metadata; revision, update and heartbeat milliseconds make the new lifecycle exp
 
 ## Local checks
 
+The qualification drivers require PHP 8.5 or newer with Swoole, OpenSSL and
+sockets. Restore contracts also require PDO SQLite; full static analysis requires
+ext-yaml. The `--pins-notices-only` check does not run the YAML-based analysis.
+Install the standalone workflow and registry autoloaders from the repository root
+before running the commands below:
+
+```sh
+composer --working-dir=scripts install --no-dev
+composer --working-dir=relay install --no-dev
+```
+
+These installs do not load the application kernel or require application services.
+Tests of the unchanged enrollment issuer and backup worker still need their Python
+subject runtime. `REGISTRY_SUBJECT_PYTHON` selects the enrollment subject's Python
+executable; it defaults to `python3`. The qualification drivers themselves run in PHP.
+
 The CI entrypoint builds pinned dependencies in a disposable directory. Both
 `release` and `sanitize` require `REGISTRY_FULL_DISK_ROOT` to name a dedicated,
 initially empty tmpfs mount of at most 128 MiB. Missing or unsafe storage fails the
@@ -140,7 +156,7 @@ It starts one local node, exercises the actual SQL and C++ response decoder, and
 always terminates the process and removes its temporary data.
 
 ```sh
-python3 relay/tests/run_rqlite_contract.py \
+php relay/tests/run_rqlite_contract.php \
   --rqlited /path/to/verified/rqlited \
   --fixture /tmp/baander-registry-build/registry_contract_fixture
 ```
@@ -153,9 +169,9 @@ The API test uses native rqlite with authentication and mTLS, and verifies the
 public contract, concurrent claims, readiness, limits, outage and shutdown.
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_transport_contract.py \
+php relay/tests/run_transport_contract.php \
   --fixture /tmp/baander-registry-build/registry_transport_fixture
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_http_contract.py \
+php relay/tests/run_http_contract.php \
   --rqlited /path/to/verified/rqlited \
   --server /tmp/baander-registry-build/baander-registry
 ```
@@ -173,10 +189,10 @@ five-voter runs stall established cross-group links and reject new ones. Healing
 closes stalled links before unblocking, so buffered RPCs are not replayed.
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
+php relay/tests/run_cluster_contract.php \
   --nodes 3 --rqlited /path/to/verified/rqlited \
   --server /tmp/baander-registry-build/baander-registry
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
+php relay/tests/run_cluster_contract.php \
   --nodes 5 --rqlited /path/to/verified/rqlited \
   --server /tmp/baander-registry-build/baander-registry
 ```
@@ -241,10 +257,10 @@ must receive 403, the original owner must advance its revision, and every voter'
 local database must converge within 30 seconds.
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_restore_contract.py \
+php relay/tests/run_restore_contract.php \
   --rqlited /path/to/verified/rqlited \
   --server /tmp/baander-registry-build/baander-registry
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_restore_contract.py \
+php relay/tests/run_restore_contract.php \
   --nodes 5 --rqlited /path/to/verified/rqlited \
   --server /tmp/baander-registry-build/baander-registry
 ```
@@ -479,7 +495,7 @@ uploaded artifact for 14 days. To verify an existing local image and retain its
 evidence:
 
 ```sh
-python3 relay/tools/verify_packaged_image.py \
+php relay/tools/verify_packaged_image.php \
   --image baander/registry:0.1.0 --kind api \
   --output var/test-runs/registry-inventory/manual
 ```
@@ -547,8 +563,11 @@ qualification, then removes its image tags:
 bash scripts/test-registry-container.sh
 ```
 
-The image build context is allowlisted: local data, keys, operator configuration
-and PHP files are excluded. The API image builds C++20 Release code with static
+The image build context allowlists native sources, qualification and inventory
+tooling, Composer metadata and the generated autoloader. Local data, keys and
+operator configuration are excluded. Build stages use PHP to capture evidence and
+generate inventories; the final API and voter images contain no PHP runtime.
+The API image builds C++20 Release code with static
 OpenSSL 3.5.3 and the CMake dependency checksums above. The voter image uses
 a clean build of the rqlite 10.5.1 source commit. Both use the immutable official
 Debian base
@@ -566,7 +585,7 @@ docker build --platform linux/amd64 -f relay/docker/Dockerfile \
   -t baander/registry:0.1.0 relay
 docker build --platform linux/amd64 -f relay/docker/rqlite.Dockerfile \
   -t baander/registry-rqlite:10.5.1 relay
-PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_container_contract.py \
+php relay/tests/run_container_contract.php \
   --api-image baander/registry:0.1.0 --rqlite-image baander/registry-rqlite:10.5.1
 ```
 

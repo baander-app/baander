@@ -7,16 +7,26 @@ writable storage. Changing an agent branch does not change the persistent checko
 
 ## Prerequisites and host setup
 
-The controller requires Linux, Python 3, Git, OpenSSL, Docker with Compose and
-Buildx, NetworkManager managing DNS through dnsmasq, mkcert, and a working systemd
-user manager. Docker must provide cgroup v2 and publish loopback port 443 for the
-invoking user. Each worker pair requires at least two daemon CPUs and 8448 MiB of
-daemon RAM; allow additional resources for web, dependencies and concurrent
-instances. Use Yarn for frontend work; never run npm.
+The controller requires Linux, PHP 8.5+ with Swoole, Composer, Bash, GNU coreutils,
+`setsid`, Git, OpenSSL, Docker with Compose and Buildx, NetworkManager managing DNS
+through dnsmasq, mkcert, and a working systemd user manager. Docker must provide
+cgroup v2 and publish loopback port 443 for the invoking user. Each worker pair
+requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
+resources for web, dependencies and concurrent instances. Use Yarn for frontend
+work; never run npm.
+
+Host setup uses the Composer project under `scripts/`, which installs the local
+`baander/tooling` library from `packages/baander-tooling/`; application
+dependencies and the application kernel are not prerequisites. It checks the PHP
+runtime before writing state. Bash entrypoints forward to PHP; the application
+console keeps its application commands. The root command `composer tooling:autoload`
+installs both the `scripts/` and `relay/` Composer projects for development and test
+work. For host setup, use the `scripts/` installation shown below.
 
 Generate the host instructions before starting an instance:
 
 ```bash
+composer --working-dir=scripts install --no-dev
 make dev-host-setup
 ```
 
@@ -77,7 +87,9 @@ The persistent updater is a systemd user timer named
 controller state directories from sharing a timer. Inspect installed timers with
 `systemctl --user list-timers 'baander-development-*'`.
 It checks remote `master` every 60 seconds while enabled. Its controller and clone
-live outside worktrees. The service retains the absolute executable search paths
+live outside worktrees. Publication copies the PHP controller and records its
+absolute PHP executable under the lifecycle lock, preserving updater intent.
+The service retains the absolute executable search paths
 from `dev-up`, including Docker credential helpers; remote access must work without
 an interactive prompt. The user manager must remain available for checks to run;
 the workflow does not enable login lingering. A stopped instance stays stopped
@@ -161,7 +173,7 @@ For an isolated controller test or another state directory, use the dispatcher's
 `--state-root` option before its subcommand:
 
 ```bash
-python3 scripts/dev-environment.py --state-root /absolute/private/state status --instance persistent
+php scripts/dev-environment.php --state-root /absolute/private/state status --instance persistent
 ```
 
 There is no implicit state-root environment override. Keep state private: it holds
@@ -203,7 +215,7 @@ re-enrolling passkeys.
 
 Run the integrated acceptance harness on a host that has completed DNS, trust and
 SELinux setup. It needs unused loopback port 443, enough Docker capacity for three
-instances, host FFmpeg/ffprobe, Python's `cryptography` package, and the web
+instances, host FFmpeg/ffprobe, the PHP OpenSSL extension, and the web
 workspace's installed Playwright package and Chromium browser.
 
 Select a new workspace and a separate state directory outside the checkout:

@@ -77,7 +77,7 @@ Transport exceptions do not log request bodies, credentials or authentication
 headers. Responses carry `Cache-Control: no-store`.
 
 `relay/tests/security_test.cpp` checks response field selection and malformed
-database results containing secret markers. `relay/tests/run_http_contract.py`
+database results containing secret markers. `relay/tests/run_http_contract.php`
 checks response bodies, headers and captured API/rqlite logs for the actual raw
 credential, its digest, enrollment capability, enrollment key and database password
 markers. Those checks cover their fixture values and paths; they are not exhaustive
@@ -97,7 +97,7 @@ five minutes and compares the MAC with `CRYPTO_memcmp`. A capability cannot be
 moved to another identity or credential. It is not consumed on use; an owner
 already needs no enrollment for a heartbeat.
 
-`relay/tests/run_cluster_contract.py` exercises distinct owners through different
+`relay/tests/run_cluster_contract.php` exercises distinct owners through different
 API instances: a claimant with valid enrollment for a different credential still
 gets `403`, stored ownership and metadata/revision remain unchanged, a capability
 cannot claim a different identity, and the owner can retry through the other API.
@@ -113,7 +113,7 @@ submitted again: it restores its old URL, name and version while advancing the
 server revision and heartbeat. Monotonic timestamps and revisions record accepted
 writes; they do not order client intent or prevent replay.
 
-`relay/tests/run_http_contract.py` updates owner metadata, then replays the exact
+`relay/tests/run_http_contract.php` updates owner metadata, then replays the exact
 earlier body with the original enrollment capability and checks that the old
 metadata returns with a new revision. A separate heartbeat checks that the owner
 can register without enrollment. This is an accepted limitation of the current protocol. Someone who
@@ -187,7 +187,7 @@ HTTPS, explicit CA trust, hostname verification, SNI, a client certificate/key a
 Basic authentication. Optional `connectAddress` changes the connected IP while
 retaining the configured TLS identity. Redirects are rejected, not followed.
 Configuration and its DNS remain privileged inputs; this is not a public-address
-allowlist. `relay/tests/run_transport_contract.py` checks certificates, hostname
+allowlist. `relay/tests/run_transport_contract.php` checks certificates, hostname
 binding, redirects, deadlines and reconnection with disposable TLS peers.
 
 ### TLS or quorum downgrade
@@ -204,7 +204,7 @@ outcomes produce `503`; the transport evicts the connection and does not replay
 the uncertain write. A confirmed absent or offline identity gets `404`, which is
 distinct from inability to obtain an authoritative answer.
 
-`relay/tests/run_cluster_contract.py` checks partitions, minority refusal, majority
+`relay/tests/run_cluster_contract.php` checks partitions, minority refusal, majority
 progress, loss of a quorum and recovery with persisted identities/revisions.
 Local TLS forwarders emulate partitions; they do not establish regional network
 or physical-failure behavior. The startup wrapper requires explicit new-node modes,

@@ -451,6 +451,35 @@ Current qualification results are recorded in the roadmap.
 
 ## Running Tests
 
+Workflow orchestration requires PHP 8.5+ with Swoole, Composer, Bash and GNU
+coreutils on the host. Process groups also require `setsid`. Generate the standalone
+loaders with `composer tooling:autoload`; this installs the Composer projects under
+`scripts/` and `relay/` without booting the application kernel.
+
+With the root development dependencies installed, run the workflow checks from the
+repository root:
+
+```bash
+composer test:tooling
+composer test:registry-subjects
+composer analyse:tooling
+composer check:tooling-format
+```
+
+The tooling suite uses `phpunit-tooling.xml.dist` and remains separate from the
+four application suites. `composer test:tooling` excludes the
+`registry-python-subject` group. `composer test:registry-subjects` runs that group
+against the unchanged registry backup service and enrollment issuer; it requires
+Python 3 for those programs under test. Set `REGISTRY_SUBJECT_PYTHON` to select
+their interpreter. Both suites are mandatory CI gates. Test and analysis commands
+install the standalone loaders before running. Use `composer format:tooling` to
+apply the scoped PER-CS3 formatting rules before checking them.
+
+CI also runs the harness suite in the `tooling` runtime from
+`docker/runner/Dockerfile`, without Python, pcntl or posix. The
+`docker/runner/tooling-test.Dockerfile` copies source and Composer dependencies
+from the application CI image, so this check needs no host bind mount.
+
 Use an application image that satisfies the current Composer lockfile. To build
 one locally and select it for the disposable runners:
 
@@ -475,7 +504,7 @@ bash scripts/test-backend-container.sh tests/Integration/RefreshTokenGraceTest.p
 bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
 ```
 
-It requires Python 3, Docker and the Docker Compose plugin on the host.
+It requires the host tooling baseline above, Docker and the Docker Compose plugin.
 `BAANDER_TEST_PROCESSES` defaults to `2` and accepts integers from `1` through
 `8`; `1` is the diagnostic setting. `BAANDER_TEST_TIMEOUT` bounds the complete
 run, including setup, and defaults to `3600` seconds. Cleanup has separate
@@ -729,21 +758,21 @@ cleanup failure fails the run. Service stacks use bounded
 `docker compose down --volumes --remove-orphans` after collecting diagnostics.
 Final coverage is published only after identity and artifact checks; merging
 retains uncovered executable lines and exclusions. Validate the standard reports
-with `python3 scripts/validate-backend-coverage.py coverage` before using
+with `php scripts/validate-backend-coverage.php coverage` before using
 `coverage/metrics.json`.
 
-Runner regressions use `python3 -m unittest discover -s scripts/tests` and the
+Runner regressions use `composer test:tooling` and the
 `BackendTestRunnerTest` PHPUnit file. The destructive isolation probe,
-`python3 scripts/test-backend-stack-isolation.py`, creates two disposable stacks
+`php scripts/test-backend-stack-isolation.php`, creates two disposable stacks
 to check database outages, Redis pause/flush, cache/socket separation and
 inherited DSNs. Runtime security drills remain separate serial commands.
 
 For qualification,
-`python3 scripts/compare-backend-runs.py <reference> <candidate>` compares
+`php scripts/compare-backend-runs.php <reference> <candidate>` compares
 selected and completed identities, seed, timings, coverage denominators and
-exact executable/covered line sets. Coverage comparison requires host PHP and
-the installed Composer dependencies to read serialized artifacts; the Python
-regression suite does not.
+exact executable/covered line sets. Coverage validation and comparison require the
+PHP DOM extension. Coverage comparison also uses the root Composer dependencies
+to read serialized artifacts.
 
 Full coverage qualification matched 9,098 selected/completed test identities,
 44,191 executable lines and 35,385 covered lines between the sequential reference
@@ -812,14 +841,14 @@ extension requirement remains unchanged.
 Run the backend runner regressions before changing orchestration or cleanup:
 
 ```bash
-python3 -m unittest discover -s scripts/tests
+composer test:tooling
 bash scripts/test-worker-operator-cleanup.sh
 ```
 
-CI runs both commands in its backend runner regression step. The operator cleanup
-script uses a disposable Docker CLI stub to check enumeration failures, removal
-failures, retained resources, browser-hook cleanup and preservation of an earlier
-failure exit code. It does not prove cleanup against a real daemon; the production
+CI runs the PHP tooling suite and the operator cleanup script as separate steps.
+The operator cleanup script uses a disposable Docker CLI stub to check enumeration
+failures, removal failures, retained resources, browser-hook cleanup and preservation
+of an earlier failure exit code. It does not prove cleanup against a real daemon; the production
 operator drill must still verify absence of its containers, networks and volumes.
 
 For strict unit and messaging checks, run from the checkout:
@@ -841,9 +870,10 @@ bash scripts/test-functional-container.sh tests/Integration/WorkerDeploymentLeas
 ```
 
 Both unit and functional wrappers invoke the shared backend coordinator. They
-require Python 3, Docker, the Docker Compose plugin and installed Composer
-dependencies. The unit wrapper defaults to `Unit,StaticAnalysisRules`; filters keep
-that selection, a later explicit `--testsuite` overrides it, and file paths follow
+require the host tooling baseline above, Docker, the Docker Compose plugin and
+installed application Composer dependencies. The unit wrapper defaults to
+`Unit,StaticAnalysisRules`; filters keep that selection, a later explicit
+`--testsuite` overrides it, and file paths follow
 PHPUnit's selection rules. The functional wrapper defaults to `tests/Functional`
 only when called without arguments; otherwise it forwards the supplied selection,
 including integration paths.
@@ -854,9 +884,10 @@ networking disabled; functional and integration selections use disposable Compos
 stacks. `phpunit.xml.dist` randomizes test order within dependency constraints and
 treats unexpected output as risky.
 
-The operator runner requires Python 3 and Docker. Its default host mode also
-requires PHP with `posix` and `pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its
-executable) and a local Unix endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). The host
+The operator runner requires the host tooling baseline above and Docker. Its
+default host mode also requires the operator PHP runtime with `posix` and
+`pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its executable) and a local Unix
+endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). The host
 controller reaches a loopback-published database port; the worker reaches the same
 database through its private network. Its outer 240-second timeout bounds native
 database waits; DBAL `connect_timeout` is not a hard connection deadline.
@@ -888,9 +919,11 @@ ceilings, not measured universal capacity defaults.
 Both modes exercise `bin/worker-deployment.php` create, reconciliation, start,
 status and recovery against disposable PostgreSQL/Redis with canonical private
 credentials. They verify real outbox delivery, scheduler work, lease/child
-identities and retirement of the immutable boot. Both modes pass locally, including
-container mode from a workspace with only the runner script and no host PHP or
-Composer dependencies. The fixture image does not certify the production build.
+identities and retirement of the immutable boot. Earlier qualification passed both
+modes, including container mode from a workspace with only the former runner script
+and no host PHP or Composer dependencies. The PHP orchestration now requires the
+host tooling baseline in both modes. The fixture image does not certify the
+production build.
 Forgejo now includes a
 blocking operator lifecycle step using container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built

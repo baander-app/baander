@@ -1,7 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory-php
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf build-essential ca-certificates curl pkg-config xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/build-tooling-php.sh /tmp/build-tooling-php.sh
+RUN sh /tmp/build-tooling-php.sh
+
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake ninja-build curl ca-certificates perl pkg-config python3 \
+    build-essential cmake ninja-build curl ca-certificates perl pkg-config \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
 RUN curl --fail --silent --show-error --location --max-time 180 \
@@ -20,8 +27,10 @@ RUN cmake -S . -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
       -DCMAKE_EXE_LINKER_FLAGS=-Wl,-Map,/build/baander-registry.map \
       -DOPENSSL_ROOT_DIR=/opt/openssl -DOPENSSL_USE_STATIC_LIBS=TRUE \
     && cmake --build /build --parallel 2
-COPY tools/packaged_inventory.py /tools/packaged_inventory.py
-RUN python3 /tools/packaged_inventory.py capture-api --build /build --output /build/api-build.json
+COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
+COPY tools/packaged_inventory.php /tools/packaged_inventory.php
+COPY tools/inventory /tools/inventory
+RUN php /tools/packaged_inventory.php capture-api --build /build --output /build/api-build.json
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libstdc++6 && rm -rf /var/lib/apt/lists/* \
@@ -37,12 +46,12 @@ ENTRYPOINT ["/usr/local/bin/baander-registry"]
 CMD ["--config", "/etc/baander-registry/config.json"]
 
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory
-RUN apt-get update && apt-get install -y --no-install-recommends python3 \
-    && rm -rf /var/lib/apt/lists/*
-COPY tools/packaged_inventory.py /tools/packaged_inventory.py
+COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
+COPY tools/packaged_inventory.php /tools/packaged_inventory.php
+COPY tools/inventory /tools/inventory
 COPY third_party/inventory /resolutions
 COPY --from=runtime-base / /rootfs/
-RUN python3 /tools/packaged_inventory.py generate --kind api --root /rootfs \
+RUN php /tools/packaged_inventory.php generate --kind api --root /rootfs \
     --resolutions /resolutions --output /out
 
 FROM runtime-base AS runtime

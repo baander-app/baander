@@ -15,7 +15,17 @@ $finder = Finder::create()
     ->notPath('backend-test-runner.php')
     ->notPath('e2e-ingest-video.php')
     ->notPath('retain-build-evidence.php')
-    ->notPath('web-runtime');
+    ->notPath('web-runtime')
+    ->append([
+        __DIR__ . '/tests/Fixtures/Http/dns-orphan-supervisor.php',
+        __DIR__ . '/tests/Fixtures/Http/dns-server.php',
+        __DIR__ . '/tests/Fixtures/Worker/autoscaling-verify.php',
+        __DIR__ . '/tests/Fixtures/Worker/control-capacity-postgres-sample.php',
+        __DIR__ . '/tests/Fixtures/Worker/control-capacity-verify.php',
+        __DIR__ . '/tests/Fixtures/Worker/legacy-runtime.php',
+        __DIR__ . '/tests/Fixtures/Worker/lifecycle-checkpoint.php',
+        __DIR__ . '/tests/Fixtures/Worker/media-control-verify.php',
+    ]);
 
 return new Config()
     ->setRiskyAllowed(false)

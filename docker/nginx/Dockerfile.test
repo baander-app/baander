@@ -1,3 +1,20 @@
 FROM nginx:alpine
 
-RUN apk add --no-cache curl openssl python3
+ARG SWOOLE_VERSION=6.2.0
+ARG SWOOLE_SHA256=b66bf449440c1ba2727314e1e9c4c078978e7def21a02b729bbfec35601ae2ee
+
+RUN apk add --no-cache bash coreutils curl libstdc++ openssl php85 php85-sockets util-linux \
+    && apk add --no-cache --virtual .php-build autoconf g++ linux-headers make php85-dev pkgconf \
+    && curl -fsSL "https://pecl.php.net/get/swoole-${SWOOLE_VERSION}.tgz" -o /tmp/swoole.tgz \
+    && echo "${SWOOLE_SHA256}  /tmp/swoole.tgz" | sha256sum -c - \
+    && mkdir /tmp/swoole \
+    && tar -xzf /tmp/swoole.tgz -C /tmp/swoole --strip-components=1 \
+    && cd /tmp/swoole \
+    && phpize85 \
+    && ./configure --with-php-config=/usr/bin/php-config85 --enable-sockets --disable-brotli \
+    && make -j4 \
+    && make install \
+    && echo 'extension=swoole.so' > /etc/php85/conf.d/99_swoole.ini \
+    && php -r 'if (PHP_VERSION_ID < 80500 || !extension_loaded("swoole")) { exit(1); }' \
+    && apk del .php-build \
+    && rm -rf /tmp/swoole /tmp/swoole.tgz

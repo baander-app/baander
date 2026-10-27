@@ -39,7 +39,10 @@ final class AtomicFileTest extends TestCase
         $reader = fopen($path, 'r');
         AtomicFile::writeJson($path, ['phase' => 'ready']);
         self::assertSame(['phase' => 'ready'], AtomicFile::readJson($path));
-        self::assertSame(['phase' => 'preparing'], json_decode(stream_get_contents($reader), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(
+            ['phase' => 'preparing'],
+            json_decode(stream_get_contents($reader), true, flags: JSON_THROW_ON_ERROR),
+        );
         fclose($reader);
         self::assertSame(0600, fileperms($path) & 0777);
         self::assertSame(0700, fileperms(dirname($path)) & 0777);
@@ -155,7 +158,11 @@ final class AtomicFileTest extends TestCase
     /** @return array{int, string, string} */
     private function contender(): array
     {
-        $child = proc_open([PHP_BINARY, __DIR__ . '/Fixtures/filesystem-lock.php', $this->directory], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $child = proc_open(
+            [PHP_BINARY, __DIR__ . '/Fixtures/filesystem-lock.php', $this->directory],
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+        );
         self::assertIsResource($child);
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);

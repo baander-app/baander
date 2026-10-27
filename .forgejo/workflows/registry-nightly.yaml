@@ -20,12 +20,14 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install parser fuzz toolchain
                 run: |
                     apt-get update
                     apt-get install -y --no-install-recommends python3 openssl clang-19 libclang-rt-19-dev ninja-build
-            -   name: Verify qualification orchestration
-                run: python3 relay/tests/test_qualification_runner.py
             -   name: Qualify five-voter Registry
                 env:
                     CC: clang-19
@@ -34,7 +36,7 @@ jobs:
                     REGISTRY_FUZZ_RUNS: '10000'
                     REGISTRY_FUZZ_SECONDS: '120'
                     REGISTRY_QUALIFICATION_OUTPUT: var/test-runs/registry-nightly/${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
-                run: bash scripts/test-registry.sh fuzz
+                run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh fuzz
             -   name: Preserve nightly qualification evidence
                 if: always()
                 uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5

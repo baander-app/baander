@@ -23,4 +23,4 @@ clean:
 	@rm -f $(WASM)
 serve-demo:
 	@echo "Serving at http://localhost:8000"
-	python3 -m http.server 8000
+	php -S 0.0.0.0:8000 -t .

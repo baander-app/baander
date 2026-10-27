@@ -6,7 +6,10 @@ $argv = $_SERVER['argv'];
 
 switch ($argv[1]) {
     case 'echo':
-        echo json_encode(['argv' => array_slice($argv, 2), 'cwd' => getcwd(), 'env' => getenv('BAANDER_PROCESS_TEST')], JSON_THROW_ON_ERROR);
+        echo json_encode(
+            ['argv' => array_slice($argv, 2), 'cwd' => getcwd(), 'env' => getenv('BAANDER_PROCESS_TEST')],
+            JSON_THROW_ON_ERROR,
+        );
         fwrite(STDERR, 'diagnostic');
         exit(7);
     case 'large':

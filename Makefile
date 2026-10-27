@@ -1,8 +1,9 @@
 .DEFAULT_GOAL := help
-DEV_ENVIRONMENT := python3 scripts/dev-environment.py
+DEV_ENVIRONMENT := php scripts/dev-environment.php
+TOOLING_EXEC := php "$(dir $(abspath $(lastword $(MAKEFILE_LIST))))scripts/exec-command.php"
 DEV_TARGET = $(if $(INSTANCE),--instance $(INSTANCE),)
 DEV_MEDIA = $(if $(MEDIA),--media "$(MEDIA)",)
-STATIC_CHECK := python3 scripts/check-backend-container.py
+STATIC_CHECK := php scripts/check-backend-container.php
 STATIC_IMAGE = $(if $(BAANDER_TEST_IMAGE),--image "$(BAANDER_TEST_IMAGE)",)
 override cmd := $(value cmd)
 export cmd
@@ -58,7 +59,7 @@ ssh-nginx: ## Open a shell in the selected instance frontend
 
 exec: ## Run cmd in this preview; INSTANCE=persistent is required for baander.test
 ifeq ($(INSIDE_DOCKER_CONTAINER), 1)
-	@python3 -c 'import os, shlex; command = shlex.split(os.environ["cmd"]); os.execvp(command[0], command)'
+	@$(TOOLING_EXEC)
 else
 	@$(DEV_ENVIRONMENT) exec $(DEV_TARGET) --command-env cmd
 endif

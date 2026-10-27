@@ -19,12 +19,15 @@ if ($argv[1] === 'scope-between') {
         $scope->dispatch();
         $between = $scope->receivedSignal();
         $ready = '/tmp/u1-process-ready-' . bin2hex(random_bytes(8));
-        Swoole\Timer::tick(5, static function (int $timer) use ($ready): void {
-            if (is_file($ready)) {
-                Swoole\Timer::clear($timer);
-                Swoole\Process::kill(getmypid(), 2);
-            }
-        });
+        Swoole\Timer::tick(
+            5,
+            static function (int $timer) use ($ready): void {
+                if (is_file($ready)) {
+                    Swoole\Timer::clear($timer);
+                    Swoole\Process::kill(getmypid(), 2);
+                }
+            },
+        );
         try {
             $result = $runner->run(new ProcessSpec(argv: [PHP_BINARY, __DIR__ . '/process-child.php', 'sleep', $ready], timeout: 2));
         } finally {
@@ -32,7 +35,10 @@ if ($argv[1] === 'scope-between') {
                 unlink($ready);
             }
         }
-        echo json_encode(['between' => $between, 'latched' => $scope->receivedSignal(), 'result' => $result], JSON_THROW_ON_ERROR);
+        echo json_encode(
+            ['between' => $between, 'latched' => $scope->receivedSignal(), 'result' => $result],
+            JSON_THROW_ON_ERROR,
+        );
     } finally {
         $scope->close();
     }
@@ -44,7 +50,10 @@ if ($argv[1] === 'scope-between') {
         $cancelled = $runner->run(new ProcessSpec(argv: [PHP_BINARY, __DIR__ . '/process-child.php', 'sleep']));
         Swoole\Timer::after(30, static fn() => Swoole\Process::kill(getmypid(), 2));
         $result = $runner->run(new ProcessSpec(argv: [PHP_BINARY, '-r', 'usleep(150000); echo "cleaned";'], timeout: 1, ignoreCancellation: true));
-        echo json_encode(['cancelled' => $cancelled->cancelled, 'latched' => $scope->receivedSignal(), 'result' => $result], JSON_THROW_ON_ERROR);
+        echo json_encode(
+            ['cancelled' => $cancelled->cancelled, 'latched' => $scope->receivedSignal(), 'result' => $result],
+            JSON_THROW_ON_ERROR,
+        );
     } finally {
         $scope->close();
     }
@@ -82,8 +91,11 @@ if ($argv[1] === 'scope-between') {
 } else {
     $result = $runner->run(new ProcessSpec(argv: [PHP_BINARY, '-r', 'echo "standalone";'], processGroup: true));
 }
-echo json_encode([
-    'result' => $result,
-    'pcntl' => extension_loaded('pcntl'),
-    'posix' => extension_loaded('posix'),
-], JSON_THROW_ON_ERROR), "\n";
+echo json_encode(
+    [
+        'result' => $result,
+        'pcntl' => extension_loaded('pcntl'),
+        'posix' => extension_loaded('posix'),
+    ],
+    JSON_THROW_ON_ERROR,
+), "\n";

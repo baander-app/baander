@@ -30,7 +30,9 @@ final class DevelopmentSupervisorTest extends TestCase
         putenv('XDG_CONFIG_HOME=' . $this->root . '/config');
         mkdir($this->root . '/source/scripts', 0700, true);
         mkdir($this->root . '/source/docker/dev/systemd', 0700, true);
-        file_put_contents($this->root . '/source/scripts/dev-environment.php', <<<'PHP'
+        file_put_contents(
+            $this->root . '/source/scripts/dev-environment.php',
+            <<<'PHP'
 <?php
 require __DIR__ . '/bootstrap.php';
 Baander\Tooling\Runtime\Requirements::check(false);
@@ -41,14 +43,18 @@ if (($argv[1] ?? '') === '--probe-package') {
 } else {
     echo 'controller';
 }
-PHP);
+PHP,
+        );
         copy(dirname(__DIR__, 2) . '/bootstrap.php', $this->root . '/source/scripts/bootstrap.php');
         $repository = dirname(__DIR__, 3);
         $this->copyFixtureTree($repository . '/packages/baander-tooling', $this->root . '/source/packages/baander-tooling');
         $this->copyFixtureTree($repository . '/scripts/vendor', $this->root . '/source/scripts/vendor');
         file_put_contents($this->root . '/source/docker/dev/private.key', 'do-not-copy');
         foreach (['baander-development.service.template', 'baander-development.timer'] as $name) {
-            copy(dirname(__DIR__, 3) . '/docker/dev/systemd/' . $name, $this->root . '/source/docker/dev/systemd/' . $name);
+            copy(
+                dirname(__DIR__, 3) . '/docker/dev/systemd/' . $name,
+                $this->root . '/source/docker/dev/systemd/' . $name,
+            );
         }
     }
 
@@ -114,17 +120,27 @@ PHP);
         rename($this->root . '/source', $this->root . '/source-offline');
         self::assertFileExists(dirname($controller) . '/vendor/autoload.php');
         self::assertSame('controller', new Runner()->run([PHP_BINARY, '-n', $controller])->stdout);
-        $probe = json_decode(new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        $probe = json_decode(
+            new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout,
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
         self::assertSame('package-helper', $probe['stdout']);
         self::assertSame(0, $probe['exit']);
-        self::assertSame($this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php', $probe['source']);
+        self::assertSame(
+            $this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php',
+            $probe['source'],
+        );
         self::assertFileDoesNotExist(dirname($controller) . '/dev-environment.py');
         self::assertDirectoryDoesNotExist(dirname($controller) . '/dev_environment');
         self::assertFileDoesNotExist($this->store->root . '/controller/docker/dev/private.key');
         self::assertStringContainsString(Supervisor::systemdArgument((string) realpath(PHP_BINARY)), $unit);
         self::assertStringContainsString(Supervisor::systemdArgument($controller), $unit);
         self::assertStringNotContainsString($this->root . '/source', $unit);
-        self::assertStringContainsString('Unit=' . $supervisor->unit . '.service', (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.timer'));
+        self::assertStringContainsString(
+            'Unit=' . $supervisor->unit . '.service',
+            (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.timer'),
+        );
     }
 
     public function testOnlyTheDeclaredComposerPackageLinkCanEnterThePayload(): void
@@ -151,7 +167,10 @@ PHP);
 
     public function testOtherVendorSymlinksAreRejectedEvenWhenTheyPointToThePackage(): void
     {
-        symlink($this->root . '/source/packages/baander-tooling', $this->root . '/source/scripts/vendor/unexpected-package');
+        symlink(
+            $this->root . '/source/packages/baander-tooling',
+            $this->root . '/source/scripts/vendor/unexpected-package',
+        );
         $this->expectException(WorkflowError::class);
         $this->expectExceptionMessage('symlink controller payload');
         $this->supervisor($this->runner())->install();
@@ -163,7 +182,10 @@ PHP);
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
         $unit = (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.service');
-        self::assertStringContainsString('Environment="PATH=/home/operator/.rd/bin:/opt/a \\"quote\\" %%name $literal:/opt/back\\\\slash:/usr/bin"', $unit);
+        self::assertStringContainsString(
+            'Environment="PATH=/home/operator/.rd/bin:/opt/a \\"quote\\" %%name $literal:/opt/back\\\\slash:/usr/bin"',
+            $unit,
+        );
         self::assertStringNotContainsString('relative', $unit);
     }
 
@@ -200,7 +222,10 @@ PHP);
             $supervisor = $this->supervisor($runner);
             $supervisor->refresh();
             self::assertFalse($this->store->enabled('persistent'));
-            self::assertSame(['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'], $runner->calls[array_key_last($runner->calls)]['arguments']);
+            self::assertSame(
+                ['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'],
+                $runner->calls[array_key_last($runner->calls)]['arguments'],
+            );
             self::assertSame('database_mutating', $this->store->load('persistent')['phase']);
         } finally {
             $lock->release();
@@ -229,7 +254,10 @@ PHP);
         $supervisor = $this->supervisor($runner);
         $supervisor->enable();
         self::assertFalse($this->store->enabled('persistent'));
-        self::assertSame(['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'], $runner->calls[array_key_last($runner->calls)]['arguments']);
+        self::assertSame(
+            ['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'],
+            $runner->calls[array_key_last($runner->calls)]['arguments'],
+        );
     }
 
     public function testFailedEnableRollsBackIntent(): void

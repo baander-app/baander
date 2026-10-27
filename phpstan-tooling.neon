@@ -6,6 +6,14 @@ parameters:
         - relay/tests
         - relay/tools
         - .agents/skills/prose-fix/scripts
+        - tests/Fixtures/Http/dns-orphan-supervisor.php
+        - tests/Fixtures/Http/dns-server.php
+        - tests/Fixtures/Worker/autoscaling-verify.php
+        - tests/Fixtures/Worker/control-capacity-postgres-sample.php
+        - tests/Fixtures/Worker/control-capacity-verify.php
+        - tests/Fixtures/Worker/legacy-runtime.php
+        - tests/Fixtures/Worker/lifecycle-checkpoint.php
+        - tests/Fixtures/Worker/media-control-verify.php
     excludePaths:
         analyseAndScan:
             - scripts/vendor
@@ -15,3 +23,5 @@ parameters:
             - scripts/web-runtime
     bootstrapFiles:
         - vendor/autoload.php
+    stubFiles:
+        - packages/baander-tooling/phpstan/ffi.stub

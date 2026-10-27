@@ -62,9 +62,15 @@ final class DevelopmentStateTest extends TestCase
 
     public function testRecordsReopenWithoutChangingSchemaOrIndependentIntent(): void
     {
-        $record = ['id' => 'persistent', 'phase' => 'database_mutating', 'repository' => 'repository',
-            'environment' => ['APP_SECRET' => 'private'], 'checkpoint' => ['directory' => '/retained/checkpoint', 'verified' => true],
-            'media' => [['source' => '/media', 'target' => '/var/media']], 'running_revision' => null];
+        $record = [
+            'id' => 'persistent',
+            'phase' => 'database_mutating',
+            'repository' => 'repository',
+            'environment' => ['APP_SECRET' => 'private'],
+            'checkpoint' => ['directory' => '/retained/checkpoint', 'verified' => true],
+            'media' => [['source' => '/media', 'target' => '/var/media']],
+            'running_revision' => null,
+        ];
         $this->store->save('persistent', $record);
         $this->store->setEnabled('persistent', true);
         $lock = $this->store->lock('persistent');
@@ -98,7 +104,10 @@ final class DevelopmentStateTest extends TestCase
     {
         $this->store->save('persistent', ['id' => 'persistent']);
         $path = $this->store->directory('persistent') . '/state.json';
-        file_put_contents($path, '{"id":"persistent","custom":{"mapping":{},"list":[]},"environment":{},"migration_hashes":{}}');
+        file_put_contents(
+            $path,
+            '{"id":"persistent","custom":{"mapping":{},"list":[]},"environment":{},"migration_hashes":{}}',
+        );
         $record = $this->store->load('persistent');
         $this->store->save('persistent', $record);
         $decoded = json_decode((string) file_get_contents($path));
@@ -134,12 +143,25 @@ final class DevelopmentStateTest extends TestCase
 
     public function testEnvironmentKeepsOnlyExplicitTargetingAndSafeAmbientKeys(): void
     {
-        self::assertSame(['PATH' => '/usr/bin', 'HOME' => '/home/developer', 'SSH_AUTH_SOCK' => '/agent'], Environment::clean([
-            'PATH' => '/usr/bin', 'HOME' => '/home/developer', 'SSH_AUTH_SOCK' => '/agent', 'DATABASE_URL' => 'secret',
-            'DOCKER_HOST' => 'tcp://baander.app:2375', 'COMPOSE_FILE' => '/other', 'APP_SECRET' => 'private', 'GIT_DIR' => '/other']));
+        self::assertSame(
+            ['PATH' => '/usr/bin', 'HOME' => '/home/developer', 'SSH_AUTH_SOCK' => '/agent'],
+            Environment::clean([
+                'PATH' => '/usr/bin',
+                'HOME' => '/home/developer',
+                'SSH_AUTH_SOCK' => '/agent',
+                'DATABASE_URL' => 'secret',
+                'DOCKER_HOST' => 'tcp://baander.app:2375',
+                'COMPOSE_FILE' => '/other',
+                'APP_SECRET' => 'private',
+                'GIT_DIR' => '/other',
+            ]),
+        );
         putenv('COMPOSE_PROJECT_NAME=wrong');
         try {
-            $result = new Runner()->run([PHP_BINARY, '-r', 'echo json_encode([getenv("DATABASE_URL"),getenv("COMPOSE_PROJECT_NAME")]);'], env: ['DATABASE_URL' => 'selected']);
+            $result = new Runner()->run(
+                [PHP_BINARY, '-r', 'echo json_encode([getenv("DATABASE_URL"),getenv("COMPOSE_PROJECT_NAME")]);'],
+                env: ['DATABASE_URL' => 'selected'],
+            );
             self::assertSame(['selected', false], json_decode($result->stdout, true));
         } finally {
             putenv('COMPOSE_PROJECT_NAME');
@@ -193,7 +215,21 @@ final class DevelopmentStateTest extends TestCase
         $docker = new Docker($runner, ['executable' => '/selected/docker', 'context' => 'selected', 'daemon_id' => 'daemon']);
         self::assertSame(['ID' => 'daemon'], $docker->validate());
         $docker->compose(['project' => 'selected-project', 'compose_file' => '/selected/compose.json'], ['up', '-d']);
-        self::assertSame(['/selected/docker', '--context', 'selected', 'compose', '--project-name', 'selected-project', '--file', '/selected/compose.json', 'up', '-d'], $runner->seen[1]);
+        self::assertSame(
+            [
+                '/selected/docker',
+                '--context',
+                'selected',
+                'compose',
+                '--project-name',
+                'selected-project',
+                '--file',
+                '/selected/compose.json',
+                'up',
+                '-d',
+            ],
+            $runner->seen[1],
+        );
         $this->expectExceptionMessage('identity changed');
         new Docker($runner, ['executable' => '/selected/docker', 'context' => 'selected', 'daemon_id' => 'other'])->validate();
     }

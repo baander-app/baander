@@ -23,7 +23,10 @@ final class CommandWordsTest extends TestCase
         yield 'double quote escapes' => ['"a\\"b\\\\c\\$d\\`e\\q"', ['a"b\\c\\$d\\`e\\q']];
         yield 'single quote escapes stay literal' => ["'a\\b'", ['a\\b']];
         yield 'punctuation stays literal' => ['echo $HOME `id` ; && | > # ~ *', ['echo', '$HOME', '`id`', ';', '&&', '|', '>', '#', '~', '*']];
-        yield 'command substitution stays literal' => ["printf '%s' 'quoted value' ';' '$(touch marker)'", ['printf', '%s', 'quoted value', ';', '$(touch marker)']];
+        yield 'command substitution stays literal' => [
+            "printf '%s' 'quoted value' ';' '$(touch marker)'",
+            ['printf', '%s', 'quoted value', ';', '$(touch marker)'],
+        ];
         yield 'quoted newline' => ["cmd \"first\nsecond\"", ['cmd', "first\nsecond"]];
         yield 'escaped newline' => ["cmd first\\\nsecond", ['cmd', "first\nsecond"]];
         yield 'double quoted escaped newline' => ["\"first\\\nsecond\"", ["first\\\nsecond"]];

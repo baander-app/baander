@@ -48,7 +48,14 @@ if(REGISTRY_THREAD_SANITIZER)
 endif()
 include(CTest)
 if(BUILD_TESTING)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  find_program(REGISTRY_PHP_EXECUTABLE NAMES php REQUIRED)
+  find_program(REGISTRY_SUBJECT_PYTHON NAMES python3 REQUIRED)
+  execute_process(
+    COMMAND ${REGISTRY_PHP_EXECUTABLE} -r "exit(PHP_VERSION_ID >= 80500 && extension_loaded('swoole') ? 0 : 1);"
+    RESULT_VARIABLE REGISTRY_PHP_BASELINE)
+  if(NOT REGISTRY_PHP_BASELINE EQUAL 0)
+    message(FATAL_ERROR "Registry test harnesses require PHP 8.5 or newer with Swoole")
+  endif()
   set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
   FetchContent_Declare(googletest URL https://codeload.github.com/google/googletest/tar.gz/refs/tags/v1.17.0 URL_HASH SHA256=65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
   FetchContent_MakeAvailable(googletest)
@@ -58,7 +65,9 @@ if(BUILD_TESTING)
   include(GoogleTest)
   gtest_discover_tests(registry_tests)
   add_test(NAME registry_enrollment_issuer
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_issue_enrollment.py)
+    COMMAND ${REGISTRY_PHP_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_issue_enrollment.php
+            --python ${REGISTRY_SUBJECT_PYTHON}
+            --issuer ${CMAKE_CURRENT_SOURCE_DIR}/tools/issue_enrollment.py)
   set_tests_properties(registry_enrollment_issuer PROPERTIES TIMEOUT 10)
   if(REGISTRY_THREAD_SANITIZER)
     add_executable(registry_tsan_probe tests/tsan_probe.cpp)
@@ -66,7 +75,7 @@ if(BUILD_TESTING)
     target_compile_options(registry_tsan_probe PRIVATE -Wall -Wextra -Wpedantic -Werror -fsanitize=thread -fno-omit-frame-pointer -g)
     target_link_options(registry_tsan_probe PRIVATE -fsanitize=thread)
     add_test(NAME registry_tsan_positive_control
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_tsan.py
+      COMMAND ${REGISTRY_PHP_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_tsan.php
               --probe $<TARGET_FILE:registry_tsan_probe>)
     set_tests_properties(registry_tsan_positive_control PROPERTIES TIMEOUT 30)
   endif()

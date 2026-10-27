@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 set -euo pipefail
-exec python3 "$(dirname "$0")/test-backend-container.py" "$@"
+exec php "$(dirname "$0")/test-backend-container.php" "$@"

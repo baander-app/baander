@@ -89,6 +89,34 @@ assertions, with six Docker qualification cases still pending; inventory checks
 pass 76 tests and 281 assertions. Tooling PHPStan passes. These checks do not
 complete the remaining workflow migration or integrated acceptance.
 
+Workflow implementation checkpoint (U3–U8), 2026-10-27: replaced the development
+controller, backend coordination, inventory tools, runtime drills, registry
+harnesses, DSP servers and prose audit with PHP entrypoints and short Bash
+launchers. The registry has its own Composer project. Shipped backup and enrollment
+implementations remain byte-identical. Source snapshots and static-check archives
+retain the standalone Composer loaders and prose helper while excluding host
+secrets and other agent files; the packaging suite passes 20 tests and 96 assertions.
+
+Backend qualification passes 17 tests and 52 assertions across ordinary, native
+and service lanes, plus 20 stack-isolation checks. Its before/after inventory
+retains all 16 unrelated containers, four networks and 1,350 volumes. Inventory
+checks pass 76 tests and 281 assertions. Registry qualification passes 32 release,
+32 sanitizer, 33 thread-sanitizer and 32 fuzz CTests, the real protocol and recovery
+contracts, 10,000 parser fuzz runs and the use-after-free negative control. The
+encrypted backup/restore gate completes in 46 seconds; the separate cadence gate
+completes in 631 seconds. Web workflow contracts pass 27 tests and 80 assertions;
+startup and messaging workflow contracts pass eight tests and 43 assertions.
+
+Readability verification covers expanded calls, arrays and control blocks, plus
+PHP 8.5 pipes for sequential transformations. The 69 tooling test files retain
+identical parsed structure after formatting. The runtime and registry
+simplification passes preserve proof tests and resource protections. Dedicated
+tooling PHPStan and all three standalone Composer manifest checks pass. CI now
+includes an additional harness suite in a runtime without Python, pcntl or posix.
+Integrated verification remains open: the host package update interrupted the
+Python-free run, and the refreshed-image runtime drills, host lifecycle, final
+inventory checks and independent code review still need their final receipts.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

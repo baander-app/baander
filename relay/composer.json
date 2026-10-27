@@ -1,0 +1,22 @@
+{
+  "name": "baander/registry-test-tooling",
+  "description": "Standalone registry qualification and inventory tooling",
+  "type": "project",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=8.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "Baander\\RegistryTests\\": "tests/Support/",
+      "Baander\\Registry\\Inventory\\": "tools/inventory/"
+    },
+    "classmap": [
+      "tools/inventory/Inventory.php"
+    ]
+  },
+  "config": {
+    "allow-plugins": false,
+    "sort-packages": true
+  }
+}

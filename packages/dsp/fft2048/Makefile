@@ -1,5 +1,5 @@
 # Build and demo for fft2048 WASM
-# Requires: Emscripten (emcc) and Python 3
+# Requires: Emscripten (emcc) and PHP 8.5+
 
 EMCC ?= emcc
 SRC  := fft2048.cpp
@@ -30,4 +30,4 @@ clean:
 
 serve-demo:
 	@echo "Serving demo at http://localhost:8000"
-	python3 -m http.server 8000
+	php -S 0.0.0.0:8000 -t .

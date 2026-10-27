@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * Linux libc functions declared by the DNS orphan supervisor's FFI::cdef().
+ *
+ * @method int prctl(int $option, int $arg2, int $arg3, int $arg4, int $arg5)
+ * @method int waitpid(int $pid, \FFI\CData $status, int $options)
+ */
+final class FFI
+{
+}

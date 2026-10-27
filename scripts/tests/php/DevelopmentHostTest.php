@@ -74,7 +74,10 @@ final class DevelopmentHostTest extends TestCase
 
     public function testInspectionChecksHostWithoutCreatingState(): void
     {
-        self::assertSame(['resolver' => 'NetworkManager', 'port' => 443, 'hostname' => 'baander.test'], new Host($this->store, $this->runner(), $this->system())->inspect());
+        self::assertSame(
+            ['resolver' => 'NetworkManager', 'port' => 443, 'hostname' => 'baander.test'],
+            new Host($this->store, $this->runner(), $this->system())->inspect(),
+        );
         self::assertDirectoryDoesNotExist($this->store->root);
     }
 
@@ -168,7 +171,10 @@ final class DevelopmentHostTest extends TestCase
                 $recursive[] = $call['arguments'][array_key_last($call['arguments'])];
             }
         }
-        self::assertEqualsCanonicalizing([$this->root . '/checkout', $this->store->root . '/gateway', $this->store->root . '/persistent'], $recursive);
+        self::assertEqualsCanonicalizing(
+            [$this->root . '/checkout', $this->store->root . '/gateway', $this->store->root . '/persistent'],
+            $recursive,
+        );
         self::assertSame('private-ca', file_get_contents($this->store->root . '/host-setup/ca/rootCA-key.pem'));
     }
 
@@ -198,7 +204,10 @@ final class DevelopmentHostTest extends TestCase
     public function testHostInstructionsAreCopiedWithoutApplicationBootstrap(): void
     {
         $directory = new Host($this->store, $this->runner(), $this->system())->instructions();
-        self::assertFileEquals(dirname(__DIR__, 3) . '/docker/dev/host-setup/10-baander-dns.conf', $directory . '/10-baander-dns.conf');
+        self::assertFileEquals(
+            dirname(__DIR__, 3) . '/docker/dev/host-setup/10-baander-dns.conf',
+            $directory . '/10-baander-dns.conf',
+        );
     }
 
     public function testGatewayOwnsNetworkAndRestoresConfigurationWhenReloadFails(): void
@@ -209,16 +218,25 @@ final class DevelopmentHostTest extends TestCase
             if (in_array('info', $arguments, true)) {
                 $output = '{"ID":"daemon"}';
             } elseif (in_array('inspect', $arguments, true)) {
-                $output = json_encode([['Labels' => ['app.baander.development.owner' => 'gateway-' . $this->store->scope()],
-                    'IPAM' => ['Config' => [['Subnet' => '172.29.20.0/24']]]]], JSON_THROW_ON_ERROR);
+                $output = json_encode(
+                    [[
+                        'Labels' => ['app.baander.development.owner' => 'gateway-' . $this->store->scope()],
+                        'IPAM' => ['Config' => [['Subnet' => '172.29.20.0/24']]],
+                    ]],
+                    JSON_THROW_ON_ERROR,
+                );
             } elseif (is_file($failureFlag) && in_array('reload', $arguments, true)) {
                 throw new WorkflowError('reload failed');
             }
             return new ProcessResult(0, null, false, false, $output, '', 0);
         });
         $gateway = new Gateway($this->store, $runner);
-        $instance = ['id' => 'persistent', 'hostname' => 'baander.test', 'project' => 'owned',
-            'docker' => ['executable' => '/fake/docker', 'context' => 'selected', 'daemon_id' => 'daemon']];
+        $instance = [
+            'id' => 'persistent',
+            'hostname' => 'baander.test',
+            'project' => 'owned',
+            'docker' => ['executable' => '/fake/docker', 'context' => 'selected', 'daemon_id' => 'daemon'],
+        ];
         $network = $gateway->configure($instance, ['nginx_image' => 'nginx@sha256:original']);
         self::assertSame('172.29.20.2', $network['ipv4_address']);
         $gateway->route($instance);
@@ -258,6 +276,10 @@ final class DevelopmentHostTest extends TestCase
             0,
         ));
         $this->expectExceptionMessage('not owned');
-        Gateway::ownedNetwork(new \Baander\Tooling\Development\Docker($runner, ['executable' => '/fake/docker', 'context' => 'selected']), 'network', 'owned');
+        Gateway::ownedNetwork(
+            new \Baander\Tooling\Development\Docker($runner, ['executable' => '/fake/docker', 'context' => 'selected']),
+            'network',
+            'owned',
+        );
     }
 }

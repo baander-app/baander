@@ -1,4 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory-php
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf build-essential ca-certificates curl pkg-config xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/build-tooling-php.sh /tmp/build-tooling-php.sh
+RUN sh /tmp/build-tooling-php.sh
+
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS fetch
 ARG TARGETARCH
 RUN test "$TARGETARCH" = amd64
@@ -39,12 +46,12 @@ ENTRYPOINT ["python3", "/usr/local/bin/registry-backup"]
 CMD ["run", "--config", "/etc/baander-registry-backup/backup.json"]
 
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory
-RUN apt-get update && apt-get install -y --no-install-recommends python3 \
-    && rm -rf /var/lib/apt/lists/*
-COPY tools/packaged_inventory.py /tools/packaged_inventory.py
+COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
+COPY tools/packaged_inventory.php /tools/packaged_inventory.php
+COPY tools/inventory /tools/inventory
 COPY third_party/inventory /resolutions
 COPY --from=runtime-base / /rootfs/
-RUN python3 /tools/packaged_inventory.py generate --kind backup --root /rootfs \
+RUN php /tools/packaged_inventory.php generate --kind backup --root /rootfs \
     --resolutions /resolutions --output /out
 
 FROM runtime-base

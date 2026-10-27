@@ -57,11 +57,16 @@ final class RuntimeTest extends TestCase
         $source = 'require ' . var_export($loader, true) . '; '
             . 'use Baander\\Tooling\\Runtime\\Requirements; '
             . $body;
-        $process = proc_open([PHP_BINARY, '-n', '-d', 'display_errors=stderr', '-r', $source], [
-            0 => ['file', '/dev/null', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ], $pipes, '/tmp');
+        $process = proc_open(
+            [PHP_BINARY, '-n', '-d', 'display_errors=stderr', '-r', $source],
+            [
+                0 => ['file', '/dev/null', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ],
+            $pipes,
+            '/tmp',
+        );
         self::assertIsResource($process);
         $output = stream_get_contents($pipes[1]);
         fclose($pipes[1]);

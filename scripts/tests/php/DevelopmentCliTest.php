@@ -1,0 +1,309 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Baander\Tooling\Tests;
+
+use Baander\Tooling\Development\Cli;
+use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Development\StateStore;
+use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Process\ProcessSpec;
+use PHPUnit\Framework\TestCase;
+
+final class DevelopmentCliTest extends TestCase
+{
+    private string $directory;
+
+    protected function setUp(): void
+    {
+        $this->directory = '/tmp/baander-cli-' . bin2hex(random_bytes(8));
+        mkdir($this->directory, 0700);
+        mkdir($this->directory . '/checkout', 0700);
+    }
+
+    protected function tearDown(): void
+    {
+        $remove = static function (string $path) use (&$remove): void {
+            if (is_dir($path) && !is_link($path)) {
+                foreach (scandir($path) ?: [] as $name) {
+                    if ($name !== '.' && $name !== '..') {
+                        $remove($path . '/' . $name);
+                    }
+                }
+                rmdir($path);
+            } else {
+                unlink($path);
+            }
+        };
+        $remove($this->directory);
+        putenv('BAANDER_COMMAND');
+    }
+
+    public function testCommandEnvironmentPreservesQuotedValuesAndMetacharacters(): void
+    {
+        putenv("BAANDER_COMMAND=printf '%s' 'quoted value' ';' '\$(touch marker)'");
+        self::assertSame(
+            ['printf', '%s', 'quoted value', ';', '$(touch marker)'],
+            Cli::execCommand(Cli::parse(['exec', '--command-env', 'BAANDER_COMMAND'])),
+        );
+    }
+
+    public function testExplicitShellCommandIsPassedWhole(): void
+    {
+        $payload = 'printf \'%s\' "quoted value"; printf \'%s\' "$(pwd)"';
+        putenv('BAANDER_COMMAND=' . $payload);
+        self::assertSame(
+            ['bash', '-c', $payload],
+            Cli::execCommand(Cli::parse(['exec', '--shell-command-env', 'BAANDER_COMMAND'])),
+        );
+        self::assertSame(['php', '-v'], Cli::execCommand(Cli::parse(['exec', '--', 'php', '-v'])));
+    }
+
+    public function testEmptyAndConflictingCommandSourcesFail(): void
+    {
+        foreach ([
+            ['exec'],
+            ['exec', '--command-env', 'BAANDER_COMMAND'],
+            ['exec', '--command-env', 'BAANDER_COMMAND', '--', 'php'],
+        ] as $arguments) {
+            try {
+                Cli::execCommand(Cli::parse($arguments));
+                self::fail('A missing or conflicting command must fail.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('command', $error->getMessage());
+            }
+        }
+    }
+
+    public function testStateInsideCheckoutFailsBeforeCreation(): void
+    {
+        foreach ([$this->directory . '/checkout', $this->directory . '/checkout/private-state'] as $path) {
+            try {
+                Cli::configure(
+                    new StateStore($path),
+                    new Runner(),
+                    $this->directory . '/checkout',
+                    'repository',
+                    Cli::parse(['up']),
+                );
+                self::fail('State inside the worktree must fail.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('outside the worktree', $error->getMessage());
+            }
+        }
+        self::assertSame(['.', '..'], scandir($this->directory . '/checkout'));
+    }
+
+    public function testMediaCannotExposeStateOrPrivateSubdirectories(): void
+    {
+        $store = new StateStore($this->directory . '/state');
+        mkdir($store->root, 0700);
+        mkdir($store->root . '/gateway', 0700);
+        foreach ([$this->directory, $store->root, $store->root . '/gateway'] as $source) {
+            try {
+                Cli::configure(
+                    $store,
+                    new Runner(),
+                    $this->directory . '/checkout',
+                    'repository',
+                    Cli::parse(['up', '--media', $source]),
+                );
+                self::fail('Media exposing state must fail.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Media directories', $error->getMessage());
+            }
+        }
+        self::assertSame([], glob($store->root . '/*/state.json'));
+    }
+
+    public function testInheritedAndExistingMediaRemainValidated(): void
+    {
+        $store = new StateStore($this->directory . '/state');
+        $store->save(
+            'persistent',
+            [
+                'id' => 'persistent',
+                'repository' => 'repository',
+                'media' => [['source' => $this->directory, 'target' => '/media']],
+            ],
+        );
+        $saved = file_get_contents($store->directory('persistent') . '/state.json');
+        foreach ([['up'], ['up', '--instance', 'persistent']] as $arguments) {
+            try {
+                Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse($arguments));
+                self::fail('Saved media exposing state must fail.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Media directories', $error->getMessage());
+            }
+        }
+        self::assertSame($saved, file_get_contents($store->directory('persistent') . '/state.json'));
+    }
+
+    public function testStoppedInstanceCannotProduceAReadyUrl(): void
+    {
+        $this->expectException(WorkflowError::class);
+        Cli::readyUrl(['phase' => 'stopped', 'readiness' => null, 'hostname' => 'dev.baander.app']);
+    }
+
+    public function testUnknownOptionsAndInvalidChoicesAreRejected(): void
+    {
+        foreach ([
+            [['up', '--instance', 'preview'], 'persistent'],
+            [['exec', '--service', 'invalid'], 'service'],
+            [['status', '--unknown'], 'Unknown'],
+            [['exec', '--command-env', 'A', '--shell-command-env', 'B'], 'Choose'],
+        ] as [$arguments, $diagnostic]) {
+            try {
+                Cli::parse($arguments);
+                self::fail('Invalid CLI options must fail.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString($diagnostic, $error->getMessage());
+            }
+        }
+    }
+
+    public function testMakeExportsCommandWithoutExecutingHostMetacharacters(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $capture = __DIR__ . '/Fixtures/dev-cli-capture.php';
+        $output = $this->directory . '/capture.json';
+        $marker = $this->directory . '/host-marker';
+        $payload = "printf '%s' 'quoted value'; touch " . $marker . '; $(shell touch ' . $marker . ')';
+        foreach ([
+            'exec' => ['--command-env', 'cmd'],
+            'exec-by-root' => ['--user', 'root', '--command-env', 'cmd'],
+            'exec-bash' => ['--shell-command-env', 'cmd'],
+        ] as $target => $expected) {
+            $result = new ProcessRunner()->run(new ProcessSpec(
+                argv: [
+                    'make',
+                    '--no-print-directory',
+                    '-f',
+                    $root . '/Makefile',
+                    $target,
+                    'INSIDE_DOCKER_CONTAINER=0',
+                    'DEV_ENVIRONMENT=' . escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($capture),
+                    'cmd=' . $payload,
+                ],
+                cwd: $this->directory,
+                environment: [...getenv(), 'CAPTURE_RESULT' => $output],
+                timeout: 10,
+            ));
+            self::assertSame(0, $result->exitCode, $result->stderr);
+            self::assertSame(
+                [['exec', ...$expected], $payload],
+                json_decode(file_get_contents($output), true, flags: JSON_THROW_ON_ERROR),
+            );
+            self::assertFileDoesNotExist($marker);
+        }
+        $payload = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($capture) . " 'quoted value' ';' touch " . escapeshellarg($marker);
+        $result = new ProcessRunner()->run(new ProcessSpec(
+            argv: [
+                'make',
+                '--no-print-directory',
+                '-f',
+                $root . '/Makefile',
+                'exec',
+                'INSIDE_DOCKER_CONTAINER=1',
+                'cmd=' . $payload,
+            ],
+            cwd: $this->directory,
+            environment: [...getenv(), 'CAPTURE_RESULT' => $output],
+            timeout: 10,
+        ));
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertSame(
+            [['quoted value', ';', 'touch', $marker], $payload],
+            json_decode(file_get_contents($output), true, flags: JSON_THROW_ON_ERROR),
+        );
+        self::assertFileDoesNotExist($marker);
+    }
+
+    public function testHostSetupRejectsStateInsideCheckoutBeforeWritingFiles(): void
+    {
+        $runner = new Runner();
+        $runner->run(['git', 'init', '-q', $this->directory . '/checkout']);
+        $result = new ProcessRunner()->run(new ProcessSpec(
+            argv: [
+                PHP_BINARY,
+                dirname(__DIR__, 2) . '/dev-environment.php',
+                '--state-root',
+                $this->directory . '/checkout/state',
+                'host-setup',
+            ],
+            cwd: $this->directory . '/checkout',
+            environment: getenv(),
+            timeout: 10,
+        ));
+        self::assertSame(1, $result->exitCode);
+        self::assertStringContainsString('outside the worktree', $result->stderr);
+        self::assertDirectoryDoesNotExist($this->directory . '/checkout/state');
+    }
+
+    public function testRuntimeFailurePrecedesAnyStateChange(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(
+            argv: [
+                PHP_BINARY,
+                '-n',
+                dirname(__DIR__, 2) . '/dev-environment.php',
+                '--state-root',
+                $this->directory . '/state',
+                'host-setup',
+            ],
+            cwd: $this->directory . '/checkout',
+            environment: getenv(),
+            timeout: 10,
+        ));
+        self::assertSame(1, $result->exitCode);
+        self::assertStringContainsString('swoole is required', $result->stderr);
+        self::assertDirectoryDoesNotExist($this->directory . '/state');
+    }
+
+    public function testHostSetupOutsideGitWritesOnlyItsExplicitStateRoot(): void
+    {
+        $result = new ProcessRunner()->run(new ProcessSpec(
+            argv: [
+                PHP_BINARY,
+                dirname(__DIR__, 2) . '/dev-environment.php',
+                '--state-root',
+                $this->directory . '/state',
+                'host-setup',
+            ],
+            cwd: $this->directory . '/checkout',
+            environment: getenv(),
+            timeout: 10,
+        ));
+        self::assertSame(0, $result->exitCode, $result->stderr);
+        self::assertFileExists($this->directory . '/state/host-setup/README.md');
+        self::assertStringContainsString($this->directory . '/state/host-setup/README.md', $result->stdout);
+        self::assertSame(['.', '..'], scandir($this->directory . '/checkout'));
+    }
+
+    public function testWorktreeWithoutRemoteKeepsTheSharedRepositoryIdentity(): void
+    {
+        $runner = new Runner();
+        $root = $this->directory . '/checkout';
+        $runner->run(['git', 'init', '-q', $root]);
+        $runner->run(
+            [
+                'git',
+                '-c',
+                'user.name=Tooling',
+                '-c',
+                'user.email=tooling@baander.app',
+                'commit',
+                '--allow-empty',
+                '-qm',
+                'fixture',
+            ],
+            cwd: $root,
+        );
+        $runner->run(['git', 'worktree', 'add', '--detach', $this->directory . '/worktree'], cwd: $root);
+        [$checkout, $identity] = Cli::repositoryContext($runner, $this->directory . '/worktree');
+        self::assertSame($this->directory . '/worktree', $checkout);
+        self::assertSame(realpath($root . '/.git'), $identity);
+    }
+}

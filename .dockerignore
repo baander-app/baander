@@ -3,6 +3,13 @@
 .git
 # Agent indexes, sessions, profiling captures and editor state are host-only.
 .agents
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/prose-fix/
+.agents/skills/prose-fix/*
+!.agents/skills/prose-fix/scripts/
 .codex
 .rpiv
 .reli

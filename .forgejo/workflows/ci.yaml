@@ -29,6 +29,9 @@ jobs:
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
 
+            -   name: Prepare standalone PHP tooling
+                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+
             -   name: Login to Container Registry
                 run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
 
@@ -214,17 +217,29 @@ jobs:
 
             -   name: Backend runner regressions
                 run: |
-                    python3 -m unittest discover -s scripts/tests
-                    docker run --rm --network none --entrypoint python3 "$CI_IMAGE" \
-                      -m unittest discover -s scripts/tests -p test_retain_build_evidence.py
+                    docker run --rm --network none --entrypoint php "$CI_IMAGE" \
+                      vendor/bin/phpunit --configuration phpunit-tooling.xml.dist scripts/tests/php/RetainBuildEvidenceTest.php
                     bash scripts/test-worker-operator-cleanup.sh
 
             -   name: PHP tooling regressions
                 run: |
+                    docker run --rm --network none "$CI_IMAGE" \
+                      composer check:tooling-format
                     docker run --rm --network none -e XDEBUG_MODE=off "$CI_IMAGE" \
-                      php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist
+                      php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --exclude-group registry-python-subject
+                    docker run --rm --network none -e XDEBUG_MODE=off -e REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 "$CI_IMAGE" \
+                      php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --group registry-python-subject
                     docker run --rm --network none -e XDEBUG_MODE=off "$CI_IMAGE" \
                       php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G --no-progress
+
+            -   name: Python-free workflow contracts
+                run: |
+                    TOOLING_IMAGE="baander-tooling:${{ forgejo.run_id }}-${{ forgejo.run_attempt }}"
+                    docker build --target tooling --file docker/runner/Dockerfile \
+                      --tag "$TOOLING_IMAGE" .
+                    docker build --file docker/runner/tooling-test.Dockerfile \
+                      --build-arg CI_IMAGE="$CI_IMAGE" \
+                      --build-arg TOOLING_IMAGE="$TOOLING_IMAGE" .
 
             -   name: Development instance safety and source admission
                 run: |
@@ -236,7 +251,7 @@ jobs:
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
-                      python3 scripts/test-backend-stack-isolation.py --artifacts var/test-isolation
+                      php scripts/test-backend-stack-isolation.php --artifacts var/test-isolation
 
             -   name: PHPUnit with coverage
                 run: |
@@ -332,7 +347,7 @@ jobs:
                       timeout 900 bash scripts/test-web-shutdown-container.sh
 
             -   name: Extract coverage metrics
-                run: python3 scripts/validate-backend-coverage.py coverage
+                run: php scripts/validate-backend-coverage.php coverage
 
             -   name: Preserve backend verification artifacts
                 if: always()
@@ -532,12 +547,16 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install native test tools
                 run: |
                     apt-get update
                     apt-get install -y --no-install-recommends ninja-build openssl
             -   name: Build and qualify registry
-                run: bash scripts/test-registry.sh ${{ matrix.mode }}
+                run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh ${{ matrix.mode }}
 
     registry-static-quality:
         runs-on: docker-cli
@@ -552,16 +571,20 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install static analysis toolchain
                 run: |
                     apt-get update
-                    apt-get install -y --no-install-recommends clang-19 clang-tidy-19 ninja-build python3 python3-yaml
+                    apt-get install -y --no-install-recommends clang-19 clang-tidy-19 ninja-build
             -   name: Analyze registry and verify direct dependency licenses
                 run: bash scripts/test-registry-static.sh
 
     registry-container-quality:
         runs-on: docker-cli
-        timeout-minutes: 30
+        timeout-minutes: 45
         env:
             REGISTRY_INVENTORY_OUTPUT: var/test-runs/registry-inventory
         container:
@@ -574,10 +597,14 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install container test tools
                 run: |
                     apt-get update
-                    apt-get install -y --no-install-recommends python3 openssl
+                    apt-get install -y --no-install-recommends openssl
             -   name: Build and qualify registry containers
                 run: bash scripts/test-registry-container.sh
             -   name: Qualify encrypted registry backup and recovery
@@ -604,6 +631,10 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install thread sanitizer toolchain
                 run: |
                     apt-get update
@@ -612,7 +643,7 @@ jobs:
                 env:
                     CC: clang-19
                     CXX: clang++-19
-                run: bash scripts/test-registry.sh thread
+                run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh thread
 
     registry-fuzz-quality:
         runs-on: docker-cli
@@ -627,6 +658,10 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: |
+                    composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+                    composer --working-dir=relay install --no-dev --no-interaction --no-scripts --no-plugins
             -   name: Install parser fuzz toolchain
                 run: |
                     apt-get update
@@ -635,7 +670,7 @@ jobs:
                 env:
                     CC: clang-19
                     CXX: clang++-19
-                run: bash scripts/test-registry.sh fuzz
+                run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh fuzz
 
     build-and-push:
         runs-on: docker-cli
@@ -650,6 +685,9 @@ jobs:
                     git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
                     git checkout -q --detach "${{ forgejo.sha }}"
                     test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+
+            -   name: Prepare standalone PHP tooling
+                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
 
             -   name: Login to Container Registry
                 run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ forgejo.actor }} --password-stdin
