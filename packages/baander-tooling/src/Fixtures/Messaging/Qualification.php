@@ -135,15 +135,13 @@ final class Qualification
                 }
                 throw new \RuntimeException(ucfirst($mode) . ' services did not become ready within 30 attempts.');
             }
-            if ($mode !== 'messaging') {
-                $sql = file_get_contents($runtime->root . '/tests/Fixtures/postgres-extensions.sql');
-                Runtime::require($sql !== false, 'PostgreSQL extension fixture is missing.');
-                $docker->run(
-                    ['exec', '-i', $postgres, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'baander', '-d', $database],
-                    input: $sql,
-                    timeout: null,
-                );
-            }
+            $sql = file_get_contents($runtime->root . '/tests/Fixtures/postgres-extensions.sql');
+            Runtime::require($sql !== false, 'PostgreSQL extension fixture is missing.');
+            $docker->run(
+                ['exec', '-i', $postgres, 'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'baander', '-d', $database],
+                input: $sql,
+                timeout: null,
+            );
             $app = $id . '-app';
             $resources->containers[] = $app;
             $environment = $mode === 'messaging'

@@ -211,8 +211,16 @@ final class MessagingWorkflowTest extends TestCase
         self::assertSame(7, $result->exitCode, $result->stderr);
         self::assertStringContainsString('fixture workload failed', $result->stderr);
         self::assertStringContainsString('cleanup failed', $result->stderr);
+        self::assertFileExists($this->root . '/sql');
+        self::assertSame('CREATE EXTENSION fixture;', file_get_contents($this->root . '/sql'));
         self::assertFileExists($this->root . '/archive-arguments');
-        self::assertTrue(array_any($this->recorded(), static fn(array $args): bool => in_array('--fail-on-skipped', $args, true)));
+        $calls = $this->recorded();
+        $provision = array_find_key($calls, static fn(array $args): bool => in_array('psql', $args, true));
+        $workload = array_find_key($calls, static fn(array $args): bool => in_array('--fail-on-skipped', $args, true));
+        self::assertNotNull($provision);
+        self::assertNotNull($workload);
+        self::assertContains('messaging_test', $calls[$provision]);
+        self::assertLessThan($workload, $provision);
         self::assertFalse($this->json('artifacts/cleanup.json')['cleanupVerified']);
     }
 

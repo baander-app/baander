@@ -231,8 +231,15 @@ The workflow suite passes 19 tests and 41 assertions; the lead's focused check
 passes one test and five assertions. A live PostgreSQL cleanup probe and the
 65-second web runtime drill restore exact container, network and volume inventories.
 Focused PHPStan, formatting and independent review pass. The production worker
-drill also passes in 65 seconds. Host lifecycle, messaging and full backend
-acceptance remain open.
+drill also passes in 65 seconds.
+
+Messaging checkpoint, 2026-10-28: the messaging harness now provisions the existing
+PostgreSQL extension fixture before starting its workload, matching the producer
+and outbox harnesses. The regression fails without provisioning; all six workflow
+tests and 42 assertions pass with the repair. The live Docker run passes 165 tests
+and 2,488 assertions in 122 seconds and restores exact resource inventories.
+Focused PHPStan, formatting and independent review pass. Host lifecycle and full
+backend acceptance remain open.
 
 ## Fixed product name
 
