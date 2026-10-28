@@ -241,6 +241,17 @@ and 2,488 assertions in 122 seconds and restores exact resource inventories.
 Focused PHPStan, formatting and independent review pass. Host lifecycle and full
 backend acceptance remain open.
 
+Host acceptance interruption, 2026-10-28: fresh and repeated startup preserve
+the configured account, library and secrets, but worker-control failures prevent
+accepting the lifecycle run. Diagnosis remains open. Stopping the run exposed a
+separate cancellation bug: exceptions thrown directly from Swoole signal callbacks
+bypass the entrypoint's failure handler. Polling now captures the exception and
+throws it on the normal PHP stack. Real SIGTERM and SIGINT regressions fail with
+the old code and pass with the repair, including retained evidence, exit status
+and timer cleanup. The acceptance-log suite passes six tests and 40 assertions;
+focused PHPStan, formatting, five simplification reviews and independent code
+review pass. Full lifecycle acceptance remains open.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

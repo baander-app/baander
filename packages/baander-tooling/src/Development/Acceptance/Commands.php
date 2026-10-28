@@ -69,23 +69,27 @@ final class Commands
 
     public function pause(int $microseconds): void
     {
+        $failure = null;
         \Swoole\Process::signal(
             SIGTERM,
-            static fn() => throw new \RuntimeException('Qualification cancelled by SIGTERM.'),
+            static function () use (&$failure): void {
+                $failure ??= new \RuntimeException('Qualification cancelled by SIGTERM.');
+            },
         );
         \Swoole\Process::signal(
             SIGINT,
-            static fn() => throw new \RuntimeException('Qualification cancelled by SIGINT.'),
+            static function () use (&$failure): void {
+                $failure ??= new \RuntimeException('Qualification cancelled by SIGINT.');
+            },
         );
         $deadline = Support::now() + $microseconds / 1000000;
-        $failure = null;
         $timer = \Swoole\Timer::tick(5, function () use (&$failure): void {
             try {
                 foreach ($this->pending as $process) {
                     $process->pump();
                 }
             } catch (\Throwable $error) {
-                $failure = $error;
+                $failure ??= $error;
             }
         });
         try {

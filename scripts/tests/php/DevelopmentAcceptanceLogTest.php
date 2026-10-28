@@ -6,6 +6,7 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Acceptance\Commands;
 use Baander\Tooling\Development\Acceptance\Support;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentAcceptanceLogTest extends TestCase
@@ -96,5 +97,47 @@ final class DevelopmentAcceptanceLogTest extends TestCase
         self::assertCount(1, $logs);
         self::assertSame('silent-child-ready', file_get_contents($logs[0]));
         self::assertSame(0600, fileperms($logs[0]) & 0777);
+    }
+
+    /** @return iterable<string,array{string}> */
+    public static function pollingSignals(): iterable
+    {
+        yield 'termination' => ['SIGTERM'];
+        yield 'interrupt' => ['SIGINT'];
+    }
+
+    #[DataProvider('pollingSignals')]
+    public function testPollingSignalReachesTheOuterFailureHandler(string $signal): void
+    {
+        $code = <<<'PHP_CODE'
+            require $argv[1];
+            $root = $argv[2];
+            $signal = constant($argv[3]);
+            $commands = new Baander\Tooling\Development\Acceptance\Commands($root, $root . '/logs');
+            Swoole\Timer::after(25, static function () use ($signal): void {
+                Swoole\Process::kill(getmypid(), $signal);
+            });
+            try {
+                $commands->pause(500000);
+            } catch (Throwable $error) {
+                file_put_contents($root . '/failure-preserved', $error->getMessage());
+                $timers = Swoole\Timer::stats()['num'];
+                $commands->pause(10000);
+                echo json_encode(['message' => $error->getMessage(), 'timers' => $timers], JSON_THROW_ON_ERROR);
+                exit(1);
+            }
+            exit(2);
+            PHP_CODE;
+        $result = Support::run(
+            [PHP_BINARY, '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $this->root, $signal],
+            timeout: 4,
+            check: false,
+        );
+        self::assertSame(1, $result->exitCode, $result->stderr);
+        self::assertFalse($result->timedOut);
+        $report = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Qualification cancelled by ' . $signal . '.', $report['message']);
+        self::assertSame(0, $report['timers']);
+        self::assertSame($report['message'], file_get_contents($this->root . '/failure-preserved'));
     }
 }
