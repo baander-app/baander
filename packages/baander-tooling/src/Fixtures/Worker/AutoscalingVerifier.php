@@ -60,11 +60,14 @@ final class AutoscalingVerifier
         return $receipts;
     }
 
-    /** @return array<string,mixed> */
-    public static function burst(string $root, string $batch): array
+    /**
+     * @param list<array<string,mixed>>|null $values
+     * @return array<string,mixed>
+     */
+    public static function burst(string $root, string $batch, ?array $values = null): array
     {
         $publication = Reports::json($root . '/' . $batch . '.json');
-        $completed = self::receipts(self::samples($root), $batch);
+        $completed = self::receipts($values ?? self::samples($root), $batch);
         $expected = $batch === 'cpu' ? self::THRESHOLDS['cpuMessages'] : self::THRESHOLDS['messagesPerBurst'];
         $kind = $batch === 'cpu' ? 'cpu' : 'io';
         Reports::require(
@@ -366,7 +369,7 @@ final class AutoscalingVerifier
         }
         $bursts = [];
         foreach (['cold', 'repeat'] as $name) {
-            $result = self::burst($root, $name);
+            $result = self::burst($root, $name, $values);
             $start = Reports::json($root . '/' . $name . '.json')['started'];
             $phase = Reports::window($values, $start, $result['ended']);
             Reports::require(
@@ -394,7 +397,7 @@ final class AutoscalingVerifier
             )) <= 3,
             'Media control exceeded deadline',
         );
-        $cpuBurst = self::burst($root, 'cpu');
+        $cpuBurst = self::burst($root, 'cpu', $values);
         $pressureStart = $media['pressureStartedAt'];
         $pressureEnd = $media['pressureEndedAt'];
         Reports::require($pressureEnd - $pressureStart >= 60, 'Pressure window lasted less than sixty seconds');

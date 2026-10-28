@@ -191,6 +191,32 @@ it could finish or clean up. Its retained receipt records an interrupted run,
 not a code failure or a passing result. Remaining runtime, host lifecycle and
 backend acceptance continue after recovery of the disposable resources.
 
+Runtime recovery checkpoint, 2026-10-28: removed only the interrupted drill's six
+containers, two networks, six volumes and four fixture tags; unrelated resource
+identities were preserved. Memory and PID capacity cases pass in 122 and 109
+seconds, including the selected OOM death, control survival, fork-pressure behavior
+and exact cleanup. The actual Docker startup checks also pass.
+
+CPU qualification remains nonpassing: the first desired-state acknowledgement
+takes 7.11 seconds against the unchanged two-second limit. The historical launcher
+reproduces the initial readiness failure on the same images, but stops before CPU
+pressure; it does not establish the cause of that latency. The media-control gate
+hits the documented HLS-only observer limitation with current DASH output. Those
+assertions and the application behavior remain unchanged.
+
+Reader repair, 2026-10-28: autoscaling verification exposed a PHP memory failure
+while loading and rereading its JSONL evidence. The reader now consumes lines
+incrementally, and verification reuses decoded samples. The retained run's peak
+falls from 181.63 MiB to 56 MiB under a 128 MiB limit, reaching the unchanged media
+deadline assertion. A separate 70.23 MiB, 4,608-record regression fails with the old
+reader and passes with the fix at 78 MiB, preserving record count and payloads.
+The worker-fixture suite passes 89 tests and 120 assertions; the lead's focused
+checks pass three tests and nine assertions. Tooling PHPStan and formatting across
+276 files pass. Five simplification reviews and the independent code review have
+no findings; comparison with the old parser passes all 46 semantic cases.
+Higher autoscaling profiles, remaining
+runtime gates, host lifecycle and full backend acceptance remain open.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

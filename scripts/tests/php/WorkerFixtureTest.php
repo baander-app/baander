@@ -476,6 +476,48 @@ final class WorkerFixtureTest extends TestCase
         file_put_contents($this->root . '/control-samples.jsonl', '{', FILE_APPEND);
         self::assertCount(400, AutoscalingVerifier::samples($this->root));
         AutoscalingVerifier::idle($this->root);
+        file_put_contents($this->root . '/control-samples.jsonl', "\n\n", FILE_APPEND);
+        self::assertCount(400, Reports::samples($this->root . '/control-samples.jsonl', true));
+    }
+
+    public function testMalformedInteriorJsonlStillFailsBeforeLaterEvidence(): void
+    {
+        $path = $this->root . '/evidence.jsonl';
+        file_put_contents($path, "{\"monotonic\":0}\n{\n\n{\"monotonic\":1}\n");
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Malformed interior sample in evidence.jsonl');
+        Reports::samples($path, true);
+    }
+
+    public function testLargeCumulativeJsonlEvidenceFitsTheDefaultCliMemoryBudget(): void
+    {
+        $this->autoscalingFixture();
+        $path = $this->root . '/cumulative.jsonl';
+        $stream = fopen($path, 'wb');
+        self::assertIsResource($stream);
+        $completions = $this->values[399]['completions'];
+        try {
+            for ($index = 0; $index < 4608; ++$index) {
+                $sample = ['monotonic' => $index / 4, 'completions' => $completions];
+                fwrite($stream, json_encode($sample, JSON_THROW_ON_ERROR) . "\n");
+            }
+        } finally {
+            fclose($stream);
+        }
+        $code = <<<'PHP_CODE'
+            require $argv[1];
+            $samples = Baander\Tooling\Fixtures\Worker\Reports::samples($argv[2]);
+            echo json_encode(['count' => count($samples), 'first' => $samples[0], 'last' => $samples[array_key_last($samples)]], JSON_THROW_ON_ERROR);
+            PHP_CODE;
+        $result = new Runner()->run(
+            [PHP_BINARY, '-d', 'memory_limit=128M', '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $path],
+            check: false,
+        );
+        self::assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+        $observed = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(4608, $observed['count']);
+        self::assertSame(['monotonic' => 0, 'completions' => $completions], $observed['first']);
+        self::assertSame(['monotonic' => 1151.75, 'completions' => $completions], $observed['last']);
     }
 
     /** @return iterable<string,array{string}> */

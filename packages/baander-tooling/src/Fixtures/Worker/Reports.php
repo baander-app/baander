@@ -36,26 +36,33 @@ final class Reports
     /** @return list<array<string,mixed>> */
     public static function samples(string $path, bool $strictInterior = false): array
     {
-        $lines = preg_split('/\r?\n/', rtrim(self::text($path), "\r\n"));
+        $stream = @fopen($path, 'rb');
+        self::require($stream !== false, 'Cannot read evidence: ' . $path);
         $samples = [];
-        foreach ($lines as $index => $line) {
-            if ($line === '' && count($lines) === 1) {
-                continue;
-            }
-            try {
-                $sample = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                self::require(is_array($sample), 'Malformed sample in ' . $path);
-                $samples[] = $sample;
-            } catch (JsonException $error) {
-                if ($strictInterior && $index !== count($lines) - 1) {
+        $pendingError = null;
+        try {
+            while (($line = fgets($stream)) !== false) {
+                if ($pendingError !== null && rtrim($line, "\r\n") !== '') {
                     throw new RuntimeException(
                         'Malformed interior sample in ' . basename($path),
-                        previous: $error,
+                        previous: $pendingError,
                     );
                 }
+                try {
+                    $sample = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+                    self::require(is_array($sample), 'Malformed sample in ' . $path);
+                    $samples[] = $sample;
+                } catch (JsonException $error) {
+                    if ($strictInterior) {
+                        $pendingError ??= $error;
+                    }
+                }
             }
+            self::require(feof($stream), 'Cannot read evidence: ' . $path);
+            return $samples;
+        } finally {
+            fclose($stream);
         }
-        return $samples;
     }
 
     /** @return array<string,int> */
