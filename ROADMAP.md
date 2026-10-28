@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-27. This roadmap selects future work and records unresolved
+Updated: 2026-10-28. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -181,6 +181,15 @@ and volume inventories. The new command-boundary regression fails without the
 alias and passes with it: one test, five assertions. Focused formatting, PHPStan
 and independent review pass. The combined cleanup and network suite passes 38
 tests and 380 assertions. Longer runtime, host lifecycle and backend gates remain open.
+
+Runtime continuation, 2026-10-28: the source operator drill passes in 83 seconds,
+the image-backed operator drill in 79 seconds, and baked worker recovery in 123
+seconds. The lifecycle drill passes both Redis and PostgreSQL outage scenarios in
+311 seconds, including retained ownership, draining, successor recovery and exact
+resource cleanup. A host shutdown interrupted the following capacity drill before
+it could finish or clean up. Its retained receipt records an interrupted run,
+not a code failure or a passing result. Remaining runtime, host lifecycle and
+backend acceptance continue after recovery of the disposable resources.
 
 ## Fixed product name
 
