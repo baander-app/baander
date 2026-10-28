@@ -198,9 +198,13 @@ seconds, including the selected OOM death, control survival, fork-pressure behav
 and exact cleanup. The actual Docker startup checks also pass.
 
 CPU qualification remains nonpassing: the first desired-state acknowledgement
-takes 7.11 seconds against the unchanged two-second limit. The historical launcher
-reproduces the initial readiness failure on the same images, but stops before CPU
-pressure; it does not establish the cause of that latency. The media-control gate
+takes 7.11 seconds against the unchanged two-second limit. A second faithful run
+of the historical Bash/Python launcher reaches CPU pressure and records a 10.5285
+second first acknowledgement. Its verifier fails the ten-second consumer progress
+window: the blocking acknowledgement leaves 10.8985 seconds between observations,
+although the acknowledged count rises from five to 328. This reproduces the slow
+first acknowledgement before the port; it does not prove that processing stopped.
+Both historical runs restore their resource inventories. The media-control gate
 hits the documented HLS-only observer limitation with current DASH output. Those
 assertions and the application behavior remain unchanged.
 
@@ -214,8 +218,21 @@ The worker-fixture suite passes 89 tests and 120 assertions; the lead's focused
 checks pass three tests and nine assertions. Tooling PHPStan and formatting across
 276 files pass. Five simplification reviews and the independent code review have
 no findings; comparison with the old parser passes all 46 semantic cases.
-Higher autoscaling profiles, remaining
-runtime gates, host lifecycle and full backend acceptance remain open.
+Autoscaling profiles one, two and four complete their workloads, but retain first
+acknowledgement times of 12.1503, 11.2652 and 12.9059 seconds against the unchanged
+three-second limit. Profiles two and four use the repaired reader without memory
+failures and restore their resource inventories. Later assertions remain unqualified
+because verification stops at that deadline.
+
+Web cleanup checkpoint, 2026-10-28: shutdown scenarios pass in 155 seconds, but
+expose an anonymous PostgreSQL volume left by the inherited cleanup command.
+Both web harnesses now remove anonymous volumes with their owned containers.
+The workflow suite passes 19 tests and 41 assertions; the lead's focused check
+passes one test and five assertions. A live PostgreSQL cleanup probe and the
+65-second web runtime drill restore exact container, network and volume inventories.
+Focused PHPStan, formatting and independent review pass. The production worker
+drill also passes in 65 seconds. Host lifecycle, messaging and full backend
+acceptance remain open.
 
 ## Fixed product name
 

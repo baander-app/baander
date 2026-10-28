@@ -888,6 +888,7 @@ final class ShutdownWorkflow
                 [
                     'rm',
                     '-f',
+                    '-v',
                     $this->id . '-web',
                     $this->id . '-probe',
                     $this->id . '-client',

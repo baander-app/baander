@@ -67,7 +67,7 @@ final class RuntimeWorkflow
                 $containers[] = $this->id . '-mailpit';
             }
             array_push($containers, $this->id . '-redis', $this->id . '-postgres');
-            foreach ([['rm', '-f', ...$containers], ['network', 'rm', $this->id]] as $command) {
+            foreach ([['rm', '-f', '-v', ...$containers], ['network', 'rm', $this->id]] as $command) {
                 try {
                     $this->docker->run($command, check: false);
                 } catch (Throwable $cleanup) {

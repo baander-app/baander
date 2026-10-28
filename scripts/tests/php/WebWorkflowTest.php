@@ -131,6 +131,7 @@ LOG;
                     'web-fixture',
                     'rm',
                     '-f',
+                    '-v',
                     $id . '-web',
                     $id . '-probe',
                     $id . '-client',
