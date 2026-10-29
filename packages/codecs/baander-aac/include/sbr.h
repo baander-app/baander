@@ -351,6 +351,18 @@ void aac_sbr_usac_apply(AacSbrState* s, float* left, float* right);
 void aac_sbr_usac_apply_to_qmf(AacSbrState* s, int ch, const float* core, struct AacUsacQmfFrame_* out);
 void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in, float* out);
 
+/* The order of stereoConfigIndex 3, where MPS 212 runs on the core band
+ * of the downmix and the two-channel SBR data reconstructs each output:
+ * the first analyses the downmix frame into its QMF low band (the high
+ * band zero) with the frame's housekeeping; the second takes the MPS
+ * output of channel `ch` as that channel's low band, generates its high
+ * band from channel `ch`'s SBR data and leaves the frame for
+ * aac_sbr_usac_synthesize.  The harmonic transposer has no time signal
+ * here, so the patching generates the high band. */
+void aac_sbr_usac_analyze_core(AacSbrState* s, const float* core, struct AacUsacQmfFrame_* out);
+void aac_sbr_usac_apply_low_to_qmf(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in,
+                                   struct AacUsacQmfFrame_* out);
+
 /* ── Shared internals of sbr_dec.cpp and sbr_esbr.cpp ──────────────
  * The bitstream elements both syntaxes share (sbr_grid, sbr_dtdf,
  * sbr_invf, sbr_envelope, sbr_noise, sbr_sinusoidal_coding of 14496-3

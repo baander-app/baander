@@ -1036,9 +1036,10 @@ void x_gen(const AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChanne
   }
 }
 
-/* Analysis of the frame into the channel's buffers, the high band and
- * the adjusted output: the whole QMF-domain processing of one channel. */
-void process_channel(AacSbrState* s, int c, const float* pcm) {
+/* Analysis of the frame into the channel's buffers: the core samples
+ * (full scale 1.0) into the low-band history, and the transposer's
+ * output when the harmonic SBR is on. */
+void analyze_channel(AacSbrState* s, int c, const float* pcm) {
   AacSbrUsac* u = &s->usac;
   AacSbrUsacChannel* uc = &u->ch[c];
   AacSbrChannel* ch = &s->data[c];
@@ -1067,6 +1068,33 @@ void process_channel(AacSbrState* s, int c, const float* pcm) {
       aac_qmf_analyze(&uc->hbe_analysis, transposed + 64 * i, uc->W_hbe[hist - lag + i]);
     }
   }
+}
+
+/* The low band of the frame handed in as QMF samples (the MPS 212
+ * output of a stereoConfigIndex 3 element) into the channel's history,
+ * in place of its own analysis.  The transposer has no time signal to
+ * work on here, so the patching generates the high band. */
+void take_low_band(AacSbrState* s, int c, const struct AacUsacQmfFrame_* in) {
+  AacSbrUsac* u = &s->usac;
+  AacSbrUsacChannel* uc = &u->ch[c];
+  const int slots = u->slots_of_frame;
+  const int hist = u->history;
+  memmove(uc->W_low, uc->W_low + slots, (size_t)hist * sizeof(uc->W_low[0]));
+  for (int i = 0; i < slots; i++) {
+    for (int k = 0; k < 32; k++) {
+      uc->W_low[hist + i][k][0] = in->x[i][k][0];
+      uc->W_low[hist + i][k][1] = in->x[i][k][1];
+    }
+  }
+}
+
+/* From the channel's low-band history to the high band and the
+ * adjusted output: the rest of the QMF-domain processing of one channel. */
+void reconstruct_channel(AacSbrState* s, int c) {
+  AacSbrUsac* u = &s->usac;
+  AacSbrUsacChannel* uc = &u->ch[c];
+  AacSbrChannel* ch = &s->data[c];
+  AacSbrUsacChannelData* d = &u->data[c];
   lf_gen(u, uc, u->X_low);
   uc->Ypos ^= 1;
   if (s->start) {
@@ -1087,6 +1115,33 @@ void process_channel(AacSbrState* s, int c, const float* pcm) {
     }
   }
   x_gen(s, ch, uc, u->X);
+}
+
+/* The frame-level housekeeping before the first channel of a frame. */
+void frame_begin(AacSbrState* s) {
+  if (s->start && !s->ready_for_dequant) {
+    usac_turnoff(s);
+  }
+  if (!s->kx_and_m_pushed) {
+    s->kx[0] = s->kx[1];
+    s->m[0] = s->m[1];
+  } else {
+    s->kx_and_m_pushed = 0;
+  }
+  if (s->start) {
+    aac_sbr_dequant(s);
+    s->ready_for_dequant = 0;
+  }
+}
+
+void copy_x(const AacSbrUsac* u, struct AacUsacQmfFrame_* out) {
+  out->slots = u->slots_of_frame;
+  for (int i = 0; i < u->slots_of_frame; i++) {
+    for (int k = 0; k < 64; k++) {
+      out->x[i][k][0] = u->X[0][i][k];
+      out->x[i][k][1] = u->X[1][i][k];
+    }
+  }
 }
 
 void anchor_check(AacSbrState* s, int nch) {
@@ -1254,31 +1309,40 @@ int aac_sbr_usac_decode(AacSbrState* s, AacBitReader* r, int elem_type, int nr_c
 
 void aac_sbr_usac_apply_to_qmf(AacSbrState* s, int ch, const float* core,
                                struct AacUsacQmfFrame_* out) {
-  AacSbrUsac* u = &s->usac;
   if (ch == 0) {
-    /* the frame-level housekeeping once per frame */
-    if (s->start && !s->ready_for_dequant) {
-      usac_turnoff(s);
-    }
-    if (!s->kx_and_m_pushed) {
-      s->kx[0] = s->kx[1];
-      s->m[0] = s->m[1];
-    } else {
-      s->kx_and_m_pushed = 0;
-    }
-    if (s->start) {
-      aac_sbr_dequant(s);
-      s->ready_for_dequant = 0;
+    frame_begin(s);
+  }
+  analyze_channel(s, ch, core);
+  reconstruct_channel(s, ch);
+  copy_x(&s->usac, out);
+}
+
+void aac_sbr_usac_analyze_core(AacSbrState* s, const float* core, struct AacUsacQmfFrame_* out) {
+  AacSbrUsac* u = &s->usac;
+  const int slots = u->slots_of_frame;
+  const int bands = u->analysis_bands;
+  frame_begin(s);
+  float pcm[AAC_USAC_MAX_CORE_FRAME];
+  for (int i = 0; i < u->core_frame; i++) {
+    pcm[i] = core[i] * 32768.0f;
+  }
+  /* the analysis at its own timing; the high band is the SBR's to make
+   * per output channel */
+  out->slots = slots;
+  for (int i = 0; i < slots; i++) {
+    memset(out->x[i], 0, sizeof(out->x[i]));
+    aac_qmf_analyze(&s->data[0].analysis, pcm + bands * i, out->x[i]);
+    for (int k = 32; k < 64; k++) {
+      out->x[i][k][0] = out->x[i][k][1] = 0.0f;
     }
   }
-  process_channel(s, ch, core);
-  out->slots = u->slots_of_frame;
-  for (int i = 0; i < u->slots_of_frame; i++) {
-    for (int k = 0; k < 64; k++) {
-      out->x[i][k][0] = u->X[0][i][k];
-      out->x[i][k][1] = u->X[1][i][k];
-    }
-  }
+}
+
+void aac_sbr_usac_apply_low_to_qmf(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in,
+                                   struct AacUsacQmfFrame_* out) {
+  take_low_band(s, ch, in);
+  reconstruct_channel(s, ch);
+  copy_x(&s->usac, out);
 }
 
 void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in,
