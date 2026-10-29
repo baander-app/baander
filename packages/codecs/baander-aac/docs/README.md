@@ -237,7 +237,7 @@ Against the FDK decoder (loudness normalisation off, 48 kHz output, delay
 SBR, 80 dB with 2:1 SBR and MPS 212 with residual coding
 (stereoConfigIndex 3), 80 dB on a mono 2:1 SBR stream (50 dB above
 7 kHz, the floor of the 16-bit reference), 61 dB on speech with the LPD
-core and 4:1 SBR and 52 dB with 2:1 SBR, and 18 to 26 dB on music with
+core and 4:1 SBR and 52 dB with 2:1 SBR, and 24 to 26 dB on music with
 the LPD core at 8:3 and 4:1 with MPS 212 (stereoConfigIndex 1): there
 libxaac itself reaches 20 to 27 dB against FDK, the two references
 disagreeing by 38 to 50 dB in the SBR bands, so the limit is the LPD

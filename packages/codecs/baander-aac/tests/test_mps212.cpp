@@ -13,8 +13,11 @@
 #include <vector>
 
 #include "aac.h"
+#include "aac_dsp.h"
 #include "bitstream.h"
+#include "decoder.h"
 #include "mps212.h"
+#include "sbr.h"
 #include "test_util.h"
 
 namespace {
@@ -404,6 +407,253 @@ void test_decorrelator(void) {
   aac_mps212_destroy(s);
 }
 
+/* ── Mps212Data() by hand ───────────────────────────────────────── */
+
+constexpr int kBands = 7; /* bsFreqRes 5 */
+constexpr int kIpdBands = 3;
+
+/* One parameter type of a frame: at most one coded set, PCM coded at
+ * stride 1 on its quantiser scale. */
+struct TypeSpec {
+  int mode[2]; /* bsDataMode per set */
+  int coarse;  /* bsQuantCoarse of the coded set */
+  int values[kBands];
+};
+
+struct FrameSpec {
+  int indep;
+  int num_sets;
+  int slot[2];
+  TypeSpec cld, icc, ipd;
+  int phase_mode, opd_smoothing;
+};
+
+void write_ecdata(AacBitWriter* w, int type, int num_sets, const TypeSpec& t) {
+  for (int i = 0; i < num_sets; i++) {
+    aac_bitwriter_write(w, (uint32_t)t.mode[i], 2);
+  }
+  for (int i = 0; i < num_sets; i++) {
+    if (t.mode[i] != 3) {
+      continue;
+    }
+    aac_bitwriter_write(w, 0, 1);                  /* bsDataPair */
+    aac_bitwriter_write(w, (uint32_t)t.coarse, 1); /* bsQuantCoarse */
+    aac_bitwriter_write(w, 0, 2);                  /* bsFreqResStride: every band */
+    aac_bitwriter_write(w, 1, 1);                  /* bsPCMCoding */
+    const int bands = type == 2 ? kIpdBands : kBands;
+    int bits, offset;
+    if (type == 0) {
+      bits = t.coarse ? 4 : 5;
+      offset = t.coarse ? 7 : 15;
+    } else if (type == 1) {
+      bits = t.coarse ? 2 : 3;
+      offset = 0;
+    } else {
+      bits = t.coarse ? 3 : 4;
+      offset = 0;
+    }
+    for (int b = 0; b < bands; b++) {
+      aac_bitwriter_write(w, (uint32_t)(t.values[b] + offset), bits);
+    }
+  }
+}
+
+/* Mps212Data() of a high-rate, phase-coded configuration without
+ * temporal shaping: explicit parameter slots, no smoothing. */
+int write_frame(uint8_t* buf, int cap, const FrameSpec& f) {
+  AacBitWriter w;
+  aac_bitwriter_init(&w, buf, cap);
+  aac_bitwriter_write(&w, 1, 1); /* bsFramingType */
+  aac_bitwriter_write(&w, (uint32_t)(f.num_sets - 1), 3);
+  for (int i = 0; i < f.num_sets; i++) {
+    aac_bitwriter_write(&w, (uint32_t)f.slot[i], 5);
+  }
+  if (!f.indep) {
+    aac_bitwriter_write(&w, 0, 1); /* bsIndependencyFlag */
+  }
+  write_ecdata(&w, 0, f.num_sets, f.cld);
+  write_ecdata(&w, 1, f.num_sets, f.icc);
+  aac_bitwriter_write(&w, (uint32_t)f.phase_mode, 1);
+  if (f.phase_mode) {
+    aac_bitwriter_write(&w, (uint32_t)f.opd_smoothing, 1);
+    write_ecdata(&w, 2, f.num_sets, f.ipd);
+  }
+  for (int i = 0; i < f.num_sets; i++) {
+    aac_bitwriter_write(&w, 0, 2); /* bsSmoothMode */
+  }
+  aac_bitwriter_byte_align(&w);
+  return aac_bitwriter_bytes_written(&w);
+}
+
+/* The quantiser flag of each parameter set (the previous set's for a
+ * kept set, the last set's for the appended frame-end set) and the
+ * previous parameters surviving a damaged frame. */
+void test_frame_fields(void) {
+  AacUsacMps212Config cfg;
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.freq_res = 5;
+  cfg.fixed_gain_dmx = 4;
+  cfg.high_rate_mode = 1;
+  cfg.phase_coding = 1;
+  AacMps212State* s = aac_mps212_create(&cfg, 1, 1024, 2048, 48000);
+  CHECK(s != NULL, "create");
+  if (!s) {
+    return;
+  }
+  CHECK(aac_mps212_num_param_bands(s) == kBands && aac_mps212_num_ipd_bands(s) == kIpdBands,
+        "bands %d, ipd bands %d", aac_mps212_num_param_bands(s), aac_mps212_num_ipd_bands(s));
+  uint8_t buf[64];
+  AacBitReader r;
+  /* frame 1: one set at the frame end, every type coded on the fine scale */
+  FrameSpec a = {};
+  a.indep = 1;
+  a.num_sets = 1;
+  a.slot[0] = 31;
+  a.cld = {{3, 0}, 0, {3, -2, 0, 1, 5, -7, 15}};
+  a.icc = {{3, 0}, 0, {0, 1, 2, 3, 4, 5, 7}};
+  a.ipd = {{3, 0}, 0, {5, 9, 12}};
+  a.phase_mode = 1;
+  a.opd_smoothing = 1;
+  int n = write_frame(buf, sizeof(buf), a);
+  aac_bitreader_init(&r, buf, n);
+  CHECK(aac_mps212_read(s, &r, 1) == AAC_OK, "frame 1");
+  CHECK(aac_mps212_num_param_sets(s) == 1 && aac_mps212_param(s, 0, 0, 0) == 3 &&
+            aac_mps212_param(s, 0, 0, 6) == 15 && aac_mps212_param(s, 1, 0, 6) == 7 &&
+            aac_mps212_param(s, 2, 0, 1) == 9,
+        "frame 1: sets %d, cld %d %d, icc %d, ipd %d", aac_mps212_num_param_sets(s),
+        aac_mps212_param(s, 0, 0, 0), aac_mps212_param(s, 0, 0, 6), aac_mps212_param(s, 1, 0, 6),
+        aac_mps212_param(s, 2, 0, 1));
+  CHECK(aac_mps212_phase_mode(s) == 1 && aac_mps212_quant_coarse(s, 2, 0) == 0,
+        "frame 1: phase mode %d, ipd quantiser %d", aac_mps212_phase_mode(s),
+        aac_mps212_quant_coarse(s, 2, 0));
+  /* frame 2: two sets; the IPD of the first is kept (on the fine scale
+   * of frame 1), the second is coded coarse */
+  FrameSpec b = {};
+  b.indep = 0;
+  b.num_sets = 2;
+  b.slot[0] = 15;
+  b.slot[1] = 31;
+  b.cld = {{1, 1}, 0, {0}};
+  b.icc = {{1, 1}, 0, {0}};
+  b.ipd = {{1, 3}, 1, {2, 3, 1}};
+  b.phase_mode = 1;
+  b.opd_smoothing = 1;
+  n = write_frame(buf, sizeof(buf), b);
+  aac_bitreader_init(&r, buf, n);
+  CHECK(aac_mps212_read(s, &r, 0) == AAC_OK, "frame 2");
+  CHECK(aac_mps212_num_param_sets(s) == 2 && aac_mps212_param_slot(s, 1) == 31, "frame 2: sets");
+  CHECK(aac_mps212_param(s, 2, 0, 0) == 5 && aac_mps212_param(s, 2, 1, 0) == 4 &&
+            aac_mps212_param(s, 2, 1, 1) == 6 && aac_mps212_param(s, 2, 1, 2) == 2 &&
+            aac_mps212_param(s, 0, 1, 0) == 3,
+        "frame 2: ipd %d / %d %d %d, cld %d", aac_mps212_param(s, 2, 0, 0),
+        aac_mps212_param(s, 2, 1, 0), aac_mps212_param(s, 2, 1, 1), aac_mps212_param(s, 2, 1, 2),
+        aac_mps212_param(s, 0, 1, 0));
+  CHECK(aac_mps212_quant_coarse(s, 2, 0) == 0 && aac_mps212_quant_coarse(s, 2, 1) == 1,
+        "frame 2: the kept set reads the coded set's quantiser (%d %d)",
+        aac_mps212_quant_coarse(s, 2, 0), aac_mps212_quant_coarse(s, 2, 1));
+  /* frame 3: one kept set short of the frame end; the appended end set
+   * carries the coarse quantiser of frame 2's last set */
+  FrameSpec c = {};
+  c.indep = 0;
+  c.num_sets = 1;
+  c.slot[0] = 20;
+  c.cld = {{1, 0}, 0, {0}};
+  c.icc = {{1, 0}, 0, {0}};
+  c.ipd = {{1, 0}, 0, {0}};
+  c.phase_mode = 1;
+  c.opd_smoothing = 1;
+  n = write_frame(buf, sizeof(buf), c);
+  aac_bitreader_init(&r, buf, n);
+  CHECK(aac_mps212_read(s, &r, 0) == AAC_OK, "frame 3");
+  CHECK(aac_mps212_num_param_sets(s) == 2 && aac_mps212_param_slot(s, 0) == 20 &&
+            aac_mps212_param_slot(s, 1) == 31,
+        "frame 3: the frame-end set");
+  CHECK(aac_mps212_quant_coarse(s, 2, 0) == 1 && aac_mps212_quant_coarse(s, 2, 1) == 1 &&
+            aac_mps212_param(s, 2, 1, 0) == 4,
+        "frame 3: quantisers %d %d, ipd %d", aac_mps212_quant_coarse(s, 2, 0),
+        aac_mps212_quant_coarse(s, 2, 1), aac_mps212_param(s, 2, 1, 0));
+  /* a damaged frame (parameter slots out of order) keeps the previous
+   * parameters as one set at the frame end, on the fine scale */
+  FrameSpec d = b;
+  d.slot[0] = 31;
+  d.slot[1] = 15;
+  n = write_frame(buf, sizeof(buf), d);
+  aac_bitreader_init(&r, buf, n);
+  CHECK(aac_mps212_read(s, &r, 0) == AAC_ERR_DECODE, "slots out of order accepted");
+  CHECK(aac_mps212_num_param_sets(s) == 1 && aac_mps212_param_slot(s, 0) == 31 &&
+            aac_mps212_data_mode(s, 2, 0) == 1 && aac_mps212_param(s, 2, 0, 0) == 4 &&
+            aac_mps212_param(s, 2, 0, 1) == 6 && aac_mps212_param(s, 0, 0, 0) == 3 &&
+            aac_mps212_quant_coarse(s, 2, 0) == 1,
+        "damaged frame: sets %d, mode %d, ipd %d %d, cld %d, quantiser %d",
+        aac_mps212_num_param_sets(s), aac_mps212_data_mode(s, 2, 0), aac_mps212_param(s, 2, 0, 0),
+        aac_mps212_param(s, 2, 0, 1), aac_mps212_param(s, 0, 0, 0), aac_mps212_quant_coarse(s, 2, 0));
+  /* a truncated frame too */
+  n = write_frame(buf, sizeof(buf), b);
+  aac_bitreader_init(&r, buf, 1);
+  CHECK(aac_mps212_read(s, &r, 0) == AAC_ERR_DECODE, "truncated frame accepted");
+  CHECK(aac_mps212_num_param_sets(s) == 1 && aac_mps212_param(s, 2, 0, 0) == 4 &&
+            aac_mps212_param(s, 0, 0, 0) == 3 && aac_mps212_quant_coarse(s, 2, 0) == 1,
+        "truncated frame: ipd %d, cld %d, quantiser %d", aac_mps212_param(s, 2, 0, 0),
+        aac_mps212_param(s, 0, 0, 0), aac_mps212_quant_coarse(s, 2, 0));
+  aac_mps212_destroy(s);
+}
+
+/* ── the residual delay the frame walker sets ───────────────────── */
+
+/* With the SBR in front of MPS 212 the residual lags by the SBR output's
+ * lag behind the core analysis: three time slots, plus the transposer's
+ * delay when the configuration runs it; with stereoConfigIndex 3 the
+ * downmix arrives at the analysis timing and the residual is not
+ * delayed. */
+void test_residual_delay(void) {
+  struct Case {
+    int sci, harmonic, expect;
+  } cases[] = {{2, 0, 3 * 2}, {2, 1, (3 + AAC_SBR_USAC_HBE_DELAY) * 2}, {3, 1, 0}};
+  for (const Case& k : cases) {
+    AacDecoderState* dec = aac_decoder_state_create(48000, 0, aac_dsp_global());
+    CHECK(dec != NULL, "decoder state");
+    if (!dec) {
+      continue;
+    }
+    AacUsacConfig c = {};
+    c.sample_rate = 48000;
+    c.frame_length = 1024;
+    c.output_frame_length = 2048;
+    c.sbr_ratio_index = AAC_USAC_SBR_2_1;
+    c.core_sample_rate = 24000;
+    c.channel_config_index = 2;
+    c.num_channels = 2;
+    c.num_elements = 1;
+    c.elem[0].type = AAC_USAC_CPE;
+    c.elem[0].stereo_config_index = k.sci;
+    c.elem[0].sbr.harmonic_sbr = k.harmonic;
+    c.elem[0].sbr.dflt.start_freq = 10;
+    c.elem[0].sbr.dflt.stop_freq = 10;
+    c.elem[0].mps.freq_res = 5;
+    c.elem[0].mps.fixed_gain_dmx = 4;
+    c.elem[0].mps.high_rate_mode = 1;
+    c.elem[0].mps.residual_coding = 1;
+    c.elem[0].mps.residual_bands = 2;
+    const int ret = aac_usac_apply_config(dec, &c);
+    CHECK(ret == AAC_OK, "stereoConfigIndex %d, harmonic %d: configuration refused (%d)", k.sci,
+          k.harmonic, ret);
+    if (ret == AAC_OK) {
+      const AacUsacElement& e = dec->usac->elem[0];
+      CHECK(e.sbr != NULL && e.mps != NULL, "stereoConfigIndex %d: modules", k.sci);
+      if (e.sbr && e.mps) {
+        const int sbr_lag = e.sbr->usac.history - e.sbr->usac.offset;
+        const int delay = aac_mps212_residual_delay(e.mps);
+        CHECK(delay == k.expect, "stereoConfigIndex %d, harmonic %d: residual delay %d, expected %d",
+              k.sci, k.harmonic, delay, k.expect);
+        CHECK(k.sci == 3 || sbr_lag == delay,
+              "stereoConfigIndex %d, harmonic %d: the SBR output lags by %d slots", k.sci,
+              k.harmonic, sbr_lag);
+      }
+    }
+    aac_decoder_state_destroy(dec);
+  }
+}
+
 /* ── the MPS 212 streams through the decoder ────────────────────── */
 
 struct Decoded {
@@ -593,11 +843,13 @@ int main(int argc, char** argv) {
   test_matrices();
   test_hybrid();
   test_decorrelator();
+  test_frame_fields();
+  test_residual_delay();
   test_stream("usac_music_48000_48000.loas", 40, "mps212_music_48000_48000_fdk.wav", 45.0);
   test_stream("usac_music_48000_64000.loas", 40);
   /* stereoConfigIndex 1 at the 8:3 and 4:1 ratios on an LPD core: the
    * low band is the core's, the comparison is of the timing and the gain */
-  test_stream("usac_music_48000_24000.loas", 40, "mps212_music_48000_24000_fdk.wav", 12.0);
+  test_stream("usac_music_48000_24000.loas", 40, "mps212_music_48000_24000_fdk.wav", 18.0);
   test_stream("usac_music_48000_16000.loas", 20, "mps212_music_48000_16000_fdk.wav", 20.0);
   return test_summary("test_mps212");
 }

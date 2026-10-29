@@ -158,6 +158,13 @@ int build_elements(AacUsacState* u) {
       if (!e->mps) {
         return AAC_ERR_MEMORY;
       }
+      /* With the SBR in front of MPS 212 the residual (analysed from the
+       * core frame) must lag by what the SBR output lags the core: its
+       * history less the output offset, which the harmonic transposer
+       * lengthens. */
+      if (e->sbr && !e->mps_before_sbr) {
+        aac_mps212_set_residual_delay(e->mps, e->sbr->usac.history - e->sbr->usac.offset);
+      }
     }
   }
   return AAC_OK;

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "qmf.h"
 
@@ -77,14 +78,41 @@ enum { kBackwards = 0, kForwards = 1 };
 /* The parameters of one type in transit: the coded sets, the coded
  * history (on the coded set's quantiser scale) and the mapped indices. */
 struct TypeData {
-  int mode[kMaxSets];        /* bsDataMode per parameter set */
-  int coarse[kMaxSets];      /* bsQuantCoarse per coded set */
-  int stride_idx[kMaxSets];  /* bsFreqResStride per coded set */
-  int cmp[kMaxSets][kMaxPb]; /* coded values per coded set */
-  int last[kMaxPb];          /* the coded history */
-  int coarse_prev;
-  int idx[kMaxSets][kMaxPb]; /* mapped fine indices per parameter set */
+  int mode[kMaxSets];         /* bsDataMode per parameter set */
+  int coded_coarse[kMaxSets]; /* bsQuantCoarse per coded set */
+  int stride_idx[kMaxSets];   /* bsFreqResStride per coded set */
+  int cmp[kMaxSets][kMaxPb];  /* coded values per coded set */
+  int last[kMaxPb];           /* the coded history */
+  int coarse_prev;            /* the quantiser of the last mapped set */
+  int idx[kMaxSets][kMaxPb];  /* mapped fine indices per parameter set */
   int idx_prev[kMaxPb];
+  int set_coarse[kMaxSets];   /* the quantiser each parameter set was coded on:
+                                 a kept or interpolated set carries the previous one's */
+};
+
+/* The fields Mps212Data() sets.  The parse works on a copy and commits
+ * it when the whole frame reads cleanly, so a damaged frame leaves the
+ * previous frame's parameters in place. */
+struct Params {
+  int num_sets; /* coded sets plus the frame-end set when added */
+  int param_slot[kMaxSets];
+  int param_diff[kMaxSets];
+  int independency;
+  TypeData td[3];
+  int smooth_mode[kMaxSets], smooth_time_idx[kMaxSets], smooth_stride_idx[kMaxSets];
+  int smg_bits[kMaxSets][kMaxPb];
+  int smoothing[kMaxSets][kMaxPb];
+  float inv_smooth_time[kMaxSets];
+  int prev_smg[kMaxPb];
+  float prev_inv_smooth_time;
+  int phase_mode, opd_smoothing;
+  int temp_shape_enable;
+  int stp_channel[2], ges_channel[2];
+  float env_shape[2][kMaxSlots];
+  int tsd_enable;
+  int tsd_transient[kMaxSlots];
+  int tsd_phase[kMaxSlots];
+  int num_sets_prev;
 };
 
 struct Decorr {
@@ -121,24 +149,7 @@ struct AacMps212State_ {
   float gain;
 
   /* ── bitstream data ── */
-  int num_sets; /* coded sets plus the frame-end set when added */
-  int param_slot[kMaxSets];
-  int param_diff[kMaxSets];
-  int independency;
-  TypeData td[3];
-  int smooth_mode[kMaxSets], smooth_time_idx[kMaxSets], smooth_stride_idx[kMaxSets];
-  int smg_bits[kMaxSets][kMaxPb];
-  int smoothing[kMaxSets][kMaxPb];
-  float inv_smooth_time[kMaxSets];
-  int prev_smg[kMaxPb];
-  float prev_inv_smooth_time;
-  int phase_mode, opd_smoothing;
-  int temp_shape_enable;
-  int stp_channel[2], ges_channel[2];
-  float env_shape[2][kMaxSlots];
-  int tsd_enable;
-  int tsd_transient[kMaxSlots];
-  int tsd_phase[kMaxSlots];
+  Params p;
 
   /* ── mixing matrices: [set][band][row][col][re/im] on the direct
    * signals (downmix, residual) and [set][band][row][re/im] on the
@@ -150,7 +161,6 @@ struct AacMps212State_ {
   float phase_l[kMaxSets][kMaxPb], phase_r[kMaxSets][kMaxPb];
   float phase_l_prev[kMaxPb], phase_r_prev[kMaxPb];
   float opd_smooth_l[kMaxPb], opd_smooth_r[kMaxPb];
-  int num_sets_prev;
 
   /* ── per-slot trajectories: entry n belongs to parameter slot n, the
    * hybrid slot the parameter grid sits on ── */
@@ -695,16 +705,16 @@ void fine_to_coarse(int* v, int n) {
   }
 }
 
-int read_ecdata(AacMps212State* s, AacBitReader* r, int type) {
-  TypeData* t = &s->td[type];
+int read_ecdata(const AacMps212State* s, Params* p, AacBitReader* r, int type) {
+  TypeData* t = &p->td[type];
   const int bands = type == kIpd ? s->num_ipd_bands : s->num_bands;
-  for (int i = 0; i < s->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
     t->mode[i] = (int)aac_bitreader_read(r, 2);
   }
   int set = 0;
   int pair = 0;
   int old_coarse = t->coarse_prev;
-  for (int i = 0; i < s->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
     if (t->mode[i] == 0) {
       memset(t->last, 0, sizeof(int) * (size_t)bands);
       old_coarse = 0;
@@ -722,7 +732,7 @@ int read_ecdata(AacMps212State* s, AacBitReader* r, int type) {
     if (set + pair >= kMaxSets - 1) {
       return -1;
     }
-    t->coarse[set] = coarse;
+    t->coded_coarse[set] = coarse;
     t->stride_idx[set] = stride_idx;
     if (coarse != old_coarse) {
       if (old_coarse) {
@@ -737,7 +747,7 @@ int read_ecdata(AacMps212State* s, AacBitReader* r, int type) {
     for (int g = 0; g < groups; g++) {
       history[g] = t->last[map[g]];
     }
-    const int time_ref = !(s->independency && i == 0) || set > 0;
+    const int time_ref = !(p->independency && i == 0) || set > 0;
     if (ec_data_pair(r, type, t->cmp, set, groups, pair, coarse, time_ref, history)) {
       return -1;
     }
@@ -752,7 +762,7 @@ int read_ecdata(AacMps212State* s, AacBitReader* r, int type) {
     }
     old_coarse = coarse;
     if (pair) {
-      t->coarse[set + 1] = coarse;
+      t->coded_coarse[set + 1] = coarse;
       t->stride_idx[set + 1] = stride_idx;
     }
     set += pair + 1;
@@ -762,14 +772,16 @@ int read_ecdata(AacMps212State* s, AacBitReader* r, int type) {
 
 /* The mapped indices of one type: the coded sets expanded over the
  * parameter bands, the kept and the interpolated sets filled in, the
- * coarse sets on the fine scale. */
-int map_type(AacMps212State* s, int type) {
-  TypeData* t = &s->td[type];
+ * coarse sets on the fine scale.  Each set keeps the quantiser it was
+ * coded on (the previous set's when kept or interpolated), which the
+ * OPD smoothing threshold reads per parameter set. */
+int map_type(const AacMps212State* s, Params* p, int type) {
+  TypeData* t = &p->td[type];
   const int bands = type == kIpd ? s->num_ipd_bands : s->num_bands;
   int interp[kMaxSets] = {0};
-  int coarse_flag[kMaxSets] = {0};
   int set = 0;
-  for (int i = 0; i < s->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
+    t->set_coarse[i] = 0;
     switch (t->mode[i]) {
       case 0:
         memset(t->idx[i], 0, sizeof(int) * (size_t)bands);
@@ -779,7 +791,7 @@ int map_type(AacMps212State* s, int type) {
       case 1:
       case 2:
         memcpy(t->idx[i], t->idx_prev, sizeof(int) * (size_t)bands);
-        coarse_flag[i] = t->coarse_prev;
+        t->set_coarse[i] = t->coarse_prev;
         interp[i] = t->mode[i] == 2;
         break;
       default: {
@@ -791,35 +803,35 @@ int map_type(AacMps212State* s, int type) {
           }
         }
         memcpy(t->idx_prev, t->idx[i], sizeof(int) * (size_t)bands);
-        t->coarse_prev = t->coarse[set];
-        coarse_flag[i] = t->coarse[set];
+        t->coarse_prev = t->coded_coarse[set];
+        t->set_coarse[i] = t->coarse_prev;
         set++;
         break;
       }
     }
   }
-  for (int i = 0; i < s->num_sets; i++) {
-    if (coarse_flag[i]) {
+  for (int i = 0; i < p->num_sets; i++) {
+    if (t->set_coarse[i]) {
       coarse_to_fine(type, t->idx[i], bands);
     }
   }
   int i1 = -1;
-  for (int i = 0; i < s->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
     if (!interp[i]) {
       i1 = i;
       continue;
     }
     int i2 = i;
-    while (i2 < s->num_sets && interp[i2]) {
+    while (i2 < p->num_sets && interp[i2]) {
       i2++;
     }
-    if (i2 >= s->num_sets) {
+    if (i2 >= p->num_sets) {
       return -1;
     }
-    const int x1 = i1 < 0 ? 0 : s->param_slot[i1];
+    const int x1 = i1 < 0 ? 0 : p->param_slot[i1];
     const int lo = i1 < 0 ? 0 : i1;
-    const int xi = s->param_slot[i];
-    const int x2 = s->param_slot[i2];
+    const int xi = p->param_slot[i];
+    const int x2 = p->param_slot[i2];
     for (int b = 0; b < bands; b++) {
       int y1 = t->idx[lo][b];
       int y2 = t->idx[i2][b];
@@ -834,7 +846,7 @@ int map_type(AacMps212State* s, int type) {
       t->idx[i][b] = yi;
     }
   }
-  for (int i = 0; i < s->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
     for (int b = 0; b < bands; b++) {
       int v = t->idx[i][b];
       if (type == kCld) {
@@ -848,8 +860,8 @@ int map_type(AacMps212State* s, int type) {
   return 0;
 }
 
-void clear_ipd(AacMps212State* s) {
-  TypeData* t = &s->td[kIpd];
+void clear_ipd(Params* p) {
+  TypeData* t = &p->td[kIpd];
   memset(t->last, 0, sizeof(t->last));
   memset(t->cmp, 0, sizeof(t->cmp));
   memset(t->idx, 0, sizeof(t->idx));
@@ -859,17 +871,17 @@ void clear_ipd(AacMps212State* s) {
 
 /* ── SmgData() and TempShapeData() ──────────────────────────────── */
 
-int read_smoothing(AacMps212State* s, AacBitReader* r) {
-  for (int ps = 0; ps < s->num_sets; ps++) {
-    s->smooth_mode[ps] = (int)aac_bitreader_read(r, 2);
-    if (s->smooth_mode[ps] >= 2) {
-      s->smooth_time_idx[ps] = (int)aac_bitreader_read(r, 2);
+int read_smoothing(const AacMps212State* s, Params* p, AacBitReader* r) {
+  for (int ps = 0; ps < p->num_sets; ps++) {
+    p->smooth_mode[ps] = (int)aac_bitreader_read(r, 2);
+    if (p->smooth_mode[ps] >= 2) {
+      p->smooth_time_idx[ps] = (int)aac_bitreader_read(r, 2);
     }
-    if (s->smooth_mode[ps] == 3) {
-      s->smooth_stride_idx[ps] = (int)aac_bitreader_read(r, 2);
-      const int groups = (s->num_bands - 1) / aac_mps212_stride[s->smooth_stride_idx[ps]] + 1;
+    if (p->smooth_mode[ps] == 3) {
+      p->smooth_stride_idx[ps] = (int)aac_bitreader_read(r, 2);
+      const int groups = (s->num_bands - 1) / aac_mps212_stride[p->smooth_stride_idx[ps]] + 1;
       for (int g = 0; g < groups; g++) {
-        s->smg_bits[ps][g] = (int)aac_bitreader_read(r, 1);
+        p->smg_bits[ps][g] = (int)aac_bitreader_read(r, 1);
       }
     }
   }
@@ -878,49 +890,49 @@ int read_smoothing(AacMps212State* s, AacBitReader* r) {
 
 /* The smoothing flags and times per set from SmgData(); mode 1 continues
  * the previous set's. */
-void map_smoothing(AacMps212State* s) {
-  for (int ps = 0; ps < s->num_sets; ps++) {
-    switch (s->smooth_mode[ps]) {
+void map_smoothing(const AacMps212State* s, Params* p) {
+  for (int ps = 0; ps < p->num_sets; ps++) {
+    switch (p->smooth_mode[ps]) {
       case 0:
-        s->inv_smooth_time[ps] = 1.0f / 256.0f;
-        memset(s->smoothing[ps], 0, sizeof(s->smoothing[ps]));
+        p->inv_smooth_time[ps] = 1.0f / 256.0f;
+        memset(p->smoothing[ps], 0, sizeof(p->smoothing[ps]));
         break;
       case 1:
         if (ps > 0) {
-          s->inv_smooth_time[ps] = s->inv_smooth_time[ps - 1];
-          memcpy(s->smoothing[ps], s->smoothing[ps - 1], sizeof(s->smoothing[ps]));
+          p->inv_smooth_time[ps] = p->inv_smooth_time[ps - 1];
+          memcpy(p->smoothing[ps], p->smoothing[ps - 1], sizeof(p->smoothing[ps]));
         } else {
-          s->inv_smooth_time[ps] = s->prev_inv_smooth_time;
-          memcpy(s->smoothing[ps], s->prev_smg, sizeof(s->smoothing[ps]));
+          p->inv_smooth_time[ps] = p->prev_inv_smooth_time;
+          memcpy(p->smoothing[ps], p->prev_smg, sizeof(p->smoothing[ps]));
         }
         break;
       case 2:
-        s->inv_smooth_time[ps] = 1.0f / (float)aac_mps212_smoothing_time[s->smooth_time_idx[ps]];
+        p->inv_smooth_time[ps] = 1.0f / (float)aac_mps212_smoothing_time[p->smooth_time_idx[ps]];
         for (int pb = 0; pb < s->num_bands; pb++) {
-          s->smoothing[ps][pb] = 1;
+          p->smoothing[ps][pb] = 1;
         }
         break;
       default: {
-        s->inv_smooth_time[ps] = 1.0f / (float)aac_mps212_smoothing_time[s->smooth_time_idx[ps]];
+        p->inv_smooth_time[ps] = 1.0f / (float)aac_mps212_smoothing_time[p->smooth_time_idx[ps]];
         int map[kMaxPb + 1];
         const int groups =
-            band_map(s->num_bands, aac_mps212_stride[s->smooth_stride_idx[ps]], map);
+            band_map(s->num_bands, aac_mps212_stride[p->smooth_stride_idx[ps]], map);
         for (int g = 0; g < groups; g++) {
           for (int pb = map[g]; pb < map[g + 1]; pb++) {
-            s->smoothing[ps][pb] = s->smg_bits[ps][g];
+            p->smoothing[ps][pb] = p->smg_bits[ps][g];
           }
         }
         break;
       }
     }
   }
-  s->prev_inv_smooth_time = s->inv_smooth_time[s->num_sets - 1];
-  memcpy(s->prev_smg, s->smoothing[s->num_sets - 1], sizeof(s->prev_smg));
+  p->prev_inv_smooth_time = p->inv_smooth_time[p->num_sets - 1];
+  memcpy(p->prev_smg, p->smoothing[p->num_sets - 1], sizeof(p->prev_smg));
 }
 
 /* Guided envelope shaping: run-length pairs (value, run) of the
  * quantised envelope over the slots, dequantised to the ratio. */
-int read_env_shape(AacMps212State* s, AacBitReader* r, int ch) {
+int read_env_shape(const AacMps212State* s, Params* p, AacBitReader* r, int ch) {
   int n = 0;
   while (n < s->slots) {
     const int sym = huff_read(r, aac_mps212_huff_env_shape, 39);
@@ -931,7 +943,7 @@ int read_env_shape(AacMps212State* s, AacBitReader* r, int ch) {
     const int run = sym < 0 ? 2 : (sym & 15) + 1;
     const float ratio = powf(2.0f, (float)value / (float)(s->cfg.env_quant_mode + 2) - 1.0f);
     for (int i = n; i < n + run && i < s->slots; i++) {
-      s->env_shape[ch][i] = ratio;
+      p->env_shape[ch][i] = ratio;
     }
     n += run;
   }
@@ -959,30 +971,30 @@ uint64_t read_wide(AacBitReader* r, int bits) {
   return v;
 }
 
-int read_temp_shape(AacMps212State* s, AacBitReader* r) {
-  s->temp_shape_enable = 0;
-  s->tsd_enable = 0;
-  s->stp_channel[0] = s->stp_channel[1] = 0;
-  s->ges_channel[0] = s->ges_channel[1] = 0;
-  memset(s->tsd_transient, 0, sizeof(s->tsd_transient));
+int read_temp_shape(const AacMps212State* s, Params* p, AacBitReader* r) {
+  p->temp_shape_enable = 0;
+  p->tsd_enable = 0;
+  p->stp_channel[0] = p->stp_channel[1] = 0;
+  p->ges_channel[0] = p->ges_channel[1] = 0;
+  memset(p->tsd_transient, 0, sizeof(p->tsd_transient));
   if (s->cfg.temp_shape_config == 3) {
-    s->tsd_enable = (int)aac_bitreader_read(r, 1);
+    p->tsd_enable = (int)aac_bitreader_read(r, 1);
   } else if (s->cfg.temp_shape_config != 0) {
-    s->temp_shape_enable = (int)aac_bitreader_read(r, 1);
-    if (s->temp_shape_enable) {
-      int* flags = s->cfg.temp_shape_config == 1 ? s->stp_channel : s->ges_channel;
+    p->temp_shape_enable = (int)aac_bitreader_read(r, 1);
+    if (p->temp_shape_enable) {
+      int* flags = s->cfg.temp_shape_config == 1 ? p->stp_channel : p->ges_channel;
       flags[0] = (int)aac_bitreader_read(r, 1);
       flags[1] = (int)aac_bitreader_read(r, 1);
       if (s->cfg.temp_shape_config == 2) {
         for (int ch = 0; ch < 2; ch++) {
-          if (flags[ch] && read_env_shape(s, r, ch)) {
+          if (flags[ch] && read_env_shape(s, p, r, ch)) {
             return -1;
           }
         }
       }
     }
   }
-  if (!s->tsd_enable) {
+  if (!p->tsd_enable) {
     return 0;
   }
   const int count_bits = s->slots == 64 ? 5 : 4;
@@ -994,24 +1006,24 @@ int read_temp_shape(AacMps212State* s, AacBitReader* r) {
   uint64_t index = read_wide(r, table[num_tr - 1]);
   /* the combinatorial number system: the set of slots from the index,
    * highest slot first */
-  int p = num_tr;
-  for (int k = s->slots - 1; k >= 0 && p > 0; k--) {
-    if (p > k) {
+  int left = num_tr;
+  for (int k = s->slots - 1; k >= 0 && left > 0; k--) {
+    if (left > k) {
       for (; k >= 0; k--) {
-        s->tsd_transient[k] = 1;
+        p->tsd_transient[k] = 1;
       }
       break;
     }
-    const uint64_t c = binomial(k, p);
+    const uint64_t c = binomial(k, left);
     if (index >= c) {
       index -= c;
-      s->tsd_transient[k] = 1;
-      p--;
+      p->tsd_transient[k] = 1;
+      left--;
     }
   }
   for (int i = 0; i < s->slots; i++) {
-    if (s->tsd_transient[i]) {
-      s->tsd_phase[i] = (int)aac_bitreader_read(r, 3);
+    if (p->tsd_transient[i]) {
+      p->tsd_phase[i] = (int)aac_bitreader_read(r, 3);
     }
   }
   return 0;
@@ -1086,11 +1098,11 @@ float wrap_pi(float a) {
 
 /* The matrices of every parameter set from the mapped indices. */
 void set_matrices(AacMps212State* s) {
-  for (int ps = 0; ps < s->num_sets; ps++) {
+  for (int ps = 0; ps < s->p.num_sets; ps++) {
     for (int pb = 0; pb < s->num_bands; pb++) {
-      const int cld = s->td[kCld].idx[ps][pb];
-      const int icc = s->td[kIcc].idx[ps][pb];
-      const int ipd = pb < s->num_ipd_bands ? (s->td[kIpd].idx[ps][pb] & 15) : 0;
+      const int cld = s->p.td[kCld].idx[ps][pb];
+      const int icc = s->p.td[kIcc].idx[ps][pb];
+      const int ipd = pb < s->num_ipd_bands ? (s->p.td[kIpd].idx[ps][pb] & 15) : 0;
       float (*mr)[2][2] = s->m_res[ps][pb];
       float (*md)[2] = s->m_dec[ps][pb];
       memset(mr, 0, sizeof(float) * 8);
@@ -1123,7 +1135,7 @@ void set_matrices(AacMps212State* s) {
         md[1][0] = h[1][1][0];
       }
       float pl = 0.0f, pr = 0.0f;
-      if (s->phase_coding == 1 && s->phase_mode && pb < s->num_ipd_bands) {
+      if (s->phase_coding == 1 && s->p.phase_mode && pb < s->num_ipd_bands) {
         const int ci = cld + 15;
         float opd = 0.0f;
         if (!(ci == 15 && ipd == 8)) {
@@ -1140,17 +1152,19 @@ void set_matrices(AacMps212State* s) {
     return;
   }
   /* OPD smoothing: the phases follow a first-order smoother over the
-   * slots unless the smoothed phase difference leaves the quantiser step */
-  if (!s->opd_smoothing) {
+   * slots unless the smoothed phase difference leaves the quantiser step,
+   * half a step of the quantiser the set's IPD values were coded on */
+  if (!s->p.opd_smoothing) {
     for (int pb = 0; pb < s->num_bands; pb++) {
-      s->opd_smooth_l[pb] = s->phase_l[s->num_sets - 1][pb];
-      s->opd_smooth_r[pb] = s->phase_r[s->num_sets - 1][pb];
+      s->opd_smooth_l[pb] = s->phase_l[s->p.num_sets - 1][pb];
+      s->opd_smooth_r[pb] = s->phase_r[s->p.num_sets - 1][pb];
     }
     return;
   }
-  for (int ps = 0; ps < s->num_sets; ps++) {
-    const float thr = s->td[kIpd].coarse[ps] ? 50.0f * kPi / 180.0f : 25.0f * kPi / 180.0f;
-    const float delta = (float)s->param_diff[ps] / 128.0f;
+  for (int ps = 0; ps < s->p.num_sets; ps++) {
+    const float thr =
+        s->p.td[kIpd].set_coarse[ps] ? 50.0f * kPi / 180.0f : 25.0f * kPi / 180.0f;
+    const float delta = (float)s->p.param_diff[ps] / 128.0f;
     for (int pb = 0; pb < s->num_bands; pb++) {
       float l = s->phase_l[ps][pb];
       float r = s->phase_r[ps][pb];
@@ -1176,10 +1190,10 @@ void set_matrices(AacMps212State* s) {
 /* First-order smoothing of the matrices in the flagged bands towards
  * the previous set (bsSmoothMode). */
 void smooth_matrices(AacMps212State* s) {
-  for (int ps = 0; ps < s->num_sets; ps++) {
-    const float delta = (float)s->param_diff[ps] * s->inv_smooth_time[ps];
+  for (int ps = 0; ps < s->p.num_sets; ps++) {
+    const float delta = (float)s->p.param_diff[ps] * s->p.inv_smooth_time[ps];
     for (int pb = s->res_bands; pb < s->num_bands; pb++) {
-      if (!s->smoothing[ps][pb]) {
+      if (!s->p.smoothing[ps][pb]) {
         continue;
       }
       float* cur = &s->m_res[ps][pb][0][0][0];
@@ -1210,8 +1224,8 @@ float angle_step(float a1, float a2, float* start, int diff) {
  * turn the matrices complex. */
 void interpolate_matrices(AacMps212State* s) {
   int ts = 0;
-  for (int ps = 0; ps < s->num_sets; ps++) {
-    const int diff = s->param_diff[ps];
+  for (int ps = 0; ps < s->p.num_sets; ps++) {
+    const int diff = s->p.param_diff[ps];
     for (int pb = 0; pb < s->num_bands; pb++) {
       const float* a = ps > 0 ? &s->m_res[ps - 1][pb][0][0][0] : &s->m_res_prev[pb][0][0][0];
       const float* b = &s->m_res[ps][pb][0][0][0];
@@ -1260,12 +1274,8 @@ void interpolate_matrices(AacMps212State* s) {
 /* ── hybrid filterbank (ISO/IEC 23003-1 6.6.3) ──────────────────── */
 
 float g_f8[8][kProto][2];
-int g_hybrid_ready = 0;
 
-void hybrid_tables_init(void) {
-  if (g_hybrid_ready) {
-    return;
-  }
+void build_hybrid_tables(void) {
   for (int q = 0; q < 8; q++) {
     for (int n = 0; n < kProto; n++) {
       const double theta = 2.0 * M_PI * (q + 0.5) * (n - kHybDelay) / 8.0;
@@ -1273,7 +1283,13 @@ void hybrid_tables_init(void) {
       g_f8[q][n][1] = (float)(aac_mps212_hybrid_proto8[n] * -sin(theta));
     }
   }
-  g_hybrid_ready = 1;
+}
+
+/* Decoders may start on several threads at once; the tables are built
+ * exactly once before any of them reads them. */
+void hybrid_tables_init(void) {
+  static std::once_flag once;
+  std::call_once(once, build_hybrid_tables);
 }
 
 /* The ten lowest hybrid bands from 13 slots of QMF bands 0..2 (oldest
@@ -1601,25 +1617,26 @@ int ceil_log2(int n) {
 
 /* The frame-end set and the slot spans once the sets of a frame are
  * known. */
-int finish_sets(AacMps212State* s) {
-  if (s->param_slot[s->num_sets - 1] != s->slots - 1) {
-    if (s->num_sets >= kMaxSets) {
+int finish_sets(const AacMps212State* s, Params* p) {
+  if (p->param_slot[p->num_sets - 1] != s->slots - 1) {
+    if (p->num_sets >= kMaxSets) {
       return -1;
     }
-    const int last = s->num_sets - 1;
+    const int last = p->num_sets - 1;
     for (int t = 0; t < 3; t++) {
-      memcpy(s->td[t].idx[last + 1], s->td[t].idx[last], sizeof(s->td[t].idx[last]));
+      memcpy(p->td[t].idx[last + 1], p->td[t].idx[last], sizeof(p->td[t].idx[last]));
+      p->td[t].set_coarse[last + 1] = p->td[t].set_coarse[last];
     }
-    s->inv_smooth_time[last + 1] = s->inv_smooth_time[last];
-    memcpy(s->smoothing[last + 1], s->smoothing[last], sizeof(s->smoothing[last]));
-    s->smooth_mode[last + 1] = s->smooth_mode[last];
-    s->num_sets++;
-    s->param_slot[s->num_sets - 1] = s->slots - 1;
+    p->inv_smooth_time[last + 1] = p->inv_smooth_time[last];
+    memcpy(p->smoothing[last + 1], p->smoothing[last], sizeof(p->smoothing[last]));
+    p->smooth_mode[last + 1] = p->smooth_mode[last];
+    p->num_sets++;
+    p->param_slot[p->num_sets - 1] = s->slots - 1;
   }
-  s->param_diff[0] = s->param_slot[0] + 1;
-  for (int i = 1; i < s->num_sets; i++) {
-    s->param_diff[i] = s->param_slot[i] - s->param_slot[i - 1];
-    if (s->param_diff[i] <= 0) {
+  p->param_diff[0] = p->param_slot[0] + 1;
+  for (int i = 1; i < p->num_sets; i++) {
+    p->param_diff[i] = p->param_slot[i] - p->param_slot[i - 1];
+    if (p->param_diff[i] <= 0) {
       return -1;
     }
   }
@@ -1659,7 +1676,7 @@ void reset_signal_state(AacMps212State* s) {
   memset(s->stp_on, 0, sizeof(s->stp_on));
   memset(s->tsd_on, 0, sizeof(s->tsd_on));
   memset(s->tsd_ph, 0, sizeof(s->tsd_ph));
-  s->num_sets_prev = 1;
+  s->p.num_sets_prev = 1;
 }
 
 }  // namespace
@@ -1761,24 +1778,24 @@ void aac_mps212_reset(AacMps212State* s) {
   if (s == NULL) {
     return;
   }
-  memset(s->td, 0, sizeof(s->td));
-  memset(s->smooth_mode, 0, sizeof(s->smooth_mode));
-  memset(s->smoothing, 0, sizeof(s->smoothing));
-  memset(s->prev_smg, 0, sizeof(s->prev_smg));
-  s->prev_inv_smooth_time = 1.0f / 256.0f;
-  s->phase_mode = 0;
-  s->opd_smoothing = 0;
-  s->temp_shape_enable = 0;
-  s->tsd_enable = 0;
-  s->stp_channel[0] = s->stp_channel[1] = 0;
-  s->ges_channel[0] = s->ges_channel[1] = 0;
-  memset(s->env_shape, 0, sizeof(s->env_shape));
-  memset(s->tsd_transient, 0, sizeof(s->tsd_transient));
-  memset(s->tsd_phase, 0, sizeof(s->tsd_phase));
-  s->num_sets = 1;
-  s->param_slot[0] = s->slots - 1;
-  s->param_diff[0] = s->slots;
-  s->independency = 1;
+  memset(s->p.td, 0, sizeof(s->p.td));
+  memset(s->p.smooth_mode, 0, sizeof(s->p.smooth_mode));
+  memset(s->p.smoothing, 0, sizeof(s->p.smoothing));
+  memset(s->p.prev_smg, 0, sizeof(s->p.prev_smg));
+  s->p.prev_inv_smooth_time = 1.0f / 256.0f;
+  s->p.phase_mode = 0;
+  s->p.opd_smoothing = 0;
+  s->p.temp_shape_enable = 0;
+  s->p.tsd_enable = 0;
+  s->p.stp_channel[0] = s->p.stp_channel[1] = 0;
+  s->p.ges_channel[0] = s->p.ges_channel[1] = 0;
+  memset(s->p.env_shape, 0, sizeof(s->p.env_shape));
+  memset(s->p.tsd_transient, 0, sizeof(s->p.tsd_transient));
+  memset(s->p.tsd_phase, 0, sizeof(s->p.tsd_phase));
+  s->p.num_sets = 1;
+  s->p.param_slot[0] = s->slots - 1;
+  s->p.param_diff[0] = s->slots;
+  s->p.independency = 1;
   reset_signal_state(s);
 }
 
@@ -1788,85 +1805,83 @@ void aac_mps212_set_residual_delay(AacMps212State* s, int slots) {
   }
 }
 
+int aac_mps212_residual_delay(const AacMps212State* s) { return s ? s->residual_delay : -1; }
+
 int aac_mps212_read(AacMps212State* s, AacBitReader* r, int indep) {
   if (s == NULL || r == NULL) {
     return AAC_ERR_INVALID_ARG;
   }
-  /* the parse works on a copy; a damaged frame keeps the state */
-  AacMps212State* w = (AacMps212State*)malloc(sizeof(AacMps212State));
-  if (w == NULL) {
-    return AAC_ERR_MEMORY;
-  }
-  memcpy(w, s, sizeof(AacMps212State));
-  w->num_sets_prev = s->num_sets;
+  /* the parse works on a copy of the frame fields; a damaged frame keeps
+   * the previous frame's */
+  Params w = s->p;
+  Params* p = &w;
+  p->num_sets_prev = s->p.num_sets;
   int ok = 1;
   int framing_type = 0;
-  if (w->cfg.high_rate_mode) {
+  if (s->cfg.high_rate_mode) {
     framing_type = (int)aac_bitreader_read(r, 1);
-    w->num_sets = (int)aac_bitreader_read(r, 3) + 1;
+    p->num_sets = (int)aac_bitreader_read(r, 3) + 1;
   } else {
-    w->num_sets = 1;
+    p->num_sets = 1;
   }
   int prev_slot = -1;
-  for (int i = 0; i < w->num_sets; i++) {
+  for (int i = 0; i < p->num_sets; i++) {
     int slot;
     if (framing_type) {
-      slot = (int)aac_bitreader_read(r, w->slot_bits);
+      slot = (int)aac_bitreader_read(r, s->slot_bits);
     } else {
-      slot = (w->slots * (i + 1) + w->num_sets - 1) / w->num_sets - 1;
+      slot = (s->slots * (i + 1) + p->num_sets - 1) / p->num_sets - 1;
     }
-    if (slot <= prev_slot || slot >= w->slots) {
+    if (slot <= prev_slot || slot >= s->slots) {
       ok = 0;
       break;
     }
-    w->param_slot[i] = slot;
+    p->param_slot[i] = slot;
     prev_slot = slot;
   }
   if (ok) {
-    w->independency = indep ? 1 : (int)aac_bitreader_read(r, 1);
-    ok = read_ecdata(w, r, kCld) == 0 && read_ecdata(w, r, kIcc) == 0;
+    p->independency = indep ? 1 : (int)aac_bitreader_read(r, 1);
+    ok = read_ecdata(s, p, r, kCld) == 0 && read_ecdata(s, p, r, kIcc) == 0;
   }
   if (ok) {
-    w->phase_mode = 0;
-    w->opd_smoothing = 0;
-    if (w->cfg.phase_coding) {
-      w->phase_mode = (int)aac_bitreader_read(r, 1);
-      if (w->phase_mode) {
-        w->opd_smoothing = (int)aac_bitreader_read(r, 1);
-        ok = read_ecdata(w, r, kIpd) == 0;
+    p->phase_mode = 0;
+    p->opd_smoothing = 0;
+    if (s->cfg.phase_coding) {
+      p->phase_mode = (int)aac_bitreader_read(r, 1);
+      if (p->phase_mode) {
+        p->opd_smoothing = (int)aac_bitreader_read(r, 1);
+        ok = read_ecdata(s, p, r, kIpd) == 0;
       } else {
-        clear_ipd(w);
+        clear_ipd(p);
       }
     } else {
-      clear_ipd(w);
+      clear_ipd(p);
     }
   }
-  if (ok && w->cfg.high_rate_mode) {
-    ok = read_smoothing(w, r) == 0;
+  if (ok && s->cfg.high_rate_mode) {
+    ok = read_smoothing(s, p, r) == 0;
   } else if (ok) {
-    memset(w->smooth_mode, 0, sizeof(w->smooth_mode));
+    memset(p->smooth_mode, 0, sizeof(p->smooth_mode));
   }
   if (ok) {
-    ok = read_temp_shape(w, r) == 0;
+    ok = read_temp_shape(s, p, r) == 0;
   }
   if (ok && r->overread) {
     ok = 0;
   }
   if (ok) {
-    ok = map_type(w, kCld) == 0 && map_type(w, kIcc) == 0 &&
-         (!w->cfg.phase_coding || map_type(w, kIpd) == 0);
+    ok = map_type(s, p, kCld) == 0 && map_type(s, p, kIcc) == 0 &&
+         (!s->cfg.phase_coding || map_type(s, p, kIpd) == 0);
   }
   if (ok) {
-    map_smoothing(w);
-    ok = finish_sets(w) == 0;
+    map_smoothing(s, p);
+    ok = finish_sets(s, p) == 0;
   }
   if (!ok) {
-    free(w);
     aac_mps212_conceal(s);
     return AAC_ERR_DECODE;
   }
-  memcpy(s, w, sizeof(AacMps212State));
-  free(w);
+  s->p = w;
   return AAC_OK;
 }
 
@@ -1874,23 +1889,30 @@ void aac_mps212_conceal(AacMps212State* s) {
   if (s == NULL) {
     return;
   }
-  /* one set at the end of the frame holding the last parameters */
-  s->num_sets_prev = s->num_sets;
-  s->num_sets = 1;
-  s->param_slot[0] = s->slots - 1;
-  s->param_diff[0] = s->slots;
+  /* one set at the end of the frame holding the last parameters (the
+   * history is on the coded scale; a coarse one goes to the fine scale
+   * as a kept set would) */
+  s->p.num_sets_prev = s->p.num_sets;
+  s->p.num_sets = 1;
+  s->p.param_slot[0] = s->slots - 1;
+  s->p.param_diff[0] = s->slots;
   for (int t = 0; t < 3; t++) {
-    memcpy(s->td[t].idx[0], s->td[t].idx_prev, sizeof(s->td[t].idx[0]));
-    s->td[t].mode[0] = 1;
+    TypeData* td = &s->p.td[t];
+    memcpy(td->idx[0], td->idx_prev, sizeof(td->idx[0]));
+    td->mode[0] = 1;
+    td->set_coarse[0] = td->coarse_prev;
+    if (td->coarse_prev) {
+      coarse_to_fine(t, td->idx[0], t == kIpd ? s->num_ipd_bands : s->num_bands);
+    }
   }
-  s->temp_shape_enable = 0;
-  s->tsd_enable = 0;
-  s->stp_channel[0] = s->stp_channel[1] = 0;
-  s->ges_channel[0] = s->ges_channel[1] = 0;
-  memset(s->tsd_transient, 0, sizeof(s->tsd_transient));
-  s->smooth_mode[0] = 1;
-  s->inv_smooth_time[0] = s->prev_inv_smooth_time;
-  memcpy(s->smoothing[0], s->prev_smg, sizeof(s->smoothing[0]));
+  s->p.temp_shape_enable = 0;
+  s->p.tsd_enable = 0;
+  s->p.stp_channel[0] = s->p.stp_channel[1] = 0;
+  s->p.ges_channel[0] = s->p.ges_channel[1] = 0;
+  memset(s->p.tsd_transient, 0, sizeof(s->p.tsd_transient));
+  s->p.smooth_mode[0] = 1;
+  s->p.inv_smooth_time[0] = s->p.prev_inv_smooth_time;
+  memcpy(s->p.smoothing[0], s->p.prev_smg, sizeof(s->p.smoothing[0]));
 }
 
 void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float* residual,
@@ -1903,23 +1925,23 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
   const int res_bands = use_res ? s->res_bands : 0;
 
   /* the matrices of the frame */
-  memcpy(s->m_res_prev, s->m_res[s->num_sets_prev - 1], sizeof(s->m_res_prev));
-  memcpy(s->m_dec_prev, s->m_dec[s->num_sets_prev - 1], sizeof(s->m_dec_prev));
-  memcpy(s->phase_l_prev, s->phase_l[s->num_sets_prev - 1], sizeof(s->phase_l_prev));
-  memcpy(s->phase_r_prev, s->phase_r[s->num_sets_prev - 1], sizeof(s->phase_r_prev));
+  memcpy(s->m_res_prev, s->m_res[s->p.num_sets_prev - 1], sizeof(s->m_res_prev));
+  memcpy(s->m_dec_prev, s->m_dec[s->p.num_sets_prev - 1], sizeof(s->m_dec_prev));
+  memcpy(s->phase_l_prev, s->phase_l[s->p.num_sets_prev - 1], sizeof(s->phase_l_prev));
+  memcpy(s->phase_r_prev, s->phase_r[s->p.num_sets_prev - 1], sizeof(s->phase_r_prev));
   set_matrices(s);
   smooth_matrices(s);
   interpolate_matrices(s);
   for (int n = 0; n < slots; n++) {
     for (int ch = 0; ch < 2; ch++) {
       s->ges_gain[ch][n] =
-          s->cfg.temp_shape_config == 2 && s->temp_shape_enable && s->ges_channel[ch]
-              ? s->env_shape[ch][n]
+          s->cfg.temp_shape_config == 2 && s->p.temp_shape_enable && s->p.ges_channel[ch]
+              ? s->p.env_shape[ch][n]
               : 0.0f;
-      s->stp_on[ch][n] = s->temp_shape_enable && s->stp_channel[ch];
+      s->stp_on[ch][n] = s->p.temp_shape_enable && s->p.stp_channel[ch];
     }
-    s->tsd_on[n] = s->tsd_enable && s->tsd_transient[n];
-    s->tsd_ph[n] = s->tsd_phase[n];
+    s->tsd_on[n] = s->p.tsd_enable && s->p.tsd_transient[n];
+    s->tsd_ph[n] = s->p.tsd_phase[n];
   }
 
   /* the residual: QMF analysis of the core frame (full scale 1.0 to the
@@ -2071,7 +2093,7 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
   }
   left->slots = slots;
   right->slots = slots;
-  s->num_sets_prev = s->num_sets;
+  s->p.num_sets_prev = s->p.num_sets;
 }
 
 /* ── test entry points ──────────────────────────────────────────── */
@@ -2093,42 +2115,46 @@ void aac_mps212_pred_weights(int cld_idx, int icc_idx, int ipd_idx, int has_ipd,
 
 int aac_mps212_num_param_bands(const AacMps212State* s) { return s ? s->num_bands : 0; }
 int aac_mps212_num_ipd_bands(const AacMps212State* s) { return s ? s->num_ipd_bands : 0; }
-int aac_mps212_num_param_sets(const AacMps212State* s) { return s ? s->num_sets : 0; }
+int aac_mps212_num_param_sets(const AacMps212State* s) { return s ? s->p.num_sets : 0; }
 int aac_mps212_param_slot(const AacMps212State* s, int set) {
-  return (s && set >= 0 && set < s->num_sets) ? s->param_slot[set] : -1;
+  return (s && set >= 0 && set < s->p.num_sets) ? s->p.param_slot[set] : -1;
 }
 int aac_mps212_param(const AacMps212State* s, int type, int set, int band) {
   if (s == NULL || type < 0 || type > 2 || set < 0 || set >= kMaxSets || band < 0 ||
       band >= kMaxPb) {
     return 0;
   }
-  return s->td[type].idx[set][band];
+  return s->p.td[type].idx[set][band];
 }
 int aac_mps212_data_mode(const AacMps212State* s, int type, int set) {
-  return (s && type >= 0 && type < 3 && set >= 0 && set < kMaxSets) ? s->td[type].mode[set] : -1;
+  return (s && type >= 0 && type < 3 && set >= 0 && set < kMaxSets) ? s->p.td[type].mode[set] : -1;
 }
-int aac_mps212_phase_mode(const AacMps212State* s) { return s ? s->phase_mode : 0; }
+int aac_mps212_phase_mode(const AacMps212State* s) { return s ? s->p.phase_mode : 0; }
+int aac_mps212_quant_coarse(const AacMps212State* s, int type, int set) {
+  return (s && type >= 0 && type < 3 && set >= 0 && set < kMaxSets) ? s->p.td[type].set_coarse[set]
+                                                                     : -1;
+}
 int aac_mps212_smooth_mode(const AacMps212State* s, int set) {
-  return (s && set >= 0 && set < kMaxSets) ? s->smooth_mode[set] : -1;
+  return (s && set >= 0 && set < kMaxSets) ? s->p.smooth_mode[set] : -1;
 }
 int aac_mps212_smoothing(const AacMps212State* s, int set, int band) {
-  return (s && set >= 0 && set < kMaxSets && band >= 0 && band < kMaxPb) ? s->smoothing[set][band]
+  return (s && set >= 0 && set < kMaxSets && band >= 0 && band < kMaxPb) ? s->p.smoothing[set][band]
                                                                         : 0;
 }
 int aac_mps212_temp_shape_enabled(const AacMps212State* s) {
-  return s ? (s->temp_shape_enable || s->tsd_enable) : 0;
+  return s ? (s->p.temp_shape_enable || s->p.tsd_enable) : 0;
 }
 int aac_mps212_env_shape_channel(const AacMps212State* s, int ch) {
-  return (s && ch >= 0 && ch < 2) ? (s->stp_channel[ch] || s->ges_channel[ch]) : 0;
+  return (s && ch >= 0 && ch < 2) ? (s->p.stp_channel[ch] || s->p.ges_channel[ch]) : 0;
 }
 float aac_mps212_env_shape(const AacMps212State* s, int ch, int slot) {
-  return (s && ch >= 0 && ch < 2 && slot >= 0 && slot < kMaxSlots) ? s->env_shape[ch][slot] : 0.0f;
+  return (s && ch >= 0 && ch < 2 && slot >= 0 && slot < kMaxSlots) ? s->p.env_shape[ch][slot] : 0.0f;
 }
 int aac_mps212_tsd_transient(const AacMps212State* s, int slot) {
-  return (s && slot >= 0 && slot < kMaxSlots) ? s->tsd_transient[slot] : 0;
+  return (s && slot >= 0 && slot < kMaxSlots) ? s->p.tsd_transient[slot] : 0;
 }
 int aac_mps212_tsd_phase(const AacMps212State* s, int slot) {
-  return (s && slot >= 0 && slot < kMaxSlots) ? s->tsd_phase[slot] : 0;
+  return (s && slot >= 0 && slot < kMaxSlots) ? s->p.tsd_phase[slot] : 0;
 }
 
 void aac_mps212_hybrid_analysis(const float (*in)[64][2], float (*out)[2]) {

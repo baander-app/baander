@@ -841,6 +841,73 @@ static void test_mps_low_band_lead() {
         low_diff);
 }
 
+static void test_mps_before_sbr_patching() {
+  /* With stereoConfigIndex 3 the low band arrives as the MPS 212 output
+   * in the QMF domain and the transposer has no time signal to run on:
+   * a frame asking for the harmonic patching gets the LPC patching, the
+   * same high band as a frame asking for that outright, and a channel
+   * fed time samples again runs the transposer again. */
+  static AacSbrState a, b;
+  const AacUsacSbrConfig cfg = config(10, 10, 2, 2, 1);
+  const int frame = 1024;
+  aac_sbr_usac_init(&a, 24000, frame, AAC_USAC_SBR_2_1, &cfg, 3);
+  aac_sbr_usac_init(&b, 24000, frame, AAC_USAC_SBR_2_1, &cfg, 3);
+  CHECK(a.usac.harmonic_sbr && a.usac.history == (4 + AAC_SBR_USAC_HBE_DELAY) * 2,
+        "transposer history %d", a.usac.history);
+  std::vector<float> core = gen_wideband(frame * 6, 24000, 1);
+  uint8_t bits[512];
+  static AacUsacQmfFrame low_a, low_b, qa, qb;
+  double high = 0.0, diff = 0.0;
+  bool finite = true;
+  for (int n = 0; n < 6; n++) {
+    TestFrame f = plain_frame(1, 45);
+    f.indep = n == 0;
+    f.info_present = 0;
+    f.patching_mode = 0;
+    write_usac_sbr_data(bits, sizeof(bits), &a, &cfg, f);
+    AacBitReader r;
+    aac_bitreader_init(&r, bits, sizeof(bits));
+    CHECK(aac_sbr_usac_decode(&a, &r, AAC_ELEM_SCE, 1, f.indep) == AAC_OK, "frame %d (a)", n);
+    f.patching_mode = 1;
+    write_usac_sbr_data(bits, sizeof(bits), &b, &cfg, f);
+    aac_bitreader_init(&r, bits, sizeof(bits));
+    CHECK(aac_sbr_usac_decode(&b, &r, AAC_ELEM_SCE, 1, f.indep) == AAC_OK, "frame %d (b)", n);
+    CHECK(a.usac.data[0].patching_mode == 0 && b.usac.data[0].patching_mode == 1,
+          "frame %d: patching fields %d %d", n, a.usac.data[0].patching_mode,
+          b.usac.data[0].patching_mode);
+    aac_sbr_usac_analyze_core(&a, core.data() + n * frame, &low_a);
+    aac_sbr_usac_analyze_core(&b, core.data() + n * frame, &low_b);
+    aac_sbr_usac_apply_low_to_qmf(&a, 0, &low_a, &qa);
+    aac_sbr_usac_apply_low_to_qmf(&b, 0, &low_b, &qb);
+    CHECK(a.usac.ch[0].low_band_taken == 1, "frame %d: the low band is not flagged as taken", n);
+    for (int i = 0; i < qa.slots; i++) {
+      for (int k = a.kx[1]; k < 64; k++) {
+        for (int c = 0; c < 2; c++) {
+          finite = finite && std::isfinite(qa.x[i][k][c]);
+          high += (double)qa.x[i][k][c] * qa.x[i][k][c];
+          const double d = (double)qa.x[i][k][c] - qb.x[i][k][c];
+          diff += d * d;
+        }
+      }
+    }
+  }
+  CHECK(finite, "non-finite high band");
+  CHECK(high > 0.0, "the high band is silent");
+  CHECK(diff == 0.0, "the taken low band was not patched: %g of the high band differs",
+        high > 0.0 ? diff / high : diff);
+  /* time samples again: the channel is back on the transposer */
+  TestFrame f = plain_frame(1, 45);
+  f.indep = 0;
+  f.info_present = 0;
+  f.patching_mode = 0;
+  write_usac_sbr_data(bits, sizeof(bits), &a, &cfg, f);
+  AacBitReader r;
+  aac_bitreader_init(&r, bits, sizeof(bits));
+  CHECK(aac_sbr_usac_decode(&a, &r, AAC_ELEM_SCE, 1, 0) == AAC_OK, "time-domain frame");
+  aac_sbr_usac_apply_to_qmf(&a, 0, core.data(), &qa);
+  CHECK(a.usac.ch[0].low_band_taken == 0, "the flag outlived the frame");
+}
+
 /* ── the low band of real streams against the FDK decoder ────────── */
 
 static std::vector<float> read_wav_mono(const std::string& path, int* sr) {
@@ -1096,6 +1163,7 @@ int main() {
   test_inter_tes();
   test_split_interface();
   test_mps_low_band_lead();
+  test_mps_before_sbr_patching();
   test_fdk_lowband();
   test_fdk_stream();
   return test_summary("test_usac_sbr");

@@ -165,6 +165,8 @@ using AacSbrUsacChannelData = struct AacSbrUsacChannelData_ {
 using AacSbrUsacChannel = struct AacSbrUsacChannel_ {
   float W_low[AAC_SBR_USAC_COLS][32][2]; /* core analysis, history then frame */
   float W_hbe[AAC_SBR_USAC_COLS][64][2]; /* analysis of the transposed signal */
+  int low_band_taken; /* the frame's low band was handed in as QMF samples: no
+                         time signal reached the transposer, so W_hbe is stale */
   int Ypos;
   float Y[2][AAC_SBR_USAC_Y_SLOTS][64][2];
   float g_temp[AAC_SBR_USAC_Y_SLOTS + 4][AAC_SBR_MAX_BANDS];
@@ -363,7 +365,9 @@ void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFram
  * output of channel `ch` as that channel's low band, generates its high
  * band from channel `ch`'s SBR data and leaves the frame for
  * aac_sbr_usac_synthesize.  The harmonic transposer has no time signal
- * here, so the patching generates the high band. */
+ * here, so the LPC patching generates the high band whatever the frame's
+ * bs_sbr_patching_mode says (the reference decoder leaves this
+ * combination without a transposer input as well). */
 void aac_sbr_usac_analyze_core(AacSbrState* s, const float* core, struct AacUsacQmfFrame_* out);
 void aac_sbr_usac_apply_low_to_qmf(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in,
                                    struct AacUsacQmfFrame_* out);

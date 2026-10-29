@@ -850,7 +850,7 @@ FDK the behavioural one through its binaries only, and FFmpeg master is no
 oracle for the 2:1 and 8:3 streams (its output is wrong). Verification
 against the FDK decoder (loudness normalisation off, delay 0 throughout):
 81 to 84 dB on the FD core, 80 dB with 2:1 SBR and residual-coded MPS 212
-and on mono 2:1 SBR, 61 dB on LPD speech at 4:1 and 52 dB at 2:1, 18 and
+and on mono 2:1 SBR, 61 dB on LPD speech at 4:1 and 52 dB at 2:1, 24 and
 26 dB on LPD music at 8:3 and 4:1 where libxaac itself reaches 20 and 27 dB
 (the references disagree by 38 to 50 dB in the SBR bands); parsing
 bit-exact with libxaac on every stream; the DRC normalisation gain exact

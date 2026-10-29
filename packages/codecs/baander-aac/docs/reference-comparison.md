@@ -240,7 +240,7 @@ streams wrongly.
 | `usac_speech_48000_16000` (mono 16 kbit/s) | LPD, 4:1 | 61.3 dB |
 | `usac_lpd_speech_24000` (mono 24 kbit/s) | LPD, 2:1 | 52.1 dB |
 | `usac_speech_48000_24000` (mono 24 kbit/s) | LPD, 2:1 | 52.1 dB |
-| `usac_music_48000_24000` (stereo 24 kbit/s) | LPD, 8:3 (768-line core), MPS 212 (stereoConfigIndex 1) | 17.8 dB |
+| `usac_music_48000_24000` (stereo 24 kbit/s) | LPD, 8:3 (768-line core), MPS 212 (stereoConfigIndex 1) | 23.9 dB |
 | `usac_music_48000_16000` (stereo 16 kbit/s) | LPD, 4:1, MPS 212 (stereoConfigIndex 1) | 25.9 dB |
 
 On the two LPD music streams libxaac itself reaches 19.8 and 27.4 dB

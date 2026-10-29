@@ -57,9 +57,12 @@ void aac_mps212_conceal(AacMps212State* s);
  * downmix's).  With stereoConfigIndex 1 and 2 the default is the three
  * envelope time slots (times the QMF slots per time slot) by which the
  * SBR module hands the downmix later than the plain analysis of the core
- * frame, and a harmonic transposer adds its own delay; with 3 the downmix
- * arrives at the analysis timing and the default is zero. */
+ * frame; the frame walker sets the SBR module's actual lag here, which
+ * grows by the harmonic transposer's delay when the configuration runs
+ * it.  With 3 the downmix arrives at the analysis timing and the default
+ * is zero. */
 void aac_mps212_set_residual_delay(AacMps212State* s, int slots);
+int aac_mps212_residual_delay(const AacMps212State* s);
 
 /* ── tables (src/mps212_tables.cpp) ─────────────────────────────── */
 
@@ -143,6 +146,9 @@ int aac_mps212_param_slot(const AacMps212State* s, int set);
 int aac_mps212_param(const AacMps212State* s, int type, int set, int band);
 int aac_mps212_data_mode(const AacMps212State* s, int type, int set);
 int aac_mps212_phase_mode(const AacMps212State* s);
+/* The quantiser (1 coarse, 0 fine) the set's values of a type were coded
+ * on; a kept or interpolated set carries the previous set's. */
+int aac_mps212_quant_coarse(const AacMps212State* s, int type, int set);
 int aac_mps212_smooth_mode(const AacMps212State* s, int set);
 int aac_mps212_smoothing(const AacMps212State* s, int set, int band);
 int aac_mps212_temp_shape_enabled(const AacMps212State* s);

@@ -736,7 +736,11 @@ void pre_flatten(const float X_low[32][kCols][2], int bands, int start, int end,
 
 /* The high band for the frame's envelopes: the LPC patching with the
  * chirped predictors (the source bands pre-flattened when the frame's
- * SbrInfo asks for it), or the analysed transposer output. */
+ * SbrInfo asks for it), or the analysed transposer output.  A channel
+ * whose low band came in as QMF samples (stereoConfigIndex 3, the MPS
+ * 212 output) gave the transposer nothing to work on, so its frames are
+ * patched even when bs_sbr_patching_mode asks for the transposer; the
+ * reference decoder has no transposer buffer for that channel either. */
 int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
            const AacSbrUsacChannelData* d) {
   AacSbrUsac* u = &s->usac;
@@ -749,7 +753,7 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
   if (end > kCols || start < 2) {
     return AAC_ERR_DECODE;
   }
-  if (u->harmonic_sbr && !d->patching_mode) {
+  if (u->harmonic_sbr && !d->patching_mode && !uc->low_band_taken) {
     for (int k = kx; k < kx + m; k++) {
       for (int i = start; i < end; i++) {
         u->X_high[k][i][0] = uc->W_hbe[i][k][0];
@@ -1148,6 +1152,7 @@ void analyze_channel(AacSbrState* s, int c, const float* pcm) {
   for (int i = 0; i < u->core_frame; i++) {
     core[i] = pcm[i] * 32768.0f;
   }
+  uc->low_band_taken = 0;
   memmove(uc->W_low, uc->W_low + slots, (size_t)hist * sizeof(uc->W_low[0]));
   for (int i = 0; i < slots; i++) {
     float W[64][2];
@@ -1170,12 +1175,13 @@ void analyze_channel(AacSbrState* s, int c, const float* pcm) {
 /* The low band of the frame handed in as QMF samples (the MPS 212
  * output of a stereoConfigIndex 3 element) into the channel's history,
  * in place of its own analysis.  The transposer has no time signal to
- * work on here, so the patching generates the high band. */
+ * work on here, so the channel is flagged for hf_gen to patch. */
 void take_low_band(AacSbrState* s, int c, const struct AacUsacQmfFrame_* in) {
   AacSbrUsac* u = &s->usac;
   AacSbrUsacChannel* uc = &u->ch[c];
   const int slots = u->slots_of_frame;
   const int hist = u->history;
+  uc->low_band_taken = 1;
   memmove(uc->W_low, uc->W_low + slots, (size_t)hist * sizeof(uc->W_low[0]));
   for (int i = 0; i < slots; i++) {
     for (int k = 0; k < 32; k++) {
