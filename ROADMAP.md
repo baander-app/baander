@@ -23,6 +23,19 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Configurable development libraries
+
+The [implementation plan](docs/plans/2026-10-29-1726-feat-configurable-development-libraries-plan.md)
+adds local library definitions in `dev.local.json`, read-only media mounts and
+idempotent library creation during preview startup. The requested Movies library
+uses the developer's video directory; scanning remains manual.
+
+Planning checkpoint, 2026-10-29: ten requirements and three implementation units
+cover configuration, startup reconciliation, privacy and actual preview setup.
+Four document-review personas completed; one conflicting optional-field description
+was corrected, with no remaining findings. Prose and whitespace checks passed.
+Implementation and runtime verification remain open.
+
 ## PHP-first testing and development tooling
 
 The [implementation plan](docs/plans/2026-10-27-1812-refactor-php-first-development-tooling-plan.md)
