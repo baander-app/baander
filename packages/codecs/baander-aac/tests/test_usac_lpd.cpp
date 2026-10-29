@@ -2,7 +2,9 @@
  * LSP to LPC conversion against an LPC analysis of the synthesis filter,
  * the algebraic vector quantiser (codevectors on the RE8 lattice and the
  * index syntax round trip), the ACELP pulse codes and the pitch lag
- * codes, the FAC transform and windows, the core channel contract
+ * codes at the core rates the range formula serves and above, the FAC
+ * transform and windows, the FAC a frame header denies at a mode
+ * boundary, the core channel contract
  * (overlap, concealment, random input), and the core output of six
  * xHE-AAC streams with an LPD core (12, 18 and 24 kHz, 1024 and 768
  * lines, SCE and CPE with one core channel) against stored expectations
@@ -11,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <set>
+#include <vector>
 
 #include "../src/usac_lpd_internal.h"
 #include "asc.h"
@@ -392,10 +395,75 @@ static void test_pitch() {
   }
   CHECK(t0_min <= base && base <= t0_max, "relative range around the lag");
   aac_usac_lpd_channel_destroy(c);
-  /* at 24 kHz the range scales: 64 .. 411 */
+  /* at 24 kHz the range scales: 64 .. 411, and the 9 bit code covers it
+   * exactly, so that a corrupt code still names a lag inside it */
   c = aac_usac_lpd_channel_create(1024, 24000);
   CHECK(c && c->pit_min == 64 && c->pit_fr2 == 98 && c->pit_max == 411, "pitch range at 24 kHz");
-  aac_usac_lpd_channel_destroy(c);
+  if (c) {
+    for (int idx = 0; idx < 512; idx++) {
+      lpd_acelp_pitch(c, idx, 1, &t0, &frac, &t0_min, &t0_max);
+      CHECK(t0 >= c->pit_min && t0 <= c->pit_max && frac >= 0 && frac < 4,
+            "24 kHz lag %d + %d/4 in range at %d", t0, frac, idx);
+      CHECK(t0_min >= c->pit_min && t0_max <= c->pit_max, "24 kHz relative range at %d", idx);
+    }
+    lpd_acelp_pitch(c, 511, 1, &t0, &frac, &t0_min, &t0_max);
+    CHECK(t0 == c->pit_max && frac == 0, "24 kHz code 511 is pit_max: %d", t0);
+    aac_usac_lpd_channel_destroy(c);
+  }
+  /* above 24 kHz the scaling closes the quarter resolution range and the
+   * lag limit stays at the excitation history: the limits keep their
+   * order and the top codes clamp to pit_max instead of reaching beyond
+   * the history */
+  c = aac_usac_lpd_channel_create(1024, 48000);
+  CHECK(c != nullptr, "channel at 48 kHz");
+  if (c) {
+    printf("pitch range at 48 kHz: min %d fr2 %d fr1 %d max %d\n", c->pit_min, c->pit_fr2,
+           c->pit_fr1, c->pit_max);
+    CHECK(c->pit_min == 128 && c->pit_fr2 == c->pit_min && c->pit_fr1 == 160 &&
+              c->pit_max == LPD_PIT_MAX,
+          "pitch range at 48 kHz");
+    int clamped = 0;
+    for (int idx = 0; idx < 512; idx++) {
+      lpd_acelp_pitch(c, idx, 1, &t0, &frac, &t0_min, &t0_max);
+      CHECK(t0 >= c->pit_min && t0 <= c->pit_max && frac >= 0 && frac < 4,
+            "48 kHz lag %d + %d/4 in range at %d", t0, frac, idx);
+      CHECK(t0_min >= c->pit_min && t0_max <= c->pit_max && t0_min <= t0 && t0 <= t0_max,
+            "48 kHz relative range at %d", idx);
+      clamped += t0 == c->pit_max;
+      for (int rel = 0; rel < 64; rel++) {
+        int t1, f1;
+        lpd_acelp_pitch(c, rel, 0, &t1, &f1, &t0_min, &t0_max);
+        CHECK(t1 >= c->pit_min && t1 <= c->pit_max, "48 kHz relative lag at %d/%d", idx, rel);
+      }
+    }
+    CHECK(clamped > 1, "48 kHz: the top codes clamp to pit_max (%d of them)", clamped);
+    /* a frame with the top code in every subframe decodes within the
+     * excitation history */
+    LpdFrameData f;
+    memset(&f, 0, sizeof(f));
+    for (int sf = 0; sf < LPD_MAX_SUBFR; sf++) {
+      f.acelp[0].acb_index[sf] = sf % 2 ? 63 : 511;
+      f.acelp[0].gains_index[sf] = 100;
+    }
+    f.acelp[0].mean_energy = 3;
+    float a[LPD_MAX_SUBFR + 1][LPD_M + 1];
+    memset(a, 0, sizeof(a));
+    for (int sf = 0; sf <= LPD_MAX_SUBFR; sf++) {
+      a[sf][0] = 1.0f;
+    }
+    for (int i = 0; i < LPD_EXC_HIST; i++) {
+      c->exc[i] = 0.5f * sinf(0.05f * (float)i);
+    }
+    int pitch[LPD_MAX_SUBFR];
+    float gain[LPD_MAX_SUBFR];
+    lpd_acelp_decode(c, &f, 0, a, 1.0f, pitch, gain);
+    int finite = 1;
+    for (int i = 0; i < c->l_div; i++) {
+      finite &= std::isfinite(c->syn[LPD_SYN_HIST + i]) != 0;
+    }
+    CHECK(finite && pitch[0] == c->pit_max, "48 kHz top codes: finite synthesis, lag %d", pitch[0]);
+    aac_usac_lpd_channel_destroy(c);
+  }
   /* the adaptive codebook interpolation reproduces a shifted sinusoid */
   float exc[LPD_EXC_HIST + 65];
   for (int i = 0; i < LPD_EXC_HIST; i++) {
@@ -458,6 +526,82 @@ static void test_fac() {
   CHECK(fabsf(out[0] - 2.0f / lfac * cosf((float)(M_PI / lfac * 0.5 * 3.5))) < 1e-5f &&
             out[lfac + 5] == 0.0f,
         "fac synth basis: %f", out[0]);
+}
+
+/* ── the FAC at a frame start the header denies ─────────────────── */
+
+/* The synthesis of a TCX after an ACELP segment, or of an ACELP frame
+ * after a TCX, as the first subframe of a frame whose header announces
+ * no FAC: the data of fac[0], left over from an earlier frame, must not
+ * enter the output.  Decodes a trivial segment three times from the
+ * same state, with the FAC absent over stale coefficients, absent over
+ * zero coefficients and present, and compares the samples around the
+ * boundary. */
+static std::vector<float> decode_boundary(int tcx, int present, int stale) {
+  AacUsacLpdChannel* c = aac_usac_lpd_channel_create(1024, 12000);
+  CHECK(c != nullptr, "channel");
+  if (!c) {
+    return {};
+  }
+  unsigned seed = 7u;
+  c->noise_seed = &seed;
+  c->mode_prev = tcx ? 0 : 1;
+  c->fac_gain = 1.0f;
+  for (int i = 0; i < LPD_MAX_LFAC / 4; i++) {
+    c->alfd_gains[i] = 1.0f;
+  }
+  for (int i = 0; i < (int)(sizeof(c->ovl) / sizeof(c->ovl[0])); i++) {
+    c->ovl[i] = 0.1f * sinf(0.2f * (float)i);
+  }
+  for (int i = 0; i < LPD_SYN_HIST; i++) {
+    c->syn[i] = 0.1f * sinf(0.3f * (float)i);
+    c->exc[i % LPD_EXC_HIST] = 0.1f * sinf(0.7f * (float)i);
+  }
+  for (int i = 0; i <= LPD_M; i++) {
+    c->a_prev[0][i] = c->a_prev[1][i] = i == 0 ? 1.0f : 0.0f;
+  }
+  LpdFrameData f;
+  memset(&f, 0, sizeof(f));
+  f.fac_present[0] = present;
+  if (stale) {
+    for (int i = 0; i < LPD_MAX_LFAC; i++) {
+      f.fac[0][i] = (i * 7) % 11 - 5;
+    }
+  }
+  float a[LPD_MAX_SUBFR + 1][LPD_M + 1];
+  memset(a, 0, sizeof(a));
+  for (int sf = 0; sf <= LPD_MAX_SUBFR; sf++) {
+    a[sf][0] = 1.0f;
+  }
+  if (tcx) {
+    f.tcx[0].lg = c->l_div;
+    f.tcx[0].noise_factor = 8; /* no noise filling: the spectrum stays empty */
+    f.tcx[0].global_gain = 60;
+    lpd_tcx_decode(c, &f, 0, a[0], a[0]);
+  } else {
+    for (int sf = 0; sf < LPD_MAX_SUBFR; sf++) {
+      f.acelp[0].gains_index[sf] = 40;
+    }
+    int pitch[LPD_MAX_SUBFR];
+    float gain[LPD_MAX_SUBFR];
+    lpd_acelp_decode(c, &f, 0, a, 1.0f, pitch, gain);
+  }
+  const float* from = c->syn + LPD_SYN_HIST - c->lfac;
+  std::vector<float> out(from, from + c->lfac + c->l_div);
+  aac_usac_lpd_channel_destroy(c);
+  return out;
+}
+
+static void test_fac_absent() {
+  for (int tcx = 0; tcx < 2; tcx++) {
+    const char* what = tcx ? "ACELP to TCX" : "TCX to ACELP";
+    const std::vector<float> absent_stale = decode_boundary(tcx, 0, 1);
+    const std::vector<float> absent_zero = decode_boundary(tcx, 0, 0);
+    const std::vector<float> present = decode_boundary(tcx, 1, 1);
+    CHECK(!absent_stale.empty() && absent_stale == absent_zero,
+          "%s without a FAC: stale coefficients stay out of the synthesis", what);
+    CHECK(present != absent_stale, "%s with a FAC: the coefficients enter the synthesis", what);
+  }
 }
 
 /* ── core channel contract ──────────────────────────────────────── */
@@ -716,6 +860,7 @@ int main() {
   test_acelp_pulses();
   test_pitch();
   test_fac();
+  test_fac_absent();
   test_contract();
   const LpdStream streams[6] = {
       {"usac_lpd_speech_12000.loas", "usac_lpd_speech_12000_core.s16", 12000, 1024},

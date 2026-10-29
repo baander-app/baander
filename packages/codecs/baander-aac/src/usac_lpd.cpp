@@ -9,14 +9,6 @@
 
 #include "usac_lpd_internal.h"
 
-#ifdef LPD_TRACE
-#include <cstdio>
-extern int lpd_trace_frame;
-#define LPD_T(...) fprintf(stderr, __VA_ARGS__)
-#else
-#define LPD_T(...) ((void)0)
-#endif
-
 namespace {
 
 /* The LPD synthesis runs at the scale of the FD core's transform output
@@ -30,7 +22,11 @@ float* syn0(AacUsacLpdChannel* c) { return c->syn + LPD_SYN_HIST; }
 float* exc0(AacUsacLpdChannel* c) { return c->exc + LPD_EXC_HIST; }
 
 /* The pitch range at the core rate: the offset of the sampling rate
- * against 12.8 kHz scales the lag limits. */
+ * against 12.8 kHz scales the lag limits, which at the rates up to 24 kHz
+ * the 9 bit lag code covers exactly.  Above that the formula's quarter
+ * resolution range closes (pit_fr2 falls below pit_min) and pit_max
+ * outgrows the excitation history, so the limits are held in order and
+ * within the history; the lag decoder keeps every code inside them. */
 void pitch_range(AacUsacLpdChannel* c) {
   const int i = (c->core_sr * 34 + 6400) / 12800 - 34;
   c->pit_min = 34 + i;
@@ -39,6 +35,15 @@ void pitch_range(AacUsacLpdChannel* c) {
   c->pit_max = 231 + 6 * i;
   if (c->pit_max > LPD_PIT_MAX) {
     c->pit_max = LPD_PIT_MAX;
+  }
+  if (c->pit_fr2 < c->pit_min) {
+    c->pit_fr2 = c->pit_min;
+  }
+  if (c->pit_fr1 < c->pit_fr2) {
+    c->pit_fr1 = c->pit_fr2;
+  }
+  if (c->pit_max < c->pit_fr1) {
+    c->pit_max = c->pit_fr1;
   }
 }
 
@@ -135,7 +140,6 @@ int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* 
   f->fac_data_present = (int)aac_bitreader_read(r, 1);
   f->first_lpd_flag = !f->core_mode_last;
   f->arith_reset = 0;
-  LPD_T("XLPD f=%d hdr acelp_core_mode=%d lpd_mode=%d mod=%d%d%d%d bpf=%d core_mode_last=%d fac_present=%d left=%d\n", lpd_trace_frame, f->acelp_core_mode, f->lpd_mode, f->mod[0], f->mod[1], f->mod[2], f->mod[3], f->bpf_control_info, f->core_mode_last, f->fac_data_present, aac_bitreader_bits_left(r));
   memset(f->fac_present, 0, sizeof(f->fac_present));
   int last = c->mode_prev;
   int first_tcx = 1;
@@ -151,12 +155,10 @@ int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* 
         return ret;
       }
     }
-    LPD_T("XLPD f=%d k=%d before_core left=%d\n", lpd_trace_frame, k, aac_bitreader_bits_left(r));
     if (f->mod[k] == 0) {
       if ((ret = lpd_read_acelp(r, f->acelp_core_mode, c->nb_subfr, &f->acelp[k])) != AAC_OK) {
         return ret;
       }
-      LPD_T("XLPD f=%d k=%d acelp mean_energy=%d left=%d\n", lpd_trace_frame, k, f->acelp[k].mean_energy, aac_bitreader_bits_left(r));
       last = 0;
       k++;
     } else {
@@ -164,12 +166,6 @@ int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* 
       if ((ret = lpd_read_tcx(r, lg, first_tcx, indep, c, f, k)) != AAC_OK) {
         return ret;
       }
-#ifdef LPD_TRACE
-      LPD_T("XLPD f=%d k=%d tcx lg=%d noise_factor=%d global_gain=%d arith_reset=%d first=%d left=%d\n", lpd_trace_frame, k, lg, f->tcx[k].noise_factor, f->tcx[k].global_gain, f->arith_reset, first_tcx, aac_bitreader_bits_left(r));
-      LPD_T("XLPD f=%d k=%d tcxq", lpd_trace_frame, k);
-      for (int ii = 0; ii < lg; ii++) LPD_T(" %d", f->tcx[k].q[ii]);
-      LPD_T("\n");
-#endif
       last = f->mod[k];
       k += 1 << (f->mod[k] - 1);
       first_tcx = 0;
@@ -178,7 +174,6 @@ int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* 
   if ((ret = lpd_read_lpc_data(r, f)) != AAC_OK) {
     return ret;
   }
-  LPD_T("XLPD f=%d lpc_data left=%d\n", lpd_trace_frame, aac_bitreader_bits_left(r));
   f->fd_fac_short = 0;
   f->fd_fac_gain = 0;
   if (!f->core_mode_last && f->fac_data_present) {
@@ -188,7 +183,6 @@ int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* 
     if ((ret = lpd_read_fac(r, length, f->fd_fac)) != AAC_OK) {
       return ret;
     }
-    LPD_T("XLPD f=%d fdfac short=%d gain=%d left=%d\n", lpd_trace_frame, f->fd_fac_short, f->fd_fac_gain, aac_bitreader_bits_left(r));
   }
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
@@ -377,13 +371,6 @@ void decode_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, const LpdFrameDa
   /* the LPC sets */
   float lsf[5][LPD_M];
   lpd_lsf_decode(c, f, lsf);
-#ifdef LPD_TRACE
-  for (int a = 0; a < 5; a++) {
-    LPD_T("XLPD f=%d lsf%d", lpd_trace_frame, a);
-    for (int b = 0; b < LPD_M; b++) LPD_T(" %.6f", lsf[a][b]);
-    LPD_T("\n");
-  }
-#endif
   if (f->first_lpd_flag) {
     memcpy(c->lsf_prev, lsf[0], sizeof(c->lsf_prev));
     lpd_lsf_to_lsp(c->lsf_prev, c->lsp_prev);
@@ -419,7 +406,6 @@ void decode_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, const LpdFrameDa
     float lsp[LPD_M];
     lpd_lsf_to_lsp(lsf[set], lsp);
     const float stab = lpd_stab_fac(lsf[set], c->lsf_prev);
-    LPD_T("XLPD f=%d k=%d mode=%d mode_prev=%d stab=%.5f\n", lpd_trace_frame, k, mode, c->mode_prev, stab);
     if (mode == 0) {
       float a[LPD_MAX_SUBFR + 1][LPD_M + 1];
       lpd_interp_lsp(c->lsp_prev, lsp, c->nb_subfr, a);
@@ -464,11 +450,6 @@ void decode_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, const LpdFrameDa
   for (int i = 0; i < c->nb_slots; i++) {
     refine_gain(s + i * LPD_SUBFR, pitch[i], &gain[i]);
   }
-#ifdef LPD_TRACE
-  LPD_T("XLPD f=%d pitch", lpd_trace_frame);
-  for (int a = 0; a < c->nb_slots + s0; a++) LPD_T(" %d/%.4f", pitch[a], gain[a]);
-  LPD_T("\n");
-#endif
   float lpd_out[LPD_MAX_FRAME];
   const int len2 = f->mod[3] == 0 ? c->synth_delay : c->synth_delay - c->lfac;
   bass_postfilter(s, pitch, gain, n, len2, c->bpf_noise, lpd_out);

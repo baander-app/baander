@@ -20,6 +20,13 @@ extern "C" {
  * module; created per channel. */
 typedef struct AacUsacLpdChannel_ AacUsacLpdChannel;
 
+/* Creates the channel for a frame length of 1024 or 768 and any core
+ * sample rate, so that an element whose frames stay in the frequency
+ * domain has its channel too.  The ACELP pitch lag range follows the
+ * standard's scaling of the 12.8 kHz range up to a 24 kHz core, the
+ * highest rate that scaling serves; above it the range is held in order
+ * within the excitation history and every lag code decodes inside it.
+ * Returns null for another frame length or a rate of zero or less. */
 AacUsacLpdChannel* aac_usac_lpd_channel_create(int frame_length, int core_sample_rate);
 void aac_usac_lpd_channel_destroy(AacUsacLpdChannel* c);
 void aac_usac_lpd_channel_reset(AacUsacLpdChannel* c);

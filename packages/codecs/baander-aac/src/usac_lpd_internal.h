@@ -36,7 +36,8 @@
 #define LPD_MAX_LFAC 128    /* FAC length: L_DIV / 2 */
 #define LPD_MAX_TCX 1024    /* TCX80 lines */
 #define LPD_MAX_SLOTS 16    /* 64-sample postfilter slots per superframe */
-#define LPD_PIT_MAX 411     /* the largest pitch lag at any core rate (24 kHz) */
+#define LPD_PIT_MAX 411     /* the largest pitch lag: that of a 24 kHz core, the highest rate
+                             * the lag range formula serves; the excitation history holds it */
 #define LPD_INTERP_ORDER 16 /* half length of the 1/4 resolution interpolation filter */
 #define LPD_UP_SAMP 4
 #define LPD_INTERP_LEN (LPD_UP_SAMP * LPD_INTERP_ORDER + 1)

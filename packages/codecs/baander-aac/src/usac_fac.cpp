@@ -11,32 +11,43 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-/* The cosine tables of the DCT-IV lengths in use, built on first use. */
-struct Dct4Table {
-  int n;
-  float* cos_table;
-};
+/* The FAC lengths in use: lfac (a frame of 1024 or 768 lines) and the
+ * FD frame's FAC of frame_length / 8 or, for short windows, / 16. */
+constexpr int kDct4Lengths[4] = {48, 64, 96, 128};
 
-const float* dct4_table(int n) {
-  static Dct4Table tables[8];
-  static float storage[8][LPD_MAX_LFAC * LPD_MAX_LFAC];
-  for (int t = 0; t < 8; t++) {
-    if (tables[t].n == n) {
-      return tables[t].cos_table;
-    }
-    if (tables[t].n == 0) {
-      float* c = storage[t];
+/* The cosine tables of those lengths.  The one instance is a
+ * function-local static, which the language initialises exactly once
+ * even when several decoders reach it at the same time on different
+ * threads. */
+struct Dct4Tables {
+  float cos_table[4][LPD_MAX_LFAC * LPD_MAX_LFAC];
+
+  Dct4Tables() {
+    for (int t = 0; t < 4; t++) {
+      const int n = kDct4Lengths[t];
+      float* c = cos_table[t];
       for (int k = 0; k < n; k++) {
         for (int j = 0; j < n; j++) {
           c[k * n + j] = (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
         }
       }
-      tables[t].cos_table = c;
-      tables[t].n = n;
-      return c;
     }
   }
-  return nullptr;
+
+  /* The table of length n, or null for a length not in the set. */
+  const float* table(int n) const {
+    for (int t = 0; t < 4; t++) {
+      if (kDct4Lengths[t] == n) {
+        return cos_table[t];
+      }
+    }
+    return nullptr;
+  }
+};
+
+const Dct4Tables& dct4_tables() {
+  static const Dct4Tables tables;
+  return tables;
 }
 
 }  // namespace
@@ -68,12 +79,18 @@ int lpd_read_fac(AacBitReader* r, int length, int* coef) {
 }
 
 void lpd_dct4(const float* in, float* out, int n) {
-  const float* c = dct4_table(n);
+  const float* c = dct4_tables().table(n);
   for (int k = 0; k < n; k++) {
-    const float* row = c + k * n;
     float s = 0.0f;
-    for (int j = 0; j < n; j++) {
-      s += in[j] * row[j];
+    if (c) {
+      const float* row = c + k * n;
+      for (int j = 0; j < n; j++) {
+        s += in[j] * row[j];
+      }
+    } else {
+      for (int j = 0; j < n; j++) {
+        s += in[j] * (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
+      }
     }
     out[k] = s;
   }

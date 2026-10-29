@@ -10,14 +10,6 @@
 
 #include "usac_lpd_internal.h"
 
-#ifdef LPD_TRACE
-#include <cstdio>
-extern int lpd_trace_frame;
-#define LPD_T(...) fprintf(stderr, __VA_ARGS__)
-#else
-#define LPD_T(...) ((void)0)
-#endif
-
 namespace {
 
 constexpr int kIcbBits[8] = {20, 28, 36, 44, 52, 64, 12, 16};
@@ -199,6 +191,14 @@ void lpd_acelp_pitch(const AacUsacLpdChannel* c, int index, int absolute, int* t
     *t0 = index - n_fr4 - n_fr2 + c->pit_fr1;
     *frac = 0;
   }
+  /* The 9 bit code covers the lag range exactly at the core rates the
+   * standard's range formula is made for; where pit_max is held at the
+   * excitation history's limit the top codes would reach beyond it, so
+   * the lag stays within the range. */
+  if (*t0 > c->pit_max) {
+    *t0 = c->pit_max;
+    *frac = 0;
+  }
   *t0_min = *t0 - 8;
   if (*t0_min < c->pit_min) {
     *t0_min = c->pit_min;
@@ -239,15 +239,21 @@ namespace {
 /* The TCX to ACELP transition: the FAC of the boundary, synthesised
  * through the TCX's end filter, is added to the windowed TCX end, which
  * completes the last lfac samples before the segment, and the
- * excitation of those samples is recomputed for the adaptive codebook. */
+ * excitation of those samples is recomputed for the adaptive codebook.
+ * A stream that announces no FAC at this boundary gets the windowed TCX
+ * end alone, never the coefficients of an earlier frame. */
 void tcx_to_acelp(AacUsacLpdChannel* c, const LpdFrameData* f, int k, float* synth, float* exc) {
   const int lfac = c->lfac;
   float x[LPD_MAX_LFAC], xn[2 * LPD_MAX_LFAC];
-  for (int i = 0; i < lfac; i++) {
-    x[i] = c->fac_gain * (float)f->fac[k][i];
-  }
-  for (int i = 0; i < lfac / 4; i++) {
-    x[i] *= c->alfd_gains[i];
+  if (f->fac_present[k]) {
+    for (int i = 0; i < lfac; i++) {
+      x[i] = c->fac_gain * (float)f->fac[k][i];
+    }
+    for (int i = 0; i < lfac / 4; i++) {
+      x[i] *= c->alfd_gains[i];
+    }
+  } else {
+    memset(x, 0, (size_t)lfac * sizeof(float));
   }
   lpd_fac_synth(x, lfac, c->a_prev[1], xn + lfac, lfac);
   memset(xn, 0, (size_t)lfac * sizeof(float));
@@ -328,7 +334,6 @@ void lpd_acelp_decode(AacUsacLpdChannel* c, const LpdFrameData* f, int k,
     const float gain_pit = lpd_gain_table[gi][0];
     const float est = mean_energy - (float)(10.0 * log10(ener / (double)LPD_SUBFR));
     const float gain_code = lpd_gain_table[gi][1] * (float)pow(10.0, 0.05 * (double)est);
-    LPD_T("XLPD f=%d k=%d sf=%d T=%d frac=%d gp=%.5f gc=%.5f ltp=%d code0=%.2f code1=%.2f\n", lpd_trace_frame, k, sf, t0, frac, gain_pit, gain_code, d->ltp_filtering_flag[sf], code[0], code[1]);
     /* the voicing factor of the two contributions */
     float ener_pit = 0.0f;
     for (int i = 0; i < LPD_SUBFR; i++) {

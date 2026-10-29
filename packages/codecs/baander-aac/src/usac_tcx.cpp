@@ -11,14 +11,6 @@
 
 #include "usac_lpd_internal.h"
 
-#ifdef LPD_TRACE
-#include <cstdio>
-extern int lpd_trace_frame;
-#define LPD_T(...) fprintf(stderr, __VA_ARGS__)
-#else
-#define LPD_T(...) ((void)0)
-#endif
-
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -202,22 +194,26 @@ void lpd_tcx_decode(AacUsacLpdChannel* c, const LpdFrameData* f, int k, const fl
     xn_buf[i] = scale * y[i - lfac + lg / 2];
   }
   c->fac_gain = gain * 0.5f * (float)sqrt((double)lfac / (double)lg);
-  LPD_T("XLPD f=%d k=%d tcx gain_tcx=%.6f energy=%.3f noise_level=%.4f mode_prev=%d xn0=%.6f xn1=%.6f xnmid=%.6f\n", lpd_trace_frame, k, gain, energy, noise_level, c->mode_prev, xn_buf[0] / gain, xn_buf[1] / gain, xn_buf[lg / 2] / gain);
   for (int i = 0; i < lfac / 4; i++) {
     c->alfd_gains[i] = alfd[i * lg / (8 * lfac)];
   }
 
   /* the FAC after an ACELP segment: its synthesis through the old
    * filter plus the ACELP's end and zero input response folded into the
-   * aliasing region */
+   * aliasing region; a stream that announces no FAC at this boundary
+   * gets the folding alone, never the coefficients of an earlier frame */
   float xn1[2 * LPD_MAX_LFAC];
   if (c->mode_prev == 0) {
     float xf[LPD_MAX_LFAC], past_w[LPD_MAX_LFAC], zir_w[LPD_MAX_LFAC];
-    for (int i = 0; i < lfac; i++) {
-      xf[i] = c->fac_gain * (float)f->fac[k][i];
-    }
-    for (int i = 0; i < lfac / 4; i++) {
-      xf[i] *= c->alfd_gains[i];
+    if (f->fac_present[k]) {
+      for (int i = 0; i < lfac; i++) {
+        xf[i] = c->fac_gain * (float)f->fac[k][i];
+      }
+      for (int i = 0; i < lfac / 4; i++) {
+        xf[i] *= c->alfd_gains[i];
+      }
+    } else {
+      memset(xf, 0, (size_t)lfac * sizeof(float));
     }
     lpd_fac_synth(xf, lfac, a_old, xn1, 2 * lfac);
     lpd_fac_windows(lfac, past_w, zir_w);
