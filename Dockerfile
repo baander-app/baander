@@ -506,8 +506,7 @@ COPY ./docker/dev/juul.localdomain.crt /usr/local/share/ca-certificates/juul.loc
 RUN update-ca-certificates
 
 # Copy runtime entrypoint (disables Xdebug before supervisord starts)
-COPY ./docker/dev/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY --chmod=755 ./docker/dev/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Copy Xdebug config directly to the correct location (one step)
 COPY ./docker/dev/xdebug-main.ini /usr/local/etc/php/conf.d/xdebug.ini

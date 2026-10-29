@@ -285,6 +285,43 @@ simplification lenses and independent code review have no findings. The failed p
 preserved: recovery reuses its defective pinned image. Container and browser
 verification of the fixed code will use a fresh isolated worktree.
 
+Final tooling checkpoint, 2026-10-29: the CI runtime and the runtime without
+Python, pcntl or posix each pass 646 tests and 2,816 assertions. Both report seven
+skips: the six opt-in development Docker cases separately pass six tests and 64
+assertions, and the clang-19 case is covered by native static qualification.
+All three Composer loaders and every overlaid source hash are verified; both runs
+restore exact container, network and volume inventories. The snapshot permission
+change also passes the representative backend selection: 17 tests and 52
+assertions across three lanes, with unchanged test identities, seed and coverage
+mode. The earlier complete backend and native qualification results remain valid
+for their recorded source revisions.
+
+Actual preview checkpoint, 2026-10-29: a fresh managed worktree starts through
+`make preview-up` after documented SELinux path sharing, without application
+dependencies installed on the host. The restricted-root operator validator loads
+Composer successfully; web and both worker roles become ready. Browser checks
+against the explicit preview URL pass trusted HTTPS, login, navigation to music,
+Vite asset loading and HMR connection, with no page errors or failed requests.
+The original blocked preview and its data remain retained, and the persistent
+instance remains untouched. Full isolated lifecycle acceptance is still running.
+
+Development entrypoint repair, 2026-10-29: isolated lifecycle acceptance passes
+fresh/repeated startup, serialized remote updates, failed-build retention and
+incompatible-history refusal. The first disposable preview then fails before
+console startup. Its private source checkout supplies the development entrypoint
+as `0700`; Docker copies it as root, and adding execute bits leaves `0711`, which
+the application user cannot read. The exact failed image reproduces permission
+denial and exit 2 even for `php --version`.
+
+The Dockerfile now installs that entrypoint explicitly as `0755`. Building from
+the same unmodified restrictive source snapshot passes; the resulting image
+reports `0755` with root ownership and runs its default entrypoint successfully.
+Both disposable probes use no mounts or network and leave the original container
+inventory intact. Independent review has no findings; whitespace checks pass.
+The failed lifecycle's logs, state and data remain retained, and the managed
+preview is restored with trusted HTTPS, login and HMR verified again. Remaining
+lifecycle scenarios await continuation; the original failure is not a full pass.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
