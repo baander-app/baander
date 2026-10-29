@@ -657,8 +657,78 @@ void lf_gen(const AacSbrUsac* u, const AacSbrUsacChannel* ch, float X_low[32][kC
   }
 }
 
+/* Pre-flattening of the low band (7.5.2.4, bs_sbr_preprocessing): a
+ * cubic polynomial fitted to the energies in dB of the k0 analysis bands
+ * over the frame's envelope span gives, per source band, the gain that
+ * levels the fitted slope to the mean energy before the patching. */
+void pre_flatten(const float X_low[32][kCols][2], int bands, int start, int end, float* gain) {
+  double env[32];
+  double mean = 0.0;
+  for (int k = 0; k < bands; k++) {
+    double e = 0.0;
+    for (int i = start; i < end; i++) {
+      e += X_low[k][i][0] * X_low[k][i][0] + X_low[k][i][1] * X_low[k][i][1];
+    }
+    env[k] = 10.0 * log10(e / (double)(end - start) + 1.0);
+    mean += env[k];
+  }
+  mean /= (double)bands;
+  /* the normal equations of the least-squares cubic in k, solved by
+   * Gaussian elimination with pivoting */
+  double a[4][5] = {};
+  for (int k = 0; k < bands; k++) {
+    double v[7];
+    v[0] = 1.0;
+    for (int i = 1; i < 7; i++) {
+      v[i] = v[i - 1] * (double)k;
+    }
+    for (int i = 0; i < 4; i++) {
+      a[i][4] += v[i] * env[k];
+      for (int j = 0; j < 4; j++) {
+        a[i][j] += v[i + j];
+      }
+    }
+  }
+  for (int i = 0; i < 4; i++) {
+    int pivot = i;
+    for (int r = i + 1; r < 4; r++) {
+      if (fabs(a[r][i]) > fabs(a[pivot][i])) {
+        pivot = r;
+      }
+    }
+    if (pivot != i) {
+      for (int j = 0; j < 5; j++) {
+        std::swap(a[i][j], a[pivot][j]);
+      }
+    }
+    if (a[i][i] == 0.0) {
+      break;
+    }
+    for (int r = i + 1; r < 4; r++) {
+      const double f = a[r][i] / a[i][i];
+      for (int j = i; j < 5; j++) {
+        a[r][j] -= f * a[i][j];
+      }
+    }
+  }
+  double p[4] = {};
+  for (int i = 3; i >= 0; i--) {
+    double v = a[i][4];
+    for (int j = i + 1; j < 4; j++) {
+      v -= a[i][j] * p[j];
+    }
+    p[i] = a[i][i] != 0.0 ? v / a[i][i] : 0.0;
+  }
+  for (int k = 0; k < bands; k++) {
+    const double x = (double)k;
+    const double slope = p[0] + x * (p[1] + x * (p[2] + x * p[3]));
+    gain[k] = (float)pow(10.0, (mean - slope) / 20.0);
+  }
+}
+
 /* The high band for the frame's envelopes: the LPC patching with the
- * chirped predictors, or the analysed transposer output. */
+ * chirped predictors (the source bands pre-flattened when the frame's
+ * SbrInfo asks for it), or the analysed transposer output. */
 int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
            const AacSbrUsacChannelData* d) {
   AacSbrUsac* u = &s->usac;
@@ -681,8 +751,15 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
     return 0;
   }
   const int cov_cols = kLpcHistory + u->slots_of_frame;
-  for (int k = 0; k < s->k[0] && k < 32; k++) {
+  const int k0 = std::min(s->k[0], 32);
+  for (int k = 0; k < k0; k++) {
     aac_sbr_lpc_band(u->alpha0[k], u->alpha1[k], u->X_low[k] + (u->history - kLpcHistory), cov_cols);
+  }
+  float pre_gain[32];
+  if (u->preprocessing && k0 > 0 && end > start) {
+    pre_flatten(u->X_low, k0, start, end, pre_gain);
+  } else {
+    std::fill(pre_gain, pre_gain + 32, 1.0f);
   }
   int g = 0;
   int k = kx;
@@ -700,6 +777,12 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
        * an 8:3 header may ask for */
       aac_sbr_hf_gen_band(u->X_high[k], u->X_low[p], u->alpha0[p], u->alpha1[p], uc->bw_array[g],
                           start, end);
+      if (pre_gain[p] != 1.0f) {
+        for (int i = start; i < end; i++) {
+          u->X_high[k][i][0] *= pre_gain[p];
+          u->X_high[k][i][1] *= pre_gain[p];
+        }
+      }
     }
   }
   for (; k < kx + m; k++) {

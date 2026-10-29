@@ -4,10 +4,11 @@
  * through a writer and the parser, the harmonic transposer, PVC and
  * inter-TES on constructed frames, the split QMF-frame interface, and the
  * low band of a real 8:3 and 4:1 stream against the FDK decoder's output
- * through the upsampling path.  Decoding the SBR payload of a real stream
- * needs the core decoder; that check runs after integration. */
+ * through the upsampling path, and a real 2:1 SCE music stream through
+ * the decoder against the FDK decode above and below the crossover. */
 #include <complex>
 
+#include "aac.h"
 #include "qmf.h"
 #include "sbr.h"
 #include "test_util.h"
@@ -929,6 +930,116 @@ static void test_fdk_lowband() {
               2600.0, 768.0 + 580.0);
 }
 
+/* ── a real SCE stream through the decoder ─────────────────────── */
+
+struct Decoded {
+  std::vector<float> pcm;
+  int channels = 0, rate = 0, frames = 0, errors = 0;
+};
+
+static Decoded decode_stream(const std::vector<uint8_t>& in) {
+  Decoded d;
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  aac_decoder_set_concealment(dec, AAC_CONCEAL_OFF);
+  /* the FDK reference decode carries no loudness normalisation */
+  aac_decoder_set_loudness(dec, 0, -2400);
+  std::vector<float> buf(AAC_DECODER_MAX_OUTPUT * 8);
+  size_t pos = 0;
+  for (;;) {
+    if (pos < in.size()) {
+      const int t = aac_decoder_feed(dec, in.data() + pos, (int)std::min<size_t>(in.size() - pos, 65536));
+      if (t < 0) {
+        break;
+      }
+      pos += (size_t)t;
+    }
+    const int n = aac_decoder_decode_next(dec, buf.data(), (int)buf.size());
+    if (n == 0) {
+      if (pos >= in.size()) {
+        break;
+      }
+      continue;
+    }
+    if (n < 0) {
+      d.errors++;
+      if (n == AAC_ERR_UNSUPPORTED) {
+        break;
+      }
+      continue;
+    }
+    d.frames++;
+    d.channels = aac_decoder_channels(dec);
+    d.rate = aac_decoder_sample_rate(dec);
+    d.pcm.insert(d.pcm.end(), buf.begin(), buf.begin() + (size_t)n * d.channels);
+  }
+  aac_decoder_destroy(dec);
+  return d;
+}
+
+/* Gain (dB) and SNR (dB) of `out` against `ref` after a least-squares
+ * gain, skipping the filters' edges. */
+static void gain_and_snr(const std::vector<float>& ref, const std::vector<float>& out,
+                         double* gain_db, double* snr) {
+  const size_t n = std::min(ref.size(), out.size()) - 512;
+  double rr = 0.0, ro = 0.0, oo = 0.0;
+  for (size_t i = 512; i < n; i++) {
+    rr += (double)ref[i] * ref[i];
+    ro += (double)ref[i] * out[i];
+    oo += (double)out[i] * out[i];
+  }
+  const double g = ro / std::max(rr, 1e-20);
+  double err = 0.0;
+  for (size_t i = 512; i < n; i++) {
+    const double e = out[i] - g * ref[i];
+    err += e * e;
+  }
+  *gain_db = 10.0 * log10(oo / std::max(rr, 1e-20));
+  *snr = 10.0 * log10(g * g * rr / std::max(err, 1e-20));
+}
+
+/* A mono music stream (SCE, FD core at 24 kHz, 2:1 SBR with the
+ * pre-flattening on, no harmonic SBR, PVC or inter-TES) against the FDK
+ * decoder: the band below 7 kHz is the core, the band above it the
+ * reconstructed high band.  The reference is 16-bit, which bounds the
+ * measurable SNR near 50 dB. */
+static void test_fdk_stream() {
+  const char* name = "usac_sbr_sce_music_48k.loas";
+  const char* ref_name = "usac_sbr_sce_music_48k_fdk.wav";
+  const std::vector<uint8_t> in = read_file(data_path(name));
+  int sr = 0;
+  const std::vector<float> ref = read_wav_mono(data_path(ref_name), &sr);
+  CHECK(!in.empty() && sr == 48000 && ref.size() > 48000, "%s: stream or reference missing", name);
+  if (in.empty() || ref.size() <= 48000) {
+    return;
+  }
+  const Decoded d = decode_stream(in);
+  printf("%s: %d frames, %d errors, %d channel(s) at %d Hz\n", name, d.frames, d.errors, d.channels,
+         d.rate);
+  CHECK(d.errors == 0 && d.frames >= 70, "%s: %d frames, %d errors", name, d.frames, d.errors);
+  CHECK(d.channels == 1 && d.rate == 48000, "%s: %d channels at %d Hz", name, d.channels, d.rate);
+  if (d.channels != 1 || d.pcm.size() < 48000) {
+    return;
+  }
+  const std::vector<float> ref_low = lowpass_channel(ref, 1, 0, 7000.0f, 48000);
+  const std::vector<float> out_low = lowpass_channel(d.pcm, 1, 0, 7000.0f, 48000);
+  std::vector<float> ref_high(ref.size()), out_high(d.pcm.size());
+  for (size_t i = 0; i < ref.size(); i++) {
+    ref_high[i] = ref[i] - ref_low[i];
+  }
+  for (size_t i = 0; i < d.pcm.size(); i++) {
+    out_high[i] = d.pcm[i] - out_low[i];
+  }
+  double gain = 0.0, snr_low = 0.0, snr_high = 0.0;
+  gain_and_snr(ref_low, out_low, &gain, &snr_low);
+  printf("%s: below 7 kHz against %s: gain %+.2f dB, snr %.1f dB\n", name, ref_name, gain, snr_low);
+  CHECK(fabs(gain) < 0.5 && snr_low >= 60.0, "%s: low band gain %.2f dB, snr %.1f dB", name, gain,
+        snr_low);
+  gain_and_snr(ref_high, out_high, &gain, &snr_high);
+  printf("%s: above 7 kHz against %s: gain %+.2f dB, snr %.1f dB\n", name, ref_name, gain, snr_high);
+  CHECK(fabs(gain) < 1.0 && snr_high >= 40.0, "%s: high band gain %.2f dB, snr %.1f dB", name, gain,
+        snr_high);
+}
+
 int main() {
   test_qmf_banks();
   test_freq_tables();
@@ -938,5 +1049,6 @@ int main() {
   test_inter_tes();
   test_split_interface();
   test_fdk_lowband();
+  test_fdk_stream();
   return test_summary("test_usac_sbr");
 }
