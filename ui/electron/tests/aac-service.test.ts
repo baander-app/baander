@@ -57,9 +57,9 @@ test('one-shot encode/decode reconstructs the signal', { skip: !available && 'na
   assert.ok(snrDb(pcm, result.pcm, 2048 * 2) > 30);
 });
 
-// The USAC core is not complete yet: the frames of the stream are concealed
-// while the configuration and the MPEG-D loudness metadata are read.
-test('a USAC stream reports its object type and MPEG-D loudness', { skip: !available && 'native binding not built' }, async () => {
+// A USAC stream decodes in full, and the MPEG-D loudness metadata is read
+// with its configuration.
+test('a USAC stream decodes and reports its MPEG-D loudness', { skip: !available && 'native binding not built' }, async () => {
   const service = new AacService();
   const stream = readFileSync(join(codec, 'tests/data/usac_music_48000_96000.loas'));
   const result = await service.decode(stream, { channels: 0 });
@@ -68,7 +68,8 @@ test('a USAC stream reports its object type and MPEG-D loudness', { skip: !avail
   assert.equal(result.channels, 2);
   assert.equal(result.frameSize, 1024);
   assert.equal(result.errors, 0);
-  assert.ok(result.concealedFrames >= 1);
+  assert.equal(result.concealedFrames, 0);
+  assert.equal(result.pcm.length, 94 * 1024 * 2);
   assert.deepEqual(result.loudness, { programLoudness: -14.25, normalizationGain: -9.75 });
 
   const session = await service.openDecoder({ channels: 0, loudness: { targetLufs: -14.25 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 50 });
