@@ -231,11 +231,11 @@ static void write_sce(AacBitWriter* w, const AacSbrState* s, const AacUsacSbrCon
     aac_bitwriter_write(w, 0, 2);
     aac_bitwriter_write(w, f.num_env == 1 ? 0 : (f.num_env == 2 ? 1 : 2), 2);
     aac_bitwriter_write(w, (uint32_t)f.env[0].freq_res, 1);
-    /* sbr_dtdf */
-    for (int e = 0; e < f.num_env; e++) {
+    /* sbr_dtdf: an independent frame omits the first direction bits */
+    for (int e = f.indep ? 1 : 0; e < f.num_env; e++) {
       aac_bitwriter_write(w, (uint32_t)f.env[e].delta_time, 1);
     }
-    for (int i = 0; i < num_noise; i++) {
+    for (int i = f.indep ? 1 : 0; i < num_noise; i++) {
       aac_bitwriter_write(w, 0, 1);
     }
     for (int i = 0; i < s->n_q; i++) {

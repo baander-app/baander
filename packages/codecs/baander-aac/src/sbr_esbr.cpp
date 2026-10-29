@@ -205,6 +205,18 @@ void read_header(AacSbrState* s, AacBitReader* r) {
 
 /* ── bitstream: the USAC additions ─────────────────────────────── */
 
+/* sbr_dtdf() of the USAC syntax: an independent frame carries no
+ * direction bit for its first envelope and first noise floor, both of
+ * which are coded in frequency. */
+void read_dtdf(AacBitReader* r, AacSbrChannel* ch, int indep) {
+  for (int i = 0; i < ch->num_env; i++) {
+    ch->df_env[i] = indep && i == 0 ? 0 : (int)aac_bitreader_read(r, 1);
+  }
+  for (int i = 0; i < ch->num_noise; i++) {
+    ch->df_noise[i] = indep && i == 0 ? 0 : (int)aac_bitreader_read(r, 1);
+  }
+}
+
 /* bs_temp_shape and bs_inter_temp_shape_mode per envelope, at the end of
  * sbr_envelope() when the configuration enables inter-TES (7.5.5). */
 void read_inter_tes(AacBitReader* r, const AacSbrChannel* ch, AacSbrUsacChannelData* d) {
@@ -290,7 +302,7 @@ int read_pvc_envelope(AacBitReader* r, AacSbrUsacChannelData* d) {
   return 0;
 }
 
-int read_single_channel(AacSbrState* s, AacBitReader* r) {
+int read_single_channel(AacSbrState* s, AacBitReader* r, int indep) {
   AacSbrUsac* u = &s->usac;
   AacSbrChannel* ch = &s->data[0];
   AacSbrUsacChannelData* d = &u->data[0];
@@ -303,7 +315,7 @@ int read_single_channel(AacSbrState* s, AacBitReader* r) {
     if ((ret = aac_sbr_read_grid(s, r, ch))) {
       return ret;
     }
-    aac_sbr_read_dtdf(r, ch);
+    read_dtdf(r, ch, indep);
     aac_sbr_read_invf(s, r, ch);
     if ((ret = aac_sbr_read_envelope(s, r, ch, 0))) {
       return ret;
@@ -334,7 +346,7 @@ int read_single_channel(AacSbrState* s, AacBitReader* r) {
   return 0;
 }
 
-int read_channel_pair(AacSbrState* s, AacBitReader* r) {
+int read_channel_pair(AacSbrState* s, AacBitReader* r, int indep) {
   AacSbrUsac* u = &s->usac;
   AacSbrChannel* l = &s->data[0];
   AacSbrChannel* rt = &s->data[1];
@@ -356,8 +368,8 @@ int read_channel_pair(AacSbrState* s, AacBitReader* r) {
       return ret;
     }
     aac_sbr_copy_grid(rt, l);
-    aac_sbr_read_dtdf(r, l);
-    aac_sbr_read_dtdf(r, rt);
+    read_dtdf(r, l, indep);
+    read_dtdf(r, rt, indep);
     aac_sbr_read_invf(s, r, l);
     memcpy(rt->invf_mode[1], rt->invf_mode[0], sizeof(rt->invf_mode[0]));
     memcpy(rt->invf_mode[0], l->invf_mode[0], sizeof(rt->invf_mode[0]));
@@ -380,8 +392,8 @@ int read_channel_pair(AacSbrState* s, AacBitReader* r) {
     if ((ret = aac_sbr_read_grid(s, r, l)) || (ret = aac_sbr_read_grid(s, r, rt))) {
       return ret;
     }
-    aac_sbr_read_dtdf(r, l);
-    aac_sbr_read_dtdf(r, rt);
+    read_dtdf(r, l, indep);
+    read_dtdf(r, rt, indep);
     aac_sbr_read_invf(s, r, l);
     aac_sbr_read_invf(s, r, rt);
     if ((ret = aac_sbr_read_envelope(s, r, l, 0))) {
@@ -1228,7 +1240,7 @@ int aac_sbr_usac_decode(AacSbrState* s, AacBitReader* r, int elem_type, int nr_c
   }
   if (ret == 0) {
     s->ready_for_dequant = 1;
-    ret = nr_channels == 1 ? read_single_channel(s, r) : read_channel_pair(s, r);
+    ret = nr_channels == 1 ? read_single_channel(s, r, indep) : read_channel_pair(s, r, indep);
   }
   if (ret || r->overread) {
     restore_params(s, &saved);
