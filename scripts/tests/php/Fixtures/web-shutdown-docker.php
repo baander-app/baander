@@ -8,11 +8,13 @@ file_put_contents(getenv('WEB_WORKFLOW_TRACE'), json_encode($args, JSON_THROW_ON
 while (in_array($args[0] ?? '', ['--context', '--host'], true)) {
     $args = array_slice($args, 2);
 }
-if (($args[0] ?? null) === 'context') {
+if ($args === ['context', 'show']) {
     echo "web-fixture\n";
     exit(0);
 }
-if (($args[0] ?? null) === 'run' && in_array('sleep', $args, true)) {
+require __DIR__ . '/WebDockerState.php';
+webDockerState($args, getenv('WEB_WORKFLOW_TRACE'));
+if (($args[0] ?? null) === 'start' && str_ends_with(end($args), '-client')) {
     if (getenv('WEB_WORKFLOW_STAGE') === '1') {
         exit(0);
     }
@@ -25,7 +27,7 @@ if (($args[0] ?? null) === 'run' && in_array('sleep', $args, true)) {
     fwrite(STDERR, "injected client start failure\n");
     exit(42);
 }
-if (($args[0] ?? null) === 'start' && getenv('WEB_WORKFLOW_STAGE') === '1') {
+if (($args[0] ?? null) === 'start' && str_ends_with(end($args), '-probe') && getenv('WEB_WORKFLOW_STAGE') === '1') {
     fwrite(STDERR, "injected probe start failure\n");
     exit(43);
 }

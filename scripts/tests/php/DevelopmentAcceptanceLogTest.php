@@ -11,16 +11,19 @@ use PHPUnit\Framework\TestCase;
 
 final class DevelopmentAcceptanceLogTest extends TestCase
 {
+    private \Baander\Tooling\Process\EngineExecutor $executor;
     private string $root;
 
     protected function setUp(): void
     {
+        $this->executor = new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv()));
         $this->root = Support::temporary('baander-acceptance-log-test-');
         mkdir($this->root . '/logs', 0700);
     }
 
     protected function tearDown(): void
     {
+        $this->executor->close();
         Support::removeTree($this->root);
     }
 
@@ -32,7 +35,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
 
     public function testCommandReturnsMergedOutputAndRetainsPrivateLog(): void
     {
-        $commands = new Commands($this->root, $this->root . '/logs');
+        $commands = new Commands($this->root, $this->root . '/logs', new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
         $output = $commands->run($this->child('output'));
         self::assertStringContainsString('qualified-revision', $output);
         self::assertStringContainsString('command-diagnostic', $output);
@@ -44,7 +47,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
 
     public function testAsyncOutputKeepsDrainingDuringConcurrentPollingCommand(): void
     {
-        $commands = new Commands($this->root, $this->root . '/logs');
+        $commands = new Commands($this->root, $this->root . '/logs', new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
         $marker = $this->root . '/producer-finished';
         $producer = $commands->start($this->child('producer', $marker), timeout: 6);
         try {
@@ -72,7 +75,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
 
     public function testPollingPauseIsBoundedAndDrainsAsyncOutput(): void
     {
-        $result = Support::run($this->child('pause-driver', $this->root), timeout: 4, check: false);
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec($this->child('pause-driver', $this->root), timeout: 4, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy(null));
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertFalse($result->timedOut);
         $report = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
@@ -86,7 +89,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
 
     public function testParentSignalStopsOwnedSilentChildAndRetainsLog(): void
     {
-        $result = Support::run($this->child('signal-driver', $this->root), timeout: 6);
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec($this->child('signal-driver', $this->root), timeout: 6, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy([0]));
         self::assertSame(0, $result->exitCode, $result->stderr);
         $report = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
         self::assertTrue($report['cancelled']);
@@ -97,6 +100,20 @@ final class DevelopmentAcceptanceLogTest extends TestCase
         self::assertCount(1, $logs);
         self::assertSame('silent-child-ready', file_get_contents($logs[0]));
         self::assertSame(0600, fileperms($logs[0]) & 0777);
+    }
+
+    public function testCommandUsesCapturedEnvironmentAfterAmbientChanges(): void
+    {
+        $name = 'BAANDER_ACCEPTANCE_TEST_VALUE';
+        $original = getenv($name);
+        $environment = array_replace(getenv(), [$name => 'captured']);
+        $commands = new Commands($this->root, $this->root . '/logs', $this->executor, $environment);
+        try {
+            putenv($name . '=changed');
+            self::assertSame('captured', $commands->run([PHP_BINARY, '-r', 'echo getenv($argv[1]);', $name]));
+        } finally {
+            putenv($original === false ? $name : $name . '=' . $original);
+        }
     }
 
     /** @return iterable<string,array{string}> */
@@ -113,7 +130,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
             require $argv[1];
             $root = $argv[2];
             $signal = constant($argv[3]);
-            $commands = new Baander\Tooling\Development\Acceptance\Commands($root, $root . '/logs');
+            $commands = new Baander\Tooling\Development\Acceptance\Commands($root, $root . '/logs', new Baander\Tooling\Process\EngineExecutor(new Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
             Swoole\Timer::after(25, static function () use ($signal): void {
                 Swoole\Process::kill(getmypid(), $signal);
             });
@@ -128,11 +145,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
             }
             exit(2);
             PHP_CODE;
-        $result = Support::run(
-            [PHP_BINARY, '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $this->root, $signal],
-            timeout: 4,
-            check: false,
-        );
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec([PHP_BINARY, '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $this->root, $signal], timeout: 4, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy(null));
         self::assertSame(1, $result->exitCode, $result->stderr);
         self::assertFalse($result->timedOut);
         $report = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);

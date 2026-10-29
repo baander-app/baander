@@ -242,6 +242,23 @@ files. Six generated-manifest Docker cases, actual preview state conversion,
 U7–U8/U11 delivery, final CI-image and live qualification, and final code review
 remain open.
 
+Acceptance and fixture migration checkpoint (U7), 2026-10-29: acceptance,
+HTTP, web, messaging and startup workflows use shared configuration, checked
+execution and the Docker client, with catalog-pinned images, canonical layout,
+named finite budgets and durable scoped cleanup. Browser preparation checks the
+installed Playwright version; recovery uses its saved target receipt. JSON stdout
+and diagnostic separation remain intact. The raw Support::run helper and obsolete
+HTTP drill are removed.
+
+The initial affected run reached 86 tests and 361 assertions with eight fixture
+failures. All eight are repaired; the focused identity/fixture run passes 14 tests
+and 71 assertions, and the separate cancellation control passes one test and four
+assertions. Configuration/runtime/startup integration passes 20 tests and 54
+assertions. These follow-ups do not establish a passing 86-test aggregate. The
+full 376-file static-analysis result and 12-file formatting normalization are
+recorded in U6 above. U8/U11 delivery, final CI-image and live qualification, and
+final code review remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

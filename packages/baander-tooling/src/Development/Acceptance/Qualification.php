@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Baander\Tooling\Development\Acceptance;
 
 use Baander\Tooling\Development\Database;
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\{Client, Target};
+use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessSpec};
 use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Filesystem\AtomicFile;
@@ -33,8 +33,10 @@ final class Qualification
     /** @var array<string,string> */
     private array $seedMediaHashes = [];
 
-    /** @param array<string,string|bool> $args */
-    public function __construct(private readonly array $args)
+    /** @param array<string,string|bool> $args
+     * @param array<string,string> $environment
+     */
+    public function __construct(private readonly array $args, private readonly CommandExecutor $executor, private readonly Client $selectedDocker, private readonly array $environment)
     {
         $this->source = dirname(__DIR__, 5);
         $this->workspace = Support::path((string) $args['workspace']);
@@ -43,8 +45,8 @@ final class Qualification
         $this->remote = $this->workspace . '/origin.git';
         $this->media = $this->workspace . '/media';
         $this->logs = $this->workspace . '/logs';
-        $this->database = new Database($this->store, new Runner());
-        $this->commands = new Commands($this->checkout, $this->logs);
+        $this->database = new Database($this->store, $this->executor);
+        $this->commands = new Commands($this->checkout, $this->logs, $this->executor, $this->environment);
     }
 
     /** @param non-empty-list<string> $argv */
@@ -96,9 +98,9 @@ final class Qualification
         throw new \RuntimeException('Timed out waiting for ' . $description . '; inspect ' . $this->store->root);
     }
 
-    private function docker(string $identity = 'persistent'): Docker
+    private function docker(string $identity = 'persistent'): Client
     {
-        return new Docker(new Runner(), $this->state($identity)['docker']);
+        return new Client($this->executor, Target::fromArray($this->state($identity)['docker']), $this->environment);
     }
 
     private function ready(string $revision, string $identity = 'persistent'): void
@@ -112,10 +114,10 @@ final class Qualification
         $this->origin($identity);
         $instance = $this->state($identity);
         $docker = $this->docker($identity);
-        $identifier = trim($docker->compose($instance, ['ps', '-q', 'app'])->stdout);
+        $identifier = trim($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', 'app'])->stdout);
         $actual = trim($docker->run(['inspect', '--format', '{{.Image}}', $identifier])->stdout);
         Support::check(
-            $actual === $instance['release']['app_image'],
+            $actual === $instance['release']['images']['app_image']['resolvedId'],
             'App did not run the prepared immutable image',
         );
         if ($identity === 'persistent') {
@@ -198,7 +200,7 @@ final class Qualification
         ] as $kind => $arguments) {
             $inventory[$kind] = preg_split(
                 '/\s+/',
-                trim(Support::run(['docker', '--context', 'default', ...$arguments])->stdout),
+                trim($this->selectedDocker->run($arguments)->stdout),
                 flags: PREG_SPLIT_NO_EMPTY,
             );
             sort($inventory[$kind]);
@@ -213,7 +215,7 @@ final class Qualification
         }
         if ($this->store->load('persistent') !== null) {
             $this->store->setEnabled('persistent', false);
-            Support::run(
+            $this->executor->run(new ProcessSpec(
                 [
                     'systemctl',
                     '--user',
@@ -221,8 +223,10 @@ final class Qualification
                     '--now',
                     'baander-development-' . $this->store->scope() . '.timer',
                 ],
-                check: false,
-            );
+                environment: $this->environment,
+                replaceEnvironment: true,
+                processGroup: true,
+            ), new CompletionPolicy(null));
         }
         $join = fn(string $command): string => $this->cliArguments(
             $command,
@@ -266,8 +270,8 @@ final class Qualification
                 $instance['repository'] === $this->remote,
                 'Cleanup instance belongs to another repository.',
             );
-            $docker = new Docker(new Runner(), $instance['docker']);
-            $docker->validate();
+            $docker = new Client($this->executor, Target::fromArray($instance['docker']), $this->environment);
+            $docker->validateIdentity();
             $this->cli('down', ['--instance', $instance['id']]);
             $compose = AtomicFile::readJson($instance['compose_file']);
             foreach ($compose['volumes'] as $volume) {
@@ -281,13 +285,13 @@ final class Qualification
                 );
                 $expectedVolumes[] = $manifest['ipcVolume'];
             }
-            $docker->compose($instance, ['down', '--remove-orphans']);
+            $docker->compose($instance['project'], $instance['compose_file'], ['down', '--remove-orphans']);
             $network = $instance['network'];
             $expectedNetworks[is_array($network) ? $network['name'] : $network] = $instance['id'];
         }
         $gateway = AtomicFile::readJson($this->store->root . '/gateway/state.json');
-        $docker = new Docker(new Runner(), $gateway['docker']);
-        $docker->compose($gateway, ['down', '--remove-orphans']);
+        $docker = new Client($this->executor, Target::fromArray($gateway['docker']), $this->environment);
+        $docker->compose($gateway['project'], $gateway['compose_file'], ['down', '--remove-orphans']);
         $projects[] = $gateway['project'];
         $expectedNetworks[$gateway['gateway']['name']] = 'gateway-' . $this->store->scope();
         foreach (array_unique($projects) as $project) {
@@ -343,7 +347,7 @@ final class Qualification
         }
         $unit = 'baander-development-' . $this->store->scope();
         $this->command(['systemctl', '--user', 'disable', '--now', $unit . '.timer']);
-        $config = (getenv('XDG_CONFIG_HOME') ?: getenv('HOME') . '/.config') . '/systemd/user';
+        $config = (($this->environment['XDG_CONFIG_HOME'] ?? '') ?: ($this->environment['HOME'] ?? '') . '/.config') . '/systemd/user';
         foreach (['.service', '.timer'] as $suffix) {
             if (file_exists($config . '/' . $unit . $suffix)) {
                 unlink($config . '/' . $unit . $suffix);
@@ -729,7 +733,7 @@ final class Qualification
     {
         $instance = $this->state();
         $docker = $this->docker();
-        $container = trim($docker->compose($instance, ['ps', '-q', 'postgres'])->stdout);
+        $container = trim($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', 'postgres'])->stdout);
         $network = json_decode(
             $docker->run(['inspect', $container])->stdout,
             true,
@@ -795,7 +799,7 @@ MIGRATION;
             ($current['checkpoint']['verified'] ?? null) === true,
             'Partial mutation has no verified checkpoint.',
         );
-        new Docker(new Runner(), $current['docker'])->compose($current, ['up', '-d', '--wait', 'postgres']);
+        new Client($this->executor, Target::fromArray($current['docker']), $this->environment)->compose($current['project'], $current['compose_file'], ['up', '-d', '--wait', 'postgres']);
         Support::check(
             $this->sql("SELECT json_build_object('rows',count(*)) FROM workflow_qualification_committed;")['rows'] === 1,
             'Committed migration evidence was lost.',

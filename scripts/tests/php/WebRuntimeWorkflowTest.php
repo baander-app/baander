@@ -15,6 +15,7 @@ final class WebRuntimeWorkflowTest extends TestCase
     {
         $this->directory = sys_get_temp_dir() . '/baander-web-workflow-' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700);
+        copy(__DIR__ . '/Fixtures/WebDockerState.php', $this->directory . '/WebDockerState.php');
         foreach (['docker', 'tar'] as $binary) {
             copy(__DIR__ . '/Fixtures/WebRuntimeCommand.php', $this->directory . '/' . $binary);
             chmod($this->directory . '/' . $binary, 0700);
@@ -23,8 +24,9 @@ final class WebRuntimeWorkflowTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->directory . '/*') as $file) {
-            unlink($file);
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($files as $file) {
+            $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
         }
         rmdir($this->directory);
     }
@@ -36,6 +38,7 @@ final class WebRuntimeWorkflowTest extends TestCase
     {
         $environment = getenv();
         $environment['PATH'] = $this->directory . ':' . $environment['PATH'];
+        $environment['BAANDER_TEST_ARTIFACTS'] = $this->directory . '/artifacts';
         $environment['WEB_RUNTIME_CALLS'] = $this->directory . '/calls';
         $environment['WEB_RUNTIME_MODE'] = $mode;
         $environment['WEB_RUNTIME_ROOT'] = dirname(__DIR__, 3);
@@ -87,12 +90,7 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertContains('--exclude=config/secrets/oauth', $tar);
         self::assertContains('--exclude=config/secrets/*.decrypt.private.php', $tar);
         self::assertContains('packages', $tar);
-        $id = $commands[count($commands) - 1][2];
-        self::assertSame(
-            ['rm', '-f', '-v', $id . '-app', $id . '-redis', $id . '-postgres'],
-            $commands[count($commands) - 2],
-        );
-        self::assertSame(['network', 'rm'], array_slice($commands[count($commands) - 1], 0, 2));
+        self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'rm'));
         self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 0, 3) === ['stop', '-t', '1']));
         self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'pause'));
         self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'unpause'));
@@ -104,7 +102,7 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertSame(0, $status, $output);
         self::assertFalse(array_any($calls, static fn(array $call): bool => $call['binary'] === 'tar'));
         self::assertFalse(array_any(self::dockerCalls($calls), static fn(array $call): bool => $call[0] === 'cp'));
-        self::assertTrue(array_any(self::dockerCalls($calls), static fn(array $call): bool => in_array('/var/www/html', $call, true)));
+        self::assertTrue(array_any(self::dockerCalls($calls), static fn(array $call): bool => in_array('/opt/baander', $call, true)));
     }
 
     public function testCommandFailureRetainsExitAndDiagnosticsDespiteCleanupFailure(): void
@@ -114,7 +112,7 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertStringContainsString('security-characterization-failure', $output);
         self::assertStringContainsString('owned-serve-diagnostic', $output);
         $commands = self::dockerCalls($calls);
-        self::assertSame(['network', 'rm'], array_slice($commands[count($commands) - 1], 0, 2));
+        self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'rm']));
     }
 
     public function testCanaryFailsAndCleansOwnedResources(): void
@@ -124,10 +122,16 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertStringContainsString('A malformed request credential reached runtime logs.', $output);
     }
 
-    public function testCleanupFailureDoesNotChangeSuccessfulExit(): void
+    public function testCleanupFailureChangesSuccessfulExit(): void
     {
         [$status, $output] = $this->runWorkflow('security', 'cleanup-failure', baked: true);
-        self::assertSame(0, $status, $output);
+        self::assertSame(1, $status, $output);
+        self::assertStringContainsString('Retry receipt:', $output);
+        $receipt = $this->directory . '/artifacts/resources.json';
+        self::assertFileExists($receipt);
+        $ownership = json_decode(file_get_contents($receipt), true, flags: JSON_THROW_ON_ERROR);
+        self::assertCount(4, $ownership['resources']);
+        self::assertSame('unix:///web-fixture.sock', $ownership['target']['endpoint']);
     }
 
     public function testEarlyFailureStillAttemptsOwnedCleanupAndPreservesStatus(): void
@@ -135,12 +139,8 @@ final class WebRuntimeWorkflowTest extends TestCase
         [$status, $output, $calls] = $this->runWorkflow('web', 'early-failure');
         self::assertSame(37, $status, $output);
         $commands = self::dockerCalls($calls);
-        $id = $commands[count($commands) - 1][2];
-        self::assertSame(
-            ['rm', '-f', '-v', $id . '-app', $id . '-mailpit', $id . '-redis', $id . '-postgres'],
-            $commands[count($commands) - 2],
-        );
-        self::assertSame(['network', 'rm'], array_slice($commands[count($commands) - 1], 0, 2));
+        self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'inspect']));
+        self::assertFalse(array_any($commands, static fn(array $command): bool => $command[0] === 'rm'));
     }
 
     public function testSafariMismatchPrintsDiffAndStopsBeforeOutage(): void

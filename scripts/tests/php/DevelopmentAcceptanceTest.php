@@ -13,14 +13,17 @@ use PHPUnit\Framework\TestCase;
 
 final class DevelopmentAcceptanceTest extends TestCase
 {
+    private \Baander\Tooling\Process\EngineExecutor $executor;
     private string $root;
 
     protected function setUp(): void
     {
+        $this->executor = new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv()));
         $this->root = Support::temporary('baander-acceptance-test-');
     }
     protected function tearDown(): void
     {
+        $this->executor->close();
         Support::removeTree($this->root);
     }
 
@@ -31,7 +34,7 @@ final class DevelopmentAcceptanceTest extends TestCase
 
     public function testDpopProofHasVerifiableEs256SignatureAndBoundClaims(): void
     {
-        $client = new MediaClient('https://media.baander.app/', '/unused');
+        $client = new MediaClient('https://media.baander.app/', '/unused', $this->executor->context);
         $client->token = 'private-test-token';
         [$header, $claims, $signature] = explode('.', $client->proof('POST', 'https://media.baander.app/api/song?private=query#fragment'));
         $decodedHeader = json_decode($this->decode($header), true, flags: JSON_THROW_ON_ERROR);
@@ -90,7 +93,7 @@ final class DevelopmentAcceptanceTest extends TestCase
             }
             self::assertFileExists($this->root . '/port');
             $origin = 'https://127.0.0.1:' . trim((string) file_get_contents($this->root . '/port'));
-            $client = new MediaClient($origin, $this->root . '/certificate.pem');
+            $client = new MediaClient($origin, $this->root . '/certificate.pem', $this->executor->context);
             self::assertSame([200, ['authenticated' => true]], $client->request('/nonce', 'POST', []));
             $requestText = (string) file_get_contents($this->root . '/request-1');
             self::assertStringEndsWith('{}', $requestText);
@@ -116,7 +119,7 @@ final class DevelopmentAcceptanceTest extends TestCase
     public function testAudioOracleRequiresTheCompleteNonSilentEightSecondTone(): void
     {
         $fixture = $this->root . '/tone.flac';
-        Support::run([
+        $this->executor->run(new \Baander\Tooling\Process\ProcessSpec([
             'ffmpeg',
             '-v',
             'error',
@@ -127,13 +130,13 @@ final class DevelopmentAcceptanceTest extends TestCase
             '-c:a',
             'flac',
             $fixture,
-        ]);
-        $result = MediaProbe::decodedAudio($fixture);
+        ], processGroup: true), new \Baander\Tooling\Process\CompletionPolicy([0]));
+        $result = new MediaProbe($this->executor, $this->executor->context)->decodedAudio($fixture);
         self::assertSame('flac', $result['codec']);
         self::assertSame(64000, $result['decodedSamples']);
         self::assertTrue($result['nonSilent']);
         $short = $this->root . '/short.flac';
-        Support::run([
+        $this->executor->run(new \Baander\Tooling\Process\ProcessSpec([
             'ffmpeg',
             '-v',
             'error',
@@ -144,9 +147,9 @@ final class DevelopmentAcceptanceTest extends TestCase
             '-c:a',
             'flac',
             $short,
-        ]);
+        ], processGroup: true), new \Baander\Tooling\Process\CompletionPolicy([0]));
         $this->expectExceptionMessage('Audio did not decode the complete eight second tone:');
-        MediaProbe::decodedAudio($short);
+        new MediaProbe($this->executor, $this->executor->context)->decodedAudio($short);
     }
 
     public function testMediaProbeRejectsSymlinkedFixtureBeforeAnyWrite(): void
@@ -156,7 +159,7 @@ final class DevelopmentAcceptanceTest extends TestCase
         file_put_contents($this->root . '/outside.flac', 'unchanged');
         symlink($this->root . '/outside.flac', $this->root . '/media/workflow-qualification-tone.flac');
         try {
-            MediaProbe::qualify(['workspace' => $this->root, 'state-root' => $this->root . '/state', 'instance' => 'persistent']);
+            new MediaProbe($this->executor, $this->executor->context)->qualify(['workspace' => $this->root, 'state-root' => $this->root . '/state', 'instance' => 'persistent']);
             self::fail('Symlinked source fixture was accepted.');
         } catch (\RuntimeException $error) {
             self::assertStringContainsString('symlink', strtolower($error->getMessage()));
@@ -167,17 +170,14 @@ final class DevelopmentAcceptanceTest extends TestCase
     public function testExistingWorkspaceIsRejectedBeforeDockerOrStateMutation(): void
     {
         $state = $this->root . '/state';
-        $result = Support::run(
-            [
-                PHP_BINARY,
-                dirname(__DIR__, 2) . '/dev_environment_acceptance.php',
-                '--workspace',
-                $this->root,
-                '--state-root',
-                $state,
-            ],
-            check: false,
-        );
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec([
+            PHP_BINARY,
+            dirname(__DIR__, 2) . '/dev_environment_acceptance.php',
+            '--workspace',
+            $this->root,
+            '--state-root',
+            $state,
+        ], processGroup: true), new \Baander\Tooling\Process\CompletionPolicy(null));
         self::assertSame(1, $result->exitCode);
         self::assertStringContainsString('Select a new workspace', $result->stderr);
         self::assertDirectoryDoesNotExist($state);

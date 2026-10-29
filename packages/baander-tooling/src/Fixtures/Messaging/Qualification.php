@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Baander\Tooling\Fixtures\Messaging;
 
 use Baander\Tooling\Fixtures\Runtime;
-use Baander\Tooling\Fixtures\Worker\Resources;
-use Throwable;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Resources\ResourceKind;
 
 final class Qualification
 {
@@ -59,7 +59,7 @@ final class Qualification
 
     public static function main(string $root, string $mode): int
     {
-        $runtime = new Runtime($root, $mode === 'messaging' ? PHP_FLOAT_MAX : 180);
+        $runtime = new Runtime($root, budget: $mode === 'messaging' ? 'messaging' : 'http');
         try {
             self::run($runtime, $mode);
             return 0;
@@ -73,37 +73,36 @@ final class Qualification
         $commands = self::commands($mode);
         $inImage = $mode !== 'messaging' && ($runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1';
         Runtime::require($inImage || is_file($runtime->root . '/vendor/autoload.php'), 'Install Composer dependencies first.');
-        $resources = new Resources($runtime, $mode);
-        $docker = $resources->docker;
-        $failure = null;
-        fwrite(STDERR, 'Fixture evidence: ' . $resources->artifacts . "\n");
-        try {
-            $id = $resources->id;
-            $resources->networks[] = $id;
-            $docker->run(['network', 'create', ...($mode === 'messaging' ? [] : ['--internal']), $id], timeout: null);
+        $docker = $runtime->docker();
+        $layout = $runtime->layout();
+        $applicationImage = $runtime->image('application')->id;
+        $redisImage = $runtime->image('fixtureRedis')->id;
+        $postgresImage = $runtime->image('postgres')->id;
+        $artifacts = Runtime::artifacts($runtime->root, $mode, $runtime->environment);
+        $ledger = $runtime->resources($artifacts);
+        fwrite(STDERR, 'Fixture evidence: ' . $artifacts . "\n");
+        $ledger->scoped(static function () use ($runtime, $mode, $commands, $inImage, $docker, $layout, $applicationImage, $redisImage, $postgresImage, $artifacts, $ledger): void {
+            $id = 'baander-' . $mode . '-' . bin2hex(random_bytes(8));
+            $ledger->create(ResourceKind::Network, $id, $mode === 'messaging' ? [] : ['--internal']);
             $redis = $id . '-redis';
             $postgres = $id . '-postgres';
             $database = $mode . '_test';
-            $resources->containers[] = $redis;
-            $docker->run([
-                'run', '-d',
-                '--name', $redis,
+            $redis = $ledger->create(ResourceKind::Container, $redis, [
                 '--network', $id,
                 '--network-alias', 'redis',
                 ...($mode === 'messaging' ? [] : ['-e', 'REDIS_ARGS=--requirepass test-only']),
-                'redis/redis-stack-server:edge',
-            ], timeout: null);
-            $resources->containers[] = $postgres;
-            $docker->run([
-                'run', '-d',
-                '--name', $postgres,
+                $redisImage,
+            ]);
+            $docker->run(['start', $redis]);
+            $postgres = $ledger->create(ResourceKind::Container, $postgres, [
                 '--network', $id,
                 '--network-alias', 'postgres',
                 '-e', 'POSTGRES_USER=baander',
                 '-e', 'POSTGRES_PASSWORD=test-only',
                 '-e', 'POSTGRES_DB=' . $database,
-                $runtime->environment['BAANDER_TEST_POSTGRES_IMAGE'] ?? 'baander-database:latest',
-            ], timeout: null);
+                $postgresImage,
+            ]);
+            $docker->run(['start', $postgres]);
             $ready = false;
             for ($attempt = 0; $attempt < 30; ++$attempt) {
                 $pg = $docker->run(
@@ -143,7 +142,6 @@ final class Qualification
                 timeout: null,
             );
             $app = $id . '-app';
-            $resources->containers[] = $app;
             $environment = $mode === 'messaging'
                 ? [
                     'MESSENGER_TEST_REDIS_DSN=redis://redis:6379',
@@ -163,16 +161,15 @@ final class Qualification
             foreach ($environment as $value) {
                 array_push($flags, '-e', $value);
             }
-            $docker->run([
-                'run', '-d',
-                '--name', $app,
+            $app = $ledger->create(ResourceKind::Container, $app, [
                 '--privileged',
                 '--network', $id,
                 '--entrypoint', 'sleep',
-                ...$flags, $runtime->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest', 'infinity',
-            ], timeout: null);
+                ...$flags, $applicationImage, 'infinity',
+            ]);
+            $docker->run(['start', $app]);
             $directory = $inImage
-                ? '/var/www/html'
+                ? $layout->root
                 : ($mode === 'messaging' ? '/tmp/baander-tests' : '/tmp/baander-' . $mode . '-runtime');
             if (!$inImage) {
                 $paths = [
@@ -182,7 +179,7 @@ final class Qualification
                 if ($mode !== 'messaging') {
                     array_push($paths, 'docker/general', 'templates', 'public', 'translations');
                 }
-                self::stage($runtime, $resources, $app, $paths, $directory);
+                self::stage($runtime, $docker, $artifacts, $app, $paths, $directory);
             }
             foreach ($commands as $command) {
                 $docker->run(['exec', '-w', $directory, $app, ...$command], timeout: null, interactive: true);
@@ -190,38 +187,27 @@ final class Qualification
             if ($mode === 'outbox') {
                 fwrite(STDOUT, "Production outbox replay preserved projections and avoided duplicate Redis handoffs.\n");
             }
-        } catch (Throwable $error) {
-            $failure = $error;
-            throw $error;
-        } finally {
-            try {
-                $resources->close();
-            } catch (Throwable $cleanup) {
-                if ($failure !== null) {
-                    throw new \RuntimeException($cleanup->getMessage(), previous: $failure);
-                }
-                throw $cleanup;
-            }
-        }
+        }, $runtime->configuration->budgets->seconds('cleanup'));
     }
 
     /** @param list<string> $paths */
     private static function stage(
         Runtime $runtime,
-        Resources $resources,
+        Client $docker,
+        string $artifacts,
         string $container,
         array $paths,
         string $directory,
     ): void {
-        $archive = $resources->artifacts . '/checkout.tar';
+        $archive = $artifacts . '/checkout.tar';
         try {
             $runtime->run(['tar', '-cf', $archive, ...$paths], timeout: null);
             // The parent directory is private. Let the image's default user read
             // the copied archive and own the extracted checkout, as in the stream.
             Runtime::require(chmod($archive, 0644), 'Cannot prepare the private checkout archive.');
-            $resources->docker->run(['exec', $container, 'mkdir', '-p', $directory], timeout: null);
-            $resources->docker->run(['cp', $archive, $container . ':' . $directory . '/.fixture-checkout.tar'], timeout: null);
-            $resources->docker->run([
+            $docker->run(['exec', $container, 'mkdir', '-p', $directory], timeout: null);
+            $docker->run(['cp', $archive, $container . ':' . $directory . '/.fixture-checkout.tar'], timeout: null);
+            $docker->run([
                 'exec', $container, 'sh', '-ec',
                 'tar -xf "$1/.fixture-checkout.tar" -C "$1"; rm "$1/.fixture-checkout.tar"',
                 'fixture-stage', $directory,

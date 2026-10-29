@@ -10,8 +10,16 @@ use Baander\Tooling\Runtime\Requirements;
 
 try {
     Requirements::check();
-    $image = getenv('BAANDER_TEST_IMAGE') ?: 'martinjuul/baander-app:latest';
-    $version = <<<'CODE'
+    $environment = getenv();
+    $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+    $artifacts = Support::temporary('baander-xdebug-check-');
+    $target = new \Baander\Tooling\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $artifacts . '/transport');
+    $docker = new \Baander\Tooling\Docker\Client($executor, $target, $environment);
+    $image = $docker->resolveImage($configuration->images->role('application'), pull: false)->id;
+    $ledger = new \Baander\Tooling\Resources\ResourceLedger($artifacts . '/resources.json', $docker, $environment);
+    $ledger->scoped(function () use ($docker, $ledger, $image): void {
+        $version = <<<'CODE'
 $expected = getenv("XDEBUG_VERSION");
 $actual = phpversion("xdebug");
 if (!$expected || $actual !== $expected) {
@@ -19,9 +27,7 @@ if (!$expected || $actual !== $expected) {
     exit(1);
 }
 CODE;
-    Support::run(['docker', 'run', '--rm', '--network', 'none', '--entrypoint', 'php', $image, '-r', $version], passthrough: true);
-    Support::run(['docker', 'run', '--rm', '--network', 'none', $image, 'php', '-r', 'exit(extension_loaded("xdebug") ? 1 : 0);'], passthrough: true);
-    $coverage = <<<'CODE'
+        $coverage = <<<'CODE'
 $file = tempnam(sys_get_temp_dir(), "xdebug-smoke-");
 file_put_contents($file, "<?php\nreturn 42;\n");
 xdebug_start_code_coverage();
@@ -31,8 +37,7 @@ xdebug_stop_code_coverage();
 unlink($file);
 exit(($coverage[$file][2] ?? null) === 1 ? 0 : 1);
 CODE;
-    Support::run(['docker', 'run', '--rm', '--network', 'none', '-e', 'XDEBUG_MODE=coverage', $image, 'php', '-r', $coverage], passthrough: true);
-    $aliases = <<<'SH'
+        $aliases = <<<'SH'
 set -e
 shopt -s expand_aliases
 source /home/www-data/.bashrc
@@ -42,9 +47,23 @@ php -r 'exit(extension_loaded("xdebug") && in_array("debug", xdebug_info("mode")
 eval "debug-off"
 php -r 'exit(extension_loaded("xdebug") ? 1 : 0);'
 SH;
-    Support::run(['docker', 'run', '--rm', '--network', 'none', $image, 'bash', '-c', $aliases], passthrough: true);
+        foreach ([
+            ['--network', 'none', '--entrypoint', 'php', $image, '-r', $version],
+            ['--network', 'none', $image, 'php', '-r', 'exit(extension_loaded("xdebug") ? 1 : 0);'],
+            ['--network', 'none', '-e', 'XDEBUG_MODE=coverage', $image, 'php', '-r', $coverage],
+            ['--network', 'none', $image, 'bash', '-c', $aliases],
+        ] as $arguments) {
+            $container = $ledger->create(\Baander\Tooling\Resources\ResourceKind::Container, 'baander-xdebug-' . bin2hex(random_bytes(6)), $arguments);
+            $docker->run(['start', '--attach', $container], interactive: true);
+            $status = (int) trim($docker->run(['wait', $container])->stdout);
+            if ($status !== 0) {
+                throw new \Baander\Tooling\Process\CommandFailure('Xdebug container check failed.', $status);
+            }
+        }
+    }, $configuration->budgets->seconds('cleanup'));
+    Support::removeTree($artifacts);
     echo "Xdebug container checks passed (4 scenarios).\n";
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
-    exit($error instanceof \Baander\Tooling\Development\Acceptance\CommandFailure ? $error->status : 1);
+    exit($error->getCode() > 0 && $error->getCode() < 256 ? $error->getCode() : 1);
 }

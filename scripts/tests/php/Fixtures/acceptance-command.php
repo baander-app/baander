@@ -37,7 +37,7 @@ switch ($argv[1]) {
         sleep(30);
         break;
     case 'pause-driver':
-        $commands = new Commands($argv[2], $argv[2] . '/logs');
+        $commands = new Commands($argv[2], $argv[2] . '/logs', new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
         $started = hrtime(true);
         $commands->pause(10000);
         $idleSeconds = (hrtime(true) - $started) / 1000000000;
@@ -50,7 +50,7 @@ switch ($argv[1]) {
         echo json_encode(['idleSeconds' => $idleSeconds, 'status' => $result->exitCode], JSON_THROW_ON_ERROR);
         break;
     case 'signal-driver':
-        $commands = new Commands($argv[2], $argv[2] . '/logs');
+        $commands = new Commands($argv[2], $argv[2] . '/logs', new \Baander\Tooling\Process\EngineExecutor(new \Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
         $timer = Swoole\Timer::tick(
             10,
             static function () use ($argv, &$timer): void {

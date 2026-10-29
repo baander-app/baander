@@ -22,7 +22,11 @@ if ($arguments === ['context', 'show']) {
     echo "web-fixture\n";
     exit(0);
 }
-array_splice($arguments, 0, 2);
+require __DIR__ . '/WebDockerState.php';
+if ($arguments[0] !== 'context') {
+    array_splice($arguments, 0, 2);
+}
+webDockerState($arguments, getenv('WEB_RUNTIME_CALLS'));
 $mode = getenv('WEB_RUNTIME_MODE');
 if ($arguments[0] === 'cp') {
     if ((fileperms($arguments[1]) & 0777) !== 0644 || (fileperms(dirname($arguments[1])) & 0777) !== 0700) {

@@ -19,77 +19,7 @@ final class MessagingWorkflowTest extends TestCase
         mkdir($this->root . '/tests/Fixtures', 0700, true);
         file_put_contents($this->root . '/vendor/autoload.php', '<?php');
         file_put_contents($this->root . '/tests/Fixtures/postgres-extensions.sql', 'CREATE EXTENSION fixture;');
-        file_put_contents(
-            $this->root . '/bin/docker',
-            '#!' . PHP_BINARY . "\n" . <<<'PHP_CODE'
-        <?php
-
-        $args = array_slice($_SERVER['argv'], 1);
-        if (in_array($args[0] ?? '', ['--host', '--context'], true)) {
-            $args = array_slice($args, 2);
-        }
-        $root = getenv('PROBE_ROOT');
-        file_put_contents($root . '/commands', json_encode($args) . "\n", FILE_APPEND);
-        $state = ['containers' => [], 'networks' => []];
-        if (is_file($root . '/state')) {
-            $state = file_get_contents($root . '/state')
-                |> (static fn(string $json): array => json_decode($json, true));
-        }
-        $option = static function (string $name) use ($args): ?string {
-            $at = array_search($name, $args, true);
-            return $at === false ? null : ($args[$at + 1] ?? null);
-        };
-        $status = 0;
-        if ($args === ['context', 'show']) {
-            echo "test\n";
-        } elseif ($args[0] === 'run') {
-            $state['containers'][$option('--name')] = true;
-            echo "container\n";
-        } elseif (array_slice($args, 0, 2) === ['network', 'create']) {
-            $state['networks'][$args[array_key_last($args)]] = true;
-        } elseif ($args[0] === 'rm') {
-            unset($state['containers'][$args[array_key_last($args)]]);
-        } elseif (array_slice($args, 0, 2) === ['network', 'rm']) {
-            if (getenv('PROBE_CLEANUP_FAIL') === '1') {
-                $status = 31;
-                fwrite(STDERR, "network removal refused\n");
-            } else {
-                unset($state['networks'][$args[2]]);
-            }
-        } elseif ($args[0] === 'ps' || ($args[1] ?? '') === 'ls') {
-            $filter = substr($option('--filter') ?? '', 5);
-            $names = $args[0] === 'ps' ? $state['containers'] : ($args[0] === 'network' ? $state['networks'] : []);
-            foreach (array_keys($names) as $name) {
-                if ($filter === '^/' . $name . '$' || str_contains($name, $filter)) {
-                    echo $name, "\n";
-                }
-            }
-        } elseif ($args[0] === 'logs') {
-            echo 'container diagnostics: ', $args[array_key_last($args)], "\n";
-        } elseif ($args[0] === 'exec') {
-            if (in_array('pg_isready', $args, true)) {
-                $status = getenv('PROBE_NOT_READY') === '1' ? 1 : 0;
-            } elseif (in_array('redis-cli', $args, true)) {
-                echo "PONG\n";
-            } elseif (in_array('psql', $args, true)) {
-                file_put_contents($root . '/sql', stream_get_contents(STDIN));
-            } elseif (in_array('php', $args, true)) {
-                if (getenv('PROBE_WORK_INTERRUPT') === '1') {
-                    Swoole\Process::kill((int) file_get_contents($root . '/runner-pid'), 15);
-                    usleep(1000000);
-                }
-                if (getenv('PROBE_WORK_FAIL') === '1') {
-                    $status = 7;
-                    fwrite(STDERR, "fixture workload failed\n");
-                } else {
-                    echo "fixture workload passed\n";
-                }
-            }
-        }
-        file_put_contents($root . '/state', json_encode($state));
-        exit($status);
-        PHP_CODE,
-        );
+        file_put_contents($this->root . '/bin/docker', '#!' . PHP_BINARY . "\n" . file_get_contents(__DIR__ . '/Fixtures/messaging-docker.php'));
         file_put_contents(
             $this->root . '/bin/tar',
             '#!' . PHP_BINARY . "\n" . <<<'PHP_CODE'
@@ -121,6 +51,14 @@ final class MessagingWorkflowTest extends TestCase
         $code = <<<'PHP_CODE'
         require $argv[1];
         file_put_contents($argv[2] . '/runner-pid', (string) getmypid());
+        if (getenv('PROBE_USE_MAIN') === '1') {
+            try {
+                exit(Baander\Tooling\Fixtures\Messaging\Qualification::main($argv[2], $argv[3]));
+            } catch (Throwable $error) {
+                fwrite(STDERR, Baander\Tooling\Fixtures\Runtime::failure($error));
+                exit(Baander\Tooling\Fixtures\Runtime::status($error));
+            }
+        }
         $r = new Baander\Tooling\Fixtures\Runtime($argv[2], (float) $argv[4]);
         try {
             Baander\Tooling\Fixtures\Messaging\Qualification::run($r, $argv[3]);
@@ -189,18 +127,18 @@ final class MessagingWorkflowTest extends TestCase
                 && !in_array('--user', $args, true),
         ));
         self::assertFalse(is_file($this->root . '/artifacts/checkout.tar'));
-        self::assertTrue($this->json('artifacts/cleanup.json')['cleanupVerified']);
+        self::assertFileDoesNotExist($this->root . '/artifacts/resources.json');
         self::assertSame(['containers' => [], 'networks' => []], $this->json('state'));
     }
 
     public function testProducerCanRunTheImageCheckoutWithoutArchivingHostSource(): void
     {
-        $result = $this->execute('producer', ['BAANDER_TEST_CHECKOUT_IN_IMAGE' => '1']);
+        $result = $this->execute('producer', ['BAANDER_TEST_CHECKOUT_IN_IMAGE' => '1', 'PROBE_APP_HOME' => '/srv/baander']);
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertFalse(is_file($this->root . '/archive-arguments'));
         self::assertTrue(array_any(
             $this->recorded(),
-            static fn(array $args): bool => in_array('/var/www/html', $args, true)
+            static fn(array $args): bool => in_array('/srv/baander', $args, true)
                 && in_array('tests/Fixtures/producer-runtime.php', $args, true),
         ));
     }
@@ -221,7 +159,7 @@ final class MessagingWorkflowTest extends TestCase
         self::assertNotNull($workload);
         self::assertContains('messaging_test', $calls[$provision]);
         self::assertLessThan($workload, $provision);
-        self::assertFalse($this->json('artifacts/cleanup.json')['cleanupVerified']);
+        self::assertCount(1, $this->json('artifacts/resources.json')['resources']);
     }
 
     public function testWorkflowInterruptionRetainsItsSignalStatusAndCleansContainers(): void
@@ -234,7 +172,7 @@ final class MessagingWorkflowTest extends TestCase
             ],
         );
         self::assertSame(143, $result->exitCode, $result->stderr);
-        self::assertTrue($this->json('artifacts/cleanup.json')['cleanupVerified']);
+        self::assertFileDoesNotExist($this->root . '/artifacts/resources.json');
         self::assertSame(['containers' => [], 'networks' => []], $this->json('state'));
     }
 
@@ -247,7 +185,7 @@ final class MessagingWorkflowTest extends TestCase
         file_put_contents($this->root . '/state', json_encode($unrelated, JSON_THROW_ON_ERROR));
         $result = $this->execute('messaging', ['PROBE_NOT_READY' => '1'], .5);
         self::assertSame(124, $result->exitCode, $result->stderr);
-        self::assertTrue($this->json('artifacts/cleanup.json')['cleanupVerified']);
+        self::assertFileDoesNotExist($this->root . '/artifacts/resources.json');
         self::assertSame($unrelated, $this->json('state'));
     }
 
@@ -270,5 +208,14 @@ final class MessagingWorkflowTest extends TestCase
         self::assertContains('tests/Integration/WorkerLeaseAgentTest.php', $messaging);
         self::assertContains('--fail-on-phpunit-notice', $messaging);
         self::assertContains('--fail-on-skipped', $messaging);
+    }
+
+    public function testEntrypointUsesConfiguredFiniteMessagingBudget(): void
+    {
+        file_put_contents($this->root . '/dev.local.json', '{"tooling":{"budgets":{"messaging":0.05}}}');
+        $result = $this->execute('messaging', ['PROBE_USE_MAIN' => '1', 'CI' => 'false']);
+        self::assertSame(124, $result->exitCode, $result->stderr);
+        self::assertLessThan(5, $result->duration);
+        self::assertFileDoesNotExist($this->root . '/artifacts/resources.json');
     }
 }
