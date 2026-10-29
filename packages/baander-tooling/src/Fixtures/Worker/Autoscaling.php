@@ -12,7 +12,7 @@ final class Autoscaling
     public static function main(array $arguments, string $root): int
     {
         if ($arguments === []) {
-            $runtime = new Runtime($root, budget: 'workerCapacity');
+            $runtime = new Runtime($root, budget: 'workerAutoscaling');
             $artifacts = Runtime::artifacts($root, 'autoscaling');
             try {
                 $runtime->run(
@@ -28,7 +28,7 @@ final class Autoscaling
                             'BAANDER_TEST_TWO_COMMAND' => '1',
                             'BAANDER_TEST_AUTOSCALING_CHECKPOINT' => $root . '/scripts/test-worker-autoscaling-container.sh',
                         ],
-                        600,
+                        $runtime->configuration->budgets->seconds('workerCapacity'),
                     );
                 }
                 $runtime->run(

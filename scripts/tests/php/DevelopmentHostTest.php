@@ -16,8 +16,6 @@ use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, CommandFailure};
 use Baander\Tooling\Development\Environment;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/host-command-executor.php';
-
 final class DevelopmentHostTest extends TestCase
 {
     private string $root;

@@ -12,10 +12,6 @@ use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-require_once __DIR__ . '/Fixtures/dev-data.php';
-
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentBootstrapTest extends DevDataTestCase
 {
     /** @return array<string,string> */

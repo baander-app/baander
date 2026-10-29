@@ -12,8 +12,6 @@ use Baander\Tooling\Docker\Target;
 use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
 use PHPUnit\Framework\Attributes\DataProvider;
 
-require_once __DIR__ . '/Fixtures/dev-data.php';
-
 final class DevelopmentDatabaseTest extends DevDataTestCase
 {
     /** @param array<string,mixed> $catalog

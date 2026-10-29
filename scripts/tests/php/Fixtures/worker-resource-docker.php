@@ -12,7 +12,7 @@ file_put_contents(
 if (in_array($arguments[0] ?? '', ['--context', '--host'], true)) {
     $arguments = array_slice($arguments, 2);
 }
-require __DIR__ . '/worker-resource-state.php';
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
 workerResourceState($arguments);
 if (($arguments[0] ?? '') === 'ps') {
     $filter = $arguments[array_search('--filter', $arguments, true) + 1];

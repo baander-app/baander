@@ -7,8 +7,6 @@ namespace Baander\Tooling\Tests;
 use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Process\ProcessResult;
 
-require_once __DIR__ . '/development-command-executor.php';
-
 final class DevCoreRunner extends DevelopmentCommandExecutor
 {
     /** @var list<array{arguments:non-empty-list<string>,env:array<string,string>|null,timeout:float|null,interactive:bool}> */

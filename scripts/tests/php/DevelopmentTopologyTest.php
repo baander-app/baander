@@ -14,8 +14,6 @@ use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Inventory\Collector;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentTopologyTest extends TestCase
 {
     public function testPreviewRemovalKeepsPersistentAndCannotReplaceOwnedHostname(): void

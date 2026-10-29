@@ -12,7 +12,7 @@ if ($args === ['context', 'show']) {
     echo "web-fixture\n";
     exit(0);
 }
-require __DIR__ . '/WebDockerState.php';
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
 webDockerState($args, getenv('WEB_WORKFLOW_TRACE'));
 if (($args[0] ?? null) === 'start' && str_ends_with(end($args), '-client')) {
     if (getenv('WEB_WORKFLOW_STAGE') === '1') {

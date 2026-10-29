@@ -460,20 +460,26 @@ With the root development dependencies installed, run the workflow checks from t
 repository root:
 
 ```bash
-composer test:tooling
+composer run-script --timeout=7200 test:tooling
 composer test:registry-subjects
 composer analyse:tooling
 composer check:tooling-format
+composer check:tooling-architecture
 ```
 
 The tooling suite uses `phpunit-tooling.xml.dist` and remains separate from the
-four application suites. `composer test:tooling` excludes the
+four application suites. `composer run-script --timeout=7200 test:tooling` excludes the
 `registry-python-subject` group. `composer test:registry-subjects` runs that group
 against the unchanged registry backup service and enrollment issuer; it requires
 Python 3 for those programs under test. Set `REGISTRY_SUBJECT_PYTHON` to select
 their interpreter. Both suites are mandatory CI gates. Test and analysis commands
 install the standalone loaders before running. Use `composer format:tooling` to
 apply the scoped PER-CS3 formatting rules before checking them.
+`composer check:tooling-architecture` combines `composer deptrac:tooling` with
+`composer check:tooling-source-policy`: dependency and source checks reject reverse
+CLI dependencies, raw process/Docker bypasses, manual implementation loaders and
+duplicated image/layout defaults. These commands describe the required gates;
+passing results and live qualification limits belong in the roadmap.
 
 CI also runs the harness suite in the `tooling` runtime from
 `docker/runner/Dockerfile`, without Python, pcntl or posix. The
@@ -484,9 +490,17 @@ Use an application image that satisfies the current Composer lockfile. To build
 one locally and select it for the disposable runners:
 
 ```bash
-docker buildx build --target ci --load -t baander-ci:local .
+php scripts/build-application.php --buildx --target ci --tag baander-ci:local
 export BAANDER_TEST_IMAGE=baander-ci:local
 ```
+
+The build entrypoint supplies the canonical `APP_HOME` and image layout metadata
+from the selected source and verifies the resulting image. Direct runtime-image
+builds without that contract fail. The
+[tooling package reference](../../packages/baander-tooling/README.md#configuration-and-image-roles)
+lists role image overrides, Docker selector precedence and finite budgets. Supported
+configuration is captured once per invocation; nested hooks use the same resolved
+target and image selections.
 
 The default image reference in the runners may require registry access. An existing
 locally qualified image can be selected with the same variable. Check its PHP
@@ -507,9 +521,13 @@ bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --cov
 It requires the host tooling baseline above, Docker and the Docker Compose plugin.
 `BAANDER_TEST_PROCESSES` defaults to `2` and accepts integers from `1` through
 `8`; `1` is the diagnostic setting. `BAANDER_TEST_TIMEOUT` bounds the complete
-run, including setup, and defaults to `3600` seconds. Cleanup has separate
-bounded attempts after interruption or timeout. `BAANDER_TEST_IMAGE` selects the
-application runtime, and `BAANDER_TEST_POSTGRES_IMAGE` selects the
+run, including setup, and defaults to `3600` seconds. Cleanup uses a separate
+shared total budget, defaulting to `120` seconds (`BAANDER_CLEANUP_TIMEOUT`), after
+interruption or timeout. Unresolved ownership receipts remain in the run artifacts;
+keep them and their saved transport material for cleanup against the recorded
+daemon. Cleanup failure fails an otherwise successful run. Messaging has a finite
+`600`-second catalog budget, overridable through `tooling.budgets.messaging`.
+`BAANDER_TEST_IMAGE` selects the application runtime, and `BAANDER_TEST_POSTGRES_IMAGE` selects the
 extension-capable database image. CI uses `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`
 with its freshly built image; local runs copy the current source and installed
 dependencies into each container.
@@ -761,7 +779,7 @@ retains uncovered executable lines and exclusions. Validate the standard reports
 with `php scripts/validate-backend-coverage.php coverage` before using
 `coverage/metrics.json`.
 
-Runner regressions use `composer test:tooling` and the
+Runner regressions use `composer run-script --timeout=7200 test:tooling` and the
 `BackendTestRunnerTest` PHPUnit file. The destructive isolation probe,
 `php scripts/test-backend-stack-isolation.php`, creates two disposable stacks
 to check database outages, Redis pause/flush, cache/socket separation and
@@ -841,7 +859,7 @@ extension requirement remains unchanged.
 Run the backend runner regressions before changing orchestration or cleanup:
 
 ```bash
-composer test:tooling
+composer run-script --timeout=7200 test:tooling
 bash scripts/test-worker-operator-cleanup.sh
 ```
 
@@ -894,8 +912,8 @@ database waits; DBAL `connect_timeout` is not a hard connection deadline.
 
 `BAANDER_TEST_OPERATOR_IN_CONTAINER=1` runs the entrypoint in a separate trusted
 controller container with PHP and a verified static Docker CLI. The CLI comes from
-`docker:29.7.2-cli` by default (`BAANDER_TEST_DOCKER_CLI_IMAGE` overrides it). Only
-the controller receives the daemon socket mount. Its SELinux process label is
+the catalog's `operatorHelper` role (`BAANDER_TEST_DOCKER_CLI_IMAGE` overrides it).
+Only the controller receives the daemon socket mount. Its SELinux process label is
 disabled to access that socket without relabeling it; this exception applies only
 to the trusted test controller. Credentials are streamed into private files owned
 by its user, and it reaches PostgreSQL on a separate controller network with
@@ -987,7 +1005,7 @@ To check the actual production worker target, build it separately and pass its
 local image reference to the production runner:
 
 ```bash
-docker buildx build --target worker --load -t baander-worker:test .
+php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-worker-production-container.sh
 ```
 
@@ -1031,8 +1049,11 @@ BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-check
   bash scripts/test-two-command-deployment-container.sh
 ```
 
-The hook uses `mcr.microsoft.com/playwright:v1.60.0-noble`, Docker host networking
-and the checkout's `playwright-core` dependency. Set
+The hook uses the configured `browser` image role, Docker host networking and the
+checkout's `playwright-core` dependency. A custom `BAANDER_BROWSER_IMAGE` requires
+`BAANDER_BROWSER_PLAYWRIGHT_VERSION`; preflight checks that declaration against the
+installed package before browser creation. The default reference and compatible
+version live in the tooling catalog. Set
 `BAANDER_TEST_BROWSER_ENGINE` to `chromium` (the default) or `firefox`; unknown
 values fail before the deployment runner creates resources. Chromium keeps its
 `channel: 'chromium'` launch option; Firefox uses its own engine. Both run
@@ -1112,7 +1133,7 @@ regional qualification remains separate.
 The reserved-control pressure drill runs separately from the full backend suite:
 
 ```bash
-docker buildx build --target worker --load -t baander-worker:test .
+php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
   bash scripts/test-worker-control-capacity-container.sh
 ```
@@ -1136,7 +1157,7 @@ To exercise controls while native capacity is occupied, build the current worker
 image and run the dedicated drill:
 
 ```bash
-docker buildx build --target worker --load -t baander-worker:test .
+php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
   bash scripts/test-worker-media-control-container.sh
 ```

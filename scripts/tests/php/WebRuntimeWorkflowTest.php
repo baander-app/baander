@@ -15,9 +15,13 @@ final class WebRuntimeWorkflowTest extends TestCase
     {
         $this->directory = sys_get_temp_dir() . '/baander-web-workflow-' . bin2hex(random_bytes(6));
         mkdir($this->directory, 0700);
-        copy(__DIR__ . '/Fixtures/WebDockerState.php', $this->directory . '/WebDockerState.php');
+        $source = str_replace(
+            "dirname(__DIR__, 4) . '/vendor/autoload.php'",
+            var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true),
+            file_get_contents(__DIR__ . '/Fixtures/WebRuntimeCommand.php'),
+        );
         foreach (['docker', 'tar'] as $binary) {
-            copy(__DIR__ . '/Fixtures/WebRuntimeCommand.php', $this->directory . '/' . $binary);
+            file_put_contents($this->directory . '/' . $binary, $source);
             chmod($this->directory . '/' . $binary, 0700);
         }
     }

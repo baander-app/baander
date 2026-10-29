@@ -9,8 +9,6 @@ use Baander\Tooling\Filesystem\{AtomicFile, PrivateDirectory};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/retained-state-executor.php';
-
 final class DevelopmentRetainedStateTest extends TestCase
 {
     private string $root;
@@ -146,6 +144,40 @@ final class DevelopmentRetainedStateTest extends TestCase
             self::assertNotSame($saved['release']['images'], $saved['prepared_release']['images']);
         }
         self::assertFileDoesNotExist($record['prepared_release']['source'] . '/packages/baander-tooling/resources/application-layout.json');
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function historicalVariableLayouts(): iterable
+    {
+        yield 'literal environment' => ["ENV APP_HOME=/var/www/html \\\n    APP_ENV=prod\nWORKDIR \${APP_HOME}\n", true];
+        yield 'unresolved environment' => ["ARG APP_HOME\nWORKDIR \${APP_HOME}\n", false];
+        yield 'different environment' => ["ENV APP_HOME=/srv/baander\nWORKDIR \${APP_HOME}\n", false];
+        yield 'overridden environment' => ["ENV APP_HOME=/var/www/html\nENV APP_HOME=/srv/baander\nWORKDIR \${APP_HOME}\n", false];
+        yield 'legacy syntax override' => ["ENV APP_HOME=/var/www/html\nENV APP_HOME /srv/baander\nWORKDIR \${APP_HOME}\n", false];
+        yield 'environment declared too late' => ["WORKDIR \${APP_HOME}\nENV APP_HOME=/var/www/html\n", false];
+        yield 'environment from unrelated stage' => ["ENV APP_HOME=/var/www/html\nFROM php:8.5\nWORKDIR \${APP_HOME}\n", false];
+    }
+
+    #[DataProvider('historicalVariableLayouts')]
+    public function testHistoricalVariableLayoutRequiresLiteralUnambiguousSource(string $instructions, bool $supported): void
+    {
+        $record = $this->record(true);
+        file_put_contents($record['prepared_release']['source'] . '/Dockerfile', "FROM php:8.5\n" . $instructions);
+        $path = $this->store->directory($record['id']) . '/state.json';
+        $original = file_get_contents($path);
+        if (!$supported) {
+            try {
+                $this->converter()->convert($record['id']);
+                self::fail('Unproven historical layout was accepted.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Historical source does not prove', $error->getMessage());
+                self::assertSame($original, file_get_contents($path));
+            }
+            return;
+        }
+        $this->converter()->convert($record['id']);
+        self::assertSame('/var/www/html', $this->store->load($record['id'])['prepared_release']['layout']['root']);
+        self::assertSame($original, file_get_contents(glob($path . '.pre-contract-*')[0]));
     }
 
     /** @return iterable<string,array{string}> */

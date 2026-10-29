@@ -70,6 +70,15 @@ final readonly class OperatorConfiguration
         return $value === '1';
     }
 
+    public function budget(): string
+    {
+        return match (true) {
+            $this->lifecyclePhase !== '' => 'workerLifecycle',
+            $this->twoCommand || $this->mediaObservation || $this->checkpoint !== null => 'workerCapacity',
+            default => 'workerOperator',
+        };
+    }
+
     public static function workerName(string $namespace, string $boot): string
     {
         return 'baander-worker-' . substr(hash('sha256', $namespace), 0, 32) . '-' . $boot . '-execution';

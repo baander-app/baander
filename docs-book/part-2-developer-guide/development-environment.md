@@ -87,8 +87,10 @@ The persistent updater is a systemd user timer named
 controller state directories from sharing a timer. Inspect installed timers with
 `systemctl --user list-timers 'baander-development-*'`.
 It checks remote `master` every 60 seconds while enabled. Its controller and clone
-live outside worktrees. Publication copies the PHP controller and records its
-absolute PHP executable under the lifecycle lock, preserving updater intent.
+live outside worktrees. Publication installs a complete controller generation,
+atomically selects it and records its absolute PHP executable, preserving updater
+intent. Invocations lease
+the selected generation until they finish, so an update retains code still in use.
 The service retains the absolute executable search paths
 from `dev-up`, including Docker credential helpers; remote access must work without
 an interactive prompt. The user manager must remain available for checks to run;
@@ -127,6 +129,27 @@ E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless
 The browser runner requires an explicit isolated preview URL. It does not provision
 an app or fall back to the persistent instance. See [Testing](testing.md) for the
 separate disposable backend coordinator and frontend suites.
+
+## Local tooling settings
+
+The optional `tooling` object in `dev.local.json` selects role image references,
+Docker transport and finite workflow budgets alongside `libraries`. See the
+[tooling package reference](../../packages/baander-tooling/README.md#configuration-and-image-roles)
+for supported keys, environment names and browser compatibility metadata.
+Invocation settings take precedence over captured environment settings, local
+settings and tracked defaults. For example:
+
+```bash
+make preview-up OPTIONS="--docker-context desktop-linux"
+```
+
+Use `--docker-host` for an endpoint or `--docker-executable` for a different CLI.
+A host and context cannot be supplied together. Startup validates new settings
+before changing instance state. Recovery uses the saved release's target, layout,
+images and generated inputs, even if today's local settings are invalid. Existing
+PostgreSQL and Redis data keep their recorded image identities; an image override
+does not upgrade those data stores. Preserve saved state when conversion or
+ownership checks refuse recovery. Lifecycle commands do not authorize a reset.
 
 ## Media mounts
 

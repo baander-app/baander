@@ -9,8 +9,6 @@ use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\WorkflowError;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentLocalConfigurationTest extends TestCase
 {
     private string $directory;

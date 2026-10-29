@@ -495,10 +495,17 @@ uploaded artifact for 14 days. To verify an existing local image and retain its
 evidence:
 
 ```sh
-php relay/tools/verify_packaged_image.php \
+php scripts/verify-registry-image.php \
   --image baander/registry:0.1.0 --kind api \
   --output var/test-runs/registry-inventory/manual
 ```
+
+The command verifies the selected existing image without rebuilding it. It captures
+the Docker target from the repository tooling configuration and keeps private
+transport and ownership evidence under `var/test-runs/registry-image/<run-id>/`.
+Verification and cleanup use that captured target. If cleanup cannot prove that
+its resources are absent, the command reports the retained receipt path; retry it
+with the cleanup command above and keep its transport snapshot alongside it.
 
 Use `--kind rqlite` or `--kind backup` for the other images. This inventory records
 packaged components and their license evidence; it does not make a legal approval

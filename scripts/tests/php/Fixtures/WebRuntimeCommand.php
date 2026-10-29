@@ -22,7 +22,7 @@ if ($arguments === ['context', 'show']) {
     echo "web-fixture\n";
     exit(0);
 }
-require __DIR__ . '/WebDockerState.php';
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
 if ($arguments[0] !== 'context') {
     array_splice($arguments, 0, 2);
 }

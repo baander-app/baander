@@ -162,6 +162,10 @@
     },
     "classmap": [
       "scripts/tests/php/"
+    ],
+    "files": [
+      "scripts/tests/php/Fixtures/WebDockerState.php",
+      "scripts/tests/php/Fixtures/worker-resource-state.php"
     ]
   },
   "config": {
@@ -194,12 +198,6 @@
     }
   },
   "scripts": {
-    "post-install-cmd": [
-      "@auto-scripts"
-    ],
-    "post-update-cmd": [
-      "@auto-scripts"
-    ],
     "analyse:tooling": [
       "@tooling:autoload",
       "@php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G"
@@ -208,12 +206,24 @@
       "cache:clear": "symfony-cmd",
       "assets:install %PUBLIC_DIR%": "symfony-cmd"
     },
+    "check:tooling-architecture": [
+      "@deptrac:tooling",
+      "@check:tooling-source-policy"
+    ],
     "check:tooling-format": "@php vendor/bin/php-cs-fixer check --config=.php-cs-fixer.tooling.php --using-cache=no",
+    "check:tooling-source-policy": "@php scripts/check-tooling-source-policy.php",
     "deptrac": "deptrac analyse",
     "deptrac:baseline": "deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml",
     "deptrac:graph": "deptrac analyse --formatter=graphviz --output=deptrac-graph.dot",
+    "deptrac:tooling": "@php vendor/bin/deptrac analyse --config-file=deptrac-tooling.yaml --no-cache --no-progress",
     "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
     "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
+    "post-install-cmd": [
+      "@auto-scripts"
+    ],
+    "post-update-cmd": [
+      "@auto-scripts"
+    ],
     "test:registry-subjects": [
       "@tooling:autoload",
       "@php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --group registry-python-subject"

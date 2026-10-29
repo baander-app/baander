@@ -71,6 +71,7 @@
         "workerLifecycle": 1300,
         "workerOperator": 240,
         "workerCapacity": 600,
+        "workerAutoscaling": 2000,
         "webShutdown": 900,
         "webRuntime": 180,
         "webSecurity": 360,

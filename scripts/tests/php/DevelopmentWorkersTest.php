@@ -10,11 +10,6 @@ use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-require_once __DIR__ . '/Fixtures/dev-data.php';
-
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-require_once __DIR__ . '/Fixtures/development-worker-command-executor.php';
-
 final class DevelopmentWorkersTest extends DevDataTestCase
 {
     private bool $retainQualificationEvidence = false;
@@ -316,7 +311,6 @@ final class DevelopmentWorkersTest extends DevDataTestCase
 
     public function testHistoricalRecipeIdentityDoesNotNeedSourceContents(): void
     {
-        require_once __DIR__ . '/Fixtures/historical-worker-recipe.php';
         $source = $this->root . '/helper-empty-source/movies';
         try {
             \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory($source);

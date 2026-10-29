@@ -6,8 +6,6 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Process\ProcessResult;
 
-require_once __DIR__ . '/dev-data.php';
-
 final class WorkerCommandExecutor extends DevelopmentCommandExecutor
 {
     /** @var list<array{arguments:non-empty-list<string>,input:?string,env:?array<string,string>,timeout:?float,check:bool}> */

@@ -15,8 +15,6 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentLibrariesTest extends TestCase
 {
     /** @return array<string,mixed> */

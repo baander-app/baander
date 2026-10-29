@@ -34,13 +34,17 @@ while (true) {
     $sample['processes'] = [];
     foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
         $raw = @file_get_contents($path);
-        if (!is_string($raw) || ($end = strrpos($raw, ') ')) === false) { continue; }
+        if (!is_string($raw) || ($end = strrpos($raw, ') ')) === false) {
+            continue;
+        }
         $fields = explode(' ', substr($raw, $end + 2));
         $arguments = @file_get_contents(dirname($path) . '/cmdline');
         $status = @file_get_contents(dirname($path) . '/status');
         $again = @file_get_contents($path);
         if (!is_string($again) || ($againEnd = strrpos($again, ') ')) === false
-            || (explode(' ', substr($again, $againEnd + 2))[19] ?? null) !== $fields[19]) { continue; }
+            || (explode(' ', substr($again, $againEnd + 2))[19] ?? null) !== $fields[19]) {
+            continue;
+        }
         $rssKiB = is_string($status) && preg_match('/^VmRSS:\s+([0-9]+) kB$/m', $status, $match) === 1 ? (int) $match[1] : null;
         $sample['processes'][] = ['pid' => (int) basename(dirname($path)), 'userTicks' => $fields[11], 'systemTicks' => $fields[12],
             'startTicks' => $fields[19], 'rssPages' => $fields[21], 'rssBytes' => $rssKiB === null ? null : $rssKiB * 1024, 'cmdline' => $arguments];
@@ -53,6 +57,8 @@ while (true) {
     $sample['capturedAt'] = hrtime(true) / 1e9;
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
     flush();
-    if ($stopping) { break; }
+    if ($stopping) {
+        break;
+    }
     usleep(250000);
 }

@@ -17,7 +17,9 @@ final class OperatorCommands
     /** @param array<string,string> $environment */
     public function __construct(public readonly string $root, public readonly array $environment, ?int $timeout = null)
     {
-        $this->runtime = new Runtime($root, $timeout, $environment, budget: 'workerOperator');
+        $tooling = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository($root, $environment);
+        $configuration = new OperatorConfiguration($environment, $tooling);
+        $this->runtime = new Runtime($root, $timeout, $environment, $tooling, budget: $configuration->budget());
     }
 
     public function exportTarget(string $path): void

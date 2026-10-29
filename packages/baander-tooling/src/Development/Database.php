@@ -205,7 +205,6 @@ SQL;
             $docker->run(['cp', $container . ':' . $archive, $directory . '/database.dump'], timeout: null);
             $transferred = true;
         } finally {
-            // Keep the source archive when transfer is unconfirmed. Its container is retained instance ownership.
             if ($transferred) {
                 $cleanup = new EngineExecutor(ExecutionContext::bounded($release['effective']['budgets']['cleanup'], $this->connections->environment(), ignoreCancellation: true));
                 try {

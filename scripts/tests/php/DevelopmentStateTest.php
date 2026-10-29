@@ -13,8 +13,6 @@ use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentStateTest extends TestCase
 {
     private string $root;

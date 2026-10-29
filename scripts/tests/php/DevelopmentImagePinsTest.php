@@ -12,8 +12,6 @@ use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentImagePinsTest extends TestCase
 {
     private string $root;

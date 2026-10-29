@@ -1,0 +1,386 @@
+deptrac:
+  paths:
+    - packages/baander-tooling/src
+    - scripts
+    - relay/tools
+    - relay/tests
+    - packages/baander-tooling/resources
+  exclude_files:
+    - '#/(vendor|node_modules)/#'
+  analyser:
+    types:
+      - class
+      - use
+      - function
+      - function_call
+      - file
+  ignore_uncovered_internal_classes: true
+  layers:
+    -
+      name: Architecture
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Architecture\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Architecture/
+    -
+      name: Configuration
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Configuration\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Configuration/
+    -
+      name: Filesystem
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Filesystem\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Filesystem/
+    -
+      name: Process
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Process\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Process/
+    -
+      name: Docker
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Docker\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Docker/
+    -
+      name: Resources
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Resources\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Resources/
+    -
+      name: Inventory
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Inventory\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Inventory/
+    -
+      name: Build
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Build\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Build/
+    -
+      name: CommandLine
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\CommandLine\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/CommandLine/
+    -
+      name: Runtime
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Runtime\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Runtime/
+    -
+      name: Development
+      collectors:
+        -
+          type: classLike
+          value: '^Baander\\Tooling\\Development\\(?!Acceptance\\)'
+        -
+          type: directory
+          value: '/packages/baander-tooling/src/Development/(?!Acceptance/)'
+    -
+      name: Acceptance
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Development\\Acceptance\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Development/Acceptance/
+    -
+      name: Backend
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Backend\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Backend/
+    -
+      name: FixturesHttp
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Http\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Http/
+    -
+      name: FixturesWeb
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Web\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Web/
+    -
+      name: FixturesWorker
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Worker\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Worker/
+    -
+      name: FixturesMessaging
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Messaging\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Messaging/
+    -
+      name: FixturesStartup
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Fixtures\\Startup\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Fixtures/Startup/
+    -
+      name: Fixtures
+      collectors:
+        -
+          type: classLike
+          value: '^Baander\\Tooling\\Fixtures\\(?!Http\\|Web\\|Worker\\|Messaging\\|Startup\\)'
+        -
+          type: directory
+          value: '/packages/baander-tooling/src/Fixtures/(?!Http/|Web/|Worker/|Messaging/|Startup/)'
+    -
+      name: Registry
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Registry\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Registry/
+    -
+      name: CLI
+      collectors:
+        -
+          type: directory
+          value: '/scripts/(?!tests/|vendor/).*\.php$'
+    -
+      name: ToolingTests
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\(Tooling\\Tests|Tests\\Tooling)\\
+        -
+          type: directory
+          value: '/scripts/tests/.*\.php$'
+    -
+      name: RegistryTests
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\RegistryTests\\
+        -
+          type: directory
+          value: '/relay/tests/.*\.php$'
+    -
+      name: RelayHelpers
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Registry\\
+        -
+          type: directory
+          value: '/relay/tools/(?:inventory|qualification|static)/(?!cleanup\.php$).*\.php$'
+    -
+      name: PackageEntrypoints
+      collectors:
+        -
+          type: directory
+          value: '/packages/baander-tooling/resources/.*\.php$'
+    -
+      name: RelayCLI
+      collectors:
+        -
+          type: directory
+          value: '/relay/tools/(?:[^/]+|qualification/cleanup)\.php$'
+  ruleset:
+    Architecture: {  }
+    Configuration:
+      - Filesystem
+      - Process
+    Filesystem: {  }
+    Process:
+      - Filesystem
+    Docker:
+      - Configuration
+      - Filesystem
+      - Process
+    Resources:
+      - Docker
+      - Filesystem
+      - Process
+    Inventory:
+      - Configuration
+      - Docker
+      - Filesystem
+      - Process
+      - Resources
+      - Runtime
+    Build:
+      - Configuration
+      - Docker
+      - Filesystem
+      - Inventory
+      - Process
+    CommandLine: {  }
+    Runtime: {  }
+    Development:
+      - Build
+      - CommandLine
+      - Configuration
+      - Docker
+      - Filesystem
+      - Process
+      - Resources
+    Acceptance:
+      - Configuration
+      - Development
+      - Docker
+      - Filesystem
+      - Process
+      - Resources
+    Backend:
+      - Build
+      - Configuration
+      - Docker
+      - Process
+      - Resources
+    FixturesHttp:
+      - Filesystem
+      - Fixtures
+      - Process
+      - Resources
+    FixturesWeb:
+      - Docker
+      - Fixtures
+      - Process
+      - Resources
+    FixturesWorker:
+      - Configuration
+      - Docker
+      - Filesystem
+      - Fixtures
+      - Process
+      - Resources
+    FixturesMessaging:
+      - Docker
+      - Fixtures
+      - Resources
+    FixturesStartup:
+      - Configuration
+      - Filesystem
+      - Fixtures
+    Fixtures:
+      - Configuration
+      - Docker
+      - Process
+      - Resources
+    Registry:
+      - Configuration
+      - Docker
+      - Filesystem
+      - Inventory
+      - Process
+      - Resources
+      - Runtime
+    CLI:
+      - Acceptance
+      - Backend
+      - Build
+      - CommandLine
+      - Configuration
+      - Development
+      - Docker
+      - Filesystem
+      - Fixtures
+      - FixturesHttp
+      - FixturesMessaging
+      - FixturesStartup
+      - FixturesWeb
+      - FixturesWorker
+      - Inventory
+      - Process
+      - Registry
+      - RelayHelpers
+      - Resources
+      - Runtime
+      - Architecture
+    ToolingTests:
+      - Acceptance
+      - Backend
+      - Build
+      - CommandLine
+      - Configuration
+      - Development
+      - Docker
+      - Filesystem
+      - Fixtures
+      - FixturesHttp
+      - FixturesMessaging
+      - FixturesWeb
+      - FixturesWorker
+      - Inventory
+      - Process
+      - Registry
+      - RegistryTests
+      - RelayHelpers
+      - Resources
+      - Runtime
+      - Architecture
+      - FixturesStartup
+    RegistryTests:
+      - RelayHelpers
+    RelayHelpers: {  }
+    PackageEntrypoints:
+      - Runtime
+    RelayCLI:
+      - RelayHelpers
+      - RegistryTests

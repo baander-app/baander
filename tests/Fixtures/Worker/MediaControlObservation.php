@@ -114,7 +114,7 @@ final class MediaControlObservation
                 throw new RuntimeException('Native launch evidence exceeded its bounded size.');
             }
             $identity = self::identity(getmypid()) ?? throw new RuntimeException('Native launch identity unavailable.');
-            $predecessors = array_values(array_filter(self::snapshot($scope['jobId']), static fn (array $other): bool => $other !== $identity));
+            $predecessors = array_values(array_filter(self::snapshot($scope['jobId']), static fn(array $other): bool => $other !== $identity));
             $record = $scope + ['monotonic' => hrtime(true) / 1e9, 'time' => microtime(true), 'identity' => $identity, 'argv' => $arguments, 'predecessors' => $predecessors];
             $line = json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . "\n";
             if (strlen($line) > 65_536 || fwrite($handle, $line) !== strlen($line) || !fflush($handle)) {
@@ -159,7 +159,7 @@ final class MediaControlObservation
             if (count($lines) > self::MAX_RECORDS) {
                 throw new RuntimeException('Native launch evidence exceeded its bounded record count.');
             }
-            return array_map(static fn (string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines);
+            return array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines);
         } finally {
             fclose($handle);
         }
@@ -168,7 +168,7 @@ final class MediaControlObservation
     /** @return list<array<string,mixed>> */
     public static function launchesForJob(string $jobId): array
     {
-        return array_values(array_filter(self::records(), static fn (array $record): bool => $record['jobId'] === $jobId));
+        return array_values(array_filter(self::records(), static fn(array $record): bool => $record['jobId'] === $jobId));
     }
 
     /** @param list<array<string,mixed>>|null $records */
@@ -225,7 +225,9 @@ final class MediaControlObservation
             if (file_put_contents($path . '.part', $json) !== strlen($json) || !chmod($path . '.part', 0644) || !rename($path . '.part', $path)) {
                 throw new RuntimeException('Native observation snapshot could not be published.');
             }
-            if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) { break; }
+            if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) {
+                break;
+            }
             usleep(50_000);
         }
     }

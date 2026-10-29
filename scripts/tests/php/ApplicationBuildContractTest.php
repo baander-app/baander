@@ -117,8 +117,7 @@ final class ApplicationBuildContractTest extends TestCase
     {
         $this->layout('/srv/baander');
         $docker = $this->source . '/docker.fixture';
-        file_put_contents($docker, <<<'PHP'
-#!/usr/bin/env php
+        file_put_contents($docker, '#!' . PHP_BINARY . "\n" . <<<'PHP'
 <?php
 if (in_array('info', $argv, true)) {
     echo '{"ID":"build-fixture"}';
@@ -155,8 +154,7 @@ PHP);
     {
         $this->layout('/srv/baander');
         $docker = $this->source . '/docker-failure.fixture';
-        file_put_contents($docker, <<<'PHP'
-#!/usr/bin/env php
+        file_put_contents($docker, '#!' . PHP_BINARY . "\n" . <<<'PHP'
 <?php
 if (in_array('info', $argv, true)) {
     echo '{"ID":"build-fixture"}';

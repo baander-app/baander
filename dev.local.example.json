@@ -11,6 +11,10 @@
         "images": {
             "developmentRedis": {
                 "reference": "redis:7-alpine"
+            },
+            "browser": {
+                "reference": "mcr.microsoft.com/playwright:v1.60.0-noble",
+                "playwrightVersion": "1.60.0"
             }
         },
         "docker": {

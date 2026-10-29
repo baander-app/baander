@@ -38,7 +38,6 @@ final readonly class RetainedState
         if (!$needed && !$gatewayNeedsConversion) {
             return;
         }
-        // The barrier is acquired before the instance lock and retained until publication.
         $barrier = new ControllerPayload($this->store->root)->drainReaders();
         try {
             if (!$needed) {
@@ -134,15 +133,13 @@ final readonly class RetainedState
             }
         }
         $release['layout'] = $layout->toArray();
-        // No local file or current image catalog participates in historical reconstruction.
-        $contract = ReleaseContract::capture(
+        return ReleaseContract::capture(
             $release,
             $instance,
             ['process' => 120.0, 'cleanup' => 120.0, 'backend' => 3600.0],
             ['release' => 'verified-retained-images-and-source', 'budgets' => 'bounded-conversion-policy'],
             $this->store,
         )->toArray();
-        return ReleaseContract::fromArray($contract)->toArray();
     }
 
     /** @param array<string,mixed> $image
@@ -162,8 +159,7 @@ final readonly class RetainedState
         $dockerfile = $source . '/Dockerfile';
         PrivateDirectory::assertNoSymlinks($dockerfile);
         $content = is_file($dockerfile) ? file_get_contents($dockerfile) : false;
-        // Old images predate the layout label: require literal agreeing source evidence, not today's defaults.
-        if ($content === false || preg_match('/^WORKDIR\\s+' . preg_quote($root, '/') . '\\s*$/m', $content) !== 1
+        if ($content === false || !$this->sourceProvesLayout($content, $root)
             || !is_file($source . '/bin/console')) {
             throw new WorkflowError('Historical source does not prove the retained image application layout.');
         }
@@ -173,6 +169,22 @@ final readonly class RetainedState
             }
         }
         return $layout;
+    }
+
+    private function sourceProvesLayout(string $content, string $root): bool
+    {
+        if (preg_match('/^WORKDIR\\s+' . preg_quote($root, '/') . '\\s*$/m', $content) === 1) {
+            return true;
+        }
+        if (preg_match_all('/\\bAPP_HOME(?:[ \\t]*=|[ \\t]+)/', $content) !== 1
+            || preg_match('/^ARG[ \\t]+APP_HOME\\b/m', $content) === 1
+            || preg_match('/^ENV[ \\t]+APP_HOME=' . preg_quote($root, '/') . '(?:[ \\t]+\\\\)?[ \\t]*$/m', $content, $declaration, PREG_OFFSET_CAPTURE) !== 1
+            || preg_match('/^WORKDIR[ \\t]+\\$\\{APP_HOME\\}[ \\t]*$/m', $content, $workdir, PREG_OFFSET_CAPTURE) !== 1
+            || $declaration[0][1] >= $workdir[0][1]) {
+            return false;
+        }
+        $instructions = substr($content, $declaration[0][1], $workdir[0][1] - $declaration[0][1]);
+        return preg_match('/^FROM[ \\t]/mi', $instructions) !== 1;
     }
 
     private function gateway(): void

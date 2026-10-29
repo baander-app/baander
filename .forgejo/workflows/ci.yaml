@@ -222,6 +222,8 @@ jobs:
             -   name: PHP tooling regressions
                 run: |
                     docker run --rm --network none "$CI_IMAGE" \
+                      composer check:tooling-architecture
+                    docker run --rm --network none "$CI_IMAGE" \
                       composer check:tooling-format
                     docker run --rm --network none -e XDEBUG_MODE=off "$CI_IMAGE" \
                       php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist --exclude-group registry-python-subject

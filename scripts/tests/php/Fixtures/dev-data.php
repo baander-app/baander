@@ -9,8 +9,6 @@ use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/development-command-executor.php';
-
 final class DevDataRunner extends DevelopmentCommandExecutor
 {
     /** @var list<array{arguments:non-empty-list<string>,input:?string,env:?array<string,string>,timeout:?float,check:bool}> */

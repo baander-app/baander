@@ -13,8 +13,11 @@ final class WorkerLegacyRuntimeTest extends TestCase
     {
         $directory = sys_get_temp_dir() . '/baander-legacy-runtime-' . bin2hex(random_bytes(8));
         mkdir($directory . '/bin', 0700, true);
-        copy(__DIR__ . '/Fixtures/worker-legacy-runtime-docker.php', $directory . '/bin/docker');
-        copy(__DIR__ . '/Fixtures/worker-resource-state.php', $directory . '/bin/worker-resource-state.php');
+        file_put_contents($directory . '/bin/docker', str_replace(
+            "dirname(__DIR__, 4) . '/vendor/autoload.php'",
+            var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true),
+            file_get_contents(__DIR__ . '/Fixtures/worker-legacy-runtime-docker.php'),
+        ));
         chmod($directory . '/bin/docker', 0700);
         $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         try {

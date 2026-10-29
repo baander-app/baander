@@ -6,6 +6,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY docker/build-tooling-php.sh /tmp/build-tooling-php.sh
 RUN sh /tmp/build-tooling-php.sh
 
+FROM composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc AS inventory-loader
+WORKDIR /tooling
+COPY composer.json composer.lock ./
+COPY tools ./tools
+COPY tests/Support ./tests/Support
+RUN composer install --no-dev --no-interaction --no-scripts --no-plugins --classmap-authoritative --ignore-platform-req=php
+
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake ninja-build curl ca-certificates perl pkg-config \
@@ -28,9 +35,8 @@ RUN cmake -S . -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
       -DOPENSSL_ROOT_DIR=/opt/openssl -DOPENSSL_USE_STATIC_LIBS=TRUE \
     && cmake --build /build --parallel 2
 COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
-COPY tools/packaged_inventory.php /tools/packaged_inventory.php
-COPY tools/inventory /tools/inventory
-RUN php /tools/packaged_inventory.php capture-api --build /build --output /build/api-build.json
+COPY --from=inventory-loader /tooling /tooling
+RUN php /tooling/tools/packaged_inventory.php capture-api --build /build --output /build/api-build.json
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libstdc++6 && rm -rf /var/lib/apt/lists/* \
@@ -47,11 +53,10 @@ CMD ["--config", "/etc/baander-registry/config.json"]
 
 FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory
 COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
-COPY tools/packaged_inventory.php /tools/packaged_inventory.php
-COPY tools/inventory /tools/inventory
+COPY --from=inventory-loader /tooling /tooling
 COPY third_party/inventory /resolutions
 COPY --from=runtime-base / /rootfs/
-RUN php /tools/packaged_inventory.php generate --kind api --root /rootfs \
+RUN php /tooling/tools/packaged_inventory.php generate --kind api --root /rootfs \
     --resolutions /resolutions --output /out
 
 FROM runtime-base AS runtime

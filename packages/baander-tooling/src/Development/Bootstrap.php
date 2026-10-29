@@ -459,7 +459,7 @@ CODE;
         return $transferred;
     }
 
-    /** Persist data-volume ownership before creation; an incomplete extraction is never reset automatically.
+    /**
      * @param array<string,mixed> $instance
      * @param array<string,mixed> $release
      */

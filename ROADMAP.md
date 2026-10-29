@@ -278,6 +278,47 @@ normalization are recorded above. U11 delivery, live worker/cgroup/operator
 qualification, final CI-image and preview acceptance, and final code review remain
 open.
 
+Boundary and integration checkpoint (U11), 2026-10-29: the tooling Deptrac
+and source-policy gates now run through Composer and CI. The policy checks raw
+process/Docker calls, manual loaders, image/layout literals and obsolete helpers;
+callsite exceptions have reasons and fail when their source anchors become stale.
+Composer consumers replace manual loading, and the obsolete Development Runner
+and Docker helpers are removed. Standalone relay inventory verification owns its
+Docker resources and cleanup receipts; the public registry-image wrapper supplies
+resolved transport and finite budgets. Guides and CI use the current contracts.
+
+Host gate/inventory verification passes 54 tests and 384 assertions; source policy
+passes 32 tests and 100 assertions; the public CLI passes two tests and 28
+assertions. Full tooling static analysis passes across 380 files. Deptrac reports
+zero violations, errors or warnings, with 4,029 allowed and 321 external uncovered
+dependencies. Loader integration initially had five failures across 73 tests and
+490 assertions. After executable fixture copies were repaired, the web follow-up
+passes eight tests and 41 assertions; the full loader aggregate remains unverified.
+The application-build contract passes eight host tests and 32 assertions.
+
+Five-lens simplification of U6–U8 applied one quality change and five comment
+changes; follow-up verification passes 10 tests and 176 assertions and three-file
+static analysis. U11 simplification applied one efficiency change and seven comment
+changes in two groups; source policy, two-file static analysis and style checks
+pass. The full 942-test CI-image run exceeded Composer's 300-second timeout before
+completion and reported two PHP-path fixture failures, since repaired on the host.
+Its retry, final CI-image and live preview acceptance, worker and relay
+qualification, and independent code review remain open.
+
+Live acceptance follow-up: DNS and web runtime qualification pass in the rebuilt CI
+image. Retained-state recovery exposed a valid historical Dockerfile form that the
+converter rejected: a literal APP_HOME environment value followed by a variable
+WORKDIR. The converter now accepts that observed form while rejecting ambiguous
+declarations; 17 retained-state tests and 190 assertions, scoped static analysis
+and formatting pass. Worker scenario deadlines now use their selected catalog
+budget, with a separate 2,000-second autoscaling aggregate and configurable profile
+budgets. The budget regression group passes 14 tests and 42 assertions, and the combined
+configuration/resources/cleanup group passes 55 tests and 305 assertions. Integrated
+host checks pass 76 tests and 372 assertions, full tooling static analysis, and
+formatting across 383 files. Deptrac reports 4,066 allowed dependencies, 326
+external uncovered dependencies and zero violations, warnings or errors. Full CI
+and live acceptance remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

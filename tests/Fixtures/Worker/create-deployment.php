@@ -55,23 +55,44 @@ try {
     $recipesFor = static function (string $boot) use ($namespace, $daemon, $arguments, $runtime, $ipcVolume, $sleeper, $appHome): array {
         $recipes = [];
         foreach (DeploymentUnit::cases() as $unit) {
-            $recipes[$unit->value] = new DeploymentContainerRecipe($namespace, $boot, $daemon, $arguments[3],
-                ['/usr/local/bin/php', '-r', $sleeper], 'none', 64 * 1024 * 1024, 1_000_000_000, 32,
-                $unit, [$unit === DeploymentUnit::Control ? 0 : 1], $ipcVolume, $appHome, $runtime);
+            $recipes[$unit->value] = new DeploymentContainerRecipe(
+                $namespace,
+                $boot,
+                $daemon,
+                $arguments[3],
+                ['/usr/local/bin/php', '-r', $sleeper],
+                'none',
+                64 * 1024 * 1024,
+                1_000_000_000,
+                32,
+                $unit,
+                [$unit === DeploymentUnit::Control ? 0 : 1],
+                $ipcVolume,
+                $appHome,
+                $runtime,
+            );
         }
         return $recipes;
     };
     $reserve = static function (string $boot, array $recipes) use ($inventory, $namespace, $daemon): void {
-        if (!$inventory->reserveBoot($namespace, $boot, hash('sha256', $boot), $daemon,
-            $recipes['control']->fingerprint(), $recipes['execution']->fingerprint())) {
+        if (!$inventory->reserveBoot(
+            $namespace,
+            $boot,
+            hash('sha256', $boot),
+            $daemon,
+            $recipes['control']->fingerprint(),
+            $recipes['execution']->fingerprint(),
+        )) {
             throw new RuntimeException('Could not reserve the fixed deployment pair.');
         }
     };
     $start = static function ($binding, $recipe) use ($inventory, $command, $observer): bool {
         return (new RegisteredDeploymentStart($inventory, static function (array $args) use ($command, $observer, $binding): string {
             if ($args === ['container', 'start', $binding->containerId]) {
-                $committed = $observer->fetchOne('SELECT count(*) FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND container_id = :container AND start_claimed_at IS NOT NULL',
-                    ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'unit' => $binding->unit->value, 'container' => $binding->containerId]);
+                $committed = $observer->fetchOne(
+                    'SELECT count(*) FROM worker_deployment_containers WHERE namespace = :namespace AND boot_id = :boot AND unit = :unit AND container_id = :container AND start_claimed_at IS NOT NULL',
+                    ['namespace' => $binding->namespace, 'boot' => $binding->bootId, 'unit' => $binding->unit->value, 'container' => $binding->containerId],
+                );
                 if ((int) $committed !== 1) {
                     throw new RuntimeException('Docker startup preceded the committed unit claim.');
                 }
@@ -100,7 +121,9 @@ try {
         $uncertainCreator->create($recipes['control']);
         throw new LogicException('Lost create reply unexpectedly bound a unit.');
     } catch (RuntimeException $error) {
-        if ($error !== $lostReply) { throw $error; }
+        if ($error !== $lostReply) {
+            throw $error;
+        }
     }
     try {
         $uncertainCreator->create($recipes['control']);
@@ -111,26 +134,45 @@ try {
         throw new RuntimeException('Lost reply failed to preserve one irreversible create claim.');
     }
     $original = $recipes['control'];
-    $different = new DeploymentContainerRecipe($namespace, $boot, $daemon, $original->imageId,
-        $original->command, $original->network, $original->memoryBytes + 16 * 1024 * 1024,
-        $original->nanoCpus, $original->pidsLimit, $original->unit, $original->cpuSet, $ipcVolume, $appHome, $runtime);
+    $different = new DeploymentContainerRecipe(
+        $namespace,
+        $boot,
+        $daemon,
+        $original->imageId,
+        $original->command,
+        $original->network,
+        $original->memoryBytes + 16 * 1024 * 1024,
+        $original->nanoCpus,
+        $original->pidsLimit,
+        $original->unit,
+        $original->cpuSet,
+        $ipcVolume,
+        $appHome,
+        $runtime,
+    );
     try {
         $creator->reconcile($different);
         throw new LogicException('A changed recipe reconciled the reserved unit.');
     } catch (RuntimeException) {
     }
     $control = $creator->reconcile($recipes['control']);
-    if ($control->containerId !== $ownedIds[0]) { throw new RuntimeException('Reconciliation changed immutable ID.'); }
+    if ($control->containerId !== $ownedIds[0]) {
+        throw new RuntimeException('Reconciliation changed immutable ID.');
+    }
     $execution = $creator->create($recipes['execution']);
     $ownedIds[] = $execution->containerId;
     foreach ([$control, $execution] as $binding) {
         if (trim($command->execute(['container', 'inspect', '--format', '{{.State.Status}} {{.State.Pid}}', $binding->containerId])) !== 'created 0') {
             throw new RuntimeException('Create/reconciliation started a unit automatically.');
         }
-        if (!$start($binding, $recipes[$binding->unit->value])) { throw new RuntimeException('Registered unit start denied.'); }
+        if (!$start($binding, $recipes[$binding->unit->value])) {
+            throw new RuntimeException('Registered unit start denied.');
+        }
         $startedPid = trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId]));
         try {
-            if ($start($binding, $recipes[$binding->unit->value])) { throw new LogicException('Repeated start admitted.'); }
+            if ($start($binding, $recipes[$binding->unit->value])) {
+                throw new LogicException('Repeated start admitted.');
+            }
         } catch (RuntimeException) {
         }
         if (trim($command->execute(['container', 'inspect', '--format', '{{.State.Pid}}', $binding->containerId])) !== $startedPid) {
@@ -143,13 +185,20 @@ try {
         throw new RuntimeException('Runtime configuration was not preserved literally.');
     }
     $lease = $leases->acquire($namespace, $boot, 60);
-    if ($lease === null || $lease->epoch !== 1) { throw new RuntimeException('Paired owner lease acquisition failed.'); }
+    if ($lease === null || $lease->epoch !== 1) {
+        throw new RuntimeException('Paired owner lease acquisition failed.');
+    }
     $connection->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second' WHERE namespace = :namespace", ['namespace' => $namespace]);
     $replacementBoot = bin2hex(random_bytes(16));
-    if ($leases->acquire($namespace, $replacementBoot, 60) !== null) { throw new RuntimeException('Expiry released paired ownership.'); }
+    if ($leases->acquire($namespace, $replacementBoot, 60) !== null) {
+        throw new RuntimeException('Expiry released paired ownership.');
+    }
     try {
-        (new DockerWorkerContainment($command->execute(...), $recipes['control']))->retire($control->containerId,
-            new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $replacementBoot, 1), DeploymentUnit::Control);
+        (new DockerWorkerContainment($command->execute(...), $recipes['control']))->retire(
+            $control->containerId,
+            new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $replacementBoot, 1),
+            DeploymentUnit::Control,
+        );
         throw new LogicException('Wrong owner retired a live unit.');
     } catch (RuntimeException) {
     }
@@ -158,12 +207,16 @@ try {
     try {
         (new RegisteredDeploymentRecovery($inventory, $retirements, static function (array $args) use ($command, $lostRemoval): string {
             $result = $command->execute($args);
-            if (array_slice($args, 0, 3) === ['container', 'rm', '--force']) { throw $lostRemoval; }
+            if (array_slice($args, 0, 3) === ['container', 'rm', '--force']) {
+                throw $lostRemoval;
+            }
             return $result;
         }, $recipes))->recover($namespace, $boot);
         throw new LogicException('Lost removal reply completed root retirement.');
     } catch (RuntimeException $error) {
-        if ($error !== $lostRemoval) { throw $error; }
+        if ($error !== $lostRemoval) {
+            throw $error;
+        }
     }
     $pending = (new DoctrineDeploymentInventory($observer))->findBoot($namespace, $boot);
     if ($pending === null || $pending->retired || $pending->execution->retirement?->completed !== false
@@ -177,9 +230,14 @@ try {
     }
     $replacementRecipes = $recipesFor($replacementBoot);
     $reserve($replacementBoot, $replacementRecipes);
-    foreach ($replacementRecipes as $recipe) { $binding = $creator->create($recipe); $ownedIds[] = $binding->containerId; }
+    foreach ($replacementRecipes as $recipe) {
+        $binding = $creator->create($recipe);
+        $ownedIds[] = $binding->containerId;
+    }
     $replacementControl = $inventory->findUnit($namespace, $replacementBoot, DeploymentUnit::Control);
-    if ($replacementControl === null || !$start($replacementControl, $replacementRecipes['control'])) { throw new RuntimeException('Replacement control start failed.'); }
+    if ($replacementControl === null || !$start($replacementControl, $replacementRecipes['control'])) {
+        throw new RuntimeException('Replacement control start failed.');
+    }
     $replacement = $leases->acquire($namespace, $replacementBoot, 60);
     if ($replacement === null || $replacement->epoch !== 2 || $leases->renew($lease, 60)) {
         throw new RuntimeException('Joint containment did not advance epoch or fence stale lease operations.');
@@ -190,7 +248,11 @@ try {
         throw new RuntimeException('Delayed old-boot retirement changed active successor ownership or epoch.');
     }
     foreach ([$control, $execution] as $binding) {
-        try { $command->execute(['container', 'start', $binding->containerId]); throw new LogicException('Removed unit restarted.'); } catch (RuntimeException) {}
+        try {
+            $command->execute(['container', 'start', $binding->containerId]);
+            throw new LogicException('Removed unit restarted.');
+        } catch (RuntimeException) {
+        }
     }
     if (!(new RegisteredDeploymentRecovery($inventory, $retirements, $command->execute(...), $replacementRecipes))->recover($namespace, $replacementBoot)) {
         throw new RuntimeException('Replacement with never-started execution could not retire.');
@@ -206,9 +268,15 @@ try {
     echo "PASS: interrupted execution removal preserves control/root; joint immutable-ID containment advances epoch; old IDs/tokens stay fenced; never-started and never-created units retire\n";
 } finally {
     foreach ($ownedIds as $ownedId) {
-        try { $command->execute(['container', 'rm', '--force', $ownedId]); } catch (RuntimeException) {}
+        try {
+            $command->execute(['container', 'rm', '--force', $ownedId]);
+        } catch (RuntimeException) {
+        }
     }
-    try { $command->execute(['volume', 'rm', $ipcVolume]); } catch (RuntimeException) {}
+    try {
+        $command->execute(['volume', 'rm', $ipcVolume]);
+    } catch (RuntimeException) {
+    }
     $observer->close();
     $connection->executeStatement('SET search_path TO public');
     $connection->executeStatement('DROP SCHEMA ' . $schema . ' CASCADE');

@@ -14,8 +14,6 @@ use Baander\Tooling\Process\ProcessRunner;
 use Baander\Tooling\Process\ProcessSpec;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 final class DevelopmentCliTest extends TestCase
 {
     private string $directory;

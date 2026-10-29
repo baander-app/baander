@@ -17,8 +17,11 @@ final class WorkerResourceTest extends TestCase
     {
         $directory = sys_get_temp_dir() . '/baander-worker-resource-' . bin2hex(random_bytes(8));
         mkdir($directory . '/bin', 0700, true);
-        copy(__DIR__ . '/Fixtures/worker-resource-docker.php', $directory . '/bin/docker');
-        copy(__DIR__ . '/Fixtures/worker-resource-state.php', $directory . '/bin/worker-resource-state.php');
+        file_put_contents($directory . '/bin/docker', str_replace(
+            "dirname(__DIR__, 4) . '/vendor/autoload.php'",
+            var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true),
+            file_get_contents(__DIR__ . '/Fixtures/worker-resource-docker.php'),
+        ));
         chmod($directory . '/bin/docker', 0755);
         $previousPath = getenv('PATH');
         $previousArtifacts = getenv('BAANDER_TEST_ARTIFACTS');

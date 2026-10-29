@@ -13,7 +13,7 @@ $state['calls'][] = $arguments;
 $mode = $state['mode'];
 if ($arguments[0] === 'create' || (in_array($arguments[0], ['network', 'volume'], true) && ($arguments[1] ?? '') === 'create') || $arguments[0] === 'build') {
     $kind = match ($arguments[0]) {
-        'create' => 'container', 'build' => 'image', default => $arguments[0]
+        'create' => 'container', 'build' => 'image', default => $arguments[0],
     };
     $name = match ($kind) {
         'container' => $arguments[array_search('--name', $arguments, true) + 1],

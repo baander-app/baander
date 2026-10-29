@@ -16,8 +16,6 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 
-require_once __DIR__ . '/Fixtures/development-command-executor.php';
-
 #[AllowMockObjectsWithoutExpectations]
 final class DevelopmentUpdatesTest extends TestCase
 {
