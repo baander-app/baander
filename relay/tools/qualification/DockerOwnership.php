@@ -186,7 +186,13 @@ final class DockerOwnership
                 || ($kind === 'network' && preg_match('/^(?:Error response from daemon: )?network ' . $escaped . ' not found$/Di', trim($result['stderr'])) === 1)
                 || ($kind === 'volume' && preg_match('/^(?:Error response from daemon: )?get ' . $escaped . ': no such volume$/Di', trim($result['stderr'])) === 1);
             Runtime::requireThat($result['code'] === 1 && $missing, 'Cannot prove relay resource absence: ' . $result['stderr']);
-            $listing = $this->raw([$kind, 'ls', ...($kind === 'container' ? ['--all', '--no-trunc'] : ($kind === 'network' ? ['--no-trunc'] : [])), '--format', '{{json .}}'], null, $seconds);
+            // Docker's full JSON formatter requests filesystem sizes and can fail on unrelated container snapshots.
+            $format = match ($kind) {
+                'container' => '{"ID":{{json .ID}},"Names":{{json .Names}}}',
+                'network' => '{"ID":{{json .ID}},"Name":{{json .Name}}}',
+                default => '{"Name":{{json .Name}}}',
+            };
+            $listing = $this->raw([$kind, 'ls', ...($kind === 'container' ? ['--all', '--no-trunc'] : ($kind === 'network' ? ['--no-trunc'] : [])), '--format', $format], null, $seconds);
             Runtime::requireThat($listing['code'] === 0, 'Cannot enumerate relay resources to prove absence.');
             foreach (explode("\n", trim($listing['stdout'])) as $line) {
                 if ($line === '') {

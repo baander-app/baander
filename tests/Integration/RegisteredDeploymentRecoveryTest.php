@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Application\DTO\DeploymentUnit;
-
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
@@ -331,7 +330,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
 
     private function recipe(DeploymentUnit $unit, string $ipcVolume = 'worker-ipc'): \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe
     {
-        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], $ipcVolume);
+        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], $ipcVolume, '/app');
     }
 
     /** @return array{control:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe,execution:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe} */

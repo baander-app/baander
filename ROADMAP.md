@@ -319,6 +319,57 @@ formatting across 383 files. Deptrac reports 4,066 allowed dependencies, 326
 external uncovered dependencies and zero violations, warnings or errors. Full CI
 and live acceptance remain open.
 
+Integration repair checkpoint, 2026-10-29: acceptance polling now uses the shared
+signal owner. Its eight tests and 53 assertions pass with displayed warnings
+enabled. Composer fixture helpers now load lazily as classes; vendor-only consumers
+and the affected web/worker fixtures pass 30 tests and 105 assertions. A missed
+worker-recipe test consumer now supplies its explicit application root. Docker
+client fixtures use the executing PHP binary; 14 tests and 56 assertions pass.
+
+Recovery failures return accepted attempts to blocked state without replacing the
+primary error; 22 activation/update tests and 142 assertions pass. Worker validation
+runs as the image user, while the trusted controller has read access to retained
+Composer files. Validation precedes resource creation; bounded inputs and creation
+intent precede admission, and IPC cleanup uses the shared ledger. The worker group
+passes 49 cases and 141 assertions with six live-image cases still gated; a loader
+follow-up passes 13 tests and 43 assertions.
+
+Cleanup now enumerates resource identities without asking Docker for filesystem
+sizes of unrelated containers. Both ownership implementations pass 18 tests and
+101 assertions; the new relay success case also passes with the shared executor.
+Three retained cleanup receipts from live checks were reconciled after this fix.
+The CI-image repair subset passes 53 tests and 396 assertions, and the unchanged
+Python-subject boundary passes two tests and two assertions. These are focused
+results; the full CI aggregate remains open.
+
+Live DNS, web runtime, security, shutdown, outbox, producer and worker-containment
+checks pass. Messaging passes 165 tests and 2,488 assertions in the CI image. The
+retained blocked preview recovered to ready with its workers ready and data kept.
+Its current-source refresh, configured-library/browser checks, worker and registry
+qualification, alternate-layout checks and final independent review remain open.
+
+Qualification repair checkpoint, 2026-10-29: source discovery now works from
+source archives and linked worktrees; 32 tests and 73 assertions pass, with one
+skip requiring clang-tidy 19. Private operator diagnostics pass five tests and
+41 assertions. Real read-only filesystem probes confirm that temporary-file and
+directory creation fail without writable temporary storage and succeed with a
+private 16 MiB tmpfs at mode 0700; the operator regression passes two tests and
+17 assertions. Generated worker manifests pass the real production-recipe check:
+six tests and 78 assertions, with cleanup verified.
+
+The previous full CI run failed with 942 tests, 4,604 assertions, 16 errors, two
+failures, one warning and seven skips. Its three root causes have scoped fixes;
+those follow-ups do not establish a passing aggregate. The v5 CI image
+`sha256:76ae97dc04286e70bbbf28eab8755fdf51438b584c07d8b1d92719e6e5b3ae09`
+is running the full suite. Current tooling static analysis passes across 384 files,
+and formatting passes across 385 files. Five-lens simplification of the latest
+diff applied two comment changes; reuse, quality, efficiency and test review
+required no changes.
+
+Preview shutdown now succeeds, but its saved blocked phase still requires
+recovery before changing media configuration. Final CI results, preview and
+remaining live qualification, and independent code review remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

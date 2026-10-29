@@ -26,8 +26,7 @@ final class DockerClientTest extends TestCase
         mkdir($this->root, 0700);
         file_put_contents($this->root . '/endpoint', 'unix:///selected.sock');
         file_put_contents($this->root . '/id', 'selected-daemon');
-        file_put_contents($this->root . '/docker', <<<'CLI'
-#!/usr/bin/php
+        file_put_contents($this->root . '/docker', '#!' . PHP_BINARY . "\n" . <<<'CLI'
 <?php
 $args = array_slice($argv, 1);
 file_put_contents(getenv('FAKE_ROOT') . '/calls', json_encode([$args, getenv('DOCKER_CONTEXT'), getenv('DOCKER_HOST'), getenv('DOCKER_CONFIG')]) . "\n", FILE_APPEND);

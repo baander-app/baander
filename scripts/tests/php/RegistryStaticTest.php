@@ -41,7 +41,7 @@ final class RegistryStaticTest extends TestCase
         putenv('PATH=' . $this->work);
         try {
             try {
-                StaticQualification::run(dirname(__DIR__, 3));
+                StaticQualification::run($this->work);
                 self::fail('Missing executable must fail qualification.');
             } catch (RuntimeException $failure) {
                 self::assertStringContainsString('Missing required executable:', $failure->getMessage());

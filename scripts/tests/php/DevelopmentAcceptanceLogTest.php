@@ -30,7 +30,7 @@ final class DevelopmentAcceptanceLogTest extends TestCase
     /** @return non-empty-list<string> */
     private function child(string $mode, string ...$arguments): array
     {
-        return [PHP_BINARY, __DIR__ . '/Fixtures/acceptance-command.php', $mode, ...$arguments];
+        return [PHP_BINARY, '-d', 'display_errors=1', '-d', 'error_reporting=-1', __DIR__ . '/Fixtures/acceptance-command.php', $mode, ...$arguments];
     }
 
     public function testCommandReturnsMergedOutputAndRetainsPrivateLog(): void
@@ -87,6 +87,13 @@ final class DevelopmentAcceptanceLogTest extends TestCase
         self::assertSame(4194304, filesize($logs[0]));
     }
 
+    public function testPausePreservesSharedSignalOwnershipUntilTheExecutorCloses(): void
+    {
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec($this->child('pause-ownership-driver', $this->root), timeout: 4, processGroup: true));
+        self::assertSame('signal-ownership-intact', $result->stdout);
+        self::assertSame('', $result->stderr);
+    }
+
     public function testParentSignalStopsOwnedSilentChildAndRetainsLog(): void
     {
         $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec($this->child('signal-driver', $this->root), timeout: 6, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy([0]));
@@ -126,30 +133,17 @@ final class DevelopmentAcceptanceLogTest extends TestCase
     #[DataProvider('pollingSignals')]
     public function testPollingSignalReachesTheOuterFailureHandler(string $signal): void
     {
-        $code = <<<'PHP_CODE'
-            require $argv[1];
-            $root = $argv[2];
-            $signal = constant($argv[3]);
-            $commands = new Baander\Tooling\Development\Acceptance\Commands($root, $root . '/logs', new Baander\Tooling\Process\EngineExecutor(new Baander\Tooling\Process\ExecutionContext(getenv())), getenv());
-            Swoole\Timer::after(25, static function () use ($signal): void {
-                Swoole\Process::kill(getmypid(), $signal);
-            });
-            try {
-                $commands->pause(500000);
-            } catch (Throwable $error) {
-                file_put_contents($root . '/failure-preserved', $error->getMessage());
-                $timers = Swoole\Timer::stats()['num'];
-                $commands->pause(10000);
-                echo json_encode(['message' => $error->getMessage(), 'timers' => $timers], JSON_THROW_ON_ERROR);
-                exit(1);
-            }
-            exit(2);
-            PHP_CODE;
-        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec([PHP_BINARY, '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $this->root, $signal], timeout: 4, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy(null));
-        self::assertSame(1, $result->exitCode, $result->stderr);
+        $result = $this->executor->run(new \Baander\Tooling\Process\ProcessSpec($this->child('polling-signal-driver', $this->root, $signal), timeout: 4, processGroup: true), new \Baander\Tooling\Process\CompletionPolicy(null));
+        $status = 128 + constant($signal);
+        self::assertSame($status, $result->exitCode, $result->stderr);
         self::assertFalse($result->timedOut);
         $report = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame('Qualification cancelled by ' . $signal . '.', $report['message']);
+        self::assertSame('Execution interrupted.', $report['message']);
+        self::assertSame($status, $report['status']);
+        self::assertSame($status, $report['repeatedStatus']);
+        self::assertSame('cleaned', $report['cleanup']);
+        self::assertSame('complete', file_get_contents($this->root . '/cleanup-finished'));
+        self::assertSame('', $result->stderr);
         self::assertSame(0, $report['timers']);
         self::assertSame($report['message'], file_get_contents($this->root . '/failure-preserved'));
     }

@@ -440,11 +440,13 @@ class Updater
     {
         new RetainedState($this->store, $this->runner, $this->environment)->convert($identity);
         $lock = $this->store->lock($identity);
+        $recovering = false;
         try {
             $instance = $this->store->load($identity);
             if ($instance === null || ($instance['phase'] ?? null) !== 'blocked' || empty($instance['prepared_release'])) {
                 throw new WorkflowError('Recovery requires a blocked attempt with retained release artifacts.');
             }
+            $recovering = true;
             $release = $instance['prepared_release'];
             ReleaseContract::fromArray($release)->validateInputs($instance);
             $instance['media'] = $release['effective']['media'];
@@ -485,13 +487,7 @@ class Updater
                 throw new WorkflowError('Database reconciliation is still required. Preserve the checkpoint; no migration or reset was attempted.');
             }
             if ($adopting || empty($instance['database_mutation_started'])) {
-                try {
-                    $this->activate($instance, $release);
-                } catch (\Throwable $error) {
-                    $current = $this->required($identity);
-                    $this->save($current, ['phase' => 'blocked', 'failure' => 'Recovery was not confirmed; retain the saved attempt and checkpoint.']);
-                    throw $error;
-                }
+                $this->activate($instance, $release);
                 return;
             }
             $this->save($instance, ['migration_hashes' => $catalog['migration_hashes']]);
@@ -500,6 +496,15 @@ class Updater
                 $instance = array_replace($instance, $this->bootstrap->initialize($instance, $release));
             }
             $this->startRelease($instance, $release);
+        } catch (\Throwable $error) {
+            if ($recovering) {
+                try {
+                    $current = $this->required($identity);
+                    $this->save($current, ['phase' => 'blocked', 'failure' => 'Recovery was not confirmed; retain the saved attempt and checkpoint.']);
+                } catch (\Throwable) {
+                }
+            }
+            throw $error;
         } finally {
             $lock->release();
         }

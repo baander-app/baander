@@ -162,10 +162,6 @@
     },
     "classmap": [
       "scripts/tests/php/"
-    ],
-    "files": [
-      "scripts/tests/php/Fixtures/WebDockerState.php",
-      "scripts/tests/php/Fixtures/worker-resource-state.php"
     ]
   },
   "config": {

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
-use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, ProcessResult, CompletionPolicy};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Resources\{ResourceKind, ResourceLedger};
 
 class Workers
 {
@@ -51,6 +52,7 @@ class Workers
         ], $this->connections->environment(), $cleanupSeconds)->stdout
             |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
         $mounts = [];
+        $sharedVolumes = [];
         foreach ($instance['media'] ?? [] as $item) {
             $mounts[] = [
                 'source' => \Baander\Tooling\Filesystem\Paths::resolvedPath($item['source']),
@@ -92,13 +94,7 @@ class Workers
                 throw new WorkflowError('Worker shared ' . $key . ' requires a named volume; relocate adopted bind storage before enabling workers.');
             }
             $name = $configuration['volumes'][$configured['source']]['name'];
-            $docker->run([
-                'volume',
-                'create',
-                '--label',
-                'app.baander.development.owner=' . $instance['id'],
-                $name,
-            ]);
+            $sharedVolumes[] = $name;
             $mounts[] = [
                 'volume' => $name,
                 'target' => $target,
@@ -107,50 +103,6 @@ class Workers
             ];
         }
         $ipc = $instance['project'] . '-ipc-' . $boot;
-        $instance['workers'] = [
-            'directory' => $directory,
-            'operator_image' => $release['images']['operator_image']['resolvedId'],
-            'layout' => $release['layout'],
-            'socket' => substr($endpoint, strlen('unix://')),
-            'phase' => 'preparing',
-            'boot_id' => $boot,
-            'ipc_volume' => $ipc,
-            'cleanup_budget' => $cleanupSeconds,
-        ];
-        $this->store->save($instance['id'], $instance);
-        $docker->run([
-            'volume',
-            'create',
-            '--label',
-            'app.baander.development.owner=' . $instance['id'],
-            $ipc,
-        ]);
-        $initializeIpc = <<<'CODE'
-$directory = '/run/baander-worker';
-$user = posix_getpwnam('www-data');
-if ($user === false || !chmod($directory, 0700)
-    || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }
-CODE;
-        \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
-            '--network',
-            'none',
-            '--read-only',
-            '--user',
-            '0',
-            '--cap-drop',
-            'ALL',
-            '--cap-add',
-            'CHOWN',
-            '--security-opt',
-            'no-new-privileges',
-            '--mount',
-            'type=volume,src=' . $ipc . ',dst=/run/baander-worker,volume-nocopy',
-            '--entrypoint',
-            'php',
-            $release['images']['worker_image']['resolvedId'],
-            '-r',
-            $initializeIpc,
-        ], $this->connections->environment(), $cleanupSeconds);
         $manifest = [
             'version' => 5,
             'sourceMountPolicy' => 'local-development',
@@ -214,7 +166,7 @@ CODE;
             '--network',
             'none',
             '--user',
-            '0',
+            'www-data',
             '--cap-drop',
             'ALL',
             '--security-opt',
@@ -232,7 +184,10 @@ $document = json_decode($input, true, 16, JSON_THROW_ON_ERROR);
 $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson(json_encode($document['manifest'], JSON_THROW_ON_ERROR), $argv[1]);
 $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment($document['environment']);
 foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manifest->recipe($unit, $environment); }
-} catch (Throwable) { exit(1); }
+} catch (Throwable $error) {
+    fwrite(STDERR, get_class($error) . ': ' . $error->getMessage() . "\n" . $error->getFile() . ':' . $error->getLine() . "\n");
+    exit(1);
+}
 CODE;
         $payload = json_encode(
             ['manifest' => $manifest, 'environment' => $credentials['runtimeEnvironment']],
@@ -243,14 +198,10 @@ CODE;
         }
         $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $release['images']['operator_image']['resolvedId'], '-r', $validator, $home], $this->connections->environment(), $cleanupSeconds, input: $payload, check: false);
         if ($result->exitCode !== 0) {
-            throw new WorkflowError('Worker shared storage or runtime configuration is invalid; remove overlapping media paths and reconcile adopted storage before enabling workers.');
+            $log = $directory . '/validation.log';
+            $recorded = $this->writeDiagnostic($log, $result, json_encode($credentials, JSON_THROW_ON_ERROR));
+            throw new WorkflowError('Worker validation failed' . ($recorded ? '; inspect ' . $log . '.' : '.'));
         }
-        $docker->run([
-            'image',
-            'tag',
-            $release['images']['operator_image']['resolvedId'],
-            'baander-development-controller:' . $instance['project'] . '-' . $boot,
-        ]);
         AtomicFile::writeJson($directory . '/manifest.json', $manifest);
         AtomicFile::writeJson($directory . '/credentials.json', $credentials);
         $instance['workers'] = [
@@ -258,12 +209,59 @@ CODE;
             'operator_image' => $release['images']['operator_image']['resolvedId'],
             'layout' => $release['layout'],
             'socket' => substr($endpoint, strlen('unix://')),
-            'phase' => 'prepared',
-            'cleanup_budget' => $cleanupSeconds,
+            'phase' => 'preparing',
             'boot_id' => $boot,
             'ipc_volume' => $ipc,
+            'cleanup_budget' => $cleanupSeconds,
+            'preparation' => [
+                'version' => 1,
+                'manifest' => hash_file('sha256', $directory . '/manifest.json'),
+                'credentials' => hash_file('sha256', $directory . '/credentials.json'),
+                'worker_image' => $release['images']['worker_image']['resolvedId'],
+            ],
         ];
         $this->store->save($instance['id'], $instance);
+        foreach ($sharedVolumes as $name) {
+            $docker->run(['volume', 'create', '--label', 'app.baander.development.owner=' . $instance['id'], $name]);
+        }
+        new ResourceLedger($directory . '/ipc-resources.json', $docker, $this->connections->environment())->create(
+            ResourceKind::Volume,
+            $ipc,
+            ['--label', 'app.baander.development.owner=' . $instance['id']],
+        );
+        $initializeIpc = <<<'CODE'
+$directory = '/run/baander-worker';
+$user = posix_getpwnam('www-data');
+if ($user === false || !chmod($directory, 0700)
+    || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }
+CODE;
+        \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
+            '--network',
+            'none',
+            '--read-only',
+            '--user',
+            '0',
+            '--cap-drop',
+            'ALL',
+            '--cap-add',
+            'CHOWN',
+            '--security-opt',
+            'no-new-privileges',
+            '--mount',
+            'type=volume,src=' . $ipc . ',dst=/run/baander-worker,volume-nocopy',
+            '--entrypoint',
+            'php',
+            $release['images']['worker_image']['resolvedId'],
+            '-r',
+            $initializeIpc,
+        ], $this->connections->environment(), $cleanupSeconds);
+        $docker->run([
+            'image',
+            'tag',
+            $release['images']['operator_image']['resolvedId'],
+            'baander-development-controller:' . $instance['project'] . '-' . $boot,
+        ]);
+        $this->phase($instance, 'prepared');
     }
 
     /** @param array<string,mixed> $manifest
@@ -335,9 +333,16 @@ CODE;
     public function invoke(array $instance, string $action): array
     {
         $record = $instance['workers'];
+        if ($action === 'create' && isset($record['preparation'])) {
+            $saved = $this->store->load($instance['id'])['workers'] ?? [];
+            if (($saved['phase'] ?? null) !== 'create_unconfirmed' || ($saved['boot_id'] ?? null) !== $record['boot_id']) {
+                throw new WorkflowError('Worker admission requires durable creation intent for this boot.');
+            }
+        }
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
-        // Preserve the daemon socket's existing SELinux label in the trusted controller.
+        // The trusted controller needs read access to retained Composer trees owned by www-data.
+        // Preserve the daemon socket's existing SELinux label.
         $arguments = [
             '-i',
             '--network',
@@ -346,6 +351,8 @@ CODE;
             '0',
             '--cap-drop',
             'ALL',
+            '--cap-add',
+            'DAC_READ_SEARCH',
             '--security-opt',
             'no-new-privileges',
             '--security-opt',
@@ -356,11 +363,16 @@ CODE;
             'type=bind,src=' . $record['socket'] . ',dst=/var/run/docker.sock',
             '--tmpfs',
             '/operator:rw,noexec,nosuid,size=1m,mode=0700',
+            '--tmpfs',
+            '/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700',
         ];
         $documents = [];
         foreach (['manifest', 'credentials'] as $name) {
-            $contents = file_get_contents($record['directory'] . '/' . $name . '.json', length: 8193);
-            if ($contents === false || strlen($contents) > 8192) {
+            $contents = @file_get_contents($record['directory'] . '/' . $name . '.json', length: 8193);
+            if ($contents === false) {
+                throw new WorkflowError('Worker operator inputs are missing or unreadable; preserve the saved ownership record.');
+            }
+            if (strlen($contents) > 8192) {
                 throw new WorkflowError('Worker operator input exceeds its bounded file size.');
             }
             $documents[$name] = $contents;
@@ -425,10 +437,35 @@ CODE;
             }
             return $response['result'];
         } catch (\Throwable $error) {
+            $log = $record['directory'] . '/operator-' . hash('sha256', $action) . '.log';
+            $recorded = $this->writeDiagnostic($log, $result, $documents['credentials']);
             throw new WorkflowError(
-                'Worker ' . $action . ' was not confirmed; inspect status and use explicit recovery.',
+                'Worker ' . $action . ' was not confirmed; inspect ' . ($recorded ? $log : 'status') . ' and use explicit recovery.',
                 previous: $error,
             );
+        }
+    }
+
+    private function writeDiagnostic(string $path, ProcessResult $result, string $credentials): bool
+    {
+        try {
+            $document = json_decode($credentials, true, flags: JSON_THROW_ON_ERROR);
+            if (!is_array($document)) {
+                return false;
+            }
+            $values = [];
+            array_walk_recursive($document, static function (mixed $value) use (&$values): void {
+                if (is_string($value) && $value !== '') {
+                    $values[] = $value;
+                    $values[] = substr(json_encode($value, JSON_THROW_ON_ERROR), 1, -1);
+                }
+            });
+            $redactions = array_fill_keys($values, '[redacted]');
+            $streams = array_map(static fn(string $stream): string => substr(strtr($stream, $redactions), 0, 32700), [$result->stdout, $result->stderr]);
+            AtomicFile::write($path, 'Exit status: ' . $result->exitCode . "\nStdout:\n" . $streams[0] . "\nStderr:\n" . $streams[1]);
+            return true;
+        } catch (\Throwable) {
+            return false;
         }
     }
 
@@ -531,9 +568,83 @@ CODE;
     }
 
     /** @param array<string,mixed> $instance */
+    private function retireUnadmitted(array &$instance): void
+    {
+        $record = $instance['workers'];
+        $proof = $record['preparation'];
+        $directory = $record['directory'];
+        if (($proof['version'] ?? null) !== 1
+            || preg_match('/^[a-f0-9]{32}$/D', $record['boot_id']) !== 1
+            || $record['ipc_volume'] !== $instance['project'] . '-ipc-' . $record['boot_id']
+            || $directory !== $this->store->directory($instance['id']) . '/workers/' . $record['boot_id']) {
+            throw new WorkflowError('Worker preparation ownership is not verified; preserve its inputs.');
+        }
+        foreach (['manifest', 'credentials'] as $name) {
+            $path = $directory . '/' . $name . '.json';
+            PrivateDirectory::assertNoSymlinks($path);
+            if (!is_file($path) || ($proof[$name] ?? null) !== hash_file('sha256', $path)) {
+                throw new WorkflowError('Worker preparation inputs changed; preserve its ownership record.');
+            }
+        }
+        $manifest = AtomicFile::readJson($directory . '/manifest.json');
+        if (($manifest['namespace'] ?? null) !== $instance['project']
+            || ($manifest['bootId'] ?? null) !== $record['boot_id']
+            || ($manifest['daemonId'] ?? null) !== $instance['docker']['daemonId']
+            || ($manifest['imageId'] ?? null) !== ($proof['worker_image'] ?? null)
+            || ($manifest['ipcVolume'] ?? null) !== $record['ipc_volume']) {
+            throw new WorkflowError('Worker preparation identity differs from its verified inputs.');
+        }
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
+        if (trim($docker->run(['ps', '-aq', '--filter', 'label=app.baander.worker.namespace=' . $manifest['namespace'],
+            '--filter', 'label=app.baander.worker.boot-id=' . $manifest['bootId']])->stdout) !== '') {
+            throw new WorkflowError('Unadmitted worker containers require investigation before preparation cleanup.');
+        }
+        $this->cleanupIpc($instance);
+        $this->phase($instance, 'retired');
+    }
+
+    /** @param array<string,mixed> $instance */
+    private function cleanupIpc(array $instance): void
+    {
+        $record = $instance['workers'];
+        $deadline = hrtime(true) / 1e9 + ($record['cleanup_budget'] ?? 120.0);
+        foreach (['ipc-initialize-resources.json', 'ipc-resources.json'] as $name) {
+            $path = $record['directory'] . '/' . $name;
+            PrivateDirectory::assertNoSymlinks($path);
+            if (!file_exists($path)) {
+                continue;
+            }
+            $receipt = AtomicFile::readJson($path);
+            if (!Connections::sameTarget($receipt['target'] ?? [], $instance['docker'])) {
+                throw new WorkflowError('Worker IPC ownership differs from the saved Docker target.');
+            }
+            if ($name === 'ipc-resources.json') {
+                foreach ($receipt['resources'] as $resource) {
+                    if ($resource['kind'] !== 'volume' || $resource['name'] !== $record['ipc_volume']) {
+                        throw new WorkflowError('Worker IPC receipt includes unrelated resources; preserve it for investigation.');
+                    }
+                }
+            }
+            $remaining = $deadline - hrtime(true) / 1e9;
+            if ($remaining <= 0) {
+                throw new WorkflowError('Worker IPC cleanup exhausted its shared budget; preserve the remaining receipts.');
+            }
+            $cleanup = ResourceLedger::recover($path, $this->connections->environment(), $remaining);
+            if (!$cleanup->successful()) {
+                throw new WorkflowError($cleanup->message());
+            }
+        }
+    }
+
+    /** @param array<string,mixed> $instance */
     public function retire(array &$instance): void
     {
         if (empty($instance['workers']) || ($instance['workers']['phase'] ?? null) === 'retired') {
+            return;
+        }
+        if (in_array($instance['workers']['phase'] ?? null, ['preparing', 'prepared'], true) && isset($instance['workers']['preparation'])) {
+            $this->retireUnadmitted($instance);
             return;
         }
         $this->phase($instance, 'retirement_unconfirmed');
@@ -565,6 +676,7 @@ CODE;
                 |> trim(...)) !== '') {
                 throw new WorkflowError('Unregistered worker containers require explicit investigation before cleanup.');
             }
+            $this->cleanupIpc($instance);
             $this->phase($instance, 'retired');
             return;
         }
@@ -572,6 +684,7 @@ CODE;
         if (($result['state'] ?? null) !== 'retired') {
             throw new WorkflowError('Worker retirement was not confirmed; the instance remains blocked.');
         }
+        $this->cleanupIpc($instance);
         $this->phase($instance, 'retired');
     }
 }

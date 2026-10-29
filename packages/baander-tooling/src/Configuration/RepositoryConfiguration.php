@@ -13,6 +13,9 @@ final class RepositoryConfiguration
     {
         $path = $root . '/dev.local.json';
         if (!file_exists($path)) {
+            if (!file_exists($root . '/.git')) {
+                return null;
+            }
             $metadata = $runner->run(new ProcessSpec(['git', 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'], cwd: $root, processGroup: true), new CompletionPolicy(null));
             $directories = explode("\n", trim($metadata->stdout));
             if ($metadata->exitCode !== 0 || count($directories) !== 2 || $directories[0] === $directories[1]) {

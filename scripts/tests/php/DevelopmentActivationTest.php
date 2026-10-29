@@ -19,6 +19,7 @@ use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Inventory\Collector;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DevelopmentActivationTest extends TestCase
 {
@@ -279,6 +280,82 @@ final class DevelopmentActivationTest extends TestCase
         self::assertSame('ready', $saved['phase']);
         self::assertSame('new', $saved['running_revision']);
         self::assertSame(['Version.php' => 'confirmed'], $saved['migration_hashes']);
+    }
+
+    /** @return iterable<string,array{bool,bool}> */
+    public static function failedRecoveries(): iterable
+    {
+        yield 'confirmed mutation' => [true, false];
+        yield 'activation before mutation' => [false, false];
+        yield 'confirmed mutation with failed recording' => [true, true];
+        yield 'activation with failed recording' => [false, true];
+    }
+
+    #[DataProvider('failedRecoveries')]
+    public function testFailedRecoveryRetainsArtifactsAndOriginalErrorAndReleasesLock(bool $mutated, bool $recordingFails): void
+    {
+        $checkpoint = ['directory' => '/checkpoint/retained', 'verified' => true];
+        $this->store->save('persistent', array_replace($this->instance, [
+            'phase' => 'blocked', 'prepared_release' => $this->new,
+            'database_mutation_started' => $mutated, 'checkpoint' => $checkpoint,
+        ]));
+        if ($recordingFails) {
+            $updater = $this->getMockBuilder(Updater::class)
+                ->setConstructorArgs([$this->store, new DevelopmentCommandExecutor()])->onlyMethods(['save'])->getMock();
+            foreach (['runtime', 'gateway', 'database', 'bootstrap', 'workers', 'libraries'] as $property) {
+                $updater->{$property} = $this->updater->{$property};
+            }
+            $updater->expects(self::atLeastOnce())->method('save')->willReturnCallback(function (array &$instance, array $values): void {
+                if (($values['phase'] ?? null) === 'blocked') {
+                    throw new WorkflowError('Recovery recording failed.');
+                }
+                $instance = array_replace($instance, $values);
+                $this->store->save($instance['id'], $instance);
+            });
+            $this->updater = $updater;
+        }
+        $database = $this->createMock(Database::class);
+        $database->method('inspect')->willReturn(['fresh' => false, 'pending' => [], 'migration_hashes' => ['confirmed']]);
+        $database->expects(self::never())->method('migrate');
+        $this->updater->database = $database;
+        $failure = new WorkflowError('Worker preparation failed.');
+        $workers = $this->createMock(Workers::class);
+        $workers->expects(self::once())->method('prepare')->willThrowException($failure);
+        $workers->expects(self::never())->method('start');
+        $this->updater->workers = $workers;
+        try {
+            $this->updater->recover('persistent');
+            self::fail('Recovery unexpectedly succeeded.');
+        } catch (WorkflowError $error) {
+            self::assertSame($failure, $error);
+        }
+        $saved = $this->store->load('persistent');
+        if (!$recordingFails) {
+            self::assertSame('blocked', $saved['phase']);
+        }
+        self::assertSame($checkpoint, $saved['checkpoint']);
+        foreach (['revision', 'source', 'sourceDigest', 'sourceIdentity', 'inputs'] as $field) {
+            self::assertEquals($this->new[$field], $saved['prepared_release'][$field]);
+        }
+        self::assertSame($mutated, $saved['database_mutation_started']);
+        $lock = $this->store->lock('persistent', blocking: false);
+        $lock->release();
+    }
+
+    public function testRecoveryRejectsInvalidAttemptWithoutChangingItsState(): void
+    {
+        $path = $this->store->directory('persistent') . '/state.json';
+        foreach (['ready', 'blocked'] as $phase) {
+            $this->store->save('persistent', array_replace($this->instance, ['phase' => $phase]));
+            $original = file_get_contents($path);
+            try {
+                $this->updater->recover('persistent');
+                self::fail('Invalid instance was accepted for recovery.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('Recovery requires a blocked attempt', $error->getMessage());
+            }
+            self::assertSame($original, file_get_contents($path));
+        }
     }
 
     public function testDownRetainsInterruptedEvidenceAndBlocksFutureUpdate(): void

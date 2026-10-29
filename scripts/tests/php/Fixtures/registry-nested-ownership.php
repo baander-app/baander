@@ -37,4 +37,4 @@ try {
     fwrite(STDERR, $failure->getMessage() . "\n");
     exit($failure->getCode() ?: 1);
 }
-exit(99);
+exit($primary === 0 ? 0 : 99);

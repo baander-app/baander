@@ -43,6 +43,11 @@ if ($command === 'info') {
     }
     echo json_encode([$found]);
 } elseif (in_array($command, ['container', 'network', 'volume'], true) && ($arguments[1] ?? '') === 'ls') {
+    $format = $arguments[array_search('--format', $arguments, true) + 1];
+    if ($command === 'container' && is_file($state . '/snapshot-size-fails') && ($format === '{{json .}}' || str_contains($format, '.Size'))) {
+        fwrite(STDERR, 'snapshotter.Usage failed for unrelated container');
+        exit(7);
+    }
     if (is_file($state . '/list-fails')) {
         fwrite(STDERR, 'transport unavailable');
         exit(7);

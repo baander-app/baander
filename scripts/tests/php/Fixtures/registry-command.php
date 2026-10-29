@@ -102,6 +102,16 @@ if ($name === 'docker') {
             exit(1);
         }
         echo json_encode([$entry]);
+    } elseif (in_array($args[0] ?? '', ['container', 'network', 'volume'], true) && ($args[1] ?? '') === 'ls') {
+        $kind = $args[0];
+        $format = $args[array_search('--format', $args, true) + 1];
+        if ($kind === 'container' && getenv('STUB_FAIL') === 'container-snapshot-size' && ($format === '{{json .}}' || str_contains($format, '.Size'))) {
+            fwrite(STDERR, 'snapshotter.Usage failed for unrelated container');
+            exit(7);
+        }
+        foreach ($resources[$kind . 's'] as $entry) {
+            echo json_encode(['ID' => $entry['Id'], $kind === 'container' ? 'Names' : 'Name' => ltrim($entry['Name'], '/')]), "\n";
+        }
     } elseif (($args[0] ?? '') === 'image' && ($args[1] ?? '') === 'rm') {
         if (getenv('STUB_FAIL') === 'image-cleanup') {
             exit(8);

@@ -227,13 +227,65 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertStringNotContainsString($instance['workers']['directory'], $arguments);
         self::assertStringNotContainsString('secret', $arguments);
         self::assertStringContainsString('label=disable', $arguments);
-        self::assertStringNotContainsString('--cap-add', $arguments);
+        self::assertStringContainsString('--cap-drop ALL --cap-add DAC_READ_SEARCH', $arguments);
+        self::assertContains('--read-only', $creation['arguments']);
+        self::assertContains('/tmp:rw,noexec,nosuid,nodev,size=16m,mode=0700', $creation['arguments']);
         self::assertStringContainsString('mode=0700', $arguments);
         $documents = json_decode($call['input'], true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(['manifest', 'credentials'], array_keys($documents));
         self::assertSame(['private' => 'secret'], json_decode($documents['credentials'], true, flags: JSON_THROW_ON_ERROR));
         self::assertSame([], glob($this->root . '/resource-*.json'));
         self::assertSame([], glob($instance['workers']['directory'] . '/*-resources.json'));
+    }
+
+    /** @return iterable<string,array{bool}> */
+    public static function operatorDiagnosticDestinations(): iterable
+    {
+        yield 'private diagnostic' => [true];
+        yield 'unwritable diagnostic' => [false];
+    }
+
+    #[DataProvider('operatorDiagnosticDestinations')]
+    public function testOperatorFailureRetainsBoundedRedactedOutputAndPrimaryError(bool $writable): void
+    {
+        $instance = $this->workerInstance();
+        $database = 'postgresql://baander:private-password@database.baander.app/worker';
+        AtomicFile::writeJson($instance['workers']['directory'] . '/credentials.json', [
+            'controllerDatabaseUrl' => $database,
+            'runtimeEnvironment' => ['APP_SECRET' => 'runtime-private', 'DATABASE_URL' => $database],
+        ]);
+        $log = $instance['workers']['directory'] . '/operator-' . hash('sha256', 'status') . '.log';
+        if (!$writable) {
+            mkdir($log);
+        }
+        $stdout = json_encode(['success' => false, 'message' => 'stdout-marker ' . $database . ' runtime-private ' . str_repeat('o', 40000)], JSON_THROW_ON_ERROR);
+        $runner = $this->runner(static fn(array $arguments): string|\Baander\Tooling\Process\ProcessResult => in_array('info', $arguments, true)
+            ? '{"ID":"daemon"}'
+            : new \Baander\Tooling\Process\ProcessResult(7, null, false, false, $stdout, 'stderr-marker ' . $database . ' runtime-private', 0));
+        try {
+            new Workers($this->store, $runner)->invoke($instance, 'status');
+            self::fail('Failed operator was accepted.');
+        } catch (WorkflowError $error) {
+            $primary = $error->getPrevious();
+            self::assertNotNull($primary);
+            self::assertSame('Unconfirmed operator result', $primary->getMessage());
+            self::assertSame(7, $primary->getCode());
+            self::assertSame(7, $error->getCode());
+            if ($writable) {
+                self::assertStringContainsString($log, $error->getMessage());
+            }
+        }
+        if ($writable) {
+            self::assertFileExists($log);
+            self::assertSame(0600, fileperms($log) & 0777);
+            self::assertLessThanOrEqual(65536, filesize($log));
+            $output = file_get_contents($log);
+            self::assertStringContainsString('stdout-marker', $output);
+            self::assertStringContainsString('stderr-marker', $output);
+            self::assertStringContainsString('[redacted]', $output);
+            self::assertStringNotContainsString('runtime-private', $output);
+            self::assertStringNotContainsString('private-password', $output);
+        }
     }
 
     public function testMissingSavedSourceDoesNotPreventObservationButStillBlocksCreation(): void
@@ -393,9 +445,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             'STREAM_URL_HMAC_SECRET' => 'instance-stream-secret',
         ];
     }
-    private function preparationRunner(bool $reject = false): WorkerCommandExecutor
+    private function preparationRunner(bool $reject = false, bool $failInitialization = false): WorkerCommandExecutor
     {
-        return $this->runner(static function (array $arguments) use ($reject): string|\Baander\Tooling\Process\ProcessResult {
+        return $this->runner(static function (array $arguments) use ($reject, $failInitialization): string|\Baander\Tooling\Process\ProcessResult {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon","NCPU":2,"MemTotal":17179869184}';
             }
@@ -403,7 +455,13 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 return '[{"Endpoints":{"docker":{"Host":"unix:///var/run/docker.sock"}}}]';
             }
             if ($reject && in_array('-i', $arguments, true)) {
-                return DevDataRunner::result('', 1);
+                return new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'validator rejected worker-parser-test', 0);
+            }
+            if ($failInitialization && in_array('CHOWN', $arguments, true)) {
+                return new \Baander\Tooling\Process\ProcessResult(1, null, false, false, '', 'IPC initialization failed', 0);
+            }
+            if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {
+                return $arguments[array_key_last($arguments)];
             }
             return '{}';
         });
@@ -422,6 +480,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $runner = $this->preparationRunner();
         new Workers($this->store, $runner)->prepare($this->instance, $this->release);
         $manifest = AtomicFile::readJson($this->instance['workers']['directory'] . '/manifest.json');
+        $validation = array_find($runner->calls, static fn(array $call): bool => in_array('-i', $call['arguments'], true));
+        self::assertSame('www-data', $validation['arguments'][array_search('--user', $validation['arguments'], true) + 1]);
+        self::assertNotContains('--cap-add', $validation['arguments']);
         $source = array_find($manifest['mediaMounts'], static fn(array $mount): bool => $mount['target'] === '/storage/media');
         self::assertSame(
             [
@@ -450,7 +511,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         ));
         self::assertSame(0700, fileperms($this->instance['workers']['directory']) & 0777);
         self::assertSame([], glob($this->root . '/resource-*.json'));
-        self::assertSame([], glob($this->instance['workers']['directory'] . '/*-resources.json'));
+        self::assertSame([$this->instance['workers']['directory'] . '/ipc-resources.json'], glob($this->instance['workers']['directory'] . '/*-resources.json'));
     }
 
     public function testDerivedBindIsRefusedBeforeSavingWorkerPointer(): void
@@ -466,20 +527,202 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertArrayNotHasKey('workers', $this->instance);
     }
 
-    public function testProductionValidationFailureRetainsPreparingOwnership(): void
+    public function testProductionValidationFailureDoesNotPublishWorkerOwnershipOrCreateVolumes(): void
+    {
+        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
+        $runner = $this->preparationRunner(true);
+        try {
+            new Workers($this->store, $runner)->prepare($this->instance, $this->release);
+            self::fail('Rejected manifest accepted');
+        } catch (WorkflowError $error) {
+            $logs = glob($this->store->directory('persistent') . '/workers/*/validation.log');
+            self::assertCount(1, $logs);
+            $log = $logs[0];
+            self::assertStringContainsString($log, $error->getMessage());
+            self::assertSame(0600, fileperms($log) & 0777);
+            self::assertStringContainsString('validator rejected [redacted]', file_get_contents($log));
+            self::assertStringNotContainsString('worker-parser-test', file_get_contents($log));
+        }
+        self::assertArrayNotHasKey('workers', $this->instance);
+        self::assertArrayNotHasKey('workers', $this->store->load('persistent') ?? []);
+        self::assertFalse(array_any($runner->calls, static fn(array $call): bool => array_slice($call['arguments'], 0, 2) === ['volume', 'create']));
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+    }
+
+    private function failIpcPreparation(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
         try {
-            new Workers($this->store, $this->preparationRunner(true))->prepare($this->instance, $this->release);
-            self::fail('Rejected manifest accepted');
+            new Workers($this->store, $this->preparationRunner(failInitialization: true))->prepare($this->instance, $this->release);
+            self::fail('IPC initialization failure was ignored.');
+        } catch (\Baander\Tooling\Process\CommandFailure $error) {
+            self::assertNotNull($error->result);
+            self::assertStringContainsString('IPC initialization failed', $error->result->stderr);
+        }
+    }
+
+    private function volumeCleanupFixture(string $token): string
+    {
+        $docker = $this->instance['docker']['executable'];
+        symlink(dirname(__DIR__, 3) . '/vendor', $this->root . '/vendor');
+        file_put_contents($docker, '#!' . PHP_BINARY . "\n<?php\n"
+            . '$arguments = array_slice($_SERVER["argv"], 3);' . "\n"
+            . 'if ($arguments[0] === "info") { echo \'{"ID":"daemon"}\'; exit; }' . "\n"
+            . 'putenv("WORKER_RESOURCE_COMMANDS=" . __DIR__ . "/cleanup-commands");' . "\n"
+            . 'require __DIR__ . "/vendor/autoload.php";' . "\n"
+            . '\\Baander\\Tooling\\Tests\\Fixtures\\WorkerResourceState::handle($arguments);' . "\n");
+        $volume = $this->instance['workers']['ipc_volume'];
+        $path = $this->root . '/resource-' . $volume . '.json';
+        AtomicFile::writeJson($path, ['Name' => $volume, 'Id' => $volume, 'kind' => 'volume', 'Labels' => ['org.baander.tooling.run' => $token]]);
+        return $path;
+    }
+
+    public function testFailedPreparationRetiresWithoutInvokingAnUnadmittedOperator(): void
+    {
+        $this->failIpcPreparation();
+        $directory = $this->instance['workers']['directory'];
+        self::assertFileExists($directory . '/manifest.json');
+        self::assertFileExists($directory . '/credentials.json');
+        $receipt = AtomicFile::readJson($directory . '/ipc-resources.json');
+        $volume = $this->volumeCleanupFixture($receipt['token']);
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('Unadmitted operator was invoked.'), $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : ''));
+        $workers->retire($this->instance);
+        self::assertSame('retired', $this->store->load('persistent')['workers']['phase']);
+        self::assertFileDoesNotExist($directory . '/ipc-resources.json');
+        self::assertFileDoesNotExist($volume);
+        self::assertFileExists($directory . '/manifest.json');
+    }
+
+    public function testPreparingCleanupPreservesVolumeWhoseOwnershipChanged(): void
+    {
+        $this->failIpcPreparation();
+        $volume = $this->volumeCleanupFixture('different-owner');
+        $workers = $this->lifecycle(static fn(): array => throw new WorkflowError('Unadmitted operator was invoked.'), $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : ''));
+        try {
+            $workers->retire($this->instance);
+            self::fail('Changed volume ownership was ignored.');
         } catch (WorkflowError $error) {
-            self::assertStringContainsString('overlapping media paths', $error->getMessage());
+            self::assertStringContainsString('ownership does not match', $error->getMessage());
         }
         self::assertSame('preparing', $this->instance['workers']['phase']);
-        self::assertEquals($this->instance['workers'], $this->store->load('persistent')['workers']);
-        self::assertStringContainsString('-ipc-', $this->instance['workers']['ipc_volume']);
-        self::assertSame([], glob($this->root . '/resource-*.json'));
-        self::assertSame([], glob($this->instance['workers']['directory'] . '/*-resources.json'));
+        self::assertFileExists($volume);
+        self::assertFileExists($this->instance['workers']['directory'] . '/ipc-resources.json');
+    }
+
+    public function testPreparingCleanupRefusesUnexpectedWorkerContainers(): void
+    {
+        $this->failIpcPreparation();
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : 'unexpected-worker');
+        try {
+            $this->lifecycle(static fn(): array => throw new WorkflowError('Unadmitted operator was invoked.'), $runner)->retire($this->instance);
+            self::fail('Unexpected workers were ignored.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('Unadmitted worker containers', $error->getMessage());
+        }
+        self::assertSame('preparing', $this->instance['workers']['phase']);
+        self::assertFileExists($this->instance['workers']['directory'] . '/ipc-resources.json');
+    }
+
+    public function testChangedPreparingInputsCannotAuthorizeCleanup(): void
+    {
+        $this->failIpcPreparation();
+        $path = $this->instance['workers']['directory'] . '/manifest.json';
+        AtomicFile::writeJson($path, ['bootId' => 'another-boot']);
+        $runner = $this->runner(static fn(): string => throw new WorkflowError('Cleanup must not reach Docker.'));
+        try {
+            $this->lifecycle(static fn(): array => throw new WorkflowError('Cleanup must not invoke operator.'), $runner)->retire($this->instance);
+            self::fail('Changed preparation evidence was accepted.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('preparation', $error->getMessage());
+        }
+        self::assertSame([], $runner->calls);
+        self::assertSame('preparing', $this->instance['workers']['phase']);
+        self::assertFileExists($this->instance['workers']['directory'] . '/ipc-resources.json');
+    }
+
+    public function testLegacyMissingInputsNeverAuthorizeLocalCleanup(): void
+    {
+        $instance = $this->workerInstance();
+        $instance['workers']['phase'] = 'preparing';
+        $directory = $instance['workers']['directory'];
+        unlink($directory . '/manifest.json');
+        AtomicFile::write($directory . '/ipc-resources.json', 'unproven legacy ownership');
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true)
+            ? '{"ID":"daemon"}'
+            : throw new WorkflowError('Docker mutation must not run without inputs.'));
+        try {
+            new Workers($this->store, $runner)->retire($instance);
+            self::fail('Missing legacy inputs were accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('inputs are missing or unreadable', $error->getMessage());
+        }
+        self::assertCount(1, $runner->calls);
+        self::assertContains('info', $runner->calls[0]['arguments']);
+        self::assertSame('unproven legacy ownership', file_get_contents($directory . '/ipc-resources.json'));
+    }
+
+    public function testUnadmittedBootRequiresDurableCreationIntentBeforeInvokingOperator(): void
+    {
+        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
+        new Workers($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $runner = $this->runner(static fn(): string => throw new WorkflowError('Unexpected Docker operation.'));
+        foreach (['prepared', 'memory-only intent', 'different saved boot'] as $case) {
+            if ($case !== 'prepared') {
+                $this->instance['workers']['phase'] = 'create_unconfirmed';
+            }
+            if ($case === 'different saved boot') {
+                $saved = $this->instance;
+                $saved['workers']['boot_id'] = str_repeat('f', 32);
+                $this->store->save('persistent', $saved);
+            }
+            try {
+                new Workers($this->store, $runner)->invoke($this->instance, 'create');
+                self::fail('Creation bypassed durable admission intent.');
+            } catch (WorkflowError $error) {
+                self::assertStringContainsString('durable creation intent', $error->getMessage());
+            }
+        }
+        self::assertSame([], $runner->calls);
+    }
+
+    public function testNewPreparedBootStartsThroughDurableAdmissionIntent(): void
+    {
+        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
+        new Workers($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true)
+            ? '{"ID":"daemon"}'
+            : json_encode(['success' => true, 'action' => $arguments[array_key_last($arguments)], 'result' => new \stdClass()], JSON_THROW_ON_ERROR));
+        new Workers($this->store, $runner)->start($this->instance);
+        self::assertSame('started', $this->store->load('persistent')['workers']['phase']);
+    }
+
+    /** @return iterable<string,array{bool}> */
+    public static function confirmedRetirements(): iterable
+    {
+        yield 'unregistered' => [false];
+        yield 'operator recovery' => [true];
+    }
+
+    #[DataProvider('confirmedRetirements')]
+    public function testConfirmedRetirementCleansOnlyOwnedIpc(bool $recover): void
+    {
+        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
+        new Workers($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $this->instance['workers']['phase'] = 'ready';
+        $receipt = $this->instance['workers']['directory'] . '/ipc-resources.json';
+        $volume = $this->volumeCleanupFixture(AtomicFile::readJson($receipt)['token']);
+        $status = ['namespace' => $this->instance['project'], 'bootId' => $this->instance['workers']['boot_id'],
+            'retirement' => $recover ? 'pending' : 'unregistered', 'reservation' => 'none', 'units' => []];
+        $actions = [];
+        $workers = $this->lifecycle(static function (array $instance, string $action) use ($status, &$actions): array {
+            $actions[] = $action;
+            return $action === 'status' ? $status : ['state' => 'retired'];
+        }, $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : ''));
+        $workers->retire($this->instance);
+        self::assertSame($recover ? ['status', 'recover'] : ['status'], $actions);
+        self::assertSame('retired', $this->instance['workers']['phase']);
+        self::assertFileDoesNotExist($receipt);
+        self::assertFileDoesNotExist($volume);
     }
 
     /** @return iterable<string,array{string}> */
@@ -642,7 +885,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                     \Baander\Tooling\Process\CompletionPolicy $policy = new \Baander\Tooling\Process\CompletionPolicy(),
                 ): \Baander\Tooling\Process\ProcessResult {
                     $arguments = array_slice($command->argv, $this->prefixLength);
-                    if (array_slice($arguments, 0, 2) === ['volume', 'create']) {
+                    if (array_slice($arguments, 0, 2) === ['volume', 'create']
+                        && !array_any($arguments, static fn(string $argument): bool => str_starts_with($argument, 'org.baander.tooling.run='))) {
                         $name = array_pop($arguments);
                         $id = $this->ledger->create(\Baander\Tooling\Resources\ResourceKind::Volume, $name, array_slice($arguments, 2));
                         return $policy->complete(new \Baander\Tooling\Process\ProcessResult(0, null, false, false, $id, '', 0), $command);
@@ -674,14 +918,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                         $workers->prepare($this->instance, $this->release);
                         self::fail('Unsafe production topology accepted');
                     } catch (WorkflowError $error) {
-                        self::assertStringContainsString($topology === 'overlap' ? 'overlapping media paths' : 'requires a named volume', $error->getMessage());
+                        self::assertStringContainsString($topology === 'overlap' ? 'Worker validation failed' : 'requires a named volume', $error->getMessage());
                     }
-                    if ($topology === 'overlap') {
-                        self::assertSame('preparing', $this->instance['workers']['phase']);
-                        self::assertSame($this->instance['workers'], $this->store->load('persistent')['workers']);
-                    } else {
-                        self::assertArrayNotHasKey('workers', $this->instance);
-                    }
+                    self::assertArrayNotHasKey('workers', $this->instance);
                     return;
                 }
                 $workers->prepare($this->instance, $this->release);
@@ -712,6 +951,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                     self::assertSame('unregistered', $status['retirement']);
                     self::assertSame('none', $status['reservation']);
                 }
+                $workers->retire($this->instance);
+                self::assertSame('retired', $this->instance['workers']['phase']);
+                self::assertFileDoesNotExist($directory . '/ipc-resources.json');
             }, $configuration->budgets->seconds('cleanup'));
         } catch (\Throwable $error) {
             $this->retainQualificationEvidence = file_exists($this->root . '/qualification-resources.json')

@@ -26,7 +26,7 @@ require dirname(__DIR__, 4) . '/vendor/autoload.php';
 if ($arguments[0] !== 'context') {
     array_splice($arguments, 0, 2);
 }
-webDockerState($arguments, getenv('WEB_RUNTIME_CALLS'));
+\Baander\Tooling\Tests\Fixtures\WebDockerState::handle($arguments, getenv('WEB_RUNTIME_CALLS'));
 $mode = getenv('WEB_RUNTIME_MODE');
 if ($arguments[0] === 'cp') {
     if ((fileperms($arguments[1]) & 0777) !== 0644 || (fileperms(dirname($arguments[1])) & 0777) !== 0700) {

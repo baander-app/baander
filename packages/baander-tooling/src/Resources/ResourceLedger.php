@@ -169,7 +169,13 @@ final class ResourceLedger
                 if ($byId) {
                     $arguments[] = '--no-trunc';
                 }
-                $listing = $docker->run([...$arguments, '--format', '{{json .}}'])->stdout;
+                // Docker's full JSON formatter requests filesystem sizes and can fail on unrelated container snapshots.
+                $format = match ($kind) {
+                    'container' => '{"ID":{{json .ID}},"Names":{{json .Names}}}',
+                    'network' => '{"ID":{{json .ID}},"Name":{{json .Name}}}',
+                    default => '{"Name":{{json .Name}}}',
+                };
+                $listing = $docker->run([...$arguments, '--format', $format])->stdout;
                 foreach (explode("\n", trim($listing)) as $line) {
                     if ($line === '') {
                         continue;

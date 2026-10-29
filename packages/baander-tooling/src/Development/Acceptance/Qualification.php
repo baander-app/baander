@@ -6,7 +6,7 @@ namespace Baander\Tooling\Development\Acceptance;
 
 use Baander\Tooling\Development\Database;
 use Baander\Tooling\Docker\{Client, Target};
-use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessSpec};
+use Baander\Tooling\Process\{EngineExecutor, CompletionPolicy, ProcessSpec};
 use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
@@ -36,7 +36,7 @@ final class Qualification
     /** @param array<string,string|bool> $args
      * @param array<string,string> $environment
      */
-    public function __construct(private readonly array $args, private readonly CommandExecutor $executor, private readonly Client $selectedDocker, private readonly array $environment)
+    public function __construct(private readonly array $args, private readonly EngineExecutor $executor, private readonly Client $selectedDocker, private readonly array $environment)
     {
         $this->source = dirname(__DIR__, 5);
         $this->workspace = Support::path((string) $args['workspace']);

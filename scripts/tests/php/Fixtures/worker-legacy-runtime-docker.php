@@ -13,7 +13,7 @@ file_put_contents(
     FILE_APPEND | LOCK_EX,
 );
 require dirname(__DIR__, 4) . '/vendor/autoload.php';
-workerResourceState($arguments);
+\Baander\Tooling\Tests\Fixtures\WorkerResourceState::handle($arguments);
 if (in_array('redis-cli', $arguments, true)) {
     echo 'PONG';
 }

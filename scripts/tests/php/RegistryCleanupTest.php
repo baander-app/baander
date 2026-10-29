@@ -6,6 +6,8 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Process\ProcessRunner;
 use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -56,6 +58,37 @@ PHP;
             } else {
                 copy($entry->getPathname(), $target);
             }
+        }
+    }
+
+    public function testNestedAbsenceEnumerationDoesNotMeasureUnrelatedContainerSnapshots(): void
+    {
+        $root = sys_get_temp_dir() . '/baander-registry-snapshot-' . bin2hex(random_bytes(8));
+        mkdir($root, 0700);
+        $foreign = ['Id' => str_repeat('c', 64), 'Name' => '/baander-unrelated', 'Config' => ['Labels' => []]];
+        file_put_contents($root . '/docker-state.json', json_encode(['containers' => ['baander-unrelated' => $foreign]], JSON_THROW_ON_ERROR));
+        $environment = array_replace(getenv(), [
+            'REGISTRY_TEST_STATE' => $root,
+            'STUB_FAIL' => 'container-snapshot-size',
+            'REGISTRY_NESTED_RECEIPT' => $root . '/nested-resources.json',
+        ]);
+        $executor = new EngineExecutor(ExecutionContext::bounded(20, $environment));
+        try {
+            $result = $executor->run(new ProcessSpec(
+                [PHP_BINARY, __DIR__ . '/Fixtures/registry-nested-ownership.php', $root, '0'],
+                processGroup: true,
+            ));
+            self::assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
+            self::assertFileDoesNotExist($root . '/nested-resources.json');
+            $state = json_decode(file_get_contents($root . '/docker-state.json'), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame(['baander-unrelated' => $foreign], $state['containers']);
+            self::assertSame([], $state['networks']);
+            self::assertSame([], $state['volumes']);
+            self::assertStringContainsString('container ls --all --no-trunc --format', file_get_contents($root . '/calls'));
+            self::assertStringNotContainsString('--filter', file_get_contents($root . '/calls'));
+        } finally {
+            $executor->close();
+            \Baander\Tooling\Inventory\Collector::remove($root);
         }
     }
 

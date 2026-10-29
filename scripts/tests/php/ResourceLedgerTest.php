@@ -108,6 +108,29 @@ final class ResourceLedgerTest extends TestCase
         self::assertFileDoesNotExist($this->directory . '/receipt.json');
     }
 
+    public function testAbsenceEnumerationDoesNotMeasureUnrelatedContainerSnapshots(): void
+    {
+        $ledger = $this->ledger();
+        $ledger->create(ResourceKind::Container, 'baander-test-owned', ['image']);
+        $foreign = ['Id' => str_repeat('b', 64), 'Name' => '/baander-unrelated', 'kind' => 'container', 'Config' => ['Labels' => []]];
+        file_put_contents($this->directory . '/resource-unrelated.json', json_encode($foreign, JSON_THROW_ON_ERROR));
+        touch($this->directory . '/snapshot-size-fails');
+
+        $report = $ledger->cleanup(10);
+
+        self::assertTrue($report->successful(), $report->message());
+        self::assertFileDoesNotExist($this->directory . '/resource.json');
+        self::assertFileDoesNotExist($this->directory . '/receipt.json');
+        self::assertSame($foreign, json_decode(file_get_contents($this->directory . '/resource-unrelated.json'), true, flags: JSON_THROW_ON_ERROR));
+        $calls = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($this->directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES));
+        $listings = array_filter($calls, static fn(array $call): bool => array_slice($call, 0, 2) === ['container', 'ls']);
+        self::assertNotEmpty($listings);
+        foreach ($listings as $listing) {
+            self::assertContains('--all', $listing);
+            self::assertNotContains('--filter', $listing);
+        }
+    }
+
     public function testCleanupHasItsOwnBudgetAfterOrdinaryDeadlineExpires(): void
     {
         $this->ledger()->create(ResourceKind::Container, 'baander-test-owned', ['image']);
