@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-28. This roadmap selects future work and records unresolved
+Updated: 2026-10-29. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -251,6 +251,26 @@ the old code and pass with the repair, including retained evidence, exit status
 and timer cleanup. The acceptance-log suite passes six tests and 40 assertions;
 focused PHPStan, formatting, five simplification reviews and independent code
 review pass. Full lifecycle acceptance remains open.
+
+Backend acceptance, 2026-10-28: full `make ci` passes 10,762 tests and 117,039
+assertions across four lanes, without failures, errors or skips. Composer validation
+and normalization, application PHPStan across 3,241 files, and Deptrac pass;
+Deptrac retains 484 baseline skips. Validated coverage is 60.93% of classes,
+77.43% of methods and 83.78% of lines. The representative 17-test, 52-assertion
+run matches the retained test identities, seed and coverage mode. Two actual
+coverage runs each pass ten tests and 24 assertions and match all executable and
+covered lines and denominators. Removing only the child Swoole loader produces
+the expected missing-native-constant failure during discovery; no selected native
+tests execute in that control. Host configuration, user-staged deletions and exact
+container, network and volume inventories remain unchanged.
+
+Tooling recovery, 2026-10-29: the host shutdown interrupts the final CI tooling run
+before its summary; its partial output is not a passing result. The stopped owned
+container is removed after preserving its logs. A focused run reproduces two stale
+web-runtime cleanup expectations. They now verify anonymous-volume removal and
+the complete owned container list; all eight tests and 38 assertions pass, with
+focused PHPStan, formatting and independent review clean. Final tooling suites
+and the actual worktree preview/browser check remain pending.
 
 ## Fixed product name
 

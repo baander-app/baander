@@ -87,9 +87,12 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertContains('--exclude=config/secrets/oauth', $tar);
         self::assertContains('--exclude=config/secrets/*.decrypt.private.php', $tar);
         self::assertContains('packages', $tar);
-        self::assertSame(['rm', '-f'], array_slice($commands[count($commands) - 2], 0, 2));
+        $id = $commands[count($commands) - 1][2];
+        self::assertSame(
+            ['rm', '-f', '-v', $id . '-app', $id . '-redis', $id . '-postgres'],
+            $commands[count($commands) - 2],
+        );
         self::assertSame(['network', 'rm'], array_slice($commands[count($commands) - 1], 0, 2));
-        self::assertCount(5, $commands[count($commands) - 2]);
         self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 0, 3) === ['stop', '-t', '1']));
         self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'pause'));
         self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'unpause'));
@@ -132,7 +135,11 @@ final class WebRuntimeWorkflowTest extends TestCase
         [$status, $output, $calls] = $this->runWorkflow('web', 'early-failure');
         self::assertSame(37, $status, $output);
         $commands = self::dockerCalls($calls);
-        self::assertCount(6, $commands[count($commands) - 2]);
+        $id = $commands[count($commands) - 1][2];
+        self::assertSame(
+            ['rm', '-f', '-v', $id . '-app', $id . '-mailpit', $id . '-redis', $id . '-postgres'],
+            $commands[count($commands) - 2],
+        );
         self::assertSame(['network', 'rm'], array_slice($commands[count($commands) - 1], 0, 2));
     }
 
