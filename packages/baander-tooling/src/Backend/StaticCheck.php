@@ -176,20 +176,41 @@ final class StaticCheck
         $configuration = ToolingConfiguration::resolve(flags: $context === null ? [] : ['docker' => ['context' => $context]], environment: $environment);
         $runner = new Runner();
         $directory = sys_get_temp_dir() . '/baander-check-' . bin2hex(random_bytes(12));
-        if (!mkdir($directory, 0700)) {
-            throw new WorkflowError('Cannot create static-check workspace.');
-        }
-        $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
-        $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $directory . '/transport'), $environment);
-        $ledger = new ResourceLedger($directory . '/resources.json', $docker, $environment);
+        $executor = null;
+        $ownsDirectory = false;
+        $primary = null;
+        $status = 0;
         try {
+            if (!mkdir($directory, 0700)) {
+                throw new WorkflowError('Cannot create static-check workspace.');
+            }
+            $ownsDirectory = true;
+            $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+            $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $directory . '/transport'), $environment);
+            $ledger = new ResourceLedger($directory . '/resources.json', $docker, $environment);
             [$source, $revision, $archive] = self::prepareCheckout($runner, $root, $directory);
-            $image ??= new ApplicationImage($docker)->build($source, 'ci', $revision, 'baander-check:' . $revision . '-' . basename($directory));
-            return self::runCheck($docker, $image, $archive, $command, ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json'), $ledger, $configuration->budgets->seconds('cleanup'));
+            $image ??= new ApplicationImage($docker, $configuration->images)->build($source, 'ci', $revision, 'baander-check:' . $revision . '-' . basename($directory));
+            $status = self::runCheck($docker, $image, $archive, $command, ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json'), $ledger, $configuration->budgets->seconds('cleanup'));
+            return $status;
+        } catch (\Throwable $error) {
+            $primary = $error;
+            throw $error;
         } finally {
-            $executor->close();
-            if (!file_exists($directory . '/resources.json') && !is_link($directory . '/resources.json')) {
-                $runner->run(['rm', '-rf', '--', $directory], check: false);
+            $errors = [];
+            try {
+                $executor?->close();
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            try {
+                if ($ownsDirectory && !file_exists($directory . '/resources.json') && !is_link($directory . '/resources.json')) {
+                    $runner->run(['rm', '-rf', '--', $directory], timeout: $configuration->budgets->seconds('cleanup'));
+                }
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            if ($errors !== []) {
+                throw new WorkflowError(($primary !== null ? $primary->getMessage() . '; ' : '') . 'Static-check staging cleanup failed: ' . implode('; ', $errors), $primary !== null ? ($primary->getCode() ?: 1) : ($status ?: 1), $primary);
             }
         }
     }

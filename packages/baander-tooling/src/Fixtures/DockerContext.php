@@ -69,6 +69,10 @@ final class DockerContext
         '.env',
         '.env.test',
         'docker/general/start-web.sh',
+        'docker/general/start-worker.sh',
+        'docker/general/start-operator.sh',
+        'packages/baander-tooling/resources/application-layout.json',
+        'packages/baander-tooling/resources/tooling-defaults.json',
     ];
 
     /** @param list<string> $arguments */

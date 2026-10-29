@@ -1,13 +1,16 @@
 ARG CI_IMAGE=baander-ci:local
 ARG TOOLING_IMAGE=baander-tooling:local
+ARG APP_HOME
 
 FROM ${CI_IMAGE} AS application
 FROM ${TOOLING_IMAGE}
+ARG APP_HOME
+RUN test -n "$APP_HOME"
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=application --chown=1000:1000 /var/www/html /app
+COPY --from=application --chown=1000:1000 ${APP_HOME} /app
 WORKDIR /app
 USER 1000:1000
 

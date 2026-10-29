@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development\Build;
 
+use Baander\Tooling\Build\BuildRequest;
+use Baander\Tooling\Configuration\{ApplicationLayout, ToolingConfiguration};
 use Baander\Tooling\Development\Docker;
 use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\StateStore;
@@ -12,7 +14,7 @@ use Baander\Tooling\Filesystem\PrivateDirectory;
 
 class Builder
 {
-    public function __construct(private readonly ?StateStore $store, private readonly Runner $runner) {}
+    public function __construct(private readonly ?StateStore $store, private readonly Runner $runner, private readonly ToolingConfiguration $configuration) {}
 
     /** @param array<string,mixed> $instance
      * @return array<string,mixed>
@@ -32,23 +34,29 @@ class Builder
         } else {
             $revision = Source::snapshotWorktree($this->runner, $instance['worktree'], $source);
         }
+        $layout = ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
         $instance['target_revision'] = $revision;
         $this->store->save($instance['id'], $instance);
-        $release = ['revision' => $revision, 'source' => $source];
+        $release = ['revision' => $revision, 'source' => $source, 'layout' => $layout->toArray()];
         $release['tool_image'] = $this->build($docker, $source, 'dev-tools', $revision);
         $this->frontend($docker, $source, $release['tool_image']);
         $release['app_image'] = $this->build($docker, $source, $instance['kind'] === 'persistent' ? 'production' : 'dev-runtime', $revision);
         $release['worker_image'] = $this->build($docker, $source, 'worker', $revision);
         $release['operator_image'] = $this->build($docker, $source, 'dev-operator', $revision);
-        $tag = 'baander-development-postgres:' . $revision . '-' . basename($source);
-        $docker->run(['build', '--file', $source . '/docker/postgres/Dockerfile', '--tag', $tag, $source . '/docker'], timeout: null, logPath: $builds . '/' . basename($source) . '-postgres.log');
-        $release['postgres_image'] = $this->imageId($docker, $tag);
-        foreach (['nginx_image' => 'nginx:stable-alpine', 'redis_image' => 'redis:7-alpine'] as $key => $tag) {
-            $docker->run(['pull', $tag], timeout: 300, logPath: $builds . '/' . basename($source) . '-' . $key . '.log');
-            $release[$key] = $this->imageId($docker, $tag);
-        }
-        foreach (['postgres_image', 'redis_image'] as $key) {
-            $release[$key] = $instance[$key] ?? $instance['release'][$key] ?? $release[$key];
+        foreach (['postgres_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
+            $selection = $this->configuration->images->role($role);
+            $retained = in_array($role, ['postgres', 'developmentRedis'], true) ? ($instance[$key] ?? $instance['release'][$key] ?? null) : null;
+            if ($retained !== null) {
+                $release[$key] = $retained;
+            } elseif ($role === 'postgres' && $this->configuration->provenance['images.postgres.reference'] === 'defaults') {
+                $tag = 'baander-development-postgres:' . $revision . '-' . basename($source);
+                $docker->run(['build', '--file', $source . '/docker/postgres/Dockerfile', '--tag', $tag, $source . '/docker'], timeout: null, logPath: $builds . '/' . basename($source) . '-postgres.log');
+                $release[$key] = $this->imageId($docker, $tag);
+            } else {
+                $docker->run(['pull', $selection->reference], timeout: 300, logPath: $builds . '/' . basename($source) . '-' . $key . '.log');
+                $release[$key] = $this->imageId($docker, $selection->reference);
+            }
+            $release['image_selections'][$key] = [...$selection->toArray(), 'id' => $release[$key], 'retained' => $retained !== null];
         }
         $release['image_pins'] = [];
         foreach ($release as $key => $image) {
@@ -69,8 +77,9 @@ class Builder
     public function build(Docker $docker, string $source, string $target, string $revision): string
     {
         $tag = 'baander-development-' . $target . ':' . $revision . '-' . basename($source);
-        $docker->run(['build', '--target', $target, '--build-arg', 'BAANDER_SOURCE_REVISION=' . $revision, '--tag', $tag, $source], timeout: null, logPath: dirname($source) . '/' . basename($source) . '-' . $target . '.log');
-        return $this->imageId($docker, $tag);
+        $request = BuildRequest::fromSource($source, $target, $revision, $tag, $this->configuration->images->role('operatorHelper'));
+        $docker->run($request->arguments, timeout: null, logPath: dirname($source) . '/' . basename($source) . '-' . $target . '.log');
+        return $request->imageId($docker->run(['image', 'inspect', $tag])->stdout);
     }
 
     public function frontend(Docker $docker, string $source, string $image): void

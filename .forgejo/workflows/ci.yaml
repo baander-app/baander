@@ -70,13 +70,11 @@ jobs:
 
             -   name: Build CI image
                 run: |
-                    docker buildx build \
-                      --target ci \
-                      -t "$CI_IMAGE" \
-                      --load \
-                      --cache-to=type=local,dest=/tmp/buildkit-cache,mode=max \
-                      --cache-from=type=local,src=/tmp/buildkit-cache \
-                      .
+                    php scripts/build-application.php --buildx \
+                      --target ci --revision "${{ forgejo.sha }}" \
+                      --tag "$CI_IMAGE" \
+                      --cache-to type=local,dest=/tmp/buildkit-cache,mode=max \
+                      --cache-from type=local,src=/tmp/buildkit-cache
 
             -   name: Xdebug runtime contract
                 run: BAANDER_TEST_IMAGE="$CI_IMAGE" bash scripts/test-dev-xdebug-container.sh
@@ -148,10 +146,10 @@ jobs:
 
             -   name: Build production worker image
                 run: |
-                    docker buildx build --target worker --load \
-                      --build-arg BAANDER_SOURCE_REVISION="${{ forgejo.sha }}" \
-                      -t "${CI_IMAGE}-worker" \
-                      --cache-from=type=local,src=/tmp/buildkit-cache .
+                    php scripts/build-application.php --buildx --target worker \
+                      --revision "${{ forgejo.sha }}" \
+                      --tag "${CI_IMAGE}-worker" \
+                      --cache-from type=local,src=/tmp/buildkit-cache
 
             -   name: Collect and verify worker packaged inventory
                 run: |
@@ -238,6 +236,7 @@ jobs:
                     docker build --target tooling --file docker/runner/Dockerfile \
                       --tag "$TOOLING_IMAGE" .
                     docker build --file docker/runner/tooling-test.Dockerfile \
+                      --build-arg APP_HOME="$(php -r 'require "scripts/bootstrap.php"; echo Baander\Tooling\Configuration\ApplicationLayout::load()->root;')" \
                       --build-arg CI_IMAGE="$CI_IMAGE" \
                       --build-arg TOOLING_IMAGE="$TOOLING_IMAGE" .
 
@@ -694,13 +693,11 @@ jobs:
 
             -   name: Build production image
                 run: |
-                    docker buildx build \
+                    php scripts/build-application.php --buildx \
                       --target production \
-                      --build-arg BAANDER_SOURCE_REVISION="${{ forgejo.sha }}" \
+                      --revision "${{ forgejo.sha }}" \
                       --tag "$REGISTRY/$IMAGE_NAME:${{ forgejo.sha }}" \
-                      --tag "$REGISTRY/$IMAGE_NAME:latest" \
-                      --load \
-                      .
+                      --tag "$REGISTRY/$IMAGE_NAME:latest"
 
             -   name: Collect and verify production packaged inventory
                 run: |

@@ -17,7 +17,6 @@ use Baander\Tooling\Runtime\Requirements;
 try {
     Requirements::check();
     $environment = getenv();
-    // Recovery's child owns the saved cleanup budget and must ignore current configuration.
     $context = ($_SERVER['argv'][1] ?? '') === 'cleanup-collection'
         ? new ExecutionContext($environment, ignoreCancellation: true)
         : ExecutionContext::bounded(ToolingConfiguration::resolve(environment: $environment)->budgets->seconds('backend'), $environment);

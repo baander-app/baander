@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -159,6 +160,7 @@ class Runtime
                 'image' => $release['nginx_image'],
                 'environment' => [
                     'SERVER_NAME' => $instance['hostname'],
+                    'APP_HOME' => isset($release['layout']) ? ApplicationLayout::fromArray($release['layout'])->root : ApplicationLayout::load()->root,
                     'GATEWAY_ADDRESS' => $instance['gateway']['ipv4_address'] ?? '',
                 ],
                 'volumes' => [

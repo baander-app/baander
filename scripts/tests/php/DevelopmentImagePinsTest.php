@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Build\Builder;
+use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
@@ -26,6 +27,8 @@ final class DevelopmentImagePinsTest extends TestCase
         $runner = new Runner();
         $runner->run(['git', 'init', '-b', 'master', $this->root . '/source']);
         file_put_contents($this->root . '/source/code.php', '<?php');
+        mkdir($this->root . '/source/packages/baander-tooling/resources', 0700, true);
+        file_put_contents($this->root . '/source/packages/baander-tooling/resources/application-layout.json', '{"version":1,"root":"/srv/baander"}');
         $this->runner = new ImageRecordingRunner();
         $store = new StateStore($this->root . '/state');
         $this->instance = [
@@ -36,7 +39,7 @@ final class DevelopmentImagePinsTest extends TestCase
             'docker' => ['executable' => '/fake/docker', 'context' => 'owned', 'daemon_id' => 'daemon'],
         ];
         $store->save($this->instance['id'], $this->instance);
-        $this->builder = new Builder($store, $this->runner);
+        $this->builder = new Builder($store, $this->runner, ToolingConfiguration::resolve(['images' => ['developmentRedis' => ['reference' => 'registry.baander.app/redis:new']]]));
     }
 
     protected function tearDown(): void
@@ -55,9 +58,9 @@ final class DevelopmentImagePinsTest extends TestCase
             self::assertContains(['/fake/docker', '--context', 'owned', 'image', 'tag', $first[$key], $pin], $this->runner->calls);
         }
         foreach ([$first, $second] as $release) {
-            $postgresTag = 'baander-development-postgres:' . $release['revision'] . '-' . basename($release['source']);
+            self::assertSame(['version' => 1, 'root' => '/srv/baander'], $release['layout']);
             self::assertContains(
-                ['/fake/docker', '--context', 'owned', 'image', 'inspect', '--format', '{{.Id}}', $postgresTag],
+                ['/fake/docker', '--context', 'owned', 'image', 'inspect', '--format', '{{.Id}}', 'baander-development-postgres:' . $release['revision'] . '-' . basename($release['source'])],
                 $this->runner->calls,
             );
         }
@@ -67,12 +70,33 @@ final class DevelopmentImagePinsTest extends TestCase
         ));
     }
 
+    public function testDefaultPostgresIsBuiltFromSelectedSourceInsteadOfPulled(): void
+    {
+        $release = $this->builder->prepare($this->instance);
+        self::assertTrue((bool) array_filter($this->runner->calls, static fn(array $args): bool => in_array($release['source'] . '/docker/postgres/Dockerfile', $args, true)));
+        self::assertNotContains(['/fake/docker', '--context', 'owned', 'pull', 'baander-database:latest'], $this->runner->calls);
+    }
+
+    public function testExplicitPostgresPreferencePullsTheSelectedSource(): void
+    {
+        $builder = new Builder(new StateStore($this->root . '/state'), $this->runner, ToolingConfiguration::resolve([
+            'images' => ['postgres' => ['reference' => 'registry.baander.app/postgres:qualification']],
+        ]));
+        $release = $builder->prepare($this->instance);
+        self::assertContains(['/fake/docker', '--context', 'owned', 'pull', 'registry.baander.app/postgres:qualification'], $this->runner->calls);
+        self::assertSame('registry.baander.app/postgres:qualification', $release['image_selections']['postgres_image']['reference']);
+        self::assertFalse((bool) array_filter($this->runner->calls, static fn(array $args): bool => in_array($release['source'] . '/docker/postgres/Dockerfile', $args, true)));
+    }
+
     public function testExistingStorageImagesOverrideNewBuildBeforePinning(): void
     {
         $this->instance['release'] = ['postgres_image' => 'previous-postgres', 'redis_image' => 'previous-redis'];
         $release = $this->builder->prepare($this->instance);
         self::assertSame('previous-postgres', $release['postgres_image']);
         self::assertSame('previous-redis', $release['redis_image']);
+        self::assertTrue($release['image_selections']['redis_image']['retained']);
+        self::assertNotContains(['/fake/docker', '--context', 'owned', 'pull', 'registry.baander.app/redis:new'], $this->runner->calls);
+        self::assertSame('registry.baander.app/redis:new', $release['image_selections']['redis_image']['reference']);
         $this->instance['postgres_image'] = 'adopted-postgres';
         $this->instance['redis_image'] = 'adopted-redis';
         $release = $this->builder->prepare($this->instance);
@@ -133,6 +157,12 @@ final class ImageRecordingRunner extends Runner
         $this->calls[] = $arguments;
         if ($this->interruptCreate && in_array('create', $arguments, true)) {
             throw new WorkflowError('Container creation confirmation lost');
+        }
+        if (in_array('image', $arguments, true) && in_array('inspect', $arguments, true) && !in_array('--format', $arguments, true)) {
+            return new ProcessResult(0, null, false, false, json_encode([[
+                'Id' => 'sha256:' . hash('sha256', implode(' ', $arguments)),
+                'Config' => ['Env' => ['APP_HOME=/srv/baander'], 'WorkingDir' => '/srv/baander', 'Labels' => ['org.baander.application-layout' => '{"version":1,"root":"/srv/baander"}']],
+            ]], JSON_THROW_ON_ERROR), '', 0);
         }
         $output = in_array('info', $arguments, true) ? '{"ID":"daemon"}' : (in_array('{{.State.ExitCode}}', $arguments, true) ? $this->frontendExit : 'sha256:' . hash('sha256', implode(' ', $arguments)));
         return new ProcessResult(0, null, false, false, $output, '', 0);

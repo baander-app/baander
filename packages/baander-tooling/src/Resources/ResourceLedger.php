@@ -68,7 +68,7 @@ final class ResourceLedger
         }
         Target::fromArray($state['target']);
         foreach ($state['resources'] as $resource) {
-            if (!is_array($resource) || !in_array($resource['kind'] ?? null, ['container', 'volume', 'network'], true)
+            if (!is_array($resource) || !in_array($resource['kind'] ?? null, array_column(ResourceKind::cases(), 'value'), true)
                 || !is_string($resource['name'] ?? null) || preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/D', $resource['name']) !== 1
                 || !array_key_exists('id', $resource) || ($resource['id'] !== null && !is_string($resource['id']))) {
                 throw new \RuntimeException('Invalid resource ownership; preserve the receipt.');
@@ -93,23 +93,7 @@ final class ResourceLedger
             $docker->validateIdentity();
             foreach (array_reverse($state['resources'], true) as $index => $resource) {
                 try {
-                    $observed = self::inspect($docker, $resource['kind'], $resource['name']);
-                    if ($observed !== null) {
-                        $labels = $resource['kind'] === 'container' ? ($observed['Config']['Labels'] ?? []) : ($observed['Labels'] ?? []);
-                        $observedName = $resource['kind'] === 'container' ? ltrim($observed['Name'] ?? '', '/') : ($observed['Name'] ?? '');
-                        $id = $resource['kind'] === 'volume' ? ($observed['Name'] ?? null) : ($observed['Id'] ?? $observed['ID'] ?? null);
-                        if ($observedName !== $resource['name'] || ($labels[self::LABEL] ?? null) !== $state['token'] || ($resource['id'] !== null && $resource['id'] !== $id)) {
-                            throw new \RuntimeException('Saved resource ownership does not match; refusing removal');
-                        }
-                        if (!is_string($id) || $id === '') {
-                            throw new \RuntimeException('Cannot resolve owned resource identity');
-                        }
-                        $remove = $resource['kind'] === 'container' ? ['rm', '--force', '--volumes', '--', $id] : [$resource['kind'], 'rm', '--', $id];
-                        $docker->run($remove);
-                        if (self::inspect($docker, $resource['kind'], $resource['name']) !== null) {
-                            throw new \RuntimeException('Owned resource remains after removal');
-                        }
-                    }
+                    self::removeOwnedResource($docker, $resource, $state['token']);
                     unset($state['resources'][$index]);
                 } catch (\Throwable $error) {
                     $errors[] = $resource['kind'] . ' ' . $resource['name'] . ': ' . $error->getMessage();
@@ -130,6 +114,30 @@ final class ResourceLedger
             $lock?->release();
         }
         return new CleanupReport($errors, $this->receipt);
+    }
+
+    /** @param array{kind:string,name:string,id:?string} $resource */
+    private static function removeOwnedResource(Client $docker, array $resource, string $token): void
+    {
+        $observed = self::inspect($docker, $resource['kind'], $resource['name']);
+        if ($observed === null) {
+            return;
+        }
+        $container = $resource['kind'] === ResourceKind::Container->value;
+        $labels = $container ? ($observed['Config']['Labels'] ?? []) : ($observed['Labels'] ?? []);
+        $observedName = $container ? ltrim($observed['Name'] ?? '', '/') : ($observed['Name'] ?? '');
+        $id = $resource['kind'] === ResourceKind::Volume->value ? ($observed['Name'] ?? null) : ($observed['Id'] ?? $observed['ID'] ?? null);
+        if ($observedName !== $resource['name'] || ($labels[self::LABEL] ?? null) !== $token || ($resource['id'] !== null && $resource['id'] !== $id)) {
+            throw new \RuntimeException('Saved resource ownership does not match; refusing removal');
+        }
+        if (!is_string($id) || $id === '') {
+            throw new \RuntimeException('Cannot resolve owned resource identity');
+        }
+        $remove = $container ? ['rm', '--force', '--volumes', '--', $id] : [$resource['kind'], 'rm', '--', $id];
+        $docker->run($remove);
+        if (self::inspect($docker, $resource['kind'], $resource['name']) !== null) {
+            throw new \RuntimeException('Owned resource remains after removal');
+        }
     }
 
     /** @return array<string,mixed>|null */

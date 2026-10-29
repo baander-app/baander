@@ -4,7 +4,6 @@ set -euo pipefail
 # ── Configuration ──────────────────────────────────────────────────────────
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RELI_DIR="${REPO_ROOT}/.reli"
-CONTAINER_WORKDIR="/var/www/html"
 PROFILER_CONTAINER="baander-profiler"
 APP_CONTAINER="baander-app"
 DEFAULT_DURATION=30
@@ -29,15 +28,18 @@ reli_exec_tty(){ docker exec -it "${PROFILER_CONTAINER}" /app/reli "$@"; }
 
 to_container_path() {
     local host="$1"
-    echo "${host}" | sed "s|^${REPO_ROOT}|${CONTAINER_WORKDIR}|"
+    local container_workdir
+    container_workdir="$(docker inspect --format '{{.Config.WorkingDir}}' "${APP_CONTAINER}")"
+    [[ "$container_workdir" == /* ]] || die "Application container has no absolute working directory."
+    printf '%s\n' "${host/#${REPO_ROOT}/${container_workdir}}"
 }
 
-# Source .env for docker compose (env var substitutions in docker-compose.yml)
 run_compose() {
-    (
-        [ -f "${REPO_ROOT}/.env" ] && { set -a; . "${REPO_ROOT}/.env"; set +a; }
-        docker compose "$@"
-    )
+    local generated="${REPO_ROOT}/.env.compose.local"
+    local -a environment_files=()
+    [[ -f "$generated" ]] || die "Build the Compose application first: php scripts/build-application.php --target dev --tag baander-dev:local --compose-env .env.compose.local"
+    [[ ! -f "${REPO_ROOT}/.env" ]] || environment_files+=(--env-file "${REPO_ROOT}/.env")
+    docker compose --project-directory "$REPO_ROOT" "${environment_files[@]}" --env-file "$generated" "$@"
 }
 
 make_capture_dir() {

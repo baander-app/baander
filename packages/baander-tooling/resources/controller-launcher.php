@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-// No generation code may load before its shared lease is held.
 (static function (): void {
     $root = __DIR__;
     $assertPath = static function (string $path): void {

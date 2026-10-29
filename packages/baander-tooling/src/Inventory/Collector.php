@@ -8,6 +8,7 @@ use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Docker\TargetResolver;
 use Baander\Tooling\Filesystem\AtomicFile;
+use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Process\EngineExecutor;
 use Baander\Tooling\Process\ExecutionContext;
 use Baander\Tooling\Resources\ResourceKind;
@@ -23,18 +24,28 @@ final class Collector
         }
         $environment = getenv();
         $configuration = ToolingConfiguration::resolve(environment: $environment);
-        $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
-        $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $session . '/transport'), $environment);
-        ApplicationInventory::directory($output);
-        $log = $output . '/collection.log';
-        file_put_contents($log, '');
-        $token = bin2hex(random_bytes(8));
-        $work = rtrim(sys_get_temp_dir(), '/') . '/baander-application-inventory.' . $token;
-        $container = 'baander-application-inventory-' . $token;
-        $state = ['work' => $work, 'output' => $output, 'cleanupSeconds' => $configuration->budgets->seconds('cleanup')];
-        AtomicFile::writeJson($session . '/state.json', $state);
-        $ledger = new ResourceLedger($session . '/resources.json', $docker, $environment);
+        $executor = null;
+        $log = null;
+        $ownsSession = false;
+        $primary = null;
         try {
+            PrivateDirectory::assertNoSymlinks($session);
+            if (is_dir($session) && array_diff(scandir($session) ?: [], ['.', '..']) !== []) {
+                throw new InventoryError('Inventory session is not empty; recover it before collecting.');
+            }
+            PrivateDirectory::ensure($session);
+            $ownsSession = true;
+            $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+            $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $session . '/transport'), $environment);
+            ApplicationInventory::directory($output);
+            $log = $output . '/collection.log';
+            file_put_contents($log, '');
+            $token = bin2hex(random_bytes(8));
+            $work = rtrim(sys_get_temp_dir(), '/') . '/baander-application-inventory.' . $token;
+            $container = 'baander-application-inventory-' . $token;
+            $state = ['work' => $work, 'output' => $output, 'cleanupSeconds' => $configuration->budgets->seconds('cleanup')];
+            AtomicFile::writeJson($session . '/state.json', $state);
+            $ledger = new ResourceLedger($session . '/resources.json', $docker, $environment);
             return $ledger->scoped(static function () use ($work, $docker, $image, $output, $target, $revision, $container, $log, $executor, $loader, $environment, $ledger): array {
                 ApplicationInventory::directory($work);
                 $inspect = $docker->run(['image', 'inspect', '--', $image])->stdout;
@@ -55,12 +66,31 @@ final class Collector
                 return Json::read($output . '/inventory.json');
             }, $state['cleanupSeconds']);
         } catch (\Throwable $error) {
-            file_put_contents($log, $error->getMessage() . "\n", FILE_APPEND);
+            $primary = $error;
+            if ($log !== null) {
+                file_put_contents($log, $error->getMessage() . "\n", FILE_APPEND);
+            }
             throw $error;
         } finally {
-            $executor->close();
-            if (!file_exists($session . '/resources.json') && !is_link($session . '/resources.json')) {
-                self::cleanup($session);
+            $errors = [];
+            try {
+                $executor?->close();
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            try {
+                if ($ownsSession && !file_exists($session . '/resources.json') && !is_link($session . '/resources.json')) {
+                    if (file_exists($session . '/state.json') || is_link($session . '/state.json')) {
+                        self::cleanup($session);
+                    } else {
+                        self::remove($session);
+                    }
+                }
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            if ($errors !== []) {
+                throw new InventoryError(($primary !== null ? $primary->getMessage() . '; ' : '') . 'Inventory staging cleanup failed: ' . implode('; ', $errors), $primary?->getCode() ?: 1, $primary);
             }
         }
     }

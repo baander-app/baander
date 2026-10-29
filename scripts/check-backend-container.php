@@ -13,5 +13,5 @@ try {
     exit(2);
 } catch (RuntimeException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
-    exit(1);
+    exit($error->getCode() > 0 && $error->getCode() <= 255 ? $error->getCode() : 1);
 }

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Development\Build\Builder;
 use Baander\Tooling\Development\Build\SourceUnavailable;
 
 class Updater
 {
     private const array INTERRUPTED_PHASES = ['database_mutating', 'quiescing', 'checkpointing', 'activating', 'blocked'];
-    public Builder $builder;
+    public ?Builder $builder = null;
     public Runtime $runtime;
     public Gateway $gateway;
     public Database $database;
@@ -20,13 +21,25 @@ class Updater
 
     public function __construct(private readonly StateStore $store, private readonly Runner $runner)
     {
-        $this->builder = new Builder($store, $runner);
         $this->runtime = new Runtime($store, $runner);
         $this->gateway = new Gateway($store, $runner);
         $this->database = new Database($store, $runner);
         $this->bootstrap = new Bootstrap($store, $runner);
         $this->workers = new Workers($store, $runner);
         $this->libraries = new Libraries($runner);
+    }
+
+    /** @param array<string,mixed> $instance
+     * @return array<string,mixed>
+     */
+    private function prepare(array &$instance): array
+    {
+        if ($this->builder === null) {
+            $local = LocalConfiguration::load($this->runner, $instance['worktree']);
+            $configuration = ToolingConfiguration::resolve(environment: getenv(), local: $local['tooling'] ?? []);
+            $this->builder = new Builder($this->store, $this->runner, $configuration);
+        }
+        return $this->builder->prepare($instance);
     }
 
     /** @param array<string,mixed> $instance */
@@ -121,7 +134,7 @@ class Updater
                 'database_mutation_confirmed' => false,
             ]);
             try {
-                $release = $retainedRelease ?? $this->builder->prepare($instance);
+                $release = $retainedRelease ?? $this->prepare($instance);
             } catch (SourceUnavailable $error) {
                 $instance = $this->required($identity);
                 $delay = min(300, max(60, ($instance['retry_delay'] ?? 30) * 2));
