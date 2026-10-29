@@ -91,7 +91,7 @@ final class DevelopmentRetainedStateTest extends TestCase
 
     private function converter(): RetainedState
     {
-        return new RetainedState($this->store, $this->executor, ['PATH' => '/bin:/usr/bin', 'HOME' => $this->root]);
+        return new RetainedState($this->store, $this->executor, ['PATH' => '/bin:/usr/bin', 'HOME' => $this->root], 5);
     }
 
     /** @return iterable<string,array{bool}> */

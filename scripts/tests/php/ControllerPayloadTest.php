@@ -35,7 +35,30 @@ require __DIR__ . '/bootstrap.php';
 use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Development\RetainedGenerationProbe;
-if (($argv[1] ?? '') === 'shutdown') {
+if (in_array($argv[1] ?? '', ['convert', 'convert-managed', 'drain'], true)) {
+    $directory = $argv[4];
+    file_put_contents($directory . '/ready', (string) getmypid());
+    while (!is_file($directory . '/begin')) { usleep(1000); }
+    $context = str_ends_with($argv[1], '-managed')
+        ? new Baander\Tooling\Process\ExecutionContext(getenv())
+        : Baander\Tooling\Process\ExecutionContext::bounded((float) $argv[5], getenv());
+    $executor = new Baander\Tooling\Process\EngineExecutor($context);
+    $barrier = null;
+    try {
+        if (str_starts_with($argv[1], 'convert')) {
+            new Baander\Tooling\Development\RetainedState(new Baander\Tooling\Development\StateStore($argv[2]), $executor, getenv(), (float) $argv[3])->convert('persistent');
+        } else {
+            $barrier = new Baander\Tooling\Development\ControllerPayload($argv[2])->drainReaders((float) $argv[3], $executor);
+        }
+        $report = ['status' => 0, 'message' => 'drained'];
+    } catch (Throwable $error) {
+        $report = ['status' => $error->getCode(), 'message' => $error->getMessage()];
+    }
+    file_put_contents($directory . '/report.json', json_encode($report, JSON_THROW_ON_ERROR));
+    while (!is_file($directory . '/finish')) { usleep(1000); }
+    $barrier?->release();
+    $executor->close();
+} elseif (($argv[1] ?? '') === 'shutdown') {
     register_shutdown_function(static function (): void {
         echo "shutdown-ready\n";
         fflush(STDOUT);
@@ -267,7 +290,7 @@ CODE);
 
     public function testAbsentInstalledControllerHasNoReadersToDrain(): void
     {
-        $barrier = $this->payload->drainReaders();
+        $barrier = $this->payload->drainReaders(5);
         try {
             self::assertNull($this->payload->selectedGeneration());
             self::assertNull(FileLock::tryAcquire($this->root . '/state/controller/compatibility.lock', shared: true));
@@ -276,13 +299,175 @@ CODE);
         }
     }
 
+    public function testSupersededInvocationRefusesConversionWithoutWaitingForItsOwnLease(): void
+    {
+        $old = $this->payload->publish($this->root . '/source');
+        $original = $this->retainedRecord();
+        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        try {
+            [$child, $directory] = $this->conversionChild($executor, 'convert', 2);
+            $selected = $this->payload->publish($this->root . '/source');
+            touch($directory . '/begin');
+            $this->awaitFile($executor, $directory . '/report.json');
+            $report = AtomicFile::readJson($directory . '/report.json');
+            self::assertStringContainsString('selected controller generation', $report['message']);
+            self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
+            self::assertSame($selected, $this->payload->selectedGeneration());
+            self::assertDirectoryExists($this->generation($old));
+            self::assertNull(FileLock::tryAcquire($this->root . '/state/controller/leases/' . $old . '.lock'));
+            $available = FileLock::acquire($this->root . '/state/controller/compatibility.lock');
+            $available->release();
+            touch($directory . '/finish');
+            self::assertSame(0, $executor->wait($child)->exitCode);
+        } finally {
+            $executor->close();
+        }
+    }
+
+    public function testConcurrentConverterRefusesTheBarrierWhileHoldingAnOldLease(): void
+    {
+        $old = $this->payload->publish($this->root . '/source');
+        $original = $this->retainedRecord();
+        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        try {
+            [$older, $olderDirectory] = $this->conversionChild($executor, 'convert', 2);
+            $this->payload->publish($this->root . '/source');
+            [$current, $currentDirectory] = $this->conversionChild($executor, 'drain', 2);
+            touch($currentDirectory . '/begin');
+            do {
+                $executor->checkpoint();
+                $executor->pump();
+                $available = FileLock::tryAcquire($this->root . '/state/controller/compatibility.lock');
+                $available?->release();
+            } while ($available !== null);
+            touch($olderDirectory . '/begin');
+            $this->awaitFile($executor, $olderDirectory . '/report.json');
+            self::assertStringContainsString('conversion is already draining', AtomicFile::readJson($olderDirectory . '/report.json')['message']);
+            self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
+            self::assertDirectoryExists($this->generation($old));
+            touch($olderDirectory . '/finish');
+            self::assertSame(0, $executor->wait($older)->exitCode);
+            $this->awaitFile($executor, $currentDirectory . '/report.json');
+            self::assertSame(0, AtomicFile::readJson($currentDirectory . '/report.json')['status']);
+            touch($currentDirectory . '/finish');
+            self::assertSame(0, $executor->wait($current)->exitCode);
+        } finally {
+            $executor->close();
+        }
+    }
+
+    public function testReaderDrainHonorsTheInvokingDeadlineAndPreservesRetainedState(): void
+    {
+        $old = $this->payload->publish($this->root . '/source');
+        $original = $this->retainedRecord();
+        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        try {
+            [$reader, $readerDirectory] = $this->conversionChild($executor, 'drain', 2);
+            $this->payload->publish($this->root . '/source');
+            [$current, $currentDirectory] = $this->conversionChild($executor, 'convert', 2, .1);
+            touch($currentDirectory . '/begin');
+            $this->awaitFile($executor, $currentDirectory . '/report.json');
+            self::assertSame(124, AtomicFile::readJson($currentDirectory . '/report.json')['status']);
+            self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
+            self::assertDirectoryExists($this->generation($old));
+            self::assertNull(FileLock::tryAcquire($this->root . '/state/controller/leases/' . $old . '.lock'));
+            $available = FileLock::acquire($this->root . '/state/controller/compatibility.lock');
+            $available->release();
+            touch($currentDirectory . '/finish');
+            self::assertSame(0, $executor->wait($current)->exitCode);
+        } finally {
+            $executor->close();
+        }
+    }
+
+    public function testManagedInvocationStillHonorsTheExplicitFiniteDrainBudget(): void
+    {
+        $old = $this->payload->publish($this->root . '/source');
+        $original = $this->retainedRecord();
+        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        try {
+            $this->conversionChild($executor, 'drain', 2);
+            $this->payload->publish($this->root . '/source');
+            [$current, $directory] = $this->conversionChild($executor, 'convert-managed', .1);
+            touch($directory . '/begin');
+            $this->awaitFile($executor, $directory . '/report.json');
+            self::assertSame(124, AtomicFile::readJson($directory . '/report.json')['status']);
+            self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
+            self::assertDirectoryExists($this->generation($old));
+            $available = FileLock::acquire($this->root . '/state/controller/compatibility.lock');
+            $available->release();
+            touch($directory . '/finish');
+            self::assertSame(0, $executor->wait($current)->exitCode);
+        } finally {
+            $executor->close();
+        }
+    }
+
+    public function testReaderDrainRespondsToInterruptionAndReleasesItsBarrier(): void
+    {
+        $this->payload->publish($this->root . '/source');
+        $original = $this->retainedRecord();
+        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        try {
+            $this->conversionChild($executor, 'drain', 2);
+            $this->payload->publish($this->root . '/source');
+            [$current, $directory] = $this->conversionChild($executor, 'convert', 2);
+            touch($directory . '/begin');
+            do {
+                $executor->checkpoint();
+                $executor->pump();
+                $available = FileLock::tryAcquire($this->root . '/state/controller/compatibility.lock');
+                $available?->release();
+            } while ($available !== null);
+            self::assertTrue(\Swoole\Process::kill((int) file_get_contents($directory . '/ready'), SIGTERM));
+            $this->awaitFile($executor, $directory . '/report.json');
+            self::assertSame(143, AtomicFile::readJson($directory . '/report.json')['status']);
+            self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
+            $available = FileLock::acquire($this->root . '/state/controller/compatibility.lock');
+            $available->release();
+            touch($directory . '/finish');
+            self::assertSame(0, $executor->wait($current)->exitCode);
+        } finally {
+            $executor->close();
+        }
+    }
+
+    private function retainedRecord(): string
+    {
+        $store = new \Baander\Tooling\Development\StateStore($this->root . '/state');
+        $record = ['id' => 'persistent', 'docker' => ['executable' => '/bin/true', 'context' => 'retained', 'daemon_id' => 'retained-daemon']];
+        $store->save('persistent', $record);
+        return file_get_contents($this->root . '/state/persistent/state.json');
+    }
+
+    /** @return array{\Baander\Tooling\Process\RunningProcess,string} */
+    private function conversionChild(EngineExecutor $executor, string $mode, float $seconds, ?float $owningSeconds = null): array
+    {
+        $directory = $this->root . '/conversion-' . bin2hex(random_bytes(4));
+        mkdir($directory, 0700);
+        $child = $executor->start(new ProcessSpec([PHP_BINARY, $this->payload->launcher(), $mode, $this->root . '/state', (string) $seconds, $directory, (string) ($owningSeconds ?? $seconds)], processGroup: true));
+        $this->awaitFile($executor, $directory . '/ready');
+        return [$child, $directory];
+    }
+
+    private function awaitFile(EngineExecutor $executor, string $path): void
+    {
+        $deadline = microtime(true) + 1;
+        while (!is_file($path) && microtime(true) < $deadline) {
+            $executor->checkpoint();
+            $executor->pump();
+            usleep(1000);
+        }
+        self::assertFileExists($path, 'The controller did not complete its bounded protocol step.');
+    }
+
     public function testUnleasedLegacyPayloadBlocksConversionAndRemainsIntact(): void
     {
         $this->payload->publish($this->root . '/source');
         mkdir($this->root . '/state/controller/scripts');
         file_put_contents($this->root . '/state/controller/scripts/dev-environment.py', 'retained legacy code');
         try {
-            $barrier = $this->payload->drainReaders();
+            $barrier = $this->payload->drainReaders(5);
             $barrier->release();
             self::fail('Unleased readers were treated as drained.');
         } catch (\RuntimeException $error) {

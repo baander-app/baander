@@ -275,7 +275,7 @@ final class Cli
             }
             $reservedTargets = array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target');
             $media = new Mounts($layout)->preflight($media, $store->root, $applicationEnvironment, $reservedTargets);
-            new RetainedState($store, $runner, $environment)->convert($identity);
+            new RetainedState($store, $runner, $environment, $configuration->budgets->seconds('process'))->convert($identity);
             $converted = $store->load($identity);
             if ($converted !== null && $converted != $observed) {
                 $previousConfiguration = $observed ?? [];
@@ -471,7 +471,7 @@ final class Cli
                 if ($instance['kind'] === 'persistent') {
                     new Supervisor($store, $runner)->disable();
                 }
-                new Updater($store, $runner, environment: $environment)->down($instance['id']);
+                new Updater($store, $runner, environment: $environment, drainSeconds: $bootstrapBudget)->down($instance['id']);
                 return 0;
             }
             if ($command === 'update') {
@@ -479,7 +479,7 @@ final class Cli
                 return 0;
             }
             if ($command === 'recover') {
-                new Updater($store, $runner, environment: $environment)->recover($instance['id']);
+                new Updater($store, $runner, environment: $environment, drainSeconds: $bootstrapBudget)->recover($instance['id']);
                 return 0;
             }
             if ($command === 'restart') {

@@ -52,6 +52,7 @@ declare(strict_types=1);
         // Global resources survive shutdown callbacks and object destructors; PHP
         // closes the stream during final resource cleanup when the invocation ends.
         $GLOBALS['baanderControllerGenerationLease'] = $lease;
+        $GLOBALS['baanderControllerGeneration'] = ['root' => $root, 'id' => $id];
     } finally {
         fclose($publication);
     }

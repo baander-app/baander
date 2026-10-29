@@ -7,6 +7,7 @@ namespace Baander\Tooling\Development;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\FileLock;
 use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Process\{CommandFailure, EngineExecutor, ExecutionContext};
 
 final class ControllerPayload
 {
@@ -133,23 +134,36 @@ final class ControllerPayload
      * The selected generation must already support the replacement state contract.
      */
     #[\NoDiscard]
-    public function drainReaders(): FileLock
+    public function drainReaders(float $seconds, ?EngineExecutor $executor = null): FileLock
     {
+        if (!is_finite($seconds) || $seconds <= 0) {
+            throw new WorkflowError('Controller reader drain requires a positive finite budget.');
+        }
         if ($this->legacyDispatchers() !== []) {
             throw new WorkflowError('Retained controller dispatchers have unleased readers. Preserve the original state and establish a supported-entrypoint fence proving all legacy service and manual invocations finished before conversion.');
         }
-        $barrier = FileLock::acquire($this->root . '/compatibility.lock', false);
+        $barrier = FileLock::tryAcquire($this->root . '/compatibility.lock');
+        if ($barrier === null) {
+            throw new WorkflowError('Another conversion is already draining controller readers; retry after it finishes.');
+        }
+        $ownedExecutor = $executor === null;
+        $deadline = hrtime(true) / 1e9 + $seconds;
         try {
-            $publication = FileLock::acquire($this->root . '/publication.lock', false);
+            $executor ??= new EngineExecutor(ExecutionContext::bounded($seconds, getenv()));
+            $publication = $this->waitForLock($this->root . '/publication.lock', $executor, $deadline);
             try {
                 $selected = $this->selectedGeneration();
+                $invocation = $GLOBALS['baanderControllerGeneration'] ?? null;
+                if (($invocation['root'] ?? null) === $this->root && ($invocation['id'] ?? null) !== $selected) {
+                    throw new WorkflowError('Retry conversion through the selected controller generation; this invocation was superseded.');
+                }
                 $generations = $this->generations();
             } finally {
                 $publication->release();
             }
             foreach ($generations as $id) {
                 if ($id !== $selected) {
-                    $lease = FileLock::acquire($this->root . '/leases/' . $id . '.lock', false);
+                    $lease = $this->waitForLock($this->root . '/leases/' . $id . '.lock', $executor, $deadline);
                     $lease->release();
                 }
             }
@@ -157,7 +171,26 @@ final class ControllerPayload
         } catch (\Throwable $error) {
             $barrier->release();
             throw $error;
+        } finally {
+            if ($ownedExecutor) {
+                $executor?->close();
+            }
         }
+    }
+
+    private function waitForLock(string $path, EngineExecutor $executor, float $deadline): FileLock
+    {
+        do {
+            $executor->checkpoint();
+            if (hrtime(true) / 1e9 >= $deadline) {
+                throw new CommandFailure('Controller reader drain budget expired; preserve retained state and retry after older invocations finish.', 124);
+            }
+            $lock = FileLock::tryAcquire($path);
+            if ($lock !== null) {
+                return $lock;
+            }
+            usleep(10_000);
+        } while (true);
     }
 
     /** @return list<string> */

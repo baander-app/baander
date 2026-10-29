@@ -72,6 +72,9 @@ if ($command === 'image' && ($arguments[1] ?? '') === 'inspect') {
     exit(0);
 }
 if ($command === 'info') {
+    if (is_file($directory . '/cleanup-started')) {
+        usleep((int) (getenv('BACKEND_CLEANUP_DELAY_MICROSECONDS') ?: 0));
+    }
     file_put_contents(
         $directory . '/docker-environment.json',
         json_encode(

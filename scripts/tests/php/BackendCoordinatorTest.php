@@ -386,6 +386,38 @@ final class BackendCoordinatorTest extends TestCase
         self::assertStringContainsString('Cleanup failed', $result->stderr);
     }
 
+    public function testComposeAndStandaloneCleanupShareOneBudget(): void
+    {
+        $environment = array_replace($this->fakeEnvironment(services: true), ['BACKEND_CLEANUP_DELAY_MICROSECONDS' => '3000000']);
+        $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::resolve(['budgets' => ['cleanup' => 2]], $environment);
+        $runtime = new Runtime($this->directory, 60, dirname(__DIR__, 3), $environment, $configuration);
+        try {
+            $runtime->connect();
+            $runtime->startServices('first');
+            $runtime->startServices('second');
+            $standalone = $runtime->createApp('standalone');
+            mkdir($this->directory . '/source', 0700);
+            file_put_contents($this->directory . '/source/checkout', 'retained source');
+            $runtime->cleanupErrors[] = 'Original qualification failure';
+            $before = count($this->commands());
+            file_put_contents($this->directory . '/cleanup-started', 'ready');
+            self::assertFalse($runtime->cleanup());
+            self::assertSame('Original qualification failure', $runtime->cleanupErrors[0]);
+            $identityChecks = array_values(array_filter(array_slice($this->commands(), $before), static fn(array $arguments): bool => in_array('info', $arguments, true)));
+            self::assertLessThanOrEqual(1, count($identityChecks), 'Later owners must not receive fresh cleanup budgets after the first expires.');
+            self::assertCount(2, glob($this->directory . '/*.ownership.json'));
+            self::assertFileExists($this->directory . '/ownership.json');
+            self::assertSame('retained source', file_get_contents($this->directory . '/source/checkout'));
+            self::assertStringContainsString('Cannot remove prepared checkout ' . $this->directory . '/source', implode("\n", $runtime->cleanupErrors));
+            $state = json_decode(file_get_contents($this->directory . '/state.json'), true, flags: JSON_THROW_ON_ERROR);
+            self::assertCount(2, $state['projects']);
+            self::assertArrayHasKey($standalone, $state['containers']);
+            self::assertStringContainsString('expired', implode("\n", $runtime->cleanupErrors));
+        } finally {
+            $runtime->close();
+        }
+    }
+
     public function testServiceLanesUseDisjointComposeProjectsAndExplicitCleanup(): void
     {
         $environment = $this->fakeEnvironment(services: true);

@@ -7,13 +7,13 @@ namespace Baander\Tooling\Development;
 use Baander\Tooling\Configuration\{ApplicationLayout, DockerSettings};
 use Baander\Tooling\Docker\{Client, Target, TargetResolver};
 use Baander\Tooling\Filesystem\{AtomicFile, FileLock, PrivateDirectory};
-use Baander\Tooling\Process\CommandExecutor;
+use Baander\Tooling\Process\{CommandExecutor, EngineExecutor};
 
 /** A bounded upgrade of retained ownership, before an instance operation takes its lock. */
 final readonly class RetainedState
 {
     /** @param array<string,string> $environment */
-    public function __construct(private StateStore $store, private CommandExecutor $executor, private array $environment) {}
+    public function __construct(private StateStore $store, private CommandExecutor $executor, private array $environment, private ?float $drainSeconds) {}
 
     public function convert(string $identity, bool $activation = true): void
     {
@@ -38,7 +38,10 @@ final readonly class RetainedState
         if (!$needed && !$gatewayNeedsConversion) {
             return;
         }
-        $barrier = new ControllerPayload($this->store->root)->drainReaders();
+        if ($this->drainSeconds === null) {
+            throw new WorkflowError('Retained controller conversion requires the invocation process budget.');
+        }
+        $barrier = new ControllerPayload($this->store->root)->drainReaders($this->drainSeconds, $this->executor instanceof EngineExecutor ? $this->executor : null);
         try {
             if (!$needed) {
                 $this->gateway();

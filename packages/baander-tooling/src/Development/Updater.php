@@ -23,11 +23,13 @@ class Updater
     /** @var array<string,string> */
     private readonly array $environment;
     private readonly Connections $connections;
+    private readonly ?float $drainSeconds;
 
     /** @param array<string,string>|null $environment */
-    public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, private readonly ?ToolingConfiguration $configuration = null, ?array $environment = null)
+    public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, private readonly ?ToolingConfiguration $configuration = null, ?array $environment = null, ?float $drainSeconds = null)
     {
         $this->environment = $environment ?? getenv();
+        $this->drainSeconds = $drainSeconds ?? $configuration?->budgets->seconds('process');
         $connections = $this->connections = new Connections($runner, Environment::clean($this->environment));
         $this->runtime = new Runtime($store, $runner, $connections);
         $this->gateway = new Gateway($store, $runner, $connections);
@@ -91,7 +93,7 @@ class Updater
                 array_column(array_diff_key($observed['state_mounts'] ?? [], ['media' => true]), 'target'),
             );
         }
-        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity);
+        new RetainedState($this->store, $this->runner, $this->environment, $this->drainSeconds)->convert($identity);
         $lock = $this->store->lock($identity);
         try {
             $instance = $this->store->load($identity);
@@ -417,7 +419,7 @@ class Updater
 
     public function down(string $identity): void
     {
-        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity, activation: false);
+        new RetainedState($this->store, $this->runner, $this->environment, $this->drainSeconds)->convert($identity, activation: false);
         $this->store->setEnabled($identity, false);
         $lock = $this->store->lock($identity);
         try {
@@ -438,7 +440,7 @@ class Updater
 
     public function recover(string $identity): void
     {
-        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity);
+        new RetainedState($this->store, $this->runner, $this->environment, $this->drainSeconds)->convert($identity);
         $lock = $this->store->lock($identity);
         $recovering = false;
         try {

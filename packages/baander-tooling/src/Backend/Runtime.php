@@ -477,9 +477,13 @@ class Runtime
                 if (!isset($this->ownedProjects[$project])) {
                     continue;
                 }
-                $report = $this->ownedProjects[$project]->cleanup($this->configuration->budgets->seconds('cleanup'), $this->artifacts . '/' . $project . '.compose.log');
-                if (!$report->successful()) {
-                    $this->cleanupErrors[] = $report->message();
+                try {
+                    $report = $this->ownedProjects[$project]->cleanup($this->remainingCleanupBudget(), $this->artifacts . '/' . $project . '.compose.log');
+                    if (!$report->successful()) {
+                        $this->cleanupErrors[] = $report->message();
+                    }
+                } catch (Throwable $error) {
+                    $this->cleanupErrors[] = $project . ': ' . $error->getMessage();
                 }
             }
             foreach (array_reverse($this->containers) as $name) {
@@ -488,9 +492,13 @@ class Runtime
                 }
                 $this->cleanupCommand(['logs', $name], 10, $this->artifacts . '/' . $name . '.container.log', removal: false);
             }
-            $report = $this->ledger?->cleanup($this->configuration->budgets->seconds('cleanup'));
-            if ($report !== null && !$report->successful()) {
-                $this->cleanupErrors[] = $report->message();
+            try {
+                $report = $this->ledger?->cleanup($this->remainingCleanupBudget());
+                if ($report !== null && !$report->successful()) {
+                    $this->cleanupErrors[] = $report->message();
+                }
+            } catch (Throwable $error) {
+                $this->cleanupErrors[] = $error->getMessage();
             }
             foreach (array_reverse($this->networks) as $name) {
                 if (!in_array($name, $this->projectNetworks, true)) {
@@ -520,13 +528,23 @@ class Runtime
                 unlink($this->archive);
             }
             if (is_dir($this->artifacts . '/source')) {
-                $this->run(['rm', '-rf', '--', $this->artifacts . '/source'], timeout: 30, check: false);
+                try {
+                    $this->run(['rm', '-rf', '--', $this->artifacts . '/source'], timeout: 30, check: false);
+                } catch (Throwable $error) {
+                    $this->cleanupErrors[] = 'Cannot remove prepared checkout ' . $this->artifacts . '/source: ' . $error->getMessage();
+                }
             }
             foreach ($this->cleanupErrors as $error) {
                 fwrite(STDERR, 'Cleanup failed: ' . $error . "\n");
             }
             return $this->cleanupErrors === [];
         });
+    }
+
+    private function remainingCleanupBudget(): float
+    {
+        return $this->executor->context->remaining()
+            ?? throw new \LogicException('Backend cleanup requires a bounded execution context.');
     }
 
     /** @param list<string> $arguments

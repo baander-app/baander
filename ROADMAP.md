@@ -396,9 +396,69 @@ records with null scan timestamps; no reset ran. The v5 full CI run failed with
 stale identity-format assertions and fakes. The registry inventory regression
 passes one test and 199 assertions. The complete worker cleanup class passes
 41 tests and 273 assertions without failures or skips; scoped static analysis,
-style and source policy pass. The v7 full CI result remains pending. Core changes
-remain uncommitted, final code review has not started, and full CI and remaining
-acceptance stay open.
+style and source policy pass. The subsequent v7 run was interrupted; final CI
+acceptance continues below. Build ownership landed in local commit `7a22c44d`;
+subsequent repairs remain under qualification.
+
+Callback and fixture checkpoint, 2026-10-30: worker callbacks receive the
+actual randomized web-container name instead of deriving it from the PostgreSQL
+name. The checkpoint regression passes one test and five assertions. Fixture
+warmup now waits for acknowledged pause and resume before publishing capacity
+readiness; measurement thresholds and samples are unchanged. The worker-fixture
+subset passes 20 tests and 31 assertions. These focused results do not establish
+live pressure qualification.
+
+The full v8 CI suite is running against image
+`sha256:87ccc6f4031ba50beb3262845c8cca4c7be2da5d03f4df823eb014f75b3d4bee`;
+its source proof is retained under
+`var/test-runs/ci-checkpoint-overlay-1793315529-1565964/source-proof.json`.
+Capacity v8 uses current host source with `BAANDER_TEST_CHECKOUT_IN_IMAGE=0`.
+The fixture difference from that image is deletion of a redundant warmup comment;
+executable source is unchanged. Later sampler, backend and controller repairs need
+focused CI proof from an updated image. The acceptance results below remain
+incomplete.
+
+Final review and sampler checkpoint, 2026-10-30: independent code review
+completed eight lenses and confirmed two P2 defects: nested backend cleanup owners
+received fresh budgets, and a superseded installed controller could wait on its own
+generation lease during conversion. Both findings and a follow-up prepared-checkout
+error-handling correction are now fixed and verified. The source-proven v10 CI
+image passes 116 tests and 1,031 assertions; the review findings are closed.
+
+The five-file sampler repair admits interrupted completion only with typed proof
+of the exact contained worker pair, exhaustion and continuous drain evidence.
+Implementation and independent focused review are complete. Verification passes
+130 tests and 204 assertions, followed by 27 tests and 33 assertions; source policy
+passes 32 tests and 100 assertions, with scoped static analysis and style clean.
+The live retry remains pending.
+
+CI v8 gates pass static analysis across 388 files and formatting across 389.
+Deptrac reports 4,262 allowed and 360 external uncovered dependencies, with zero
+violations, errors or warnings; source policy passes. Registry subjects pass two
+tests and two assertions. Docker-context checks exclude 35 artifacts and preserve
+29 markers; all four Xdebug scenarios pass. The 1,022-test full v8 suite remains
+active; later live results are recorded below.
+
+Capacity CPU passes with 160 acknowledgements (maximum 0.369 seconds) and 1,451
+heartbeats (maximum gap 0.0227 seconds). Memory qualification failed on sampler
+exit 137 before the typed-proof repair; cleanup was verified, but live repair
+acceptance is pending. PID, media and container browser qualification remain
+pending. These results do not establish full pressure acceptance.
+
+Observer and review-fix follow-up, 2026-10-30: CI v11 passes 13 observer tests
+and 351 assertions, static analysis across 390 files and formatting across 391.
+Deptrac reports 4,332 allowed and 361 external uncovered dependencies, with zero
+violations, warnings or errors. Autoscaling profile one passed its 369-second
+callback and cleanup. Profile two failed on a transient admission read-lock timeout
+of 50 milliseconds. The fixture now retries within the existing 250-millisecond
+bound; independent focused review is complete, and live retry remains pending.
+Production behavior and measured thresholds are unchanged.
+
+Capacity v10 CPU passes again, but its memory pressure probe exits 137 after
+`oomTargetDied`; cleanup succeeds. Extending contained-probe completion with owned
+failure identity and terminal proof is in progress. Media v11 is running; PID and
+container browser checks remain pending. U11 stays open for final full CI evidence,
+remaining live qualification and verification of the contained-probe extension.
 
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
