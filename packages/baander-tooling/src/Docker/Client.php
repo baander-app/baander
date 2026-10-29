@@ -33,10 +33,17 @@ final readonly class Client
     public function command(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25, bool $appendLog = false): ProcessSpec
     {
         $this->target->assertSnapshot();
+        $environment = self::transportEnvironment(array_replace($this->environment, $env ?? []));
+        $buildOffset = self::buildOffset($arguments);
+        if ($buildOffset !== null) {
+            $arguments = self::pinBuilder($arguments, $buildOffset);
+            unset($environment['BUILDX_BUILDER'], $environment['BUILDKIT_HOST']);
+            $environment['DOCKER_BUILDKIT'] = '1';
+        }
         return new ProcessSpec(
             [$this->target->executable, '--host', $this->target->endpoint, ...$this->target->transportArguments, ...$arguments],
             cwd: $cwd,
-            environment: self::transportEnvironment(array_replace($this->environment, $env ?? [])),
+            environment: $environment,
             timeout: $timeout,
             stdin: $input,
             logPath: $logPath,
@@ -47,6 +54,52 @@ final readonly class Client
             terminationGrace: $terminationGrace,
             appendLog: $appendLog,
         );
+    }
+
+    /** @param list<string> $arguments */
+    private static function buildOffset(array $arguments): ?int
+    {
+        if (($arguments[0] ?? null) === 'build') {
+            return 1;
+        }
+        if (!in_array($arguments[0] ?? null, ['buildx', 'builder', 'image'], true)) {
+            return null;
+        }
+        for ($index = 1; $index < count($arguments); ++$index) {
+            if ($arguments[$index] === 'build') {
+                return $index + 1;
+            }
+            if ($arguments[$index] === '--builder') {
+                ++$index;
+            } elseif (!str_starts_with($arguments[$index], '--builder=')
+                && !in_array($arguments[$index], ['-D', '--debug'], true)
+                && !str_starts_with($arguments[$index], '--debug=')) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** @param list<string> $arguments
+     * @return list<string>
+     */
+    private static function pinBuilder(array $arguments, int $offset): array
+    {
+        $selected = false;
+        for ($index = 0; $index < count($arguments) && $arguments[$index] !== '--'; ++$index) {
+            if ($arguments[$index] === '--builder') {
+                $builder = $arguments[++$index] ?? null;
+            } elseif (str_starts_with($arguments[$index], '--builder=')) {
+                $builder = substr($arguments[$index], strlen('--builder='));
+            } else {
+                continue;
+            }
+            if ($selected || $builder !== 'default') {
+                throw new \InvalidArgumentException('Builds require exactly one default builder on the captured Docker daemon.');
+            }
+            $selected = true;
+        }
+        return $selected ? $arguments : [...array_slice($arguments, 0, $offset), '--builder', 'default', ...array_slice($arguments, $offset)];
     }
 
     /** @param list<string> $arguments

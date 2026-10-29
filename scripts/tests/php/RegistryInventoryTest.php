@@ -609,7 +609,7 @@ FIXTURE;
             } else {
                 self::assertNull($resource);
                 self::assertFileDoesNotExist($ownership);
-                self::assertSame(['container', 'ls', '--all', '--no-trunc', '--format', '{{json .}}'], end($calls));
+                self::assertSame(['container', 'ls', '--all', '--no-trunc', '--format', '{"ID":{{json .ID}},"Names":{{json .Names}}}'], end($calls));
             }
             unset($verifier, $owner);
         }

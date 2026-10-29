@@ -370,6 +370,36 @@ Preview shutdown now succeeds, but its saved blocked phase still requires
 recovery before changing media configuration. Final CI results, preview and
 remaining live qualification, and independent code review remain open.
 
+Build and live qualification checkpoint, 2026-10-29: builds use the captured
+daemon's default BuildKit builder and verified temporary aliases for selected local
+image IDs. Shared bases retain an independent verified reference; dangling inputs
+fail before mutation, and cleanup owns no shared base. CI v6 build-contract checks
+pass 58 tests and 347 assertions without skips. Full tooling static analysis
+passes across 387 files and formatting across 388. Deptrac reports 4,246 allowed
+and 357 external uncovered dependencies, with zero violations, warnings or errors;
+source policy passes. Five-lens simplification applied two comment changes and
+required no reuse, quality, efficiency or test changes.
+
+The real v9 worker operator and Redis/PostgreSQL lifecycle checks pass with
+cleanup. The backend native lane passes 16 tests; the service lane passes 14 tests
+and 8,983 assertions. All three websocket proxy variants pass. Relay API/rqlite
+inventories and the TLS cluster contract pass, as do 89 encrypted-backup CLI
+contract checks, restore and the 600-second cadence check. Relay cleanup passes.
+The current alternate-root worker runs at `/srv/baander` as PID 1 without
+development tools; inventory integrity passes for 52,535 files. Redistribution
+review remains not qualified with 5,404 gaps, a separate existing classification.
+
+Host Playwright passes preview login and Library UI checks with normal TLS
+verification and zero page errors. Repeated startup preserves the same two library
+records with null scan timestamps; no reset ran. The v5 full CI run failed with
+984 tests, 4,660 assertions, five failures and seven skips; its failures concern
+stale identity-format assertions and fakes. The registry inventory regression
+passes one test and 199 assertions. The complete worker cleanup class passes
+41 tests and 273 assertions without failures or skips; scoped static analysis,
+style and source policy pass. The v7 full CI result remains pending. Core changes
+remain uncommitted, final code review has not started, and full CI and remaining
+acceptance stay open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

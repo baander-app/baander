@@ -116,7 +116,7 @@ final readonly class OperatorProvisioning
         if (!$this->qualification->configuration->useImage) {
             $this->buildFixture();
             $s->imageId = $this->qualification->output(['image', 'inspect', '--format', '{{.Id}}', $s->fixtureImage]);
-            $controllerBase = $s->fixtureImage;
+            $controllerBase = $s->imageId;
         }
         if ($this->qualification->configuration->mediaObservation) {
             $prefix = [
@@ -334,7 +334,7 @@ final readonly class OperatorProvisioning
             [
                 '--pull=false',
                 '--build-arg',
-                'FIXTURE_BASE=' . $s->fixtureBase,
+                'FIXTURE_BASE=' . $this->qualification->resources->buildInput('fixture-base', $s->fixtureBase),
                 '--build-arg',
                 'MEDIA_CONTROL_OBSERVATION=' . ($this->qualification->configuration->mediaObservation ? '1' : '0'),
                 $s->work,
@@ -359,9 +359,9 @@ final readonly class OperatorProvisioning
             [
                 '--pull=false',
                 '--build-arg',
-                'CONTROLLER_BASE=' . $base,
+                'CONTROLLER_BASE=' . $this->qualification->resources->buildInput('controller-base', $base),
                 '--build-arg',
-                'DOCKER_CLI=' . $s->controllerCli,
+                'DOCKER_CLI=' . $this->qualification->resources->buildInput('docker-cli', $s->controllerCli),
                 $this->qualification->work('controller'),
             ],
             $this->qualification->artifact('controller-build.log'),
@@ -499,7 +499,6 @@ final readonly class OperatorProvisioning
             ];
         }
         $runtime = [
-            'APP_HOME' => $s->appHome,
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
             'APP_SECRET' => 'operator-test-only',
@@ -520,7 +519,7 @@ final readonly class OperatorProvisioning
             ],
         );
         $lines = [];
-        foreach ($runtime as $key => $value) {
+        foreach (['APP_HOME' => $s->appHome, ...$runtime] as $key => $value) {
             $lines[] = $key . '=' . $value;
         }
         $this->qualification->write($this->qualification->work('runtime.env'), implode("\n", $lines) . "\n");
@@ -554,7 +553,7 @@ final readonly class OperatorProvisioning
             '/bin/sh',
             $s->imageId,
             '-ec',
-            self::MEDIA_PREPARATION,
+            $this->qualification->application(self::MEDIA_PREPARATION),
         ]);
         $this->qualification->resources->runContainer(
             [

@@ -12,6 +12,7 @@ use Baander\Tooling\Docker\TargetResolver;
 use Baander\Tooling\Process\EngineExecutor;
 use Baander\Tooling\Process\ExecutionContext;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DockerClientTest extends TestCase
 {
@@ -29,7 +30,7 @@ final class DockerClientTest extends TestCase
         file_put_contents($this->root . '/docker', '#!' . PHP_BINARY . "\n" . <<<'CLI'
 <?php
 $args = array_slice($argv, 1);
-file_put_contents(getenv('FAKE_ROOT') . '/calls', json_encode([$args, getenv('DOCKER_CONTEXT'), getenv('DOCKER_HOST'), getenv('DOCKER_CONFIG')]) . "\n", FILE_APPEND);
+file_put_contents(getenv('FAKE_ROOT') . '/calls', json_encode([$args, getenv('DOCKER_CONTEXT'), getenv('DOCKER_HOST'), getenv('DOCKER_CONFIG'), ['BUILDX_BUILDER' => getenv('BUILDX_BUILDER'), 'BUILDKIT_HOST' => getenv('BUILDKIT_HOST'), 'DOCKER_BUILDKIT' => getenv('DOCKER_BUILDKIT'), 'CUSTOM_BUILD_SETTING' => getenv('CUSTOM_BUILD_SETTING')]]) . "\n", FILE_APPEND);
 if ($args[0] === 'context') {
     if ($args[1] === 'show') { echo 'selected'; exit; }
     $material = file_exists(getenv('FAKE_ROOT') . '/declared-tls') ? json_decode(file_get_contents(getenv('FAKE_ROOT') . '/declared-tls'), true) : [];
@@ -99,6 +100,83 @@ CLI);
         $calls = file($this->root . '/calls', FILE_IGNORE_NEW_LINES);
         self::assertCount(1, $calls);
         self::assertSame(['--host', 'unix:///selected.sock', 'info', '--format', '{{json .}}'], json_decode($calls[0], true, flags: JSON_THROW_ON_ERROR)[0]);
+    }
+
+    /** @return iterable<string,array{list<string>,list<string>,bool}> */
+    public static function pinnedBuilds(): iterable
+    {
+        yield 'plain build' => [['build'], ['build', '--builder', 'default'], false];
+        yield 'asynchronous buildx' => [['buildx', 'build', '--load'], ['buildx', 'build', '--builder', 'default', '--load'], true];
+        yield 'explicit default' => [['build', '--builder', 'default'], ['build', '--builder', 'default'], false];
+        yield 'explicit buildx default' => [['buildx', 'build', '--builder=default'], ['buildx', 'build', '--builder=default'], false];
+        yield 'buildx root selector' => [['buildx', '--builder', 'default', '--debug', 'build'], ['buildx', '--builder', 'default', '--debug', 'build'], false];
+        yield 'image build alias' => [['image', 'build'], ['image', 'build', '--builder', 'default'], false];
+        yield 'builder build alias' => [['builder', 'build'], ['builder', 'build', '--builder', 'default'], false];
+    }
+
+    /** @param list<string> $prefix
+     * @param list<string> $expected
+     */
+    #[DataProvider('pinnedBuilds')]
+    public function testBuildsUseFrozenDaemonAndCommandLocalBuilderEnvironment(array $prefix, array $expected, bool $asynchronous): void
+    {
+        $target = $this->resolve();
+        $captured = $this->environment + ['BUILDX_BUILDER' => 'captured-foreign', 'BUILDKIT_HOST' => 'tcp://captured.baander.app:1234', 'DOCKER_BUILDKIT' => '0'];
+        $overrides = ['BUILDX_BUILDER' => 'override-foreign', 'BUILDKIT_HOST' => 'tcp://override.baander.app:1234', 'DOCKER_BUILDKIT' => 'false', 'CUSTOM_BUILD_SETTING' => 'preserved'];
+        $client = new Client($this->executor, $target, $captured);
+        $options = ['--tag', 'baander-build:test', '--cache-from', 'type=registry,ref=registry.baander.app/cache',
+            '--cache-to', 'type=local,dest=/tmp/baander-cache', '--build-arg', 'VALUE=--builder=preserved', '--', './context'];
+        if ($asynchronous) {
+            $this->executor->wait($client->start([...$prefix, ...$options], env: $overrides));
+        } else {
+            $client->run([...$prefix, ...$options], env: $overrides);
+        }
+        $calls = array_map(static fn(string $line): mixed => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($this->root . '/calls', FILE_IGNORE_NEW_LINES));
+        [$arguments, , , $config, $environment] = $calls[array_key_last($calls)];
+        self::assertSame(['--host', 'unix:///selected.sock', ...$expected, ...$options], $arguments);
+        self::assertSame($this->root . '/auth', $config);
+        self::assertFalse($environment['BUILDX_BUILDER']);
+        self::assertFalse($environment['BUILDKIT_HOST']);
+        self::assertSame('1', $environment['DOCKER_BUILDKIT']);
+        self::assertSame('preserved', $environment['CUSTOM_BUILD_SETTING']);
+        self::assertSame('captured-foreign', $captured['BUILDX_BUILDER']);
+        self::assertSame('override-foreign', $overrides['BUILDX_BUILDER']);
+        $client->run(['version'], env: $overrides);
+        $calls = file($this->root . '/calls', FILE_IGNORE_NEW_LINES);
+        $nonBuild = json_decode($calls[array_key_last($calls)], true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($overrides, $nonBuild[4]);
+        $client->run(['version']);
+        $calls = file($this->root . '/calls', FILE_IGNORE_NEW_LINES);
+        $capturedAgain = json_decode($calls[array_key_last($calls)], true, flags: JSON_THROW_ON_ERROR)[4];
+        self::assertSame('captured-foreign', $capturedAgain['BUILDX_BUILDER']);
+        self::assertSame('tcp://captured.baander.app:1234', $capturedAgain['BUILDKIT_HOST']);
+        self::assertSame('0', $capturedAgain['DOCKER_BUILDKIT']);
+    }
+
+    /** @return iterable<string,array{list<string>}> */
+    public static function conflictingBuildSelectors(): iterable
+    {
+        yield 'plain foreign' => [['build', '--builder', 'foreign']];
+        yield 'buildx foreign' => [['buildx', 'build', '--builder=foreign']];
+        yield 'duplicate default' => [['build', '--builder', 'default', '--builder=default']];
+        yield 'missing builder' => [['buildx', 'build', '--builder']];
+        yield 'foreign root selector' => [['buildx', '--builder', 'foreign', 'build']];
+        yield 'duplicate across root and command' => [['buildx', '--builder=default', 'build', '--builder', 'default']];
+    }
+
+    /** @param list<string> $arguments */
+    #[DataProvider('conflictingBuildSelectors')]
+    public function testBuildSelectorConflictsFailBeforeExecutingDocker(array $arguments): void
+    {
+        $client = new Client($this->executor, $this->resolve(), $this->environment);
+        file_put_contents($this->root . '/calls', '');
+        try {
+            $client->run($arguments);
+            self::fail('An ambiguous or foreign builder was accepted.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString('builder', $error->getMessage());
+        }
+        self::assertSame('', file_get_contents($this->root . '/calls'));
     }
 
     public function testDockerDoesNotRequireComposeAndDaemonMismatchRetainsSnapshot(): void

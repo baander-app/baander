@@ -6,6 +6,8 @@ namespace Baander\Tooling\Fixtures\Worker;
 
 use Baander\Tooling\Resources\{ResourceLedger, ResourceKind, DisposableContainer, ImageLedger};
 use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Filesystem\AtomicFile;
+use Baander\Tooling\Fixtures\Runtime;
 
 final class OperatorResources
 {
@@ -81,13 +83,47 @@ final class OperatorResources
         return $this->ledger->create(ResourceKind::Volume, $name, $arguments);
     }
 
+    public function buildInput(string $role, string $id): string
+    {
+        $docker = $this->commands->client();
+        $images = $this->images ??= new ImageLedger($this->artifacts . '/images.json', $docker);
+        $path = $this->artifacts . '/build-inputs.json';
+        $evidence = is_file($path) ? AtomicFile::readJson($path) : ['version' => 1, 'daemonId' => $docker->target->daemonId, 'inputs' => []];
+        if (($evidence['version'] ?? null) !== 1 || ($evidence['daemonId'] ?? null) !== $docker->target->daemonId || !is_array($evidence['inputs'] ?? null)
+            || array_key_exists($role, $evidence['inputs'])) {
+            throw new \RuntimeException('Invalid or duplicate build input evidence; preserve it for inspection.');
+        }
+        $evidence['inputs'][$role] = ['id' => $id];
+        AtomicFile::writeJson($path, $evidence);
+        $reference = $images->alias($role, $id);
+        $evidence['inputs'][$role]['reference'] = $reference;
+        AtomicFile::writeJson($path, $evidence);
+        return $reference;
+    }
+
     /** @param list<string> $arguments Docker build options and context, without tag or ownership flags. */
     public function buildImage(string $name, array $arguments, string $log): ProcessResult
     {
         $docker = $this->commands->client();
         $images = $this->images ??= new ImageLedger($this->artifacts . '/images.json', $docker);
+        $images->validateAliases($docker);
         $images->intend($name);
-        $result = $docker->run(['build', '--tag', $name, '--label', 'org.baander.tooling.run=' . $images->token, ...$arguments], logPath: $log);
+        $failure = null;
+        try {
+            $result = $docker->run(['build', '--tag', $name, '--label', 'org.baander.tooling.run=' . $images->token, ...$arguments], logPath: $log);
+        } catch (\Throwable $error) {
+            $failure = $error;
+            throw $error;
+        } finally {
+            try {
+                $images->validateAliases($docker);
+            } catch (\Throwable $verification) {
+                if ($failure !== null) {
+                    throw new \RuntimeException(Runtime::failure($failure) . "\nBuild input verification failed: " . $verification->getMessage(), Runtime::status($failure), $failure);
+                }
+                throw $verification;
+            }
+        }
         $images->observe($name);
         return $result;
     }

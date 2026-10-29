@@ -82,6 +82,37 @@ final class WorkerCleanupTest extends TestCase
         }
     }
 
+    /** @return iterable<string,array{string,string,list<string>}> */
+    public static function identityEnumerations(): iterable
+    {
+        yield 'container' => ['container', '{"ID":{{json .ID}},"Names":{{json .Names}}}', ['ID', 'Names']];
+        yield 'network' => ['network', '{"ID":{{json .ID}},"Name":{{json .Name}}}', ['ID', 'Name']];
+        yield 'volume' => ['volume', '{"Name":{{json .Name}}}', ['Name']];
+    }
+
+    /** @param list<string> $fields */
+    #[DataProvider('identityEnumerations')]
+    public function testDockerFakeHonorsIdentityOnlyEnumeration(string $kind, string $format, array $fields): void
+    {
+        $this->state('clean', null);
+        $commands = new OperatorCommands(dirname(__DIR__, 3), $this->environment, 60);
+        try {
+            $arguments = [$kind, 'ls', ...($kind === 'container' ? ['--all', '--no-trunc'] : ($kind === 'network' ? ['--no-trunc'] : [])), '--format', $format];
+            $output = trim($commands->docker($arguments)->stdout);
+            $rows = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), explode("\n", $output));
+            self::assertNotEmpty($rows);
+            foreach ($rows as $row) {
+                self::assertEqualsCanonicalizing($fields, array_keys($row));
+                if ($kind !== 'volume') {
+                    self::assertSame(hash('sha256', $row[$kind === 'container' ? 'Names' : 'Name']), $row['ID']);
+                }
+            }
+            self::assertContains('unrelated-' . $kind, array_column($rows, $kind === 'container' ? 'Names' : 'Name'));
+        } finally {
+            $commands->close();
+        }
+    }
+
     private function state(string $mode, ?string $blocked): OperatorRun
     {
         $resources = [];

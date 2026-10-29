@@ -75,8 +75,22 @@ if ($arguments[0] === 'info') {
     if ($mode === 'transport' || ($mode === 'verification-transport' && $state['queries'][$kind] === 2)) {
         $code = 125;
     } else {
+        $formatIndex = array_search('--format', $arguments, true);
+        $format = $formatIndex === false ? null : $arguments[$formatIndex + 1];
+        $identityFormat = match ($kind) {
+            'container' => '{"ID":{{json .ID}},"Names":{{json .Names}}}',
+            'network' => '{"ID":{{json .ID}},"Name":{{json .Name}}}',
+            'volume' => '{"Name":{{json .Name}}}',
+            default => null,
+        };
         foreach ($state['resources'][$kind] ?? [] as $name) {
-            if (in_array('{{json .}}', $arguments, true)) {
+            if ($identityFormat !== null && $format === $identityFormat) {
+                echo json_encode(match ($kind) {
+                    'container' => ['ID' => hash('sha256', $name), 'Names' => $name],
+                    'network' => ['ID' => hash('sha256', $name), 'Name' => $name],
+                    default => ['Name' => $name],
+                }, JSON_THROW_ON_ERROR), "\n";
+            } elseif ($format === '{{json .}}') {
                 echo json_encode($kind === 'image'
                     ? ['Repository' => explode(':', $name, 2)[0], 'Tag' => explode(':', $name, 2)[1] ?? 'latest', 'ID' => 'sha256:' . hash('sha256', $name)]
                     : [$kind === 'container' ? 'Names' : 'Name' => $name, 'ID' => hash('sha256', $name)], JSON_THROW_ON_ERROR), "\n";

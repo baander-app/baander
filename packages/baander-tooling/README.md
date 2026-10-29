@@ -99,6 +99,18 @@ tags; `--source`, `--revision`, `--cache-from` and `--cache-to` supply build inp
 Compose consumers. Use that generated file when the consuming Compose command
 requires it.
 
+`Docker\Client` pins builds to the selected daemon's default BuildKit builder.
+It removes ambient `BUILDX_BUILDER` and `BUILDKIT_HOST` settings and enables
+BuildKit only in the build command's environment; the caller's environment stays
+unchanged. A remote builder cannot override the captured daemon selection.
+
+Builds that consume selected local image IDs use owned temporary tags, verified
+against those IDs before and after the build. Each shared base must retain another
+verified tag or a digest from a different repository so removing the temporary tag
+cannot remove the base. A dangling source image is rejected before alias creation.
+Cleanup owns the temporary aliases and build outputs; it never claims ownership
+of a shared base image.
+
 A development prepared release saves its layout, Docker target, immutable image
 identities, effective settings and generated-input/source identities before
 activation. Recovery uses that saved contract even when current local preferences
