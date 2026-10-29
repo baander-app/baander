@@ -135,8 +135,8 @@ final class DevelopmentActivationTest extends TestCase
                 return new ProcessResult(0, null, false, false, '[]', '', 0);
             }
             self::assertSame([
-                'app:library:create', 'Music', '/media/music', 'music', '--slug', 'music', '--json',
-            ], array_slice($arguments, -7));
+                'app:library:create', '--slug', 'music', '--json', '--', 'Music', '/media/music', 'music',
+            ], array_slice($arguments, -8));
             return new ProcessResult(0, null, false, false, '{}', '', 0);
         });
         $this->updater->libraries = new Libraries($runner);

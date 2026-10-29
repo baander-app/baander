@@ -65,12 +65,13 @@ class Libraries
                 $docker->compose($instance, [
                     ...$command,
                     'app:library:create',
-                    $definition['name'],
-                    $definition['target'],
-                    $definition['type'],
                     '--slug',
                     $definition['slug'],
                     '--json',
+                    '--',
+                    $definition['name'],
+                    $definition['target'],
+                    $definition['type'],
                 ]);
             } catch (WorkflowError $error) {
                 throw new WorkflowError(sprintf(

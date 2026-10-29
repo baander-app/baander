@@ -207,10 +207,7 @@ final class Cli
         self::validateMediaState([...$configured, ...$explicit], $store->root);
         self::validateMediaMounts($configured);
         self::validateMediaMounts($explicit);
-        $supplied = [];
-        foreach ([...$configured, ...$explicit] as $mount) {
-            $supplied[$mount['target']] = $mount;
-        }
+        $supplied = array_column([...$configured, ...$explicit], null, 'target');
         self::validateMediaMounts(array_values($supplied));
         $identity = $options['instance'] ?? Environment::previewId($root, $repository);
         $lock = $store->lock($identity);
@@ -244,7 +241,7 @@ final class Cli
                     ))
                     |> array_values(...);
             }
-            foreach ([...($libraries === null ? [] : $configured), ...$explicit] as $mount) {
+            foreach ([...$configured, ...$explicit] as $mount) {
                 $media = $media
                     |> (static fn(array $mounts): array => array_filter(
                         $mounts,

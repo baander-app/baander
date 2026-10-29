@@ -6,7 +6,10 @@ namespace Baander\Tooling\Development;
 
 final class LocalConfiguration
 {
-    /** @return list<array{slug:string,name:string,type:string,source:string,target:string}>|null */
+    /**
+     * @return list<array{slug:string,name:string,type:string,source:string,target:string}>|null
+     * @phpstan-impure
+     */
     public static function libraries(Runner $runner, string $root): ?array
     {
         $path = $root . '/dev.local.json';
@@ -33,7 +36,7 @@ final class LocalConfiguration
             $candidate = $runner->run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd: $checkout, check: false);
             if (
                 $candidate->exitCode !== 0
-                || Environment::resolvedPath(trim($candidate->stdout)) !== Environment::resolvedPath($directories[1])
+                || ($candidate->stdout |> trim(...) |> Environment::resolvedPath(...)) !== Environment::resolvedPath($directories[1])
             ) {
                 return null;
             }
@@ -53,7 +56,7 @@ final class LocalConfiguration
         }
         if (
             !$configuration instanceof \stdClass
-            || array_diff(array_keys(get_object_vars($configuration)), ['libraries']) !== []
+            || array_diff($configuration |> get_object_vars(...) |> array_keys(...), ['libraries']) !== []
         ) {
             throw new WorkflowError('dev.local.json must be an object containing only libraries.');
         }
@@ -68,7 +71,7 @@ final class LocalConfiguration
         foreach ($configuration->libraries as $entry) {
             if (
                 !$entry instanceof \stdClass
-                || array_diff(array_keys(get_object_vars($entry)), ['slug', 'name', 'type', 'path']) !== []
+                || array_diff($entry |> get_object_vars(...) |> array_keys(...), ['slug', 'name', 'type', 'path']) !== []
             ) {
                 throw new WorkflowError('Each development library must contain only slug, name, type and path.');
             }
@@ -77,7 +80,7 @@ final class LocalConfiguration
                     throw new WorkflowError('Each development library requires a nonempty ' . $field . ' string.');
                 }
             }
-            $slug = strtolower(trim($entry->slug));
+            $slug = $entry->slug |> trim(...) |> strtolower(...);
             if (preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug) !== 1 || isset($slugs[$slug])) {
                 throw new WorkflowError('Development library slugs must be valid and unique.');
             }

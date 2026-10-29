@@ -10,6 +10,10 @@ use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputDefinition;
+use Symfony\Component\Console\Input\InputOption;
 
 final class DevelopmentLibrariesTest extends TestCase
 {
@@ -48,9 +52,39 @@ final class DevelopmentLibrariesTest extends TestCase
         $prefix = ['fake', '--context', 'owned', 'compose', '--project-name', 'libraries-test', '--file', '/disposable/compose.json', 'exec', '-T', 'app', 'php', 'bin/console'];
         self::assertSame([
             [...$prefix, 'app:library:list', '--json'],
-            [...$prefix, 'app:library:create', ' Music ', '/media/music', 'music', '--slug', 'music', '--json'],
+            [...$prefix, 'app:library:create', '--slug', 'music', '--json', '--', ' Music ', '/media/music', 'music'],
             [...$prefix, 'app:library:list', '--json'],
         ], $commands);
+    }
+
+    public function testLeadingHyphenNameRemainsAnArgumentInsteadOfRequestingHelp(): void
+    {
+        $instance = self::instance();
+        $instance['libraries'][0]['name'] = '--help';
+        $runner = $this->createMock(Runner::class);
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (array $arguments): ProcessResult {
+            if (in_array('app:library:list', $arguments, true)) {
+                return new ProcessResult(0, null, false, false, '[]', '', 0);
+            }
+            $position = array_search('app:library:create', $arguments, true);
+            self::assertIsInt($position);
+            $input = new ArgvInput(['bin/console', ...array_slice($arguments, $position + 1)]);
+            self::assertFalse($input->hasParameterOption('--help', true));
+            $input->bind(new InputDefinition([
+                new InputArgument('name', InputArgument::REQUIRED),
+                new InputArgument('path', InputArgument::REQUIRED),
+                new InputArgument('type', InputArgument::REQUIRED),
+                new InputOption('slug', mode: InputOption::VALUE_REQUIRED),
+                new InputOption('json'),
+            ]));
+            self::assertSame('--help', $input->getArgument('name'));
+            self::assertSame('/media/music', $input->getArgument('path'));
+            self::assertSame('music', $input->getArgument('type'));
+            self::assertSame('music', $input->getOption('slug'));
+            self::assertTrue($input->getOption('json'));
+            return new ProcessResult(0, null, false, false, '{}', '', 0);
+        });
+        new Libraries($runner)->ensure($instance);
     }
 
     public function testEmptyOrAbsentDefinitionsNeverRunCommands(): void
@@ -80,12 +114,29 @@ final class DevelopmentLibrariesTest extends TestCase
         new Libraries($runner)->ensure(self::instance());
     }
 
+    /** @return iterable<string,array{string,string}> */
     public static function driftCases(): iterable
     {
         yield 'name' => ['name', 'Renamed'];
         yield 'type' => ['type', 'podcast'];
         yield 'path' => ['path', '/other'];
         yield 'filesystem' => ['filesystemType', 'remote'];
+    }
+
+    public function testLaterConflictPreventsCreatingAnEarlierMissingLibrary(): void
+    {
+        $instance = self::instance();
+        array_unshift($instance['libraries'], [
+            'slug' => 'movies', 'name' => 'Movies', 'type' => 'movie',
+            'source' => '/host/movies', 'target' => '/media/movies',
+        ]);
+        $catalog = [array_replace(self::existing(), ['name' => 'Conflicting name'])];
+        $runner = $this->createMock(Runner::class);
+        $runner->expects(self::once())->method('run')->willReturn(
+            new ProcessResult(0, null, false, false, json_encode($catalog, JSON_THROW_ON_ERROR), '', 0),
+        );
+        $this->expectExceptionMessage('conflicting name');
+        new Libraries($runner)->ensure($instance);
     }
 
     #[DataProvider('invalidLists')]
@@ -98,6 +149,7 @@ final class DevelopmentLibrariesTest extends TestCase
         new Libraries($runner)->ensure(self::instance());
     }
 
+    /** @return iterable<string,array{string}> */
     public static function invalidLists(): iterable
     {
         yield 'not json' => ['invalid'];
