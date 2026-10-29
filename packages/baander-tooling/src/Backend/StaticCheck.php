@@ -13,9 +13,9 @@ use Baander\Tooling\Process\EngineExecutor;
 use Baander\Tooling\Process\ExecutionContext;
 use Baander\Tooling\Resources\ResourceKind;
 use Baander\Tooling\Resources\ResourceLedger;
-use Baander\Tooling\Development\Build\Source;
-use Baander\Tooling\Development\Runner;
-use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Build\Source;
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec};
+use RuntimeException;
 
 final class StaticCheck
 {
@@ -29,9 +29,9 @@ final class StaticCheck
                 && self::inventory([...$lock['packages'], ...$lock['packages-dev']]) === self::inventory($installed['packages'])) {
                 return;
             }
-        } catch (\JsonException|WorkflowError) {
+        } catch (\JsonException|RuntimeException) {
         }
-        throw new WorkflowError('Composer dependencies do not match composer.lock; run composer install with development dependencies first.');
+        throw new RuntimeException('Composer dependencies do not match composer.lock; run composer install with development dependencies first.');
     }
 
     /** @return array<string,mixed> */
@@ -39,11 +39,11 @@ final class StaticCheck
     {
         $contents = is_file($path) ? file_get_contents($path) : false;
         if ($contents === false) {
-            throw new WorkflowError('Cannot read Composer metadata.');
+            throw new RuntimeException('Cannot read Composer metadata.');
         }
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($decoded)) {
-            throw new WorkflowError('Invalid Composer metadata.');
+            throw new RuntimeException('Invalid Composer metadata.');
         }
         return $decoded;
     }
@@ -56,13 +56,13 @@ final class StaticCheck
         $inventory = [];
         foreach ($packages as $package) {
             if (!is_array($package) || !is_string($package['name'] ?? null) || !is_string($package['version'] ?? null)) {
-                throw new WorkflowError('Invalid Composer package metadata.');
+                throw new RuntimeException('Invalid Composer package metadata.');
             }
             $references = [];
             foreach (['source', 'dist'] as $kind) {
                 $section = $package[$kind] ?? [];
                 if (!is_array($section) || (!is_null($section['reference'] ?? null) && !is_string($section['reference']))) {
-                    throw new WorkflowError('Invalid Composer reference metadata.');
+                    throw new RuntimeException('Invalid Composer reference metadata.');
                 }
                 $references[] = $section['reference'] ?? null;
             }
@@ -73,18 +73,18 @@ final class StaticCheck
     }
 
     /** @return array{string,string,string} */
-    public static function prepareCheckout(Runner $runner, string $root, string $directory): array
+    public static function prepareCheckout(CommandExecutor $runner, string $root, string $directory): array
     {
         if (!is_file($root . '/vendor/autoload.php')) {
-            throw new WorkflowError('Install Composer dependencies first.');
+            throw new RuntimeException('Install Composer dependencies first.');
         }
         if (!is_file($root . '/scripts/vendor/autoload.php')) {
-            throw new WorkflowError('Install workflow tooling first: composer --working-dir=scripts install --no-dev');
+            throw new RuntimeException('Install workflow tooling first: composer --working-dir=scripts install --no-dev');
         }
         $dependencies = ['vendor', 'scripts/vendor'];
         if (is_file($root . '/relay/composer.json')) {
             if (!is_file($root . '/relay/vendor/autoload.php')) {
-                throw new WorkflowError('Install registry tooling first: composer --working-dir=relay install --no-dev');
+                throw new RuntimeException('Install registry tooling first: composer --working-dir=relay install --no-dev');
             }
             $dependencies[] = 'relay/vendor';
         }
@@ -92,8 +92,8 @@ final class StaticCheck
         $source = $directory . '/source';
         $revision = Source::snapshotWorktree($runner, $root, $source);
         $archive = $directory . '/checkout.tar';
-        $runner->run(['tar', '--exclude=__pycache__', '--exclude=.phpunit.cache', '-cf', $archive,
-            '-C', $source, '.', '-C', $root, ...$dependencies], timeout: null);
+        $runner->run(new ProcessSpec(['tar', '--exclude=__pycache__', '--exclude=.phpunit.cache', '-cf', $archive,
+            '-C', $source, '.', '-C', $root, ...$dependencies]));
         return [$source, $revision, $archive];
     }
 
@@ -173,8 +173,7 @@ final class StaticCheck
             throw new \InvalidArgumentException('Supply a check command after --.');
         }
         $environment = getenv();
-        $configuration = ToolingConfiguration::resolve(flags: $context === null ? [] : ['docker' => ['context' => $context]], environment: $environment);
-        $runner = new Runner();
+        $configuration = ToolingConfiguration::forRepository($root, $environment, $context === null ? [] : ['docker' => ['context' => $context]]);
         $directory = sys_get_temp_dir() . '/baander-check-' . bin2hex(random_bytes(12));
         $executor = null;
         $ownsDirectory = false;
@@ -182,13 +181,13 @@ final class StaticCheck
         $status = 0;
         try {
             if (!mkdir($directory, 0700)) {
-                throw new WorkflowError('Cannot create static-check workspace.');
+                throw new RuntimeException('Cannot create static-check workspace.');
             }
             $ownsDirectory = true;
             $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
             $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $directory . '/transport'), $environment);
             $ledger = new ResourceLedger($directory . '/resources.json', $docker, $environment);
-            [$source, $revision, $archive] = self::prepareCheckout($runner, $root, $directory);
+            [$source, $revision, $archive] = self::prepareCheckout($executor, $root, $directory);
             $image ??= new ApplicationImage($docker, $configuration->images)->build($source, 'ci', $revision, 'baander-check:' . $revision . '-' . basename($directory));
             $status = self::runCheck($docker, $image, $archive, $command, ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json'), $ledger, $configuration->budgets->seconds('cleanup'));
             return $status;
@@ -204,13 +203,18 @@ final class StaticCheck
             }
             try {
                 if ($ownsDirectory && !file_exists($directory . '/resources.json') && !is_link($directory . '/resources.json')) {
-                    $runner->run(['rm', '-rf', '--', $directory], timeout: $configuration->budgets->seconds('cleanup'));
+                    $cleanup = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('cleanup'), $environment, ignoreCancellation: true));
+                    try {
+                        $cleanup->run(new ProcessSpec(['rm', '-rf', '--', $directory]));
+                    } finally {
+                        $cleanup->close();
+                    }
                 }
             } catch (\Throwable $error) {
                 $errors[] = $error->getMessage();
             }
             if ($errors !== []) {
-                throw new WorkflowError(($primary !== null ? $primary->getMessage() . '; ' : '') . 'Static-check staging cleanup failed: ' . implode('; ', $errors), $primary !== null ? ($primary->getCode() ?: 1) : ($status ?: 1), $primary);
+                throw new RuntimeException(($primary !== null ? $primary->getMessage() . '; ' : '') . 'Static-check staging cleanup failed: ' . implode('; ', $errors), $primary !== null ? ($primary->getCode() ?: 1) : ($status ?: 1), $primary);
             }
         }
     }

@@ -86,6 +86,22 @@ CLI);
         }
     }
 
+    public function testNestedInvocationUsesCapturedTargetWithoutResolvingAmbientContext(): void
+    {
+        $target = $this->resolve();
+        $file = $this->root . '/target.json';
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($file, $target->toArray());
+        file_put_contents($this->root . '/calls', '');
+        file_put_contents($this->root . '/endpoint', 'unix:///other.sock');
+        $environment = $this->environment + ['BAANDER_TOOLING_TARGET_FILE' => $file];
+        $resolved = new TargetResolver($this->executor, $environment)->resolve(new DockerSettings('/missing/ambient-docker', context: 'changed'), $this->root . '/unused-snapshot');
+        self::assertSame($target->toArray(), $resolved->toArray());
+        self::assertDirectoryDoesNotExist($this->root . '/unused-snapshot');
+        $calls = file($this->root . '/calls', FILE_IGNORE_NEW_LINES);
+        self::assertCount(1, $calls);
+        self::assertSame(['--host', 'unix:///selected.sock', 'info', '--format', '{{json .}}'], json_decode($calls[0], true, flags: JSON_THROW_ON_ERROR)[0]);
+    }
+
     public function testDockerDoesNotRequireComposeAndDaemonMismatchRetainsSnapshot(): void
     {
         $target = $this->resolve();

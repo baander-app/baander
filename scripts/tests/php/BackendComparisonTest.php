@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Backend\Comparison;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Inventory\Collector;
+use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -32,7 +33,7 @@ final class BackendComparisonTest extends TestCase
 
     protected function tearDown(): void
     {
-        new Runner()->run(['rm', '-rf', '--', $this->directory]);
+        Collector::remove($this->directory);
     }
 
     private function fixture(string $directory): void
@@ -265,9 +266,13 @@ final class BackendComparisonTest extends TestCase
     public function testCliComparesRealRunsAndReportsUsageErrors(): void
     {
         $entrypoint = dirname(__DIR__, 2) . '/compare-backend-runs.php';
-        $runner = new Runner();
-        $result = $runner->run([PHP_BINARY, $entrypoint, $this->directory . '/reference', $this->directory . '/candidate']);
-        self::assertSame(1, json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR)['tests']);
-        self::assertSame(2, $runner->run([PHP_BINARY, $entrypoint], check: false)->exitCode);
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, $entrypoint, $this->directory . '/reference', $this->directory . '/candidate']));
+            self::assertSame(1, json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR)['tests']);
+            self::assertSame(2, $executor->run(new ProcessSpec([PHP_BINARY, $entrypoint]), new CompletionPolicy([2]))->exitCode);
+        } finally {
+            $executor->close();
+        }
     }
 }

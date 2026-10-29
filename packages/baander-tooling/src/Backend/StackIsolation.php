@@ -12,7 +12,6 @@ final class StackIsolation
 {
     private const string DATABASE_URL = 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8';
     private const string REDIS_URL = 'redis://default:test-only@redis:6379';
-    private const string CACHE = '/var/www/html/var/cache/test/stack-isolation-marker';
     private const string SOCKET = '/tmp/baander-stack-isolation.sock';
     private const string CONNECT = <<<'PHP_CODE'
 $database = parse_url(getenv('DATABASE_URL'));
@@ -73,7 +72,7 @@ PHP_CODE;
 
     private function seed(string $stack): void
     {
-        $cache = var_export(self::CACHE, true);
+        $cache = var_export($this->runtime->layout->path('var/cache/test/stack-isolation-marker'), true);
         $socket = var_export(self::SOCKET, true);
         $marker = var_export($stack, true);
         $this->php($stack, self::CONNECT . <<<PHP_CODE
@@ -162,7 +161,7 @@ PHP_CODE]);
         $this->expect('peer Redis responds during pause', Runtime::now() - $started < 2, true);
         $this->php('left', $redis . "\$redis->setOption(Redis::OPT_READ_TIMEOUT, 10); echo \$redis->ping() ? 'ready' : 'failed';");
         $this->expect('left Redis pause observed', Runtime::now() - $started >= 3, true);
-        $cache = var_export(self::CACHE, true);
+        $cache = var_export($this->runtime->layout->path('var/cache/test/stack-isolation-marker'), true);
         $socket = var_export(self::SOCKET, true);
         foreach (['left', 'right'] as $stack) {
             $this->expect($stack . ' identical cache path', $this->php($stack, 'echo file_get_contents(' . $cache . ');'), $stack);
@@ -190,7 +189,7 @@ PHP_CODE]);
     public static function main(array $arguments, string $root): int
     {
         $artifacts = null;
-        $timeout = 300;
+        $timeout = null;
         while ($arguments !== []) {
             $option = array_shift($arguments);
             if ($option === '--help' || $option === '-h') {
@@ -211,12 +210,15 @@ PHP_CODE]);
                 default => throw new InvalidArgumentException('Unknown option: ' . $option),
             };
         }
+        $environment = getenv();
+        $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository($root, $environment, $timeout === null ? [] : ['budgets' => ['backend' => $timeout]]);
+        $timeout = $configuration->budgets->seconds('backend');
+        \Baander\Tooling\Configuration\ApplicationLayout::load($root . '/packages/baander-tooling/resources/application-layout.json');
         $artifacts ??= sys_get_temp_dir() . '/baander-stack-isolation-' . bin2hex(random_bytes(8));
         if (!is_dir($artifacts) && !mkdir($artifacts, 0700, true)) {
             throw new RuntimeException('Cannot create stack-isolation artifacts');
         }
-        $runtime = new Runtime($artifacts, $timeout, $root);
-        $runtime->image = $runtime->environment['BAANDER_TEST_IMAGE'] ?? 'baander-ci-prewarm:local';
+        $runtime = new Runtime($artifacts, $timeout, $root, $environment, $configuration);
         $regression = new self($runtime);
         $error = null;
         try {

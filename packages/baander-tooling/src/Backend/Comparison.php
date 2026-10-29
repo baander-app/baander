@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Backend;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
 use RuntimeException;
 
 final readonly class Comparison
@@ -29,10 +30,15 @@ final readonly class Comparison
         echo json_encode(['files' => $files, 'lines' => $lines, 'covered' => $covered], JSON_THROW_ON_ERROR);
         PHP_CODE;
 
+    private CommandExecutor $runner;
+
     public function __construct(
         private string $root,
-        private Runner $runner = new Runner(),
-    ) {}
+        ?CommandExecutor $runner = null,
+    ) {
+        $environment = getenv();
+        $this->runner = $runner ?? new EngineExecutor(ExecutionContext::bounded(ToolingConfiguration::forRepository($root, $environment)->budgets->seconds('backend'), $environment, $root));
+    }
 
     /** @return array<string,mixed> */
     private static function json(string $path): array
@@ -119,11 +125,10 @@ final readonly class Comparison
         if ($paths === []) {
             throw new RuntimeException('No serialized coverage lanes found');
         }
-        $extracted = $this->runner->run(
+        $extracted = $this->runner->run(new ProcessSpec(
             [PHP_BINARY, '-d', 'memory_limit=2G', '-r', self::EXTRACT_COVERAGE, $this->root . '/vendor/autoload.php', ...$paths],
             timeout: 120,
-            check: false,
-        );
+        ), new CompletionPolicy(null));
         if ($extracted->exitCode !== 0) {
             throw new RuntimeException('Cannot read serialized coverage: ' . trim($extracted->stderr));
         }

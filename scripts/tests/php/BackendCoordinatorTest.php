@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Backend\{Coordinator, Runtime};
-use Baander\Tooling\Development\{Docker, Environment, Runner, WorkflowError};
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Inventory\Collector;
+use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -14,18 +16,19 @@ use RuntimeException;
 final class BackendCoordinatorTest extends TestCase
 {
     private string $directory;
-    private Runner $runner;
+    private EngineExecutor $executor;
 
     protected function setUp(): void
     {
         $this->directory = sys_get_temp_dir() . '/baander-backend-tooling-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0700);
-        $this->runner = new Runner();
+        $this->executor = new EngineExecutor(ExecutionContext::bounded(120, getenv()));
     }
 
     protected function tearDown(): void
     {
-        $this->runner->run(['rm', '-rf', '--', $this->directory]);
+        $this->executor->close();
+        Collector::remove($this->directory);
     }
 
     /** @param array<string,string>|null $environment */
@@ -155,22 +158,64 @@ final class BackendCoordinatorTest extends TestCase
         }
     }
 
-    public function testTimeoutRetainsStreamedLogsAndStopsLaterCommands(): void
+    public function testControlledInterruptionRetainsLogsAfterChildReadiness(): void
+    {
+        $runtime = $this->runtime();
+        $process = null;
+        try {
+            $ready = $this->directory . '/ready';
+            $process = $runtime->startCommand(
+                [PHP_BINARY, '-r', 'echo "before timeout"; file_put_contents($argv[1], "ready"); usleep(20000000);', $ready],
+                timeout: 30,
+                logPath: $this->directory . '/timeout.log',
+            );
+            $deadline = Runtime::now() + 10;
+            while (!is_file($ready) && Runtime::now() < $deadline) {
+                usleep(1000);
+            }
+            self::assertFileExists($ready);
+            $process->cancel();
+            try {
+                $runtime->waitCommand($process, false);
+                self::fail('Interruption did not fail');
+            } catch (RuntimeException $error) {
+                self::assertStringContainsString('interrupted', $error->getMessage());
+            }
+            self::assertTrue($runtime->stopped);
+            self::assertSame('before timeout', file_get_contents($this->directory . '/timeout.log'));
+            try {
+                $runtime->startLane('later', ['files' => ['tests/Unit/LaterTest.php'], 'processes' => 1, 'batch' => 1, 'services' => true, 'privileged' => true], $this->directory, false);
+                self::fail('Started a later lane');
+            } catch (\Baander\Tooling\Process\CommandFailure $error) {
+                self::assertSame(143, $error->getCode());
+                self::assertSame([], $runtime->projects);
+                self::assertSame([], $runtime->containers);
+            }
+            try {
+                $runtime->run([PHP_BINARY, '-r', 'file_put_contents($argv[1], "wrong");', $this->directory . '/later']);
+                self::fail('Started a later command');
+            } catch (RuntimeException) {
+                self::assertFileDoesNotExist($this->directory . '/later');
+            }
+        } finally {
+            $process?->cancel();
+            $runtime->close();
+        }
+    }
+
+    public function testTimeoutCannotBecomeSuccessWhenTerminatedChildExitsZero(): void
     {
         $runtime = $this->runtime();
         try {
             try {
-                $runtime->run(
-                    [PHP_BINARY, '-r', 'echo "before timeout"; usleep(2000000);'],
-                    timeout: 0.1,
-                    logPath: $this->directory . '/timeout.log',
-                );
-                self::fail('Timeout did not fail');
-            } catch (RuntimeException $error) {
-                self::assertStringContainsString('timeout', $error->getMessage());
+                $runtime->run(['/bin/sh', '-c', 'trap "exit 0" TERM; while :; do sleep 1; done'], timeout: 0.1, check: false);
+                self::fail('Accepted a timed out command');
+            } catch (\Baander\Tooling\Process\CommandFailure $error) {
+                self::assertSame(124, $error->getCode());
+                self::assertTrue($error->result->timedOut);
+                self::assertSame(0, $error->result->exitCode);
+                self::assertTrue($runtime->stopped);
             }
-            self::assertTrue($runtime->stopped);
-            self::assertSame('before timeout', file_get_contents($this->directory . '/timeout.log'));
         } finally {
             $runtime->close();
         }
@@ -298,18 +343,18 @@ final class BackendCoordinatorTest extends TestCase
     public static function outcomes(): iterable
     {
         yield 'success' => ['', 0];
-        yield 'discovery failure' => ['discover', 1];
-        yield 'lane failure' => ['run', 1];
-        yield 'finalization failure' => ['finalize', 1];
+        yield 'discovery failure' => ['discover', 5];
+        yield 'lane failure' => ['run', 5];
+        yield 'finalization failure' => ['finalize', 5];
         yield 'cleanup failure' => ['cleanup', 1];
-        yield 'cancellation' => ['cancel', 1];
+        yield 'cancellation' => ['cancel', 143];
     }
 
     #[DataProvider('outcomes')]
     public function testCliPreservesOutcomesLogsTimingAndCleanup(string $failure, int $expected): void
     {
         $environment = $this->fakeEnvironment($failure);
-        $result = $this->runner->run([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], env: $environment, check: false);
+        $result = $this->executor->run(new ProcessSpec([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], environment: $environment, processGroup: true, replaceEnvironment: true), new CompletionPolicy(null));
         self::assertSame($expected, $result->exitCode, $result->stdout . $result->stderr);
         $runs = glob($this->directory . '/artifacts/*');
         self::assertCount(1, $runs);
@@ -329,10 +374,22 @@ final class BackendCoordinatorTest extends TestCase
         }
     }
 
+    public function testPrimaryFailureSurvivesCleanupFailureWithOwnershipReceipt(): void
+    {
+        $environment = array_replace($this->fakeEnvironment('discover'), ['BACKEND_FAIL_CLEANUP' => '1']);
+        $result = $this->executor->run(new ProcessSpec([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], environment: $environment, processGroup: true, replaceEnvironment: true), new CompletionPolicy(null));
+        self::assertSame(5, $result->exitCode, $result->stdout . $result->stderr);
+        $run = glob($this->directory . '/artifacts/*')[0];
+        self::assertSame(5, json_decode(file_get_contents($run . '/timing.json'), true, flags: JSON_THROW_ON_ERROR)['status']);
+        self::assertFileExists($run . '/ownership.json');
+        self::assertStringContainsString('discover fixture failure', file_get_contents($run . '/discovery.log'));
+        self::assertStringContainsString('Cleanup failed', $result->stderr);
+    }
+
     public function testServiceLanesUseDisjointComposeProjectsAndExplicitCleanup(): void
     {
         $environment = $this->fakeEnvironment(services: true);
-        $result = $this->runner->run([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], env: $environment, check: false);
+        $result = $this->executor->run(new ProcessSpec([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], environment: $environment, processGroup: true, replaceEnvironment: true), new CompletionPolicy(null));
         self::assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
         $projects = [];
         foreach ($this->commands() as $arguments) {
@@ -344,6 +401,9 @@ final class BackendCoordinatorTest extends TestCase
         }
         self::assertCount(2, array_unique($projects));
         $run = glob($this->directory . '/artifacts/*')[0];
+        foreach ($projects as $project) {
+            self::assertStringContainsString('compose log', file_get_contents($run . '/' . $project . '.compose.log'));
+        }
         foreach (['stack-1', 'stack-2'] as $lane) {
             self::assertFileExists($run . '/run/' . $lane . '.result.json');
             $log = file_get_contents($run . '/' . $lane . '.log');
@@ -354,20 +414,48 @@ final class BackendCoordinatorTest extends TestCase
         self::assertContains('anonymous-fixture-volume', $resources['volumes']);
     }
 
-    public function testFailedInventoryStillRemovesProjectsAndWritesFailedTiming(): void
+    public function testFailedInventoryRetainsOwnedProjectsAndWritesFailedTiming(): void
     {
         $environment = $this->fakeEnvironment('inventory', true);
-        $result = $this->runner->run([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], env: $environment, check: false);
-        self::assertSame(1, $result->exitCode);
+        $result = $this->executor->run(new ProcessSpec([PHP_BINARY, dirname(__DIR__, 2) . '/test-backend-container.php'], environment: $environment, processGroup: true, replaceEnvironment: true), new CompletionPolicy(null));
+        self::assertSame(8, $result->exitCode);
         self::assertStringContainsString('Cleanup failed', $result->stderr);
         $removals = array_filter($this->commands(), static fn(array $arguments): bool => in_array('down', $arguments, true));
-        self::assertCount(2, $removals);
+        self::assertCount(0, $removals);
+        self::assertCount(1, glob(glob($this->directory . '/artifacts/*')[0] . '/*.ownership.json'));
         $run = glob($this->directory . '/artifacts/*')[0];
-        self::assertSame(1, json_decode(file_get_contents($run . '/timing.json'), true, flags: JSON_THROW_ON_ERROR)['status']);
+        self::assertSame(8, json_decode(file_get_contents($run . '/timing.json'), true, flags: JSON_THROW_ON_ERROR)['status']);
         self::assertStringContainsString('inventory fixture failure', file_get_contents($run . '/after-cleanup-all-volumes.log'));
         $logs = glob($run . '/before-cleanup-*-volumes.log');
         self::assertNotEmpty($logs);
         self::assertStringContainsString('inventory fixture failure', file_get_contents($logs[0]));
+    }
+
+    public function testAlternateApplicationLayoutReachesArchiveProvisioningAndNativePartition(): void
+    {
+        $environment = array_replace($this->fakeEnvironment(), ['BACKEND_APP_HOME' => '/srv/baander']);
+        $root = $this->directory . '/source';
+        mkdir($root . '/packages/baander-tooling/resources', 0700, true);
+        file_put_contents($root . '/packages/baander-tooling/resources/application-layout.json', '{"version":1,"root":"/srv/baander"}');
+        $runtime = new Runtime($this->directory, 30, $root, $environment);
+        try {
+            $runtime->connect();
+            $runtime->archive = $this->directory . '/checkout.tar';
+            file_put_contents($runtime->archive, 'archive fixture');
+            $runtime->createApp('alternate');
+            $commands = $this->commands();
+            $creation = current(array_filter($commands, static fn(array $args): bool => in_array('create', $args, true)));
+            self::assertSame('/srv/baander', $creation[array_search('--workdir', $creation, true) + 1]);
+            self::assertContains('sha256:' . str_repeat('a', 64), $creation);
+            $provision = current(array_filter($commands, static fn(array $args): bool => array_any($args, static fn(string $arg): bool => str_contains($arg, 'tar -xf'))));
+            self::assertStringContainsString("tar -xf /tmp/checkout.tar -C '/srv/baander'", $provision[array_key_last($provision)]);
+            self::assertStringNotContainsString('/var/www/html', $provision[array_key_last($provision)]);
+            $lanes = Coordinator::partition(['/srv/baander/tests/Unit/NativeTest.php'], ['tests/Unit/NativeTest.php' => 'native'], 2, $runtime->layout->root);
+            self::assertArrayHasKey('native', $lanes);
+            self::assertTrue($runtime->cleanup());
+        } finally {
+            $runtime->close();
+        }
     }
 
     /** @return iterable<string,array{array<string,string>,string,string}> */
@@ -409,21 +497,16 @@ final class BackendCoordinatorTest extends TestCase
         $runtime = $this->runtime($environment);
         try {
             $runtime->connect();
-            $prefix = $runtime->dockerArguments();
-            self::assertSame([$option, $target], array_slice($prefix, 1));
-            $docker = new Docker(
-                $runtime,
-                [
-                    'executable' => $prefix[0],
-                    $option === '--host' ? 'host' : 'context' => $target,
-                    'daemon_id' => 'fixture-daemon',
-                ],
-            );
-            self::assertSame('fixture-daemon', $docker->validate()['ID']);
+            $first = $this->commands();
+            $selectedHost = $option === '--host' ? $target : 'unix:///baander.app/' . $target . '.sock';
+            $operational = array_values(array_filter($first, static fn(array $args): bool => $args[0] === '--host'));
+            self::assertNotEmpty($operational);
+            self::assertSame($selectedHost, $operational[0][1]);
             if ($option === '--host') {
+                self::assertContains('--tlsverify', $operational[0]);
                 $observed = json_decode(file_get_contents($this->directory . '/docker-environment.json'), true, flags: JSON_THROW_ON_ERROR);
-                self::assertSame('1', $observed['tls']);
-                self::assertSame('/tmp/baander-docker-certificates', $observed['certificates']);
+                self::assertFalse($observed['tls']);
+                self::assertFalse($observed['certificates']);
             }
             $runtime->createApp('target');
             $runtime->stopped = true;
@@ -431,17 +514,8 @@ final class BackendCoordinatorTest extends TestCase
             self::assertTrue($runtime->cleanup());
             foreach ($this->commands() as $arguments) {
                 if (($arguments[0] ?? '') !== 'context') {
-                    self::assertSame([$option, $target], array_slice($arguments, 0, 2));
+                    self::assertSame(['--host', $selectedHost], array_slice($arguments, 0, 2));
                 }
-            }
-            $changed = new Docker($runtime, array_replace($docker->configuration, ['daemon_id' => 'different-daemon']));
-            $runtime->stopped = false;
-            $runtime->deadline = Runtime::now() + 10;
-            try {
-                $changed->validate();
-                self::fail('Accepted changed daemon identity');
-            } catch (WorkflowError $error) {
-                self::assertStringContainsString('identity changed', $error->getMessage());
             }
         } finally {
             $runtime->close();

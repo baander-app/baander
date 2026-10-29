@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Backend;
 
-use Baander\Tooling\Development\{Cli, Docker, Environment, Runner};
-use Baander\Tooling\Process\{ProcessRunner, ProcessResult, ProcessSpec, RunningProcess, SignalScope};
+use Baander\Tooling\Configuration\{ApplicationLayout, ToolingConfiguration};
+use Baander\Tooling\Docker\{Client, Target, TargetResolver};
+use Baander\Tooling\Resources\{ComposeProject, ResourceKind, ResourceLedger};
+use Baander\Tooling\Process\{CommandFailure, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec, RunningProcess};
 use RuntimeException;
 use Throwable;
 
-class Runtime extends Runner
+class Runtime
 {
-    public const string CONTAINER_ROOT = '/var/www/html';
     public const string RUN_DIRECTORY = '/tmp/baander-run';
     public const string SWOOLE_LOADER = '/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini';
     public float $deadline;
@@ -36,9 +37,15 @@ class Runtime extends Runner
     public string $prefix;
     public string $image;
     public ?string $archive = null;
-    private readonly ProcessRunner $processes;
-    private readonly SignalScope $signals;
-    private ?Docker $dockerAdapter = null;
+    private EngineExecutor $executor;
+    private ?Client $dockerAdapter = null;
+    private ?ResourceLedger $ledger = null;
+    /** @var array<string,string> */
+    private array $serviceImages = [];
+    /** @var array<string,ComposeProject> */
+    private array $ownedProjects = [];
+    public readonly ToolingConfiguration $configuration;
+    public readonly ApplicationLayout $layout;
     private bool $independent = false;
     /** @var array{containers:list<string>,networks:list<string>,volumes:list<string>} */
     public array $resources = ['containers' => [], 'networks' => [], 'volumes' => []];
@@ -48,9 +55,10 @@ class Runtime extends Runner
     /** @param array<string,string>|null $environment */
     public function __construct(
         public readonly string $artifacts,
-        int $timeout,
+        float $timeout,
         public readonly string $root,
         ?array $environment = null,
+        ?ToolingConfiguration $configuration = null,
     ) {
         $this->environment = $environment ?? getenv();
         $disable = $this->environment['BAANDER_TEST_DISABLE_SWOOLE'] ?? '0';
@@ -58,13 +66,12 @@ class Runtime extends Runner
             throw new \InvalidArgumentException('BAANDER_TEST_DISABLE_SWOOLE must be 0 or 1');
         }
         $this->disableSwoole = $disable === '1';
+        $this->configuration = $configuration ?? ToolingConfiguration::forRepository($root, $this->environment);
+        $this->layout = ApplicationLayout::load($root . '/packages/baander-tooling/resources/application-layout.json');
         $this->deadline = self::now() + $timeout;
         $this->prefix = 'baander-tests-' . bin2hex(random_bytes(6));
-        $this->image = $this->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest';
-        $this->processes = new ProcessRunner();
-        $this->signals = new SignalScope(function (): void {
-            $this->stopped = true;
-        });
+        $this->image = $this->configuration->images->role('application')->reference;
+        $this->executor = new EngineExecutor(ExecutionContext::bounded($timeout, $this->environment, $root));
     }
 
     public static function now(): float
@@ -74,49 +81,23 @@ class Runtime extends Runner
 
     public function close(): void
     {
-        $this->signals->close();
+        $this->executor->close();
     }
 
-    /** @param array<string,string>|null $target */
-    public function connect(?array $target = null): void
+    public function connect(?Target $target = null): void
     {
-        if ($target !== null) {
-            $this->dockerAdapter = new Docker($this, $target);
-            return;
+        if ($this->dockerAdapter !== null) {
+            throw new RuntimeException('Docker target is already connected');
         }
-        $context = $this->environment['BAANDER_TEST_DOCKER_CONTEXT'] ?? '';
-        if ($context === '') {
-            $context = $this->environment['DOCKER_CONTEXT'] ?? '';
+        $target ??= new TargetResolver($this->executor, $this->environment)->resolve($this->configuration->docker, $this->artifacts . '/transport');
+        $this->dockerAdapter = new Client($this->executor, $target, $this->environment);
+        $this->ledger = new ResourceLedger($this->artifacts . '/ownership.json', $this->dockerAdapter, $this->environment);
+        $this->image = $this->dockerAdapter->resolveImage($this->configuration->images->role('application'), false)->id;
+        $inspection = json_decode($this->docker(['image', 'inspect', '--', $this->image])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($inspection) || count($inspection) !== 1 || !is_array($inspection[0])
+            || ApplicationLayout::fromImage($inspection[0])->toArray() !== $this->layout->toArray()) {
+            throw new RuntimeException('Backend image layout differs from the selected source layout');
         }
-        $host = $this->environment['DOCKER_HOST'] ?? '';
-        if ($context !== '') {
-            $target = Cli::dockerTarget($this, $context);
-        } else {
-            $executable = Environment::executable('docker') ?? throw new RuntimeException('Install Docker with Compose first');
-            if ($host !== '') {
-                $target = ['executable' => $executable, 'host' => $host];
-                $docker = new Docker($this, $target);
-                $information = json_decode($docker->run(['info', '--format', '{{json .}}'])->stdout, true, flags: JSON_THROW_ON_ERROR);
-                if (!is_array($information) || !is_string($information['ID'] ?? null) || $information['ID'] === '') {
-                    throw new RuntimeException('Cannot verify Docker daemon identity');
-                }
-                $target['daemon_id'] = $information['ID'];
-                $docker->run(['compose', 'version']);
-            } else {
-                $context = trim($this->run([$executable, 'context', 'show'])->stdout);
-                if ($context === '') {
-                    throw new RuntimeException('Cannot determine current Docker context');
-                }
-                $target = Cli::dockerTarget($this, $context);
-            }
-        }
-        $this->dockerAdapter = new Docker($this, $target);
-    }
-
-    /** @return non-empty-list<string> */
-    public function dockerArguments(): array
-    {
-        return ($this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'))->commandPrefix();
     }
 
     /** @param non-empty-list<string> $arguments
@@ -133,13 +114,13 @@ class Runtime extends Runner
         bool $interactive = false,
     ): ProcessResult {
         $process = $this->startCommand($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive);
-        return $this->waitCommand($process, $arguments, $check, $logPath);
+        return $this->waitCommand($process, $check);
     }
 
     /** @param non-empty-list<string> $arguments
      * @param array<string,string>|null $env
      */
-    private function startCommand(
+    public function startCommand(
         array $arguments,
         ?string $cwd = null,
         ?array $env = null,
@@ -149,17 +130,16 @@ class Runtime extends Runner
         bool $interactive = false,
     ): RunningProcess {
         if (!$this->independent) {
-            $this->signals->dispatch();
             if ($this->stopped) {
-                throw new RuntimeException('Backend run interrupted');
+                throw new CommandFailure('Backend run interrupted', 143);
             }
             $remaining = $this->deadline - self::now();
             if ($remaining <= 0) {
-                throw new RuntimeException('Backend overall timeout expired');
+                throw new CommandFailure('Backend overall timeout expired', 124);
             }
             $timeout = $timeout === null ? $remaining : min($timeout, $remaining);
         }
-        return $this->processes->start(new ProcessSpec(
+        return $this->executor->start(new ProcessSpec(
             argv: $arguments,
             cwd: $cwd ?? $this->root,
             environment: $env ?? $this->environment,
@@ -173,21 +153,29 @@ class Runtime extends Runner
         ));
     }
 
-    /** @param non-empty-list<string> $arguments */
-    private function waitCommand(RunningProcess $process, array $arguments, bool $check, ?string $log): ProcessResult
+    public function waitCommand(RunningProcess $process, bool $check = true): ProcessResult
     {
-        $result = $this->processes->wait($process);
-        if ($result->cancelled || $result->timedOut) {
-            if (!$this->independent) {
+        try {
+            return $this->executor->wait($process, new CompletionPolicy($check ? [0] : null));
+        } catch (CommandFailure $error) {
+            if (!$this->independent && ($error->result?->timedOut || $error->result?->cancelled || $error->result?->signal !== null)) {
                 $this->stopped = true;
             }
-            throw new RuntimeException('Backend run interrupted or command timeout expired: ' . $arguments[0]);
+            throw $error;
         }
-        if ($check && $result->exitCode !== 0) {
-            throw new RuntimeException('Command failed (' . $result->exitCode . '): ' . implode(' ', array_slice($arguments, 0, 3))
-                . "\n" . ($log ?? substr($result->stdout . $result->stderr, -4000)));
+    }
+
+    private function checkpoint(): void
+    {
+        if (!$this->independent) {
+            if ($this->stopped) {
+                throw new CommandFailure('Backend run interrupted', 143);
+            }
+            if ($this->deadline <= self::now()) {
+                throw new CommandFailure('Backend overall timeout expired', 124);
+            }
         }
-        return $result;
+        $this->executor->checkpoint();
     }
 
     /** @param list<string> $arguments
@@ -195,36 +183,32 @@ class Runtime extends Runner
      */
     public function docker(array $arguments, ?string $log = null, bool $check = true, ?array $env = null, ?float $timeout = null): ProcessResult
     {
-        return ($this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'))->run(
-            $arguments,
-            env: $env,
-            timeout: $timeout,
-            check: $check,
-            logPath: $log,
-        );
-    }
-
-    /** @param list<string> $arguments
-     * @return list<string>
-     */
-    public function composeArguments(string $project, array $arguments): array
-    {
-        return [
-            'compose',
-            '--project-name', $project,
-            '--project-directory', $this->root,
-            '--file', $this->root . '/compose.test.yaml',
-            ...$arguments,
-        ];
+        $this->checkpoint();
+        try {
+            return ($this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'))->run(
+                $arguments,
+                env: $env,
+                timeout: $timeout,
+                check: $check,
+                logPath: $log,
+                appendLog: true,
+            );
+        } catch (CommandFailure $error) {
+            if (!$this->independent && ($error->result?->timedOut || $error->result?->cancelled || $error->result?->signal !== null)) {
+                $this->stopped = true;
+            }
+            throw $error;
+        }
     }
 
     /** @param list<string> $arguments */
     public function compose(string $project, array $arguments, ?string $log = null, bool $check = true): ProcessResult
     {
+        $this->checkpoint();
         if (!in_array($project, $this->projects, true)) {
             throw new RuntimeException('Unregistered Compose test project: ' . $project);
         }
-        return $this->docker($this->composeArguments($project, $arguments), $log, $check, $this->projectEnvironments[$project]);
+        return $this->ownedProjects[$project]->run($arguments, $log, $check);
     }
 
     public function serviceContainer(string $project, string $service): string
@@ -246,7 +230,7 @@ class Runtime extends Runner
         if (($this->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '') === '1') {
             return;
         }
-        [, , $this->archive] = StaticCheck::prepareCheckout($this, $this->root, $this->artifacts);
+        [, , $this->archive] = StaticCheck::prepareCheckout($this->executor, $this->root, $this->artifacts);
     }
 
     public function createApp(
@@ -256,24 +240,21 @@ class Runtime extends Runner
         bool $services = false,
         bool $coverage = false,
     ): string {
+        $this->checkpoint();
         if ($services) {
             if (!in_array($network, $this->projects, true)) {
                 throw new RuntimeException('Service app requires a registered Compose project');
             }
-            $this->projectEnvironments[$network]['BAANDER_TEST_XDEBUG_MODE'] = $coverage ? 'coverage' : 'off';
-            $this->projectEnvironments[$network]['BAANDER_TEST_APP_PRIVILEGED'] = $privileged ? 'true' : 'false';
             $this->compose($network, ['up', '--detach', '--wait', '--wait-timeout', '60', 'app']);
             $name = $this->serviceContainer($network, 'app');
         } else {
             $name = $this->prefix . '-' . $lane;
             $this->containers[] = $name;
             $arguments = [
-                'create',
                 '--user', '0:0',
-                '--name', $name,
                 '--network', $network,
                 '--label', 'com.baander.backend.run=' . $this->prefix,
-                '--workdir', self::CONTAINER_ROOT,
+                '--workdir', $this->layout->root,
                 '--entrypoint', 'sh',
                 '-e', 'APP_ENV=test',
                 '-e', 'APP_DEBUG=0',
@@ -282,18 +263,18 @@ class Runtime extends Runner
             if ($privileged) {
                 $arguments[] = '--privileged';
             }
-            $this->docker([...$arguments, $this->image, '-c', 'exec sleep infinity']);
+            ($this->ledger ?? throw new RuntimeException('Docker target is not connected'))->create(ResourceKind::Container, $name, [...$arguments, $this->image, '-c', 'exec sleep infinity']);
             $this->docker(['start', $name]);
         }
         if ($this->archive !== null) {
             $this->docker(['cp', $this->archive, $name . ':/tmp/checkout.tar']);
-            $this->docker(['exec', $name, 'sh', '-ec', <<<'SH'
-                rm -rf /var/www/html
-                mkdir -p /var/www/html
-                tar -xf /tmp/checkout.tar -C /var/www/html
+            $this->docker(['exec', $name, 'sh', '-ec', str_replace('APPLICATION_ROOT', escapeshellarg($this->layout->root), <<<'SH'
+                rm -rf APPLICATION_ROOT
+                mkdir -p APPLICATION_ROOT
+                tar -xf /tmp/checkout.tar -C APPLICATION_ROOT
                 rm /tmp/checkout.tar
-                chown -R www-data:www-data /var/www/html
-                SH]);
+                chown -R www-data:www-data APPLICATION_ROOT
+                SH)]);
         }
         $this->docker(['exec', $name, 'sh', '-ec', 'mkdir -p ' . self::RUN_DIRECTORY . '; chown www-data:www-data ' . self::RUN_DIRECTORY]);
         if ($this->disableSwoole) {
@@ -302,8 +283,12 @@ class Runtime extends Runner
         return $name;
     }
 
-    public function startServices(string $lane): string
+    public function startServices(string $lane, bool $coverage = false, bool $privileged = true): string
     {
+        $this->checkpoint();
+        foreach (['postgres', 'fixtureRedis'] as $role) {
+            $this->serviceImages[$role] ??= ($this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'))->resolveImage($this->configuration->images->role($role), false)->id;
+        }
         $project = $this->prefix . '-' . $lane;
         if (in_array($project, $this->projects, true)) {
             throw new RuntimeException('Compose test project already registered: ' . $project);
@@ -311,9 +296,13 @@ class Runtime extends Runner
         $this->projects[] = $project;
         $this->projectEnvironments[$project] = array_replace($this->environment, [
             'BAANDER_TEST_IMAGE' => $this->image,
-            'BAANDER_TEST_POSTGRES_IMAGE' => $this->environment['BAANDER_TEST_POSTGRES_IMAGE'] ?? 'baander-database:latest',
-            'BAANDER_TEST_REDIS_IMAGE' => $this->environment['BAANDER_TEST_REDIS_IMAGE'] ?? 'redis/redis-stack-server:edge',
-            'BAANDER_TEST_XDEBUG_MODE' => 'off', 'BAANDER_TEST_APP_PRIVILEGED' => 'true']);
+            'BAANDER_APP_HOME' => $this->layout->root,
+            'BAANDER_TEST_POSTGRES_IMAGE' => $this->serviceImages['postgres'],
+            'BAANDER_TEST_REDIS_IMAGE' => $this->serviceImages['fixtureRedis'],
+            'BAANDER_TEST_XDEBUG_MODE' => $coverage ? 'coverage' : 'off', 'BAANDER_TEST_APP_PRIVILEGED' => $privileged ? 'true' : 'false']);
+        $owner = new ComposeProject($this->artifacts . '/' . $project . '.ownership.json', $this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'), $this->environment);
+        $owner->prepare($project, $this->root . '/compose.test.yaml', $this->root, $this->projectEnvironments[$project], $this->layout->root);
+        $this->ownedProjects[$project] = $owner;
         $this->networks[] = $project . '_private';
         $this->projectNetworks[] = $project . '_private';
         array_push($this->volumes, $project . '_postgres_data', $project . '_redis_data');
@@ -336,8 +325,9 @@ class Runtime extends Runner
      */
     public function startLane(string $lane, array $spec, string $run, bool $coverage): array
     {
+        $this->checkpoint();
         $started = self::now();
-        $network = $spec['services'] ? $this->startServices($lane) : 'none';
+        $network = $spec['services'] ? $this->startServices($lane, $coverage, $spec['privileged']) : 'none';
         $app = $this->createApp($lane, $network, $spec['privileged'], $spec['services'], $coverage);
         $log = $this->artifacts . '/' . $lane . '.log';
         try {
@@ -354,9 +344,11 @@ class Runtime extends Runner
                     SH], $log);
             }
             $this->docker(['exec', $app, 'chown', '-R', 'www-data:www-data', self::RUN_DIRECTORY]);
-            $arguments = [...$this->dockerArguments(), 'exec', '--user', 'www-data', $app, 'php', '-d', 'memory_limit=2G',
-                'scripts/backend-test-runner.php', 'run', self::RUN_DIRECTORY, $lane];
-            $process = $this->startCommand($arguments, logPath: $log);
+            $process = ($this->dockerAdapter ?? throw new RuntimeException('Docker target is not connected'))->start(
+                ['exec', '--user', 'www-data', $app, 'php', '-d', 'memory_limit=2G', 'scripts/backend-test-runner.php', 'run', self::RUN_DIRECTORY, $lane],
+                logPath: $log,
+                appendLog: true,
+            );
             return compact('app', 'lane', 'run', 'started', 'process');
         } catch (Throwable $error) {
             $this->collectLane($app, $lane, $run);
@@ -368,7 +360,7 @@ class Runtime extends Runner
     public function finishLane(array $lane): int
     {
         try {
-            $result = $this->waitCommand($lane['process'], ['docker', 'exec'], false, $this->artifacts . '/' . $lane['lane'] . '.log');
+            $result = $this->waitCommand($lane['process'], false);
             printf(
                 "%s: exit %d, %.1fs; %s/%s.log\n",
                 $lane['lane'],
@@ -407,12 +399,21 @@ class Runtime extends Runner
      */
     private function independently(callable $operation): mixed
     {
-        $previous = $this->independent;
+        if ($this->independent) {
+            return $operation();
+        }
+        $previous = $this->executor;
+        $docker = $this->dockerAdapter;
+        $this->executor = new EngineExecutor(ExecutionContext::bounded($this->configuration->budgets->seconds('cleanup'), $this->environment, $this->root, true));
+        $this->dockerAdapter = $docker === null ? null : new Client($this->executor, $docker->target, $this->environment);
         $this->independent = true;
         try {
             return $operation();
         } finally {
-            $this->independent = $previous;
+            $this->executor->close();
+            $this->executor = $previous;
+            $this->dockerAdapter = $docker;
+            $this->independent = false;
         }
     }
 
@@ -476,25 +477,23 @@ class Runtime extends Runner
                 $this->cleanupErrors[] = $error->getMessage();
             }
             foreach (array_reverse($this->projects) as $project) {
-                $this->cleanupCommand(
-                    $this->composeArguments($project, ['logs', '--no-color']),
-                    10,
-                    $this->artifacts . '/' . $project . '.compose.log',
-                    $this->projectEnvironments[$project],
-                    false,
-                );
-                $this->cleanupCommand(
-                    $this->composeArguments($project, ['down', '--volumes', '--remove-orphans', '--timeout', '5']),
-                    30,
-                    env: $this->projectEnvironments[$project],
-                );
+                if (!isset($this->ownedProjects[$project])) {
+                    continue;
+                }
+                $report = $this->ownedProjects[$project]->cleanup($this->configuration->budgets->seconds('cleanup'), $this->artifacts . '/' . $project . '.compose.log');
+                if (!$report->successful()) {
+                    $this->cleanupErrors[] = $report->message();
+                }
             }
             foreach (array_reverse($this->containers) as $name) {
                 if (in_array($name, $this->projectContainers, true)) {
                     continue;
                 }
                 $this->cleanupCommand(['logs', $name], 10, $this->artifacts . '/' . $name . '.container.log', removal: false);
-                $this->cleanupCommand(['rm', '-f', '--volumes', $name], 20);
+            }
+            $report = $this->ledger?->cleanup($this->configuration->budgets->seconds('cleanup'));
+            if ($report !== null && !$report->successful()) {
+                $this->cleanupErrors[] = $report->message();
             }
             foreach (array_reverse($this->networks) as $name) {
                 if (!in_array($name, $this->projectNetworks, true)) {
@@ -553,8 +552,7 @@ class Runtime extends Runner
     private function inventoryCommand(array $arguments, string $log): ProcessResult
     {
         try {
-            $process = $this->startCommand([...$this->dockerArguments(), ...$arguments], timeout: 15);
-            $result = $this->processes->wait($process);
+            $result = $this->docker($arguments, check: false, timeout: 15);
             file_put_contents($log, json_encode($arguments, JSON_THROW_ON_ERROR) . "\n" . $result->stdout . $result->stderr);
         } catch (Throwable $error) {
             file_put_contents($log, json_encode($arguments, JSON_THROW_ON_ERROR) . "\n" . $error->getMessage() . "\n");
@@ -627,7 +625,7 @@ class Runtime extends Runner
     private function runtimeEvidence(string $app, string $lane, string $phase): array
     {
         $path = $this->artifacts . '/' . $lane . '.runtime-' . $phase . '.json';
-        $this->docker(['exec', '--user', 'www-data', $app, 'php', '-r', self::RUNTIME_PROBE, $phase], $path);
+        $this->docker(['exec', '--user', 'www-data', $app, 'php', '-r', self::RUNTIME_PROBE, $phase, $this->layout->root], $path);
         return json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
     }
 
@@ -669,7 +667,7 @@ $evidence = [
 ];
 try {
     if ($argv[1] === 'after') {
-        require '/var/www/html/vendor/autoload.php';
+        require $argv[2] . '/vendor/autoload.php';
         $evidence['autoload'] = true;
     }
 } catch (Throwable $error) {

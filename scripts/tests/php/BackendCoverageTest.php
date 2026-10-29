@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Backend\Coverage;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Inventory\Collector;
+use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -39,7 +40,7 @@ final class BackendCoverageTest extends TestCase
 
     protected function tearDown(): void
     {
-        new Runner()->run(['rm', '-rf', '--', $this->directory]);
+        Collector::remove($this->directory);
     }
 
     private function write(string $text = self::TEXT, string $xml = self::XML): void
@@ -180,9 +181,13 @@ final class BackendCoverageTest extends TestCase
         rename($this->directory . '/report.txt', $this->directory . '/coverage/report.txt');
         rename($this->directory . '/clover.xml', $this->directory . '/coverage/clover.xml');
         $entrypoint = dirname(__DIR__, 2) . '/validate-backend-coverage.php';
-        $runner = new Runner();
-        self::assertSame(0, $runner->run([PHP_BINARY, $entrypoint], cwd: $this->directory)->exitCode);
-        unlink($this->directory . '/coverage/clover.xml');
-        self::assertSame(1, $runner->run([PHP_BINARY, $entrypoint, $this->directory . '/coverage'], check: false)->exitCode);
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, getenv()));
+        try {
+            self::assertSame(0, $executor->run(new ProcessSpec([PHP_BINARY, $entrypoint], cwd: $this->directory))->exitCode);
+            unlink($this->directory . '/coverage/clover.xml');
+            self::assertSame(1, $executor->run(new ProcessSpec([PHP_BINARY, $entrypoint, $this->directory . '/coverage']), new CompletionPolicy([1]))->exitCode);
+        } finally {
+            $executor->close();
+        }
     }
 }

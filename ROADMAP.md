@@ -192,6 +192,25 @@ three-file U9 refactor; the focused follow-up also passes for all three files.
 These are host-only checks. U6–U8, U10–U11, final CI-image and live qualification,
 and final code review remain open.
 
+Backend implementation checkpoint (U10), 2026-10-29: backend workflows use
+shared checked execution, finite budgets, canonical layout and catalog image IDs.
+Compose recovery retains immutable Docker connection ownership and resource
+receipts; named-resource guards prevent cleanup of unrelated resources. A child
+readiness handshake replaces the 100 ms startup assumption. Later-lane failures
+remain visible, and coverage, source-archive and exit-status contracts are
+preserved. Shared target resolution uses the saved invocation target even when
+ambient Docker settings change.
+
+Root event evidence records 103 passing backend and Compose cases: 22 comparison,
+26 coordinator, 36 coverage, 11 static-check and eight Compose cases. The combined
+309-test run remains nonpassing with 28 errors in worker classes that loaded the
+old target resolver before the runtime edit. Full integration acceptance remains
+open. The separate neutral Source suite passes 13 tests and 58 assertions,
+and Docker-client checks pass 14 tests and 56 assertions. Scoped static analysis
+passes across 16 files. Formatting processed 18 files and fixed Backend/Runtime.php.
+U6–U8, U11, final CI-image and live qualification, and final code review remain
+open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

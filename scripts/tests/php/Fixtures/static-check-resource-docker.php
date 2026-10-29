@@ -27,14 +27,17 @@ if ($command === 'image' && ($arguments[1] ?? '') === 'inspect') {
         fwrite(STDERR, 'authorization denied');
         exit(1);
     }
-    if (!is_file($state . '/resource.json')) {
+    $resource = is_file($state . '/resource.json') ? json_decode(file_get_contents($state . '/resource.json'), true, flags: JSON_THROW_ON_ERROR) : null;
+    $identity = end($arguments);
+    if ($resource === null || !in_array($identity, [$resource['Id'], ltrim($resource['Name'], '/')], true)) {
         fwrite(STDERR, 'Error: No such container: ' . end($arguments));
         exit(1);
     }
     echo '[' . file_get_contents($state . '/resource.json') . ']';
 } elseif ($command === 'container' && ($arguments[1] ?? '') === 'ls') {
     if (is_file($state . '/resource.json')) {
-        echo json_encode(['Names' => 'baander-test-owned']);
+        $resource = json_decode(file_get_contents($state . '/resource.json'), true, flags: JSON_THROW_ON_ERROR);
+        echo json_encode(['Names' => ltrim($resource['Name'], '/'), 'ID' => $resource['Id']]);
     }
 } elseif ($command === 'start') {
 } elseif ($command === 'cp') {

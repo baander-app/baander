@@ -26,15 +26,16 @@ final class Coordinator
      * @param array<string,string> $native
      * @return array<string,array{files:list<string>,processes:int,batch:int,services:bool,privileged:bool}>
      */
-    public static function partition(array $files, array $native, int $workers): array
+    public static function partition(array $files, array $native, int $workers, ?string $applicationRoot = null): array
     {
         if ($files === [] || count(array_unique($files)) !== count($files)) {
             throw new InvalidArgumentException('Discovery must contain unique, nonempty test files');
         }
+        $applicationRoot ??= \Baander\Tooling\Configuration\ApplicationLayout::load()->root;
         $ordinary = $serial = $services = [];
         sort($files, SORT_STRING);
         foreach ($files as $file) {
-            $relative = str_starts_with($file, Runtime::CONTAINER_ROOT . '/') ? substr($file, strlen(Runtime::CONTAINER_ROOT) + 1) : $file;
+            $relative = str_starts_with($file, $applicationRoot . '/') ? substr($file, strlen($applicationRoot) + 1) : $file;
             if (isset($native[$relative])) {
                 $serial[] = $file;
             } elseif (str_starts_with($relative, 'tests/Functional/') || str_starts_with($relative, 'tests/Integration/')) {
@@ -86,11 +87,13 @@ final class Coordinator
     {
         $environment ??= getenv();
         $workers = self::positiveInteger($environment['BAANDER_TEST_PROCESSES'] ?? '2', 'BAANDER_TEST_PROCESSES', 8);
-        $timeout = self::positiveInteger($environment['BAANDER_TEST_TIMEOUT'] ?? '3600', 'BAANDER_TEST_TIMEOUT');
         $disable = $environment['BAANDER_TEST_DISABLE_SWOOLE'] ?? '0';
         if (!in_array($disable, ['0', '1'], true)) {
             throw new InvalidArgumentException('BAANDER_TEST_DISABLE_SWOOLE must be 0 or 1');
         }
+        $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository($root, $environment);
+        $timeout = $configuration->budgets->seconds('backend');
+        \Baander\Tooling\Configuration\ApplicationLayout::load($root . '/packages/baander-tooling/resources/application-layout.json');
         $artifacts = $environment['BAANDER_TEST_ARTIFACTS'] ?? $root . '/var/test-runs';
         if (!str_starts_with($artifacts, '/')) {
             $artifacts = getcwd() . '/' . $artifacts;
@@ -101,7 +104,7 @@ final class Coordinator
         }
         printf("Backend artifacts: %s\n", $artifacts);
         $started = Runtime::now();
-        $runtime = new Runtime($artifacts, $timeout, $root, $environment);
+        $runtime = new Runtime($artifacts, $timeout, $root, $environment, $configuration);
         $pending = [];
         $status = 1;
         try {
@@ -115,7 +118,7 @@ final class Coordinator
             $runtime->docker(['cp', $discovery . ':' . Runtime::RUN_DIRECTORY . '/.', $run]);
             $selected = json_decode(file_get_contents($run . '/discovery.json'), true, flags: JSON_THROW_ON_ERROR);
             $native = json_decode(file_get_contents($root . '/scripts/backend-native-tests.json'), true, flags: JSON_THROW_ON_ERROR);
-            $lanes = self::partition(array_keys($selected['files']), $native, $workers);
+            $lanes = self::partition(array_keys($selected['files']), $native, $workers, $runtime->layout->root);
             foreach ($lanes as $lane => $spec) {
                 file_put_contents($run . '/' . $lane . '.json', json_encode($spec, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n");
             }
@@ -148,7 +151,7 @@ final class Coordinator
             $result = $runtime->helper($discovery, ['finalize', Runtime::RUN_DIRECTORY], $artifacts . '/finalize.log', false);
             $runtime->docker(['cp', $discovery . ':' . Runtime::RUN_DIRECTORY . '/.', $run]);
             if ($result->exitCode !== 0 || array_any($statuses, static fn(int $code): bool => $code !== 0)) {
-                throw new RuntimeException('Backend validation failed; inspect lane and finalize logs');
+                throw new RuntimeException('Backend validation failed; inspect lane and finalize logs', $result->exitCode !== 0 ? $result->exitCode : current(array_filter($statuses, static fn(int $code): bool => $code !== 0)));
             }
             foreach ($selected['reports'] ?? [] as $option => $target) {
                 $destination = str_starts_with($target, '/') ? $target : $root . '/' . $target;
@@ -157,7 +160,7 @@ final class Coordinator
                 }
                 $staging = $destination . '.' . $runtime->prefix;
                 try {
-                    $runtime->docker(['cp', $discovery . ':' . (str_starts_with($target, '/') ? $target : Runtime::CONTAINER_ROOT . '/' . $target), $staging]);
+                    $runtime->docker(['cp', $discovery . ':' . (str_starts_with($target, '/') ? $target : $runtime->layout->root . '/' . $target), $staging]);
                     if (!is_dir($artifacts . '/reports')) {
                         mkdir($artifacts . '/reports', 0700);
                     }
@@ -172,6 +175,7 @@ final class Coordinator
             }
             $status = 0;
         } catch (Throwable $error) {
+            $status = $error->getCode() > 0 && $error->getCode() <= 255 ? $error->getCode() : 1;
             fwrite(STDERR, $error->getMessage() . "\n");
         } finally {
             foreach ($pending as $lane) {
@@ -184,10 +188,10 @@ final class Coordinator
             }
             try {
                 if (!$runtime->cleanup()) {
-                    $status = 1;
+                    $status = $status ?: 1;
                 }
             } catch (Throwable $error) {
-                $status = 1;
+                $status = $status ?: 1;
                 fwrite(STDERR, 'Cleanup failed: ' . $error->getMessage() . "\n");
             }
             $runtime->close();

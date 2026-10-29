@@ -6,6 +6,7 @@ namespace Baander\Tooling\Docker;
 
 use Baander\Tooling\Configuration\DockerSettings;
 use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Process\CommandExecutor;
 use Baander\Tooling\Process\ProcessSpec;
 
@@ -16,6 +17,12 @@ final readonly class TargetResolver
 
     public function resolve(DockerSettings $settings, string $snapshotDirectory): Target
     {
+        $captured = $this->nonempty('BAANDER_TOOLING_TARGET_FILE');
+        if ($captured !== null) {
+            $target = Target::fromArray(AtomicFile::readJson($captured));
+            new Client($this->executor, $target, $this->environment)->validateIdentity();
+            return $target;
+        }
         $executable = $this->executable($settings->executable);
         $context = $settings->context;
         $endpoint = $settings->host;
