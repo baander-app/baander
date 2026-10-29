@@ -25,6 +25,13 @@ trees; they are not acceptance evidence for a new change.
 
 ## Configurable development libraries
 
+Runtime integration correction, 2026-10-29: the preview exposed Messenger logs
+on stdout before the library command's JSON. Six development and production
+Monolog stream paths now use stderr, preserving their handler names and logging
+levels. Real stream-handler probes confirmed Messenger INFO and general/security
+WARNING records reach stderr while stdout remains valid JSON in both environments.
+This corrects the existing console output contract required by startup provisioning.
+
 Implementation checkpoint, 2026-10-29 (U3): local configuration is excluded from
 Git, Docker contexts and preview snapshots, including accidentally tracked files.
 The tracked example and development guide describe precedence and manual scanning.

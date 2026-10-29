@@ -41,7 +41,7 @@ when@dev:
                 formatter: monolog.formatter.line
             stdout:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: warning
                 channels: [ '!events' ]
                 formatter: monolog.formatter.line
@@ -57,13 +57,13 @@ when@dev:
                 formatter: monolog.formatter.line
             security:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: warning
                 channels: [ security ]
                 formatter: monolog.formatter.line
             messenger:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: info
                 channels: [ messenger ]
                 formatter: monolog.formatter.line
@@ -97,7 +97,7 @@ when@prod:
                 formatter: monolog.formatter.json
             stdout:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: warning
                 channels: [ '!events' ]
                 formatter: monolog.formatter.json
@@ -113,13 +113,13 @@ when@prod:
                 formatter: monolog.formatter.json
             security:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: warning
                 channels: [ security ]
                 formatter: monolog.formatter.json
             messenger:
                 type: stream
-                path: php://stdout
+                path: php://stderr
                 level: info
                 channels: [ messenger ]
                 formatter: monolog.formatter.json
