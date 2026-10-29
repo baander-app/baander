@@ -6,6 +6,8 @@ namespace Baander\Tooling\Configuration;
 
 final readonly class ApplicationLayout
 {
+    public const string IMAGE_LABEL = 'org.baander.application-layout';
+
     private function __construct(public int $version, public string $root) {}
 
     public static function load(?string $path = null): self
@@ -33,6 +35,34 @@ final readonly class ApplicationLayout
             throw new \InvalidArgumentException('Application path must be a safe relative path.');
         }
         return $this->root . '/' . $relative;
+    }
+
+    /** @param array<string,mixed> $image */
+    public static function fromImage(array $image): self
+    {
+        $metadata = $image['Config']['Labels'][self::IMAGE_LABEL] ?? null;
+        if (!is_string($metadata)) {
+            throw new \RuntimeException('Application image has no layout contract. Rebuild it with scripts/build-application.php.');
+        }
+        $data = json_decode($metadata, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($data)) {
+            throw new \RuntimeException('Invalid application image layout metadata.');
+        }
+        $layout = self::fromArray($data);
+        $root = null;
+        $environment = $image['Config']['Env'] ?? [];
+        if (!is_array($environment)) {
+            throw new \RuntimeException('Invalid application image environment.');
+        }
+        foreach ($environment as $entry) {
+            if (is_string($entry) && str_starts_with($entry, 'APP_HOME=')) {
+                $root = substr($entry, strlen('APP_HOME='));
+            }
+        }
+        if ($root !== $layout->root || ($image['Config']['WorkingDir'] ?? null) !== $layout->root) {
+            throw new \RuntimeException('Application image environment and working directory disagree with its layout contract.');
+        }
+        return $layout;
     }
 
     private static function safeSegments(string $path): bool

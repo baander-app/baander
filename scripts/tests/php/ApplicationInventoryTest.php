@@ -17,12 +17,13 @@ final class ApplicationInventoryTest extends TestCase
     private string $temporary;
     private string $root;
     private string $bundle;
-    /** @var array<string, string> */
+    /** @var array<string, mixed> */
     private array $identity = [
         'image_id' => 'sha256:abc',
         'target' => 'production',
         'platform' => 'linux/amd64',
         'revision' => 'abc',
+        'application_layout' => ['version' => 1, 'root' => '/var/www/html'],
     ];
 
     protected function setUp(): void
@@ -398,6 +399,42 @@ final class ApplicationInventoryTest extends TestCase
         return $archive;
     }
 
+    public function testAcceptedArchiveDevicesAndFifoAreInventoriedWithoutSpecialFiles(): void
+    {
+        $entries = [];
+        foreach (Inventory::files($this->root) as $path) {
+            $entries[] = ['name' => ltrim($path, '/'), 'data' => file_get_contents($this->root . $path)];
+        }
+        foreach (['3' => 'character', '4' => 'block', '6' => 'fifo'] as $type => $name) {
+            $entries[] = ['name' => 'dev/' . $name, 'type' => (string) $type];
+        }
+        $root = $this->temporary . '/special-export';
+        SafeTar::extract($this->tar($entries), $root);
+        $inventory = Inventory::generate($root, $this->identity, $this->bundle, 'abc');
+        foreach (['character', 'block', 'fifo'] as $name) {
+            self::assertFileDoesNotExist($root . '/dev/' . $name);
+            $entry = $this->entry($inventory, '/dev/' . $name);
+            self::assertSame($name, $entry['archive_type']);
+            self::assertSame('special', $entry['type']);
+            self::assertArrayNotHasKey('sha256', $entry);
+        }
+        Inventory::verify($root, $this->bundle . '/inventory.json', 'abc');
+    }
+
+    public function testSavedLayoutControlsOfflineClassificationAndMismatchIsRejected(): void
+    {
+        $this->identity['application_layout'] = ['version' => 1, 'root' => '/srv/baander'];
+        Inventory::directory($this->root . '/srv');
+        rename($this->root . '/var/www/html', $this->root . '/srv/baander');
+        $inventory = $this->generate();
+        self::assertSame('installed-composer', $this->entry($inventory, '/srv/baander/vendor/acme/runtime/LICENSE')['group']);
+        $this->verify();
+        $wrong = $this->identity;
+        $wrong['application_layout']['root'] = '/srv/other';
+        $this->expectExceptionMessage('observed image identity differs');
+        Inventory::verify($this->root, $this->bundle . '/inventory.json', 'abc', $wrong);
+    }
+
     public function testArchiveAbsoluteSymlinkResolvesInsideImageAndHardlinksRetainBytes(): void
     {
         $archive = $this->tar([
@@ -527,8 +564,10 @@ final class ApplicationInventoryTest extends TestCase
         self::assertFileExists($this->bundle . '/checksums.json');
         self::assertFileExists($this->bundle . '/collection.log');
         $calls = $this->dockerCalls();
-        self::assertSame(['create', '--name', $calls[1][2], '--entrypoint', '/bin/true', 'sha256:abc'], $calls[1]);
-        self::assertSame(['rm', '-v', '--', $calls[1][2]], $calls[3]);
+        $create = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'create'))[0];
+        self::assertContains('sha256:abc', $create);
+        self::assertContains('--label', $create);
+        self::assertFileDoesNotExist($this->temporary . '/container.json');
     }
 
     public function testCollectionFailureRetainsDiagnosticsAndRemovesContainer(): void
@@ -537,7 +576,48 @@ final class ApplicationInventoryTest extends TestCase
         $result = $this->collectWithFakeDocker();
         self::assertSame(9, $result[0]);
         self::assertStringContainsString('Controlled export failure', (string) file_get_contents($this->bundle . '/collection.log'));
-        self::assertSame(['rm', '-v', '--', $this->dockerCalls()[1][2]], $this->dockerCalls()[3]);
+        self::assertFileDoesNotExist($this->temporary . '/container.json');
+    }
+
+    public function testFailedRemovalFailsSuccessfulCollectionAndSavedReceiptCanBeRetried(): void
+    {
+        touch($this->temporary . '/fail-remove');
+        $result = $this->collectWithFakeDocker();
+        self::assertSame(1, $result[0], $result[2]);
+        self::assertStringContainsString('cleanup', $result[2]);
+        self::assertFileExists($this->bundle . '/inventory.json');
+        self::assertFileExists($this->temporary . '/container.json');
+        $sessions = glob($this->temporary . '/baander-application-inventory-session.*');
+        self::assertCount(1, $sessions);
+        self::assertFileExists($sessions[0] . '/resources.json');
+        unlink($this->temporary . '/fail-remove');
+        $environment = array_replace(getenv(), ['INVENTORY_DOCKER_STATE' => $this->temporary, 'TMPDIR' => $this->temporary, 'BAANDER_BROWSER_IMAGE' => "invalid\nreference"]);
+        try {
+            \Baander\Tooling\Configuration\ToolingConfiguration::resolve(environment: $environment);
+            self::fail('Expected current image configuration to be invalid.');
+        } catch (\InvalidArgumentException) {
+        }
+        $runner = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded(20, $environment));
+        try {
+            $retry = $runner->run(new \Baander\Tooling\Process\ProcessSpec([PHP_BINARY, dirname(__DIR__, 2) . '/packaged_inventory.php', 'cleanup-collection', '--session', $sessions[0]], environment: $environment));
+            self::assertSame(0, $retry->exitCode);
+        } finally {
+            $runner->close();
+        }
+        self::assertFileDoesNotExist($this->temporary . '/container.json');
+        self::assertDirectoryDoesNotExist($sessions[0]);
+    }
+
+    public function testPrimaryCollectionStatusSurvivesFailedRemoval(): void
+    {
+        touch($this->temporary . '/fail-remove');
+        touch($this->temporary . '/fail-export');
+        $result = $this->collectWithFakeDocker();
+        self::assertSame(9, $result[0], $result[2]);
+        self::assertStringContainsString('Controlled export failure', file_get_contents($this->bundle . '/collection.log'));
+        self::assertStringContainsString('status 9', $result[2]);
+        self::assertStringContainsString('cleanup', $result[2]);
+        self::assertFileExists($this->temporary . '/container.json');
     }
 
     /** @return iterable<string, array{int}> */
@@ -554,8 +634,9 @@ final class ApplicationInventoryTest extends TestCase
         $result = $this->collectWithFakeDocker('abc', $signal);
         self::assertSame(128 + $signal, $result[0], $result[2]);
         $calls = $this->dockerCalls();
-        self::assertSame(['rm', '-v', '--', $calls[1][2]], $calls[3]);
-        self::assertDirectoryDoesNotExist(dirname($calls[2][2]));
+        self::assertFileDoesNotExist($this->temporary . '/container.json');
+        $export = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'export'))[0];
+        self::assertDirectoryDoesNotExist(dirname($export[2]));
     }
 
     public function testCollectionRejectsWrongRevisionBeforeCreatingContainer(): void
@@ -566,15 +647,14 @@ final class ApplicationInventoryTest extends TestCase
         self::assertSame([], array_filter($this->dockerCalls(), static fn(array $call): bool => $call[0] === 'create'));
     }
 
-    public function testShellCleansReceiptWhenCollectorIsKilledBetweenProcesses(): void
+    public function testShellRecoversUncertainCreationWhenCollectorIsInterrupted(): void
     {
         file_put_contents($this->temporary . '/block-create-log', '');
         $result = $this->collectWithFakeDocker('abc', 15, true);
         self::assertSame(143, $result[0], $result[2]);
         $calls = $this->dockerCalls();
-        self::assertSame(['rm', '-v', '--', $calls[1][2]], $calls[2]);
-        $work = sys_get_temp_dir() . '/baander-application-inventory.' . substr($calls[1][2], strlen('baander-application-inventory-'));
-        self::assertDirectoryDoesNotExist($work);
+        self::assertFileDoesNotExist($this->temporary . '/container.json');
+        self::assertSame([], glob($this->temporary . '/baander-application-inventory.*'));
     }
 
     public function testCliRejectsMissingSwooleBeforeCreatingOutput(): void
@@ -672,7 +752,7 @@ final class ApplicationInventoryTest extends TestCase
                 'Id' => 'sha256:abc',
                 'Os' => 'linux',
                 'Architecture' => 'amd64',
-                'Config' => ['Labels' => ['org.opencontainers.image.revision' => $revision]],
+                'Config' => ['Labels' => ['org.opencontainers.image.revision' => $revision, 'org.baander.application-layout' => json_encode($this->identity['application_layout'])], 'Env' => ['APP_HOME=' . $this->identity['application_layout']['root']], 'WorkingDir' => $this->identity['application_layout']['root']],
             ]]),
         );
         mkdir($this->temporary . '/fake-bin');
@@ -680,6 +760,7 @@ final class ApplicationInventoryTest extends TestCase
         $environment = getenv();
         $environment['PATH'] = $this->temporary . '/fake-bin:' . ($environment['PATH'] ?? '');
         $environment['INVENTORY_DOCKER_STATE'] = $this->temporary;
+        $environment['TMPDIR'] = $this->temporary;
         $child = proc_open(
             [
                 'bash',
@@ -703,20 +784,8 @@ final class ApplicationInventoryTest extends TestCase
             while (!is_file($this->temporary . '/create-block-ready') && microtime(true) < $deadline) {
                 usleep(10000);
             }
-            self::assertFileExists($this->temporary . '/collector-pid');
-            $pid = (int) file_get_contents($this->temporary . '/collector-pid');
-            while (trim((string) file_get_contents('/proc/' . $pid . '/wchan')) !== 'wait_for_partner' && microtime(true) < $deadline) {
-                usleep(10000);
-            }
-            $blocked = trim((string) file_get_contents('/proc/' . $pid . '/wchan'));
-            unlink($this->bundle . '/collection.log');
-            file_put_contents($this->bundle . '/collection.log', '');
-            \Swoole\Process::kill($pid, $signal);
-            self::assertSame(
-                'wait_for_partner',
-                $blocked,
-                'Collector must be outside ProcessRunner, blocked in synchronous log I/O',
-            );
+            self::assertFileExists($this->temporary . '/create-block-ready');
+            \Swoole\Process::kill(proc_get_status($child)['pid'], $signal);
         } elseif ($signal !== 0) {
             $deadline = microtime(true) + 5;
             while (!is_file($this->temporary . '/export-ready') && microtime(true) < $deadline) {

@@ -4,92 +4,64 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Inventory;
 
-use Baander\Tooling\Process\ProcessRunner;
-use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\TargetResolver;
 use Baander\Tooling\Filesystem\AtomicFile;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Resources\ResourceKind;
+use Baander\Tooling\Resources\ResourceLedger;
 
 final class Collector
 {
     /** @return array<string, mixed> */
-    public static function collect(string $image, string $target, string $revision, string $output, string $session): array
+    public static function collect(string $image, string $target, string $revision, string $output, string $session, string $loader): array
     {
         if ($image === '' || $revision === '' || $output === '' || !in_array($target, ['production', 'worker'], true)) {
             throw new InventoryError('Image, production|worker target, revision and output are required', 2);
         }
+        $environment = getenv();
+        $configuration = ToolingConfiguration::resolve(environment: $environment);
+        $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+        $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $session . '/transport'), $environment);
         ApplicationInventory::directory($output);
         $log = $output . '/collection.log';
         file_put_contents($log, '');
         $token = bin2hex(random_bytes(8));
         $work = rtrim(sys_get_temp_dir(), '/') . '/baander-application-inventory.' . $token;
         $container = 'baander-application-inventory-' . $token;
-        $state = ['container' => $container, 'work' => $work, 'output' => $output, 'create_started' => false];
+        $state = ['work' => $work, 'output' => $output, 'cleanupSeconds' => $configuration->budgets->seconds('cleanup')];
         AtomicFile::writeJson($session . '/state.json', $state);
-        $runner = new ProcessRunner();
+        $ledger = new ResourceLedger($session . '/resources.json', $docker, $environment);
         try {
-            ApplicationInventory::directory($work);
-            $inspect = self::run($runner, ['docker', 'image', 'inspect', '--', $image], $log);
-            file_put_contents($output . '/image-inspect.json', $inspect);
-            $identity = ApplicationInventory::imageIdentity(Json::read($output . '/image-inspect.json'), $target);
-            ApplicationInventory::checkIdentity($identity, $revision);
-            $state['create_started'] = true;
-            AtomicFile::writeJson($session . '/state.json', $state);
-            $containerId = self::run(
-                $runner,
-                ['docker', 'create', '--name', $container, '--entrypoint', '/bin/true', $identity['image_id']],
-                $log,
-            ) |> trim(...);
-            if ($containerId === '') {
-                throw new InventoryError('Docker returned no inspection container');
-            }
-            self::run($runner, ['docker', 'export', '--output', $work . '/filesystem.tar', $containerId], $log);
-            $entrypoint = dirname(__DIR__, 4) . '/scripts/packaged_inventory.php';
-            self::run(
-                $runner,
-                [PHP_BINARY, $entrypoint, 'extract', '--archive', $work . '/filesystem.tar', '--root', $work . '/root'],
-                $log,
-            );
-            self::run(
-                $runner,
-                [
-                    PHP_BINARY,
-                    $entrypoint,
-                    'generate',
-                    '--root',
-                    $work . '/root',
-                    '--image-inspect',
-                    $output . '/image-inspect.json',
-                    '--target',
-                    $target,
-                    '--revision',
-                    $revision,
-                    '--output',
-                    $output,
-                ],
-                $log,
-            );
-            self::run(
-                $runner,
-                [
-                    PHP_BINARY,
-                    $entrypoint,
-                    'verify',
-                    '--root',
-                    $work . '/root',
-                    '--image-inspect',
-                    $output . '/image-inspect.json',
-                    '--inventory',
-                    $output . '/inventory.json',
-                    '--revision',
-                    $revision,
-                ],
-                $log,
-            );
-            return Json::read($output . '/inventory.json');
+            return $ledger->scoped(static function () use ($work, $docker, $image, $output, $target, $revision, $container, $log, $executor, $loader, $environment, $ledger): array {
+                ApplicationInventory::directory($work);
+                $inspect = $docker->run(['image', 'inspect', '--', $image])->stdout;
+                file_put_contents($log, $inspect, FILE_APPEND);
+                file_put_contents($output . '/image-inspect.json', $inspect);
+                $identity = ApplicationInventory::imageIdentity(Json::read($output . '/image-inspect.json'), $target);
+                ApplicationInventory::checkIdentity($identity, $revision);
+                $containerId = $ledger->create(ResourceKind::Container, $container, ['--entrypoint', '/bin/true', $identity['image_id']]);
+                file_put_contents($log, $containerId . "\n", FILE_APPEND);
+                $docker->run(['export', '--output', $work . '/filesystem.tar', $containerId], logPath: $log);
+                foreach ([
+                    ['extract', '--archive', $work . '/filesystem.tar', '--root', $work . '/root'],
+                    ['generate', '--root', $work . '/root', '--image-inspect', $output . '/image-inspect.json', '--target', $target, '--revision', $revision, '--output', $output],
+                    ['verify', '--root', $work . '/root', '--image-inspect', $output . '/image-inspect.json', '--inventory', $output . '/inventory.json', '--revision', $revision],
+                ] as $arguments) {
+                    $executor->run(Worker::command($loader, $arguments, $environment, $log));
+                }
+                return Json::read($output . '/inventory.json');
+            }, $state['cleanupSeconds']);
         } catch (\Throwable $error) {
             file_put_contents($log, $error->getMessage() . "\n", FILE_APPEND);
             throw $error;
         } finally {
-            self::cleanup($session);
+            $executor->close();
+            if (!file_exists($session . '/resources.json') && !is_link($session . '/resources.json')) {
+                self::cleanup($session);
+            }
         }
     }
 
@@ -103,39 +75,19 @@ final class Collector
             return;
         }
         $state = AtomicFile::readJson($statePath);
-        $container = $state['container'];
-        if (!is_string($container) || !preg_match('/^baander-application-inventory-([a-f0-9]{16})$/D', $container, $match)) {
-            throw new InventoryError('Invalid inspection container receipt');
-        }
-        $work = rtrim(sys_get_temp_dir(), '/') . '/baander-application-inventory.' . $match[1];
-        if (($state['work'] ?? null) !== $work || !is_string($state['output'] ?? null)) {
+        $work = $state['work'] ?? null;
+        if (!is_string($work) || preg_match('~^' . preg_quote(rtrim(sys_get_temp_dir(), '/') . '/baander-application-inventory.', '~') . '[a-f0-9]{16}$~D', $work) !== 1
+            || !is_string($state['output'] ?? null) || (!is_int($state['cleanupSeconds'] ?? null) && !is_float($state['cleanupSeconds'] ?? null))) {
             throw new InventoryError('Invalid inventory cleanup receipt');
         }
-        $log = $state['output'] . '/collection.log';
-        if ($state['create_started'] ?? false) {
-            try {
-                self::run(new ProcessRunner(), ['docker', 'rm', '-v', '--', $container], $log, timeout: 30);
-            } catch (\Throwable $error) {
-                file_put_contents($log, 'Inspection container cleanup failed: ' . $error->getMessage() . "\n", FILE_APPEND);
+        if (file_exists($session . '/resources.json') || is_link($session . '/resources.json')) {
+            $report = ResourceLedger::recover($session . '/resources.json', getenv(), $state['cleanupSeconds']);
+            if (!$report->successful()) {
+                throw new InventoryError($report->message(), 1);
             }
         }
         self::remove($work);
-        unlink($statePath);
-        rmdir($session);
-    }
-
-    /** @param non-empty-list<string> $argv */
-    private static function run(ProcessRunner $runner, array $argv, string $log, ?float $timeout = null): string
-    {
-        $result = $runner->run(new ProcessSpec($argv, environment: getenv(), timeout: $timeout, processGroup: true));
-        file_put_contents($log, $result->stdout . $result->stderr, FILE_APPEND);
-        if ($result->stderr !== '') {
-            fwrite(STDERR, $result->stderr);
-        }
-        if ($result->exitCode !== 0) {
-            throw new InventoryError('Command failed (' . $result->exitCode . '): ' . implode(' ', $argv), $result->exitCode);
-        }
-        return $result->stdout;
+        self::remove($session);
     }
 
     public static function remove(string $path): void

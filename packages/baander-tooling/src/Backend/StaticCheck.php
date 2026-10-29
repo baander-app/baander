@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Backend;
 
-use Baander\Tooling\Development\Build\Builder;
+use Baander\Tooling\Build\ApplicationImage;
+use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\TargetResolver;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Resources\ResourceKind;
+use Baander\Tooling\Resources\ResourceLedger;
 use Baander\Tooling\Development\Build\Source;
-use Baander\Tooling\Development\Cli;
-use Baander\Tooling\Development\Docker;
 use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\WorkflowError;
 
@@ -92,43 +98,47 @@ final class StaticCheck
     }
 
     /** @param non-empty-list<string> $command */
-    public static function runCheck(Docker $docker, string $image, string $archive, array $command): int
+    public static function runCheck(Client $docker, string $image, string $archive, array $command, ApplicationLayout $layout, ResourceLedger $ledger, float $cleanupSeconds): int
     {
+        $inspection = json_decode($docker->run(['image', 'inspect', '--', $image])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($inspection) || !array_is_list($inspection) || count($inspection) !== 1 || !is_array($inspection[0])
+            || ApplicationLayout::fromImage($inspection[0])->toArray() !== $layout->toArray()) {
+            throw new \RuntimeException('Static-check image layout differs from the selected source layout.');
+        }
         $name = 'baander-check-' . bin2hex(random_bytes(6));
-        try {
-            $docker->run(['create', '--name', $name, '--user', '0:0', '--network', 'none',
-                '--workdir', '/var/www/html', '--entrypoint', 'sh',
+        return $ledger->scoped(static function () use ($docker, $image, $archive, $command, $layout, $ledger, $name): int {
+            $ledger->create(ResourceKind::Container, $name, ['--user', '0:0', '--network', 'none',
+                '--workdir', $layout->root, '--entrypoint', 'sh',
                 '--env', 'APP_ENV=test', '--env', 'APP_DEBUG=0', '--env', 'XDEBUG_MODE=off',
                 $image, '-ec', 'exec sleep infinity']);
             $docker->run(['start', $name]);
             $docker->run(['cp', $archive, $name . ':/tmp/checkout.tar'], timeout: null);
-            $docker->run(['exec', $name, 'sh', '-ec', <<<'SH'
+            $provision = <<<'SH'
                 umask 077
-                rm -rf /var/www/html
-                mkdir -p /var/www/html
-                tar -xf /tmp/checkout.tar -C /var/www/html
+                rm -rf APPLICATION_ROOT
+                mkdir -p APPLICATION_ROOT
+                tar -xf /tmp/checkout.tar -C APPLICATION_ROOT
                 rm /tmp/checkout.tar
-                mkdir -p /var/www/html/config/secrets/oauth /var/www/html/var
-                openssl genrsa -out /var/www/html/config/secrets/oauth/private.key 2048 2>/dev/null
-                openssl rsa -in /var/www/html/config/secrets/oauth/private.key -pubout -out /var/www/html/config/secrets/oauth/public.key 2>/dev/null
-                chown -R www-data:www-data /var/www/html
-                SH], timeout: null);
+                mkdir -p APPLICATION_ROOT/config/secrets/oauth APPLICATION_ROOT/var
+                openssl genrsa -out APPLICATION_ROOT/config/secrets/oauth/private.key 2048 2>/dev/null
+                openssl rsa -in APPLICATION_ROOT/config/secrets/oauth/private.key -pubout -out APPLICATION_ROOT/config/secrets/oauth/public.key 2>/dev/null
+                chown -R www-data:www-data APPLICATION_ROOT
+                SH;
+            $docker->run(['exec', $name, 'sh', '-ec', str_replace('APPLICATION_ROOT', escapeshellarg($layout->root), $provision)]);
             return $docker->run(
                 ['exec', '--user', 'www-data', $name, ...$command],
                 timeout: null,
                 check: false,
                 interactive: true,
             )->exitCode;
-        } finally {
-            $docker->run(['rm', '--force', $name], check: false);
-        }
+        }, $cleanupSeconds);
     }
 
     /** @param list<string> $arguments */
     public static function main(array $arguments, string $root): int
     {
         $image = null;
-        $context = 'default';
+        $context = null;
         $command = [];
         while ($arguments !== []) {
             $argument = array_shift($arguments);
@@ -162,18 +172,25 @@ final class StaticCheck
         if ($command === []) {
             throw new \InvalidArgumentException('Supply a check command after --.');
         }
+        $environment = getenv();
+        $configuration = ToolingConfiguration::resolve(flags: $context === null ? [] : ['docker' => ['context' => $context]], environment: $environment);
         $runner = new Runner();
-        $docker = new Docker($runner, Cli::dockerTarget($runner, $context));
         $directory = sys_get_temp_dir() . '/baander-check-' . bin2hex(random_bytes(12));
         if (!mkdir($directory, 0700)) {
             throw new WorkflowError('Cannot create static-check workspace.');
         }
+        $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+        $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $directory . '/transport'), $environment);
+        $ledger = new ResourceLedger($directory . '/resources.json', $docker, $environment);
         try {
             [$source, $revision, $archive] = self::prepareCheckout($runner, $root, $directory);
-            $image ??= new Builder(null, $runner)->build($docker, $source, 'ci', $revision);
-            return self::runCheck($docker, $image, $archive, $command);
+            $image ??= new ApplicationImage($docker)->build($source, 'ci', $revision, 'baander-check:' . $revision . '-' . basename($directory));
+            return self::runCheck($docker, $image, $archive, $command, ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json'), $ledger, $configuration->budgets->seconds('cleanup'));
         } finally {
-            $runner->run(['rm', '-rf', '--', $directory], check: false);
+            $executor->close();
+            if (!file_exists($directory . '/resources.json') && !is_link($directory . '/resources.json')) {
+                $runner->run(['rm', '-rf', '--', $directory], check: false);
+            }
         }
     }
 }
