@@ -53,7 +53,13 @@ final class Commands
                 return 0;
             }
             if ($command === 'collect') {
-                $result = Collector::collect($required('image'), $required('target'), $required('revision'), $required('output'), $required('session'), $loader);
+                $environment = getenv();
+                $saved = json_decode($environment['BAANDER_TOOLING_CONFIGURATION'] ?? '', true, flags: JSON_THROW_ON_ERROR);
+                if (!is_array($saved)) {
+                    throw new InventoryError('Inventory collection requires resolved invocation configuration.');
+                }
+                $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::fromArray($saved);
+                $result = Collector::collect($required('image'), $required('target'), $required('revision'), $required('output'), $required('session'), $loader, $configuration, $environment);
             } elseif ($command === 'generate') {
                 $identity = ApplicationInventory::imageIdentity(Json::read($required('image-inspect')), $required('target'));
                 $result = ApplicationInventory::generate($required('root'), $identity, $required('output'), $required('revision'));

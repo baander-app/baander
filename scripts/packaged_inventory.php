@@ -17,9 +17,13 @@ use Baander\Tooling\Runtime\Requirements;
 try {
     Requirements::check();
     $environment = getenv();
+    $configuration = ($_SERVER['argv'][1] ?? '') === 'cleanup-collection' ? null : ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    if ($configuration !== null) {
+        $environment['BAANDER_TOOLING_CONFIGURATION'] = json_encode($configuration->toArray(), JSON_THROW_ON_ERROR);
+    }
     $context = ($_SERVER['argv'][1] ?? '') === 'cleanup-collection'
         ? new ExecutionContext($environment, ignoreCancellation: true)
-        : ExecutionContext::bounded(ToolingConfiguration::resolve(environment: $environment)->budgets->seconds('backend'), $environment);
+        : ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment);
     $executor = new EngineExecutor($context);
     try {
         $result = $executor->run(Worker::command(__DIR__ . '/vendor/autoload.php', array_slice($_SERVER['argv'], 1), $environment), new CompletionPolicy(null));

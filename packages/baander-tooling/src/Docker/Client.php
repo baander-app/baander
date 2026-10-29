@@ -30,7 +30,7 @@ final readonly class Client
     /** @param list<string> $arguments
      * @param array<string,string>|null $env
      */
-    public function command(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false): ProcessSpec
+    public function command(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25, bool $appendLog = false): ProcessSpec
     {
         $this->target->assertSnapshot();
         return new ProcessSpec(
@@ -43,31 +43,34 @@ final readonly class Client
             passthrough: $interactive,
             processGroup: !$interactive,
             replaceEnvironment: true,
+            stderrLogPath: $stderrLogPath,
+            terminationGrace: $terminationGrace,
+            appendLog: $appendLog,
         );
     }
 
     /** @param list<string> $arguments
      * @param array<string,string>|null $env
      */
-    public function run(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false): ProcessResult
+    public function run(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25, bool $appendLog = false): ProcessResult
     {
-        return $this->executor->run($this->command($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive), new CompletionPolicy($check ? [0] : null));
+        return $this->executor->run($this->command($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive, $stderrLogPath, $terminationGrace, $appendLog), new CompletionPolicy($check ? [0] : null));
     }
 
     /** @param list<string> $arguments
      * @param array<string,string>|null $env
      */
-    public function start(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false): RunningProcess
+    public function start(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25, bool $appendLog = false): RunningProcess
     {
-        return $this->executor->start($this->command($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive));
+        return $this->executor->start($this->command($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive, $stderrLogPath, $terminationGrace, $appendLog));
     }
 
     /** @param list<string> $arguments
      * @param array<string,string>|null $env
      */
-    public function compose(string $project, string $file, array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false): ProcessResult
+    public function compose(string $project, string $file, array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false, bool $appendLog = false): ProcessResult
     {
-        return $this->run(['compose', '--project-name', $project, '--file', $file, ...$arguments], $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
+        return $this->run(['compose', '--project-name', $project, '--file', $file, ...$arguments], $cwd, $env, $input, $timeout, $check, $logPath, $interactive, appendLog: $appendLog);
     }
 
     /** @return array<string,mixed> */

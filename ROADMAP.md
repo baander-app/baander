@@ -161,6 +161,23 @@ the supported build command. U6–U11, final workflow gates, the authoritative
 CI-image suites on the current tree, live preview qualification and final code
 review remain open.
 
+Migration foundation checkpoint, 2026-10-29: shared RepositoryConfiguration
+selects the local configuration file and ignores developer overrides in CI.
+Inventory receives the resolved configuration snapshot. Neutral Source and Paths
+helpers provide the shared ownership needed for the pending workflow migrations.
+Resource cleanup uses immutable container IDs, detects renamed resources and
+retains unresolved receipts. DisposableContainer also removes by immutable ID
+with an independent cleanup context.
+
+Current-tree integration passes 20 configuration, fixture and startup tests with
+54 assertions; startup-fixture changes remain part of U7. Ledger identity checks
+pass ten tests and 41 assertions, and disposable-container checks pass four tests
+and 19 assertions. Scoped static analysis passes across 37 files; formatting
+checks 14 files with zero fixes. This checkpoint covers the shared configuration,
+Docker client, process specification and resource foundation. U6–U10 delivery,
+family integration, authoritative CI-image and live qualification, and final code
+review remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

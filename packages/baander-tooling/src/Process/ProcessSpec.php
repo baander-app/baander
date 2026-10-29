@@ -40,4 +40,10 @@ final readonly class ProcessSpec
             'ignoreCancellation' => $ignoreCancellation,
         ]);
     }
+
+    /** @param non-empty-list<string> $arguments */
+    public function withArguments(array $arguments): self
+    {
+        return clone($this, ['argv' => $arguments]);
+    }
 }

@@ -137,6 +137,23 @@ final class ResourceLedgerTest extends TestCase
         self::assertFalse($this->ledger()->cleanup(10)->successful());
         self::assertTrue(is_link($this->directory . '/receipt.json'));
     }
+
+    public function testRenamedOwnedContainerRetainsItsReceiptUntilIdentityIsReconciled(): void
+    {
+        $ledger = $this->ledger();
+        $ledger->create(ResourceKind::Container, 'baander-test-owned', ['image']);
+        $resource = json_decode(file_get_contents($this->directory . '/resource.json'), true, flags: JSON_THROW_ON_ERROR);
+        $resource['Name'] = '/baander-renamed';
+        file_put_contents($this->directory . '/resource.json', json_encode($resource, JSON_THROW_ON_ERROR));
+        $report = $ledger->cleanup(10);
+        self::assertFalse($report->successful());
+        self::assertFileExists($this->directory . '/receipt.json');
+        self::assertFileExists($this->directory . '/resource.json');
+        self::assertStringContainsString('ownership does not match', $report->message());
+        $resource['Name'] = '/baander-test-owned';
+        file_put_contents($this->directory . '/resource.json', json_encode($resource, JSON_THROW_ON_ERROR));
+        self::assertTrue($ledger->cleanup(10)->successful());
+    }
     public function testSuccessfulBodyFailsOnCleanupAndPrimaryFailureKeepsItsCode(): void
     {
         $ledger = $this->ledger();

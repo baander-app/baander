@@ -16,14 +16,14 @@ use Baander\Tooling\Resources\ResourceLedger;
 
 final class Collector
 {
-    /** @return array<string, mixed> */
-    public static function collect(string $image, string $target, string $revision, string $output, string $session, string $loader): array
+    /** @param array<string,string> $environment
+     * @return array<string, mixed>
+     */
+    public static function collect(string $image, string $target, string $revision, string $output, string $session, string $loader, ToolingConfiguration $configuration, array $environment): array
     {
         if ($image === '' || $revision === '' || $output === '' || !in_array($target, ['production', 'worker'], true)) {
             throw new InventoryError('Image, production|worker target, revision and output are required', 2);
         }
-        $environment = getenv();
-        $configuration = ToolingConfiguration::resolve(environment: $environment);
         $executor = null;
         $log = null;
         $ownsSession = false;

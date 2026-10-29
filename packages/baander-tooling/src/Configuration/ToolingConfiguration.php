@@ -6,6 +6,71 @@ namespace Baander\Tooling\Configuration;
 
 final readonly class ToolingConfiguration
 {
+    /** @param array<string,mixed> $data */
+    public static function fromArray(array $data): self
+    {
+        JsonObject::keys($data, ['version', 'images', 'docker', 'budgets', 'checkpoint', 'provenance'], 'resolved tooling configuration');
+        if (($data['version'] ?? null) !== 1) {
+            throw new \InvalidArgumentException('Unsupported resolved tooling configuration version.');
+        }
+        $images = [];
+        foreach (self::map($data, 'images') as $role => $definition) {
+            if (!is_array($definition) || !is_array($definition['capabilities'] ?? null) || !array_is_list($definition['capabilities'])) {
+                throw new \InvalidArgumentException('Invalid saved image selection.');
+            }
+            JsonObject::keys($definition, ['reference', 'capabilities', 'playwrightVersion'], 'saved image selection');
+            foreach ($definition['capabilities'] as $capability) {
+                if (!is_string($capability)) {
+                    throw new \InvalidArgumentException('Invalid saved image capability.');
+                }
+            }
+            $version = self::optionalString($definition, 'playwrightVersion');
+            if ($role === 'browser' && $version === null) {
+                throw new \InvalidArgumentException('Browser role requires its compatible Playwright package version.');
+            }
+            $images[$role] = new ImageSelection(self::string($definition, 'reference'), $definition['capabilities'], $version);
+        }
+        $docker = self::map($data, 'docker');
+        JsonObject::keys($docker, ['executable', 'host', 'context'], 'saved Docker settings');
+        $budgets = [];
+        foreach (self::map($data, 'budgets') as $name => $value) {
+            if (!is_int($value) && !is_float($value)) {
+                throw new \InvalidArgumentException('Invalid saved workflow budget.');
+            }
+            $budgets[$name] = (float) $value;
+        }
+        $provenance = self::map($data, 'provenance');
+        foreach ($provenance as $value) {
+            if (!is_string($value)) {
+                throw new \InvalidArgumentException('Invalid saved configuration provenance.');
+            }
+        }
+        $checkpoint = $data['checkpoint'] ?? null;
+        if ($checkpoint !== null) {
+            if (!is_array($checkpoint)) {
+                throw new \InvalidArgumentException('Invalid saved checkpoint selection.');
+            }
+            JsonObject::keys($checkpoint, ['name', 'path'], 'saved checkpoint');
+            $checkpoint = new CheckpointSelection(self::string($checkpoint, 'name'), self::string($checkpoint, 'path'));
+        }
+        return new self(new ImageCatalog($images), new DockerSettings(self::string($docker, 'executable'), self::optionalString($docker, 'host'), self::optionalString($docker, 'context')), new WorkflowBudgets($budgets), $checkpoint, $provenance);
+    }
+
+    /** @param array<string,string> $environment
+     * @param array<string,mixed> $flags
+     */
+    public static function forRepository(string $root, array $environment, array $flags = []): self
+    {
+        $defaults = JsonObject::read(dirname(__DIR__, 2) . '/resources/tooling-defaults.json');
+        $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded($defaults['budgets']['process'], $environment, $root));
+        try {
+            $local = RepositoryConfiguration::local($executor, $root, $environment);
+            return self::resolve($flags, $environment, $local['tooling'] ?? []);
+        } finally {
+            $executor->close();
+        }
+    }
+
     /** @param array<string,string> $provenance */
     private function __construct(
         public ImageCatalog $images,
@@ -196,7 +261,7 @@ final readonly class ToolingConfiguration
         if (isset($result['docker']['context'])) {
             unset($result['docker']['host']);
         }
-        foreach (['BAANDER_TEST_IMAGE' => 'application', 'BAANDER_TEST_POSTGRES_IMAGE' => 'postgres', 'BAANDER_TEST_REDIS_IMAGE' => 'fixtureRedis', 'BAANDER_TEST_PROXY_IMAGE' => 'proxy', 'BAANDER_TEST_DOCKER_CLI_IMAGE' => 'operatorHelper', 'BAANDER_BROWSER_IMAGE' => 'browser', 'BAANDER_DEVELOPMENT_REDIS_IMAGE' => 'developmentRedis', 'BAANDER_NGINX_IMAGE' => 'nginx'] as $name => $role) {
+        foreach (['BAANDER_TEST_IMAGE' => 'application', 'BAANDER_TEST_POSTGRES_IMAGE' => 'postgres', 'BAANDER_TEST_REDIS_IMAGE' => 'fixtureRedis', 'BAANDER_TEST_PROXY_IMAGE' => 'proxy', 'BAANDER_TEST_DOCKER_CLI_IMAGE' => 'operatorHelper', 'BAANDER_BROWSER_IMAGE' => 'browser', 'BAANDER_DEVELOPMENT_REDIS_IMAGE' => 'developmentRedis', 'BAANDER_NGINX_IMAGE' => 'nginx', 'BAANDER_TEST_MAILPIT_IMAGE' => 'mailpit'] as $name => $role) {
             if (isset($environment[$name]) && $environment[$name] !== '') {
                 $result['images'][$role]['reference'] = $environment[$name];
             }

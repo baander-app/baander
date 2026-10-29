@@ -18,8 +18,10 @@ final class ResourceLedger
     /** @param array<string,string> $environment */
     public function __construct(public readonly string $receipt, private readonly Client $docker, private readonly array $environment) {}
 
-    /** @param list<string> $arguments */
-    public function create(ResourceKind $resourceKind, string $name, array $arguments): string
+    /** @param list<string> $arguments
+     * @param array<string,string>|null $env
+     */
+    public function create(ResourceKind $resourceKind, string $name, array $arguments, ?array $env = null): string
     {
         $kind = $resourceKind->value;
         if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]+$/D', $name) !== 1) {
@@ -43,7 +45,7 @@ final class ResourceLedger
             $command = $kind === 'container'
                 ? ['create', '--name', $name, '--label', $label, ...$arguments]
                 : [$kind, 'create', '--label', $label, ...$arguments, $name];
-            $id = trim($this->docker->run($command)->stdout);
+            $id = trim($this->docker->run($command, env: $env)->stdout);
             if ($id === '' || ($kind !== 'volume' && preg_match('/^[a-f0-9]{64}$/D', $id) !== 1)) {
                 throw new \RuntimeException('Docker returned no immutable resource identity; recover the saved intention.');
             }
@@ -110,8 +112,13 @@ final class ResourceLedger
         } catch (\Throwable $error) {
             $errors[] = $error->getMessage();
         } finally {
-            $executor?->close();
-            $lock?->release();
+            try {
+                $executor?->close();
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            } finally {
+                $lock?->release();
+            }
         }
         return new CleanupReport($errors, $this->receipt);
     }
@@ -120,6 +127,9 @@ final class ResourceLedger
     private static function removeOwnedResource(Client $docker, array $resource, string $token): void
     {
         $observed = self::inspect($docker, $resource['kind'], $resource['name']);
+        if ($observed === null && $resource['id'] !== null && $resource['id'] !== $resource['name']) {
+            $observed = self::inspect($docker, $resource['kind'], $resource['id']);
+        }
         if ($observed === null) {
             return;
         }
@@ -135,7 +145,7 @@ final class ResourceLedger
         }
         $remove = $container ? ['rm', '--force', '--volumes', '--', $id] : [$resource['kind'], 'rm', '--', $id];
         $docker->run($remove);
-        if (self::inspect($docker, $resource['kind'], $resource['name']) !== null) {
+        if (self::inspect($docker, $resource['kind'], $id) !== null || ($id !== $resource['name'] && self::inspect($docker, $resource['kind'], $resource['name']) !== null)) {
             throw new \RuntimeException('Owned resource remains after removal');
         }
     }
@@ -155,13 +165,17 @@ final class ResourceLedger
                 if ($kind === 'container') {
                     $arguments[] = '--all';
                 }
+                $byId = $kind !== ResourceKind::Volume->value && preg_match('/^[a-f0-9]{64}$/D', $name) === 1;
+                if ($byId) {
+                    $arguments[] = '--no-trunc';
+                }
                 $listing = $docker->run([...$arguments, '--format', '{{json .}}'])->stdout;
                 foreach (explode("\n", trim($listing)) as $line) {
                     if ($line === '') {
                         continue;
                     }
                     $entry = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                    $observed = $entry[$kind === 'container' ? 'Names' : 'Name'] ?? null;
+                    $observed = $entry[$byId ? 'ID' : ($kind === 'container' ? 'Names' : 'Name')] ?? null;
                     if (!is_string($observed)) {
                         throw new \RuntimeException('Invalid resource enumeration');
                     }

@@ -45,7 +45,7 @@ final class Command
             throw new \InvalidArgumentException('Use php scripts/build-application.php --target TARGET --tag IMAGE [--source DIRECTORY] [--revision REVISION] [--buildx] [--cache-from VALUE] [--cache-to VALUE] [--compose-env FILE].');
         }
         ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
-        $configuration = ToolingConfiguration::resolve(environment: $environment);
+        $configuration = ToolingConfiguration::forRepository($source, $environment);
         $options = new BuildOptions($buildx, array_slice($tags, 1), $values['cache-from'], $values['cache-to']);
         $processes = new EngineExecutor(new ExecutionContext($environment));
         $temporary = sys_get_temp_dir() . '/baander.app-build-' . bin2hex(random_bytes(8));

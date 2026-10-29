@@ -29,11 +29,19 @@ if ($command === 'info') {
         exit(1);
     }
     $name = end($arguments);
-    if (!is_file($path($name))) {
+    $found = null;
+    foreach (glob($state . '/resource*.json') as $file) {
+        $resource = json_decode(file_get_contents($file), true);
+        if ($resource['kind'] === $command && ($resource['Id'] === $name || ltrim($resource['Name'], '/') === $name)) {
+            $found = $resource;
+            break;
+        }
+    }
+    if ($found === null) {
         fwrite(STDERR, $command === 'network' ? 'Error response from daemon: network ' . $name . ' not found' : 'Error: No such ' . $command . ': ' . $name);
         exit(1);
     }
-    echo '[' . file_get_contents($path($name)) . ']';
+    echo json_encode([$found]);
 } elseif (in_array($command, ['container', 'network', 'volume'], true) && ($arguments[1] ?? '') === 'ls') {
     if (is_file($state . '/list-fails')) {
         fwrite(STDERR, 'transport unavailable');
@@ -42,7 +50,7 @@ if ($command === 'info') {
     foreach (glob($state . '/resource*.json') as $file) {
         $resource = json_decode(file_get_contents($file), true);
         if ($resource['kind'] === $command) {
-            echo json_encode([$command === 'container' ? 'Names' : 'Name' => ltrim($resource['Name'], '/')]) . "\n";
+            echo json_encode(['ID' => $resource['Id'], $command === 'container' ? 'Names' : 'Name' => ltrim($resource['Name'], '/')]) . "\n";
         }
     }
 } elseif ($command === 'rm' || in_array($command, ['network', 'volume'], true) && ($arguments[1] ?? '') === 'rm') {

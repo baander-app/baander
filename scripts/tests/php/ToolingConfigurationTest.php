@@ -102,4 +102,27 @@ final class ToolingConfigurationTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         ToolingConfiguration::resolve(['docker' => ['host' => '']]);
     }
+
+    public function testSavedInvocationDoesNotAcquireCurrentDefaults(): void
+    {
+        $snapshot = ToolingConfiguration::resolve([
+            'images' => ['application' => ['reference' => 'registry.baander.app/application:saved']],
+            'budgets' => ['backend' => 37],
+            'checkpoints' => ['controlCapacity' => '/tmp/baander.app-checkpoint'],
+        ])->toArray();
+        unset($snapshot['images']['mailpit'], $snapshot['budgets']['webRuntime']);
+        $saved = ToolingConfiguration::fromArray(json_decode(json_encode($snapshot, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
+        self::assertEquals($snapshot, $saved->toArray());
+        self::assertSame(37.0, $saved->budgets->seconds('backend'));
+        $this->expectException(\InvalidArgumentException::class);
+        $saved->images->role('mailpit');
+    }
+
+    public function testSavedBrowserSelectionRequiresItsCompatibilityVersion(): void
+    {
+        $snapshot = ToolingConfiguration::resolve()->toArray();
+        $snapshot['images']['browser']['playwrightVersion'] = null;
+        $this->expectException(\InvalidArgumentException::class);
+        ToolingConfiguration::fromArray($snapshot);
+    }
 }

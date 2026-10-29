@@ -34,7 +34,6 @@ final class LocalFile
             }
             $tooling[$section] = $section === 'images' ? self::images($settings) : get_object_vars($settings);
         }
-        ToolingConfiguration::resolve(local: $tooling);
         return $tooling;
     }
 

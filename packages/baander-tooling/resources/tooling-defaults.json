@@ -32,6 +32,10 @@
                 "http"
             ]
         },
+        "mailpit": {
+            "reference": "axllent/mailpit:v1.31.4",
+            "capabilities": ["smtp", "http"]
+        },
         "proxy": {
             "reference": "baander-websocket-proxy-test:local",
             "capabilities": [
@@ -68,9 +72,11 @@
         "workerOperator": 240,
         "workerCapacity": 600,
         "webShutdown": 900,
+        "webRuntime": 180,
+        "webSecurity": 360,
         "browser": 400,
         "registryQualification": 1800,
         "registryStatic": 1800,
-        "registryFuzz": 120
+        "registryFuzz": 180
     }
 }
