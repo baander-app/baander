@@ -87,8 +87,11 @@ final class Source
                         throw new WorkflowError('Cannot read source snapshot entry: ' . $name);
                     }
                 }
-                if ($target !== null && (file_put_contents($target, $content) === false || !chmod($target, fileperms($original) & 0777))) {
-                    throw new WorkflowError('Cannot copy source snapshot entry: ' . $name);
+                if ($target !== null) {
+                    $permissions = (fileperms($original) & 0111) === 0 ? 0644 : 0755;
+                    if (file_put_contents($target, $content) === false || !chmod($target, $permissions)) {
+                        throw new WorkflowError('Cannot copy source snapshot entry: ' . $name);
+                    }
                 }
             } else {
                 throw new WorkflowError('Source snapshot contains an unsupported entry: ' . $name);

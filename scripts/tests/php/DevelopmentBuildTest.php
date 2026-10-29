@@ -68,14 +68,15 @@ final class DevelopmentBuildTest extends TestCase
         self::assertNotSame($first, Source::snapshotWorktree($this->runner, $this->repo, null));
     }
 
-    public function testSnapshotChildDirectoriesRemainReadableUnderARestrictiveUmask(): void
+    public function testSnapshotSourcesRemainReadableUnderARestrictiveUmask(): void
     {
         mkdir($this->repo . '/packages/bundle/src', 0750, true);
         foreach (['packages', 'packages/bundle', 'packages/bundle/src'] as $directory) {
             chmod($this->repo . '/' . $directory, 0750);
         }
         file_put_contents($this->repo . '/packages/bundle/src/functions.php', '<?php');
-        chmod($this->repo . '/packages/bundle/src/functions.php', 0640);
+        chmod($this->repo . '/packages/bundle/src/functions.php', 0600);
+        chmod($this->repo . '/execute', 0700);
         $snapshot = $this->root . '/snapshot';
         $previousUmask = umask(0077);
         try {
@@ -90,8 +91,10 @@ final class DevelopmentBuildTest extends TestCase
             self::assertSame(0755, fileperms($snapshot . '/' . $directory) & 0777);
             self::assertSame(0750, fileperms($this->repo . '/' . $directory) & 0777);
         }
-        self::assertSame(0640, fileperms($snapshot . '/packages/bundle/src/functions.php') & 0777);
-        self::assertSame(0640, fileperms($this->repo . '/packages/bundle/src/functions.php') & 0777);
+        self::assertSame(0644, fileperms($snapshot . '/packages/bundle/src/functions.php') & 0777);
+        self::assertSame(0600, fileperms($this->repo . '/packages/bundle/src/functions.php') & 0777);
+        self::assertSame(0755, fileperms($snapshot . '/execute') & 0777);
+        self::assertSame(0700, fileperms($this->repo . '/execute') & 0777);
         self::assertSame($digest, Source::snapshotWorktree($this->runner, $this->repo, null));
     }
 
@@ -145,7 +148,8 @@ final class DevelopmentBuildTest extends TestCase
         $snapshot = $this->root . '/snapshot';
         $digest = Source::snapshotWorktree($this->runner, $this->repo, $snapshot);
         self::assertSame(file_get_contents($helper), file_get_contents($snapshot . '/' . $relative));
-        self::assertSame(0750, fileperms($snapshot . '/' . $relative) & 0777);
+        self::assertSame(0755, fileperms($snapshot . '/' . $relative) & 0777);
+        self::assertSame(0750, fileperms($helper) & 0777);
         foreach ($secrets as $secret) {
             self::assertFileDoesNotExist($snapshot . '/' . $secret);
         }

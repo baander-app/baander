@@ -322,6 +322,22 @@ The failed lifecycle's logs, state and data remain retained, and the managed
 preview is restored with trusted HTTPS, login and HMR verified again. Remaining
 lifecycle scenarios await continuation; the original failure is not a full pass.
 
+Snapshot file access, 2026-10-29: a check before continuing exposes the same
+private clone's unreadable PHP files in the worker operator image. With root
+capabilities removed, Composer cannot read package files owned by `www-data` with
+mode `0600`. Snapshots now copy regular files as `0644` and executable files as
+`0755`. Original source modes, the private outer directory, caller umask, digest
+inputs and secret exclusions remain unchanged.
+
+The restrictive-mode regression fails before the repair. Source and backend
+archive checks pass 22 tests and 114 assertions; full tooling PHPStan and formatting
+across 276 files pass. An operator image built from the actual private checkout's
+normalized snapshot loads Composer successfully as root with all capabilities
+removed, without mounts or network access. The probe preserves the container
+inventory. Independent review's stale executable-mode expectation is corrected;
+no source findings remain. The lifecycle continuation stays held before its
+preview loop until the repaired source is committed to its disposable remote.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
