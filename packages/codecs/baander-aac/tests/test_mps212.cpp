@@ -595,5 +595,9 @@ int main(int argc, char** argv) {
   test_decorrelator();
   test_stream("usac_music_48000_48000.loas", 40, "mps212_music_48000_48000_fdk.wav", 45.0);
   test_stream("usac_music_48000_64000.loas", 40);
+  /* stereoConfigIndex 1 at the 8:3 and 4:1 ratios on an LPD core: the
+   * low band is the core's, the comparison is of the timing and the gain */
+  test_stream("usac_music_48000_24000.loas", 40, "mps212_music_48000_24000_fdk.wav", 12.0);
+  test_stream("usac_music_48000_16000.loas", 20, "mps212_music_48000_16000_fdk.wav", 20.0);
   return test_summary("test_mps212");
 }

@@ -27,7 +27,15 @@ namespace {
 
 constexpr int kFixFix = 0;
 constexpr int kCols = AAC_SBR_USAC_COLS;
-constexpr int kLpcHistory = 8; /* QMF slots of the previous frame in the covariance */
+/* QMF slots of the previous frame in the LPC covariance: the three time
+ * slots the output frame leads the core frame by, plus the predictor's
+ * two taps (8 at 2:1 and 8:3, 14 at 4:1). */
+int lpc_history(const AacSbrUsac* u) { return 3 * u->rate + 2; }
+/* The hybrid filter of MPS 212 delays the three lowest QMF bands by six
+ * slots (ISO/IEC 23003-1 6.6.3); with stereoConfigIndex 1 or 2 the
+ * output frame hands them that much ahead. */
+constexpr int kMpsHybridDelay = 6;
+constexpr int kMpsLowBands = 3;
 constexpr float kInterTesGamma[4] = {0.0f, 1.0f, 2.0f, 4.0f};
 
 /* ── complex FFT of n = 2^k or 3 x 2^k for the transposer ───────── */
@@ -750,10 +758,11 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
     }
     return 0;
   }
-  const int cov_cols = kLpcHistory + u->slots_of_frame;
+  const int hist = lpc_history(u);
+  const int cov_cols = hist + u->slots_of_frame;
   const int k0 = std::min(s->k[0], 32);
   for (int k = 0; k < k0; k++) {
-    aac_sbr_lpc_band(u->alpha0[k], u->alpha1[k], u->X_low[k] + (u->history - kLpcHistory), cov_cols);
+    aac_sbr_lpc_band(u->alpha0[k], u->alpha1[k], u->X_low[k] + (u->history - hist), cov_cols);
   }
   float pre_gain[32];
   if (u->preprocessing && k0 > 0 && end > start) {
@@ -1092,11 +1101,15 @@ void x_gen(const AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChanne
   const float (*Y0)[64][2] = uc->Y[1 - uc->Ypos];
   const float (*Y1)[64][2] = uc->Y[uc->Ypos];
   memset(X, 0, 2 * sizeof(*X));
+  /* the three lowest bands six slots ahead when MPS 212 follows: its
+   * hybrid filter puts them back in step with the others */
+  const int lead = u->mps_low_ahead ? kMpsHybridDelay : 0;
   int k;
   for (k = 0; k < s->kx[0] && k < 32; k++) {
+    const int col = a + (k < kMpsLowBands ? lead : 0);
     for (int i = 0; i < i_temp; i++) {
-      X[0][i][k] = u->X_low[k][i + a][0];
-      X[1][i][k] = u->X_low[k][i + a][1];
+      X[0][i][k] = u->X_low[k][i + col][0];
+      X[1][i][k] = u->X_low[k][i + col][1];
     }
   }
   for (; k < s->kx[0] + s->m[0]; k++) {
@@ -1106,9 +1119,10 @@ void x_gen(const AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChanne
     }
   }
   for (k = 0; k < s->kx[1] && k < 32; k++) {
+    const int col = a + (k < kMpsLowBands ? lead : 0);
     for (int i = i_temp; i < slots; i++) {
-      X[0][i][k] = u->X_low[k][i + a][0];
-      X[1][i][k] = u->X_low[k][i + a][1];
+      X[0][i][k] = u->X_low[k][i + col][0];
+      X[1][i][k] = u->X_low[k][i + col][1];
     }
   }
   for (; k < s->kx[1] + s->m[1]; k++) {
@@ -1251,10 +1265,11 @@ void anchor_check(AacSbrState* s, int nch) {
 /* ── public ────────────────────────────────────────────────────── */
 
 void aac_sbr_usac_init(AacSbrState* s, int core_sample_rate, int frame_length, int ratio,
-                       const struct AacUsacSbrConfig_* cfg) {
+                       const struct AacUsacSbrConfig_* cfg, int stereo_config_index) {
   memset(s, 0, sizeof(*s));
   AacSbrUsac* u = &s->usac;
   u->active = 1;
+  u->mps_low_ahead = stereo_config_index == 1 || stereo_config_index == 2;
   u->ratio = ratio;
   u->core_frame = frame_length;
   switch (ratio) {

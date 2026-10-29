@@ -149,7 +149,8 @@ int build_elements(AacUsacState* u) {
       if (!e->sbr) {
         return AAC_ERR_MEMORY;
       }
-      aac_sbr_usac_init(e->sbr, c->core_sample_rate, c->frame_length, c->sbr_ratio_index, &ec->sbr);
+      aac_sbr_usac_init(e->sbr, c->core_sample_rate, c->frame_length, c->sbr_ratio_index, &ec->sbr,
+                        sci);
     }
     if (sci > 0) {
       e->mps =
@@ -429,8 +430,10 @@ void aac_usac_state_reset(AacUsacState* u) {
       reset_core_channel(&e->core[c], c);
     }
     if (e->sbr) {
+      const AacUsacElementConfig* ec = &u->cfg.elem[i];
       aac_sbr_usac_init(e->sbr, u->cfg.core_sample_rate, u->cfg.frame_length,
-                        u->cfg.sbr_ratio_index, &u->cfg.elem[i].sbr);
+                        u->cfg.sbr_ratio_index, &ec->sbr,
+                        ec->type == AAC_USAC_CPE ? ec->stereo_config_index : 0);
     }
     if (e->mps) {
       aac_mps212_reset(e->mps);

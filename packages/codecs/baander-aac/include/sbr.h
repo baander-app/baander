@@ -193,6 +193,8 @@ using AacSbrUsac = struct AacSbrUsac_ {
   int elem_type;       /* the element's type as the caller names it */
   int history;         /* history columns in front of the frame */
   int offset;          /* column of the frame's first output slot */
+  int mps_low_ahead;   /* MPS 212 of stereoConfigIndex 1 or 2 takes the output frame:
+                          its three lowest bands go six slots ahead (see x_gen) */
   int harmonic_sbr, inter_tes, pvc;
   int hbe_n, hbe_ns;   /* transposer DFT sizes */
   int max_stretch;     /* highest transposition order */
@@ -327,9 +329,10 @@ struct AacUsacSbrConfig_;
 
 /* Prepares the state for a USAC element: `ratio` is AAC_USAC_SBR_2_1,
  * _8_3 or _4_1, `frame_length` the core frame (768 or 1024), `cfg` the
- * element's SbrConfig with the default header. */
+ * element's SbrConfig with the default header, `stereo_config_index`
+ * the element's (0 for an SCE). */
 void aac_sbr_usac_init(AacSbrState* s, int core_sample_rate, int frame_length, int ratio,
-                       const struct AacUsacSbrConfig_* cfg);
+                       const struct AacUsacSbrConfig_* cfg, int stereo_config_index);
 
 /* Parses UsacSbrData() of an SCE or CPE (`elem_type` AAC_ELEM_SCE or
  * AAC_ELEM_CPE; for a CPE with MPS 212 the data is that of the single
@@ -347,7 +350,9 @@ void aac_sbr_usac_apply(AacSbrState* s, float* left, float* right);
  * first takes the core samples of channel `ch` (0 or 1) and leaves the
  * reconstructed 64-band QMF frame; the second synthesises a QMF frame
  * into output_frame_length samples with channel `ch`'s synthesis
- * history. */
+ * history.  With stereoConfigIndex 1 or 2 the frame carries QMF bands
+ * 0..2 six slots ahead of the others, the delay of the MPS 212 hybrid
+ * filter on them, so that the MPS output sits at the frame's timing. */
 void aac_sbr_usac_apply_to_qmf(AacSbrState* s, int ch, const float* core, struct AacUsacQmfFrame_* out);
 void aac_sbr_usac_synthesize(AacSbrState* s, int ch, const struct AacUsacQmfFrame_* in, float* out);
 

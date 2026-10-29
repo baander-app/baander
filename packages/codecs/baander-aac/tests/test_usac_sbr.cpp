@@ -125,7 +125,7 @@ static void test_freq_tables() {
   static AacSbrState state;
   for (const Expected& e : kExpected) {
     const AacUsacSbrConfig cfg = config(e.start, e.stop, e.freq_scale, e.noise_bands);
-    aac_sbr_usac_init(&state, e.core_rate, e.frame, e.ratio, &cfg);
+    aac_sbr_usac_init(&state, e.core_rate, e.frame, e.ratio, &cfg, 0);
     printf("%s: k0 %d kx %d k2 %d m %d n_master %d bands %d/%d noise %d limiter %d patches",
            e.name, state.k[0], state.kx[1], state.k[2], state.m[1], state.n_master, state.n[0],
            state.n[1], state.n_q, state.n_lim);
@@ -345,7 +345,7 @@ static const AacSbrState* tables_for(int core_rate, int frame, int ratio, int st
                                      int freq_scale, int noise_bands, int xover) {
   static AacSbrState probe_state;
   const AacUsacSbrConfig cfg = config(start, stop, freq_scale, noise_bands);
-  aac_sbr_usac_init(&probe_state, core_rate, frame, ratio, &cfg);
+  aac_sbr_usac_init(&probe_state, core_rate, frame, ratio, &cfg, 0);
   probe_state.xover_band = xover;
   AacSbrFreq fq;
   aac_sbr_freq_from_state(&probe_state, &fq);
@@ -387,7 +387,7 @@ static int decode_frame(AacSbrState* s, const uint8_t* buf, int size, int indep,
 static void test_syntax_roundtrip() {
   static AacSbrState s;
   const AacUsacSbrConfig cfg = config(10, 10, 2, 2, 1, 1, 1);
-  aac_sbr_usac_init(&s, 24000, 1024, AAC_USAC_SBR_2_1, &cfg);
+  aac_sbr_usac_init(&s, 24000, 1024, AAC_USAC_SBR_2_1, &cfg, 0);
   uint8_t buf[512];
   /* 1. an independent frame on the default header, two envelopes, the
    *    second delta-time coded, inter-TES on the second, LPC patching */
@@ -589,7 +589,7 @@ static void test_harmonic_transposer() {
               0.25f * sinf(2.0f * (float)M_PI * 3000.0f * (float)i / 12000.0f);
   }
   for (int mode = 0; mode < 2; mode++) {
-    aac_sbr_usac_init(&s, 12000, frame, AAC_USAC_SBR_4_1, &cfg);
+    aac_sbr_usac_init(&s, 12000, frame, AAC_USAC_SBR_4_1, &cfg, 0);
     CHECK(s.start && s.k[2] >= 52, "4:1 tables for the transposer test: k2 %d", s.k[2]);
     TestFrame f = plain_frame(1, 48);
     f.patching_mode = mode;
@@ -668,7 +668,7 @@ static void test_pvc() {
   static AacSbrState s;
   const AacUsacSbrConfig cfg = config(7, 8, 2, 2, 0, 0, 1);
   const int frame = 768;
-  aac_sbr_usac_init(&s, 18000, frame, AAC_USAC_SBR_8_3, &cfg);
+  aac_sbr_usac_init(&s, 18000, frame, AAC_USAC_SBR_8_3, &cfg, 0);
   const int frames = 16;
   std::vector<float> core((size_t)frame * frames);
   for (size_t i = 0; i < core.size(); i++) {
@@ -720,7 +720,7 @@ static void test_inter_tes() {
   }
   double ratio[2] = {0.0, 0.0};
   for (int tes = 0; tes < 2; tes++) {
-    aac_sbr_usac_init(&s, 24000, frame, AAC_USAC_SBR_2_1, &cfg);
+    aac_sbr_usac_init(&s, 24000, frame, AAC_USAC_SBR_2_1, &cfg, 0);
     TestFrame f = plain_frame(1, 50);
     f.env[0].temp_shape = tes;
     f.env[0].temp_shape_mode = 3;
@@ -761,8 +761,8 @@ static void test_split_interface() {
    * synthesis history produces the same output for the same frame */
   static AacSbrState a, b;
   const AacUsacSbrConfig cfg = config(10, 10, 2, 2);
-  aac_sbr_usac_init(&a, 24000, 1024, AAC_USAC_SBR_2_1, &cfg);
-  aac_sbr_usac_init(&b, 24000, 1024, AAC_USAC_SBR_2_1, &cfg);
+  aac_sbr_usac_init(&a, 24000, 1024, AAC_USAC_SBR_2_1, &cfg, 0);
+  aac_sbr_usac_init(&b, 24000, 1024, AAC_USAC_SBR_2_1, &cfg, 0);
   std::vector<float> core = gen_wideband(1024 * 6, 24000, 1);
   TestFrame f = plain_frame(2, 45);
   uint8_t bits[512];
@@ -792,6 +792,53 @@ static void test_split_interface() {
   }
   CHECK(ref > 0.0 && diff < 1e-10 * ref, "split interface differs from apply: %g", diff / ref);
   CHECK(diff2 < 1e-10 * ref, "second synthesis history differs: %g", diff2 / ref);
+}
+
+static void test_mps_low_band_lead() {
+  /* with stereoConfigIndex 1 the QMF frame carries bands 0..2 six slots
+   * ahead of the frame a plain element gets, the other bands unchanged */
+  static AacSbrState a, b;
+  const AacUsacSbrConfig cfg = config(10, 10, 2, 2);
+  aac_sbr_usac_init(&a, 24000, 1024, AAC_USAC_SBR_2_1, &cfg, 0);
+  aac_sbr_usac_init(&b, 24000, 1024, AAC_USAC_SBR_2_1, &cfg, 1);
+  std::vector<float> core = gen_wideband(1024 * 6, 24000, 1);
+  TestFrame f = plain_frame(2, 45);
+  uint8_t bits[512];
+  static AacUsacQmfFrame qa[6], qb[6];
+  for (int n = 0; n < 6; n++) {
+    f.indep = n == 0;
+    f.info_present = 0;
+    write_usac_sbr_data(bits, sizeof(bits), &a, &cfg, f);
+    AacBitReader r;
+    aac_bitreader_init(&r, bits, sizeof(bits));
+    CHECK(aac_sbr_usac_decode(&a, &r, AAC_ELEM_CPE, 1, f.indep) == AAC_OK, "frame %d (a)", n);
+    aac_bitreader_init(&r, bits, sizeof(bits));
+    CHECK(aac_sbr_usac_decode(&b, &r, AAC_ELEM_CPE, 1, f.indep) == AAC_OK, "frame %d (b)", n);
+    aac_sbr_usac_apply_to_qmf(&a, 0, core.data() + n * 1024, &qa[n]);
+    aac_sbr_usac_apply_to_qmf(&b, 0, core.data() + n * 1024, &qb[n]);
+  }
+  int high_diff = 0, low_diff = 0, low_nonzero = 0;
+  for (int n = 1; n < 6; n++) {
+    for (int i = 0; i < 32; i++) {
+      for (int k = 3; k < 64; k++) {
+        high_diff += qa[n].x[i][k][0] != qb[n].x[i][k][0] || qa[n].x[i][k][1] != qb[n].x[i][k][1];
+      }
+      /* slot i + 6 of the plain sequence, in this frame or the next */
+      const int j = i + 6;
+      if (n + j / 32 >= 6) {
+        continue;
+      }
+      const AacUsacQmfFrame& ref = qa[n + j / 32];
+      for (int k = 0; k < 3; k++) {
+        low_diff += ref.x[j % 32][k][0] != qb[n].x[i][k][0] || ref.x[j % 32][k][1] != qb[n].x[i][k][1];
+        low_nonzero += qb[n].x[i][k][0] != 0.0f;
+      }
+    }
+  }
+  CHECK(high_diff == 0, "bands 3..63 differ in %d samples with stereoConfigIndex 1", high_diff);
+  CHECK(low_nonzero > 0, "bands 0..2 are silent");
+  CHECK(low_diff == 0, "bands 0..2 are not six slots ahead with stereoConfigIndex 1: %d samples",
+        low_diff);
 }
 
 /* ── the low band of real streams against the FDK decoder ────────── */
@@ -860,7 +907,7 @@ static void fdk_lowband(const char* file, int ratio, int core_rate, int frame, i
   const std::vector<float> core = resample(fdk, down, up); /* 48000 -> core rate */
   static AacSbrState s;
   const AacUsacSbrConfig cfg = config(start, stop, freq_scale, noise_bands);
-  aac_sbr_usac_init(&s, core_rate, frame, ratio, &cfg);
+  aac_sbr_usac_init(&s, core_rate, frame, ratio, &cfg, 0);
   /* upsampling only: no SBR data decoded, the state stays off */
   aac_sbr_turnoff(&s);
   const int frames = (int)core.size() / frame;
@@ -1048,6 +1095,7 @@ int main() {
   test_pvc();
   test_inter_tes();
   test_split_interface();
+  test_mps_low_band_lead();
   test_fdk_lowband();
   test_fdk_stream();
   return test_summary("test_usac_sbr");

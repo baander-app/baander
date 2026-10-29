@@ -116,7 +116,7 @@ struct AacMps212State_ {
   int num_bands, num_ipd_bands, res_bands;
   int phase_coding; /* bsPhaseCoding, 2 with residual coding (prediction mode) */
   int residual_qmf_bands, residual_hyb_bands, residual_delay;
-  int grid_delay; /* trajectory entries ahead of hybrid slot 0 (see below) */
+  int low_ahead; /* the three lowest downmix bands arrive six slots ahead (see hybrid_push) */
   const uint8_t* kernel;
   float gain;
 
@@ -152,19 +152,14 @@ struct AacMps212State_ {
   float opd_smooth_l[kMaxPb], opd_smooth_r[kMaxPb];
   int num_sets_prev;
 
-  /* ── per-slot trajectories: entry grid_delay + n belongs to parameter
-   * slot n.  With the downmix at the SBR output timing the parameter
-   * grid sits on the input slots, which the hybrid slots carry six
-   * later, so grid_delay is six and the first six entries are the
-   * previous frame's last six; with the downmix at the core analysis
-   * timing the grid sits on the hybrid slots themselves and grid_delay
-   * is zero ── */
-  float r_res[kMaxSlots + kHybDelay][kMaxPb][2][2][2];
-  float r_dec[kMaxSlots + kHybDelay][kMaxPb][2][2];
-  float ges_gain[2][kMaxSlots + kHybDelay]; /* 0 where the envelope is not shaped */
-  int stp_on[2][kMaxSlots + kHybDelay];
-  int tsd_on[kMaxSlots + kHybDelay];
-  int tsd_ph[kMaxSlots + kHybDelay];
+  /* ── per-slot trajectories: entry n belongs to parameter slot n, the
+   * hybrid slot the parameter grid sits on ── */
+  float r_res[kMaxSlots][kMaxPb][2][2][2];
+  float r_dec[kMaxSlots][kMaxPb][2][2];
+  float ges_gain[2][kMaxSlots]; /* 0 where the envelope is not shaped */
+  int stp_on[2][kMaxSlots];
+  int tsd_on[kMaxSlots];
+  int tsd_ph[kMaxSlots];
 
   /* ── signal state ── */
   float lf_hist[kProto][64][2]; /* the last 13 QMF slots, oldest first */
@@ -1214,7 +1209,7 @@ float angle_step(float a1, float a2, float* start, int diff) {
  * slot; with the IPD/OPD mode the phases are interpolated as angles and
  * turn the matrices complex. */
 void interpolate_matrices(AacMps212State* s) {
-  int ts = s->grid_delay;
+  int ts = 0;
   for (int ps = 0; ps < s->num_sets; ps++) {
     const int diff = s->param_diff[ps];
     for (int pb = 0; pb < s->num_bands; pb++) {
@@ -1328,19 +1323,22 @@ void hybrid_low(const float (*in)[64][2], float (*out)[2]) {
 }
 
 /* Pushes a slot of `bands` QMF bands into the history and returns the
- * hybrid bands of the slot six back: the lowest ten from the filters
- * over the three split bands, the others delayed to the same timing
- * (ISO/IEC 23003-1 6.6.3). */
-void hybrid_push(float (*hist)[64][2], const float (*slot)[2], int bands, float (*out)[2]) {
+ * hybrid bands: the lowest ten from the filters over the three split
+ * bands, centred six slots back (ISO/IEC 23003-1 6.6.3).  The others
+ * are delayed to the same timing, or taken from the slot itself when
+ * the split bands arrive six slots ahead (`ahead`). */
+void hybrid_push(float (*hist)[64][2], const float (*slot)[2], int bands, int ahead,
+                 float (*out)[2]) {
   memmove(hist[0], hist[1], sizeof(hist[0]) * (kProto - 1));
   for (int b = 0; b < 64; b++) {
     hist[kProto - 1][b][0] = b < bands ? slot[b][0] : 0.0f;
     hist[kProto - 1][b][1] = b < bands ? slot[b][1] : 0.0f;
   }
   hybrid_low(hist, out);
+  const float (*rest)[2] = hist[ahead ? kProto - 1 : kHybDelay];
   for (int b = kLfBands; b < 64; b++) {
-    out[7 + b][0] = hist[kHybDelay][b][0];
-    out[7 + b][1] = hist[kHybDelay][b][1];
+    out[7 + b][0] = rest[b][0];
+    out[7 + b][1] = rest[b][1];
   }
 }
 
@@ -1743,13 +1741,14 @@ AacMps212State* aac_mps212_create(const AacUsacMps212Config* cfg, int stereo_con
     s->num_ipd_bands = num_bands;
   }
   /* the downmix of stereoConfigIndex 3 arrives at the core analysis
-   * timing (MPS 212 runs before the SBR), that of 1 and 2 at the SBR
-   * output timing, three envelope time slots later */
+   * timing (MPS 212 runs before the SBR) in every band; that of 1 and 2
+   * at the SBR output timing, three envelope time slots later, with the
+   * three lowest bands six slots ahead of the others */
   if (stereo_config_index == 3) {
-    s->grid_delay = 0;
+    s->low_ahead = 0;
     s->residual_delay = 0;
   } else {
-    s->grid_delay = kHybDelay;
+    s->low_ahead = 1;
     s->residual_delay = 3 * s->rate;
   }
   aac_mps212_reset(s);
@@ -1911,21 +1910,20 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
   set_matrices(s);
   smooth_matrices(s);
   interpolate_matrices(s);
-  const int gd = s->grid_delay;
   for (int n = 0; n < slots; n++) {
     for (int ch = 0; ch < 2; ch++) {
-      s->ges_gain[ch][gd + n] =
+      s->ges_gain[ch][n] =
           s->cfg.temp_shape_config == 2 && s->temp_shape_enable && s->ges_channel[ch]
               ? s->env_shape[ch][n]
               : 0.0f;
-      s->stp_on[ch][gd + n] = s->temp_shape_enable && s->stp_channel[ch];
+      s->stp_on[ch][n] = s->temp_shape_enable && s->stp_channel[ch];
     }
-    s->tsd_on[gd + n] = s->tsd_enable && s->tsd_transient[n];
-    s->tsd_ph[gd + n] = s->tsd_phase[n];
+    s->tsd_on[n] = s->tsd_enable && s->tsd_transient[n];
+    s->tsd_ph[n] = s->tsd_phase[n];
   }
 
   /* the residual: QMF analysis of the core frame (full scale 1.0 to the
-   * QMF frame's 32768), delayed to the downmix's timing */
+   * QMF frame's 32768), delayed to the downmix's timing band by band */
   if (use_res) {
     const int B = s->residual_qmf_bands;
     float scaled[64];
@@ -1953,8 +1951,14 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
     }
     float res_slot[64][2];
     if (use_res) {
-      const int read = (s->res_ring_pos - slots + n - s->residual_delay + 2 * kResRing) % kResRing;
+      /* its three lowest bands six slots ahead like the downmix's */
+      int low_delay = s->residual_delay;
+      if (s->low_ahead) {
+        low_delay = low_delay > kHybDelay ? low_delay - kHybDelay : 0;
+      }
       for (int b = 0; b < 64; b++) {
+        const int delay = b < kLfBands ? low_delay : s->residual_delay;
+        const int read = (s->res_ring_pos - slots + n - delay + 2 * kResRing) % kResRing;
         res_slot[b][0] = g * s->res_ring[read][b][0];
         res_slot[b][1] = g * s->res_ring[read][b][1];
       }
@@ -1970,9 +1974,9 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
         }
       }
     }
-    hybrid_push(s->lf_hist, slot, 64, s->v[n]);
+    hybrid_push(s->lf_hist, slot, 64, s->low_ahead, s->v[n]);
     if (use_res) {
-      hybrid_push(s->res_lf_hist, res_slot, s->residual_qmf_bands, s->w_res[n]);
+      hybrid_push(s->res_lf_hist, res_slot, s->residual_qmf_bands, s->low_ahead, s->w_res[n]);
       for (int k = 0; k < kHyb; k++) {
         if (s->kernel[k] >= res_bands || k >= s->residual_hyb_bands) {
           s->w_res[n][k][0] = s->w_res[n][k][1] = 0.0f;
@@ -2067,15 +2071,6 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
   }
   left->slots = slots;
   right->slots = slots;
-  /* the trajectory entries past the frame belong to the next one */
-  memmove(s->r_res[0], s->r_res[slots], sizeof(s->r_res[0]) * (size_t)gd);
-  memmove(s->r_dec[0], s->r_dec[slots], sizeof(s->r_dec[0]) * (size_t)gd);
-  for (int ch = 0; ch < 2; ch++) {
-    memmove(s->ges_gain[ch], s->ges_gain[ch] + slots, sizeof(float) * (size_t)gd);
-    memmove(s->stp_on[ch], s->stp_on[ch] + slots, sizeof(int) * (size_t)gd);
-  }
-  memmove(s->tsd_on, s->tsd_on + slots, sizeof(int) * (size_t)gd);
-  memmove(s->tsd_ph, s->tsd_ph + slots, sizeof(int) * (size_t)gd);
   s->num_sets_prev = s->num_sets;
 }
 

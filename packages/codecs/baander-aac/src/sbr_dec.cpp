@@ -153,8 +153,10 @@ int aac_sbr_read_grid(AacSbrState* s, AacBitReader* r, AacSbrChannel* ch) {
   const int frame_class = (int)aac_bitreader_read(r, 2);
   switch (frame_class) {
     case kFixFix: {
+      /* AAC allows 1, 2 or 4 envelopes; the USAC grid (ISO/IEC 23003-3
+       * 7.5.2) also 8 */
       const int num_env = 1 << aac_bitreader_read(r, 2);
-      if (num_env > 5) {
+      if (num_env > (s->usac.active ? 8 : 4)) {
         return AAC_ERR_DECODE;
       }
       ch->num_env = num_env;
