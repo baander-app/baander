@@ -137,25 +137,35 @@ static int decode(int argc, char** argv) {
   const std::vector<uint8_t> in = read_all(argv[2]);
   FILE* out = open_out(argv[3]);
   std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  /* The streaming path takes ADTS, LOAS/LATM and raw access units
+   * alike, resynchronising across damaged bytes. */
   size_t pos = 0;
   int frames = 0;
   int errors = 0;
-  while (pos + 7 <= in.size()) {
-    if (in[pos] != 0xFF || (in[pos + 1] & 0xF6) != 0xF0) {
-      pos++; /* resynchronize */
+  for (;;) {
+    if (pos < in.size()) {
+      const int taken = aac_decoder_feed(dec, in.data() + pos, (int)std::min<size_t>(in.size() - pos, 65536));
+      if (taken < 0) {
+        errors++;
+        break;
+      }
+      pos += (size_t)taken;
+    }
+    const int n = aac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+    if (n == 0) {
+      if (pos >= in.size()) {
+        break;
+      }
       continue;
     }
-    const size_t len = ((in[pos + 3] & 3) << 11) | (in[pos + 4] << 3) | (in[pos + 5] >> 5);
-    if (len < 7 || pos + len > in.size()) {
-      break;
-    }
-    const int n = aac_decoder_decode(dec, in.data() + pos, (int)len, pcm.data(), (int)pcm.size());
     if (n < 0) {
       errors++;
-    } else {
-      fwrite(pcm.data(), sizeof(float), (size_t)n * aac_decoder_channels(dec), out);
+      if (n == AAC_ERR_UNSUPPORTED) {
+        break;
+      }
+      continue;
     }
-    pos += len;
+    fwrite(pcm.data(), sizeof(float), (size_t)n * aac_decoder_channels(dec), out);
     frames++;
   }
   if (out != stdout) {
