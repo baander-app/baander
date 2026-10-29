@@ -56,7 +56,6 @@ final class ContainerQualification
             $this->docker = new Client($this->runner, $target, $this->environment);
             $this->imageLedger = new ImageLedger($this->output . '/' . $this->runId . '-images.json', $this->docker);
             $this->ledger = new ResourceLedger($this->output . '/' . $this->runId . '-resources.json', $this->docker, $this->environment);
-            // Nested relay helpers use the exact captured transport through this private CLI adapter.
             $bin = $this->output . '/' . $this->runId . '-bin';
             if (!mkdir($bin, 0700)) {
                 throw new RuntimeException('Cannot create nested Docker transport adapter.');

@@ -211,6 +211,17 @@ passes across 16 files. Formatting processed 18 files and fixed Backend/Runtime.
 U6–U8, U11, final CI-image and live qualification, and final code review remain
 open.
 
+Phase simplification checkpoint (U9–U10), 2026-10-29: five reviewers examined
+`a2253e72..e05fad63`. Reuse, efficiency and test review returned no findings.
+Quality review removed the unused backend Runtime volumes property and its
+append; comment review removed three redundant production comments. All proof
+tests remain unchanged. The canonical BackendCoordinator rerun passes 26 tests
+and 469 assertions; scoped static analysis and formatting pass across four files.
+
+A fresh WorkerCleanup and WorkerOperatorResources run passes 41 tests and 263
+assertions, resolving the 28 mixed-loaded-class errors recorded above. The earlier
+combined run remains nonpassing evidence; full CI acceptance remains open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

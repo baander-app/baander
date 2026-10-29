@@ -22,8 +22,6 @@ class Runtime
     /** @var list<string> */
     public array $networks = [];
     /** @var list<string> */
-    public array $volumes = [];
-    /** @var list<string> */
     public array $projects = [];
     /** @var array<string,array<string,string>> */
     public array $projectEnvironments = [];
@@ -305,7 +303,6 @@ class Runtime
         $this->ownedProjects[$project] = $owner;
         $this->networks[] = $project . '_private';
         $this->projectNetworks[] = $project . '_private';
-        array_push($this->volumes, $project . '_postgres_data', $project . '_redis_data');
         $this->compose($project, ['up', '--detach', '--wait', '--wait-timeout', '60', 'postgres', 'redis']);
         $this->serviceContainer($project, 'postgres');
         $this->serviceContainer($project, 'redis');

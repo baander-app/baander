@@ -77,7 +77,6 @@ final class ImageLedger
                 $docker->validateIdentity();
                 $image = $this->inspect($docker, $name);
                 if ($image !== null) {
-                    // A reused tag never authorizes deletion of the replacement image.
                     $id = $this->assertOwnership($name, $image);
                     $this->removeId($docker, $name, $id);
                 } elseif ($id !== null) {

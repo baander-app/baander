@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Baander\Registry\Qualification;
 
-/** Standalone relay composition supplies its bounded Docker command executor. */
 final class DockerOwnership
 {
     /** @var resource */
