@@ -388,3 +388,32 @@ A second quantisation pass in the encoder that re-searches the scalefactors and 
 MPEG-4 DRC: per-band gains and a program reference level the encoder writes into fill elements as metadata, which a decoder applies on request, scaled by the listener's boost and cut shares and optionally normalised to a target loudness. The DVB variant adds a heavy compression gain in the ancillary data. The encoder derives the gains from one of five named compression profiles; the decoder applies nothing unless asked.
 *Avoid: MPEG-D DRC, the separate loudness and DRC standard of USAC streams.*
 
+### USAC
+
+Unified Speech and Audio Coding, ISO/IEC 23003-3, object type 42, as the xHE-AAC profile constrains it: the AAC object type whose frames carry no element ids (the configuration fixes the element list) and whose core channels switch per frame between a frequency-domain core with an arithmetic coder and a linear prediction core of ACELP and TCX frames, followed by enhanced SBR, MPS 212 and MPEG-D DRC. The decoder reads it from LOAS/LATM or raw access units; ADTS cannot carry it. The native binding and the Electron service name it `usac`; the codec decodes it and does not encode it.
+*Avoid: xHE-AAC as a separate codec; it is the profile of USAC the decoder targets.*
+
+### Enhanced SBR
+
+Spectral band replication as USAC carries it: the header travels in the configuration, the core runs at 2:1, 8:3 (a 768-line core) or 4:1 of the output rate, the patch source bands are flattened before patching, and the standard adds a harmonic transposer, predictive vector coding of the envelopes and inter-TES. The decoder implements the three additions but no stream at hand uses them.
+*Avoid: eSBR, which names the same tool.*
+
+### MPS 212
+
+The MPEG Surround one-to-two tool of a USAC channel pair: one core channel plus per-band level, correlation and phase parameters, optionally a residual signal, from which the decoder widens the pair in the QMF domain. The order in which it runs against the SBR is named by the stereoConfigIndex.
+*Avoid: MPEG Surround alone, whose 515 and 525 trees the codec does not decode.*
+
+### stereoConfigIndex
+
+The configuration value of a USAC channel pair that orders its stereo tools: 0 no MPS 212; 1 SBR on the single core channel, then MPS 212 from the parameters alone; 2 the same order with a residual signal; 3 MPS 212 on the core band with the residual, then SBR of both output channels. Only 2 is unverified against a reference, for lack of a stream.
+
+### MPEG-D DRC
+
+The loudness and dynamic range standard of USAC streams (ISO/IEC 23003-4): loudness metadata and DRC gain sets in the configuration, gain sequences in extension elements, and a selection process that matches the listener's request (target loudness, a named effect with its fallback order, album mode, boost and cut) to the sets the stream carries. The decoder normalises to -24 LUFS by default and applies DRC only to prevent clipping unless an effect is requested; MPEG-4 DRC is refused on a USAC stream.
+*Avoid: dynamic range control alone, which is the MPEG-4 tool.*
+
+### Pre-roll frame
+
+The audio pre-roll of a USAC stream access point: an extension element at the front of an independent frame (one whose `usacIndependencyFlag` is set, so that it decodes without history) that carries the stream configuration and the previous access units a decoder needs to warm its state. A cold decoder decodes them and drops their output; a warm one skips them. A seek or a configuration change lands on such a frame.
+*Avoid: keyframe, which belongs to video.*
+

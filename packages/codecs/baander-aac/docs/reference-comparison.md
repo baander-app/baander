@@ -214,3 +214,50 @@ Every encoder output is byte for byte what it was before the pass at the
 scalar, SSE2 and AVX2 levels; the LC, LD, ELD and afterburner decodes
 are bit-exact and the HE-AAC decodes differ by at most 2.4e-7 through
 the FFT-form QMF banks.
+
+## USAC (xHE-AAC)
+
+Measured on 2026-10-29 against the Fraunhofer FDK decoder (the `aac-dec`
+program of the AOSP fdk-aac, run as a black box with loudness
+normalisation off) on the streams the FDK xHE-AAC encoder produced from
+the suite's signals (`tests/data/usac_*.loas`, 48 kHz output). Difference
+SNR of our decode against FDK's over the full band and the whole stream,
+at delay 0 in every case; the FDK decodes are 16-bit, which bounds the
+measurable SNR of a quiet band near 50 dB. FFmpeg plays no part here: its
+USAC decoder (master at the time of writing) decodes the 2:1 and 8:3
+streams wrongly.
+
+| Stream | Core, SBR ratio, stereo tool | Difference SNR |
+|--------|------------------------------|---------------:|
+| `usac_fd_cpe_96k` (stereo 96 kbit/s) | FD, no SBR | 83.9 dB |
+| `usac_music_48000_96000` (stereo 96 kbit/s) | FD, no SBR | 84.1 dB |
+| `usac_fd_sce_64k` (mono 64 kbit/s) | FD, no SBR | 81.3 dB |
+| `usac_speech_48000_64000` (mono 64 kbit/s) | FD, no SBR | 81.7 dB |
+| `usac_music_48000_48000` (stereo 48 kbit/s) | FD, 2:1, MPS 212 with residual (stereoConfigIndex 3) | 80.5 dB |
+| `usac_music_48000_64000` (stereo 64 kbit/s) | FD, 2:1, MPS 212 with residual (stereoConfigIndex 3) | 80.2 dB |
+| `usac_sbr_sce_music_48k` (mono) | FD, 2:1 with pre-flattening | 80.1 dB (50 dB above 7 kHz) |
+| `usac_lpd_speech_12000` (mono 12 kbit/s) | LPD, 4:1 | 61.0 dB |
+| `usac_speech_48000_16000` (mono 16 kbit/s) | LPD, 4:1 | 61.3 dB |
+| `usac_lpd_speech_24000` (mono 24 kbit/s) | LPD, 2:1 | 52.1 dB |
+| `usac_speech_48000_24000` (mono 24 kbit/s) | LPD, 2:1 | 52.1 dB |
+| `usac_music_48000_24000` (stereo 24 kbit/s) | LPD, 8:3 (768-line core), MPS 212 (stereoConfigIndex 1) | 17.8 dB |
+| `usac_music_48000_16000` (stereo 16 kbit/s) | LPD, 4:1, MPS 212 (stereoConfigIndex 1) | 25.9 dB |
+
+On the two LPD music streams libxaac itself reaches 19.8 and 27.4 dB
+against the FDK decode, and the two references disagree by 38 to 50 dB in
+the SBR bands: the limit there is the two implementations' LPD core on
+music, not our stereo tools. Below the SBR crossover our LPD core matches
+libxaac's at 61 to 73 dB on speech and 33 to 35 dB on music; the
+remaining gap is rounding in the LSF to LPC conversion, which runs in
+double so that the optimised and plain builds agree above 110 dB. On the
+residual-coded 2:1 streams the MPS 212 upmix, fed the reference downmix,
+matches libxaac's above 119 dB.
+
+Parsing is bit-exact with libxaac on every stream: every frame of the
+core, the SBR and MPS 212 ends at the same bit position, and the MPS 212
+parameters match its trace. The MPEG-D DRC loudness normalisation gain
+matches the FDK decoder on every stream and the gain curves agree within
+0.1 dB. The harmonic transposer, predictive vector coding and inter-TES
+of the enhanced SBR, and stereoConfigIndex 2, are exercised by
+constructed data only: the FDK encoder emits none of them, so their
+interoperability is unverified.

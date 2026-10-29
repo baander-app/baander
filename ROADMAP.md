@@ -833,6 +833,37 @@ suite (5 tests). A read-only review found fourteen correctness and contract
 findings, all applied. Not run: listening tests, interop for ELD with LD-SBR
 and for the RVLC and HCR tools.
 
+Checkpoint, 2026-10-29, USAC decoder: the third tier's first plan, per the
+[plan](docs/plans/2026-10-24-005-feat-aac-codec-usac-decoder-plan.md), is
+delivered. Decoder: USAC (xHE-AAC, object type 42) over LOAS/LATM and raw
+access units with the UsacConfig, extension elements, pre-roll and
+independent frames; the frequency-domain core with the context arithmetic
+coder, noise filling, TNS, M/S and complex prediction; the linear prediction
+core with ACELP, TCX, forward aliasing cancellation and the LSF and vector
+quantisers; enhanced SBR at 2:1, 8:3 and 4:1 with pre-flattening; MPS 212
+at stereoConfigIndex 1, 2 and 3, with residual coding at 2 and 3; MPEG-D DRC and
+loudness with the selection process; concealment; the streaming API, `baac`
+and the Node binding with the loudness and DRC options. The normative
+tables are ISO/IEC 23003-3 and 23003-1 data transcribed from libxaac
+(Apache-2.0) and verified entry by entry; libxaac is the bit-level oracle,
+FDK the behavioural one through its binaries only, and FFmpeg master is no
+oracle for the 2:1 and 8:3 streams (its output is wrong). Verification
+against the FDK decoder (loudness normalisation off, delay 0 throughout):
+81 to 84 dB on the FD core, 80 dB with 2:1 SBR and residual-coded MPS 212
+and on mono 2:1 SBR, 61 dB on LPD speech at 4:1 and 52 dB at 2:1, 18 and
+26 dB on LPD music at 8:3 and 4:1 where libxaac itself reaches 20 and 27 dB
+(the references disagree by 38 to 50 dB in the SBR bands); parsing
+bit-exact with libxaac on every stream; the DRC normalisation gain exact
+against FDK. CTest 34/34 (`test_usac_config`, `test_usac_fd`,
+`test_usac_lpd`, `test_usac_sbr`, `test_mps212` and `test_unidrc` among
+them) and the binding's smoke test (11 tests). Open: the harmonic
+transposer, PVC and inter-TES are implemented but unverified, since the FDK
+encoder emits none and no stream at hand uses them; stereoConfigIndex 2 is
+verified by construction only; per-platform prebuilt binaries for the
+Electron client are pending. Not run: listening tests and the ISO
+conformance suite. Figures and limits are in the
+[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

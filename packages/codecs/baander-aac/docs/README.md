@@ -175,6 +175,80 @@ design where the standard's tables were not available, so LD-SBR
 streams are verified by roundtrip only and their interoperability with
 other decoders is unverified.
 
+A USAC stream (Unified Speech and Audio Coding, ISO/IEC 23003-3, object
+type 42, as the xHE-AAC profile constrains it) decodes from LOAS/LATM or
+from raw access units with an AudioSpecificConfig (the MP4 form; ADTS
+cannot carry it). The `UsacConfig` in the configuration fixes the element
+list, so a frame carries no element ids: the walker runs the configured
+SCE, CPE, LFE and extension elements in order, reads the audio pre-roll
+extension at a stream access point (its embedded configuration
+reconfigures the decoder; a cold decoder decodes the pre-roll frames to
+warm its state and drops their output, a warm one skips them), honours
+`usacIndependencyFlag`, and skips the extension elements it does not
+know by their escaped length.
+Each core channel is decoded by the frequency-domain core (the USAC
+window sequences and shapes, the scale factors, the context based
+arithmetic coder for the spectrum with its reset at an independent frame,
+noise filling, TNS, and in a channel pair M/S per band and complex
+stereo prediction with the MDST estimate from the current and previous
+frame) or by the linear prediction core (ACELP and TCX subframes, the
+LPC filter sets from the LSF first-stage and algebraic vector quantisers,
+forward aliasing cancellation at every core and mode boundary, the bass
+post filter), switching per frame with the transitions the standard
+describes; the 768-line core of the 8:3 ratio uses its own band tables.
+Time warping is read and refused, since xHE-AAC excludes it. Enhanced
+SBR follows the core at the 2:1, 8:3 and 4:1 ratios with the SBR header
+in the configuration and the pre-flattening of the patch source bands;
+the harmonic transposer, predictive vector coding of the envelopes and
+inter-TES are implemented per the standard but unverified, because the
+FDK encoder never emits them and no stream at hand uses them. MPEG
+Surround 212 widens the one core channel of a CPE to two from its CLD,
+ICC and IPD parameters through the hybrid filterbank, the decorrelator,
+the temporal shaping tools and, when the stream codes it, the residual
+signal. MPEG-D DRC and loudness (ISO/IEC 23003-4) are parsed from the
+configuration extensions and the `uniDrc` extension elements; the
+selection process with the effect fallbacks, album mode and peak
+protection picks the gain sets, and the gains are interpolated and
+applied in the time domain. `aac_decoder_set_loudness` (on by default,
+normalising to -24 LUFS), `aac_decoder_set_drc_effect` and the
+`aac_decoder_loudness` readback are the C API of that path; the binding
+options are listed under the Node-API binding. Concealment covers a lost
+USAC frame (the FD spectrum fades, the LPD excitation repeats, and the
+arithmetic coder resets at the next independent frame); the limiter, the
+layouts and the output delay report are shared with the other object
+types, and `aac_decoder_set_drc` (MPEG-4 DRC) reports unsupported on a
+USAC stream. `baac` and the binding decode USAC through the streaming
+API.
+
+The three orders of the stereo tools in a CPE, named by
+`stereoConfigIndex`: with 1 the SBR of the single core channel runs first
+and MPS 212 widens the full-band QMF signal from the parameters alone;
+with 2 the same order carries a residual signal that MPS 212 adds in its
+low bands; with 3 MPS 212 runs on the core band with the residual before
+any SBR, and the two-channel SBR data then generates the high band of
+each output channel from its own low band. For 1 and 2 the SBR hands the
+lowest QMF bands to MPS 212 six slots ahead of the rest, as the reference
+decoder regroups them; for 3 the parameter grid follows the input timing
+with no such prefix.
+
+Against the FDK decoder (loudness normalisation off, 48 kHz output, delay
+0 in every case) the decode of the FDK xHE-AAC encoder's streams in
+`tests/data` reaches 81 to 84 dB difference SNR on the FD core without
+SBR, 80 dB with 2:1 SBR and MPS 212 with residual coding
+(stereoConfigIndex 3), 80 dB on a mono 2:1 SBR stream (50 dB above
+7 kHz, the floor of the 16-bit reference), 61 dB on speech with the LPD
+core and 4:1 SBR and 52 dB with 2:1 SBR, and 18 to 26 dB on music with
+the LPD core at 8:3 and 4:1 with MPS 212 (stereoConfigIndex 1): there
+libxaac itself reaches 20 to 27 dB against FDK, the two references
+disagreeing by 38 to 50 dB in the SBR bands, so the limit is the LPD
+core on music, not the stereo tools. Parsing is bit-exact with libxaac on
+every stream (core, SBR and MPS 212), and the MPEG-D DRC normalisation
+gain matches the FDK decoder on every stream. stereoConfigIndex 2 is
+verified by construction only, since no stream at hand uses it. FFmpeg's
+USAC decoder (master at the time of writing) decodes the 2:1 and 8:3
+streams wrongly and served as no oracle for them; see
+[reference-comparison.md](reference-comparison.md).
+
 ### Encoder
 
 The encoder follows the structure of the Fraunhofer FDK encoder and
@@ -379,6 +453,12 @@ int aac_decoder_set_drc(AacDecoderHandle ctx, int enabled, int boost, int cut,
 int aac_decoder_program_ref_level(AacDecoderHandle ctx);
 int aac_decoder_has_drc(AacDecoderHandle ctx);
 int aac_decoder_channel_mode(AacDecoderHandle ctx);
+/* USAC loudness and MPEG-D DRC */
+int aac_decoder_set_loudness(AacDecoderHandle ctx, int enabled, int target_lufs_x100);
+int aac_decoder_set_drc_effect(AacDecoderHandle ctx, AacDrcEffect effect, int album_mode,
+                               int boost, int cut);
+int aac_decoder_loudness(AacDecoderHandle ctx, int* program_loudness_x100,
+                         int* norm_gain_db_x100);
 /* streaming input */
 int aac_decoder_feed(AacDecoderHandle ctx, const uint8_t* data, int size);
 int aac_decoder_decode_next(AacDecoderHandle ctx, float* pcm, int pcm_size);
@@ -421,6 +501,18 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
   scaling in percent, the target reference level in quarter dB below
   full scale (-1 for no loudness normalisation) and whether DVB heavy
   compression is preferred; it may be changed at any time.
+- `aac_decoder_set_loudness` (on by default) brings a USAC stream with
+  loudness metadata to the target in LUFS times 100 (-2400 by default,
+  -3100 to -1000) and leaves a stream without metadata alone;
+  `aac_decoder_set_drc_effect` asks for an MPEG-D DRC effect
+  (`AAC_DRC_EFFECT_OFF` for none at all, `AAC_DRC_EFFECT_NONE`, the
+  default, for clipping prevention only, then night, noisy, limited,
+  low level, dialog and general with the standard's fallback order),
+  album mode and the boost and cut scaling in percent;
+  `aac_decoder_loudness` reads back the declared program loudness
+  (`INT32_MIN` when the stream declares none) and the applied
+  normalisation gain, both times 100. All three may be changed at any
+  time and take effect from the next frame.
 - `aac_encoder_set_metadata` selects a compression profile (film
   standard, film light, music standard, music light or speech) and the
   program reference level in quarter dB below full scale (124 is
@@ -525,7 +617,7 @@ result carries the `loudness` readback.
 
 ## Testing
 
-`ctest` runs twenty-eight suites, and the transform, filterbank and
+`ctest` runs thirty-four suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -577,8 +669,35 @@ dual and single rate at 512 and 480, delays, concealment of a
 truncated unit and of a CRC-caught payload, the configuration with its
 headers, and byte identity of plain ELD streams against committed
 references), the DSP kernels (every SIMD kernel against its scalar
-version) and allocation (zero heap use in the steady state of every
-profile). The interop test skips when `ffmpeg` is
+version), allocation (zero heap use in the steady state of every
+profile), and the USAC decoder in six suites: the configuration
+(`test_usac_config`: the UsacConfig of every committed stream, the LATM
+access units, the pre-roll payload and its reconfiguration, independent
+frames and the layouts), the frequency-domain core (`test_usac_fd`: the
+arithmetic coder tables and roundtrip, the window shapes, the MDST
+estimate and complex prediction, the 768-line frame, and the two FD
+streams against the FDK decode), the linear prediction core
+(`test_usac_lpd`: the vector quantiser, the ACELP pulses and pitch, the
+aliasing cancellation, and the six LPD streams against their stored core
+output at 80 dB or better), the enhanced SBR (`test_usac_sbr`: the
+frequency tables of the three ratios, the grid and syntax, the
+constructed harmonic transposer, PVC and inter-TES data, the low bands
+of the 8:3 and 4:1 speech decodes against FDK, and the mono 2:1 stream
+through the public API against the FDK decode), MPS 212 (`test_mps212`:
+the codebooks and tables, the mixing matrices, the hybrid filterbank
+and decorrelator, the regrouped low band, and the four stereo streams
+against the FDK decodes) and MPEG-D DRC (`test_unidrc`: the parsers with
+a mutation fuzz, the gain decoder, the selection process, and the
+loudness and normalisation gain of two committed streams). The USAC
+data under `tests/data` is the FDK xHE-AAC encoder's output
+(`usac_*.loas`, 48 access units each, mono and stereo at 12 to
+96 kbit/s), the FDK decoder's 16-bit decodes with loudness
+normalisation off (`*_fdk.wav`) and the stored LPD core output
+(`usac_lpd_*_core.s16`); libxaac is the bit-level oracle these suites
+were pinned against (frame boundaries, parameters and the MPS 212 upmix
+on the reference downmix), FDK the behavioural one through its binaries,
+and FFmpeg plays no part in the USAC suites. The interop test skips when
+`ffmpeg` is
 not on PATH; otherwise it requires our decoder to match FFmpeg's decode
 of FFmpeg-encoded streams (ADTS and LATM), and FFmpeg to decode our
 streams (ADTS, LOAS with implicit, backward compatible and hierarchical
@@ -598,9 +717,9 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool
-tests/        CTest suites and the committed HE-AAC reference streams (tests/data)
+tests/        CTest suites and the committed HE-AAC, ELD and USAC reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
 docs/         this file and the reference comparison
 ```
@@ -640,12 +759,14 @@ ISO/IEC 14496-3 Table 1.19 and ETSI TS 101 154; FDK was consulted for
 its feature list and parameter ranges only.
 
 The USAC (xHE-AAC) decoder is written from ISO/IEC 23003-3 with the
-AOSP FDK decoder as the behavioural oracle and the Ittiam libxaac
-decoder (AOSP `external/libxaac`, Apache-2.0) as the bit-level oracle;
-no code of either was copied. The normative trained tables that cannot
-be written from the standard's text alone (the arithmetic coder's
-context models and cumulative frequency tables, the MDST filter
-coefficients of complex stereo prediction, and the codebooks of the LPD,
-MPS 212 and enhanced SBR tools as they are sourced) are ISO/IEC 23003-3
-data transcribed from libxaac's ROM files under its Apache-2.0 licence
-and verified against it entry by entry.
+AOSP FDK decoder as the behavioural oracle through its binaries only (no
+FDK source was read) and the Ittiam libxaac decoder (AOSP
+`external/libxaac`, Apache-2.0) as the bit-level oracle; no code of
+either was copied. The normative trained tables that cannot be written
+from the standard's text alone (the arithmetic coder's context models and
+cumulative frequency tables, the MDST filter coefficients of complex
+stereo prediction, the LSF, AVQ, ACELP, TCX and FAC tables of the LPD
+core, the MPS 212 codebooks, quantisers, mixing kernels, prototypes and
+decorrelator filters, and the enhanced SBR tables as they are sourced)
+are ISO/IEC 23003-3 and 23003-1 data transcribed from libxaac's ROM files under its
+Apache-2.0 licence and verified against it entry by entry.
