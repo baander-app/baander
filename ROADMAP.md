@@ -25,6 +25,13 @@ trees; they are not acceptance evidence for a new change.
 
 ## Configurable development libraries
 
+Configuration checkpoint, 2026-10-29 (U1): local definitions now produce saved
+library settings and read-only media mounts. Worktree files override the primary
+checkout; invalid definitions fail before state creation. Mount changes require a
+stopped instance. The authoritative CI image passed 28 tests and 102 assertions;
+the four changed PHP files passed the tooling formatter. Separate Git directories
+without a recorded primary checkout require a worktree-local configuration file.
+
 The [implementation plan](docs/plans/2026-10-29-1726-feat-configurable-development-libraries-plan.md)
 adds local library definitions in `dev.local.json`, read-only media mounts and
 idempotent library creation during preview startup. The requested Movies library

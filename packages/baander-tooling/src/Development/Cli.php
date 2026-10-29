@@ -190,6 +190,28 @@ final class Cli
     public static function configure(StateStore $store, Runner $runner, string $root, string $repository, array $options): array
     {
         self::validateStateRoot($store, $root);
+        $libraries = LocalConfiguration::libraries($runner, $root);
+        $explicit = [];
+        foreach ($options['media'] as $value) {
+            $parts = explode('=', $value, 2);
+            $source = Environment::resolvedPath($parts[0]);
+            $explicit[] = ['source' => $source, 'target' => $parts[1] ?? $source];
+        }
+        $configured = array_map(
+            static fn(array $library): array => [
+                'source' => $library['source'],
+                'target' => $library['target'],
+            ],
+            $libraries ?? [],
+        );
+        self::validateMediaState([...$configured, ...$explicit], $store->root);
+        self::validateMediaMounts($configured);
+        self::validateMediaMounts($explicit);
+        $supplied = [];
+        foreach ([...$configured, ...$explicit] as $mount) {
+            $supplied[$mount['target']] = $mount;
+        }
+        self::validateMediaMounts(array_values($supplied));
         $identity = $options['instance'] ?? Environment::previewId($root, $repository);
         $lock = $store->lock($identity);
         try {
@@ -197,40 +219,68 @@ final class Cli
             if ($instance !== null && $instance['repository'] !== $repository) {
                 throw new WorkflowError('The saved instance belongs to another repository.');
             }
-            $media = [];
-            foreach ($options['media'] as $value) {
-                $parts = explode('=', $value, 2);
-                $source = Environment::resolvedPath($parts[0]);
-                if (!is_dir($source)) {
-                    throw new WorkflowError('A media source must be an existing directory.');
-                }
-                $media[] = ['source' => $source, 'target' => $parts[1] ?? $source];
+            $previous = $instance;
+            if ($previous === null && $identity !== 'persistent' && $explicit === []) {
+                $persistent = $store->load('persistent');
+                $previous = ($persistent['repository'] ?? null) === $repository ? $persistent : null;
             }
-            if ($instance === null) {
-                if ($media === [] && $identity !== 'persistent') {
-                    $persistent = $store->load('persistent');
-                    $media = ($persistent['repository'] ?? null) === $repository ? ($persistent['media'] ?? []) : [];
-                }
-                self::validateMediaState($media, $store->root);
-                $instance = [
-                    'id' => $identity,
-                    'kind' => $identity === 'persistent' ? 'persistent' : 'preview',
-                    'hostname' => $identity === 'persistent' ? 'baander.test' : $identity . '.baander.test',
-                    'project' => 'baander-' . $identity . '-' . $store->scope(),
-                    'repository' => $repository,
-                    'worktree' => $root,
-                    'phase' => 'configured',
-                    'media' => $media,
-                    'docker' => self::dockerTarget($runner, $options['docker-context']),
-                ];
-                $store->save($identity, $instance);
-            } elseif ($media !== [] && $media !== ($instance['media'] ?? [])) {
-                if ($instance['phase'] !== 'stopped') {
-                    throw new WorkflowError('Stop this instance before changing its media mounts.');
-                }
-                $instance['media'] = $media;
+            $savedLibraries = $previous['libraries'] ?? [];
+            $media = $previous['media'] ?? [];
+            if ($libraries !== null) {
+                $owned = array_column($savedLibraries, 'target');
+                $media = $media
+                    |> (static fn(array $mounts): array => array_filter(
+                        $mounts,
+                        static fn(array $mount): bool => !in_array($mount['target'], $owned, true),
+                    ))
+                    |> array_values(...);
+                $savedLibraries = $libraries;
+            } elseif ($explicit !== []) {
+                $owned = array_column($savedLibraries, 'target');
+                $media = $media
+                    |> (static fn(array $mounts): array => array_filter(
+                        $mounts,
+                        static fn(array $mount): bool => in_array($mount['target'], $owned, true),
+                    ))
+                    |> array_values(...);
             }
-            self::validateMediaState($instance['media'] ?? [], $store->root);
+            foreach ([...($libraries === null ? [] : $configured), ...$explicit] as $mount) {
+                $media = $media
+                    |> (static fn(array $mounts): array => array_filter(
+                        $mounts,
+                        static fn(array $saved): bool => $saved['target'] !== $mount['target'],
+                    ))
+                    |> array_values(...);
+                $media[] = $mount;
+            }
+            foreach ($savedLibraries as $index => $library) {
+                foreach ($media as $mount) {
+                    if ($mount['target'] === $library['target']) {
+                        $savedLibraries[$index]['source'] = $mount['source'];
+                    }
+                }
+            }
+            self::validateMediaState($media, $store->root);
+            self::validateMediaMounts($media);
+            if (
+                $instance !== null
+                && $media !== ($instance['media'] ?? [])
+                && $instance['phase'] !== 'stopped'
+            ) {
+                throw new WorkflowError('Stop this instance before changing its media mounts.');
+            }
+            $instance ??= [
+                'id' => $identity,
+                'kind' => $identity === 'persistent' ? 'persistent' : 'preview',
+                'hostname' => $identity === 'persistent' ? 'baander.test' : $identity . '.baander.test',
+                'project' => 'baander-' . $identity . '-' . $store->scope(),
+                'repository' => $repository,
+                'worktree' => $root,
+                'phase' => 'configured',
+                'docker' => self::dockerTarget($runner, $options['docker-context']),
+            ];
+            $instance['media'] = $media;
+            $instance['libraries'] = $savedLibraries;
             $instance = new Bootstrap($store, $runner)->configure(
                 $instance,
                 environment: self::jsonOption($options['environment-file']),
@@ -240,6 +290,36 @@ final class Cli
             return $instance;
         } finally {
             $lock->release();
+        }
+    }
+
+    /** @param list<array<string,mixed>> $media */
+    private static function validateMediaMounts(array $media): void
+    {
+        $targets = [];
+        foreach ($media as $mount) {
+            $target = $mount['target'];
+            if (
+                !str_starts_with($mount['source'], '/')
+                || !is_dir($mount['source'])
+                || !is_readable($mount['source'])
+                || !str_starts_with($target, '/')
+            ) {
+                throw new WorkflowError('Configure an existing absolute readable media directory and absolute container path.');
+            }
+            if (
+                $target === '/var/www/html'
+                || str_starts_with($target, '/var/www/html/')
+                || in_array($target, ['/', '/var/run', '/run', '/etc'], true)
+            ) {
+                throw new WorkflowError('Media mount overlaps application or system state.');
+            }
+            foreach ($targets as $existing) {
+                if (self::within($target, $existing) || self::within($existing, $target)) {
+                    throw new WorkflowError('Media mount targets overlap.');
+                }
+            }
+            $targets[] = $target;
         }
     }
 
