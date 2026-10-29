@@ -1,5 +1,5 @@
 ---
-title: AAC codec MPEG Surround decoder: 5.1 from a stereo downmix and 212 in AAC-ELD
+title: AAC codec MPEG Surround decoder: 5.1 from a downmix and 212 in AAC-ELD
 date: 2026-10-29
 status: draft
 execution: code
@@ -11,7 +11,7 @@ execution: code
 
 Second phase of the fourth-generation scope (2026-10-23-004): decoding
 MPEG Surround (ISO/IEC 23003-1) as it travels with AAC-LC, HE-AAC and
-AAC-ELD streams, so that a 5.1 programme coded as a stereo downmix plus
+AAC-ELD streams, so that a 5.1 programme coded as a mono or stereo downmix plus
 spatial parameters plays as six channels, and an ELD v2 stream (ELD plus
 the 2-1-2 tool) plays as stereo. The USAC decoder already carries the 2-1-2
 tool as `Mps212Data`; this phase generalises its parameter path to the
@@ -44,10 +44,10 @@ In scope:
    the quantisation tables of CLD, ICC, CPC and the arbitrary downmix
    gains; the parameter mapping over the slots and the frequency
    resolution; the concealment of a lost spatial frame (parameters kept).
-3. Trees and matrices: the OTT and TTT boxes of 5151 (TTT to left, right
-   and centre, then OTT to the surround and LFE pairs), 5152 (the OTT
-   order of the standard's second tree) and 525 (two OTT boxes feeding
-   the TTT box, the arbitrary downmix gains applied before it); the mixing
+3. Trees and matrices: the OTT boxes of 5151 and 5152 (five OTT boxes
+   in two orders from a mono downmix) and the TTT box with three OTT
+   boxes of 525 (a stereo downmix, the arbitrary downmix gains applied
+   before the TTT box); the mixing
    matrices M1 (pre-matrix: downmix, decorrelator inputs, residual mixing)
    and M2 (post-matrix: direct and diffuse parts to the output channels)
    per parameter band, the prediction and energy modes of the TTT box
