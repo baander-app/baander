@@ -59,8 +59,8 @@ enum {
 enum {
   AAC_USAC_SBR_NONE = 0,
   AAC_USAC_SBR_4_1 = 1, /* 1024 core, 4096 output */
-  AAC_USAC_SBR_2_1 = 2, /* 1024 core, 2048 output */
-  AAC_USAC_SBR_8_3 = 3, /* 768 core, 2048 output */
+  AAC_USAC_SBR_8_3 = 2, /* 768 core, 2048 output */
+  AAC_USAC_SBR_2_1 = 3, /* 1024 core, 2048 output */
 };
 
 /* SbrDfltHeader() of an SbrConfig(): the header fields the configuration

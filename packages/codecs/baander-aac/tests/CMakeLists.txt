@@ -30,6 +30,7 @@ set(TEST_SOURCES
     test_unidrc.cpp
     test_usac_lpd.cpp
     test_usac_sbr.cpp
+    test_usac_fd.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

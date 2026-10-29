@@ -55,7 +55,10 @@
         "src/sbr_ld_enc.cpp",
         "src/usac_config.cpp",
         "src/usac_frame.cpp",
-        "src/usac_stubs.cpp"
+        "src/usac_arith_tables.cpp",
+        "src/usac_arith.cpp",
+        "src/usac_stereo.cpp",
+        "src/usac_fd.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

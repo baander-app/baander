@@ -146,6 +146,10 @@ using AacSbrUsacFft = struct AacSbrUsacFft_ {
 
 /* The USAC-only frame data of one channel. */
 using AacSbrUsacChannelData = struct AacSbrUsacChannelData_ {
+  /* the channel's harmonic patching data (shared by a coupled pair) */
+  int patching_mode;   /* 1: LPC patching, 0: harmonic */
+  int oversampling;
+  int pitch_in_bins;
   int temp_shape[AAC_SBR_MAX_ENV + 1];      /* bs_temp_shape per envelope (inter-TES) */
   int temp_shape_mode[AAC_SBR_MAX_ENV + 1]; /* bs_inter_temp_shape_mode */
   /* PVC (7.5.6): the frame's pvcID per time slot and the smoothing mode */
@@ -198,10 +202,6 @@ using AacSbrUsac = struct AacSbrUsac_ {
   /* SbrInfo of the frame */
   int preprocessing;
   int pvc_mode;
-  /* the frame's harmonic patching data */
-  int patching_mode;   /* 1: LPC patching, 0: harmonic */
-  int oversampling;
-  int pitch_in_bins;
   int frames;          /* frames processed since the header */
   AacSbrUsacChannelData data[2];
   AacSbrUsacChannel ch[2];

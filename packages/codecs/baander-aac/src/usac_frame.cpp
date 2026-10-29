@@ -133,7 +133,7 @@ int build_elements(AacUsacState* u) {
     e->mps_before_sbr = sci == 3;
     for (int ch = 0; ch < e->num_core_channels; ch++) {
       AacUsacCoreChannel* core = &e->core[ch];
-      core->fd = aac_usac_fd_channel_create(c->frame_length);
+      core->fd = aac_usac_fd_channel_create(c->frame_length, c->core_sample_rate);
       /* An LFE is frequency-domain only (6.2.11). */
       core->lpd = ec->type == AAC_USAC_LFE
                       ? nullptr

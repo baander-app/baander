@@ -223,20 +223,20 @@ void clear_inter_tes(AacSbrUsacChannelData* d) {
  * selects the LPC patching (1) or the transposer (0); the transposer's
  * frame carries bs_oversampling_flag and, behind bs_pitch_in_bins_flag,
  * bs_pitch_in_bins. */
-void read_patching(AacBitReader* r, AacSbrUsac* u) {
+void read_patching(AacBitReader* r, const AacSbrUsac* u, AacSbrUsacChannelData* d) {
   if (!u->harmonic_sbr) {
-    u->patching_mode = 1;
-    u->oversampling = 0;
-    u->pitch_in_bins = 0;
+    d->patching_mode = 1;
+    d->oversampling = 0;
+    d->pitch_in_bins = 0;
     return;
   }
-  u->patching_mode = (int)aac_bitreader_read(r, 1);
-  if (!u->patching_mode) {
-    u->oversampling = (int)aac_bitreader_read(r, 1);
-    u->pitch_in_bins = aac_bitreader_read(r, 1) ? (int)aac_bitreader_read(r, 7) : 0;
+  d->patching_mode = (int)aac_bitreader_read(r, 1);
+  if (!d->patching_mode) {
+    d->oversampling = (int)aac_bitreader_read(r, 1);
+    d->pitch_in_bins = aac_bitreader_read(r, 1) ? (int)aac_bitreader_read(r, 7) : 0;
   } else {
-    u->oversampling = 0;
-    u->pitch_in_bins = 0;
+    d->oversampling = 0;
+    d->pitch_in_bins = 0;
   }
 }
 
@@ -294,10 +294,9 @@ int read_single_channel(AacSbrState* s, AacBitReader* r) {
   AacSbrUsac* u = &s->usac;
   AacSbrChannel* ch = &s->data[0];
   AacSbrUsacChannelData* d = &u->data[0];
-  if (aac_bitreader_read(r, 1)) {
-    aac_bitreader_skip(r, 4); /* bs_reserved */
-  }
-  read_patching(r, u);
+  /* Unlike the AAC element there is no bs_data_extra flag: the USAC
+   * element opens with the harmonic patching fields. */
+  read_patching(r, u, d);
   int ret;
   if (u->pvc_mode == 0) {
     d->pvc_active = 0;
@@ -339,13 +338,19 @@ int read_channel_pair(AacSbrState* s, AacBitReader* r) {
   AacSbrUsac* u = &s->usac;
   AacSbrChannel* l = &s->data[0];
   AacSbrChannel* rt = &s->data[1];
-  if (aac_bitreader_read(r, 1)) {
-    aac_bitreader_skip(r, 8); /* bs_reserved */
-  }
-  read_patching(r, u);
   u->data[0].pvc_active = u->data[1].pvc_active = 0;
   int ret;
+  /* The USAC pair element opens with bs_coupling; the harmonic patching
+   * fields follow, once for a coupled pair and per channel otherwise. */
   s->coupling = (int)aac_bitreader_read(r, 1);
+  read_patching(r, u, &u->data[0]);
+  if (s->coupling) {
+    u->data[1].patching_mode = u->data[0].patching_mode;
+    u->data[1].oversampling = u->data[0].oversampling;
+    u->data[1].pitch_in_bins = u->data[0].pitch_in_bins;
+  } else {
+    read_patching(r, u, &u->data[1]);
+  }
   if (s->coupling) {
     if ((ret = aac_sbr_read_grid(s, r, l))) {
       return ret;
@@ -449,7 +454,8 @@ void hbe_window(float* w, int n) {
  * samples (full scale 32768) and `out` receives output_frame samples of
  * the transposed signal lagging the core by (hbe_n - hbe_n / 8) core
  * samples. */
-void hbe_process(AacSbrUsac* u, AacSbrUsacChannel* ch, const float* core, float* out, int kx) {
+void hbe_process(AacSbrUsac* u, AacSbrUsacChannel* ch, const AacSbrUsacChannelData* d,
+                 const float* core, float* out, int kx) {
   const int n = u->hbe_n;
   const int ns = u->hbe_ns;
   const int hop = n / AAC_SBR_USAC_HBE_HOPS;
@@ -460,7 +466,7 @@ void hbe_process(AacSbrUsac* u, AacSbrUsacChannel* ch, const float* core, float*
   memcpy(ch->hbe_in + n, core, (size_t)lc * sizeof(float));
   float* re = u->hbe_re;
   float* im = u->hbe_im;
-  const int pitch = u->pitch_in_bins > 0 ? std::max(1, (u->pitch_in_bins * n + 512) / 1024) : 0;
+  const int pitch = d->pitch_in_bins > 0 ? std::max(1, (d->pitch_in_bins * n + 512) / 1024) : 0;
   const float ola_norm = 2.0f / AAC_SBR_USAC_HBE_HOPS; /* sum of the squared sine windows per hop */
   for (int w = 0; w < lc / hop; w++) {
     /* window start p = hop + w hop into hbe_in (positions relative to the
@@ -641,7 +647,8 @@ void lf_gen(const AacSbrUsac* u, const AacSbrUsacChannel* ch, float X_low[32][kC
 
 /* The high band for the frame's envelopes: the LPC patching with the
  * chirped predictors, or the analysed transposer output. */
-int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc) {
+int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc,
+           const AacSbrUsacChannelData* d) {
   AacSbrUsac* u = &s->usac;
   const int a = u->offset;
   const int rate = u->rate;
@@ -652,7 +659,7 @@ int hf_gen(AacSbrState* s, const AacSbrChannel* ch, const AacSbrUsacChannel* uc)
   if (end > kCols || start < 2) {
     return AAC_ERR_DECODE;
   }
-  if (u->harmonic_sbr && !u->patching_mode) {
+  if (u->harmonic_sbr && !d->patching_mode) {
     for (int k = kx; k < kx + m; k++) {
       for (int i = start; i < end; i++) {
         u->X_high[k][i][0] = uc->W_hbe[i][k][0];
@@ -1040,7 +1047,7 @@ void process_channel(AacSbrState* s, int c, const float* pcm) {
   }
   if (u->harmonic_sbr) {
     float transposed[AAC_USAC_MAX_OUTPUT_FRAME];
-    hbe_process(u, uc, core, transposed, s->start ? s->kx[1] : 0);
+    hbe_process(u, uc, d, core, transposed, s->start ? s->kx[1] : 0);
     memmove(uc->W_hbe, uc->W_hbe + slots, (size_t)hist * sizeof(uc->W_hbe[0]));
     /* the transposed signal lags the core by 7 time slots */
     const int lag = 7 * u->rate;
@@ -1058,7 +1065,7 @@ void process_channel(AacSbrState* s, int c, const float* pcm) {
     if (d->pvc_active) {
       pvc_predict(s, u, uc, d, u->X_low);
     }
-    if (hf_gen(s, ch, uc) == 0 && mapping(s, ch, d, &g) == 0) {
+    if (hf_gen(s, ch, uc, d) == 0 && mapping(s, ch, d, &g) == 0) {
       env_estimate(s, ch, &g);
       gain_calc(s, ch, &g);
       inter_tes_gains(s, ch, d, uc, &g);

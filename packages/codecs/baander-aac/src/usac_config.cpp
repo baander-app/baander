@@ -25,10 +25,10 @@ const int kUsacSampleRates[31] = {96000, 88200, 64000, 48000, 44100, 32000, 2400
 /* coreSbrFrameLengthIndex (Table 70): core frame length, output frame
  * length and sbrRatioIndex. */
 constexpr int kNumCoreSbrFrameLengths = 5;
-const int kCoreFrameLength[kNumCoreSbrFrameLengths] = {768, 1024, 1024, 768, 1024};
+const int kCoreFrameLength[kNumCoreSbrFrameLengths] = {768, 1024, 768, 1024, 1024};
 const int kOutputFrameLength[kNumCoreSbrFrameLengths] = {768, 1024, 2048, 2048, 4096};
 const int kSbrRatioIndex[kNumCoreSbrFrameLengths] = {
-    AAC_USAC_SBR_NONE, AAC_USAC_SBR_NONE, AAC_USAC_SBR_2_1, AAC_USAC_SBR_8_3, AAC_USAC_SBR_4_1};
+    AAC_USAC_SBR_NONE, AAC_USAC_SBR_NONE, AAC_USAC_SBR_8_3, AAC_USAC_SBR_2_1, AAC_USAC_SBR_4_1};
 
 /* Output channels of channelConfigurationIndex 1..20 (Table 5.3 /
  * ISO/IEC 23001-8); 0 is defined by the bsOutputChannelPos list. */

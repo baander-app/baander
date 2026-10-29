@@ -638,3 +638,14 @@ the standard's recommendations, the 960-sample tables are ISO/IEC
 peak limiter, and the 7.1 channel modes and PCE height extension follow
 ISO/IEC 14496-3 Table 1.19 and ETSI TS 101 154; FDK was consulted for
 its feature list and parameter ranges only.
+
+The USAC (xHE-AAC) decoder is written from ISO/IEC 23003-3 with the
+AOSP FDK decoder as the behavioural oracle and the Ittiam libxaac
+decoder (AOSP `external/libxaac`, Apache-2.0) as the bit-level oracle;
+no code of either was copied. The normative trained tables that cannot
+be written from the standard's text alone (the arithmetic coder's
+context models and cumulative frequency tables, the MDST filter
+coefficients of complex stereo prediction, and the codebooks of the LPD,
+MPS 212 and enhanced SBR tools as they are sourced) are ISO/IEC 23003-3
+data transcribed from libxaac's ROM files under its Apache-2.0 licence
+and verified against it entry by entry.

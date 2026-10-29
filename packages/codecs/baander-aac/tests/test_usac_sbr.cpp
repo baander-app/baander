@@ -102,15 +102,15 @@ struct Expected {
 /* The structures the probe decodes of the FDK encoder and decoder show
  * (spectral lines copied band by band). */
 static const Expected kExpected[] = {
-    {"2:1 music_48000_24000 (10,10)", AAC_USAC_SBR_2_1, 24000, 1024, 10, 10, 2, 2, 18, 49, 3,
+    {"8:3 music_48000_24000 (10,10)", AAC_USAC_SBR_8_3, 18000, 768, 10, 10, 2, 2, 18, 49, 3,
      {15, 12, 4}, {2, 5, 13}},
-    {"8:3 speech_48000_24000 (7,8)", AAC_USAC_SBR_8_3, 18000, 768, 7, 8, 2, 2, 15, 41, 2,
+    {"2:1 speech_48000_24000 (7,8)", AAC_USAC_SBR_2_1, 24000, 1024, 7, 8, 2, 2, 15, 41, 2,
      {13, 13}, {1, 2}},
-    {"8:3 speech_48000_32000 (10,9)", AAC_USAC_SBR_8_3, 18000, 768, 10, 9, 2, 2, 18, 45, 2,
+    {"2:1 speech_48000_32000 (10,9)", AAC_USAC_SBR_2_1, 24000, 1024, 10, 9, 2, 2, 18, 45, 2,
      {15, 12}, {2, 5}},
-    {"8:3 music_48000_48000 (12,9)", AAC_USAC_SBR_8_3, 18000, 768, 12, 9, 1, 2, 22, 45, 2,
+    {"2:1 music_48000_48000 (12,9)", AAC_USAC_SBR_2_1, 24000, 1024, 12, 9, 1, 2, 22, 45, 2,
      {20, 3}, {2, 18}},
-    {"8:3 music_48000_64000 (14,11)", AAC_USAC_SBR_8_3, 18000, 768, 14, 11, 1, 3, 27, 54, 2,
+    {"2:1 music_48000_64000 (14,11)", AAC_USAC_SBR_2_1, 24000, 1024, 14, 11, 1, 3, 27, 54, 2,
      {18, 9}, {9, 17}},
     {"4:1 speech_48000_12000 (5,9)", AAC_USAC_SBR_4_1, 12000, 1024, 5, 9, 3, 1, 9, 42, 6,
      {7, 6, 5, 7, 4, 4}, {1, 2, 4, 1, 4, 4}},
@@ -215,7 +215,6 @@ struct TestFrame {
  * whose tables are current. */
 static void write_sce(AacBitWriter* w, const AacSbrState* s, const AacUsacSbrConfig* cfg,
                       const TestFrame& f) {
-  aac_bitwriter_write(w, 0, 1); /* bs_data_extra */
   if (cfg->harmonic_sbr) {
     aac_bitwriter_write(w, (uint32_t)f.patching_mode, 1);
     if (!f.patching_mode) {
@@ -424,7 +423,7 @@ static void test_syntax_roundtrip() {
   CHECK(s.usac.data[0].temp_shape[0] == 0 && s.usac.data[0].temp_shape[1] == 1 &&
             s.usac.data[0].temp_shape_mode[1] == 2,
         "inter-TES flags");
-  CHECK(s.usac.patching_mode == 1, "patching mode");
+  CHECK(s.usac.data[0].patching_mode == 1, "patching mode");
   /* 2. a dependent frame without info or header, harmonic patching with
    *    a pitch, a single envelope */
   f = plain_frame(1, 45);
@@ -436,9 +435,10 @@ static void test_syntax_roundtrip() {
   bits = write_usac_sbr_data(buf, sizeof(buf), &s, &cfg, f);
   used = decode_frame(&s, buf, sizeof(buf), 0, &ret);
   CHECK(ret == AAC_OK && used == bits, "frame 2: ret %d, %d of %d bits", ret, used, bits);
-  CHECK(s.usac.patching_mode == 0 && s.usac.pitch_in_bins == 37 && s.usac.oversampling == 1,
-        "harmonic fields %d %d %d", s.usac.patching_mode, s.usac.pitch_in_bins,
-        s.usac.oversampling);
+  CHECK(s.usac.data[0].patching_mode == 0 && s.usac.data[0].pitch_in_bins == 37 &&
+            s.usac.data[0].oversampling == 1,
+        "harmonic fields %d %d %d", s.usac.data[0].patching_mode, s.usac.data[0].pitch_in_bins,
+        s.usac.data[0].oversampling);
   CHECK(s.data[0].num_env == 1 && s.data[0].amp_res == 0, "single envelope at amp_res 0");
   /* 3. info and an explicit header: a new table set */
   f = plain_frame(4, 38);
