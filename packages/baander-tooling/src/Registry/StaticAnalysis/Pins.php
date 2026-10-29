@@ -4,9 +4,9 @@
 
 declare(strict_types=1);
 
-namespace Baander\Registry\StaticAnalysis;
+namespace Baander\Tooling\Registry\StaticAnalysis;
 
-use Baander\RegistryTests\Runtime;
+use Baander\Tooling\Registry\Support;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -16,7 +16,7 @@ final class Pins
     public static function read(string $path): string
     {
         $value = file_get_contents($path);
-        Runtime::requireThat($value !== false, 'Cannot read ' . $path);
+        Support::requireThat($value !== false, 'Cannot read ' . $path);
         return $value;
     }
 
@@ -46,18 +46,18 @@ final class Pins
                 |> (static fn(array $words): string => $words[0]);
             $hasUrl = preg_match('/\bURL\s+(\S+)/', $declaration, $url) === 1;
             $hasDigest = preg_match('/\bURL_HASH\s+SHA256=([a-f0-9]{64})/', $declaration, $digest) === 1;
-            Runtime::requireThat(!isset($actual[$name]) && $hasUrl && $hasDigest, 'Unreviewed dependency declaration: ' . $declaration);
+            Support::requireThat(!isset($actual[$name]) && $hasUrl && $hasDigest, 'Unreviewed dependency declaration: ' . $declaration);
             $actual[$name] = [$url[1], $digest[1]];
         }
-        Runtime::requireThat($actual == $expected, 'Registry dependency inventory changed; review versions, hashes and licenses.');
+        Support::requireThat($actual == $expected, 'Registry dependency inventory changed; review versions, hashes and licenses.');
         preg_match_all('/find_package\s*\(\s*(\w+)/i', $cmake, $packages);
         $packages = array_unique($packages[1]);
         sort($packages);
-        Runtime::requireThat(
+        Support::requireThat(
             $packages === ['OpenSSL', 'Threads'],
             'Registry environment dependency inventory changed; review its licenses.',
         );
-        Runtime::requireThat(
+        Support::requireThat(
             str_contains($cmake, 'find_package(OpenSSL 3.5.3 EXACT REQUIRED)'),
             'Registry OpenSSL pin changed; review its source and license.',
         );
@@ -101,7 +101,7 @@ final class Pins
         ] as [$filename, $version, $digest, $archive]) {
             $dockerfile = self::read($root . '/' . $filename);
             $evidence = $dockerfile . ($archive ? self::read($root . '/relay/third_party/inventory/go/components.json') : '');
-            Runtime::requireThat(
+            Support::requireThat(
                 str_contains($dockerfile, $version) && str_contains($evidence, $digest),
                 'Registry packaged dependency pin changed: ' . $filename,
             );
@@ -115,7 +115,7 @@ final class Pins
                 $files,
             ));
         sort($names);
-        Runtime::requireThat(
+        Support::requireThat(
             $names === ['age', 'boost', 'googletest', 'json', 'openssl', 'rclone', 'rqlite'],
             'Registry retained-notice inventory changed; review its coverage.',
         );
@@ -123,7 +123,7 @@ final class Pins
             'age' => 'c5d65279d02955c0fc2294ae417c3add650d228f4f5c82bd6d531fc26c89cd96',
             'rclone' => '8cd2e9e750b90a04b7d82dbbca3930c696ae0309d7c10464f90a44f45754cd04',
         ] as $name => $digest) {
-            Runtime::requireThat(
+            Support::requireThat(
                 hash_file('sha256', $root . '/relay/third_party/' . $name . '-LICENSE.txt') === $digest,
                 'Registry packaged dependency notice changed: ' . $name,
             );
@@ -140,7 +140,7 @@ final class Pins
                         |> (static fn(string $content): array => explode("\n", $content))
                         |> (static fn(array $lines): array => array_slice($lines, 0, 5))
                         |> (static fn(array $lines): string => implode("\n", $lines));
-                    Runtime::requireThat(
+                    Support::requireThat(
                         str_contains($header, 'SPDX-License-Identifier: Apache-2.0'),
                         'Missing first-party Apache-2.0 declaration: ' . $source->getPathname(),
                     );

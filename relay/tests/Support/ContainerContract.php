@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Baander\Registry\Qualification\DockerOwnership;
 use RuntimeException;
 use Throwable;
 
@@ -19,16 +20,13 @@ final class ContainerContract
     /**
      * @var list<string>
      */
-    private array $volumes = [];
-    /**
-     * @var list<string>
-     */
     private array $dataVolumes = [];
     /**
      * @var list<string>
      */
     private array $secretVolumes = [];
-    private bool $networkCreated = false;
+    private DockerOwnership $ownership;
+    private float $cleanupSeconds = 120;
     private string $password = 'disposable-container-secret';
     private string $credential;
     private string $apiImage;
@@ -37,55 +35,96 @@ final class ContainerContract
     private string $enrollmentKey;
     public static function main(): void
     {
-        $options = Runtime::arguments(['api-image', 'rqlite-image'], ['guards-only' => false]);
+        $options = Runtime::arguments(['api-image', 'rqlite-image'], [
+            'guards-only' => false,
+            'target-file' => getenv('BAANDER_TOOLING_TARGET_FILE') ?: null,
+            'ownership-receipt' => getenv('BAANDER_REGISTRY_OWNERSHIP_RECEIPT') ?: null,
+        ]);
+        Runtime::requireThat(is_string($options['target-file']) && is_string($options['ownership-receipt']), 'Container qualification requires a captured target file and an ownership receipt path.');
         $self = new self();
+        $environment = getenv();
+        foreach (['DOCKER_HOST', 'DOCKER_CONTEXT', 'DOCKER_TLS', 'DOCKER_TLS_VERIFY', 'DOCKER_CERT_PATH'] as $name) {
+            unset($environment[$name]);
+        }
+        $budget = getenv('BAANDER_CLEANUP_TIMEOUT') ?: '120';
+        Runtime::requireThat(is_numeric($budget) && is_finite((float) $budget) && (float) $budget > 0, 'Container cleanup needs a positive finite budget.');
+        $self->cleanupSeconds = (float) $budget;
+        $self->ownership = new DockerOwnership(
+            $options['ownership-receipt'],
+            DockerOwnership::read($options['target-file']),
+            static fn(array $argv, ?string $input, float $timeout): array => Runtime::run($argv, $input, $timeout, $environment),
+        );
         $self->apiImage = $options['api-image'];
         $self->rqliteImage = $options['rqlite-image'];
         $self->prefix = 'baander-registry-test-' . bin2hex(random_bytes(6));
         $self->credential = str_repeat('bc', 32);
         $self->directory = Runtime::temporaryDirectory($self->prefix);
         chmod($self->directory, 0755);
+        $primary = null;
         try {
             $self->qualify($options['guards-only']);
         } catch (Throwable $error) {
+            $primary = $error;
             foreach ($self->containers as $name) {
-                $logs = $self->docker(['logs', '--tail', '80', $name], false);
-                file_put_contents(
-                    sys_get_temp_dir() . '/' . $name . '.log',
-                    str_replace([$self->password, $self->credential], '[REDACTED]', $logs['stdout'] . $logs['stderr']),
-                );
+                try {
+                    $logs = $self->docker(['logs', '--tail', '80', $name], false);
+                    file_put_contents(
+                        sys_get_temp_dir() . '/' . $name . '.log',
+                        str_replace([$self->password, $self->credential], '[REDACTED]', $logs['stdout'] . $logs['stderr']),
+                    );
+                } catch (Throwable $diagnostic) {
+                    fwrite(STDERR, 'Cannot retain container diagnostics: ' . $diagnostic->getMessage() . "\n");
+                }
             }
-            throw $error;
         } finally {
-            $failures = [];
-            foreach (array_reverse($self->containers) as $name) {
-                if ($self->docker(['rm', '-f', $name], false)['code'] !== 0) {
-                    $failures[] = 'container cleanup failed';
-                }
-            }
-            foreach ($self->volumes as $volume) {
-                if ($self->docker(['volume', 'rm', $volume], false)['code'] !== 0) {
-                    $failures[] = 'disposable volume cleanup failed';
-                }
-            }
-            if ($self->networkCreated && $self->docker(['network', 'rm', $self->prefix], false)['code'] !== 0) {
-                $failures[] = 'disposable network cleanup failed';
-            }
-            Runtime::removeTree($self->directory);
-            Runtime::requireThat($failures === [], implode('; ', $failures));
+            $self->finish($primary);
         }
     }
+
+    private function finish(?Throwable $primary): void
+    {
+        // The owning gate's cancellation does not cancel its bounded cleanup.
+        \Swoole\Process::signal(2, static function (): void {});
+        \Swoole\Process::signal(15, static function (): void {});
+        $failures = [];
+        try {
+            $failures = $this->ownership->cleanup($this->cleanupSeconds);
+            try {
+                Runtime::removeTree($this->directory);
+            } catch (Throwable $cleanup) {
+                $failures[] = $cleanup->getMessage();
+            }
+        } finally {
+            \Swoole\Process::signal(2, static fn() => throw new Interrupted(2));
+            \Swoole\Process::signal(15, static fn() => throw new Interrupted(15));
+        }
+        if ($failures !== []) {
+            $status = $primary instanceof Interrupted ? 128 + $primary->signal : ($primary?->getCode() ?: 1);
+            throw new RuntimeException(
+                ($primary !== null ? $primary->getMessage() . '; ' : '') . 'Relay resource cleanup failed: ' . implode('; ', $failures)
+                    . '. Retry receipt: ' . $this->ownership->receipt,
+                $status > 0 && $status <= 255 ? $status : 1,
+                $primary,
+            );
+        }
+        if ($primary !== null) {
+            throw $primary;
+        }
+    }
+
     /**
      * @param list<string> $arguments
      * @return array{code:int,stdout:string,stderr:string}
      */
     private function docker(array $arguments, bool $check = true, ?string $input = null): array
     {
-        $result = Runtime::run(['docker', ...$arguments], $input, 180);
-        Runtime::requireThat(
-            !$check || $result['code'] === 0,
-            'Disposable Docker command failed: ' . str_replace([$this->password, $this->credential], '[REDACTED]', $result['stderr']),
-        );
+        $result = $this->ownership->run($arguments, $input, 180);
+        if ($check && $result['code'] !== 0) {
+            throw new RuntimeException(
+                'Disposable Docker command failed: ' . str_replace([$this->password, $this->credential], '[REDACTED]', $result['stderr']),
+                $result['code'],
+            );
+        }
         return $result;
     }
     private function issue(string $name, ?string $dns = null): void
@@ -135,7 +174,6 @@ final class ContainerContract
         $volume = $this->prefix . '-fixture-' . $suffix;
         $helper = $this->prefix . '-copy-' . $suffix;
         $this->docker(['volume', 'create', $volume]);
-        $this->volumes[] = $volume;
         $this->containers[] = $helper;
         $this->docker([
             'create',
@@ -342,14 +380,12 @@ final class ContainerContract
             $secrets[] = $target;
         }
         $this->docker(['network', 'create', $this->prefix]);
-        $this->networkCreated = true;
         foreach ($secrets as $index => $source) {
             $this->secretVolumes[] = $this->copyFixture($source, (string) $index);
         }
         for ($index = 0; $index < 5; ++$index) {
             $volume = $this->prefix . "-data-{$index}";
             $this->docker(['volume', 'create', $volume]);
-            $this->volumes[] = $volume;
             $this->dataVolumes[] = $volume;
         }
         foreach ([
@@ -399,7 +435,6 @@ final class ContainerContract
         $this->forgetContainer($node);
         $volume = $this->prefix . '-fresh-data-0';
         $this->docker(['volume', 'create', $volume]);
-        $this->volumes[] = $volume;
         $this->dataVolumes[0] = $volume;
         echo "PASS: incomplete five-voter bootstrap cannot restart as a new single-voter cluster\n";
         if ($guardsOnly) {
@@ -563,7 +598,6 @@ final class ContainerContract
         $this->forgetContainer($replacementName);
         $replacementVolume = $this->prefix . '-replacement-data-4';
         $this->docker(['volume', 'create', $replacementVolume]);
-        $this->volumes[] = $replacementVolume;
         $this->dataVolumes[4] = $replacementVolume;
         $this->start(4, 'join-new');
         $this->waitFor(

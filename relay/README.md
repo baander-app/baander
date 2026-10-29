@@ -580,13 +580,29 @@ of the operating-system package set. Dependency updates require new verified pin
 and qualification. First-party code is Apache-2.0; each runtime image retains its
 packaged dependency inventory and license evidence.
 
+The entrypoint saves a private Docker target file and transport snapshot in the
+evidence directory. It passes `BAANDER_TOOLING_TARGET_FILE` and
+`BAANDER_REGISTRY_OWNERSHIP_RECEIPT` to the relay helper. To run that helper against
+prepared images, supply the saved target file and a new ownership receipt path
+in an existing private directory:
+
 ```sh
-docker build --platform linux/amd64 -f relay/docker/Dockerfile \
-  -t baander/registry:0.1.0 relay
-docker build --platform linux/amd64 -f relay/docker/rqlite.Dockerfile \
-  -t baander/registry-rqlite:10.5.1 relay
 php relay/tests/run_container_contract.php \
+  --target-file /absolute/private/run/target.json \
+  --ownership-receipt /absolute/private/run/relay-resources.json \
   --api-image baander/registry:0.1.0 --rqlite-image baander/registry-rqlite:10.5.1
+```
+
+The helper records resource intentions before creation, then saves their immutable
+identities. Cleanup checks the original daemon and ownership labels, attempts
+independent resources within its bounded cleanup budget, and preserves the primary
+gate status when cleanup also fails. Unresolved resources keep their receipt; the
+parent outcome records its path. Keep that receipt and its transport snapshot
+together. Retry nested relay cleanup using the exact receipt path reported by the
+failed run:
+
+```sh
+php relay/tools/qualification/cleanup.php --receipt /absolute/private/run/relay-resources.json
 ```
 
 The container check creates a unique network and uniquely named disposable voter

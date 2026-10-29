@@ -4,9 +4,9 @@
 
 declare(strict_types=1);
 
-namespace Baander\Registry\StaticAnalysis;
+namespace Baander\Tooling\Registry\StaticAnalysis;
 
-use Baander\RegistryTests\Runtime;
+use Baander\Tooling\Registry\Support;
 use RuntimeException;
 
 final class Diagnostics
@@ -14,30 +14,30 @@ final class Diagnostics
     /** @return array<string,mixed> */
     public static function read(string $export): array
     {
-        Runtime::requireThat(extension_loaded('yaml'), 'Registry static analysis requires ext-yaml.');
+        Support::requireThat(extension_loaded('yaml'), 'Registry static analysis requires ext-yaml.');
         $data = yaml_parse_file($export) ?? [];
-        Runtime::requireThat(is_array($data), 'Invalid clang-tidy diagnostic export.');
+        Support::requireThat(is_array($data), 'Invalid clang-tidy diagnostic export.');
         return $data;
     }
 
     public static function check(int $status, string $export, string $dependencies): void
     {
-        Runtime::requireThat(in_array($status, [0, 1], true), 'clang-tidy failed without completing analysis: ' . $status);
+        Support::requireThat(in_array($status, [0, 1], true), 'clang-tidy failed without completing analysis: ' . $status);
         if (!is_file($export)) {
-            Runtime::requireThat($status === 0, 'clang-tidy failed without exporting diagnostics.');
+            Support::requireThat($status === 0, 'clang-tidy failed without exporting diagnostics.');
             return;
         }
         $data = self::read($export);
         $diagnostics = $data['Diagnostics'] ?? [];
-        Runtime::requireThat(is_array($diagnostics), 'Invalid diagnostic list.');
-        Runtime::requireThat(!$status || $diagnostics !== [], 'clang-tidy failed without structured diagnostics.');
+        Support::requireThat(is_array($diagnostics), 'Invalid diagnostic list.');
+        Support::requireThat(!$status || $diagnostics !== [], 'clang-tidy failed without structured diagnostics.');
         $root = realpath($dependencies);
-        Runtime::requireThat($root !== false, 'Missing dependency source directory.');
+        Support::requireThat($root !== false, 'Missing dependency source directory.');
         foreach ($diagnostics as $diagnostic) {
-            Runtime::requireThat(is_array($diagnostic), 'Invalid diagnostic record.');
+            Support::requireThat(is_array($diagnostic), 'Invalid diagnostic record.');
             $name = $diagnostic['DiagnosticName'] ?? '';
             $filename = $diagnostic['DiagnosticMessage']['FilePath'] ?? '';
-            Runtime::requireThat(is_string($name) && $name !== '' && is_string($filename), 'Invalid diagnostic location.');
+            Support::requireThat(is_string($name) && $name !== '' && is_string($filename), 'Invalid diagnostic location.');
             $location = $filename === '' ? false : realpath($filename);
             if (
                 $location === false
@@ -54,9 +54,9 @@ final class Diagnostics
     {
         $data = self::read($export);
         $diagnostics = $data['Diagnostics'] ?? [];
-        Runtime::requireThat(is_array($diagnostics), 'Invalid compiler diagnostic list.');
+        Support::requireThat(is_array($diagnostics), 'Invalid compiler diagnostic list.');
         $names = $diagnostics |> (static fn(array $items): array => array_column($items, 'DiagnosticName'));
-        Runtime::requireThat(in_array('clang-diagnostic-error', $names, true), 'Compiler control did not export a real compiler error.');
+        Support::requireThat(in_array('clang-diagnostic-error', $names, true), 'Compiler control did not export a real compiler error.');
         array_unshift(
             $diagnostics,
             [
@@ -65,6 +65,6 @@ final class Diagnostics
             ],
         );
         $data['Diagnostics'] = $diagnostics;
-        Runtime::requireThat(file_put_contents($export, yaml_emit($data)) !== false, 'Cannot write compiler control export.');
+        Support::requireThat(file_put_contents($export, yaml_emit($data)) !== false, 'Cannot write compiler control export.');
     }
 }

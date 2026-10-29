@@ -8,6 +8,7 @@
   },
   "autoload": {
     "psr-4": {
+      "Baander\\Registry\\Qualification\\": "tools/qualification/",
       "Baander\\RegistryTests\\": "tests/Support/",
       "Baander\\Registry\\Inventory\\": "tools/inventory/"
     },

@@ -21,6 +21,7 @@ COPY --from=database /usr/local/bin/rqlited /usr/local/bin/rqlited
 COPY composer.json composer.lock /qualification/
 COPY vendor /qualification/vendor
 COPY tools/inventory /qualification/tools/inventory
+COPY tools/qualification /qualification/tools/qualification
 COPY tests /qualification/tests
 COPY backup/registry_backup.py /qualification/backup/registry_backup.py
 ENV PATH=/opt/php/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

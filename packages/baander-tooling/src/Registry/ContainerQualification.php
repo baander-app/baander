@@ -5,7 +5,14 @@ declare(strict_types=1);
 namespace Baander\Tooling\Registry;
 
 use Baander\Tooling\Filesystem\AtomicFile;
-use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\TargetResolver;
+use Baander\Tooling\Resources\ResourceLedger;
+use Baander\Tooling\Resources\ResourceKind;
+use Baander\Tooling\Resources\ImageLedger;
 use Baander\Tooling\Process\ProcessSpec;
 use Baander\Tooling\Process\SignalScope;
 use Baander\Tooling\Runtime\Requirements;
@@ -14,17 +21,23 @@ use Throwable;
 
 final class ContainerQualification
 {
-    /** @var list<string> */
-    private array $images = [];
-    private string $container = '';
     private string $output = '';
+    private string $relayReceipt = '';
     private string $runId;
-    private ProcessRunner $runner;
+    private EngineExecutor $runner;
+    private Client $docker;
+    private ResourceLedger $ledger;
+    private ToolingConfiguration $configuration;
+    /** @var array<string,string> */
+    private array $environment;
+    private ImageLedger $imageLedger;
     private SignalScope $signals;
 
     public function __construct(private readonly string $root)
     {
-        $this->runner = new ProcessRunner();
+        $this->environment = getenv();
+        $this->configuration = ToolingConfiguration::forRepository($root, $this->environment);
+        $this->runner = new EngineExecutor(ExecutionContext::bounded($this->configuration->budgets->seconds('registryQualification'), $this->environment, $root));
     }
 
     public function run(bool $backup): int
@@ -32,13 +45,33 @@ final class ContainerQualification
         Requirements::check();
         $this->signals = new SignalScope();
         $this->runId = 'baander-registry-' . ($backup ? 'backup-' : 'qualification-') . bin2hex(random_bytes(8));
-        $this->output = getenv('REGISTRY_INVENTORY_OUTPUT') ?: $this->root . '/var/test-runs/registry-inventory/' . $this->runId;
+        $this->output = ($this->environment['REGISTRY_INVENTORY_OUTPUT'] ?? '') ?: $this->root . '/var/test-runs/registry-inventory/' . $this->runId;
         if (!is_dir($this->output) && !mkdir($this->output, 0700, true)) {
             throw new RuntimeException('Cannot create inventory output.');
         }
+        $this->output = realpath($this->output) ?: throw new RuntimeException('Cannot resolve registry output directory.');
         $status = 0;
         try {
-            $this->command(['docker', 'buildx', 'version'], 'buildx.log', 30);
+            $target = new TargetResolver($this->runner, $this->environment)->resolve($this->configuration->docker, $this->output . '/' . $this->runId . '-transport');
+            $this->docker = new Client($this->runner, $target, $this->environment);
+            $this->imageLedger = new ImageLedger($this->output . '/' . $this->runId . '-images.json', $this->docker);
+            $this->ledger = new ResourceLedger($this->output . '/' . $this->runId . '-resources.json', $this->docker, $this->environment);
+            // Nested relay helpers use the exact captured transport through this private CLI adapter.
+            $bin = $this->output . '/' . $this->runId . '-bin';
+            if (!mkdir($bin, 0700)) {
+                throw new RuntimeException('Cannot create nested Docker transport adapter.');
+            }
+            $argv = [$target->executable, '--host', $target->endpoint, ...$target->transportArguments];
+            AtomicFile::write($bin . '/docker', "#!/bin/sh\nexec " . implode(' ', array_map(escapeshellarg(...), $argv)) . ' "$@"' . "\n", 0700);
+            $this->environment = Client::transportEnvironment($this->environment);
+            $this->environment['PATH'] = $bin . ':' . ($this->environment['PATH'] ?? '');
+            $targetFile = $this->output . '/' . $this->runId . '-target.json';
+            AtomicFile::writeJson($targetFile, $target->toArray());
+            $this->relayReceipt = $this->output . '/' . $this->runId . '-relay-resources.json';
+            $this->environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
+            $this->environment['BAANDER_REGISTRY_OWNERSHIP_RECEIPT'] = $this->relayReceipt;
+            $this->environment['BAANDER_CLEANUP_TIMEOUT'] = (string) $this->configuration->budgets->seconds('cleanup');
+            $this->dockerCommand(['buildx', 'version'], 'buildx.log', 30);
             $api = $this->image('api', 'Dockerfile');
             $database = $this->image('database', 'rqlite.Dockerfile');
             $images = ['api' => $api, 'rqlite' => $database];
@@ -46,7 +79,7 @@ final class ContainerQualification
                 $images['backup'] = $this->image('backup', 'backup.Dockerfile');
             }
             foreach ($images as $kind => $image) {
-                $this->command(
+                $this->command(new ProcessSpec(
                     [
                         PHP_BINARY,
                         $this->root . '/relay/tools/verify_packaged_image.php',
@@ -57,12 +90,17 @@ final class ContainerQualification
                         '--output',
                         $this->output,
                     ],
-                    'inventory-' . $kind . '.log',
-                    300,
-                );
+                    cwd: $this->root,
+                    environment: $this->environment,
+                    timeout: 300,
+                    logPath: $this->logPath('inventory-' . $kind . '.log'),
+                    processGroup: true,
+                    terminationGrace: 5,
+                    replaceEnvironment: true,
+                ));
             }
             if (!$backup) {
-                $this->command(
+                $this->command(new ProcessSpec(
                     [
                         PHP_BINARY,
                         $this->root . '/relay/tests/run_container_contract.php',
@@ -71,21 +109,27 @@ final class ContainerQualification
                         '--rqlite-image',
                         $database,
                     ],
-                    'container.log',
-                    300,
-                );
+                    cwd: $this->root,
+                    environment: $this->environment,
+                    timeout: 300,
+                    logPath: $this->logPath('container.log'),
+                    processGroup: true,
+                    terminationGrace: 5,
+                    replaceEnvironment: true,
+                ));
                 echo "Registry production container qualification passed.\n";
             } else {
                 $contract = $this->runId . ':contract';
-                $this->images[] = $contract;
-                $this->command(
+                $this->imageLedger->intend($contract);
+                $this->dockerCommand(
                     [
-                        'docker',
                         'buildx',
                         'build',
                         '--platform',
                         'linux/amd64',
                         '--load',
+                        '--label',
+                        'org.baander.tooling.run=' . $this->imageLedger->token,
                         '-f',
                         $this->root . '/relay/docker/qualification.Dockerfile',
                         '--build-arg',
@@ -101,6 +145,7 @@ final class ContainerQualification
                     'build-qualification.log',
                     1800,
                 );
+                $this->imageLedger->observe($contract);
                 $this->gate(
                     $contract,
                     'encrypted',
@@ -137,21 +182,68 @@ final class ContainerQualification
                 : ($failure->getCode() > 0 && $failure->getCode() <= 255 ? $failure->getCode() : 1);
             fwrite(STDERR, $failure->getMessage() . "\n");
         } finally {
-            if ($this->container !== '' && !$this->cleanup(['docker', 'rm', '-f', $this->container])) {
-                $status = $status ?: 1;
+            $cleanupErrors = [];
+            if ($this->relayReceipt !== '' && (file_exists($this->relayReceipt) || is_link($this->relayReceipt))) {
+                $cleanupErrors[] = 'Nested relay resources remain unresolved. Retry receipt: ' . $this->relayReceipt;
             }
-            if ($this->images !== [] && !$this->cleanup(['docker', 'image', 'rm', ...$this->images])) {
-                $status = $status ?: 1;
+            $cleanupContext = null;
+            try {
+                $cleanupContext = ExecutionContext::bounded($this->configuration->budgets->seconds('cleanup'), $this->environment, ignoreCancellation: true);
+                if (isset($this->ledger)) {
+                    $report = $this->ledger->cleanup($cleanupContext->remaining());
+                    if (!$report->successful()) {
+                        $cleanupErrors[] = $report->message();
+                    }
+                }
+            } catch (Throwable $failure) {
+                $cleanupErrors[] = $failure->getMessage();
             }
-            $this->signals->dispatch();
+            $cleanupExecutor = null;
+            try {
+                if (isset($this->imageLedger) && $cleanupContext !== null) {
+                    $cleanupExecutor = new EngineExecutor($cleanupContext);
+                    $report = $this->imageLedger->cleanup(new Client($cleanupExecutor, $this->docker->target, $this->environment));
+                    if (!$report->successful()) {
+                        $cleanupErrors[] = $report->message();
+                    }
+                }
+            } catch (Throwable $failure) {
+                $cleanupErrors[] = $failure->getMessage();
+            } finally {
+                try {
+                    $cleanupExecutor?->close();
+                } catch (Throwable $failure) {
+                    $cleanupErrors[] = 'Cannot close registry image cleanup: ' . $failure->getMessage();
+                }
+            }
+            try {
+                $this->signals->dispatch();
+            } catch (Throwable $failure) {
+                $cleanupErrors[] = $failure->getMessage();
+            }
             if ($status === 0 && $this->signals->receivedSignal() !== null) {
                 $status = 128 + $this->signals->receivedSignal();
             }
-            AtomicFile::writeJson(
-                $this->output . '/' . $this->runId . '-receipt.json',
-                ['status' => $status === 0 ? 'passed' : 'failed', 'exit_status' => $status, 'backup' => $backup],
-            );
-            $this->signals->close();
+            foreach ([$this->runner, $this->signals] as $resource) {
+                try {
+                    $resource->close();
+                } catch (Throwable $failure) {
+                    $cleanupErrors[] = 'Cannot close registry execution: ' . $failure->getMessage();
+                }
+            }
+            foreach ($cleanupErrors as $error) {
+                fwrite(STDERR, 'Registry cleanup failed: ' . $error . "\n");
+                $status = $status ?: 1;
+            }
+            try {
+                AtomicFile::writeJson(
+                    $this->output . '/' . $this->runId . '-receipt.json',
+                    ['status' => $status === 0 ? 'passed' : 'failed', 'exit_status' => $status, 'backup' => $backup, 'cleanup_errors' => $cleanupErrors, 'relay_ownership_receipt' => $this->relayReceipt],
+                );
+            } catch (Throwable $failure) {
+                $status = $status ?: 1;
+                fwrite(STDERR, 'Cannot write registry outcome: ' . $failure->getMessage() . "\n");
+            }
         }
         return $status;
     }
@@ -159,15 +251,16 @@ final class ContainerQualification
     private function image(string $suffix, string $dockerfile): string
     {
         $image = $this->runId . ':' . $suffix;
-        $this->images[] = $image;
-        $this->command(
+        $this->imageLedger->intend($image);
+        $this->dockerCommand(
             [
-                'docker',
                 'buildx',
                 'build',
                 '--platform',
                 'linux/amd64',
                 '--load',
+                '--label',
+                'org.baander.tooling.run=' . $this->imageLedger->token,
                 '-f',
                 $this->root . '/relay/docker/' . $dockerfile,
                 '-t',
@@ -177,6 +270,7 @@ final class ContainerQualification
             'build-' . $suffix . '.log',
             1800,
         );
+        $this->imageLedger->observe($image);
         return $image;
     }
 
@@ -187,71 +281,49 @@ final class ContainerQualification
             $this->output . '/' . $this->runId . '-' . $gate . '-gate.json',
             ['gate' => $gate, 'timeout_seconds' => $timeout],
         );
-        $this->container = $this->runId . '-' . $gate;
-        $this->command(
-            [
-                'docker',
-                'run',
-                '--name',
-                $this->container,
-                '--network',
-                'none',
-                '--read-only',
-                '--tmpfs',
-                '/tmp:rw,exec,nosuid,nodev,size=128m,mode=1777',
-                '--entrypoint',
-                'php',
-                $image,
-                ...$arguments,
-            ],
-            $gate . '.log',
-            $timeout,
-        );
-        if (!$this->cleanup(['docker', 'rm', '-f', $this->container])) {
-            throw new RuntimeException('Cannot remove completed registry qualification container.');
+        $container = $this->runId . '-' . $gate;
+        $id = $this->ledger->create(ResourceKind::Container, $container, [
+            '--network',
+            'none',
+            '--read-only',
+            '--tmpfs',
+            '/tmp:rw,exec,nosuid,nodev,size=128m,mode=1777',
+            '--entrypoint',
+            'php',
+            $image,
+            ...$arguments,
+        ]);
+        $this->dockerCommand(['start', '--attach', $id], $gate . '.log', $timeout);
+        $report = $this->ledger->cleanup($this->configuration->budgets->seconds('cleanup'));
+        if (!$report->successful()) {
+            throw new RuntimeException($report->message());
         }
-        $this->container = '';
     }
 
     /** @param non-empty-list<string> $arguments */
-    private function command(array $arguments, string $log, float $timeout): void
+    private function dockerCommand(array $arguments, string $log, float $timeout): void
     {
-        $this->signals->dispatch();
-        if ($this->signals->receivedSignal() !== null) {
-            throw new RuntimeException('Registry qualification interrupted.', 128 + $this->signals->receivedSignal());
-        }
-        $path = $this->output . '/' . $this->runId . '-' . $log;
-        $result = $this->runner->run(new ProcessSpec(
+        $this->command($this->docker->command(
             $arguments,
             cwd: $this->root,
-            environment: getenv(),
             timeout: $timeout,
-            logPath: $path,
-            processGroup: true,
-            terminationGrace: 5,
+            logPath: $this->logPath($log),
         ));
-        readfile($path);
-        if ($result->exitCode !== 0) {
-            throw new RuntimeException('Registry gate failed: ' . $log, $result->timedOut ? 124 : $result->exitCode);
-        }
     }
 
-    /** @param non-empty-list<string> $arguments */
-    private function cleanup(array $arguments): bool
+    private function logPath(string $name): string
+    {
+        return $this->output . '/' . $this->runId . '-' . $name;
+    }
+
+    private function command(ProcessSpec $command): void
     {
         try {
-            return $this->runner->run(new ProcessSpec(
-                $arguments,
-                environment: getenv(),
-                timeout: 30,
-                logPath: $this->output . '/' . $this->runId . '-cleanup.log',
-                processGroup: true,
-                ignoreCancellation: true,
-                appendLog: true,
-            ))->exitCode === 0;
-        } catch (Throwable $failure) {
-            fwrite(STDERR, 'Registry cleanup failed: ' . $failure->getMessage() . "\n");
-            return false;
+            $this->runner->run($command);
+        } finally {
+            if ($command->logPath !== null && is_file($command->logPath)) {
+                readfile($command->logPath);
+            }
         }
     }
 }

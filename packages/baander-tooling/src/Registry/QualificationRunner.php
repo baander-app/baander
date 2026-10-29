@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Registry;
 
-use Baander\RegistryTests\BoundedStorage;
 use Baander\Tooling\Inventory\Collector;
 use Baander\Tooling\Process\ProcessResult;
-use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Process\ProcessSpec;
 use Baander\Tooling\Process\SignalScope;
 use Baander\Tooling\Runtime\Requirements;
@@ -24,12 +26,17 @@ final class QualificationRunner
     private string $fuzzSeconds = '120';
     private string $revision = '';
     private int $commandNumber = 0;
-    private ProcessRunner $runner;
+    private EngineExecutor $runner;
+    /** @var array<string,string> */
+    private array $environment;
+    private readonly ToolingConfiguration $configuration;
     private SignalScope $signals;
 
-    public function __construct(private readonly string $root)
+    public function __construct(private readonly string $root, private readonly ?StorageValidator $storageValidator = null)
     {
-        $this->runner = new ProcessRunner();
+        $this->environment = getenv();
+        $this->configuration = ToolingConfiguration::forRepository($root, $this->environment);
+        $this->runner = new EngineExecutor(ExecutionContext::bounded($this->configuration->budgets->seconds('registryQualification'), $this->environment, $root));
     }
 
     /** @param list<string> $arguments */
@@ -50,23 +57,33 @@ final class QualificationRunner
                 : ($failure->getCode() > 0 && $failure->getCode() <= 255 ? $failure->getCode() : 1);
             $this->write($failure->getMessage() . "\n", true);
         } finally {
-            try {
-                $this->retain();
+            foreach ([fn() => $this->retain(), function (): void {
                 if ($this->work !== '') {
                     Collector::remove($this->work);
                 }
-            } catch (Throwable $failure) {
-                $status = $status ?: 1;
-                $this->write('Qualification cleanup failed: ' . $failure->getMessage() . "\n", true);
+            }] as $cleanup) {
+                try {
+                    $cleanup();
+                } catch (Throwable $failure) {
+                    $status = $status ?: 1;
+                    $this->write('Qualification cleanup failed: ' . $failure->getMessage() . "\n", true);
+                }
             }
             $this->signals->dispatch();
             if ($status === 0 && $this->signals->receivedSignal() !== null) {
                 $status = 128 + $this->signals->receivedSignal();
             }
-            if ($this->output !== '' && $this->revision !== '') {
-                $this->metadata((string) $status);
+            try {
+                if ($this->output !== '' && $this->revision !== '') {
+                    $this->metadata((string) $status);
+                }
+            } catch (Throwable $failure) {
+                $status = $status ?: 1;
+                $this->write('Cannot write qualification outcome: ' . $failure->getMessage() . "\n", true);
+            } finally {
+                $this->runner->close();
+                $this->signals->close();
             }
-            $this->signals->close();
         }
         return $status;
     }
@@ -78,26 +95,23 @@ final class QualificationRunner
         if (count($arguments) > 1 || !in_array($this->mode, ['release', 'sanitize', 'thread', 'fuzz'], true)) {
             throw new RuntimeException('Usage: test-registry.sh [release|sanitize|thread|fuzz]', 2);
         }
-        $this->nodes = getenv('REGISTRY_CLUSTER_NODES') ?: '3';
-        $this->fuzzRuns = getenv('REGISTRY_FUZZ_RUNS') ?: '10000';
-        $this->fuzzSeconds = getenv('REGISTRY_FUZZ_SECONDS') ?: '120';
+        $this->nodes = ($this->environment['REGISTRY_CLUSTER_NODES'] ?? '') ?: '3';
+        $this->fuzzRuns = ($this->environment['REGISTRY_FUZZ_RUNS'] ?? '') ?: '10000';
+        $this->fuzzSeconds = ($this->environment['REGISTRY_FUZZ_SECONDS'] ?? '') ?: '120';
         if (!in_array($this->nodes, ['3', '5'], true)) {
             throw new RuntimeException('REGISTRY_CLUSTER_NODES must be 3 or 5.', 2);
         }
         if ($this->mode === 'fuzz' && (!preg_match('/^[1-9][0-9]*$/D', $this->fuzzRuns) || !preg_match('/^[1-9][0-9]*$/D', $this->fuzzSeconds))) {
             throw new RuntimeException('REGISTRY_FUZZ_RUNS and REGISTRY_FUZZ_SECONDS must be positive integers.', 2);
         }
-        $output = getenv('REGISTRY_QUALIFICATION_OUTPUT') ?: '';
+        $output = ($this->environment['REGISTRY_QUALIFICATION_OUTPUT'] ?? '') ?: '';
         if ($output !== '') {
             $this->directory($output);
             if (array_diff(scandir($output) ?: [], ['.', '..']) !== []) {
                 throw new RuntimeException('REGISTRY_QUALIFICATION_OUTPUT must be an empty directory.', 2);
             }
             $this->output = realpath($output) ?: throw new RuntimeException('Cannot resolve qualification output.');
-            $revision = $this->runner->run(new ProcessSpec(['git', '-C', $this->root, 'rev-parse', 'HEAD'], environment: getenv(), timeout: 10));
-            if ($revision->exitCode !== 0) {
-                throw new RuntimeException('Cannot observe source revision.', $revision->exitCode);
-            }
+            $revision = $this->runner->run(new ProcessSpec(['git', '-C', $this->root, 'rev-parse', 'HEAD'], environment: $this->environment, timeout: 10));
             $this->revision = trim($revision->stdout);
             $this->metadata('running');
         }
@@ -106,20 +120,23 @@ final class QualificationRunner
     private function qualify(): void
     {
         if (in_array($this->mode, ['release', 'sanitize'], true)) {
-            $storage = getenv('REGISTRY_FULL_DISK_ROOT') ?: '';
+            $storage = ($this->environment['REGISTRY_FULL_DISK_ROOT'] ?? '') ?: '';
             if ($storage === '') {
                 throw new RuntimeException('REGISTRY_FULL_DISK_ROOT must name an empty dedicated tmpfs (at most 128 MiB).', 2);
             }
-            BoundedStorage::validateRoot($storage);
+            if ($this->storageValidator === null) {
+                throw new RuntimeException('A bounded storage validator must be supplied by composition.', 2);
+            }
+            $this->storageValidator->validate($storage);
         }
         if (PHP_OS_FAMILY !== 'Linux' || php_uname('m') !== 'x86_64') {
             throw new RuntimeException('The verified rqlite qualification artifact requires Linux x86_64.', 2);
         }
         $thread = $this->mode === 'thread';
         $fuzz = $this->mode === 'fuzz';
-        $cc = getenv('CC') ?: 'clang';
-        $cxx = getenv('CXX') ?: 'clang++';
-        $python = getenv('REGISTRY_SUBJECT_PYTHON') ?: 'python3';
+        $cc = ($this->environment['CC'] ?? '') ?: 'clang';
+        $cxx = ($this->environment['CXX'] ?? '') ?: 'clang++';
+        $python = ($this->environment['REGISTRY_SUBJECT_PYTHON'] ?? '') ?: 'python3';
         foreach ([
             'cmake',
             'ninja',
@@ -171,7 +188,7 @@ final class QualificationRunner
             $environment += ['CC' => $cc, 'CXX' => $cxx];
         }
         $environment['PKG_CONFIG_PATH'] = $this->work . '/openssl/lib/pkgconfig'
-            . ((getenv('PKG_CONFIG_PATH') ?: '') === '' ? '' : ':' . getenv('PKG_CONFIG_PATH'));
+            . ((($this->environment['PKG_CONFIG_PATH'] ?? '') ?: '') === '' ? '' : ':' . ($this->environment['PKG_CONFIG_PATH'] ?? ''));
         $build = $this->work . '/build';
         $this->command(
             [
@@ -221,7 +238,7 @@ final class QualificationRunner
         if (in_array($this->mode, ['release', 'sanitize'], true)) {
             $this->contract(
                 'run_storage_contract',
-                ['--rqlited', $rqlited, '--server', $server, '--storage-root', (string) getenv('REGISTRY_FULL_DISK_ROOT')],
+                ['--rqlited', $rqlited, '--server', $server, '--storage-root', (string) ($this->environment['REGISTRY_FULL_DISK_ROOT'] ?? '')],
                 $environment,
             );
         }
@@ -255,6 +272,7 @@ final class QualificationRunner
             ],
             environment: $environment,
             log: 'fuzz.log',
+            timeout: $this->configuration->budgets->seconds('registryFuzz'),
             requireZero: false,
         );
         if ($result->exitCode !== 0) {
@@ -291,6 +309,7 @@ CPP;
             [$this->work . '/fuzz-negative', '-runs=1', '-artifact_prefix=' . $this->work . '/artifacts/'],
             environment: $environment,
             log: 'fuzz-negative.log',
+            timeout: $this->configuration->budgets->seconds('registryFuzz'),
             requireZero: false,
         );
         if (
@@ -339,6 +358,7 @@ CPP;
         array $environment = [],
         ?string $log = null,
         bool $requireZero = true,
+        ?float $timeout = null,
         ?string $input = null,
     ): ProcessResult {
         $this->signals->dispatch();
@@ -347,29 +367,29 @@ CPP;
         }
         $logPath = $this->work . '/' . ($log ?? 'command-' . ++$this->commandNumber . '.log');
         $this->write('Running: ' . implode(' ', $argv) . "\n");
-        $result = $this->runner->run(new ProcessSpec(
-            $argv,
-            cwd: $cwd ?? $this->root,
-            environment: array_replace(getenv(), ['TMPDIR' => $this->work . '/tmp'], $environment),
-            timeout: 1800,
-            stdin: $input,
-            logPath: $logPath,
-            processGroup: true,
-            appendLog: $log !== null,
-            terminationGrace: 5,
-        ));
-        $stream = fopen($logPath, 'rb');
-        if ($stream !== false) {
-            while (!feof($stream)) {
-                $this->write(fread($stream, 65536) ?: '');
+        try {
+            $result = $this->runner->run(new ProcessSpec(
+                $argv,
+                cwd: $cwd ?? $this->root,
+                environment: array_replace($this->environment, ['TMPDIR' => $this->work . '/tmp'], $environment),
+                timeout: $timeout ?? $this->configuration->budgets->seconds('registryQualification'),
+                stdin: $input,
+                logPath: $logPath,
+                processGroup: true,
+                appendLog: $log !== null,
+                terminationGrace: 5,
+            ), new CompletionPolicy($requireZero ? [0] : null));
+        } finally {
+            $stream = is_file($logPath) ? fopen($logPath, 'rb') : false;
+            if ($stream !== false) {
+                while (!feof($stream)) {
+                    $this->write(fread($stream, 65536) ?: '');
+                }
+                fclose($stream);
             }
-            fclose($stream);
         }
         if ($this->signals->receivedSignal() !== null) {
             throw new RuntimeException('Qualification interrupted.', 128 + $this->signals->receivedSignal());
-        }
-        if ($requireZero && $result->exitCode !== 0) {
-            throw new RuntimeException('FAILED (' . $result->exitCode . '): ' . implode(' ', $argv), $result->exitCode);
         }
         return $result;
     }
@@ -431,7 +451,7 @@ CPP;
             return is_executable($name);
         }
         return array_any(
-            explode(PATH_SEPARATOR, getenv('PATH') ?: ''),
+            explode(PATH_SEPARATOR, ($this->environment['PATH'] ?? '') ?: ''),
             static fn(string $directory): bool => is_executable($directory . '/' . $name),
         );
     }

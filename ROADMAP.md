@@ -178,6 +178,20 @@ Docker client, process specification and resource foundation. U6–U10 delivery,
 family integration, authoritative CI-image and live qualification, and final code
 review remain open.
 
+Registry implementation checkpoint (U9), 2026-10-29: package-owned static
+analysis helpers and injected storage validation remove incidental test-support
+dependencies while preserving the self-contained relay qualification build
+context. Nested ownership ledgers retain the saved Docker target and primary
+failure through cleanup. Image cleanup uses immutable IDs across lost tags,
+foreign retagging and uncertain build outcomes.
+
+Root integration passes 50 registry tests and 251 assertions, with one skip for
+unavailable host clang-tidy 19. The separate close-failure control passes one test
+and six assertions. Full tooling PHPStan passes across 373 files before the final
+three-file U9 refactor; the focused follow-up also passes for all three files.
+These are host-only checks. U6–U8, U10–U11, final CI-image and live qualification,
+and final code review remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

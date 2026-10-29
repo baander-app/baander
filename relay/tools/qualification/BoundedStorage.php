@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Baander\RegistryTests;
+namespace Baander\Registry\Qualification;
 
 final class BoundedStorage
 {
