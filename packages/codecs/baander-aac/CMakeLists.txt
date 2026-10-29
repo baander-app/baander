@@ -45,6 +45,7 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
     src/usac_frame.cpp src/mps212.cpp src/mps212_tables.cpp
     src/mps_tables.cpp src/mps_tree.cpp src/mps_dec.cpp
+    src/mps_params.cpp src/mps_config.cpp src/mps_frame.cpp
     src/usac_lpd.cpp src/usac_lpc.cpp src/usac_acelp.cpp src/usac_tcx.cpp src/usac_fac.cpp
     src/usac_lpd_tables.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
@@ -154,6 +155,12 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     add_executable(baac tools/baac.cpp)
     target_link_libraries(baac PRIVATE baander-aac)
     install(TARGETS baac RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    # MPEG Surround test encoder: 5.1 PCM to a LOAS stream with an AAC-LC
+    # downmix and a spatial payload, for conformance checks against
+    # reference decoders.
+    add_executable(mps-enc tools/mps-enc.cpp)
+    target_include_directories(mps-enc PRIVATE src)
+    target_link_libraries(mps-enc PRIVATE baander-aac)
 endif()
 
 if(BAAC_AAC_BUILD_TESTS)

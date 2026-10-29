@@ -28,6 +28,7 @@ set(TEST_SOURCES
     test_usac_config.cpp
     test_mps212.cpp
     test_mps_signal.cpp
+    test_mps.cpp
     test_unidrc.cpp
     test_usac_lpd.cpp
     test_usac_sbr.cpp
@@ -45,6 +46,10 @@ foreach(test_src ${TEST_SOURCES})
     endif()
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
+
+# The MPEG Surround syntax test compiles the test encoder tool in as its
+# writer, which includes the internal headers by their bare names.
+target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 # The transforms and filterbanks go through the DSP dispatch table; the
 # same suites run again with the table capped at the scalar and the SSE2

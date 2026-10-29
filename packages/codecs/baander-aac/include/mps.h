@@ -60,19 +60,28 @@ using AacMpsConfig = struct AacMpsConfig_ {
   int ttt_dual_mode[AAC_MPS_MAX_TTT_BOXES];   /* bsTttDualMode */
   int ttt_bands_low[AAC_MPS_MAX_TTT_BOXES];   /* bsTttBandsLow */
   int residual_coding;                        /* bsResidualCoding */
+  int residual_sample_rate_index;             /* bsResidualSamplingFrequencyIndex: the band tables of the residual ICS */
   int residual_frames_per_spatial_frame;      /* bsResidualFramesPerSpatialFrame + 1 */
   int residual_present[AAC_MPS_MAX_OTT_BOXES + AAC_MPS_MAX_TTT_BOXES];
   int residual_bands[AAC_MPS_MAX_OTT_BOXES + AAC_MPS_MAX_TTT_BOXES]; /* bsResidualBands */
   int env_quant_mode;                         /* bsEnvQuantMode */
+  /* the SacExtensionConfig entries in their order: each has its data in
+   * every SpatialFrame's extension part */
+  int num_extensions;
+  int extension_type[8];
   /* the low-delay variant of ELD v2 */
   int low_delay;
   int ld_num_output_channels; /* 2 for the 2-1-2 tool */
 };
 
 /* Parses SpatialSpecificConfig() (also the in-band bsSacHeader form,
- * which carries the same syntax).  Returns AAC_OK, AAC_ERR_DECODE on a
- * syntax error, AAC_ERR_UNSUPPORTED for a tree or mode outside this
- * decoder (7.1 trees, HRTF, 3D audio, the enhanced matrix mode). */
+ * which carries the same syntax).  The reader must be bounded to the
+ * config (the SacExtensionConfig loop runs over the bits that remain:
+ * the ASC's length, or bsSacHeaderLen bytes of the in-band header) and
+ * its position on entry is the anchor of the config's byte alignment.
+ * Returns AAC_OK, AAC_ERR_DECODE on a syntax error, AAC_ERR_UNSUPPORTED
+ * for a tree or mode outside this decoder (7.1 trees, HRTF, 3D audio,
+ * the arbitrary downmix residual and the arbitrary tree extensions). */
 int aac_mps_config_read(AacBitReader* r, AacMpsConfig* cfg);
 
 /* The number of parameter bands of a bsFreqRes value (0 reserved). */
@@ -97,10 +106,22 @@ const AacMpsConfig* aac_mps_config(const AacMpsState* s);
 int aac_mps_read_frame(AacMpsState* s, AacBitReader* r);
 void aac_mps_conceal(AacMpsState* s);
 
-/* Residual channels (bsResidualCoding): the caller decodes each
- * residual_data() channel element with the core and hands the time
- * samples of residual `index` (box order: OTT boxes then the TTT box)
- * for the frame, full scale 1.0, before aac_mps_apply.  NULL clears it. */
+/* Residual channels (bsResidualCoding): ResidualData() interleaves the
+ * bsIccDiff values with AAC-LC individual_channel_stream() elements, so
+ * the frame parser reads them through the caller's core decoder: the
+ * reader is called for every residual frame of every box that codes a
+ * residual (box order: OTT boxes then the TTT box; `frame` counts the
+ * residual frames of the spatial frame) with the bit reader at the
+ * element's start, and leaves it after the element: one
+ * individual_channel_stream(common_window 0) at the config's residual
+ * sampling frequency index, followed by a second one when its window
+ * sequence is EIGHT_SHORT_SEQUENCE and `upd_qmf` (the QMF slots per
+ * residual frame) is 18, 24 or 30.  It returns AAC_OK or an error, which
+ * fails the frame.  Without a reader the residual data is skipped.  The
+ * caller then hands the time samples of residual `index` for the frame,
+ * full scale 1.0, before aac_mps_apply.  NULL clears it. */
+typedef int (*AacMpsResidualReader)(void* ctx, AacBitReader* r, int box, int frame, int upd_qmf);
+void aac_mps_set_residual_reader(AacMpsState* s, AacMpsResidualReader reader, void* ctx);
 void aac_mps_set_residual(AacMpsState* s, int index, const float* pcm, int length);
 
 /* Builds the output channels from the downmix.  `in` holds the input

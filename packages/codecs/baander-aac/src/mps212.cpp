@@ -5,6 +5,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "mps_internal.h"
 #include "qmf.h"
 
 /* MPEG Surround 212 (ISO/IEC 23003-3 7.11 over the one-to-two box of
@@ -71,9 +72,6 @@ constexpr float kAbsThr = 1e-9f * 32768.0f * 32768.0f;
 constexpr float kPi = 3.14159265358979f;
 
 enum { kCld = 0, kIcc = 1, kIpd = 2 };
-enum { kDiffFreq = 0, kDiffTime = 1 };
-enum { kPairFreq = 0, kPairTime = 1 };
-enum { kBackwards = 0, kForwards = 1 };
 
 /* The parameters of one type in transit: the coded sets, the coded
  * history (on the coded set's quantiser scale) and the mapped indices. */
@@ -189,505 +187,9 @@ struct AacMps212State_ {
 
 namespace {
 
-/* ── Huffman reading ────────────────────────────────────────────── */
-
-int huff_read(AacBitReader* r, const int16_t (*nodes)[2], int count) {
-  int node = 0;
-  for (int i = 0; i < 64; i++) {
-    if (node < 0 || node >= count) {
-      return -2;
-    }
-    const int next = nodes[node][aac_bitreader_read(r, 1)];
-    if (next <= 0) {
-      return -next - 1;
-    }
-    node = next;
-  }
-  return -2;
-}
-
-const int16_t (*first_book(int type, int* count))[2] {
-  switch (type) {
-    case kCld:
-      *count = 30;
-      return aac_mps212_huff_cld_first;
-    case kIcc:
-      *count = 7;
-      return aac_mps212_huff_icc_first;
-    default:
-      *count = 7;
-      return aac_mps212_huff_ipd_first;
-  }
-}
-
-const int16_t (*book_1d(int type, int diff, int* count))[2] {
-  switch (type) {
-    case kCld:
-      *count = 30;
-      return aac_mps212_huff_cld_1d[diff];
-    case kIcc:
-      *count = 7;
-      return aac_mps212_huff_icc_1d[diff];
-    default:
-      *count = 7;
-      return aac_mps212_huff_ipd_1d[diff];
-  }
-}
-
-const int16_t (*book_2d(int type, int diff, int pairing, int lav, int* count))[2] {
-  if (type == kCld) {
-    switch (lav) {
-      case 3:
-        *count = 15;
-        return aac_mps212_huff_cld_2d_lav3[diff][pairing];
-      case 5:
-        *count = 35;
-        return aac_mps212_huff_cld_2d_lav5[diff][pairing];
-      case 7:
-        *count = 63;
-        return aac_mps212_huff_cld_2d_lav7[diff][pairing];
-      default:
-        *count = 99;
-        return aac_mps212_huff_cld_2d_lav9[diff][pairing];
-    }
-  }
-  if (type == kIcc) {
-    switch (lav) {
-      case 1:
-        *count = 3;
-        return aac_mps212_huff_icc_2d_lav1[diff][pairing];
-      case 3:
-        *count = 15;
-        return aac_mps212_huff_icc_2d_lav3[diff][pairing];
-      case 5:
-        *count = 35;
-        return aac_mps212_huff_icc_2d_lav5[diff][pairing];
-      default:
-        *count = 63;
-        return aac_mps212_huff_icc_2d_lav7[diff][pairing];
-    }
-  }
-  switch (lav) {
-    case 1:
-      *count = 3;
-      return aac_mps212_huff_ipd_2d_lav1[diff][pairing];
-    case 3:
-      *count = 15;
-      return aac_mps212_huff_ipd_2d_lav3[diff][pairing];
-    case 5:
-      *count = 35;
-      return aac_mps212_huff_ipd_2d_lav5[diff][pairing];
-    default:
-      *count = 63;
-      return aac_mps212_huff_ipd_2d_lav7[diff][pairing];
-  }
-}
-
-/* ── EcDataPair(): the non-linear coding of one or two sets ─────── */
-
-struct EcReader {
-  AacBitReader* r;
-  int type;
-  int bands;       /* coded values per set */
-  int levels;      /* quantiser levels */
-  int offset;      /* index of the lowest level */
-  int lsb;         /* 1 when the fine IPD's lowest bit is coded apart */
-  int err;
-};
-
-int bits_for(int levels, int group) {
-  uint64_t n = 1;
-  for (int i = 0; i < group; i++) {
-    n *= (uint64_t)levels;
-  }
-  int b = 0;
-  while (((uint64_t)1 << b) < n) {
-    b++;
-  }
-  return b;
-}
-
-/* PCM coded values in groups: `num` values into out1 (and out2 when both
- * are given, alternating), minus `offset`. */
-void pcm_decode(EcReader* c, int* out1, int* out2, int offset, int num, int levels) {
-  int group;
-  switch (levels) {
-    case 3:
-      group = 5;
-      break;
-    case 7:
-      group = 6;
-      break;
-    case 11:
-      group = 2;
-      break;
-    case 13:
-    case 19:
-      group = 4;
-      break;
-    case 25:
-      group = 3;
-      break;
-    default:
-      group = 1;
-      break;
-  }
-  for (int i = 0; i < num; i += group) {
-    const int n = num - i < group ? num - i : group;
-    uint32_t word = aac_bitreader_read(c->r, bits_for(levels, n));
-    for (int j = 0; j < n; j++) {
-      const int idx = i + (n - j - 1);
-      const int v = (int)(word % (uint32_t)levels) - offset;
-      word /= (uint32_t)levels;
-      if (out2 == NULL) {
-        out1[idx] = v;
-      } else if (out1 == NULL) {
-        out2[idx] = v;
-      } else if (idx & 1) {
-        out2[idx / 2] = v;
-      } else {
-        out1[idx / 2] = v;
-      }
-    }
-  }
-}
-
-/* One-dimensional codes: `p0` reads the first value with its own book,
- * the rest are magnitudes with a sign bit (CLD, ICC) or IPD differences. */
-void dec_1d(EcReader* c, int diff, int* out, int num, int p0) {
-  int i = 0;
-  if (p0) {
-    int count;
-    const int16_t (*book)[2] = first_book(c->type, &count);
-    const int sym = huff_read(c->r, book, count);
-    if (sym < 0) {
-      c->err = 1;
-      return;
-    }
-    out[0] = sym;
-    i = 1;
-  }
-  int count;
-  const int16_t (*book)[2] = book_1d(c->type, diff, &count);
-  for (; i < num; i++) {
-    int v = huff_read(c->r, book, count);
-    if (v < 0) {
-      c->err = 1;
-      return;
-    }
-    if (c->type != kIpd && v != 0 && aac_bitreader_read(c->r, 1)) {
-      v = -v;
-    }
-    out[i] = v;
-  }
-}
-
-/* Two-dimensional codes over `num` values at `stride` into pairs[i]:
- * the LAV class, the first values, the pair codes with their symmetry
- * bits, and the escaped pairs in PCM at the end. */
-void dec_2d(EcReader* c, int diff, int pairing, int (*pairs)[2], int num, int stride, int* p0a,
-            int* p0b) {
-  const int lav_sym = huff_read(c->r, aac_mps212_huff_lav, 3);
-  if (lav_sym < 0) {
-    c->err = 1;
-    return;
-  }
-  int lav;
-  if (c->type == kCld) {
-    lav = 2 * lav_sym + 3;
-  } else if (c->type == kIcc) {
-    lav = 2 * lav_sym + 1;
-  } else {
-    lav = lav_sym == 0 ? 7 : 2 * (lav_sym - 1) + 1;
-  }
-  int count;
-  const int16_t (*first)[2] = first_book(c->type, &count);
-  if (p0a) {
-    const int sym = huff_read(c->r, first, count);
-    if (sym < 0) {
-      c->err = 1;
-      return;
-    }
-    *p0a = sym;
-  }
-  if (p0b) {
-    const int sym = huff_read(c->r, first, count);
-    if (sym < 0) {
-      c->err = 1;
-      return;
-    }
-    *p0b = sym;
-  }
-  const int16_t (*book)[2] = book_2d(c->type, diff, pairing, lav, &count);
-  int esc_idx[kMaxPb];
-  int esc = 0;
-  for (int i = 0; i < num; i += stride) {
-    const int sym = huff_read(c->r, book, count);
-    if (sym == -2) {
-      c->err = 1;
-      return;
-    }
-    if (sym == -1) {
-      if (esc >= kMaxPb) {
-        c->err = 1;
-        return;
-      }
-      esc_idx[esc++] = i;
-      continue;
-    }
-    int* d = pairs[i];
-    d[0] = sym >> 4;
-    d[1] = sym & 15;
-    const int sum = d[0] + d[1];
-    const int dif = d[0] - d[1];
-    if (sum > lav) {
-      d[0] = -sum + (2 * lav + 1);
-      d[1] = -dif;
-    } else {
-      d[0] = sum;
-      d[1] = dif;
-    }
-    if (c->type != kIpd && d[0] + d[1] != 0 && aac_bitreader_read(c->r, 1)) {
-      d[0] = -d[0];
-      d[1] = -d[1];
-    }
-    if (d[0] - d[1] != 0 && aac_bitreader_read(c->r, 1)) {
-      const int t = d[0];
-      d[0] = d[1];
-      d[1] = t;
-    }
-  }
-  if (esc > 0) {
-    int ex[kMaxPb], ey[kMaxPb];
-    pcm_decode(c, ex, ey, 0, 2 * esc, 2 * lav + 1);
-    for (int i = 0; i < esc; i++) {
-      pairs[esc_idx[i]][0] = ex[i] - lav;
-      pairs[esc_idx[i]][1] = ey[i] - lav;
-    }
-  }
-}
-
-/* The Huffman part of EcDataPair(): the differences of set 1 (and set 2)
- * with bsCodingScheme and bsPairing; returns the pairing. */
-int huff_decode(EcReader* c, int* out1, int* out2, int diff1, int diff2, int* pairing) {
-  const int num = c->bands;
-  const int scheme = (int)aac_bitreader_read(c->r, 1);
-  *pairing = kPairFreq;
-  if (scheme && out2 != NULL) {
-    *pairing = (int)aac_bitreader_read(c->r, 1);
-  }
-  int pairs[kMaxPb + 1][2];
-  if (!scheme) {
-    dec_1d(c, diff1, out1, num, diff1 == kDiffFreq);
-    if (out2 && !c->err) {
-      dec_1d(c, diff2, out2, num, diff2 == kDiffFreq);
-    }
-    return 0;
-  }
-  if (*pairing == kPairFreq) {
-    int* outs[2] = {out1, out2};
-    const int diffs[2] = {diff1, diff2};
-    for (int k = 0; k < 2 && !c->err; k++) {
-      if (outs[k] == NULL) {
-        continue;
-      }
-      int* o = outs[k];
-      int n = num;
-      int* p0 = NULL;
-      if (diffs[k] == kDiffFreq) {
-        p0 = &outs[k][0];
-        o++;
-        n--;
-      }
-      const int rest = n & 1;
-      n -= rest;
-      dec_2d(c, diffs[k], kPairFreq, pairs + k, n, 2, k == 0 ? p0 : NULL, k == 1 ? p0 : NULL);
-      if (c->err) {
-        return 0;
-      }
-      if (rest) {
-        dec_1d(c, diffs[k], o + n, 1, 0);
-      }
-      for (int i = 0; i + 1 < n + 1; i += 2) {
-        o[i] = pairs[i + k][0];
-        o[i + 1] = pairs[i + k][1];
-      }
-    }
-    return 0;
-  }
-  /* time pairs: the first values of both sets first when one of them is
-   * frequency-differential, the pairs then with the time book */
-  int* o1 = out1;
-  int* o2 = out2;
-  int n = num;
-  int* p0a = NULL;
-  int* p0b = NULL;
-  if (diff1 == kDiffFreq || diff2 == kDiffFreq) {
-    p0a = &out1[0];
-    p0b = &out2[0];
-    o1++;
-    o2++;
-    n--;
-  }
-  const int diff = (diff1 == kDiffTime || diff2 == kDiffTime) ? kDiffTime : kDiffFreq;
-  dec_2d(c, diff, kPairTime, pairs, n, 1, p0a, p0b);
-  if (c->err) {
-    return 0;
-  }
-  for (int i = 0; i < n; i++) {
-    o1[i] = pairs[i][0];
-    o2[i] = pairs[i][1];
-  }
-  return 0;
-}
-
-void diff_freq_decode(const int* diff, int* out, int n) {
-  out[0] = diff[0];
-  for (int i = 1; i < n; i++) {
-    out[i] = out[i - 1] + diff[i];
-  }
-}
-
-void diff_time_decode(const int* prev, const int* diff, int* out, int mixed, int n, int sign) {
-  int i = 0;
-  if (mixed) {
-    out[0] = diff[0];
-    i = 1;
-  }
-  for (; i < n; i++) {
-    out[i] = prev[i] + sign * diff[i];
-  }
-}
-
-/* EcDataPair() of `pair ? 2 : 1` sets of `bands` values (set index
- * `set`), `history` being the coded values of the reference set on the
- * same quantiser scale; `time_ref` says a time difference to it is
- * allowed. */
-int ec_data_pair(AacBitReader* r, int type, int (*out)[kMaxPb], int set, int bands, int pair,
-                 int coarse, int time_ref, const int* history) {
-  EcReader c;
-  c.r = r;
-  c.type = type;
-  c.bands = bands;
-  c.err = 0;
-  c.lsb = 0;
-  switch (type) {
-    case kCld:
-      c.levels = coarse ? 15 : 31;
-      c.offset = coarse ? 7 : 15;
-      break;
-    case kIcc:
-      c.levels = coarse ? 4 : 8;
-      c.offset = 0;
-      break;
-    default:
-      c.levels = coarse ? 8 : 16;
-      c.offset = 0;
-      c.lsb = coarse ? 0 : 1;
-      break;
-  }
-  if (bands <= 0) {
-    return -1;
-  }
-  int data[2][kMaxPb];
-  const int pcm = (int)aac_bitreader_read(r, 1);
-  if (pcm) {
-    pcm_decode(&c, data[0], pair ? data[1] : NULL, c.offset, pair ? 2 * bands : bands, c.levels);
-  } else {
-    int diff[2][kMaxPb + 1];
-    int diff_type[2] = {kDiffFreq, kDiffFreq};
-    if (pair || time_ref) {
-      diff_type[0] = (int)aac_bitreader_read(r, 1);
-    }
-    if (pair && (diff_type[0] == kDiffFreq || time_ref)) {
-      diff_type[1] = (int)aac_bitreader_read(r, 1);
-    }
-    int pairing;
-    huff_decode(&c, diff[0], pair ? diff[1] : NULL, diff_type[0], diff_type[1], &pairing);
-    if (c.err) {
-      return -1;
-    }
-    int direction = kBackwards;
-    if (pair && (diff_type[0] == kDiffTime || diff_type[1] == kDiffTime)) {
-      if (diff_type[0] == kDiffTime && !time_ref) {
-        direction = kForwards;
-      } else if (diff_type[1] == kDiffTime) {
-        direction = kBackwards;
-      } else {
-        direction = (int)aac_bitreader_read(r, 1);
-      }
-    }
-    const int mixed = diff_type[0] != diff_type[1] && pairing == kPairTime;
-    if (direction == kBackwards) {
-      if (diff_type[0] == kDiffFreq) {
-        diff_freq_decode(diff[0], data[0], bands);
-      } else {
-        int ref[kMaxPb];
-        for (int i = 0; i < bands; i++) {
-          ref[i] = (history[i] + c.offset) >> c.lsb;
-        }
-        diff_time_decode(ref, diff[0], data[0], mixed, bands, 1);
-      }
-      if (pair) {
-        if (diff_type[1] == kDiffFreq) {
-          diff_freq_decode(diff[1], data[1], bands);
-        } else {
-          diff_time_decode(data[0], diff[1], data[1], mixed, bands, 1);
-        }
-      }
-    } else {
-      diff_freq_decode(diff[1], data[1], bands);
-      if (diff_type[0] == kDiffFreq) {
-        diff_freq_decode(diff[0], data[0], bands);
-      } else {
-        diff_time_decode(data[1], diff[0], data[0], mixed, bands, -1);
-      }
-    }
-    for (int j = 0; j < (pair ? 2 : 1); j++) {
-      for (int i = 0; i < bands; i++) {
-        int v = data[j][i];
-        if (c.lsb) {
-          v = (v << 1) | (int)aac_bitreader_read(r, 1);
-        }
-        data[j][i] = v - c.offset;
-      }
-    }
-  }
-  memcpy(out[set], data[0], sizeof(int) * (size_t)bands);
-  if (pair) {
-    memcpy(out[set + 1], data[1], sizeof(int) * (size_t)bands);
-  }
-  return 0;
-}
-
-/* ── EcData() and the mapping to parameter bands ────────────────── */
-
-int band_map(int bands, int stride, int* map) {
-  int groups = (bands - 1) / stride + 1;
-  if (groups < 1) {
-    groups = 1;
-  }
-  int width[kMaxPb + 1];
-  for (int i = 0; i < groups; i++) {
-    width[i] = stride;
-  }
-  int diff = bands - groups * stride;
-  const int incr = diff > 0 ? -1 : 1;
-  int k = diff > 0 ? groups - 1 : 0;
-  while (diff != 0) {
-    width[k] -= incr;
-    k += incr;
-    diff += incr;
-    if (k >= groups) {
-      k = diff > 0 ? groups - 1 : 0;
-    }
-  }
-  map[0] = 0;
-  for (int i = 0; i < groups; i++) {
-    map[i + 1] = map[i] + width[i];
-  }
-  return groups;
-}
+/* The Huffman reader, EcDataPair() and the band grouping of
+ * bsFreqResStride are shared with the MPEG Surround decoder of AAC
+ * (mps_params.cpp, mps_internal.h). */
 
 void coarse_to_fine(int type, int* v, int n) {
   for (int i = 0; i < n; i++) {
@@ -742,13 +244,13 @@ int read_ecdata(const AacMps212State* s, Params* p, AacBitReader* r, int type) {
       }
     }
     int map[kMaxPb + 1];
-    const int groups = band_map(bands, aac_mps212_stride[stride_idx], map);
+    const int groups = aac_mps_band_map(bands, aac_mps212_stride[stride_idx], map);
     int history[kMaxPb];
     for (int g = 0; g < groups; g++) {
       history[g] = t->last[map[g]];
     }
     const int time_ref = !(p->independency && i == 0) || set > 0;
-    if (ec_data_pair(r, type, t->cmp, set, groups, pair, coarse, time_ref, history)) {
+    if (aac_mps_ec_pair_read(r, type, t->cmp, set, groups, pair, coarse, time_ref, history, 0)) {
       return -1;
     }
     for (int g = 0; g < groups; g++) {
@@ -796,7 +298,7 @@ int map_type(const AacMps212State* s, Params* p, int type) {
         break;
       default: {
         int map[kMaxPb + 1];
-        const int groups = band_map(bands, aac_mps212_stride[t->stride_idx[set]], map);
+        const int groups = aac_mps_band_map(bands, aac_mps212_stride[t->stride_idx[set]], map);
         for (int g = 0; g < groups; g++) {
           for (int b = map[g]; b < map[g + 1]; b++) {
             t->idx[i][b] = t->cmp[set][g];
@@ -916,7 +418,7 @@ void map_smoothing(const AacMps212State* s, Params* p) {
         p->inv_smooth_time[ps] = 1.0f / (float)aac_mps212_smoothing_time[p->smooth_time_idx[ps]];
         int map[kMaxPb + 1];
         const int groups =
-            band_map(s->num_bands, aac_mps212_stride[p->smooth_stride_idx[ps]], map);
+            aac_mps_band_map(s->num_bands, aac_mps212_stride[p->smooth_stride_idx[ps]], map);
         for (int g = 0; g < groups; g++) {
           for (int pb = map[g]; pb < map[g + 1]; pb++) {
             p->smoothing[ps][pb] = p->smg_bits[ps][g];
@@ -935,7 +437,7 @@ void map_smoothing(const AacMps212State* s, Params* p) {
 int read_env_shape(const AacMps212State* s, Params* p, AacBitReader* r, int ch) {
   int n = 0;
   while (n < s->slots) {
-    const int sym = huff_read(r, aac_mps212_huff_env_shape, 39);
+    const int sym = aac_mps_huff_read(r, aac_mps212_huff_env_shape, 39);
     if (sym == -2) {
       return -1;
     }
@@ -2099,10 +1601,12 @@ void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float
 /* ── test entry points ──────────────────────────────────────────── */
 
 int aac_mps212_huff_read(AacBitReader* r, const int16_t (*nodes)[2], int count) {
-  return huff_read(r, nodes, count);
+  return aac_mps_huff_read(r, nodes, count);
 }
 
-int aac_mps212_band_map(int bands, int stride, int* map) { return band_map(bands, stride, map); }
+int aac_mps212_band_map(int bands, int stride, int* map) {
+  return aac_mps_band_map(bands, stride, map);
+}
 
 void aac_mps212_ott_matrix(int cld_idx, int icc_idx, float h[2][2][2]) {
   ott_matrix(cld_idx, icc_idx, h);
