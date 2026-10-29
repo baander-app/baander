@@ -23,9 +23,21 @@ final readonly class ProcessSpec
         public bool $appendLog = false,
         public ?string $stderrLogPath = null,
         public float $terminationGrace = 0.25,
+        public bool $replaceEnvironment = false,
     ) {
         if (!is_finite($terminationGrace) || $terminationGrace < 0) {
             throw new \InvalidArgumentException('Process termination grace must be finite nonnegative seconds.');
         }
+    }
+
+    /** @param array<string,string> $environment */
+    public function withExecution(array $environment, ?string $cwd, ?float $timeout, bool $ignoreCancellation): self
+    {
+        return clone($this, [
+            'environment' => $environment,
+            'cwd' => $cwd,
+            'timeout' => $timeout,
+            'ignoreCancellation' => $ignoreCancellation,
+        ]);
     }
 }

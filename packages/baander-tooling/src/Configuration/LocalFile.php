@@ -19,25 +19,35 @@ final class LocalFile
             if (!$data['tooling'] instanceof \stdClass) {
                 throw new \InvalidArgumentException('Development tooling settings must be an object.');
             }
-            $tooling = [];
-            foreach (get_object_vars($data['tooling']) as $section => $settings) {
-                if (!$settings instanceof \stdClass) {
-                    throw new \InvalidArgumentException('Development tooling sections must be objects.');
-                }
-                $tooling[$section] = get_object_vars($settings);
-                if ($section === 'images') {
-                    foreach ($tooling[$section] as $role => $image) {
-                        if (!$image instanceof \stdClass) {
-                            throw new \InvalidArgumentException('Development image roles must be objects.');
-                        }
-                        $tooling[$section][$role] = get_object_vars($image);
-                    }
-                }
-            }
-            // Validate supported settings without touching library paths or creating resources.
-            ToolingConfiguration::resolve(local: $tooling);
-            $data['tooling'] = $tooling;
+            $data['tooling'] = self::tooling($data['tooling']);
         }
         return $data;
+    }
+
+    /** @return array<string,mixed> */
+    private static function tooling(\stdClass $configuration): array
+    {
+        $tooling = [];
+        foreach (get_object_vars($configuration) as $section => $settings) {
+            if (!$settings instanceof \stdClass) {
+                throw new \InvalidArgumentException('Development tooling sections must be objects.');
+            }
+            $tooling[$section] = $section === 'images' ? self::images($settings) : get_object_vars($settings);
+        }
+        ToolingConfiguration::resolve(local: $tooling);
+        return $tooling;
+    }
+
+    /** @return array<string,array<string,mixed>> */
+    private static function images(\stdClass $settings): array
+    {
+        $images = [];
+        foreach (get_object_vars($settings) as $role => $image) {
+            if (!$image instanceof \stdClass) {
+                throw new \InvalidArgumentException('Development image roles must be objects.');
+            }
+            $images[$role] = get_object_vars($image);
+        }
+        return $images;
     }
 }

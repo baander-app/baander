@@ -50,12 +50,7 @@ final class ProcessRunner
         $failure = null;
         $timer = Timer::tick(5, function () use (&$failure): void {
             try {
-                foreach ($this->processes as $id => $running) {
-                    $running->pump();
-                    if ($running->result() !== null) {
-                        unset($this->processes[$id]);
-                    }
-                }
+                $this->pump();
             } catch (\Throwable $error) {
                 $failure = $error;
             }
@@ -78,6 +73,30 @@ final class ProcessRunner
         } finally {
             Timer::clear($timer);
             $signals->close();
+            if ($process->result() !== null) {
+                unset($this->processes[spl_object_id($process)]);
+            }
+        }
+    }
+
+    public function pump(): void
+    {
+        foreach ($this->processes as $id => $running) {
+            $running->pump();
+            if ($running->result() !== null) {
+                unset($this->processes[$id]);
+            }
+        }
+    }
+
+    public function close(): void
+    {
+        try {
+            foreach ($this->processes as $running) {
+                $running->dispose();
+            }
+        } finally {
+            $this->processes = [];
         }
     }
 }
