@@ -76,6 +76,41 @@ Four document-review personas completed; one conflicting optional-field descript
 was corrected, with no remaining findings. Prose and whitespace checks passed.
 Implementation and runtime verification remain open.
 
+## Cohesive project tooling
+
+Requirements checkpoint, 2026-10-29: the user confirmed the scope in the
+[implementation plan](docs/plans/2026-10-29-1854-refactor-cohesive-project-tooling-plan.md)
+after the whole-package audit of `packages/baander-tooling`. The intended outcome
+is shared configuration, image selection, application layout, Docker targeting,
+process completion, cleanup and evidence contracts, with every retained correctness
+finding repaired. Necessary caller, build and CI wiring belongs in scope.
+Commands, flags, configuration and interfaces may change incompatibly when all
+consumers migrate in the same delivery, including installed or generated controllers
+and retained-state readers. Preserve local data and remove obsolete interfaces
+without speculative compatibility layers.
+
+Planning checkpoint, 2026-10-29: the plan defines 11 ordered implementation units
+and 11 technical decisions, preserving all 27 requirements and 17 acceptance
+examples. Mandatory document review completed through five personas: coherence,
+feasibility, scope, security and adversarial. One P2 finding was corrected: ordinary
+and nested Docker operations use immutable connection transport even if the
+original named context changes. The plan includes a verification case for that
+boundary. No unresolved findings or product questions remain. Implementation and
+runtime qualification remain open; no implementation tests or runtime probes ran
+during planning.
+
+Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
+package metadata/resource files. Independent source verification confirmed all
+14 core factual claims with their stated limits. Safe host-only probes reproduced
+behavioral defects without contacting Docker. Detailed evidence remains under
+`var/tooling-audit/2026-10-29`, including `review.md` and `claim-verification.md`.
+
+The targeted host suite ran 238 tests and 1,073 assertions, with one failure and
+one skip. The failure assumes configured PHP startup and output within 100 ms;
+measured startup took about 149 ms. The skip requires unavailable clang-tidy 19.
+Neither the authoritative CI image suite nor live Docker qualification ran for
+this audit. These results establish the audit baseline, not remediation acceptance.
+
 ## PHP-first testing and development tooling
 
 The [implementation plan](docs/plans/2026-10-27-1812-refactor-php-first-development-tooling-plan.md)
