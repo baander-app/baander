@@ -217,4 +217,19 @@ CLI);
         }
         self::assertCount(1, file($this->root . '/calls'));
     }
+
+    public function testComposeAllowsExpectedExitWithoutWaivingTimeout(): void
+    {
+        $client = new Client($this->executor, $this->resolve(), $this->environment);
+        self::assertSame(71, $client->compose('qualification', '/tmp/compose.json', ['ps'], check: false)->exitCode);
+        $calls = file($this->root . '/calls', FILE_IGNORE_NEW_LINES);
+        $arguments = json_decode(end($calls), true, flags: JSON_THROW_ON_ERROR)[0];
+        self::assertSame(['--host', 'unix:///selected.sock', 'compose', '--project-name', 'qualification', '--file', '/tmp/compose.json', 'ps'], $arguments);
+        try {
+            $client->compose('qualification', '/tmp/compose.json', ['stall'], timeout: 0.05, check: false);
+            self::fail('Compose timeout was accepted.');
+        } catch (\Baander\Tooling\Process\CommandFailure $error) {
+            self::assertSame(124, $error->getCode());
+        }
+    }
 }

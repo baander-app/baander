@@ -62,10 +62,12 @@ final readonly class Client
         return $this->executor->start($this->command($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive));
     }
 
-    /** @param list<string> $arguments */
-    public function compose(string $project, string $file, array $arguments, ?string $cwd = null): ProcessResult
+    /** @param list<string> $arguments
+     * @param array<string,string>|null $env
+     */
+    public function compose(string $project, string $file, array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false): ProcessResult
     {
-        return $this->run(['compose', '--project-name', $project, '--file', $file, ...$arguments], cwd: $cwd);
+        return $this->run(['compose', '--project-name', $project, '--file', $file, ...$arguments], $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
     }
 
     /** @return array<string,mixed> */

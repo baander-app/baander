@@ -99,6 +99,68 @@ boundary. No unresolved findings or product questions remain. Implementation and
 runtime qualification remain open; no implementation tests or runtime probes ran
 during planning.
 
+Foundation checkpoint (U1–U2), 2026-10-29: local commits `593ac7af` and
+`3305507a` add shared typed configuration, image and application-layout contracts,
+checked process completion and Docker connection ownership. Explicit stop/drain
+operations retain their observed outcomes, requested SIGINT reaches the child,
+and completed output is released. Private TLS snapshots and recorded daemon
+identity preserve the selected connection across context changes. Combined host
+verification passes 108 tests and 419 assertions. Full tooling PHPStan reports no
+errors, and formatting passes across all 304 tooling PHP files.
+
+Five-persona phase simplification completed with two quality extractions, one
+bounded-diagnostic allocation fix and two redundant comments removed; all proof
+tests remain unchanged. A reproduced exit 139 occurred when a retained timeout
+exception kept SignalScope alive until late destruction. That failure is fixed;
+the subprocess regression covering shutdown-callback execution now exits 0.
+Implementation units U3–U11 and authoritative CI-image and live qualification
+remain open.
+
+Resource and controller checkpoint (U3, U5), 2026-10-29: local commits
+`a852c3d6` and `20819351` add durable resource ownership and complete controller
+publication. Cleanup uses its own execution budget, retains unresolved receipts
+and preserves the primary failure alongside cleanup diagnostics. Inventory runs
+through a package-owned entrypoint, uses saved layout evidence offline and accounts
+for special-file metadata without opening those files. U3 includes the prerequisite
+ApplicationImage contract from U4; the remaining build/layout work in U4 is active.
+
+Controller generations retain their lease through shutdown. Uncertain publication
+keeps the affected generation available for inspection and recovery. Root
+integration passes 108 tests and 404 assertions; the inventory CLI-close follow-up
+passes one test and four assertions. Full tooling PHPStan passes, and formatting
+checks 320 PHP files with zero fixes. U4, U6–U11, authoritative CI-image and live
+qualification, and final code review remain open.
+
+Build/layout checkpoint (U4), 2026-10-29: commit `fea50d77` delivers the shared
+build contract and CLI, which supply the required `APP_HOME` to
+the Dockerfile; environment-aware entrypoints replace their process and preserve
+PID 1 behavior. CI and Compose callers use that contract. The image-catalog helper
+preserves retained storage-image pins, and the default PostgreSQL image build
+continues to use tracked configuration.
+
+Host verification passes 29 tests and 147 assertions for build, topology and
+initialization; 31 tests and 157 assertions for lifecycle and ledger behavior;
+nine tests and 38 assertions for final CLI/status boundaries; and two Compose
+tests and 15 assertions. Two initialization-cleanup regressions fail before their
+fixes and pass in the 29-test group. U3/U5 simplification applies two quality
+changes and removes two redundant comments while retaining all proof tests.
+Full tooling static analysis passes; formatting checks 327 PHP files with zero
+fixes.
+
+The shared Docker client accepts Compose execution options without changing its
+completion policy. Its 12 existing tests pass with 49 assertions; the added
+expected-exit and timeout control passes with three assertions. Scoped static
+analysis and formatting pass.
+
+The default CI image builds successfully as `baander-ci-cohesive-tooling:local`
+with PHP 8.5.2 and Swoole. An alternate-layout worker image builds successfully
+at `/srv/baander` as `baander-worker-cohesive-alternate:local`. Real entrypoint
+probes verify PID 1 behavior and the absence of Xdebug and PHPUnit; ledger-owned
+resource cleanup succeeds. A direct build without `APP_HOME` fails and names
+the supported build command. U6–U11, final workflow gates, the authoritative
+CI-image suites on the current tree, live preview qualification and final code
+review remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced
