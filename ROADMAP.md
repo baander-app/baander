@@ -25,6 +25,14 @@ trees; they are not acceptance evidence for a new change.
 
 ## Configurable development libraries
 
+Delivered, 2026-10-29: the managed preview has one Movies library backed by the
+directory in the ignored local configuration. Its application path is
+`/media/movies`; the app, execution worker and control worker all mount it read-only.
+Path validation reports an existing, readable directory. Repeated startup preserved
+the same library ID, and the browser administration page shows "Last scan: Never".
+No scan or data reset ran. The preview is ready on code commit `ba575053`;
+configuration, startup, privacy and runtime delivery are complete.
+
 Runtime integration correction, 2026-10-29: the preview exposed Messenger logs
 on stdout before the library command's JSON. Six development and production
 Monolog stream paths now use stderr, preserving their handler names and logging
@@ -41,7 +49,7 @@ skips). After review fixes, 71 affected tests and 291 assertions passed, PHPStan
 reported no errors, and all 280 tooling PHP files passed formatting. The seven-lens
 code review found one argument-parsing bug; an option separator and Symfony parsing
 regression fix it. A mixed-catalog test also covers validation before creation.
-The real preview setup remains the final delivery checkpoint.
+The runtime delivery checkpoint above completes acceptance.
 
 Startup checkpoint, 2026-10-29 (U2): after runtime readiness, startup lists
 libraries and creates missing configured records. Matching records remain intact;
