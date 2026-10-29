@@ -6,6 +6,7 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Build\Builder;
 use Baander\Tooling\Development\Database;
+use Baander\Tooling\Development\Libraries;
 use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
@@ -115,6 +116,68 @@ final class DevelopmentActivationTest extends TestCase
     protected function tearDown(): void
     {
         new Runner()->run(['rm', '-rf', '--', $this->root]);
+    }
+
+    public function testExistingDatabaseStartupReconcilesPersistedLibrariesWithoutInitialization(): void
+    {
+        $this->instance['libraries'] = [[
+            'slug' => 'music', 'name' => 'Music', 'type' => 'music',
+            'source' => '/host/music', 'target' => '/media/music',
+        ]];
+        $this->store->save('persistent', $this->instance);
+        $database = $this->createMock(Database::class);
+        $database->method('inspect')->willReturn(['fresh' => false, 'pending' => []]);
+        $database->expects(self::never())->method('migrate');
+        $this->updater->database = $database;
+        $runner = $this->createMock(Runner::class);
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (array $arguments): ProcessResult {
+            if (in_array('app:library:list', $arguments, true)) {
+                return new ProcessResult(0, null, false, false, '[]', '', 0);
+            }
+            self::assertSame([
+                'app:library:create', 'Music', '/media/music', 'music', '--slug', 'music', '--json',
+            ], array_slice($arguments, -7));
+            return new ProcessResult(0, null, false, false, '{}', '', 0);
+        });
+        $this->updater->libraries = new Libraries($runner);
+        $this->updater->update('persistent');
+        $saved = $this->store->load('persistent');
+        self::assertSame('ready', $saved['phase']);
+        self::assertSame('new', $saved['running_revision']);
+        self::assertTrue($saved['readiness']['web_ready']);
+        self::assertEquals($this->instance['libraries'], $saved['libraries']);
+    }
+
+    public function testLibraryFailureAfterRuntimeReadinessNeverSavesReady(): void
+    {
+        $this->instance['libraries'] = [[
+            'slug' => 'music', 'name' => 'Music', 'type' => 'music',
+            'source' => '/host/music', 'target' => '/media/music',
+        ]];
+        $runtimeReady = false;
+        $runtime = $this->createStub(Runtime::class);
+        $runtime->method('ready')->willReturnCallback(static function () use (&$runtimeReady): array {
+            $runtimeReady = true;
+            return ['web_ready' => true];
+        });
+        $this->updater->runtime = $runtime;
+        $runner = $this->createMock(Runner::class);
+        $runner->expects(self::once())->method('run')->willReturnCallback(static function (array $arguments) use (&$runtimeReady): ProcessResult {
+            self::assertTrue($runtimeReady);
+            self::assertContains('app:library:list', $arguments);
+            throw new WorkflowError('library catalog unavailable');
+        });
+        $this->updater->libraries = new Libraries($runner);
+        try {
+            $this->updater->startRelease($this->instance, $this->new);
+            self::fail('Expected library reconciliation failure');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('list', $error->getMessage());
+            $saved = $this->store->load('persistent');
+            self::assertSame('activating', $saved['phase']);
+            self::assertNull($saved['readiness']);
+            self::assertSame('old', $saved['running_revision']);
+        }
     }
 
     public function testIncompatiblePreflightPreservesPriorRuntimeAndStorageImages(): void

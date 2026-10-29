@@ -25,6 +25,13 @@ trees; they are not acceptance evidence for a new change.
 
 ## Configurable development libraries
 
+Startup checkpoint, 2026-10-29 (U2): after runtime readiness, startup lists
+libraries and creates missing configured records. Matching records remain intact;
+conflicts and command failures prevent readiness from being saved. Scanning stays
+manual. Reconciliation, activation and update checks passed in the CI image:
+28 tests and 121 assertions. The four changed PHP files passed the formatter;
+targeted PHPStan found no errors.
+
 Configuration checkpoint, 2026-10-29 (U1): local definitions now produce saved
 library settings and read-only media mounts. Worktree files override the primary
 checkout; invalid definitions fail before state creation. Mount changes require a

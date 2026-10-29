@@ -16,6 +16,7 @@ class Updater
     public Database $database;
     public Bootstrap $bootstrap;
     public Workers $workers;
+    public Libraries $libraries;
 
     public function __construct(private readonly StateStore $store, private readonly Runner $runner)
     {
@@ -25,6 +26,7 @@ class Updater
         $this->database = new Database($store, $runner);
         $this->bootstrap = new Bootstrap($store, $runner);
         $this->workers = new Workers($store, $runner);
+        $this->libraries = new Libraries($runner);
     }
 
     /** @param array<string,mixed> $instance */
@@ -317,7 +319,7 @@ class Updater
      */
     public function startRelease(array &$instance, array $release): void
     {
-        $this->save($instance, ['phase' => 'activating', 'writers_stopped' => false]);
+        $this->save($instance, ['phase' => 'activating', 'writers_stopped' => false, 'readiness' => null]);
         $this->runtime->dependencies($instance);
         $this->runtime->up($instance, $release);
         $this->workers->prepare($instance, $release);
@@ -337,6 +339,7 @@ class Updater
                 usleep(2_000_000);
             }
         }
+        $this->libraries->ensure($instance);
         $this->save($instance, [
             'phase' => 'ready',
             'release' => $release,
