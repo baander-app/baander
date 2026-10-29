@@ -30,7 +30,8 @@ defines complete Python removal from repository-owned testing and development
 workflows, using PHP for workflow logic and Bash for short launchers and shell
 operations. Hosts require PHP 8.5+ with Swoole. Shipped backup and operator
 implementations and third-party toolchain internals remain outside scope.
-Implementation planning and document review are complete; implementation remains open.
+All eight workflow ports are implemented. The checkpoints below record verified
+behavior and remaining runtime qualification limits.
 
 Requirements checkpoint, 2026-10-27: all four Ready for Planning checks passed
 for 13 requirements and six acceptance examples. Independent source verification
@@ -337,6 +338,33 @@ removed, without mounts or network access. The probe preserves the container
 inventory. Independent review's stale executable-mode expectation is corrected;
 no source findings remain. The lifecycle continuation stays held before its
 preview loop until the repaired source is committed to its disposable remote.
+
+Lifecycle acceptance, 2026-10-29: the reviewed continuation passes all six
+remaining behavior and media checkpoints, then completes scoped cleanup. Two
+simultaneous previews retain isolated scans, accounts, resources and stop/resume
+state. Queued ingestion, original and transcoded playback, trusted HTTPS browser
+login and playback, and preview HMR pass. Shutdown during preparation cancels
+activation; the timer preserves stopped intent through its full observation
+window, and explicit startup retains identity and media. Shutdown also waits for
+a live migration; the deliberate partial commit blocks readiness, preserves a
+verified checkpoint and refuses unsafe recovery.
+
+This evidence combines four earlier passed checkpoints with one held and resumed
+continuation; it is not an uninterrupted full run. Media hashes are compared from
+the continuation's captured baseline. Cleanup preserves unrelated inventories and
+the earlier failed preview's retained network, volumes and evidence. The original
+failure remains recorded. CPU acknowledgement timing, autoscaling media deadlines
+and the HLS-only observer remain the runtime qualification limits described above;
+their assertions and application behavior have not been weakened.
+
+Final preview verification, 2026-10-29: the managed worktree runs the final code
+revision through normal startup, with web and both worker roles ready. Its explicit
+preview URL passes trusted HTTPS, login, music navigation, Vite assets and HMR
+without browser errors. The final before/after comparison shows unchanged host
+files, CA and TLS material, and retained blocked-preview state; the user's
+persistent instance is untouched.
+The final review reconciliation has no unresolved source findings. Code and
+verification records are committed locally; nothing has been pushed.
 
 ## Fixed product name
 
