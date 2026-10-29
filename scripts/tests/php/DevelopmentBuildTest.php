@@ -68,6 +68,33 @@ final class DevelopmentBuildTest extends TestCase
         self::assertNotSame($first, Source::snapshotWorktree($this->runner, $this->repo, null));
     }
 
+    public function testSnapshotChildDirectoriesRemainReadableUnderARestrictiveUmask(): void
+    {
+        mkdir($this->repo . '/packages/bundle/src', 0750, true);
+        foreach (['packages', 'packages/bundle', 'packages/bundle/src'] as $directory) {
+            chmod($this->repo . '/' . $directory, 0750);
+        }
+        file_put_contents($this->repo . '/packages/bundle/src/functions.php', '<?php');
+        chmod($this->repo . '/packages/bundle/src/functions.php', 0640);
+        $snapshot = $this->root . '/snapshot';
+        $previousUmask = umask(0077);
+        try {
+            $digest = Source::snapshotWorktree($this->runner, $this->repo, $snapshot);
+            self::assertSame(0077, umask());
+        } finally {
+            umask($previousUmask);
+        }
+
+        self::assertSame(0700, fileperms($snapshot) & 0777);
+        foreach (['packages', 'packages/bundle', 'packages/bundle/src'] as $directory) {
+            self::assertSame(0755, fileperms($snapshot . '/' . $directory) & 0777);
+            self::assertSame(0750, fileperms($this->repo . '/' . $directory) & 0777);
+        }
+        self::assertSame(0640, fileperms($snapshot . '/packages/bundle/src/functions.php') & 0777);
+        self::assertSame(0640, fileperms($this->repo . '/packages/bundle/src/functions.php') & 0777);
+        self::assertSame($digest, Source::snapshotWorktree($this->runner, $this->repo, null));
+    }
+
     public function testExternalSymlinkIsRejected(): void
     {
         symlink($this->root, $this->repo . '/src/escape');

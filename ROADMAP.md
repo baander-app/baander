@@ -272,6 +272,19 @@ the complete owned container list; all eight tests and 38 assertions pass, with
 focused PHPStan, formatting and independent review clean. Final tooling suites
 and the actual worktree preview/browser check remain pending.
 
+Snapshot permission repair, 2026-10-29: the normal preview attempt exposes source
+directories copied with mode `0700`. Docker assigns them to `www-data`; the worker
+validator runs as root without capabilities and cannot traverse Composer's package
+paths. An exact container probe confirms permission denial during autoloading,
+before the reported storage validation. Newly created snapshot child directories
+now use `0755`, even under a restrictive umask; the outer snapshot remains private,
+and source files, existing directory modes and caller umask remain unchanged.
+The regression fails before the repair; all 12 source-build tests and 52 assertions
+pass afterward. Full tooling PHPStan and formatting across 276 files pass; four
+simplification lenses and independent code review have no findings. The failed preview and its data remain
+preserved: recovery reuses its defective pinned image. Container and browser
+verification of the fixed code will use a fresh isolated worktree.
+
 ## Fixed product name
 
 The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)

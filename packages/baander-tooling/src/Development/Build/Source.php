@@ -59,8 +59,8 @@ final class Source
                 throw new WorkflowError('The prose audit helper must be a regular worktree file without symlink components.');
             }
             $target = $destination === null ? null : $destination . '/' . $name;
-            if ($target !== null && !is_dir(dirname($target)) && !mkdir(dirname($target), 0700, true)) {
-                throw new WorkflowError('Cannot create source snapshot directory.');
+            if ($target !== null) {
+                $target |> dirname(...) |> self::createSnapshotDirectory(...);
             }
             if (is_link($original)) {
                 $resolved = self::resolveLinks($original);
@@ -100,6 +100,17 @@ final class Source
             hash_update($digest, $name . "\0" . ($mode['mode'] & 0777) . "\0" . $content . "\0");
         }
         return hash_final($digest);
+    }
+
+    private static function createSnapshotDirectory(string $directory): void
+    {
+        if (is_dir($directory)) {
+            return;
+        }
+        $directory |> dirname(...) |> self::createSnapshotDirectory(...);
+        if (!mkdir($directory, 0755) || !chmod($directory, 0755)) {
+            throw new WorkflowError('Cannot create source snapshot directory.');
+        }
     }
 
     private static function resolveLinks(string $path): string
