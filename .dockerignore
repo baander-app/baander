@@ -20,6 +20,7 @@
 config/secrets/
 docker/dev/*.key
 auth.json
+dev.local.json
 docs
 node_modules
 **/node_modules

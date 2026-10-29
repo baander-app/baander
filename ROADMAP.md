@@ -25,6 +25,17 @@ trees; they are not acceptance evidence for a new change.
 
 ## Configurable development libraries
 
+Implementation checkpoint, 2026-10-29 (U3): local configuration is excluded from
+Git, Docker contexts and preview snapshots, including accidentally tracked files.
+The tracked example and development guide describe precedence and manual scanning.
+The Docker context probe excluded 35 host artifacts and retained 25 source markers.
+The CI image passed the full tooling run (676 tests, 2,924 assertions, seven existing
+skips). After review fixes, 71 affected tests and 291 assertions passed, PHPStan
+reported no errors, and all 280 tooling PHP files passed formatting. The seven-lens
+code review found one argument-parsing bug; an option separator and Symfony parsing
+regression fix it. A mixed-catalog test also covers validation before creation.
+The real preview setup remains the final delivery checkpoint.
+
 Startup checkpoint, 2026-10-29 (U2): after runtime readiness, startup lists
 libraries and creates missing configured records. Matching records remain intact;
 conflicts and command failures prevent readiness from being saved. Scanning stays

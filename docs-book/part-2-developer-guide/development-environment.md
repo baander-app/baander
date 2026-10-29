@@ -130,6 +130,58 @@ separate disposable backend coordinator and frontend suites.
 
 ## Media mounts
 
+To create libraries automatically during startup, copy `dev.local.example.json`
+to `dev.local.json` in the checkout root and set each host directory:
+
+```json
+{
+    "libraries": [
+        {
+            "slug": "movies",
+            "name": "Movies",
+            "type": "movie",
+            "path": "/absolute/path/to/movies"
+        }
+    ]
+}
+```
+
+Each entry requires a unique slug, a nonempty name, a supported type and an
+absolute path to an existing readable directory. Types are `music`, `podcast`,
+`audiobook`, `movie` and `tv_show`. Slugs use lowercase letters, digits and hyphens
+between words; surrounding whitespace and uppercase letters are normalized.
+Unknown fields and invalid definitions fail before instance state is created.
+
+The controller reads the current worktree's file first. A linked worktree without
+that file uses the primary checkout's file from the same Git repository. Files
+are not merged. With a separate Git directory, fallback requires `core.worktree`
+to identify the primary checkout; otherwise put the file in the linked worktree.
+Git ignores the local file, and Docker builds and preview source snapshots exclude
+it even if accidentally tracked. The example remains versioned. Preview web
+containers can still see the local file through their live checkout bind.
+
+Startup mounts each directory read-only at `/media/<slug>`, waits for application
+readiness, then creates any missing library. An existing library with the same
+slug must match the configured name, type, container path and local filesystem.
+A conflict or failed command stops activation with an error. Startup never scans
+the directory; start a scan from the library administration page when wanted.
+
+Stop an existing preview before adding, removing or changing mounted paths:
+
+```bash
+make preview-down
+# Edit dev.local.json.
+make preview-up
+```
+
+Changing the host path keeps the library's container path and existing catalog.
+Removing a definition removes its configured mount but does not delete the
+application library or its catalog. An empty `libraries` array removes all
+configured library mounts and provisioning while retaining unrelated manual
+mounts. A missing file or omitted `libraries` field preserves saved settings;
+new previews can inherit saved settings from this repository's persistent instance.
+Saved definitions also let the persistent updater run without the local file.
+
 Add a host media directory when starting the persistent instance:
 
 ```bash
@@ -139,6 +191,8 @@ make dev-up MEDIA=/absolute/path/to/media=/media/library
 
 The optional target preserves a path expected by an existing library. New previews
 inherit persistent media mount declarations and mount source media read-only.
+An explicit `MEDIA` mapping to a configured library target overrides its host
+source for that invocation and saves the effective source with the instance.
 Their generated conversions and other writable state remain separate. Stop an
 instance before changing its mount declarations. Directory visibility and SELinux
 permissions must work on the selected Docker daemon. Media directories must not

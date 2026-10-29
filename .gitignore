@@ -66,6 +66,7 @@ Thumbs.db
 ###< phpunit/phpunit ###
 
 auth.json
+/dev.local.json
 
 ###> phpstan/phpstan ###
 phpstan.neon

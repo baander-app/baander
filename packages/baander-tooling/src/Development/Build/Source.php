@@ -46,7 +46,7 @@ final class Source
             }
             if ($name === '' || str_starts_with($name, '/') || in_array('..', explode('/', $name), true)
                 || ($name !== self::PROSE_AUDIT && $excluded !== [])
-                || str_starts_with($name, 'config/secrets/') || $name === 'auth.json'
+                || str_starts_with($name, 'config/secrets/') || in_array($name, ['auth.json', 'dev.local.json'], true)
                 || (str_starts_with($base, '.env') && str_contains($base, '.local'))
                 || (str_starts_with($name, 'docker/dev/') && str_ends_with($name, '.key'))) {
                 continue;

@@ -68,6 +68,19 @@ final class DevelopmentBuildTest extends TestCase
         self::assertNotSame($first, Source::snapshotWorktree($this->runner, $this->repo, null));
     }
 
+    public function testSnapshotExcludesTrackedLocalConfigurationWithoutChangingItsDigest(): void
+    {
+        file_put_contents($this->repo . '/dev.local.json', '{"libraries":[]}');
+        file_put_contents($this->repo . '/dev.local.example.json', '{"libraries":[]}');
+        $this->git(['add', 'dev.local.json', 'dev.local.example.json']);
+        $snapshot = $this->root . '/snapshot';
+        $digest = Source::snapshotWorktree($this->runner, $this->repo, $snapshot);
+        self::assertFileDoesNotExist($snapshot . '/dev.local.json');
+        self::assertSame('{"libraries":[]}', file_get_contents($snapshot . '/dev.local.example.json'));
+        file_put_contents($this->repo . '/dev.local.json', 'changed private host paths');
+        self::assertSame($digest, Source::snapshotWorktree($this->runner, $this->repo, null));
+    }
+
     public function testSnapshotSourcesRemainReadableUnderARestrictiveUmask(): void
     {
         mkdir($this->repo . '/packages/bundle/src', 0750, true);

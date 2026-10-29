@@ -1,0 +1,10 @@
+{
+    "libraries": [
+        {
+            "slug": "movies",
+            "name": "Movies",
+            "type": "movie",
+            "path": "/absolute/path/to/movies"
+        }
+    ]
+}
