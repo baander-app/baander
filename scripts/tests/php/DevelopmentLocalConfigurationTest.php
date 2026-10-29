@@ -37,6 +37,25 @@ final class DevelopmentLocalConfigurationTest extends TestCase
         $remove($this->directory);
     }
 
+    public function testToolingSettingsShareDiscoveryWithoutValidatingLibraryDirectories(): void
+    {
+        $root = $this->directory . '/checkout';
+        file_put_contents($root . '/dev.local.json', '{"libraries":[{"path":"/missing/baander.app"}],"tooling":{"budgets":{"backend":90}}}');
+        $configuration = LocalConfiguration::load(new Runner(), $root);
+        self::assertSame(90, $configuration['tooling']['budgets']['backend']);
+        $this->expectException(WorkflowError::class);
+        LocalConfiguration::libraries(new Runner(), $root);
+    }
+
+    public function testLibrariesAllowValidatedToolingAndRejectUnknownToolingKeys(): void
+    {
+        $root = $this->directory . '/checkout';
+        file_put_contents($root . '/dev.local.json', '{"libraries":[],"tooling":{"budgets":{"cleanup":90}}}');
+        self::assertSame([], LocalConfiguration::libraries(new Runner(), $root));
+        file_put_contents($root . '/dev.local.json', '{"tooling":{"applicationRoot":"/opt/app"}}');
+        $this->expectException(WorkflowError::class);
+        LocalConfiguration::load(new Runner(), $root);
+    }
     private function configuration(string $root, string $name = 'Movies'): void
     {
         file_put_contents($root . '/dev.local.json', json_encode(['libraries' => [['slug' => 'movies', 'name' => $name, 'type' => 'movie', 'path' => $this->directory . '/checkout']]], JSON_THROW_ON_ERROR));
@@ -114,7 +133,7 @@ final class DevelopmentLocalConfigurationTest extends TestCase
     public function testMalformedAndInvalidConfigurationIsRejected(): void
     {
         $valid = ['slug' => 'movies', 'name' => 'Movies', 'type' => 'movie', 'path' => $this->directory . '/checkout'];
-        $cases = ['{broken', '[]', '{"unknown":[]}', '{"libraries":{}}', '{"libraries":[[]]}'];
+        $cases = ['{broken', '[]', '{"unknown":[]}', '{"libraries":{}}', '{"libraries":[[]]}', '{"tooling":[]}', '{"tooling":{"budgets":[]}}', '{"tooling":{"budgets":{"backend":"90"}}}'];
         foreach ([['extra' => 'bad'], ['slug' => 'bad_slug'], ['name' => ' '], ['type' => 'movies'], ['path' => 'relative'], ['path' => '/nonexistent/baander.app'], ['type' => 1]] as $change) {
             $cases[] = json_encode(['libraries' => [array_replace($valid, $change)]], JSON_THROW_ON_ERROR);
         }

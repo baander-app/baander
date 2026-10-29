@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Configuration\LocalFile;
+
 final class LocalConfiguration
 {
-    /**
-     * @return list<array{slug:string,name:string,type:string,source:string,target:string}>|null
-     * @phpstan-impure
-     */
-    public static function libraries(Runner $runner, string $root): ?array
+    /** @phpstan-impure */
+    public static function discover(Runner $runner, string $root): ?string
     {
         $path = $root . '/dev.local.json';
         if (!file_exists($path)) {
@@ -45,30 +44,41 @@ final class LocalConfiguration
                 return null;
             }
         }
-        $content = @file_get_contents($path);
-        if ($content === false) {
-            throw new WorkflowError('Cannot read development configuration: ' . $path);
+        return $path;
+    }
+
+    /**
+     * Read the chosen file without checking library source directories.
+     *
+     * @return array<string,mixed>
+     * @phpstan-impure
+     */
+    public static function load(Runner $runner, string $root): array
+    {
+        $path = self::discover($runner, $root);
+        if ($path === null) {
+            return [];
         }
         try {
-            $configuration = json_decode($content, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $error) {
-            throw new WorkflowError('Invalid JSON in ' . $path, previous: $error);
+            return LocalFile::read($path);
+        } catch (\InvalidArgumentException $error) {
+            throw new WorkflowError($error->getMessage(), previous: $error);
         }
-        if (
-            !$configuration instanceof \stdClass
-            || array_diff($configuration |> get_object_vars(...) |> array_keys(...), ['libraries']) !== []
-        ) {
-            throw new WorkflowError('dev.local.json must be an object containing only libraries.');
-        }
-        if (!property_exists($configuration, 'libraries')) {
+    }
+
+    /**
+     * @return list<array{slug:string,name:string,type:string,source:string,target:string}>|null
+     * @phpstan-impure
+     */
+    public static function libraries(Runner $runner, string $root): ?array
+    {
+        $configuration = self::load($runner, $root);
+        if (!array_key_exists('libraries', $configuration)) {
             return null;
-        }
-        if (!is_array($configuration->libraries)) {
-            throw new WorkflowError('dev.local.json libraries must be an array.');
         }
         $libraries = [];
         $slugs = [];
-        foreach ($configuration->libraries as $entry) {
+        foreach ($configuration['libraries'] as $entry) {
             if (
                 !$entry instanceof \stdClass
                 || array_diff($entry |> get_object_vars(...) |> array_keys(...), ['slug', 'name', 'type', 'path']) !== []

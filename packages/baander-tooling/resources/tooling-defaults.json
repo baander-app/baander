@@ -1,0 +1,76 @@
+{
+    "version": 1,
+    "images": {
+        "application": {
+            "reference": "martinjuul/baander-app:latest",
+            "capabilities": [
+                "application"
+            ]
+        },
+        "postgres": {
+            "reference": "baander-database:latest",
+            "capabilities": [
+                "postgres"
+            ]
+        },
+        "developmentRedis": {
+            "reference": "redis:7-alpine",
+            "capabilities": [
+                "redis"
+            ]
+        },
+        "fixtureRedis": {
+            "reference": "redis/redis-stack-server:edge",
+            "capabilities": [
+                "redis",
+                "redis-search"
+            ]
+        },
+        "nginx": {
+            "reference": "nginx:stable-alpine",
+            "capabilities": [
+                "http"
+            ]
+        },
+        "proxy": {
+            "reference": "baander-websocket-proxy-test:local",
+            "capabilities": [
+                "websocket-proxy"
+            ]
+        },
+        "browser": {
+            "reference": "mcr.microsoft.com/playwright:v1.60.0-noble",
+            "capabilities": [
+                "browser"
+            ],
+            "playwrightVersion": "1.60.0"
+        },
+        "operatorHelper": {
+            "reference": "docker:29.7.2-cli",
+            "capabilities": [
+                "docker-cli"
+            ]
+        }
+    },
+    "docker": {
+        "executable": "docker",
+        "host": null,
+        "context": null
+    },
+    "budgets": {
+        "process": 120,
+        "cleanup": 120,
+        "backend": 3600,
+        "messaging": 600,
+        "http": 180,
+        "fixture": 600,
+        "workerLifecycle": 1300,
+        "workerOperator": 240,
+        "workerCapacity": 600,
+        "webShutdown": 900,
+        "browser": 400,
+        "registryQualification": 1800,
+        "registryStatic": 1800,
+        "registryFuzz": 120
+    }
+}

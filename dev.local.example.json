@@ -6,5 +6,18 @@
             "type": "movie",
             "path": "/absolute/path/to/movies"
         }
-    ]
+    ],
+    "tooling": {
+        "images": {
+            "developmentRedis": {
+                "reference": "redis:7-alpine"
+            }
+        },
+        "docker": {
+            "executable": "docker"
+        },
+        "budgets": {
+            "cleanup": 120
+        }
+    }
 }
