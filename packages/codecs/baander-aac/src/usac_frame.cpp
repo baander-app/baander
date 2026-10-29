@@ -184,17 +184,13 @@ AacDecoderChannel* output_channels(AacDecoderState* s, const AacUsacElement* e) 
  *
  * With stereoConfigIndex 1 and 2 the SBR reconstructs the downmix, MPS
  * 212 splits it into left and right (adding the residual with 2), and
- * both are synthesised (7.11.2.3).  With stereoConfigIndex 3 the
- * standard runs MPS 212 on the core-band QMF of the downmix and the
- * residual first, and the two-channel UsacSbrData then reconstructs the
- * high band of each output.  The SBR interface reconstructs the high
- * band while it analyses (aac_sbr_usac_apply_to_qmf), so this walker
- * issues the same call sequence for 3 as for 1 and 2 and marks the
- * element (mps_before_sbr); the SBR module can honour the order by
- * leaving only the analysed low band in apply_to_qmf for a two-channel
- * state and reconstructing each channel's high band in
- * aac_sbr_usac_synthesize.  The oracle comparison decides once the
- * modules exist; the switch is this flag. */
+ * both are synthesised (7.11.2.3).  With stereoConfigIndex 3
+ * (mps_before_sbr) MPS 212 runs on the core-band QMF of the downmix and
+ * the residual, and the two-channel UsacSbrData then reconstructs the
+ * high band of each output from its own low band.  The MPS output lags
+ * the downmix by the hybrid delay, which is the delay the standard's
+ * decoder adds before the high-band generation, so the SBR takes it at
+ * the same slot positions as its own analysis. */
 void render_element(AacDecoderState* s, AacUsacState* u, AacUsacElement* e) {
   const AacUsacConfig* c = &u->cfg;
   AacDecoderChannel* chans = output_channels(s, e);
@@ -212,6 +208,15 @@ void render_element(AacDecoderState* s, AacUsacState* u, AacUsacElement* e) {
   AacUsacQmfFrame* dmx = &u->qmf[0];
   AacUsacQmfFrame* left = &u->qmf[1];
   AacUsacQmfFrame* right = &u->qmf[2];
+  if (e->mps_before_sbr) {
+    aac_sbr_usac_analyze_core(e->sbr, u->core[0], dmx);
+    aac_mps212_apply(e->mps, dmx, residual, left, right);
+    aac_sbr_usac_apply_low_to_qmf(e->sbr, 0, left, dmx);
+    aac_sbr_usac_synthesize(e->sbr, 0, dmx, chans[0].output);
+    aac_sbr_usac_apply_low_to_qmf(e->sbr, 1, right, dmx);
+    aac_sbr_usac_synthesize(e->sbr, 1, dmx, chans[1].output);
+    return;
+  }
   aac_sbr_usac_apply_to_qmf(e->sbr, 0, u->core[0], dmx);
   aac_mps212_apply(e->mps, dmx, residual, left, right);
   aac_sbr_usac_synthesize(e->sbr, 0, left, chans[0].output);

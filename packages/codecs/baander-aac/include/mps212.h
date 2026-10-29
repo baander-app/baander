@@ -42,17 +42,22 @@ int aac_mps212_read(AacMps212State* s, AacBitReader* r, int indep);
  * runs it through its own QMF analysis.  `left` may alias `dmx`.  The
  * output lags the downmix by six slots in every band: the hybrid
  * filtering of the three lowest bands and the delay that keeps the
- * others in step with them. */
+ * others in step with them.  The parameter grid of the frame sits on the
+ * SBR output timing: on the input slots with stereoConfigIndex 1 and 2
+ * (the SBR output), on the output slots with 3 (the input is the plain
+ * analysis, six slots ahead of it). */
 void aac_mps212_apply(AacMps212State* s, const AacUsacQmfFrame* dmx, const float* residual,
                       AacUsacQmfFrame* left, AacUsacQmfFrame* right);
 
 /* Supplies the parameters of a lost frame (the previous ones held). */
 void aac_mps212_conceal(AacMps212State* s);
 
-/* Delays the residual by `slots` QMF slots against the downmix.  The
- * default is the three envelope time slots (times the QMF slots per time
- * slot) by which the SBR module hands the downmix later than the plain
- * analysis of the core frame; a harmonic transposer adds its own delay. */
+/* Delays the residual by `slots` QMF slots against the downmix.  With
+ * stereoConfigIndex 1 and 2 the default is the three envelope time slots
+ * (times the QMF slots per time slot) by which the SBR module hands the
+ * downmix later than the plain analysis of the core frame, and a
+ * harmonic transposer adds its own delay; with 3 the downmix arrives at
+ * the analysis timing and the default is zero. */
 void aac_mps212_set_residual_delay(AacMps212State* s, int slots);
 
 /* ── tables (src/mps212_tables.cpp) ─────────────────────────────── */
