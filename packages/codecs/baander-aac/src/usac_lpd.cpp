@@ -1,483 +1,647 @@
-/* The linear prediction domain core of USAC (ISO/IEC 23003-3 6.2.7,
- * 7.11 to 7.17): lpd_channel_stream() with its mode field, the frame
- * synthesis over the four subframes with the ACELP and TCX decoders, the
- * forward aliasing cancellation and the zero input response at every
- * mode boundary, the bass postfilter, and the core channel contract of
- * usac.h (the overlap buffer toward the next frame, the FAC an FD frame
- * carries after an LPD frame, concealment).
- *
- * Time layout, in the coordinates of the output frame [0, N): the LPD
- * superframe owns [N/2, 3N/2) with the subframe boundaries
- * B_k = N/2 + k N/4.  Transform outputs (TCX, FD) extend half a slope
- * beyond their segment on each side and overlap-add; an ACELP segment is
- * exact inside its boundaries.  At a boundary between ACELP and a
- * transform segment the FAC adds 2 lfac samples centred on the boundary
- * and, after ACELP, the windowed zero input response of the synthesis
- * filter.  The output frame is final once the frame is decoded, because
- * the next frame reaches at most 3N/2 - N/8 back; [N, 2N) goes to the
- * overlap buffer. */
+/* The USAC linear prediction domain core (ISO/IEC 23003-3 6.2.7, 7.11,
+ * 7.12, 7.17): lpd_channel_stream() with its mode field, the frame
+ * synthesis over the four subframes with the LPC sets interpolated
+ * between them, the transitions from and to the frequency domain core,
+ * the bass postfilter, and the core channel contract. */
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "usac_lpd_internal.h"
 
-/* ── mode field (Table 6.2.7.1) ─────────────────────────────────── */
+#ifdef LPD_TRACE
+#include <cstdio>
+extern int lpd_trace_frame;
+#define LPD_T(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define LPD_T(...) ((void)0)
+#endif
 
-/* lpd_mode (5 bits) to the coding mode of the four subframes: 0 ACELP,
- * 1 TCX20, 2 TCX40 (two subframes), 3 TCX80 (the superframe). */
-int lpd_modes(int lpd_mode, int* mod) {
-  if (lpd_mode < 16) {
-    for (int k = 0; k < 4; k++) {
-      mod[k] = (lpd_mode >> k) & 1;
-    }
-  } else if (lpd_mode < 20) {
-    mod[0] = mod[1] = 2;
-    mod[2] = lpd_mode & 1;
-    mod[3] = (lpd_mode >> 1) & 1;
-  } else if (lpd_mode < 24) {
-    mod[0] = lpd_mode & 1;
-    mod[1] = (lpd_mode >> 1) & 1;
-    mod[2] = mod[3] = 2;
-  } else if (lpd_mode == 24) {
-    mod[0] = mod[1] = mod[2] = mod[3] = 2;
-  } else if (lpd_mode == 25) {
-    mod[0] = mod[1] = mod[2] = mod[3] = 3;
-  } else {
-    return AAC_ERR_DECODE;
+namespace {
+
+/* The LPD synthesis runs at the scale of the FD core's transform output
+ * (the scale the TCX and ACELP gains are defined at, 32768 at full
+ * scale); the core output and ch->overlap exchange it unscaled, the
+ * delivered frame is at full scale 1.0. */
+constexpr float kOutputScale = 1.0f / 32768.0f;
+constexpr float kInputScale = 32768.0f;
+
+float* syn0(AacUsacLpdChannel* c) { return c->syn + LPD_SYN_HIST; }
+float* exc0(AacUsacLpdChannel* c) { return c->exc + LPD_EXC_HIST; }
+
+/* The pitch range at the core rate: the offset of the sampling rate
+ * against 12.8 kHz scales the lag limits. */
+void pitch_range(AacUsacLpdChannel* c) {
+  const int i = (c->core_sr * 34 + 6400) / 12800 - 34;
+  c->pit_min = 34 + i;
+  c->pit_fr2 = 128 - i;
+  c->pit_fr1 = 160;
+  c->pit_max = 231 + 6 * i;
+  if (c->pit_max > LPD_PIT_MAX) {
+    c->pit_max = LPD_PIT_MAX;
   }
-  return AAC_OK;
 }
 
-/* ── channel ────────────────────────────────────────────────────── */
+}  // namespace
 
-AacUsacLpdChannel* aac_usac_lpd_channel_create(int frame_length, int core_sample_rate) {
+/* ── the channel ────────────────────────────────────────────────── */
+
+extern "C" AacUsacLpdChannel* aac_usac_lpd_channel_create(int frame_length, int core_sample_rate) {
   if ((frame_length != 1024 && frame_length != 768) || core_sample_rate <= 0) {
     return nullptr;
   }
-  lpd_tables_init();
-  auto* c = new AacUsacLpdChannel_();
+  AacUsacLpdChannel* c = (AacUsacLpdChannel*)calloc(1, sizeof(AacUsacLpdChannel));
+  if (!c) {
+    return nullptr;
+  }
   c->frame_length = frame_length;
   c->l_div = frame_length / 4;
-  c->nb_subfr = c->l_div / LPD_MAX_SUBFR;
-  c->lfac = c->l_div / 4;
-  c->lfac_fd = frame_length / 8;
+  c->nb_subfr = c->l_div / LPD_SUBFR;
+  c->lfac = c->l_div / 2;
+  c->nb_slots = frame_length / LPD_SUBFR;
+  c->synth_delay = (c->nb_slots / 2 - 1) * LPD_SUBFR;
   c->core_sr = core_sample_rate;
-  /* pitch range (7.14.2): the 12.8 kHz range of 34 .. 231 samples scaled
-   * to the core rate, keeping the 9 bit index space */
-  const int fscale = (core_sample_rate * 512) / 12800;
-  c->pit_min = (34 * fscale) / 512;
-  if (c->pit_min < LPD_INTERPOL + 1) {
-    c->pit_min = LPD_INTERPOL + 1;
-  }
-  const int delta = c->pit_min - 34;
-  c->pit_fr2 = 128 - delta;
-  c->pit_fr1 = 160 - delta;
-  c->pit_max = 231 + 6 * delta;
-  if (c->pit_max > LPD_PIT_MAX_MAX - 32) {
-    c->pit_max = LPD_PIT_MAX_MAX - 32;
-  }
-  for (int i = 0; i < 3; i++) {
-    aac_mdct_init(&c->mdct[i], 2 * (c->l_div << i));
+  pitch_range(c);
+  for (int m = 0; m < 3; m++) {
+    aac_mdct_init(&c->mdct[m], 2 * c->l_div << m);
   }
   aac_usac_lpd_channel_reset(c);
   return c;
 }
 
-void aac_usac_lpd_channel_destroy(AacUsacLpdChannel* c) { delete c; }
+extern "C" void aac_usac_lpd_channel_destroy(AacUsacLpdChannel* c) { free(c); }
 
-void aac_usac_lpd_channel_reset(AacUsacLpdChannel* c) {
-  c->have_lsf_prev = 0;
-  memcpy(c->lsf_prev, lpd_lsf_mean(), sizeof(c->lsf_prev));
-  memcpy(c->lsf_old, lpd_lsf_mean(), sizeof(c->lsf_old));
-  memset(c->a_prev, 0, sizeof(c->a_prev));
-  c->a_prev[0] = 1.0f;
+extern "C" void aac_usac_lpd_channel_reset(AacUsacLpdChannel* c) {
+  memset(c->syn, 0, sizeof(c->syn));
   memset(c->exc, 0, sizeof(c->exc));
-  memset(c->syn_mem, 0, sizeof(c->syn_mem));
-  c->tilt_code = 0.0f;
-  c->gain_code_prev = 0.0f;
-  c->t0_prev = c->pit_min;
-  c->gain_pit_prev = 0.0f;
-  c->last_mode = -1;
-  memset(c->bpf_T, 0, sizeof(c->bpf_T));
-  memset(c->bpf_gain, 0, sizeof(c->bpf_gain));
-  lpd_arith_reset(&c->arith);
-  c->noise_seed = 0x1234567u;
-  c->tcx_gain_last = 1.0f;
-  memset(c->x, 0, sizeof(c->x));
-  memset(c->hist, 0, sizeof(c->hist));
+  memset(c->ovl, 0, sizeof(c->ovl));
+  memset(c->a_prev, 0, sizeof(c->a_prev));
+  memset(c->alfd_gains, 0, sizeof(c->alfd_gains));
+  memset(c->bpf_noise, 0, sizeof(c->bpf_noise));
+  c->fac_gain = 0.0f;
+  c->gain_threshold = 0.0f;
+  c->bpf_active_prev = 0;
+  for (int i = 0; i < LPD_MAX_SLOTS / 2; i++) {
+    c->pitch_prev[i] = LPD_SUBFR;
+    c->gain_prev[i] = 0.0f;
+  }
+  /* the LSP memory starts at zero: the LSFs at the middle of the scale */
+  memset(c->lsp_prev, 0, sizeof(c->lsp_prev));
+  lpd_lsp_to_lsf(c->lsp_prev, c->lsf_prev);
+  c->mode_prev = -1;
+  aac_usac_arith_reset(&c->arith);
+  c->noise_seed = nullptr;
   c->conceal_gain = 1.0f;
   c->have_frame = 0;
 }
 
-/* ── syntax (Table 6.2.7.2) ─────────────────────────────────────── */
+/* ── the syntax ─────────────────────────────────────────────────── */
 
-static int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* f) {
-  memset(f, 0, sizeof(*f));
+int lpd_modes(int lpd_mode, int* mod) {
+  if (lpd_mode < 0 || lpd_mode > 25) {
+    return AAC_ERR_DECODE;
+  }
+  if (lpd_mode == 25) {
+    mod[0] = mod[1] = mod[2] = mod[3] = 3;
+  } else if (lpd_mode == 24) {
+    mod[0] = mod[1] = mod[2] = mod[3] = 2;
+  } else if (lpd_mode >= 20) {
+    mod[0] = lpd_mode & 1;
+    mod[1] = (lpd_mode >> 1) & 1;
+    mod[2] = mod[3] = 2;
+  } else if (lpd_mode >= 16) {
+    mod[0] = mod[1] = 2;
+    mod[2] = lpd_mode & 1;
+    mod[3] = (lpd_mode >> 1) & 1;
+  } else {
+    for (int k = 0; k < 4; k++) {
+      mod[k] = (lpd_mode >> k) & 1;
+    }
+  }
+  return AAC_OK;
+}
+
+namespace {
+
+int parse_frame(AacUsacLpdChannel* c, AacBitReader* r, int indep, LpdFrameData* f) {
+  int ret;
   f->acelp_core_mode = (int)aac_bitreader_read(r, 3);
   f->lpd_mode = (int)aac_bitreader_read(r, 5);
+  if ((ret = lpd_modes(f->lpd_mode, f->mod)) != AAC_OK) {
+    return ret;
+  }
   f->bpf_control_info = (int)aac_bitreader_read(r, 1);
   f->core_mode_last = (int)aac_bitreader_read(r, 1);
   f->fac_data_present = (int)aac_bitreader_read(r, 1);
-  if (lpd_modes(f->lpd_mode, f->mod)) {
-    return AAC_ERR_DECODE;
-  }
-  f->first_lpd_flag = f->core_mode_last == 0;
-  int last_lpd_mode = c->last_mode;
+  f->first_lpd_flag = !f->core_mode_last;
+  f->arith_reset = 0;
+  LPD_T("XLPD f=%d hdr acelp_core_mode=%d lpd_mode=%d mod=%d%d%d%d bpf=%d core_mode_last=%d fac_present=%d left=%d\n", lpd_trace_frame, f->acelp_core_mode, f->lpd_mode, f->mod[0], f->mod[1], f->mod[2], f->mod[3], f->bpf_control_info, f->core_mode_last, f->fac_data_present, aac_bitreader_bits_left(r));
+  memset(f->fac_present, 0, sizeof(f->fac_present));
+  int last = c->mode_prev;
   int first_tcx = 1;
   int k = 0;
   while (k < 4) {
-    int err;
-    if (k == 0) {
-      /* a FAC at the frame start toward an LPD neighbour */
-      if (f->core_mode_last == 1 && f->fac_data_present) {
-        err = lpd_read_fac(r, 0, c->lfac, &f->fac[0]);
-        if (err) {
-          return err;
-        }
-      }
-    } else if ((last_lpd_mode == 0 && f->mod[k] > 0) || (last_lpd_mode > 0 && f->mod[k] == 0)) {
-      err = lpd_read_fac(r, 0, c->lfac, &f->fac[k]);
-      if (err) {
-        return err;
+    /* a FAC at every ACELP/TCX boundary, which at the frame start the
+     * flag announces */
+    const int fac = k == 0 ? (f->core_mode_last && f->fac_data_present)
+                           : ((last == 0 && f->mod[k] > 0) || (last > 0 && f->mod[k] == 0));
+    if (fac) {
+      f->fac_present[k] = 1;
+      if ((ret = lpd_read_fac(r, c->lfac, f->fac[k])) != AAC_OK) {
+        return ret;
       }
     }
+    LPD_T("XLPD f=%d k=%d before_core left=%d\n", lpd_trace_frame, k, aac_bitreader_bits_left(r));
     if (f->mod[k] == 0) {
-      err = lpd_read_acelp(r, f->acelp_core_mode, c->nb_subfr, &f->acelp[k]);
-      if (err) {
-        return err;
+      if ((ret = lpd_read_acelp(r, f->acelp_core_mode, c->nb_subfr, &f->acelp[k])) != AAC_OK) {
+        return ret;
       }
-      last_lpd_mode = 0;
+      LPD_T("XLPD f=%d k=%d acelp mean_energy=%d left=%d\n", lpd_trace_frame, k, f->acelp[k].mean_energy, aac_bitreader_bits_left(r));
+      last = 0;
       k++;
     } else {
       const int lg = c->l_div << (f->mod[k] - 1);
-      err = lpd_read_tcx(r, lg, first_tcx, indep, &c->arith, &f->tcx[k]);
-      if (err) {
-        return err;
+      if ((ret = lpd_read_tcx(r, lg, first_tcx, indep, c, f, k)) != AAC_OK) {
+        return ret;
       }
-      last_lpd_mode = f->mod[k];
-      first_tcx = 0;
+#ifdef LPD_TRACE
+      LPD_T("XLPD f=%d k=%d tcx lg=%d noise_factor=%d global_gain=%d arith_reset=%d first=%d left=%d\n", lpd_trace_frame, k, lg, f->tcx[k].noise_factor, f->tcx[k].global_gain, f->arith_reset, first_tcx, aac_bitreader_bits_left(r));
+      LPD_T("XLPD f=%d k=%d tcxq", lpd_trace_frame, k);
+      for (int ii = 0; ii < lg; ii++) LPD_T(" %d", f->tcx[k].q[ii]);
+      LPD_T("\n");
+#endif
+      last = f->mod[k];
       k += 1 << (f->mod[k] - 1);
+      first_tcx = 0;
     }
   }
-  const int err = lpd_read_lpc_data(r, f);
-  if (err) {
-    return err;
+  if ((ret = lpd_read_lpc_data(r, f)) != AAC_OK) {
+    return ret;
   }
-  if (f->core_mode_last == 0 && f->fac_data_present) {
-    /* the FAC toward the previous FD frame, with its own gain */
-    const int e = lpd_read_fac(r, 1, c->lfac_fd, &f->fac_fd);
-    if (e) {
-      return e;
+  LPD_T("XLPD f=%d lpc_data left=%d\n", lpd_trace_frame, aac_bitreader_bits_left(r));
+  f->fd_fac_short = 0;
+  f->fd_fac_gain = 0;
+  if (!f->core_mode_last && f->fac_data_present) {
+    f->fd_fac_short = (int)aac_bitreader_read(r, 1);
+    const int length = f->fd_fac_short ? c->frame_length / 16 : c->frame_length / 8;
+    f->fd_fac_gain = (int)aac_bitreader_read(r, 7);
+    if ((ret = lpd_read_fac(r, length, f->fd_fac)) != AAC_OK) {
+      return ret;
     }
+    LPD_T("XLPD f=%d fdfac short=%d gain=%d left=%d\n", lpd_trace_frame, f->fd_fac_short, f->fd_fac_gain, aac_bitreader_bits_left(r));
   }
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
 
-/* ── synthesis ──────────────────────────────────────────────────── */
+/* ── the bass postfilter (7.17) ─────────────────────────────────── */
 
-/* Adds `n` samples of `src` at x[pos]. */
-static void add_at(float* x, int pos, const float* src, int n) {
-  for (int i = 0; i < n; i++) {
-    x[pos + i] += src[i];
+/* Filters `len` samples: s is the signal with the slots at multiples of
+ * 64 and the history before it, out[i] = s[i - 64] minus the low passed
+ * pitch enhancement, whose filter delay of one slot the noise memory
+ * carries across calls; `len2` bounds the look-ahead to the samples
+ * that exist beyond `len`. */
+void bass_postfilter(const float* s, const int* pitch, const float* pitch_gain, int len,
+                     int len2, float* noise_mem, float* out) {
+  memcpy(out, s - LPD_SUBFR, (size_t)len * sizeof(float));
+  float noise[LPD_BPF_DELAY + 2 * LPD_SUBFR];
+  float* cur = noise + LPD_BPF_DELAY + LPD_SUBFR;
+  for (int n = 0, sf = 0; n < len; n += LPD_SUBFR, sf++) {
+    int t = pitch[sf];
+    float gain = pitch_gain[sf];
+    if (gain > 1.0f) {
+      gain = 1.0f;
+    }
+    if (gain < 0.0f) {
+      gain = 0.0f;
+    }
+    /* the lag is halved when the signal correlates with its half */
+    {
+      const float* x = s + n - 96;
+      const float* y = s + n - t / 2 - 96;
+      float xx = 0.01f, xy = 0.01f, yy = 0.01f;
+      for (int i = 0; i < LPD_SUBFR + 96; i++) {
+        xx += x[i] * x[i];
+        xy += x[i] * y[i];
+        yy += y[i] * y[i];
+      }
+      if (xy / (float)sqrt(xx * yy) > 0.95f) {
+        t >>= 1;
+      }
+    }
+    int lg = len + len2 - t - n;
+    if (lg < 0) {
+      lg = 0;
+    }
+    if (lg > LPD_SUBFR) {
+      lg = LPD_SUBFR;
+    }
+    if (gain > 0.0f) {
+      if (lg > 0) {
+        float e0 = 0.01f, e1 = 0.01f;
+        for (int i = 0; i < lg; i++) {
+          e0 += s[n + i] * s[n + i];
+          e1 += s[n + i + t] * s[n + i + t];
+        }
+        const float g = (float)sqrt(e0 / e1);
+        if (g < gain) {
+          gain = g;
+        }
+      }
+      const float alpha = 0.5f * gain;
+      for (int i = 0; i < lg; i++) {
+        cur[i] = alpha * (s[n + i] - 0.5f * s[n + i - t] - 0.5f * s[n + i + t]);
+      }
+      for (int i = lg; i < LPD_SUBFR; i++) {
+        cur[i] = alpha * (s[n + i] - s[n + i - t]);
+      }
+    } else {
+      memset(cur, 0, LPD_SUBFR * sizeof(float));
+    }
+    memcpy(noise, noise_mem, (LPD_BPF_DELAY + LPD_SUBFR) * sizeof(float));
+    memcpy(noise_mem, noise + LPD_SUBFR, (LPD_BPF_DELAY + LPD_SUBFR) * sizeof(float));
+    const float* prev = noise + LPD_BPF_DELAY;
+    for (int i = 0; i < LPD_SUBFR; i++) {
+      float v = lpd_bpf_filter[0] * prev[i];
+      for (int j = 1; j <= LPD_BPF_DELAY; j++) {
+        v += lpd_bpf_filter[j] * (prev[i - j] + prev[i + j]);
+      }
+      out[n + i] -= v;
+    }
   }
 }
 
-/* The windowed zero input response after an ACELP segment ending at
- * x[pos], over the `slope` / 2 samples after the boundary of a transform
- * neighbour whose slope of `slope` samples is centred on the boundary:
- * weighted by 1 - w^2 of the rising sine slope. */
-static void add_zir(const float* a, const float* syn_mem, float* x, int pos, int slope) {
-  const int half = slope / 2;
-  float zir[2 * LPD_MAX_LFAC];
-  lpd_zir(a, syn_mem, zir, half);
-  for (int i = 0; i < half; i++) {
-    const float w = sinf((float)M_PI * ((float)(half + i) + 0.5f) / (2.0f * (float)slope));
-    x[pos + i] += zir[i] * (1.0f - w * w);
+/* The pitch gain of a slot refined on the synthesis itself. */
+void refine_gain(const float* s, int tp, float* gain) {
+  if (*gain <= 0.0f) {
+    return;
   }
+  float corr = 0.0f, energy = 1e-6f;
+  for (int i = 0; i < LPD_SUBFR; i++) {
+    corr += s[i] * s[i - tp];
+    energy += s[i - tp] * s[i - tp];
+  }
+  *gain = corr / energy;
 }
 
-/* The ACELP memories from the final signal before x[pos]: the history
- * buffer followed by x supplies LPD_EXC_HIST samples. */
-static void memories_from_x(AacUsacLpdChannel* c, const float* a, int pos) {
-  memcpy(c->tmp, c->hist, sizeof(c->hist));
-  memcpy(c->tmp + LPD_SYN_HIST, c->x, sizeof(float) * (size_t)pos);
-  lpd_acelp_memory_from_signal(c, a, c->tmp + LPD_SYN_HIST + pos, LPD_EXC_HIST);
-}
+/* ── the transition from the frequency domain core ──────────────── */
 
-/* Bass postfilter (7.17) over the output region [0, N) of x: per
- * 64-sample slot with a pitch lag T and gain g, the aperiodic part
- * s(n) - (s(n - T) + s(n + T)) / 2, scaled by the gain and the measured
- * correlation, is low pass filtered and subtracted. */
-static void bass_postfilter(AacUsacLpdChannel* c, float* out) {
+/* Prepares the channel for an LPD frame after an FD frame: the FD
+ * overlap gets the LPD slope of 2 fp (fp = lfac, or N / 16 after short
+ * windows) toward the superframe and feeds the overlap buffer, the
+ * memories start afresh. */
+void from_fd(AacUsacLpdChannel* c, const AacUsacCoreChannel* ch, float* fd, int* fp_out) {
   const int n = c->frame_length;
-  const int slots = n / LPD_MAX_SUBFR;
-  const float* s = c->tmp + LPD_SYN_HIST; /* x with the history before it */
-  const float* lp = lpd_bpf_filter();
-  float noise[LPD_MAX_FRAME + 2 * LPD_BPF_TAPS];
-  const int margin = LPD_BPF_TAPS;
-  for (int i = -margin; i < n + margin; i++) {
-    noise[i + margin] = 0.0f;
+  const int short_prev =
+      ch->prev_core_mode == 0 && ch->prev_window_sequence == AAC_WIN_EIGHT_SHORT;
+  const int fp = short_prev ? n / 16 : c->lfac;
+  c->mode_prev = short_prev ? -2 : -1;
+  for (int i = 0; i < LPD_MAX_SLOTS / 2; i++) {
+    c->pitch_prev[i] = LPD_SUBFR;
+    c->gain_prev[i] = 0.0f;
   }
-  for (int slot = -1; slot <= slots; slot++) {
-    const int ci = slot + slots / 2; /* combined slot index */
-    if (ci < 0 || ci >= 2 * slots) {
-      continue;
-    }
-    const int T = c->bpf_T[ci];
-    const float g = c->bpf_gain[ci];
-    if (T <= 0 || g <= 0.0f) {
-      continue;
-    }
-    int from = slot * LPD_MAX_SUBFR, to = from + LPD_MAX_SUBFR;
-    if (from < -margin) {
-      from = -margin;
-    }
-    if (to > n + margin) {
-      to = n + margin;
-    }
-    float corr = 0.0f, e_s = 0.0f, e_p = 0.0f;
-    for (int i = from; i < to; i++) {
-      const float p = 0.5f * (s[i - T] + s[i + T]);
-      corr += s[i] * p;
-      e_s += s[i] * s[i];
-      e_p += p * p;
-    }
-    float ratio = corr / (sqrtf(e_s * e_p) + 1e-9f);
-    if (ratio < 0.0f) {
-      ratio = 0.0f;
-    }
-    const float geff = g * ratio;
-    for (int i = from; i < to; i++) {
-      const float p = 0.5f * (s[i - T] + s[i + T]);
-      noise[i + margin] = geff * (s[i] - p);
-    }
+  c->bpf_active_prev = 0;
+  memset(c->syn, 0, sizeof(c->syn));
+  memset(c->exc, 0, sizeof(c->exc));
+  memset(c->a_prev, 0, sizeof(c->a_prev));
+  memset(c->bpf_noise, 0, sizeof(c->bpf_noise));
+  c->gain_threshold = 0.0f;
+  if (ch->prev_core_mode == 0) {
+    memcpy(fd, ch->overlap, (size_t)n * sizeof(float));
+  } else {
+    memset(fd, 0, (size_t)n * sizeof(float));
   }
-  for (int i = 0; i < n; i++) {
-    float v = lp[0] * noise[i + margin];
-    for (int k = 1; k < LPD_BPF_TAPS; k++) {
-      v += lp[k] * (noise[i + margin - k] + noise[i + margin + k]);
-    }
-    out[i] = s[i] - v;
+  float w[2 * LPD_MAX_LFAC];
+  lpd_sine_window(2 * fp, w);
+  for (int i = 0; i < 2 * fp; i++) {
+    fd[n / 2 - fp + i] *= w[2 * fp - 1 - i];
   }
+  memset(fd + n / 2 + fp, 0, (size_t)(n / 2 - fp) * sizeof(float));
+  memset(c->ovl, 0, sizeof(c->ovl));
+  for (int i = 0; i <= 2 * fp; i++) {
+    c->ovl[c->lfac - fp + i] = fd[n / 2 - fp - 1 + i];
+  }
+  *fp_out = fp;
 }
 
-static void finish_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, float* out) {
+/* The FAC of an FD to ACELP transition and the ACELP memories from the
+ * FD signal: the synthesis history, and the excitation as the residual
+ * of the pre-emphasised signal through the first LPC set. */
+void fd_memories(AacUsacLpdChannel* c, const LpdFrameData* f, float* fd, int fp) {
   const int n = c->frame_length;
-  const int slots = n / LPD_MAX_SUBFR;
-  /* the output region with its history, for the postfilter */
-  memcpy(c->tmp, c->hist, sizeof(c->hist));
-  memcpy(c->tmp + LPD_SYN_HIST, c->x, sizeof(float) * (size_t)LPD_X_LEN);
-  bass_postfilter(c, out);
-  /* history: the last LPD_SYN_HIST samples of the final output region */
-  memmove(c->hist, c->hist + n, sizeof(float) * (size_t)(LPD_SYN_HIST - n));
-  memcpy(c->hist + LPD_SYN_HIST - n, c->x, sizeof(float) * (size_t)n);
-  /* the contribution to the next frame */
-  memcpy(ch->overlap, c->x + n, sizeof(float) * (size_t)n);
-  ch->prev_core_mode = 1;
-  /* the postfilter slots of this frame become the previous ones */
-  memmove(c->bpf_T, c->bpf_T + slots, sizeof(int) * (size_t)slots);
-  memmove(c->bpf_gain, c->bpf_gain + slots, sizeof(float) * (size_t)slots);
-  for (int i = 0; i < slots; i++) {
-    c->bpf_T[slots + i] = 0;
-    c->bpf_gain[slots + i] = 0.0f;
+  float a0[LPD_M + 1];
+  lpd_lsp_to_a(c->lsp_prev, a0);
+  memcpy(c->a_prev[0], a0, sizeof(a0));
+  memcpy(c->a_prev[1], a0, sizeof(a0));
+  if (f->mod[0] == 0) {
+    if (f->fac_data_present) {
+      float x[LPD_MAX_LFAC], y[LPD_MAX_LFAC];
+      const float gain = (float)pow(10.0, (double)f->fd_fac_gain / 28.0);
+      for (int i = 0; i < fp; i++) {
+        x[i] = gain * (float)f->fd_fac[i];
+      }
+      lpd_fac_synth(x, fp, a0, y, fp);
+      for (int i = 0; i < fp; i++) {
+        fd[n / 2 - fp + i] += y[i];
+      }
+    }
+    memset(fd + n / 2, 0, (size_t)fp * sizeof(float));
   }
+  memcpy(syn0(c) - n / 2, fd, (size_t)(n / 2) * sizeof(float));
+  float pre[LPD_M + LPD_MAX_FRAME / 2], res[LPD_MAX_FRAME / 2];
+  memset(pre, 0, LPD_M * sizeof(float));
+  memcpy(pre + LPD_M, fd, (size_t)(n / 2) * sizeof(float));
+  lpd_preemph(pre + LPD_M, n / 2, 0.0f);
+  lpd_res_filter(a0, pre + LPD_M, res, n / 2);
+  int num = f->mod[0] != 0 && (c->nb_subfr == 4 || f->mod[1] != 0) ? c->l_div : 2 * c->l_div;
+  if (num > LPD_PIT_MAX + LPD_INTERP_ORDER + 1) {
+    num = LPD_PIT_MAX + LPD_INTERP_ORDER + 1;
+  }
+  memcpy(exc0(c) - num, res + n / 2 - num, (size_t)num * sizeof(float));
 }
 
-static void synth_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, const LpdFrameData* f,
-                        float* out) {
-  const int n = c->frame_length;
-  const int half = n / 2;
-  const int l = c->l_div;
-  const int slots = n / LPD_MAX_SUBFR;
-  float* x = c->x;
-  memset(x, 0, sizeof(c->x));
-  if (ch->prev_core_mode >= 0) {
-    memcpy(x, ch->overlap, sizeof(float) * (size_t)n);
-  }
-  const int prev_fd = ch->prev_core_mode == 0;
-  if (prev_fd || ch->prev_core_mode < 0) {
-    c->last_mode = prev_fd ? 4 : -1;
-  }
+/* ── the frame ──────────────────────────────────────────────────── */
 
-  /* the five filter sets */
-  float lsf[5][LPD_M], lsp[5][LPD_M], a[5][LPD_M + 1];
+void decode_frame(AacUsacLpdChannel* c, AacUsacCoreChannel* ch, const LpdFrameData* f,
+                  float* out) {
+  const int n = c->frame_length;
+  const int s0 = c->nb_slots / 2 - 1;
+  float fd[LPD_MAX_FRAME];
+  int fp = 0;
+  const int after_fd = ch->prev_core_mode != 1;
+  if (after_fd) {
+    from_fd(c, ch, fd, &fp);
+  }
+  memset(syn0(c), 0, (size_t)(n + c->lfac) * sizeof(float));
+  memset(exc0(c), 0, (size_t)(n + 1) * sizeof(float));
+
+  /* the LPC sets */
+  float lsf[5][LPD_M];
   lpd_lsf_decode(c, f, lsf);
-  for (int i = 0; i < 5; i++) {
-    lpd_lsf_to_lsp(lsf[i], lsp[i]);
-    lpd_lsp_to_a(lsp[i], a[i]);
+#ifdef LPD_TRACE
+  for (int a = 0; a < 5; a++) {
+    LPD_T("XLPD f=%d lsf%d", lpd_trace_frame, a);
+    for (int b = 0; b < LPD_M; b++) LPD_T(" %.6f", lsf[a][b]);
+    LPD_T("\n");
+  }
+#endif
+  if (f->first_lpd_flag) {
+    memcpy(c->lsf_prev, lsf[0], sizeof(c->lsf_prev));
+    lpd_lsf_to_lsp(c->lsf_prev, c->lsp_prev);
+  }
+  if (after_fd) {
+    if (f->mod[0] == 0 || f->mod[1] == 0 || (f->mod[2] == 0 && c->nb_subfr == 3)) {
+      fd_memories(c, f, fd, fp);
+    }
   }
 
-  /* the FAC toward a previous FD frame completes the signal before B_0 */
-  if (f->fac_fd.present) {
-    float fac[2 * LPD_MAX_LFAC];
-    lpd_fac_synth(&f->fac_fd, 1.0f, a[0], fac);
-    add_at(x, half - f->fac_fd.length, fac, 2 * f->fac_fd.length);
+  /* the pitch slots: the second half of the last superframe, then this one */
+  int pitch[LPD_MAX_SLOTS / 2 + LPD_MAX_SLOTS];
+  float gain[LPD_MAX_SLOTS / 2 + LPD_MAX_SLOTS];
+  for (int i = 0; i < s0; i++) {
+    pitch[i] = c->pitch_prev[i];
+    gain[i] = c->gain_prev[i];
   }
-
-  for (int i = 0; i < slots; i++) {
-    c->bpf_T[slots + i] = 0;
-    c->bpf_gain[slots + i] = 0.0f;
+  for (int i = 0; i < c->nb_slots; i++) {
+    pitch[s0 + i] = LPD_SUBFR;
+    gain[s0 + i] = 0.0f;
   }
 
   int k = 0;
   while (k < 4) {
-    const int b = half + k * l;
-    const int m = f->mod[k];
-    if (m == 0) {
-      if (f->fac[k].present) {
-        /* a transform segment before: the FAC, with the gain of the TCX
-         * it belongs to, then the memories from the completed signal */
-        float fac[2 * LPD_MAX_LFAC];
-        lpd_fac_synth(&f->fac[k], c->tcx_gain_last, a[k], fac);
-        add_at(x, b - c->lfac, fac, 2 * c->lfac);
+    const int mode = f->mod[k];
+    if (c->mode_prev == 0 && mode > 0 && (k != 0 || c->bpf_active_prev)) {
+      /* the ACELP's pitch carries into the first two slots of the TCX */
+      const int i = k * c->nb_subfr + s0;
+      pitch[i + 1] = pitch[i] = pitch[i - 1];
+      gain[i + 1] = gain[i] = gain[i - 1];
+    }
+    const int set = mode <= 1 ? k + 1 : (mode == 2 ? k + 2 : 4);
+    float lsp[LPD_M];
+    lpd_lsf_to_lsp(lsf[set], lsp);
+    const float stab = lpd_stab_fac(lsf[set], c->lsf_prev);
+    LPD_T("XLPD f=%d k=%d mode=%d mode_prev=%d stab=%.5f\n", lpd_trace_frame, k, mode, c->mode_prev, stab);
+    if (mode == 0) {
+      float a[LPD_MAX_SUBFR + 1][LPD_M + 1];
+      lpd_interp_lsp(c->lsp_prev, lsp, c->nb_subfr, a);
+      const int i = k * c->nb_subfr + s0;
+      lpd_acelp_decode(c, f, k, a, stab, pitch + i, gain + i);
+      if (c->mode_prev != 0 && f->bpf_control_info) {
+        /* and back into the slots before it */
+        pitch[i - 1] = pitch[i];
+        gain[i - 1] = gain[i];
+        if (c->mode_prev != -2) {
+          pitch[i - 2] = pitch[i];
+          gain[i - 2] = gain[i];
+        }
       }
-      if (c->last_mode != 0) {
-        memories_from_x(c, a[k], b);
-      }
-      float syn[LPD_MAX_DIV];
-      int t_sf[4];
-      float g_sf[4];
-      const float stab = lpd_stab_fac(lsf[k + 1], c->lsf_old);
-      lpd_acelp_decode(c, &f->acelp[k], lsp[k], lsp[k + 1], stab, syn, t_sf, g_sf);
-      add_at(x, b, syn, l);
-      for (int j = 0; j < c->nb_subfr; j++) {
-        const int slot = slots + k * c->nb_subfr + j;
-        c->bpf_T[slot] = t_sf[j];
-        c->bpf_gain[slot] = f->bpf_control_info ? g_sf[j] : 0.0f;
-      }
-      memcpy(c->lsf_old, lsf[k + 1], sizeof(c->lsf_old));
-      c->last_mode = 0;
       k++;
     } else {
-      const int lg = l << (m - 1);
-      const int left_slope = (k == 0 && c->last_mode == 4) ? 2 * c->lfac_fd : 2 * c->lfac;
-      if (f->fac[k].present) {
-        /* ACELP before: the FAC with this TCX's gain and the windowed
-         * zero input response of the synthesis filter */
-        const float gain = powf(10.0f, (float)f->tcx[k].global_gain / 28.0f) / sqrtf((float)lg);
-        float fac[2 * LPD_MAX_LFAC];
-        lpd_fac_synth(&f->fac[k], gain, a[k], fac);
-        add_at(x, b - c->lfac, fac, 2 * c->lfac);
-        add_zir(a[k], c->syn_mem, x, b, 2 * c->lfac);
-      }
-      float t[2 * LPD_MAX_TCX];
-      lpd_tcx_decode(c, &f->tcx[k], a[k], a[k + (1 << (m - 1))], left_slope, t);
-      add_at(x, b - lg / 2, t, 2 * lg);
-      k += 1 << (m - 1);
-      memcpy(c->lsf_old, lsf[k], sizeof(c->lsf_old));
-      c->last_mode = m;
+      float a_old[LPD_M + 1], a_new[LPD_M + 1];
+      lpd_lsp_to_a(c->lsp_prev, a_old);
+      lpd_lsp_to_a(lsp, a_new);
+      lpd_tcx_decode(c, f, k, a_old, a_new);
+      k += 1 << (mode - 1);
     }
+    c->mode_prev = mode;
+    memcpy(c->lsp_prev, lsp, sizeof(c->lsp_prev));
+    memcpy(c->lsf_prev, lsf[set], sizeof(c->lsf_prev));
   }
 
-  memcpy(c->lsf_prev, lsf[4], sizeof(c->lsf_prev));
-  c->have_lsf_prev = 1;
-  memcpy(c->a_prev, a[4], sizeof(c->a_prev));
-  c->conceal_gain = 1.0f;
-  finish_frame(c, ch, out);
+  /* the postfilter over the output frame, the second half of the last
+   * superframe and the first of this one */
+  if (!f->bpf_control_info) {
+    const int from = f->mod[0] != 0 && c->bpf_active_prev ? 2 : 0;
+    for (int i = from; i < c->nb_slots; i++) {
+      gain[s0 + i] = 0.0f;
+    }
+  }
+  c->bpf_active_prev = f->bpf_control_info;
+  for (int i = 0; i < s0; i++) {
+    c->pitch_prev[i] = pitch[c->nb_slots + i];
+    c->gain_prev[i] = gain[c->nb_slots + i];
+  }
+  const float* s = syn0(c) - c->synth_delay;
+  for (int i = 0; i < c->nb_slots; i++) {
+    refine_gain(s + i * LPD_SUBFR, pitch[i], &gain[i]);
+  }
+#ifdef LPD_TRACE
+  LPD_T("XLPD f=%d pitch", lpd_trace_frame);
+  for (int a = 0; a < c->nb_slots + s0; a++) LPD_T(" %d/%.4f", pitch[a], gain[a]);
+  LPD_T("\n");
+#endif
+  float lpd_out[LPD_MAX_FRAME];
+  const int len2 = f->mod[3] == 0 ? c->synth_delay : c->synth_delay - c->lfac;
+  bass_postfilter(s, pitch, gain, n, len2, c->bpf_noise, lpd_out);
+  if (after_fd) {
+    /* the FD signal stands up to the FAC region, and before an ACELP
+     * segment a slot earlier */
+    const int keep = n / 2 - fp - (f->mod[0] == 0 ? LPD_SUBFR : 0);
+    memcpy(lpd_out, fd, (size_t)keep * sizeof(float));
+  }
+  for (int i = 0; i < n; i++) {
+    out[i] = lpd_out[i] * kOutputScale;
+  }
+
+  /* the core channel contract toward an FD frame: the second half of
+   * the superframe, then the unwindowed tail around its end; the FD
+   * frame applies the slope its window sequence implies (2 lfac, or
+   * frame_length / 8 for short windows), or after ACELP replaces the
+   * region by the FAC terms */
+  memcpy(ch->overlap, syn0(c) + n / 2, (size_t)(n / 2 - c->lfac) * sizeof(float));
+  memcpy(ch->overlap + n / 2 - c->lfac, c->ovl + 1, (size_t)(2 * c->lfac) * sizeof(float));
+  memset(ch->overlap + n / 2 + c->lfac, 0, (size_t)(n / 2 - c->lfac) * sizeof(float));
+  ch->prev_core_mode = 1;
+  ch->prev_window_sequence = AAC_WIN_EIGHT_SHORT;
+  ch->prev_window_shape = AAC_WIN_SINE;
+
+  /* the histories move on by one superframe */
+  memmove(c->syn, c->syn + n, LPD_SYN_HIST * sizeof(float));
+  memmove(c->exc, c->exc + n, LPD_EXC_HIST * sizeof(float));
 }
 
-int aac_usac_lpd_decode(AacUsacCoreChannel* ch, int frame_length, int indep, AacBitReader* r,
-                        float* out) {
+}  // namespace
+
+extern "C" int aac_usac_lpd_decode(AacUsacCoreChannel* ch, int frame_length, int indep,
+                                   AacBitReader* r, float* out) {
   AacUsacLpdChannel* c = ch->lpd;
   if (!c || c->frame_length != frame_length) {
     return AAC_ERR_INVALID_ARG;
   }
-  LpdFrameData* f = &c->frame;
-  const int err = parse_frame(c, r, indep, f);
-  if (err) {
+  c->noise_seed = &ch->noise_seed;
+  const int ret = parse_frame(c, r, indep, &c->frame);
+  if (ret != AAC_OK) {
     c->have_frame = 0;
-    return err;
+    return ret;
   }
   c->have_frame = 1;
-  synth_frame(c, ch, f, out);
+  c->conceal_gain = 1.0f;
+  decode_frame(c, ch, &c->frame, out);
   return AAC_OK;
 }
 
-/* ── the FAC an FD frame carries after an LPD frame ─────────────── */
+/* ── the transition to the frequency domain core ────────────────── */
 
-void aac_usac_lpd_fac_to_fd_gain(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
-                                 int frame_length, int fac_gain_index) {
+extern "C" void aac_usac_lpd_fac_to_fd_gain(AacUsacCoreChannel* ch, const int* fac_q,
+                                            int fac_length, int frame_length, int fac_gain_index) {
   AacUsacLpdChannel* c = ch->lpd;
-  if (!c || fac_length <= 0 || fac_length > LPD_MAX_LFAC || c->frame_length != frame_length) {
+  if (!c || fac_length > LPD_MAX_LFAC || fac_length > c->lfac) {
     return;
   }
-  const int half = frame_length / 2;
-  const float gain = powf(10.0f, (float)fac_gain_index / 28.0f) / sqrtf((float)fac_length);
-  float fac[2 * LPD_MAX_LFAC];
-  lpd_fac_synth_q(fac_q, fac_length, gain, c->a_prev, fac);
-  add_at(ch->overlap, half - fac_length, fac, 2 * fac_length);
-  if (c->last_mode == 0) {
-    add_zir(c->a_prev, c->syn_mem, ch->overlap, half, 2 * fac_length);
+  const int n = frame_length;
+  const int lfac = fac_length;
+  /* the FAC through the last ACELP filter, halved; the ACELP's end and
+   * its zero input response folded into the first lfac samples */
+  float x[LPD_MAX_LFAC], y[2 * LPD_MAX_LFAC];
+  const float gain = (float)pow(10.0, (double)fac_gain_index / 28.0);
+  for (int i = 0; i < lfac; i++) {
+    x[i] = gain * (float)fac_q[i];
   }
-  c->last_mode = 4;
+  lpd_fac_synth(x, lfac, c->a_prev[1], y, 2 * lfac);
+  float past_w[LPD_MAX_LFAC], zir_w[LPD_MAX_LFAC];
+  lpd_fac_windows(lfac, past_w, zir_w);
+  /* ovl is laid out for the channel's lfac; a shorter FAC (short
+   * windows) uses the samples nearest the boundary */
+  const float* at_end = c->ovl + 1 + c->lfac; /* the first sample after the superframe */
+  for (int i = 0; i < lfac; i++) {
+    y[i] = 0.5f * y[i] + at_end[i] * zir_w[i] + at_end[-1 - i] * past_w[lfac - 1 - i];
+  }
+  for (int i = lfac; i < 2 * lfac; i++) {
+    y[i] *= 0.5f;
+  }
+  memcpy(ch->overlap + n / 2 - lfac, at_end - lfac, (size_t)lfac * sizeof(float));
+  memcpy(ch->overlap + n / 2, y, (size_t)(2 * lfac) * sizeof(float));
 }
 
-void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
-                            int frame_length) {
+extern "C" void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
+                                       int frame_length) {
   aac_usac_lpd_fac_to_fd_gain(ch, fac_q, fac_length, frame_length, 0);
 }
 
-int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
-                        int frame_length) {
-  if (fac_length <= 0 || fac_length > LPD_MAX_LFAC || fac_length % 8 != 0) {
+extern "C" int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
+                                   int frame_length) {
+  if (!ch->lpd || fac_length > LPD_MAX_LFAC) {
     return AAC_ERR_DECODE;
   }
-  LpdFacData d;
-  const int err = lpd_read_fac(r, 1, fac_length, &d);
-  if (err) {
-    return err;
+  const int gain_index = (int)aac_bitreader_read(r, 7);
+  int coef[LPD_MAX_LFAC];
+  const int ret = lpd_read_fac(r, fac_length, coef);
+  if (ret != AAC_OK) {
+    return ret;
   }
+  aac_usac_lpd_fac_to_fd_gain(ch, coef, fac_length, frame_length, gain_index);
+  return AAC_OK;
+}
+
+extern "C" void aac_usac_lpd_fd_postfilter(AacUsacCoreChannel* ch, float* out, int frame_length,
+                                           int short_windows) {
   AacUsacLpdChannel* c = ch->lpd;
   if (!c || c->frame_length != frame_length) {
-    return AAC_OK; /* nothing to cancel against */
+    return;
   }
-  int q[LPD_MAX_LFAC];
-  for (int i = 0; i < fac_length / 8; i++) {
-    lpd_avq_decode(&d.blk[i], q + 8 * i);
+  const int n = frame_length;
+  const int s0 = c->nb_slots / 2 - 1;
+  /* the synthesis: the history up to the superframe end, then the FD
+   * output from the superframe's middle */
+  float buf[LPD_SYN_HIST + LPD_MAX_FRAME];
+  memcpy(buf, c->syn, LPD_SYN_HIST * sizeof(float));
+  memset(buf + LPD_SYN_HIST, 0, LPD_MAX_FRAME * sizeof(float));
+  for (int i = 0; i < n; i++) {
+    buf[LPD_SYN_HIST - n / 2 + i] = out[i] * kInputScale;
   }
-  aac_usac_lpd_fac_to_fd_gain(ch, q, fac_length, frame_length, d.gain_index);
-  return AAC_OK;
+  int pitch[LPD_MAX_SLOTS / 2 + 3];
+  float gain[LPD_MAX_SLOTS / 2 + 3];
+  for (int i = 0; i < s0; i++) {
+    pitch[i] = c->pitch_prev[i];
+    gain[i] = c->gain_prev[i];
+  }
+  for (int i = s0; i < s0 + 4; i++) {
+    pitch[i] = LPD_SUBFR;
+    gain[i] = 0.0f;
+  }
+  if (c->mode_prev == 0) {
+    pitch[s0] = pitch[s0 - 1];
+    gain[s0] = gain[s0 - 1];
+    if (!short_windows) {
+      pitch[s0 + 1] = pitch[s0];
+      gain[s0 + 1] = gain[s0];
+    }
+  }
+  const float* s = buf + LPD_SYN_HIST - c->synth_delay;
+  for (int i = 0; i < s0 + 2; i++) {
+    refine_gain(s + i * LPD_SUBFR, pitch[i], &gain[i]);
+  }
+  const int len = (s0 + 3) * LPD_SUBFR;
+  const int len2 = n - (s0 + 4) * LPD_SUBFR;
+  float filtered[LPD_MAX_FRAME];
+  bass_postfilter(s, pitch, gain, len, len2, c->bpf_noise, filtered);
+  for (int i = 0; i < len; i++) {
+    out[i] = filtered[i] * kOutputScale;
+  }
 }
 
 /* ── concealment ────────────────────────────────────────────────── */
 
-/* The last excitation is repeated with the last pitch lag and a gain
- * decaying by 0.7 per lost frame, through the last LPC filter; the
- * contract (overlap, prev_core_mode) is kept. */
-void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out) {
+extern "C" void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out) {
   AacUsacLpdChannel* c = ch->lpd;
-  if (!c || c->frame_length != frame_length) {
-    memset(out, 0, sizeof(float) * (size_t)frame_length);
+  const int n = frame_length;
+  memset(out, 0, (size_t)n * sizeof(float));
+  if (!c || c->frame_length != n) {
     return;
   }
-  const int n = frame_length;
-  const int half = n / 2;
-  const int slots = n / LPD_MAX_SUBFR;
-  float* x = c->x;
-  memset(x, 0, sizeof(c->x));
-  if (ch->prev_core_mode >= 0) {
-    memcpy(x, ch->overlap, sizeof(float) * (size_t)n);
+  /* the pending second half of the last superframe fades out */
+  c->conceal_gain *= 0.5f;
+  const float* second = c->syn + LPD_SYN_HIST - n / 2;
+  for (int i = 0; i < n / 2; i++) {
+    out[i] = second[i] * c->conceal_gain * kOutputScale;
   }
-  if (c->last_mode != 0 && c->last_mode != -1) {
-    memories_from_x(c, c->a_prev, half);
+  memset(c->ovl, 0, sizeof(c->ovl));
+  memset(ch->overlap, 0, (size_t)n * sizeof(float));
+  memmove(c->syn, c->syn + n, LPD_SYN_HIST * sizeof(float));
+  memset(c->syn + LPD_SYN_HIST, 0, (size_t)(n + c->lfac) * sizeof(float));
+  memmove(c->exc, c->exc + n, LPD_EXC_HIST * sizeof(float));
+  memset(c->exc + LPD_EXC_HIST, 0, (size_t)(n + 1) * sizeof(float));
+  for (int i = 0; i < LPD_MAX_SLOTS / 2; i++) {
+    c->gain_prev[i] = 0.0f;
   }
-  c->conceal_gain *= 0.7f;
-  int period = c->t0_prev;
-  if (period < c->pit_min || period > c->pit_max) {
-    period = c->l_div;
-  }
-  float* exc = c->exc + LPD_EXC_HIST;
-  for (int i = 0; i < n; i++) {
-    exc[i] = c->conceal_gain * exc[i - period];
-  }
-  float syn[LPD_MAX_FRAME];
-  lpd_syn_filter(c->a_prev, exc, syn, n, c->syn_mem);
-  add_at(x, half, syn, n);
-  memmove(c->exc, c->exc + n, sizeof(float) * (size_t)LPD_EXC_HIST);
-  for (int i = 0; i < slots; i++) {
-    c->bpf_T[slots + i] = 0;
-    c->bpf_gain[slots + i] = 0.0f;
-  }
-  c->last_mode = 0;
-  finish_frame(c, ch, out);
+  ch->prev_core_mode = 1;
 }

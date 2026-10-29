@@ -59,8 +59,9 @@ void destroy_elements(AacUsacState* u) {
   u->unidrc_elem = -1;
 }
 
-void reset_core_channel(AacUsacCoreChannel* ch) {
+void reset_core_channel(AacUsacCoreChannel* ch, int position) {
   ch->prev_core_mode = -1;
+  ch->noise_seed = position ? 0x10932u : 0x3039u;
   ch->prev_window_sequence = 0;
   ch->prev_window_shape = 0;
   memset(ch->overlap, 0, sizeof(ch->overlap));
@@ -141,7 +142,7 @@ int build_elements(AacUsacState* u) {
       if (!core->fd || (!core->lpd && ec->type != AAC_USAC_LFE)) {
         return AAC_ERR_MEMORY;
       }
-      reset_core_channel(core);
+      reset_core_channel(core, ch);
     }
     if (c->sbr_ratio_index > 0) {
       e->sbr = new (std::nothrow) AacSbrState();
@@ -420,7 +421,7 @@ void aac_usac_state_reset(AacUsacState* u) {
   for (int i = 0; i < u->num_elements; i++) {
     AacUsacElement* e = &u->elem[i];
     for (int c = 0; c < e->num_core_channels; c++) {
-      reset_core_channel(&e->core[c]);
+      reset_core_channel(&e->core[c], c);
     }
     if (e->sbr) {
       aac_sbr_usac_init(e->sbr, u->cfg.core_sample_rate, u->cfg.frame_length,

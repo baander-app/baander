@@ -1,418 +1,395 @@
-/* ACELP of the USAC LPD core (ISO/IEC 23003-3 6.2.7.3, 7.14): the
- * acelp_coding() syntax, the adaptive codebook with its 1/4 sample
- * resolution and the pitch lag coding, the algebraic innovation codebook
- * (four interleaved tracks of 16 positions, 12 to 64 bits per subframe),
- * the joint gain decoding against the transmitted mean energy, the
- * innovation pre-emphasis, pitch sharpening and enhancement, the LPC
- * synthesis per 64-sample subframe. */
+/* ACELP of the USAC LPD core (ISO/IEC 23003-3 7.14): the syntax, the
+ * adaptive codebook with its 1/4 sample interpolation and low pass, the
+ * algebraic innovation codebook of 12 to 64 bits, the joint gain
+ * codebook with the energy prediction, the excitation post-processing
+ * (tilt, pitch sharpening, gain smoothing), the synthesis in the
+ * pre-emphasised domain, and the transition from a preceding TCX with
+ * its FAC. */
 #include <cmath>
 #include <cstring>
 
 #include "usac_lpd_internal.h"
 
-#define NB_POS 16  /* positions per track */
-#define NB_TRACK 4
-#define L_SUBFR LPD_MAX_SUBFR
+#ifdef LPD_TRACE
+#include <cstdio>
+extern int lpd_trace_frame;
+#define LPD_T(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define LPD_T(...) ((void)0)
+#endif
 
-/* Innovation codebook bits per subframe for acelp_core_mode 0..7 (Table
- * 7.14.1). */
-static const int kIcbBits[8] = {12, 16, 20, 28, 36, 44, 52, 64};
+namespace {
+
+constexpr int kIcbBits[8] = {20, 28, 36, 44, 52, 64, 12, 16};
+constexpr int kIcbWidths[8][4] = {{5, 5, 5, 5},     {9, 9, 5, 5},     {9, 9, 9, 9},
+                                  {13, 13, 9, 9},   {13, 13, 13, 13}, {0, 0, 0, 0},
+                                  {1, 5, 1, 5},     {1, 5, 5, 5}};
+
+}  // namespace
 
 int lpd_acelp_icb_bits(int acelp_core_mode) { return kIcbBits[acelp_core_mode & 7]; }
 
-/* ── syntax ─────────────────────────────────────────────────────── */
-
-/* Codeword widths per track for each codebook size: the richer tracks
- * come first. */
-static void icb_layout(int nbits, int* words, int* widths) {
-  switch (nbits) {
-    case 12: /* two pulses, one per pair of tracks, 5 position bits and a sign each */
-      *words = 2;
-      widths[0] = widths[1] = 6;
-      break;
-    case 16: /* one pulse per track in 8 positions */
-      *words = 4;
-      widths[0] = widths[1] = widths[2] = widths[3] = 4;
-      break;
-    case 20: /* one pulse per track */
-      *words = 4;
-      widths[0] = widths[1] = widths[2] = widths[3] = 5;
-      break;
-    case 28: /* two pulses in tracks 0 and 1, one in tracks 2 and 3 */
-      *words = 4;
-      widths[0] = widths[1] = 9;
-      widths[2] = widths[3] = 5;
-      break;
-    case 36:
-      *words = 4;
-      widths[0] = widths[1] = widths[2] = widths[3] = 9;
-      break;
-    case 44: /* three pulses in tracks 0 and 1, two in tracks 2 and 3 */
-      *words = 4;
-      widths[0] = widths[1] = 13;
-      widths[2] = widths[3] = 9;
-      break;
-    case 52:
-      *words = 4;
-      widths[0] = widths[1] = widths[2] = widths[3] = 13;
-      break;
-    default: /* 64: four pulses per track */
-      *words = 4;
-      widths[0] = widths[1] = widths[2] = widths[3] = 16;
-      break;
-  }
-}
-
 int lpd_read_acelp(AacBitReader* r, int acelp_core_mode, int nb_subfr, LpdAcelpData* d) {
-  const int nbits = lpd_acelp_icb_bits(acelp_core_mode);
-  int words, widths[4];
-  icb_layout(nbits, &words, widths);
   d->mean_energy = (int)aac_bitreader_read(r, 2);
   for (int sf = 0; sf < nb_subfr; sf++) {
-    LpdAcelpSubframe* s = &d->sf[sf];
-    s->acb_index = (int)aac_bitreader_read(r, (sf == 0 || sf == 2) ? 9 : 6);
-    s->ltp_filtering_flag = (int)aac_bitreader_read(r, 1);
-    s->icb_bits = nbits;
-    for (int t = 0; t < 4; t++) {
-      s->icb_index[t] = t < words ? aac_bitreader_read(r, widths[t]) : 0;
+    const int absolute = sf == 0 || (nb_subfr == 4 && sf == 2);
+    d->acb_index[sf] = (int)aac_bitreader_read(r, absolute ? 9 : 6);
+    d->ltp_filtering_flag[sf] = (int)aac_bitreader_read(r, 1);
+    memset(d->icb_index[sf], 0, sizeof(d->icb_index[sf]));
+    if (acelp_core_mode == 5) {
+      for (int t = 0; t < 4; t++) {
+        d->icb_index[sf][t] = (int)aac_bitreader_read(r, 2);
+      }
+      for (int t = 0; t < 4; t++) {
+        d->icb_index[sf][4 + t] = (int)aac_bitreader_read(r, 14);
+      }
+    } else {
+      for (int t = 0; t < 4; t++) {
+        d->icb_index[sf][t] = (int)aac_bitreader_read(r, kIcbWidths[acelp_core_mode & 7][t]);
+      }
     }
-    s->gains_index = (int)aac_bitreader_read(r, 7);
+    d->gains_index[sf] = (int)aac_bitreader_read(r, 7);
   }
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
 
-/* ── pitch lag (7.14.2) ─────────────────────────────────────────── */
+/* ── the innovation codebook ────────────────────────────────────── */
 
-/* The 9 bit absolute lag covers pit_min .. pit_fr2 in quarter samples,
- * pit_fr2 .. pit_fr1 in half samples and pit_fr1 .. pit_max in whole
- * samples; the 6 bit relative lag covers 16 samples around the previous
- * subframe's lag in quarter samples. */
-void lpd_acelp_pitch(const AacUsacLpdChannel* c, int index, int bits, int* t0, int* frac,
-                     int* t0_min, int* t0_max) {
-  if (bits == 9) {
-    const int n_quarter = (c->pit_fr2 - c->pit_min) * 4;
-    const int n_half = (c->pit_fr1 - c->pit_fr2) * 2;
-    if (index < n_quarter) {
-      *t0 = c->pit_min + index / 4;
-      *frac = index & 3;
-    } else if (index < n_quarter + n_half) {
-      const int i = index - n_quarter;
-      *t0 = c->pit_fr2 + i / 2;
-      *frac = (i & 1) * 2;
-    } else {
-      *t0 = c->pit_fr1 + index - n_quarter - n_half;
-      *frac = 0;
-    }
-    if (*t0 > c->pit_max) {
-      *t0 = c->pit_max;
-      *frac = 0;
-    }
-    /* the range of the following relative lag */
-    *t0_min = *t0 - 8;
-    if (*t0_min < c->pit_min) {
-      *t0_min = c->pit_min;
-    }
-    *t0_max = *t0_min + 15;
-    if (*t0_max > c->pit_max) {
-      *t0_max = c->pit_max;
-      *t0_min = *t0_max - 15;
-    }
-  } else {
-    *t0 = *t0_min + index / 4;
-    *frac = index & 3;
-    if (*t0 > *t0_max) {
-      *t0 = *t0_max;
-      *frac = 0;
-    }
-  }
+namespace {
+
+/* A pulse at position `pos` of `track` (interleaved tracks of 16). */
+void add_pulse(float* code, int track, int pos, int negative) {
+  code[4 * pos + track] += negative ? -1.0f : 1.0f;
 }
 
-/* v[n] = exc[n - t0 - frac/4] by the 1/4 resolution interpolation filter
- * (7.14.3); `exc` points at the sample of the subframe start, with the
- * history before it, and v may be the same buffer (the vector is written
- * in place to extend the excitation when the lag is shorter than the
- * subframe). */
-void lpd_acelp_adaptive(const AacUsacLpdChannel* c, const float* exc, int t0, int frac,
-                        float* v, int n) {
-  (void)c;
-  const float* h = lpd_interp_filter();
-  const int half = LPD_UP_SAMP * LPD_INTERPOL;
-  for (int k = 0; k < n; k++) {
-    float s = 0.0f;
-    for (int j = -LPD_INTERPOL + 1; j <= LPD_INTERPOL; j++) {
-      s += exc[k - t0 - j] * h[4 * j - frac + half];
-    }
-    v[k] = s;
-  }
+/* One pulse: m position bits and a sign bit above them. */
+void pulses_1(float* code, int track, int index, int m, int offset) {
+  const int pos = (index & ((1 << m) - 1)) + offset;
+  add_pulse(code, track, pos, (index >> m) & 1);
 }
 
-/* ── algebraic codebook (7.14.4) ────────────────────────────────── */
-
-/* The position codes of ISO/IEC 23003-3 7.14.4.2 (as in 3GPP AMR-WB):
- * a position value carries the track position in its low 4 bits and the
- * sign in bit 4 (set: positive). */
-static void dec_1p_n1(uint32_t index, int n, int offset, int* pos) {
-  const uint32_t mask = (1u << n) - 1u;
-  int p = (int)(index & mask) + offset;
-  if ((index >> n) & 1u) {
-    p += NB_POS;
-  }
-  pos[0] = p;
+/* Two pulses: two positions of m bits and one sign bit; the second
+ * pulse takes the opposite sign when its position is below the first. */
+void pulses_2(float* code, int track, int index, int m, int offset) {
+  const int mask = (1 << m) - 1;
+  const int pos0 = ((index >> m) & mask) + offset;
+  const int pos1 = (index & mask) + offset;
+  const int neg0 = (index >> (2 * m)) & 1;
+  add_pulse(code, track, pos0, neg0);
+  add_pulse(code, track, pos1, pos1 < pos0 ? !neg0 : neg0);
 }
 
-static void dec_2p_2n1(uint32_t index, int n, int offset, int* pos) {
-  const uint32_t mask = (1u << n) - 1u;
-  int p0 = (int)((index >> n) & mask) + offset;
-  const int i = (int)((index >> (2 * n)) & 1u);
-  int p1 = (int)(index & mask) + offset;
-  if ((p1 - offset) < (p0 - offset)) {
-    if (i == 1) {
-      p0 += NB_POS;
-    } else {
-      p1 += NB_POS;
-    }
-  } else if (i == 1) {
-    p0 += NB_POS;
-    p1 += NB_POS;
-  }
-  pos[0] = p0;
-  pos[1] = p1;
+/* Three pulses: a pair in one half of the range (2m - 1 bits plus the
+ * half) and one pulse over the whole range (m + 1 bits). */
+void pulses_3(float* code, int track, int index, int m, int offset) {
+  const int pair = index & ((1 << (2 * m - 1)) - 1);
+  const int half = (index >> (2 * m - 1)) & 1 ? 1 << (m - 1) : 0;
+  pulses_2(code, track, pair, m - 1, offset + half);
+  pulses_1(code, track, (index >> (2 * m)) & ((1 << (m + 1)) - 1), m, offset);
 }
 
-static void dec_3p_3n1(uint32_t index, int n, int offset, int* pos) {
-  const uint32_t mask = (1u << (2 * n - 1)) - 1u;
-  int j = offset;
-  if ((index >> (2 * n - 1)) & 1u) {
-    j += 1 << (n - 1);
-  }
-  dec_2p_2n1(index & mask, n - 1, j, pos);
-  const uint32_t mask2 = (1u << (n + 1)) - 1u;
-  dec_1p_n1((index >> (2 * n)) & mask2, n, offset, pos + 2);
-}
-
-static void dec_4p_4n1(uint32_t index, int n, int offset, int* pos) {
-  const uint32_t mask = (1u << (2 * n - 1)) - 1u;
-  int j = offset;
-  if ((index >> (2 * n - 1)) & 1u) {
-    j += 1 << (n - 1);
-  }
-  dec_2p_2n1(index & mask, n - 1, j, pos);
-  const uint32_t mask2 = (1u << (2 * n + 1)) - 1u;
-  dec_2p_2n1((index >> (2 * n)) & mask2, n, offset, pos + 2);
-}
-
-static void dec_4p_4n(uint32_t index, int n, int offset, int* pos) {
-  const int n1 = n - 1;
-  const int j = offset + (1 << n1);
-  switch ((index >> (4 * n - 2)) & 3u) {
-    case 0:
-      if (((index >> (4 * n - 3)) & 1u) == 0) {
-        dec_4p_4n1(index, n1, offset, pos);
-      } else {
-        dec_4p_4n1(index, n1, j, pos);
-      }
+/* Four pulses of one track in 16 bits: the two top bits pick the split
+ * between the halves of the range. */
+void pulses_4(float* code, int track, int index) {
+  switch ((index >> 14) & 3) {
+    case 0: {
+      const int offset = (index >> 13) & 1 ? 8 : 0;
+      const int quarter = (index >> 5) & 1 ? 4 : 0;
+      pulses_2(code, track, index & 31, 2, offset + quarter);
+      pulses_2(code, track, (index >> 6) & 127, 3, offset);
       break;
+    }
     case 1:
-      dec_1p_n1(index >> (3 * n1 + 1), n1, offset, pos);
-      dec_3p_3n1(index, n1, j, pos + 1);
+      pulses_1(code, track, index >> 10, 3, 0);
+      pulses_3(code, track, index, 3, 8);
       break;
     case 2:
-      dec_2p_2n1(index >> (2 * n1 + 1), n1, offset, pos);
-      dec_2p_2n1(index, n1, j, pos + 2);
+      pulses_2(code, track, index >> 7, 3, 0);
+      pulses_2(code, track, index, 3, 8);
       break;
     default:
-      dec_3p_3n1(index >> (n1 + 1), n1, offset, pos);
-      dec_1p_n1(index, n1, j, pos + 3);
+      pulses_3(code, track, index >> 4, 3, 0);
+      pulses_1(code, track, index, 3, 8);
       break;
   }
 }
 
-static void add_pulses(const int* pos, int nb_pulse, int track, float* code) {
-  for (int k = 0; k < nb_pulse; k++) {
-    const int i = (pos[k] & (NB_POS - 1)) * NB_TRACK + track;
-    code[i] += (pos[k] & NB_POS) ? 1.0f : -1.0f;
-  }
-}
+}  // namespace
 
-/* The innovation vector of one subframe from the codeword(s). */
-void lpd_acelp_pulses(const LpdAcelpSubframe* sf, float* code, int l_subfr) {
-  memset(code, 0, sizeof(float) * (size_t)l_subfr);
-  int pos[6];
-  switch (sf->icb_bits) {
+void lpd_acelp_pulses(const int* icb_index, int bits, float* code) {
+  memset(code, 0, LPD_SUBFR * sizeof(float));
+  switch (bits) {
     case 12:
-      /* two pulses, each on one of two 32-position tracks (even and odd
-       * positions), 5 position bits and a sign */
-      for (int k = 0; k < 2; k++) {
-        const uint32_t idx = sf->icb_index[k];
-        const int p = (int)(idx & 31u);
-        const int i = 2 * p + k;
-        code[i] += (idx >> 5) & 1u ? 1.0f : -1.0f;
+      /* two pulses, each on one of two tracks: a track bit and 5 bits */
+      for (int p = 0; p < 2; p++) {
+        pulses_1(code, 2 * (icb_index[2 * p] & 1) + p, icb_index[2 * p + 1], 4, 0);
       }
       break;
-    case 16:
-      /* one pulse per track on every other position (8 positions), a sign */
+    case 16: {
+      /* three pulses on the tracks but one, which the first bit names */
+      const int skipped = icb_index[0] & 1 ? 3 : 1;
+      int i = 1;
       for (int t = 0; t < 4; t++) {
-        const uint32_t idx = sf->icb_index[t];
-        const int i = (int)(idx & 7u) * 2 * NB_TRACK + t;
-        code[i] += (idx >> 3) & 1u ? 1.0f : -1.0f;
+        if (t != skipped) {
+          pulses_1(code, t, icb_index[i++], 4, 0);
+        }
       }
       break;
+    }
     case 20:
       for (int t = 0; t < 4; t++) {
-        dec_1p_n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 1, t, code);
+        pulses_1(code, t, icb_index[t], 4, 0);
       }
       break;
     case 28:
       for (int t = 0; t < 2; t++) {
-        dec_2p_2n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 2, t, code);
+        pulses_2(code, t, icb_index[t], 4, 0);
       }
       for (int t = 2; t < 4; t++) {
-        dec_1p_n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 1, t, code);
+        pulses_1(code, t, icb_index[t], 4, 0);
       }
       break;
     case 36:
       for (int t = 0; t < 4; t++) {
-        dec_2p_2n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 2, t, code);
+        pulses_2(code, t, icb_index[t], 4, 0);
       }
       break;
     case 44:
       for (int t = 0; t < 2; t++) {
-        dec_3p_3n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 3, t, code);
+        pulses_3(code, t, icb_index[t], 4, 0);
       }
       for (int t = 2; t < 4; t++) {
-        dec_2p_2n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 2, t, code);
+        pulses_2(code, t, icb_index[t], 4, 0);
       }
       break;
     case 52:
       for (int t = 0; t < 4; t++) {
-        dec_3p_3n1(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 3, t, code);
+        pulses_3(code, t, icb_index[t], 4, 0);
       }
       break;
-    default: /* 64 */
+    case 64:
       for (int t = 0; t < 4; t++) {
-        dec_4p_4n(sf->icb_index[t], 4, 0, pos);
-        add_pulses(pos, 4, t, code);
+        pulses_4(code, t, ((icb_index[t] & 3) << 14) + (icb_index[4 + t] & 16383));
       }
+      break;
+    default:
       break;
   }
 }
 
-/* ── memories (7.14.1) ──────────────────────────────────────────── */
+/* ── the adaptive codebook ──────────────────────────────────────── */
 
-/* After a TCX or FD segment the adaptive codebook holds the LPC residual
- * of the decoded signal and the synthesis filter its last outputs:
- * `sig` points at the sample following the segment, with at least
- * LPD_EXC_HIST samples before it. */
-void lpd_acelp_memory_from_signal(AacUsacLpdChannel* c, const float* a, const float* sig,
-                                  int n) {
-  float zero[LPD_M];
-  memset(zero, 0, sizeof(zero));
-  const int len = n < LPD_EXC_HIST ? n : LPD_EXC_HIST;
-  memset(c->exc, 0, sizeof(float) * (size_t)(LPD_EXC_HIST - len));
-  lpd_res_filter(a, sig - len, c->exc + LPD_EXC_HIST - len, len, zero);
-  for (int i = 0; i < LPD_M; i++) {
-    c->syn_mem[i] = sig[-1 - i];
+void lpd_acelp_pitch(const AacUsacLpdChannel* c, int index, int absolute, int* t0, int* frac,
+                     int* t0_min, int* t0_max) {
+  if (!absolute) {
+    *t0 = *t0_min + index / 4;
+    *frac = index - (*t0 - *t0_min) * 4;
+    return;
+  }
+  const int n_fr4 = (c->pit_fr2 - c->pit_min) * 4;
+  const int n_fr2 = (c->pit_fr1 - c->pit_fr2) * 2;
+  if (index < n_fr4) {
+    *t0 = c->pit_min + index / 4;
+    *frac = index - (*t0 - c->pit_min) * 4;
+  } else if (index < n_fr4 + n_fr2) {
+    const int i = index - n_fr4;
+    *t0 = c->pit_fr2 + i / 2;
+    *frac = 2 * (i - (*t0 - c->pit_fr2) * 2);
+  } else {
+    *t0 = index - n_fr4 - n_fr2 + c->pit_fr1;
+    *frac = 0;
+  }
+  *t0_min = *t0 - 8;
+  if (*t0_min < c->pit_min) {
+    *t0_min = c->pit_min;
+  }
+  *t0_max = *t0_min + 15;
+  if (*t0_max > c->pit_max) {
+    *t0_max = c->pit_max;
+    *t0_min = *t0_max - 15;
   }
 }
 
-/* ── decoding of one ACELP frame (7.14) ─────────────────────────── */
-
-void lpd_acelp_decode(AacUsacLpdChannel* c, const LpdAcelpData* d, const float* lsp0,
-                      const float* lsp1, float stab_fac, float* out, int* t_sf, float* g_sf) {
-  const float mean_ener = 18.0f + 12.0f * (float)d->mean_energy;
-  int t0 = c->t0_prev, frac = 0, t0_min = c->pit_min, t0_max = c->pit_min + 15;
-  float a[LPD_M + 1];
-  for (int sf = 0; sf < c->nb_subfr; sf++) {
-    const LpdAcelpSubframe* s = &d->sf[sf];
-    lpd_interp_lsp(lsp0, lsp1, (float)(sf + 1) / (float)c->nb_subfr, a);
-    lpd_acelp_pitch(c, s->acb_index, (sf == 0 || sf == 2) ? 9 : 6, &t0, &frac, &t0_min, &t0_max);
-
-    /* adaptive codebook, written in place at the end of the excitation */
-    float* exc = c->exc + LPD_EXC_HIST;
-    memset(exc, 0, sizeof(float) * (L_SUBFR + LPD_INTERPOL));
-    lpd_acelp_adaptive(c, exc, t0, frac, exc, L_SUBFR);
-    float v[L_SUBFR];
-    if (s->ltp_filtering_flag == 0) {
-      /* low pass B(z) = 0.18 + 0.64 z^-1 + 0.18 z^-2 centred */
-      for (int n = 0; n < L_SUBFR; n++) {
-        const float next = n + 1 < L_SUBFR ? exc[n + 1] : exc[n];
-        v[n] = 0.18f * exc[n - 1] + 0.64f * exc[n] + 0.18f * next;
-      }
-    } else {
-      memcpy(v, exc, sizeof(v));
+void lpd_acelp_adaptive(float* exc, int t0, int frac, int n) {
+  /* the sample t0 + frac/4 before: between x[-t0 - 1] and x[-t0] when
+   * frac > 0, so the filter phase is 4 - frac on the earlier sample */
+  const float* x0 = exc - t0;
+  int phase = -frac;
+  if (phase < 0) {
+    phase += LPD_UP_SAMP;
+    x0--;
+  }
+  for (int j = 0; j < n; j++) {
+    const float* x1 = x0 + j;
+    const float* x2 = x1 + 1;
+    const float* c1 = lpd_interp_filter + phase;
+    const float* c2 = lpd_interp_filter + LPD_UP_SAMP - phase;
+    float s = 0.0f;
+    for (int i = 0; i < LPD_INTERP_ORDER; i++) {
+      s += x1[-i] * c1[LPD_UP_SAMP * i] + x2[i] * c2[LPD_UP_SAMP * i];
     }
+    exc[j] = s;
+  }
+}
 
-    /* innovation: pulses, pre-emphasis with the tilt of the previous
-     * subframe, pitch sharpening */
-    float code[L_SUBFR];
-    lpd_acelp_pulses(s, code, L_SUBFR);
-    for (int n = L_SUBFR - 1; n > 0; n--) {
-      code[n] -= c->tilt_code * code[n - 1];
+/* ── the frame ──────────────────────────────────────────────────── */
+
+namespace {
+
+/* The TCX to ACELP transition: the FAC of the boundary, synthesised
+ * through the TCX's end filter, is added to the windowed TCX end, which
+ * completes the last lfac samples before the segment, and the
+ * excitation of those samples is recomputed for the adaptive codebook. */
+void tcx_to_acelp(AacUsacLpdChannel* c, const LpdFrameData* f, int k, float* synth, float* exc) {
+  const int lfac = c->lfac;
+  float x[LPD_MAX_LFAC], xn[2 * LPD_MAX_LFAC];
+  for (int i = 0; i < lfac; i++) {
+    x[i] = c->fac_gain * (float)f->fac[k][i];
+  }
+  for (int i = 0; i < lfac / 4; i++) {
+    x[i] *= c->alfd_gains[i];
+  }
+  lpd_fac_synth(x, lfac, c->a_prev[1], xn + lfac, lfac);
+  memset(xn, 0, (size_t)lfac * sizeof(float));
+  for (int i = 0; i < 2 * lfac; i++) {
+    xn[i] += synth[i - 2 * lfac];
+  }
+  memcpy(synth - lfac, xn + lfac, (size_t)lfac * sizeof(float));
+  /* the excitation of the last lfac samples: the pre-emphasis runs over
+   * both halves from a zero memory */
+  float pre[2 * LPD_MAX_LFAC];
+  memcpy(pre, xn, (size_t)(2 * lfac) * sizeof(float));
+  lpd_preemph(pre, 2 * lfac, 0.0f);
+  float buf[LPD_M + LPD_MAX_LFAC];
+  memcpy(buf, pre + lfac - LPD_M, (size_t)(LPD_M + lfac) * sizeof(float));
+  const int head = lfac % LPD_SUBFR;
+  int pos = 0, filt = 0;
+  if (head != 0) {
+    lpd_res_filter(c->a_prev[0], buf + LPD_M, exc - lfac, head);
+    pos = head;
+    filt = 1;
+  }
+  while (pos < lfac) {
+    lpd_res_filter(c->a_prev[filt < 2 ? filt : 1], buf + LPD_M + pos, exc - lfac + pos, LPD_SUBFR);
+    pos += LPD_SUBFR;
+    filt++;
+  }
+}
+
+}  // namespace
+
+void lpd_acelp_decode(AacUsacLpdChannel* c, const LpdFrameData* f, int k,
+                      const float a[][LPD_M + 1], float stab_fac, int* pitch, float* gain) {
+  const LpdAcelpData* d = &f->acelp[k];
+  const int bits = kIcbBits[f->acelp_core_mode & 7];
+  float* synth = c->syn + LPD_SYN_HIST + k * c->l_div;
+  float* exc = c->exc + LPD_EXC_HIST + k * c->l_div;
+
+  if (c->mode_prev > 0) {
+    tcx_to_acelp(c, f, k, synth, exc);
+  }
+  /* the synthesis memory: the last 16 samples, pre-emphasised */
+  float mem[LPD_M];
+  for (int i = 0; i < LPD_M; i++) {
+    mem[i] = synth[i - LPD_M] - LPD_PREEMPH * synth[i - LPD_M - 1];
+  }
+  const float mean_energy = 12.0f * (float)d->mean_energy + 18.0f;
+  int t0 = 0, frac = 0, t0_min = 0, t0_max = 0;
+  for (int sf = 0; sf < c->nb_subfr; sf++) {
+    const int off = sf * LPD_SUBFR;
+    float* e = exc + off;
+    const int absolute = sf == 0 || (c->nb_subfr == 4 && sf == 2);
+    lpd_acelp_pitch(c, d->acb_index[sf], absolute, &t0, &frac, &t0_min, &t0_max);
+    /* the adaptive codebook, one sample more for the low pass */
+    lpd_acelp_adaptive(e, t0, frac, LPD_SUBFR + 1);
+    float code[LPD_SUBFR];
+    if (d->ltp_filtering_flag[sf] == 0) {
+      for (int i = 0; i < LPD_SUBFR; i++) {
+        code[i] = 0.18f * e[i - 1] + 0.64f * e[i] + 0.18f * e[i + 1];
+      }
+      memcpy(e, code, sizeof(code));
+    }
+    /* the innovation: pulses, tilt, pitch sharpening */
+    lpd_acelp_pulses(d->icb_index[sf], bits, code);
+    for (int i = LPD_SUBFR - 1; i > 0; i--) {
+      code[i] -= LPD_TILT_CODE * code[i - 1];
     }
     const int t_int = t0 + (frac > 2 ? 1 : 0);
-    for (int n = t_int; n < L_SUBFR; n++) {
-      code[n] += LPD_PIT_SHARP * code[n - t_int];
+    for (int i = t_int; i < LPD_SUBFR; i++) {
+      code[i] += LPD_PIT_SHARP * code[i - t_int];
     }
-
-    /* gains: the innovation gain is a factor on the gain predicted from
-     * the mean energy and the innovation energy */
-    float gain_pit, gain_code_fac;
-    lpd_gain_dequant(s->gains_index, &gain_pit, &gain_code_fac);
-    float ener_code = 0.0f;
-    for (int n = 0; n < L_SUBFR; n++) {
-      ener_code += code[n] * code[n];
+    /* the gains: the pitch gain from the codebook, the innovation gain
+     * as the codebook's factor on the predicted energy */
+    float ener = 0.01f;
+    for (int i = 0; i < LPD_SUBFR; i++) {
+      ener += code[i] * code[i];
     }
-    ener_code = 10.0f * log10f(ener_code / (float)L_SUBFR + 1e-9f);
-    const float gcode0 = powf(10.0f, (mean_ener - ener_code) / 20.0f);
-    float gain_code = gain_code_fac * gcode0;
-
-    /* voicing, the tilt for the next subframe */
-    float ener_v = 0.0f, ener_c = 0.0f;
-    for (int n = 0; n < L_SUBFR; n++) {
-      ener_v += v[n] * v[n];
-      ener_c += code[n] * code[n];
+    const int gi = d->gains_index[sf] & 127;
+    const float gain_pit = lpd_gain_table[gi][0];
+    const float est = mean_energy - (float)(10.0 * log10(ener / (double)LPD_SUBFR));
+    const float gain_code = lpd_gain_table[gi][1] * (float)pow(10.0, 0.05 * (double)est);
+    LPD_T("XLPD f=%d k=%d sf=%d T=%d frac=%d gp=%.5f gc=%.5f ltp=%d code0=%.2f code1=%.2f\n", lpd_trace_frame, k, sf, t0, frac, gain_pit, gain_code, d->ltp_filtering_flag[sf], code[0], code[1]);
+    /* the voicing factor of the two contributions */
+    float ener_pit = 0.0f;
+    for (int i = 0; i < LPD_SUBFR; i++) {
+      ener_pit += e[i] * e[i];
     }
-    ener_v *= gain_pit * gain_pit;
-    ener_c *= gain_code * gain_code;
-    const float voice_fac = (ener_v - ener_c) / (ener_v + ener_c + 1e-9f);
-    c->tilt_code = 0.25f * (1.0f + voice_fac);
-
-    /* innovation enhancement (7.14.5): the innovation gain is smoothed
-     * in stable unvoiced segments, the innovation is high-pass filtered
-     * in voiced ones */
-    const float smooth = stab_fac * 0.5f * (1.0f - voice_fac);
-    const float gain_code_sm = (1.0f - smooth) * gain_code + smooth * c->gain_code_prev;
-    c->gain_code_prev = gain_code_sm;
-    const float cpit = 0.125f * (1.0f + voice_fac);
-    float code2[L_SUBFR];
-    for (int n = 0; n < L_SUBFR; n++) {
-      const float prev = n > 0 ? code[n - 1] : 0.0f;
-      const float next = n + 1 < L_SUBFR ? code[n + 1] : 0.0f;
-      code2[n] = code[n] - cpit * (prev + next);
+    ener_pit *= gain_pit * gain_pit;
+    const float ener_code = ener * gain_code * gain_code;
+    const float r_v = (ener_pit - ener_code) / (ener_pit + ener_code);
+    float post[LPD_SUBFR];
+    for (int i = 0; i < LPD_SUBFR; i++) {
+      post[i] = gain_pit * e[i];
+      e[i] = gain_pit * e[i] + gain_code * code[i];
     }
-
-    /* excitation: the plain one feeds the adaptive codebook, the enhanced
-     * one the synthesis */
-    float exc2[L_SUBFR];
-    for (int n = 0; n < L_SUBFR; n++) {
-      exc[n] = gain_pit * v[n] + gain_code * code[n];
-      exc2[n] = gain_pit * v[n] + gain_code_sm * code2[n];
+    pitch[sf] = t_int > c->pit_max ? c->pit_max : t_int;
+    gain[sf] = gain_pit;
+    /* gain smoothing toward a slowly moving threshold, by the stability
+     * and the voicing */
+    const float smooth = stab_fac * 0.5f * (1.0f - r_v);
+    float g0 = gain_code;
+    if (g0 < c->gain_threshold) {
+      g0 *= 1.19f;
+      if (g0 > c->gain_threshold) {
+        g0 = c->gain_threshold;
+      }
+    } else {
+      g0 /= 1.19f;
+      if (g0 < c->gain_threshold) {
+        g0 = c->gain_threshold;
+      }
     }
-    lpd_syn_filter(a, exc2, out + sf * L_SUBFR, L_SUBFR, c->syn_mem);
+    c->gain_threshold = g0;
+    const float gain_smooth = smooth * g0 + (1.0f - smooth) * gain_code;
+    for (int i = 0; i < LPD_SUBFR; i++) {
+      code[i] *= gain_smooth;
+    }
+    /* the innovation's high pass by the voicing */
+    const float cpe = 0.125f * (1.0f + r_v);
+    post[0] += code[0] - cpe * code[1];
+    for (int i = 1; i < LPD_SUBFR - 1; i++) {
+      post[i] += code[i] - cpe * (code[i - 1] + code[i + 1]);
+    }
+    post[LPD_SUBFR - 1] += code[LPD_SUBFR - 1] - cpe * code[LPD_SUBFR - 2];
+    /* the synthesis in the pre-emphasised domain */
+    float buf[LPD_M + LPD_SUBFR];
+    memcpy(buf, mem, sizeof(mem));
+    memcpy(buf + LPD_M, post, sizeof(post));
+    lpd_syn_filter(a[sf], buf + LPD_M, LPD_SUBFR);
+    memcpy(synth + off, buf + LPD_M, LPD_SUBFR * sizeof(float));
+    memcpy(mem, buf + LPD_SUBFR, sizeof(mem));
 
-    t_sf[sf] = t_int;
-    g_sf[sf] = gain_pit > 1.0f ? 1.0f : (gain_pit < 0.0f ? 0.0f : gain_pit);
-
-    /* shift the excitation history */
-    memmove(c->exc, c->exc + L_SUBFR, sizeof(float) * (size_t)LPD_EXC_HIST);
-    c->t0_prev = t0;
-    c->gain_pit_prev = gain_pit;
   }
+  /* the zero input response of the end filter from the pre-emphasised
+   * memory, then the de-emphasis of the segment and the response */
+  float zir[LPD_M + LPD_MAX_LFAC];
+  memcpy(zir, mem, sizeof(mem));
+  memset(zir + LPD_M, 0, LPD_MAX_LFAC * sizeof(float));
+  lpd_syn_filter(a[c->nb_subfr], zir + LPD_M, c->lfac);
+  lpd_deemph(synth, c->l_div, synth[-1]);
+  memcpy(c->ovl, synth + c->l_div - 1 - c->lfac, (size_t)(1 + c->lfac) * sizeof(float));
+  memcpy(c->ovl + 1 + c->lfac, zir + LPD_M, (size_t)c->lfac * sizeof(float));
+  lpd_deemph(c->ovl + 1 + c->lfac, c->lfac, synth[c->l_div - 1]);
+  memcpy(c->a_prev[0], a[c->nb_subfr - 2], sizeof(c->a_prev[0]));
+  memcpy(c->a_prev[1], a[c->nb_subfr - 1], sizeof(c->a_prev[1]));
 }

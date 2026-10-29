@@ -1,75 +1,104 @@
-/* Forward aliasing cancellation of the USAC LPD core (ISO/IEC 23003-3
- * 6.2.7.6, 7.16): the fac_data() syntax (an optional gain and the FAC
- * coefficients in algebraic vector quantised blocks of eight), and the
- * FAC synthesis: the lfac coefficients are transformed by an inverse
- * DCT-IV, the lfac samples extended with zeros to 2 lfac and filtered by
- * the weighted LPC synthesis filter 1 / A(z / gamma) of the boundary with
- * zero memory, so that the first half corrects the windowed and aliased
- * transform output before the boundary and the second half carries the
- * filter's response into the segment after it.  The zero input response
- * of the LPC synthesis filter after an ACELP segment is computed here as
- * well. */
+/* The forward aliasing cancellation of the USAC LPD core (ISO/IEC
+ * 23003-3 7.16): the lattice coded FAC coefficients, their DCT-IV and
+ * the weighted synthesis filter, and the windows that fold a segment
+ * into a transform's aliasing region. */
 #include <cmath>
 #include <cstring>
 
 #include "usac_lpd_internal.h"
 
-int lpd_read_fac(AacBitReader* r, int use_gain, int length, LpdFacData* d) {
-  d->present = 1;
-  d->length = length;
-  d->gain_index = use_gain ? (int)aac_bitreader_read(r, 7) : -1;
-  for (int i = 0; i < length / 8; i++) {
-    const int err = lpd_read_avq_block(r, 1, &d->blk[i]);
-    if (err) {
-      return err;
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+
+/* The cosine tables of the DCT-IV lengths in use, built on first use. */
+struct Dct4Table {
+  int n;
+  float* cos_table;
+};
+
+const float* dct4_table(int n) {
+  static Dct4Table tables[8];
+  static float storage[8][LPD_MAX_LFAC * LPD_MAX_LFAC];
+  for (int t = 0; t < 8; t++) {
+    if (tables[t].n == n) {
+      return tables[t].cos_table;
+    }
+    if (tables[t].n == 0) {
+      float* c = storage[t];
+      for (int k = 0; k < n; k++) {
+        for (int j = 0; j < n; j++) {
+          c[k * n + j] = (float)cos(kPi / n * (j + 0.5) * (k + 0.5));
+        }
+      }
+      tables[t].cos_table = c;
+      tables[t].n = n;
+      return c;
+    }
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+void lpd_sine_window(int n, float* w) {
+  for (int i = 0; i < n; i++) {
+    w[i] = (float)sin(kPi * (i + 0.5) / (2.0 * n));
+  }
+}
+
+int lpd_read_fac(AacBitReader* r, int length, int* coef) {
+  for (int i = 0; i < length; i += 8) {
+    int qn = 0;
+    while (aac_bitreader_read(r, 1) == 1u) {
+      qn++;
+      if (qn > 40) {
+        return AAC_ERR_DECODE;
+      }
+    }
+    if (qn > 0) {
+      qn++;
+    }
+    const int ret = lpd_read_avq_block(r, qn, coef + i);
+    if (ret != AAC_OK) {
+      return ret;
     }
   }
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
 
-/* Orthonormal DCT-IV: out[n] = sqrt(2/N) sum_k in[k] cos(pi/N (n+1/2)(k+1/2)). */
 void lpd_dct4(const float* in, float* out, int n) {
-  const double scale = sqrt(2.0 / (double)n);
-  for (int i = 0; i < n; i++) {
-    double s = 0.0;
-    for (int k = 0; k < n; k++) {
-      s += (double)in[k] * cos(M_PI / (double)n * ((double)i + 0.5) * ((double)k + 0.5));
+  const float* c = dct4_table(n);
+  for (int k = 0; k < n; k++) {
+    const float* row = c + k * n;
+    float s = 0.0f;
+    for (int j = 0; j < n; j++) {
+      s += in[j] * row[j];
     }
-    out[i] = (float)(s * scale);
+    out[k] = s;
   }
 }
 
-void lpd_fac_synth_q(const int* fac_q, int length, float gain, const float* a, float* out) {
-  float coef[LPD_MAX_LFAC], t[2 * LPD_MAX_LFAC];
+void lpd_fac_synth(const float* x, int length, const float* a, float* out, int out_len) {
+  float ap[LPD_M + 1];
+  float buf[LPD_M + 2 * LPD_MAX_LFAC];
+  float* y = buf + LPD_M;
+  memset(buf, 0, sizeof(buf));
+  lpd_dct4(x, y, length);
+  const float scale = 2.0f / (float)length;
   for (int i = 0; i < length; i++) {
-    coef[i] = (float)fac_q[i] * gain;
+    y[i] *= scale;
   }
-  lpd_dct4(coef, t, length);
-  memset(t + length, 0, sizeof(float) * (size_t)length);
-  float ap[LPD_M + 1], mem[LPD_M];
-  lpd_weight_a(a, LPD_GAMMA1, ap);
-  memset(mem, 0, sizeof(mem));
-  lpd_syn_filter(ap, t, out, 2 * length, mem);
+  lpd_weight_a(a, LPD_GAMMA, ap);
+  lpd_syn_filter(ap, y, out_len);
+  memcpy(out, y, (size_t)out_len * sizeof(float));
 }
 
-/* `gain` applies when the data carries no gain of its own. */
-void lpd_fac_synth(const LpdFacData* d, float gain, const float* a, float* out) {
-  int q[LPD_MAX_LFAC];
-  for (int i = 0; i < d->length / 8; i++) {
-    lpd_avq_decode(&d->blk[i], q + 8 * i);
+void lpd_fac_windows(int lfac, float* past_w, float* zir_w) {
+  float w[2 * LPD_MAX_LFAC];
+  lpd_sine_window(2 * lfac, w);
+  for (int i = 0; i < lfac; i++) {
+    past_w[i] = w[i] * w[2 * lfac - 1 - i];
+    zir_w[i] = 1.0f - w[lfac + i] * w[lfac + i];
   }
-  const float g = d->gain_index >= 0
-                      ? powf(10.0f, (float)d->gain_index / 28.0f) / sqrtf((float)d->length)
-                      : gain;
-  lpd_fac_synth_q(q, d->length, g, a, out);
-}
-
-/* Zero input response of 1 / A(z) from the memory `mem` (last outputs,
- * most recent first). */
-void lpd_zir(const float* a, const float* mem, float* out, int n) {
-  float m[LPD_M];
-  memcpy(m, mem, sizeof(m));
-  float zero[2 * LPD_MAX_LFAC];
-  memset(zero, 0, sizeof(float) * (size_t)n);
-  lpd_syn_filter(a, zero, out, n, m);
 }

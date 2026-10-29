@@ -197,6 +197,10 @@ using AacUsacCoreChannel = struct AacUsacCoreChannel_ {
   int prev_window_sequence; /* of the last FD frame */
   int prev_window_shape;
   float overlap[AAC_USAC_MAX_CORE_FRAME];
+  /* the random-sign generator of the noise filling, shared by the FD
+   * spectrum and the TCX: 0x3039 for the first channel of an element,
+   * 0x10932 for the second */
+  unsigned noise_seed;
   struct AacUsacFdChannel_* fd;
   struct AacUsacLpdChannel_* lpd;
 };

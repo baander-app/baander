@@ -49,6 +49,15 @@ extern "C" int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int 
   return AAC_OK;
 }
 
+extern "C" void aac_usac_lpd_fd_postfilter(AacUsacCoreChannel* ch, float* out, int frame_length,
+                                           int short_windows) {
+  (void)ch;
+  (void)out;
+  (void)frame_length;
+  (void)short_windows;
+}
+
+
 /* ── an arithmetic encoder matching the decoder ─────────────────── */
 
 struct ArithEncoder {
@@ -416,6 +425,7 @@ static void test_frame_768() {
   AacUsacCoreChannel ch;
   memset(&ch, 0, sizeof(ch));
   ch.prev_core_mode = -1;
+  ch.noise_seed = 0x3039u;
   ch.fd = aac_usac_fd_channel_create(768, 48000);
   CHECK(ch.fd != nullptr, "768-frame channel");
   CHECK(aac_usac_fd_channel_create(960, 48000) == nullptr, "960 is not a USAC frame length");
@@ -701,6 +711,7 @@ struct UsacDecoder {
         AacUsacCoreChannel* c = new AacUsacCoreChannel;
         memset(c, 0, sizeof(*c));
         c->prev_core_mode = -1;
+        c->noise_seed = i ? 0x10932u : 0x3039u;
         c->fd = aac_usac_fd_channel_create(cfg.frame_length, cfg.sample_rate);
         if (!c->fd) {
           return false;

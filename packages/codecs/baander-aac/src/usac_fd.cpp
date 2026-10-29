@@ -137,7 +137,6 @@ struct AacUsacFdChannel_ {
   AacMdct mdct_long, mdct_short;
   float win_long[2][kMaxFrame]; /* rising halves, sine and KBD */
   float win_short[2][kMaxShort];
-  unsigned noise_seed;
   /* the previous frame, for complex prediction and concealment */
   int have_prev;
   float prev_spec[kMaxFrame]; /* the final spectrum of the last FD frame */
@@ -487,13 +486,16 @@ float dequant(int q) {
  * quantised to zero above the noise filling start take, with random
  * sign, 2^((noise_level - 14) / 3) at the band's gain, raised by
  * noise_offset - 16 in a band whose every line is zero. */
-void dequantize(AacUsacFdChannel* fd, Channel* c, int noise_filling) {
+void dequantize(AacUsacFdChannel* fd, Channel* c, int noise_filling, unsigned* noise_seed) {
   const Ics* ics = &c->ics;
   const int* off = ics->swb_offset;
   const int n = ics->window_length;
   const int nf_start = (ics->num_windows == 8 ? 20 : 160) * fd->frame_length / AAC_FRAME_SIZE_LONG;
-  const int nf_on = noise_filling && c->noise_level > 0;
-  const float noise_val = nf_on ? exp2f((float)(c->noise_level - 14) / 3.0f) : 0.0f;
+  /* with noise filling on, every empty line above the start draws a
+   * random sign even at noise_level 0 (where the noise is zero), so the
+   * generator shared with the TCX stays in step */
+  const int nf_on = noise_filling;
+  const float noise_val = c->noise_level > 0 ? exp2f((float)(c->noise_level - 14) / 3.0f) : 0.0f;
   memset(c->spec, 0, sizeof(c->spec));
   int win = 0;
   for (int g = 0; g < ics->num_groups; g++) {
@@ -524,8 +526,8 @@ void dequantize(AacUsacFdChannel* fd, Channel* c, int noise_filling) {
           if (q[k]) {
             dst[k] = dequant(q[k]) * gain;
           } else if (fill) {
-            fd->noise_seed = fd->noise_seed * 1664525u + 1013904223u;
-            dst[k] = (fd->noise_seed & 0x10000u) ? -noise_val * gain : noise_val * gain;
+            *noise_seed = *noise_seed * 69069u + 5u;
+            dst[k] = (*noise_seed & 0x10000u) ? -noise_val * gain : noise_val * gain;
           }
         }
       }
@@ -675,22 +677,32 @@ void apply_cplx_pred(const AacUsacFdChannel* fd0, const AacUsacFdChannel* fd1,
 
 /* ── filterbank (7.9) ──────────────────────────────────────────── */
 
-/* The windowed IMDCT of one frame into buf[0..2 fl), with the slopes the
- * effective window sequence and the shapes imply; `left_shape` is the
- * previous frame's. */
+/* The IMDCT of one frame into buf[0..2 fl) with the left slope the
+ * effective window sequence and the shapes imply (`left_shape` is the
+ * previous frame's); the right slope stays unapplied, as the next frame
+ * applies it: an LPD frame windows the FD tail with its own slope.
+ * After an LPD frame the left slope is the sine slope of 2 lfac
+ * (frame_length / 4) centred on the LPD end at fl / 2; with a FAC the
+ * windowed samples before fl / 2 are dropped, the FAC terms in the
+ * overlap buffer replace them. */
 void imdct_frame(const AacUsacFdChannel* fd, const float* spec, int effective, int left_shape,
-                 int shape, float* buf) {
+                 int shape, int after_lpd, int fac_present, float* buf) {
   const int fl = fd->frame_length;
   const int sl = fd->short_length;
   const int start = (fl - sl) / 2;
   const float* lw_left = fd->win_long[left_shape];
-  const float* lw_right = fd->win_long[shape];
   const float* sw_left = fd->win_short[left_shape];
   const float* sw_right = fd->win_short[shape];
 
   if (effective != AAC_WIN_EIGHT_SHORT) {
     aac_imdct(&fd->mdct_long, spec, buf);
-    if (left_slope_short(effective)) {
+    if (after_lpd) {
+      const int lfac = fl / 8;
+      memset(buf, 0, (size_t)(fl / 2 - lfac) * sizeof(float));
+      for (int i = 0; i < 2 * lfac; i++) {
+        buf[fl / 2 - lfac + i] *= (float)sin(3.14159265358979323846 * (i + 0.5) / (4.0 * lfac));
+      }
+    } else if (left_slope_short(effective)) {
       memset(buf, 0, (size_t)start * sizeof(float));
       for (int i = 0; i < sl; i++) {
         buf[start + i] *= sw_left[i];
@@ -700,15 +712,8 @@ void imdct_frame(const AacUsacFdChannel* fd, const float* spec, int effective, i
         buf[i] *= lw_left[i];
       }
     }
-    if (right_slope_short(effective)) {
-      for (int i = 0; i < sl; i++) {
-        buf[fl + start + i] *= sw_right[sl - 1 - i];
-      }
-      memset(buf + fl + start + sl, 0, (size_t)start * sizeof(float));
-    } else {
-      for (int i = 0; i < fl; i++) {
-        buf[fl + i] *= lw_right[fl - 1 - i];
-      }
+    if (after_lpd && fac_present) {
+      memset(buf, 0, (size_t)(fl / 2) * sizeof(float));
     }
     return;
   }
@@ -720,7 +725,30 @@ void imdct_frame(const AacUsacFdChannel* fd, const float* spec, int effective, i
     float* dst = buf + start + w * sl;
     for (int i = 0; i < sl; i++) {
       dst[i] += sb[i] * left[i];
-      dst[sl + i] += sb[sl + i] * sw_right[sl - 1 - i];
+      dst[sl + i] += w == 7 ? sb[sl + i] : sb[sl + i] * sw_right[sl - 1 - i];
+    }
+  }
+  if (after_lpd && fac_present) {
+    memset(buf, 0, (size_t)(fl / 2) * sizeof(float));
+  }
+}
+
+/* The right slope of the previous FD frame on its tail in the overlap
+ * buffer. */
+void apply_right_slope(const AacUsacFdChannel* fd, const AacUsacCoreChannel* ch, float* tail) {
+  const int fl = fd->frame_length;
+  const int sl = fd->short_length;
+  const int start = (fl - sl) / 2;
+  if (right_slope_short(ch->prev_window_sequence)) {
+    const float* sw = fd->win_short[ch->prev_window_shape];
+    for (int i = 0; i < sl; i++) {
+      tail[start + i] *= sw[sl - 1 - i];
+    }
+    memset(tail + start + sl, 0, (size_t)start * sizeof(float));
+  } else {
+    const float* lw = fd->win_long[ch->prev_window_shape];
+    for (int i = 0; i < fl; i++) {
+      tail[i] *= lw[fl - 1 - i];
     }
   }
 }
@@ -728,13 +756,28 @@ void imdct_frame(const AacUsacFdChannel* fd, const float* spec, int effective, i
 /* Overlap-adds one frame and leaves the second half for the next, with
  * the core channel state the contract in usac.h describes. */
 void synthesize(AacUsacFdChannel* fd, AacUsacCoreChannel* ch, const float* spec, int effective,
-                int shape, float* out) {
+                int shape, int fac_present, float* out) {
   const int fl = fd->frame_length;
-  const int left_shape = ch->prev_core_mode == 1 ? AAC_WIN_SINE : ch->prev_window_shape;
+  const int after_lpd = ch->prev_core_mode == 1;
+  const int left_shape = after_lpd ? AAC_WIN_SINE : ch->prev_window_shape;
   float buf[2 * kMaxFrame];
-  imdct_frame(fd, spec, effective, left_shape, shape, buf);
+  imdct_frame(fd, spec, effective, left_shape, shape, after_lpd, fac_present, buf);
+  if (ch->prev_core_mode == 0) {
+    apply_right_slope(fd, ch, ch->overlap);
+  } else if (after_lpd && !fac_present) {
+    /* the LPD tail around the superframe end takes the falling slope
+     * of 2 fp (fp = lfac, or frame_length / 16 before short windows) */
+    const int fp = effective == AAC_WIN_EIGHT_SHORT ? fl / 16 : fl / 8;
+    for (int i = 0; i < 2 * fp; i++) {
+      ch->overlap[fl / 2 - fp + i] *= (float)sin(3.14159265358979323846 * (2 * fp - i - 0.5) / (4.0 * fp));
+    }
+    memset(ch->overlap + fl / 2 + fp, 0, (size_t)(fl / 2 - fp) * sizeof(float));
+  }
   for (int i = 0; i < fl; i++) {
     out[i] = (ch->overlap[i] + buf[i]) * kOutputScale;
+  }
+  if (after_lpd) {
+    aac_usac_lpd_fd_postfilter(ch, out, fl, effective == AAC_WIN_EIGHT_SHORT);
   }
   memcpy(ch->overlap, buf + fl, (size_t)fl * sizeof(float));
   ch->prev_core_mode = 0;
@@ -791,7 +834,6 @@ void aac_usac_fd_channel_reset(AacUsacFdChannel* c) {
     return;
   }
   aac_usac_arith_reset(&c->arith);
-  c->noise_seed = 0x2545F491u;
   c->have_prev = 0;
   memset(c->prev_spec, 0, sizeof(c->prev_spec));
   memset(c->prev_alpha_re, 0, sizeof(c->prev_alpha_re));
@@ -845,7 +887,9 @@ int aac_usac_core_decode(AacUsacCoreChannel* const* ch, int nr_channels, int lfe
                                       indep)) != AAC_OK) {
       return ret;
     }
-    dequantize(ch[i]->fd, &c[i], noise_filling);
+    /* the random signs come from the channel's generator, shared with
+     * the TCX noise filling */
+    dequantize(ch[i]->fd, &c[i], noise_filling, &ch[i]->noise_seed);
   }
   /* the stereo tools, with TNS before them (tns_on_lr 0) or after */
   if (both_fd && !st.tns_on_lr) {
@@ -872,7 +916,7 @@ int aac_usac_core_decode(AacUsacCoreChannel* const* ch, int nr_channels, int lfe
     fd->have_prev = 1;
     const int effective = effective_sequence(ch[i], c[i].ics.window_sequence);
     remember(fd, c[i].spec, effective, c[i].ics.window_shape);
-    synthesize(fd, ch[i], c[i].spec, effective, c[i].ics.window_shape, out[i]);
+    synthesize(fd, ch[i], c[i].spec, effective, c[i].ics.window_shape, c[i].fac_present, out[i]);
   }
   return AAC_OK;
 }
@@ -901,6 +945,6 @@ void aac_usac_core_conceal(AacUsacCoreChannel* const* ch, int nr_channels, int f
       }
     }
     fd->have_prev = 0;
-    synthesize(fd, ch[i], spec, effective, fd->last_window_shape, out[i]);
+    synthesize(fd, ch[i], spec, effective, fd->last_window_shape, 0, out[i]);
   }
 }

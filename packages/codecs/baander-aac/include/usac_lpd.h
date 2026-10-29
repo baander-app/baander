@@ -52,6 +52,13 @@ void aac_usac_lpd_fac_to_fd_gain(AacUsacCoreChannel* ch, const int* fac_q, int f
 int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
                         int frame_length);
 
+/* The bass postfilter continues into the FD frame that follows an LPD
+ * frame: the FD module calls this on that frame's core output (full
+ * scale, `frame_length` samples) after its overlap-add, with
+ * `short_windows` set for an EIGHT_SHORT_SEQUENCE frame. */
+void aac_usac_lpd_fd_postfilter(AacUsacCoreChannel* ch, float* out, int frame_length,
+                                int short_windows);
+
 /* Concealment of a lost LPD frame: repeats the last excitation with
  * decaying gain and keeps the contract. */
 void aac_usac_lpd_conceal(AacUsacCoreChannel* ch, int frame_length, float* out);
