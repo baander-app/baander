@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development\Build;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Build\BuildRequest;
 use Baander\Tooling\Configuration\{ApplicationLayout, ToolingConfiguration};
-use Baander\Tooling\Development\Docker;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Development\Connections;
+use Baander\Tooling\Build\Source;
 use Baander\Tooling\Development\StateStore;
+use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
 class Builder
 {
-    public function __construct(private readonly ?StateStore $store, private readonly Runner $runner, private readonly ToolingConfiguration $configuration) {}
+    private readonly Connections $connections;
+
+    public function __construct(private readonly ?StateStore $store, private readonly CommandExecutor $runner, private readonly ToolingConfiguration $configuration, ?Connections $connections = null)
+    {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance
      * @return array<string,mixed>
@@ -24,8 +32,8 @@ class Builder
         if ($this->store === null) {
             throw new WorkflowError('Release preparation requires an instance state store.');
         }
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $builds = $this->store->directory($instance['id']) . '/builds';
         PrivateDirectory::prepare($builds);
         $source = $builds . '/' . bin2hex(random_bytes(16));
@@ -35,6 +43,8 @@ class Builder
             $revision = Source::snapshotWorktree($this->runner, $instance['worktree'], $source);
         }
         $layout = ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json');
+        $media = new \Baander\Tooling\Development\Mounts($layout)->preflight($instance['media'] ?? [], $this->store->root, new \Baander\Tooling\Development\Runtime($this->store, $this->runner)->environment($instance), array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target'));
+        $instance['media'] = $media;
         $instance['target_revision'] = $revision;
         $this->store->save($instance['id'], $instance);
         $release = ['revision' => $revision, 'source' => $source, 'layout' => $layout->toArray()];
@@ -45,7 +55,7 @@ class Builder
         $release['operator_image'] = $this->build($docker, $source, 'dev-operator', $revision);
         foreach (['postgres_image' => 'postgres', 'nginx_image' => 'nginx', 'redis_image' => 'developmentRedis'] as $key => $role) {
             $selection = $this->configuration->images->role($role);
-            $retained = in_array($role, ['postgres', 'developmentRedis'], true) ? ($instance[$key] ?? $instance['release'][$key] ?? null) : null;
+            $retained = in_array($role, ['postgres', 'developmentRedis'], true) ? ($instance[$key] ?? $instance['release']['images'][$key]['resolvedId'] ?? null) : null;
             if ($retained !== null) {
                 $release[$key] = $retained;
             } elseif ($role === 'postgres' && $this->configuration->provenance['images.postgres.reference'] === 'defaults') {
@@ -66,15 +76,15 @@ class Builder
                 $release['image_pins'][$key] = $pin;
             }
         }
-        return $release;
+        return \Baander\Tooling\Development\ReleaseContract::prepared($release, $instance, $this->configuration, $this->store)->toArray();
     }
 
-    public function imageId(Docker $docker, string $name): string
+    public function imageId(Client $docker, string $name): string
     {
         return trim($docker->run(['image', 'inspect', '--format', '{{.Id}}', $name])->stdout);
     }
 
-    public function build(Docker $docker, string $source, string $target, string $revision): string
+    public function build(Client $docker, string $source, string $target, string $revision): string
     {
         $tag = 'baander-development-' . $target . ':' . $revision . '-' . basename($source);
         $request = BuildRequest::fromSource($source, $target, $revision, $tag, $this->configuration->images->role('operatorHelper'));
@@ -82,20 +92,18 @@ class Builder
         return $request->imageId($docker->run(['image', 'inspect', $tag])->stdout);
     }
 
-    public function frontend(Docker $docker, string $source, string $image): void
+    public function frontend(Client $docker, string $source, string $image): void
     {
         $name = 'baander-assets-' . bin2hex(random_bytes(6));
-        try {
-            $docker->run([
-                'create',
-                '--name',
-                $name,
-                '--workdir',
-                '/work/ui/web',
-                $image,
-                'sh',
-                '-ec',
-                'yarn install --immutable && yarn build',
+        $ledger = new \Baander\Tooling\Resources\ResourceLedger(
+            dirname($source) . '/' . basename($source) . '-frontend-resources.json',
+            $docker,
+            $this->connections->environment(),
+        );
+        $ledger->scoped(function () use ($ledger, $docker, $source, $image, $name): void {
+            $ledger->create(\Baander\Tooling\Resources\ResourceKind::Container, $name, [
+                '--workdir', '/work/ui/web', $image,
+                'sh', '-ec', 'yarn install --immutable && yarn build',
             ]);
             $docker->run(['cp', $source . '/.', $name . ':/work'], timeout: 300);
             $docker->run(['start', '--attach', $name], timeout: null, logPath: dirname($source) . '/' . basename($source) . '-frontend.log');
@@ -103,8 +111,6 @@ class Builder
                 throw new WorkflowError('Frontend build failed before activation.');
             }
             $docker->run(['cp', $name . ':/work/public/.', $source . '/public'], timeout: 300);
-        } finally {
-            $docker->run(['rm', '--force', $name], check: false);
-        }
+        }, $this->configuration->budgets->seconds('cleanup'));
     }
 }

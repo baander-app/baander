@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\CommandExecutor;
+use Baander\Tooling\Process\ProcessSpec;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -11,7 +13,7 @@ final class Host
 {
     public function __construct(
         private readonly StateStore $store,
-        private readonly Runner $runner,
+        private readonly CommandExecutor $executor,
         private readonly HostSystem $system = new HostSystem(),
     ) {}
 
@@ -28,7 +30,7 @@ final class Host
         if ($manager === null) {
             throw new WorkflowError('The NetworkManager daemon executable is unavailable.');
         }
-        $configuration = $this->runner->run([$manager, '--print-config'])->stdout;
+        $configuration = $this->executor->run(new ProcessSpec([$manager, '--print-config'], processGroup: true))->stdout;
         if (preg_match('/^\s*(dns\s*=\s*none|rc-manager\s*=\s*unmanaged)\s*$/m', $configuration) === 1) {
             throw new WorkflowError('NetworkManager DNS is disabled; resolve host DNS ownership before setup.');
         }
@@ -45,10 +47,10 @@ final class Host
     /** @param list<string> $paths */
     public function sharePaths(array $paths): void
     {
-        $ca = Environment::resolvedPath($this->store->root . '/host-setup/ca');
+        $ca = \Baander\Tooling\Filesystem\Paths::resolvedPath($this->store->root . '/host-setup/ca');
         $sources = [];
         foreach ($paths as $path) {
-            $source = realpath(Environment::absolutePath($path));
+            $source = realpath(\Baander\Tooling\Filesystem\Paths::absolutePath($path));
             if ($source === false || !is_dir($source)) {
                 throw new WorkflowError('Select existing directories for container access.');
             }
@@ -66,7 +68,7 @@ final class Host
         }
         PrivateDirectory::prepare($ca);
         PrivateDirectory::prepare($this->store->root);
-        $this->runner->run([$executable, '-t', 'container_file_t', '-l', 's0', $this->store->root]);
+        $this->executor->run(new ProcessSpec([$executable, '-t', 'container_file_t', '-l', 's0', $this->store->root], processGroup: true));
         $gateway = $this->store->root . '/gateway';
         PrivateDirectory::prepare($gateway);
         $instances = [];
@@ -79,7 +81,7 @@ final class Host
             if (is_link($source)) {
                 throw new WorkflowError('Refusing to relabel a symlink instance directory.');
             }
-            $this->runner->run([$executable, '-R', '--no-dereference', '-t', 'container_file_t', '-l', 's0', $source], timeout: null);
+            $this->executor->run(new ProcessSpec([$executable, '-R', '--no-dereference', '-t', 'container_file_t', '-l', 's0', $source], timeout: null, processGroup: true));
         }
     }
 
@@ -111,12 +113,12 @@ final class Host
         PrivateDirectory::prepare($ca);
         $environment = ['CAROOT' => $ca];
         if ($installTrust) {
-            $this->runner->run(['mkcert', '-install'], env: $environment, interactive: true);
+            $this->executor->run(new ProcessSpec(['mkcert', '-install'], environment: $environment, passthrough: true));
         }
         foreach (['cert.pem', 'key.pem'] as $name) {
             PrivateDirectory::assertNoSymlinks($directory . '/' . $name);
         }
-        $this->runner->run([
+        $this->executor->run(new ProcessSpec([
             'mkcert',
             '-cert-file',
             $directory . '/cert.pem',
@@ -124,7 +126,7 @@ final class Host
             $directory . '/key.pem',
             'baander.test',
             '*.baander.test',
-        ], env: $environment);
+        ], environment: $environment, processGroup: true));
         if (!chmod($directory . '/key.pem', 0600)) {
             throw new WorkflowError('Cannot make the gateway private key private.');
         }

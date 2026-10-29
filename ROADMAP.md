@@ -222,6 +222,26 @@ A fresh WorkerCleanup and WorkerOperatorResources run passes 41 tests and 263
 assertions, resolving the 28 mixed-loaded-class errors recorded above. The earlier
 combined run remains nonpassing evidence; full CI acceptance remains open.
 
+Development migration checkpoint (U6), 2026-10-29: implementation is prepared
+for saved versioned release contracts carrying configuration, layout, image IDs,
+Docker target and source inputs. Mount validation precedes mutation; disposable
+helpers have independent cleanup, and historical image retirement works without
+current media paths. CLI composition captures environment, local settings and
+budgets. Worker-domain consumers receive explicit `APP_HOME` and distinguish
+admission checks from retirement checks.
+
+The final affected development group passes 61 tests and 242 assertions. An
+earlier 280-test integration run had 12 fixture/configuration failures: nine are
+covered by that final group, while separate bootstrap and database controls pass
+one test/four assertions and two tests/six assertions. Local/invocation checks
+under `CI=1` pass 13 tests and 39 assertions. These follow-ups repair the named
+failures without establishing a passing 280-test run. Worker-domain checks pass
+327 tests and 534 assertions; focused domain static analysis passes nine files.
+Full tooling static analysis passes across 376 files, and formatting fixes 12
+files. Six generated-manifest Docker cases, actual preview state conversion,
+U7–U8/U11 delivery, final CI-image and live qualification, and final code review
+remain open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

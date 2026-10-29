@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Host;
+use Baander\Tooling\Docker\Target;
+use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Development\Gateway;
 use Baander\Tooling\Development\HostSystem;
-use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, CommandFailure};
+use Baander\Tooling\Development\Environment;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/dev-core-runner.php';
+require_once __DIR__ . '/Fixtures/host-command-executor.php';
 
 final class DevelopmentHostTest extends TestCase
 {
@@ -61,9 +64,9 @@ final class DevelopmentHostTest extends TestCase
         };
     }
 
-    private function runner(): DevCoreRunner
+    private function runner(): HostCommandExecutor
     {
-        return new DevCoreRunner(static function (array $arguments): ?ProcessResult {
+        return new HostCommandExecutor(static function (array $arguments): ?ProcessResult {
             if ($arguments[0] === 'mkcert' && in_array('-key-file', $arguments, true)) {
                 file_put_contents($arguments[array_search('-key-file', $arguments, true) + 1], 'private-key');
                 file_put_contents($arguments[array_search('-cert-file', $arguments, true) + 1], 'certificate');
@@ -212,32 +215,21 @@ final class DevelopmentHostTest extends TestCase
 
     public function testGatewayOwnsNetworkAndRestoresConfigurationWhenReloadFails(): void
     {
-        $failureFlag = $this->root . '/reload-fails';
-        $runner = new DevCoreRunner(function (array $arguments) use ($failureFlag): ProcessResult {
-            $output = '';
-            if (in_array('info', $arguments, true)) {
-                $output = '{"ID":"daemon"}';
-            } elseif (in_array('inspect', $arguments, true)) {
-                $output = json_encode(
-                    [[
-                        'Labels' => ['app.baander.development.owner' => 'gateway-' . $this->store->scope()],
-                        'IPAM' => ['Config' => [['Subnet' => '172.29.20.0/24']]],
-                    ]],
-                    JSON_THROW_ON_ERROR,
-                );
-            } elseif (is_file($failureFlag) && in_array('reload', $arguments, true)) {
-                throw new WorkflowError('reload failed');
-            }
-            return new ProcessResult(0, null, false, false, $output, '', 0);
-        });
+        $failureFlag = $this->store->root . '/reload-fails';
+        $executable = $this->root . '/host-gateway-docker';
+        file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\n\$_SERVER['argv'] = [\$_SERVER['argv'][0], "
+            . var_export($this->store->root, true) . ", ...array_slice(\$_SERVER['argv'], 1)];\nrequire "
+            . var_export(__DIR__ . '/Fixtures/host-gateway-docker.php', true) . ";\n");
+        chmod($executable, 0700);
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
         $gateway = new Gateway($this->store, $runner);
         $instance = [
             'id' => 'persistent',
             'hostname' => 'baander.test',
             'project' => 'owned',
-            'docker' => ['executable' => '/fake/docker', 'context' => 'selected', 'daemon_id' => 'daemon'],
+            'docker' => new Target($executable, 'unix:///tmp/host-fixture-docker.sock', 'daemon', 'selected', null)->toArray(),
         ];
-        $network = $gateway->configure($instance, ['nginx_image' => 'nginx@sha256:original']);
+        $network = $gateway->configure($instance, ['images' => ['nginx_image' => ['resolvedId' => 'nginx@sha256:original']]]);
         self::assertSame('172.29.20.2', $network['ipv4_address']);
         $gateway->route($instance);
         $original = file_get_contents($gateway->configuration);
@@ -246,14 +238,15 @@ final class DevelopmentHostTest extends TestCase
         try {
             $gateway->route($instance, true);
             self::fail('Reload failure ignored');
-        } catch (WorkflowError) {
+        } catch (WorkflowError|CommandFailure $error) {
+            self::assertSame(17, $error->getCode());
             self::assertSame($original, file_get_contents($gateway->configuration));
             self::assertSame($routes, file_get_contents($gateway->directory . '/routes.json'));
         }
         unlink($failureFlag);
         $gateway->remove($instance);
         self::assertSame('{}', trim((string) file_get_contents($gateway->directory . '/routes.json')));
-        $gateway->configure($instance, ['nginx_image' => 'nginx@sha256:new']);
+        $gateway->configure($instance, ['images' => ['nginx_image' => ['resolvedId' => 'nginx@sha256:new']]]);
         self::assertSame('nginx@sha256:original', $gateway->record()['nginx_image']);
     }
 
@@ -266,7 +259,7 @@ final class DevelopmentHostTest extends TestCase
         } catch (WorkflowError $error) {
             self::assertStringContainsString('hostname', $error->getMessage());
         }
-        $runner = new DevCoreRunner(static fn(array $arguments): ProcessResult => new ProcessResult(
+        $runner = new HostCommandExecutor(static fn(array $arguments): ProcessResult => new ProcessResult(
             0,
             null,
             false,
@@ -277,7 +270,7 @@ final class DevelopmentHostTest extends TestCase
         ));
         $this->expectExceptionMessage('not owned');
         Gateway::ownedNetwork(
-            new \Baander\Tooling\Development\Docker($runner, ['executable' => '/fake/docker', 'context' => 'selected']),
+            new Client($runner, new Target('/fake/docker', 'unix:///tmp/host-fixture-docker.sock', 'daemon', 'selected', null), []),
             'network',
             'owned',
         );

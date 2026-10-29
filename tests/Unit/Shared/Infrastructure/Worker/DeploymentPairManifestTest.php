@@ -13,7 +13,7 @@ final class DeploymentPairManifestTest extends TestCase
 {
     public function testEachUnitHasItsOwnEnforcedBudgetAndSharedPrivateSocketVolume(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson(json_encode(self::fields(), JSON_THROW_ON_ERROR));
+        $manifest = DeploymentOperatorManifest::fromJson(json_encode(self::fields(), JSON_THROW_ON_ERROR), '/var/www/html');
         $control = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
         $execution = $manifest->recipe(DeploymentUnit::Execution, new DeploymentRuntimeEnvironment());
 
@@ -39,15 +39,15 @@ final class DeploymentPairManifestTest extends TestCase
         $fields['executionCpuSet'] = [0, 1];
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('disjoint');
-        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
 
     public function testPolicyChangesAlterBothUnitRecipesAndFingerprint(): void
     {
         $fields = self::fields();
-        $original = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        $original = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $fields['autoscaling']['targetBacklogAgeMs'] = 20000;
-        $changed = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        $changed = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $environment = new DeploymentRuntimeEnvironment();
         self::assertNotSame($original->fingerprint($environment), $changed->fingerprint($environment));
         foreach (DeploymentUnit::cases() as $unit) {
@@ -60,7 +60,7 @@ final class DeploymentPairManifestTest extends TestCase
         $fields = self::fields();
         $fields['autoscaling']['maximumConcurrency'] = 4;
         $this->expectException(\InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+        DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
 
     /** @return array<string,mixed> */

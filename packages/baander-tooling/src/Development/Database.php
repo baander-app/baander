@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, EngineExecutor, ExecutionContext};
+use Baander\Tooling\Resources\{ResourceLedger, ResourceKind, DisposableContainer};
+use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -34,26 +37,31 @@ SELECT CASE WHEN to_regclass('doctrine_migration_versions') IS NOT NULL THEN
 COMMIT;
 SQL;
 
+    private readonly Connections $connections;
+
     public function __construct(
         private readonly StateStore $store,
-        private readonly Runner $runner,
-    ) {}
+        private readonly CommandExecutor $runner,
+        ?Connections $connections = null,
+    ) {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance */
-    public function docker(array $instance): Docker
+    public function docker(array $instance): \Baander\Tooling\Docker\Client
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         return $docker;
     }
 
     /** @param array<string,mixed> $instance */
-    public function container(array $instance, Docker $docker): string
+    public function container(array $instance, \Baander\Tooling\Docker\Client $docker): string
     {
         if (!empty($instance['adoption']) && empty($instance['ownership_transferred'])) {
             return $instance['adoption']['containers']['postgres'];
         }
-        $identifier = trim($docker->compose($instance, ['ps', '-q', 'postgres'])->stdout);
+        $identifier = trim($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', 'postgres'])->stdout);
         if ($identifier === '') {
             throw new WorkflowError('The recorded PostgreSQL container is unavailable.');
         }
@@ -172,6 +180,10 @@ SQL;
     public function checkpoint(array $instance, array $release): array
     {
         self::quiescent($instance);
+        $receipt = $this->store->directory($instance['id']) . '/checkpoint-resources.json';
+        if (file_exists($receipt) || is_link($receipt)) {
+            throw new WorkflowError('Recover unresolved checkpoint resources before creating another checkpoint: ' . $receipt);
+        }
         $catalog = $this->inspect($instance, $release);
         $docker = $this->docker($instance);
         $container = $this->container($instance, $docker);
@@ -179,6 +191,7 @@ SQL;
         $directory = $this->store->directory($instance['id']) . '/checkpoints/' . bin2hex(random_bytes(16));
         PrivateDirectory::prepare($directory);
         $archive = '/tmp/baander-checkpoint-' . basename($directory) . '.dump';
+        $transferred = false;
         try {
             $docker->run([
                 'exec',
@@ -190,8 +203,19 @@ SQL;
                 $archive,
             ], timeout: null);
             $docker->run(['cp', $container . ':' . $archive, $directory . '/database.dump'], timeout: null);
+            $transferred = true;
         } finally {
-            $docker->run(['exec', $container, 'rm', '-f', $archive], check: false);
+            // Keep the source archive when transfer is unconfirmed. Its container is retained instance ownership.
+            if ($transferred) {
+                $cleanup = new EngineExecutor(ExecutionContext::bounded($release['effective']['budgets']['cleanup'], $this->connections->environment(), ignoreCancellation: true));
+                try {
+                    $cleanupDocker = new Client($cleanup, $docker->target, $this->connections->environment());
+                    $cleanupDocker->validateIdentity();
+                    $cleanupDocker->run(['exec', $container, '/bin/sh', '-ec', 'rm -f -- "$1"; test ! -e "$1"', 'checkpoint-cleanup', $archive]);
+                } finally {
+                    $cleanup->close();
+                }
+            }
         }
         if (!is_file($directory . '/database.dump') || filesize($directory . '/database.dump') === 0) {
             throw new WorkflowError('Database checkpoint is missing or empty; live migration remains blocked.');
@@ -199,9 +223,9 @@ SQL;
         chmod($directory . '/database.dump', 0600);
         copy($this->store->directory($instance['id']) . '/env.json', $directory . '/env.json');
         chmod($directory . '/env.json', 0600);
-        $model = new Runtime($this->store, $this->runner)->config($instance, $release);
+        $model = new Runtime($this->store, $this->runner, $this->connections)->config($instance, $release);
         $redisId = empty($instance['ownership_transferred']) ? ($instance['adoption']['containers']['redis'] ?? null) : null;
-        $redisId = $redisId ?: trim($docker->compose($instance, ['ps', '-q', 'redis'])->stdout);
+        $redisId = $redisId ?: trim($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', 'redis'])->stdout);
         if ($redisId === '') {
             throw new WorkflowError('The recorded Redis container is unavailable for a consistent checkpoint.');
         }
@@ -235,37 +259,35 @@ SQL;
         if ($observed['Id'] !== $redisId || $observed['State']['Running']) {
             throw new WorkflowError('Redis did not stop; writable persistence cannot be checkpointed consistently.');
         }
-        $snapshots = [];
-        foreach (['redis', 'var', 'secrets', 'storage', 'conversions', 'transcode_state'] as $key) {
-            $nested = $key === 'transcode_state'
-                && !empty($instance['adoption'])
-                && empty($instance['ownership_transferred'])
-                && !isset($instance['state_mounts'][$key]);
-            $mount = $instance['state_mounts'][$nested ? 'var' : $key] ?? [
-                'type' => 'volume',
-                'source' => $model['volumes'][$key]['name'],
-            ];
-            $name = 'baander-checkpoint-' . bin2hex(random_bytes(16));
-            $command = $nested
-                ? 'umask 077; if [ -d /snapshot/transcode_state ]; then tar -cpf /tmp/state.tar -C /snapshot/transcode_state .; else tar -cpf /tmp/state.tar --files-from /dev/null; fi'
-                : 'umask 077; tar -cpf /tmp/state.tar -C /snapshot .';
-            $docker->run([
-                'create',
-                '--name',
-                $name,
-                '--network',
-                'none',
-                '--user',
-                '0:0',
-                '--entrypoint',
-                '/bin/sh',
-                '--mount',
-                'type=' . $mount['type'] . ',src=' . $mount['source'] . ',dst=/snapshot,readonly',
-                $release['app_image'],
-                '-ec',
-                $command,
-            ]);
-            try {
+        $ledger = new ResourceLedger($receipt, $docker, $this->connections->environment());
+        $snapshots = $ledger->scoped(function () use ($instance, $release, $model, $directory, $docker, $ledger): array {
+            $snapshots = [];
+            foreach (['redis', 'var', 'secrets', 'storage', 'conversions', 'transcode_state'] as $key) {
+                $nested = $key === 'transcode_state'
+                    && !empty($instance['adoption'])
+                    && empty($instance['ownership_transferred'])
+                    && !isset($instance['state_mounts'][$key]);
+                $mount = $instance['state_mounts'][$nested ? 'var' : $key] ?? [
+                    'type' => 'volume',
+                    'source' => $model['volumes'][$key]['name'],
+                ];
+                $name = 'baander-checkpoint-' . bin2hex(random_bytes(16));
+                $command = $nested
+                    ? 'umask 077; if [ -d /snapshot/transcode_state ]; then tar -cpf /tmp/state.tar -C /snapshot/transcode_state .; else tar -cpf /tmp/state.tar --files-from /dev/null; fi'
+                    : 'umask 077; tar -cpf /tmp/state.tar -C /snapshot .';
+                $ledger->create(ResourceKind::Container, $name, [
+                    '--network',
+                    'none',
+                    '--user',
+                    '0:0',
+                    '--entrypoint',
+                    '/bin/sh',
+                    '--mount',
+                    'type=' . $mount['type'] . ',src=' . $mount['source'] . ',dst=/snapshot,readonly',
+                    $release['images']['app_image']['resolvedId'],
+                    '-ec',
+                    $command,
+                ]);
                 $docker->run(['start', '--attach', $name], timeout: null);
                 if (trim($docker->run(['inspect', '--format', '{{.State.ExitCode}}', $name])->stdout) !== '0') {
                     throw new WorkflowError('Writable state checkpoint failed; preserve the database archive.');
@@ -274,16 +296,15 @@ SQL;
                 $docker->run(['cp', $name . ':/tmp/state.tar', $target], timeout: null);
                 chmod($target, 0600);
                 $snapshots[] = $key;
-            } finally {
-                $docker->run(['rm', '--force', $name], check: false);
             }
-        }
+            return $snapshots;
+        }, $release['effective']['budgets']['cleanup']);
         $checkpoint = [
             'directory' => $directory,
             'catalog' => $catalog,
             'state' => $snapshots,
             'verified' => false,
-            'postgres_image' => $instance['postgres_image'] ?? $release['postgres_image'],
+            'postgres_image' => $instance['postgres_image'] ?? $release['images']['postgres_image']['resolvedId'],
             'target_revision' => $release['revision'],
             'archive_sha256' => hash_file('sha256', $directory . '/database.dump'),
         ];
@@ -298,8 +319,12 @@ SQL;
      */
     public function rehearse(array $instance, array $release, array $checkpoint): array
     {
-        $docker = $this->docker($instance);
         $directory = $checkpoint['directory'];
+        $receipt = $directory . '/rehearsal-resources.json';
+        if (file_exists($receipt) || is_link($receipt)) {
+            throw new WorkflowError('Recover unresolved rehearsal resources before retrying: ' . $receipt);
+        }
+        $docker = $this->docker($instance);
         if (hash_file('sha256', $directory . '/database.dump') !== $checkpoint['archive_sha256']) {
             throw new WorkflowError('Database archive changed after checkpoint creation.');
         }
@@ -308,18 +333,20 @@ SQL;
         }
         $name = 'baander-rehearsal-' . bin2hex(random_bytes(8));
         $network = $name . '-private';
-        $env = new Runtime($this->store, $this->runner)->environment($instance);
+        $env = new Runtime($this->store, $this->runner, $this->connections)->environment($instance);
         $url = 'postgresql://' . rawurlencode($env['DB_USERNAME'])
             . ':' . rawurlencode($env['DB_PASSWORD'])
             . '@database:5432/' . rawurlencode($env['DB_DATABASE'])
             . '?serverVersion=18&charset=utf8';
-        $docker->run(['network', 'create', '--internal', $network]);
-        try {
-            $docker->run([
-                'run',
-                '-d',
-                '--name',
-                $name,
+        $commandEnvironment = array_replace($this->connections->environment(), array_intersect_key($env, array_flip(['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET'])), [
+            'POSTGRES_PASSWORD' => $env['DB_PASSWORD'], 'POSTGRES_USER' => $env['DB_USERNAME'],
+            'POSTGRES_DB' => $env['DB_DATABASE'], 'DATABASE_URL' => $url,
+        ]);
+        $docker = new Client($docker->executor, $docker->target, $commandEnvironment);
+        $ledger = new ResourceLedger($receipt, $docker, $this->connections->environment());
+        $result = $ledger->scoped(function () use ($docker, $ledger, $network, $name, $instance, $release, $checkpoint, $directory): array {
+            $ledger->create(ResourceKind::Network, $network, ['--internal']);
+            $ledger->create(ResourceKind::Container, $name, [
                 '--network',
                 $network,
                 '--network-alias',
@@ -331,11 +358,8 @@ SQL;
                 '--env',
                 'POSTGRES_DB',
                 $checkpoint['postgres_image'],
-            ], env: [
-                'POSTGRES_PASSWORD' => $env['DB_PASSWORD'],
-                'POSTGRES_USER' => $env['DB_USERNAME'],
-                'POSTGRES_DB' => $env['DB_DATABASE'],
             ]);
+            $docker->run(['start', $name]);
             $docker->run([
                 'exec',
                 $name,
@@ -359,64 +383,47 @@ SQL;
             }
             for ($attempt = 0; $attempt < 2; ++$attempt) {
                 $candidate = $name . '-app-' . $attempt;
-                try {
-                    $arguments = [
-                        'create',
-                        '--name',
-                        $candidate,
-                        '--network',
-                        $network,
-                        '--user',
-                        '0:0',
-                        '--env',
-                        'DB_HOST=database',
-                        '--env',
-                        'DATABASE_URL',
-                        '--env',
-                        'APP_ENV=prod',
-                        '--env',
-                        'APP_DEBUG=0',
-                    ];
-                    foreach (['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET'] as $key) {
-                        array_push($arguments, '--env', $key);
-                    }
-                    array_push(
-                        $arguments,
-                        '--entrypoint',
-                        '/bin/sh',
-                        $release['app_image'],
-                        '-ec',
-                        'mkdir -p config/secrets; tar -xpf /tmp/secrets.tar -C config/secrets; exec php -d memory_limit=512M bin/console "$@"',
-                        'rehearsal',
-                        'doctrine:migrations:migrate',
-                        '--no-interaction',
-                    );
-                    $docker->run(
-                        $arguments,
-                        env: array_intersect_key($env, array_flip([
-                            'DB_USERNAME',
-                            'DB_PASSWORD',
-                            'DB_DATABASE',
-                            'APP_SECRET',
-                        ])) + ['DATABASE_URL' => $url],
-                    );
-                    $docker->run(['cp', $directory . '/secrets.tar', $candidate . ':/tmp/secrets.tar'], timeout: null);
-                    $docker->run(['start', '--attach', $candidate], timeout: null);
-                    $result = json_decode($docker->run(['inspect', $candidate])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
-                    if ($result['State']['ExitCode'] !== 0) {
-                        throw new WorkflowError('Isolated migration rehearsal failed; live migration remains blocked.');
-                    }
-                } finally {
-                    $docker->run(['rm', '--force', '--volumes', $candidate], check: false);
+                $arguments = [
+                    '--network',
+                    $network,
+                    '--user',
+                    '0:0',
+                    '--env',
+                    'DB_HOST=database',
+                    '--env',
+                    'DATABASE_URL',
+                    '--env',
+                    'APP_ENV=prod',
+                    '--env',
+                    'APP_DEBUG=0',
+                ];
+                foreach (['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET'] as $key) {
+                    array_push($arguments, '--env', $key);
+                }
+                array_push(
+                    $arguments,
+                    '--entrypoint',
+                    '/bin/sh',
+                    $release['images']['app_image']['resolvedId'],
+                    '-ec',
+                    'mkdir -p config/secrets; tar -xpf /tmp/secrets.tar -C config/secrets; exec php -d memory_limit=512M bin/console "$@"',
+                    'rehearsal',
+                    'doctrine:migrations:migrate',
+                    '--no-interaction',
+                );
+                $ledger->create(ResourceKind::Container, $candidate, $arguments);
+                $docker->run(['cp', $directory . '/secrets.tar', $candidate . ':/tmp/secrets.tar'], timeout: null);
+                $docker->run(['start', '--attach', $candidate], timeout: null);
+                $result = json_decode($docker->run(['inspect', $candidate])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
+                if ($result['State']['ExitCode'] !== 0) {
+                    throw new WorkflowError('Isolated migration rehearsal failed; live migration remains blocked.');
                 }
             }
             $checkpoint['verified'] = true;
-            AtomicFile::writeJson($directory . '/checkpoint.json', $checkpoint);
             return $checkpoint;
-        } finally {
-            $docker->run(['rm', '--force', '--volumes', $name], check: false);
-            $docker->run(['network', 'rm', $network], check: false);
-        }
+        }, $release['effective']['budgets']['cleanup']);
+        AtomicFile::writeJson($directory . '/checkpoint.json', $result);
+        return $result;
     }
 
     /** @param array<string,mixed> $instance
@@ -446,16 +453,18 @@ SQL;
         $this->store->save($instance['id'], $instance);
         $docker = $this->docker($instance);
         try {
-            $docker->compose($instance, [
-                'run',
-                '--rm',
-                '--no-deps',
-                'app',
-                'php',
-                'bin/console',
-                'doctrine:migrations:migrate',
-                '--no-interaction',
-            ], timeout: null);
+            $container = new Runtime($this->store, $this->runner, $this->connections)->applicationContainer($instance, $release, [
+                'php', 'bin/console', 'doctrine:migrations:migrate', '--no-interaction',
+            ]);
+            DisposableContainer::run(
+                $docker,
+                $this->store->directory($instance['id']) . '/migration-resources.json',
+                $container['arguments'],
+                $this->connections->environment(),
+                $release['effective']['budgets']['cleanup'],
+                timeout: null,
+                containerEnvironment: $container['environment'],
+            );
         } catch (\Throwable $error) {
             $this->store->save($instance['id'], array_replace($instance, [
                 'phase' => 'blocked',

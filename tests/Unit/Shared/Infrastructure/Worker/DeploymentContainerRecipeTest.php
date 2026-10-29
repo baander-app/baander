@@ -18,6 +18,30 @@ final class DeploymentContainerRecipeTest extends TestCase
     private const string BOOT = '0123456789abcdef0123456789abcdef';
     private const string IMAGE = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
+    public function testRelocatedApplicationCodeAndAncestorsCannotBeMountedOver(): void
+    {
+        foreach (['/opt', '/opt/baander', '/opt/baander/bin', '/opt/baander/vendor', '/opt/baander/var'] as $target) {
+            try {
+                $this->recipe(['appHome' => '/opt/baander', 'mediaMounts' => [
+                    ['volume' => 'media', 'target' => $target, 'readOnly' => false, 'role' => 'derived'],
+                ]]);
+                self::fail('Application code mount was accepted: ' . $target);
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString('application code', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testRelocatedWritableStorageIsAdmittedAndHomeParticipatesInFingerprint(): void
+    {
+        $recipe = $this->recipe(['appHome' => '/opt/baander', 'mediaMounts' => [
+            ['volume' => 'media', 'target' => '/opt/baander/storage/audio', 'readOnly' => false, 'role' => 'derived'],
+            ['volume' => 'state', 'target' => '/opt/baander/var/transcode_state', 'readOnly' => false, 'role' => 'derived'],
+        ]]);
+        self::assertCount(2, $recipe->mediaMounts);
+        self::assertNotSame($this->recipe()->fingerprint(), $this->recipe(['appHome' => '/opt/baander'])->fingerprint());
+    }
+
     public function testRuntimeConfigurationParticipatesInIdentityWithoutEnteringArgv(): void
     {
         $variables = ['APP_ENV' => 'prod', 'APP_SECRET' => 'test-only-secret'];
@@ -122,6 +146,10 @@ final class DeploymentContainerRecipeTest extends TestCase
     {
         yield 'namespace whitespace' => ['namespace', 'recipe baander.app'];
         yield 'boot uppercase' => ['bootId', str_repeat('A', 32)];
+        yield 'relative application home' => ['appHome', 'opt/baander'];
+        yield 'root application home' => ['appHome', '/'];
+        yield 'traversal application home' => ['appHome', '/opt/../baander'];
+        yield 'trailing slash application home' => ['appHome', '/opt/baander/'];
         yield 'empty daemon' => ['daemonId', ''];
         yield 'oversized daemon' => ['daemonId', str_repeat('d', 129)];
         yield 'mutable image tag' => ['imageId', 'baander.app:latest'];
@@ -157,7 +185,7 @@ final class DeploymentContainerRecipeTest extends TestCase
     private function recipe(array $overrides = []): DeploymentContainerRecipe
     {
         return new DeploymentContainerRecipe(...array_replace([
-            'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
+            'appHome' => '/var/www/html', 'namespace' => 'recipe.baander.app', 'bootId' => self::BOOT, 'daemonId' => 'docker-daemon', 'imageId' => self::IMAGE,
             'command' => ['/usr/local/bin/php', '/app/bin/worker.php'], 'network' => 'none', 'memoryBytes' => 64 * 1024 * 1024,
             'nanoCpus' => 1_000_000_000, 'pidsLimit' => 32, 'unit' => DeploymentUnit::Control, 'cpuSet' => [0], 'ipcVolume' => 'worker-ipc',
         ], $overrides));

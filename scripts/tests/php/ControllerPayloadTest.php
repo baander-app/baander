@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\ControllerPayload;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\FileLock;
 use PHPUnit\Framework\TestCase;
@@ -78,7 +82,7 @@ CODE);
             self::assertNotSame($old, $new);
             self::assertDirectoryExists($this->generation($old));
             rename($this->root . '/source', $this->root . '/source-offline');
-            $result = new Runner()->run([PHP_BINARY, $this->payload->launcher()]);
+            $result = new EngineExecutor(ExecutionContext::bounded(30, Environment::clean()))->run(new ProcessSpec([PHP_BINARY, $this->payload->launcher()]));
             self::assertSame(['retained' => false, 'layout' => 1, 'defaults' => true], json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR));
             fwrite($pipes[0], "finish\n");
             fclose($pipes[0]);
@@ -159,7 +163,7 @@ CODE);
             self::fail('Incomplete generation accepted.');
         } catch (\RuntimeException) {
             self::assertSame($old, $this->payload->selectedGeneration());
-            self::assertSame(0, new Runner()->run([PHP_BINARY, $this->payload->launcher()])->exitCode);
+            self::assertSame(0, new EngineExecutor(ExecutionContext::bounded(30, Environment::clean()))->run(new ProcessSpec([PHP_BINARY, $this->payload->launcher()]))->exitCode);
         }
     }
 
@@ -261,6 +265,17 @@ CODE);
         self::assertNotSame($selected, $this->payload->publish($this->root . '/source'));
     }
 
+    public function testAbsentInstalledControllerHasNoReadersToDrain(): void
+    {
+        $barrier = $this->payload->drainReaders();
+        try {
+            self::assertNull($this->payload->selectedGeneration());
+            self::assertNull(FileLock::tryAcquire($this->root . '/state/controller/compatibility.lock', shared: true));
+        } finally {
+            $barrier->release();
+        }
+    }
+
     public function testUnleasedLegacyPayloadBlocksConversionAndRemainsIntact(): void
     {
         $this->payload->publish($this->root . '/source');
@@ -280,7 +295,7 @@ CODE);
     {
         $this->payload->publish($this->root . '/source');
         AtomicFile::writeJson($this->root . '/state/controller/selected.json', ['generation' => '../../source']);
-        $result = new Runner()->run([PHP_BINARY, $this->payload->launcher()], check: false);
+        $result = new EngineExecutor(ExecutionContext::bounded(30, Environment::clean()))->run(new ProcessSpec([PHP_BINARY, $this->payload->launcher()]), new CompletionPolicy(null));
         self::assertNotSame(0, $result->exitCode);
         self::assertStringContainsString('Invalid controller generation selector', $result->stderr);
     }

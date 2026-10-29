@@ -69,6 +69,16 @@ FORMAT;
         }
     }
 
+    public function verifyAdmission(string $containerId, string $namespace, string $bootId, DeploymentUnit $unit): void
+    {
+        foreach ($this->recipe->mediaMounts ?? [] as $mount) {
+            if (isset($mount['source'])) {
+                DeploymentContainerRecipe::verifySourceDirectory($mount['source']);
+            }
+        }
+        $this->verifyIsolation($containerId, $namespace, $bootId, $unit);
+    }
+
     /** Inspection verifies identity and isolation only; it supplies no retirement or start receipt. */
     public function verifyIsolation(string $containerId, string $namespace, string $bootId, DeploymentUnit $unit): void
     {
@@ -139,7 +149,6 @@ FORMAT;
         foreach ($expected as $declaration) {
             $actual = $byTarget[$declaration['target']] ?? [];
             if (isset($declaration['source'])) {
-                DeploymentContainerRecipe::verifySourceDirectory($declaration['source']);
                 if (($actual['Type'] ?? null) !== 'bind' || ($actual['Source'] ?? null) !== $declaration['source']
                     || ($actual['RW'] ?? null) !== false || ($actual['Propagation'] ?? null) !== 'rprivate') {
                     throw new RuntimeException('Source bind identity or access differs from admission.');

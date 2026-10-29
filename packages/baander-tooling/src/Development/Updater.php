@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Configuration\ToolingConfiguration;
 use Baander\Tooling\Development\Build\Builder;
-use Baander\Tooling\Development\Build\SourceUnavailable;
+use Baander\Tooling\Build\SourceUnavailable;
 
 class Updater
 {
@@ -19,14 +20,21 @@ class Updater
     public Workers $workers;
     public Libraries $libraries;
 
-    public function __construct(private readonly StateStore $store, private readonly Runner $runner)
+    /** @var array<string,string> */
+    private readonly array $environment;
+    private readonly Connections $connections;
+
+    /** @param array<string,string>|null $environment */
+    public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, private readonly ?ToolingConfiguration $configuration = null, ?array $environment = null)
     {
-        $this->runtime = new Runtime($store, $runner);
-        $this->gateway = new Gateway($store, $runner);
-        $this->database = new Database($store, $runner);
-        $this->bootstrap = new Bootstrap($store, $runner);
-        $this->workers = new Workers($store, $runner);
-        $this->libraries = new Libraries($runner);
+        $this->environment = $environment ?? getenv();
+        $connections = $this->connections = new Connections($runner, Environment::clean($this->environment));
+        $this->runtime = new Runtime($store, $runner, $connections);
+        $this->gateway = new Gateway($store, $runner, $connections);
+        $this->database = new Database($store, $runner, $connections);
+        $this->bootstrap = new Bootstrap($store, $runner, $connections);
+        $this->workers = new Workers($store, $runner, $connections);
+        $this->libraries = new Libraries($runner, $connections);
     }
 
     /** @param array<string,mixed> $instance
@@ -35,9 +43,15 @@ class Updater
     private function prepare(array &$instance): array
     {
         if ($this->builder === null) {
-            $local = LocalConfiguration::load($this->runner, $instance['worktree']);
-            $configuration = ToolingConfiguration::resolve(environment: getenv(), local: $local['tooling'] ?? []);
-            $this->builder = new Builder($this->store, $this->runner, $configuration);
+            $configuration = $this->configuration;
+            if ($configuration === null) {
+                if (!isset($instance['tooling'])) {
+                    throw new WorkflowError('Capture new preparation settings with up before building a release.');
+                }
+                $configuration = ToolingConfiguration::fromArray($instance['tooling']);
+            }
+            $instance['tooling'] = $configuration->toArray();
+            $this->builder = new Builder($this->store, $this->runner, $configuration, $this->connections);
         }
         return $this->builder->prepare($instance);
     }
@@ -45,7 +59,7 @@ class Updater
     /** @param array<string,mixed> $instance */
     public function head(array $instance): string
     {
-        $result = $this->runner->run(['git', 'ls-remote', '--exit-code', '--', $instance['repository'], 'refs/heads/master'], timeout: 60);
+        $result = $this->runner->run(new ProcessSpec(['git', 'ls-remote', '--exit-code', '--', $instance['repository'], 'refs/heads/master'], timeout: 60, processGroup: true));
         $fields = preg_split('/\s+/', trim($result->stdout)) ?: [];
         if (count($fields) !== 2 || $fields[1] !== 'refs/heads/master') {
             throw new WorkflowError('Remote master could not be resolved.');
@@ -64,6 +78,20 @@ class Updater
 
     public function update(string $identity, bool $automatic = false, bool $retry = false): void
     {
+        $observed = $this->store->load($identity);
+        if (!empty($observed['media'])) {
+            $savedLayout = $observed['release']['layout'] ?? $observed['prepared_release']['layout'] ?? null;
+            $layout = $savedLayout === null
+                ? \Baander\Tooling\Configuration\ApplicationLayout::load()
+                : \Baander\Tooling\Configuration\ApplicationLayout::fromArray($savedLayout);
+            new Mounts($layout)->preflight(
+                $observed['media'],
+                $this->store->root,
+                $this->runtime->environment($observed),
+                array_column(array_diff_key($observed['state_mounts'] ?? [], ['media' => true]), 'target'),
+            );
+        }
+        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity);
         $lock = $this->store->lock($identity);
         try {
             $instance = $this->store->load($identity);
@@ -88,7 +116,7 @@ class Updater
             }
             try {
                 $detected = $instance['kind'] === 'persistent' ? $this->head($instance) : null;
-            } catch (WorkflowError $error) {
+            } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
                 $delay = min(300, max(60, ($instance['retry_delay'] ?? 30) * 2));
                 $this->save($instance, [
                     'retry_delay' => $delay,
@@ -199,7 +227,10 @@ class Updater
                 $current = $this->required($identity);
                 try {
                     $this->save($current, ['detected_revision' => $this->head($instance)]);
-                } catch (WorkflowError) {
+                } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
+                    if ($error instanceof \Baander\Tooling\Process\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                        throw $error;
+                    }
                     $this->save($current, ['failure' => 'Release is ready; checking for a newer master will retry on the next tick.']);
                 }
             }
@@ -215,7 +246,7 @@ class Updater
     }
 
     /** @param array<string,mixed> $instance */
-    public function freeze(array &$instance): void
+    public function freeze(array &$instance, bool $route = true): void
     {
         $this->save($instance, [
             'phase' => 'quiescing',
@@ -224,10 +255,12 @@ class Updater
             'last_ready_revision' => $instance['running_revision'] ?? $instance['last_ready_revision'] ?? null,
             'running_revision' => null,
         ]);
-        $this->gateway->route($instance, maintenance: true);
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
-        $docker->compose($instance, ['stop', '--timeout', '35', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])], timeout: 90);
+        if ($route) {
+            $this->gateway->route($instance, maintenance: true);
+        }
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
+        $docker->compose($instance['project'], $instance['compose_file'], ['stop', '--timeout', '35', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])], timeout: 90);
         $this->workers->retire($instance);
         $this->save($instance, ['writers_stopped' => true]);
     }
@@ -242,8 +275,8 @@ class Updater
             'last_ready_revision' => $instance['running_revision'] ?? $instance['last_ready_revision'] ?? null,
             'running_revision' => null,
         ]);
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         foreach (['nginx', 'app'] as $role) {
             if (isset($instance['adoption']['containers'][$role])) {
                 $docker->run(['stop', '--time', '35', $instance['adoption']['containers'][$role]], timeout: 90);
@@ -272,13 +305,20 @@ class Updater
      */
     public function activate(array &$instance, array $release): void
     {
+        $contract = ReleaseContract::fromArray($release);
+        $contract->validateInputs($instance);
+        $instance['media'] = $release['effective']['media'];
+        $instance['libraries'] = $release['effective']['libraries'];
+        foreach (['state_mounts', 'volumes', 'postgres_image', 'redis_image'] as $field) {
+            $instance[$field] = $release['effective'][$field];
+        }
         $previous = $instance['release'] ?? null;
         $adopting = !empty($instance['adoption']) && empty($instance['ownership_transferred']);
         foreach (['postgres_image', 'redis_image'] as $key) {
             if (!empty($instance[$key])) {
-                $release[$key] = $instance[$key];
-            } elseif (!empty($previous[$key])) {
-                $release[$key] = $previous[$key];
+                $release['images'][$key]['resolvedId'] = $instance[$key];
+            } elseif (!empty($previous['images'][$key]['resolvedId'])) {
+                $release['images'][$key]['resolvedId'] = $previous['images'][$key]['resolvedId'];
             }
         }
         $this->save($instance, ['prepared_release' => $release, 'phase' => 'preflight']);
@@ -311,6 +351,10 @@ class Updater
         if ($adopting) {
             $this->save($instance, ['phase' => 'quiescing']);
             $instance = array_replace($instance, $this->bootstrap->transfer($instance, $release, $checkpoint));
+            foreach (['state_mounts', 'volumes', 'postgres_image', 'redis_image'] as $field) {
+                $release['effective'][$field] = $instance[$field] ?? $release['effective'][$field];
+            }
+            $this->save($instance, ['prepared_release' => $release]);
         }
         $instance = array_replace($instance, $this->runtime->write($instance, $release));
         $this->runtime->dependencies($instance);
@@ -344,7 +388,10 @@ class Updater
             try {
                 $readiness = $this->runtime->ready($instance);
                 break;
-            } catch (WorkflowError $error) {
+            } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
+                if ($error instanceof \Baander\Tooling\Process\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                    throw $error;
+                }
                 if (hrtime(true) >= $deadline) {
                     $this->gateway->route($instance, maintenance: true);
                     throw $error;
@@ -359,8 +406,8 @@ class Updater
             'running_revision' => $release['revision'],
             'worker_snapshot' => $release['revision'],
             'readiness' => array_replace($readiness, ['workers_ready' => true]),
-            'postgres_image' => $release['postgres_image'],
-            'redis_image' => $release['redis_image'] ?? null,
+            'postgres_image' => $release['images']['postgres_image']['resolvedId'],
+            'redis_image' => $release['images']['redis_image']['resolvedId'] ?? null,
             'failed_revision' => null,
             'failure' => null,
             'database_mutation_started' => false,
@@ -370,6 +417,7 @@ class Updater
 
     public function down(string $identity): void
     {
+        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity, activation: false);
         $this->store->setEnabled($identity, false);
         $lock = $this->store->lock($identity);
         try {
@@ -377,8 +425,9 @@ class Updater
             if ($instance === null || empty($instance['compose_file'])) {
                 return;
             }
+            ReleaseContract::validateGeneratedInputs($instance);
             $blocked = in_array($instance['phase'] ?? null, self::INTERRUPTED_PHASES, true);
-            $this->freeze($instance);
+            $this->freeze($instance, route: is_file($this->store->root . '/gateway/state.json'));
             $this->runtime->down($instance);
             $this->gateway->remove($instance);
             $this->save($instance, ['phase' => $blocked ? 'blocked' : 'stopped', 'readiness' => null]);
@@ -389,6 +438,7 @@ class Updater
 
     public function recover(string $identity): void
     {
+        new RetainedState($this->store, $this->runner, $this->environment)->convert($identity);
         $lock = $this->store->lock($identity);
         try {
             $instance = $this->store->load($identity);
@@ -396,10 +446,16 @@ class Updater
                 throw new WorkflowError('Recovery requires a blocked attempt with retained release artifacts.');
             }
             $release = $instance['prepared_release'];
+            ReleaseContract::fromArray($release)->validateInputs($instance);
+            $instance['media'] = $release['effective']['media'];
+            $instance['libraries'] = $release['effective']['libraries'];
+            foreach (['state_mounts', 'volumes', 'postgres_image', 'redis_image'] as $field) {
+                $instance[$field] = $release['effective'][$field];
+            }
             $adopting = !empty($instance['adoption']) && empty($instance['ownership_transferred']);
             if ($adopting) {
-                $docker = new Docker($this->runner, $instance['docker']);
-                $docker->validate();
+                $docker = $this->connections->client($instance['docker']);
+                $docker->validateIdentity();
                 foreach ($instance['adoption_inventory'] as $saved) {
                     $current = json_decode($docker->run(['inspect', $saved['Id']])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
                     foreach (['Id', 'Image', 'Mounts'] as $key) {

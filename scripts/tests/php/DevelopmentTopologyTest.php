@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Gateway;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
-use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Inventory\Collector;
 use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/Fixtures/development-command-executor.php';
 
 final class DevelopmentTopologyTest extends TestCase
 {
@@ -18,37 +23,21 @@ final class DevelopmentTopologyTest extends TestCase
         $root = sys_get_temp_dir() . '/baander-topology-' . bin2hex(random_bytes(8));
         try {
             $store = new StateStore($root);
-            $runner = new class ($store->scope()) extends Runner {
-                public function __construct(private readonly string $scope) {}
-                public function run(
-                    array $arguments,
-                    ?string $cwd = null,
-                    ?array $env = null,
-                    ?string $input = null,
-                    ?float $timeout = 120,
-                    bool $check = true,
-                    ?string $logPath = null,
-                    bool $interactive = false,
-                ): ProcessResult {
-                    $output = in_array('info', $arguments, true) ? '{"ID":"daemon"}' : (in_array('inspect', $arguments, true)
-                        ? json_encode(
-                            [[
-                                'Labels' => ['app.baander.development.owner' => 'gateway-' . $this->scope],
-                                'IPAM' => ['Config' => [['Subnet' => '172.20.0.0/16']]],
-                            ]],
-                            JSON_THROW_ON_ERROR,
-                        ) : '{}');
-                    return new ProcessResult(0, null, false, false, $output, '', 0);
-                }
-            };
+            PrivateDirectory::prepare($root);
+            $executable = $root . '/topology-docker';
+            file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\n\$_SERVER['argv'] = [\$_SERVER['argv'][0], "
+                . var_export($root, true) . ", ...array_slice(\$_SERVER['argv'], 1)];\nrequire "
+                . var_export(__DIR__ . '/Fixtures/activation-gateway-docker.php', true) . ";\n");
+            chmod($executable, 0700);
+            $runner = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
             $gateway = new Gateway($store, $runner);
             $instance = [
                 'id' => 'persistent',
                 'hostname' => 'baander.test',
                 'project' => 'persistent-project',
-                'docker' => ['executable' => 'fake', 'context' => 'owned', 'daemon_id' => 'daemon'],
+                'docker' => DevelopmentCommandExecutor::target($executable, 'owned', 'daemon'),
             ];
-            $gateway->configure($instance, ['nginx_image' => 'nginx']);
+            $gateway->configure($instance, DevelopmentCommandExecutor::release(['nginx_image' => 'nginx'], $instance));
             $gateway->route($instance);
             $preview = array_replace(
                 $instance,
@@ -69,7 +58,7 @@ final class DevelopmentTopologyTest extends TestCase
                 self::assertStringContainsString('owned by another', $error->getMessage());
             }
         } finally {
-            new Runner()->run(['rm', '-rf', '--', $root]);
+            Collector::remove($root);
         }
     }
 }

@@ -30,6 +30,7 @@ $observer = DriverManager::getConnection($params);
 $command = new DockerWorkerCommand($arguments[1], $arguments[2]);
 $namespace = 'baander.app:paired-controller-' . bin2hex(random_bytes(8));
 $schema = 'worker_create_' . bin2hex(random_bytes(8));
+$appHome = getenv('APP_HOME') ?: throw new RuntimeException('Observed APP_HOME is required.');
 $ipcVolume = 'baander-worker-create-' . bin2hex(random_bytes(8));
 $ownedIds = [];
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
@@ -51,12 +52,12 @@ try {
         . 'file_put_contents("/tmp/baander-descendant-ready", (string) getmypid());'
         . 'while (true) { file_put_contents("/tmp/baander-descendant-heartbeat", (string) hrtime(true)); usleep(10000); }}'
         . 'while (true) { usleep(10000); }';
-    $recipesFor = static function (string $boot) use ($namespace, $daemon, $arguments, $runtime, $ipcVolume, $sleeper): array {
+    $recipesFor = static function (string $boot) use ($namespace, $daemon, $arguments, $runtime, $ipcVolume, $sleeper, $appHome): array {
         $recipes = [];
         foreach (DeploymentUnit::cases() as $unit) {
             $recipes[$unit->value] = new DeploymentContainerRecipe($namespace, $boot, $daemon, $arguments[3],
                 ['/usr/local/bin/php', '-r', $sleeper], 'none', 64 * 1024 * 1024, 1_000_000_000, 32,
-                $unit, [$unit === DeploymentUnit::Control ? 0 : 1], $ipcVolume, $runtime);
+                $unit, [$unit === DeploymentUnit::Control ? 0 : 1], $ipcVolume, $appHome, $runtime);
         }
         return $recipes;
     };
@@ -112,7 +113,7 @@ try {
     $original = $recipes['control'];
     $different = new DeploymentContainerRecipe($namespace, $boot, $daemon, $original->imageId,
         $original->command, $original->network, $original->memoryBytes + 16 * 1024 * 1024,
-        $original->nanoCpus, $original->pidsLimit, $original->unit, $original->cpuSet, $ipcVolume, $runtime);
+        $original->nanoCpus, $original->pidsLimit, $original->unit, $original->cpuSet, $ipcVolume, $appHome, $runtime);
     try {
         $creator->reconcile($different);
         throw new LogicException('A changed recipe reconciled the reserved unit.');

@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Build\Source;
-use Baander\Tooling\Development\Build\SourceUnavailable;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Build\Source;
+use Baander\Tooling\Build\SourceUnavailable;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/Fixtures/development-command-executor.php';
 
 final class DevelopmentBuildTest extends TestCase
 {
     private string $root;
     private string $repo;
-    private Runner $runner;
+    private DevelopmentCommandExecutor $runner;
 
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir() . '/baander-source-' . bin2hex(random_bytes(8));
         $this->repo = $this->root . '/repo';
         mkdir($this->repo . '/src', 0700, true);
-        $this->runner = new Runner();
+        $this->runner = new DevelopmentCommandExecutor();
         $this->git(['init', '-b', 'master']);
         $this->git(['config', 'user.email', 'dev@baander.app']);
         $this->git(['config', 'user.name', 'Development fixture']);
@@ -38,13 +40,13 @@ final class DevelopmentBuildTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->runner->run(['rm', '-rf', '--', $this->root]);
+        $this->runner->execute(['rm', '-rf', '--', $this->root]);
     }
 
     /** @param list<string> $args */
     private function git(array $args): string
     {
-        return trim($this->runner->run(['git', ...$args], cwd: $this->repo)->stdout);
+        return trim($this->runner->execute(['git', ...$args], cwd: $this->repo)->stdout);
     }
 
     public function testPreviewCapturesEditsWithoutSecretsAndHasStableDigest(): void
@@ -114,7 +116,7 @@ final class DevelopmentBuildTest extends TestCase
     public function testExternalSymlinkIsRejected(): void
     {
         symlink($this->root, $this->repo . '/src/escape');
-        $this->expectException(WorkflowError::class);
+        $this->expectException(\RuntimeException::class);
         Source::snapshotWorktree($this->runner, $this->repo, $this->root . '/snapshot');
     }
 
@@ -173,7 +175,7 @@ final class DevelopmentBuildTest extends TestCase
         rename($this->repo . '/.agents', $this->root . '/original-agents');
         $baseline = $this->root . '/baseline.md';
         file_put_contents($baseline, "# Fixture\n\nKeep `publicId` and 32 bytes.\n");
-        $result = $this->runner->run([PHP_BINARY, $snapshot . '/' . $relative, $baseline, $baseline]);
+        $result = $this->runner->execute([PHP_BINARY, $snapshot . '/' . $relative, $baseline, $baseline]);
         self::assertStringContainsString('structural lines: identical', $result->stdout);
     }
 
@@ -200,7 +202,7 @@ final class DevelopmentBuildTest extends TestCase
             try {
                 Source::snapshotWorktree($this->runner, $this->repo, null);
                 self::fail('Expected symlink refusal');
-            } catch (WorkflowError $error) {
+            } catch (\RuntimeException $error) {
                 self::assertStringContainsString('symlink', $error->getMessage());
             } finally {
                 unlink($this->repo . '/src/escape');
@@ -222,8 +224,8 @@ final class DevelopmentBuildTest extends TestCase
 
     public function testPartialCloneIsRemovedAndRetrySucceeds(): void
     {
-        $runner = new class extends Runner {
-            public function run(
+        $runner = new class extends DevelopmentCommandExecutor {
+            public function execute(
                 array $arguments,
                 ?string $cwd = null,
                 ?array $env = null,
@@ -235,9 +237,9 @@ final class DevelopmentBuildTest extends TestCase
             ): ProcessResult {
                 if (array_slice($arguments, 0, 2) === ['git', 'clone']) {
                     mkdir($arguments[array_key_last($arguments)]);
-                    throw new WorkflowError('transport interrupted');
+                    throw new \Baander\Tooling\Process\CommandFailure('transport interrupted', 1);
                 }
-                return parent::run($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
+                return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
             }
         };
         try {
@@ -261,8 +263,8 @@ final class DevelopmentBuildTest extends TestCase
     public function testTransientFetchRetainsCheckoutAndAllowsSameRevisionRetry(): void
     {
         Source::checkoutRevision($this->runner, $this->repo, $this->root . '/managed', $this->root . '/first');
-        $runner = new class extends Runner {
-            public function run(
+        $runner = new class extends DevelopmentCommandExecutor {
+            public function execute(
                 array $arguments,
                 ?string $cwd = null,
                 ?array $env = null,
@@ -273,9 +275,9 @@ final class DevelopmentBuildTest extends TestCase
                 bool $interactive = false,
             ): ProcessResult {
                 if (array_slice($arguments, 0, 2) === ['git', 'fetch']) {
-                    throw new WorkflowError('transport interrupted');
+                    throw new \Baander\Tooling\Process\CommandFailure('transport interrupted', 1);
                 }
-                return parent::run($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
+                return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
             }
         };
         try {

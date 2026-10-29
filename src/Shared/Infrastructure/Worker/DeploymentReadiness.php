@@ -39,15 +39,15 @@ final readonly class DeploymentReadiness
             if ($binding === null || !$state->startClaimed || $state->cancelled || $state->recipeHash !== $recipe->fingerprint()) {
                 throw new RuntimeException('Worker readiness requires both admitted started units.');
             }
-            (new DockerWorkerContainment($execute, $recipe))->verifyIsolation($binding->containerId, $manifest->namespace, $manifest->bootId, $state->unit);
+            (new DockerWorkerContainment($execute, $recipe))->verifyAdmission($binding->containerId, $manifest->namespace, $manifest->bootId, $state->unit);
             $running = json_decode($execute(['container', 'inspect', '--format', '{"id":{{json .Id}},"image":{{json .Image}},"running":{{json .State.Running}},"restarting":{{json .State.Restarting}}}', $binding->containerId]), true, 8, JSON_THROW_ON_ERROR);
             if (!is_array($running) || ($running['id'] ?? null) !== $binding->containerId || ($running['image'] ?? null) !== $manifest->imageId
                 || ($running['running'] ?? null) !== true || ($running['restarting'] ?? null) !== false) {
                 throw new RuntimeException('Admitted worker container is unavailable.');
             }
-            $code = 'require "/var/www/html/vendor/autoload.php"; echo json_encode(\\App\\Shared\\Infrastructure\\Worker\\WorkerReadinessObservation::observe($argv[1], $argv[2], (int) $argv[3], $argv[4], $argv[5]), JSON_THROW_ON_ERROR);';
+            $code = 'require $argv[6] . "/vendor/autoload.php"; echo json_encode(\\App\\Shared\\Infrastructure\\Worker\\WorkerReadinessObservation::observe($argv[1], $argv[2], (int) $argv[3], $argv[4], $argv[5], $argv[6]), JSON_THROW_ON_ERROR);';
             $roles = json_decode($execute(['exec', $binding->containerId, '/usr/local/bin/php', '-d', 'memory_limit=64M', '-r', $code,
-                $manifest->namespace, $manifest->bootId, (string) $epoch, $state->unit->value, $manifest->autoscaling->toJson()]), true, 8, JSON_THROW_ON_ERROR);
+                $manifest->namespace, $manifest->bootId, (string) $epoch, $state->unit->value, $manifest->autoscaling->toJson(), $manifest->appHome]), true, 8, JSON_THROW_ON_ERROR);
             if (!is_array($roles) || $roles === []) {
                 throw new RuntimeException('Worker readiness observation was not confirmed.');
             }

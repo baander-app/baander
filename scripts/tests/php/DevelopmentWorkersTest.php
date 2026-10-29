@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\Workers;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
@@ -12,14 +12,43 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 require_once __DIR__ . '/Fixtures/dev-data.php';
 
+require_once __DIR__ . '/Fixtures/development-command-executor.php';
+require_once __DIR__ . '/Fixtures/development-worker-command-executor.php';
+
 final class DevelopmentWorkersTest extends DevDataTestCase
 {
+    private bool $retainQualificationEvidence = false;
+
+    protected function tearDown(): void
+    {
+        if (!$this->retainQualificationEvidence) {
+            parent::tearDown();
+        }
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $docker = $this->root . '/docker';
+        copy(__DIR__ . '/Fixtures/development-lifecycle-docker.php', $docker);
+        chmod($docker, 0700);
+        AtomicFile::writeJson($this->root . '/daemon.json', ['daemonId' => 'daemon']);
+        $this->instance['docker'] = DevelopmentCommandExecutor::target($docker, 'fixture');
+        $this->release['target'] = $this->instance['docker'];
+    }
+
+    /** @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Tooling\Process\ProcessResult) $callback */
+    private function runner(\Closure $callback): WorkerCommandExecutor
+    {
+        return new WorkerCommandExecutor($callback);
+    }
+
     /** @param \Closure(array<string,mixed>,string):array<string,mixed> $callback */
-    private function lifecycle(\Closure $callback, ?Runner $runner = null): Workers
+    private function lifecycle(\Closure $callback, ?DevelopmentCommandExecutor $runner = null): Workers
     {
         return new class ($this->store, $runner ?? $this->catalogRunner([]), $callback) extends Workers {
             /** @param \Closure(array<string,mixed>,string):array<string,mixed> $callback */
-            public function __construct(\Baander\Tooling\Development\StateStore $store, Runner $runner, private readonly \Closure $callback)
+            public function __construct(\Baander\Tooling\Development\StateStore $store, DevelopmentCommandExecutor $runner, private readonly \Closure $callback)
             {
                 parent::__construct($store, $runner);
             }
@@ -49,6 +78,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 'directory' => $directory,
                 'operator_image' => 'sha256:saved',
                 'boot_id' => 'saved-boot',
+                'layout' => ['version' => 1, 'root' => '/var/www/html'],
                 'socket' => '/var/run/docker.sock',
             ],
         ];
@@ -107,7 +137,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $instance = $this->workerInstance();
         $status = $this->unregisteredStatus();
         $actions = [];
-        $runner = new DevDataRunner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '');
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '');
         $workers = $this->lifecycle(
             static function (array $instance, string $action) use (&$actions, $status): array {
                 $actions[] = $action;
@@ -133,7 +163,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     {
         $instance = $this->workerInstance();
         $status = $this->unregisteredStatus();
-        $runner = new DevDataRunner(static function (array $arguments) use ($queryFailure): string {
+        $runner = $this->runner(static function (array $arguments) use ($queryFailure): string {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon"}';
             }
@@ -192,10 +222,13 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     public function testPrivateDocumentsTravelOnlyInBoundedStdin(): void
     {
         $instance = $this->workerInstance();
-        $runner = new DevDataRunner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '{"success":true,"action":"status","result":{"state":"retired"}}');
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '{"success":true,"action":"status","result":{"state":"retired"}}');
         self::assertSame(['state' => 'retired'], new Workers($this->store, $runner)->invoke($instance, 'status'));
-        $call = $runner->calls[1];
-        $arguments = implode(' ', $call['arguments']);
+        $creation = array_find($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true));
+        $call = array_find($runner->calls, static fn(array $call): bool => $call['input'] !== null);
+        self::assertNotNull($creation);
+        self::assertNotNull($call);
+        $arguments = implode(' ', $creation['arguments']);
         self::assertStringNotContainsString($instance['workers']['directory'], $arguments);
         self::assertStringNotContainsString('secret', $arguments);
         self::assertStringContainsString('label=disable', $arguments);
@@ -204,6 +237,118 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $documents = json_decode($call['input'], true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(['manifest', 'credentials'], array_keys($documents));
         self::assertSame(['private' => 'secret'], json_decode($documents['credentials'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+        self::assertSame([], glob($instance['workers']['directory'] . '/*-resources.json'));
+    }
+
+    public function testMissingSavedSourceDoesNotPreventObservationButStillBlocksCreation(): void
+    {
+        $instance = $this->workerInstance();
+        $path = $instance['workers']['directory'] . '/manifest.json';
+        $manifest = AtomicFile::readJson($path);
+        $manifest['mediaMounts'] = [['source' => $this->root . '/unavailable-source', 'target' => '/media/movies', 'role' => 'source', 'readOnly' => true]];
+        AtomicFile::writeJson($path, $manifest);
+        $original = file_get_contents($path);
+        $runner = $this->runner(static fn(array $arguments): string => in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '{"success":true,"action":"status","result":{"state":"retired"}}');
+        $workers = new Workers($this->store, $runner);
+        self::assertSame(['state' => 'retired'], $workers->invoke($instance, 'status'));
+        self::assertSame($original, file_get_contents($path));
+        $creation = array_find($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true));
+        self::assertContains('--read-only', $creation['arguments']);
+        self::assertContains($this->root . '/unavailable-source:ro,noexec,nosuid,nodev,size=1m,mode=0555', $creation['arguments']);
+        self::assertDirectoryDoesNotExist($this->root . '/unavailable-source');
+        $creations = count(array_filter($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true)));
+        try {
+            $workers->invoke($instance, 'create');
+            self::fail('Creation admitted unavailable source media.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('source directory changed', $error->getMessage());
+        }
+        self::assertSame($creations, count(array_filter($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true))));
+    }
+
+    public function testHistoricalRetirementUsesOnlyTheSavedOperatorImageLayout(): void
+    {
+        $instance = $this->workerInstance();
+        unset($instance['workers']['layout']);
+        $path = $instance['workers']['directory'] . '/manifest.json';
+        $manifest = AtomicFile::readJson($path);
+        $manifest['mediaMounts'] = [['source' => $this->root . '/missing-historical-source', 'target' => '/media/movies', 'role' => 'source', 'readOnly' => true]];
+        AtomicFile::writeJson($path, $manifest);
+        $runner = $this->runner(static function (array $arguments): string {
+            if (in_array('info', $arguments, true)) {
+                return '{"ID":"daemon"}';
+            }
+            if (in_array('image', $arguments, true) && in_array('inspect', $arguments, true)) {
+                return '[{"Id":"sha256:saved","Config":{"WorkingDir":"/srv/historical-operator","Env":["APP_HOME=/srv/historical-operator"]}}]';
+            }
+            return '{"success":true,"action":"status","result":{"state":"retired"}}';
+        });
+        self::assertSame(['state' => 'retired'], new Workers($this->store, $runner)->invoke($instance, 'status'));
+        self::assertTrue(array_any($runner->calls, static fn(array $call): bool => in_array('image', $call['arguments'], true)
+            && in_array('sha256:saved', $call['arguments'], true)));
+        self::assertDirectoryDoesNotExist($this->root . '/missing-historical-source');
+    }
+
+    public function testRetirementUsesReadOnlyPrivatePlaceholdersForNestedHistoricalSources(): void
+    {
+        $source = $this->root . '/unavailable';
+        $manifest = ['mediaMounts' => [
+            ['source' => $source, 'target' => '/media', 'role' => 'source', 'readOnly' => true],
+            ['source' => $source . '/movies', 'target' => '/movies', 'role' => 'source', 'readOnly' => true],
+        ]];
+        self::assertSame(['--tmpfs', $source . '/movies:ro,noexec,nosuid,nodev,size=1m,mode=0555'], Workers::retirementMountArguments($manifest, '/var/www/html'));
+        self::assertDirectoryDoesNotExist($source);
+        self::assertSame(['--tmpfs', '/run/media/unavailable:ro,noexec,nosuid,nodev,size=1m,mode=0555'], Workers::retirementMountArguments(['mediaMounts' => [['source' => '/run/media/unavailable', 'target' => '/media', 'role' => 'source', 'readOnly' => true]]], '/var/www/html'));
+    }
+
+    public function testRetirementPlaceholdersCannotObscureHelperRuntimePaths(): void
+    {
+        foreach (['/', '/operator/manifest.json', '/var/run/docker.sock', '/usr/local/bin/php', '/var/www/html/vendor', '/media/../operator'] as $source) {
+            try {
+                Workers::retirementMountArguments(['mediaMounts' => [['source' => $source, 'target' => '/media', 'role' => 'source', 'readOnly' => true]]], '/var/www/html');
+                self::fail('Unsafe helper placeholder accepted.');
+            } catch (WorkflowError) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function testHistoricalRecipeIdentityDoesNotNeedSourceContents(): void
+    {
+        require_once __DIR__ . '/Fixtures/historical-worker-recipe.php';
+        $source = $this->root . '/helper-empty-source/movies';
+        try {
+            \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory($source);
+            self::fail('Historical admission unexpectedly accepted a missing directory.');
+        } catch (\InvalidArgumentException $error) {
+            self::assertStringContainsString('existing canonical absolute directory', $error->getMessage());
+        }
+        mkdir($source, 0700, true);
+        $recipe = new \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe(
+            'historical-pair',
+            str_repeat('a', 32),
+            'daemon',
+            'sha256:' . str_repeat('b', 64),
+            ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'],
+            'historical-network',
+            128 * 1024 ** 2,
+            1000000000,
+            64,
+            \App\Shared\Application\DTO\DeploymentUnit::Control,
+            [0],
+            'historical-ipc',
+            mediaMounts: [['source' => $source, 'target' => '/media/movies', 'readOnly' => true, 'role' => 'source']],
+            sourceMountPolicy: 'local-development',
+        );
+        $original = $recipe->fingerprint();
+        file_put_contents($source . '/unrelated-media', 'media is not an input to retirement');
+        self::assertSame($original, $recipe->fingerprint());
+        unlink($source . '/unrelated-media');
+        \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory($source);
+        \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory(dirname($source));
+        self::assertSame($original, $recipe->fingerprint());
+        self::assertSame([], array_values(array_diff(scandir($source), ['.', '..'])));
     }
 
     public function testOversizeCredentialsAreRefusedBeforeOperatorLaunch(): void
@@ -254,9 +399,9 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             'STREAM_URL_HMAC_SECRET' => 'instance-stream-secret',
         ];
     }
-    private function preparationRunner(bool $reject = false): DevDataRunner
+    private function preparationRunner(bool $reject = false): WorkerCommandExecutor
     {
-        return new DevDataRunner(static function (array $arguments) use ($reject): string|\Baander\Tooling\Process\ProcessResult {
+        return $this->runner(static function (array $arguments) use ($reject): string|\Baander\Tooling\Process\ProcessResult {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon","NCPU":2,"MemTotal":17179869184}';
             }
@@ -310,6 +455,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             ),
         ));
         self::assertSame(0700, fileperms($this->instance['workers']['directory']) & 0777);
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+        self::assertSame([], glob($this->instance['workers']['directory'] . '/*-resources.json'));
     }
 
     public function testDerivedBindIsRefusedBeforeSavingWorkerPointer(): void
@@ -325,7 +472,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertArrayNotHasKey('workers', $this->instance);
     }
 
-    public function testProductionValidationFailureDoesNotSaveWorkerPointer(): void
+    public function testProductionValidationFailureRetainsPreparingOwnership(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());
         try {
@@ -334,7 +481,11 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         } catch (WorkflowError $error) {
             self::assertStringContainsString('overlapping media paths', $error->getMessage());
         }
-        self::assertArrayNotHasKey('workers', $this->instance);
+        self::assertSame('preparing', $this->instance['workers']['phase']);
+        self::assertEquals($this->instance['workers'], $this->store->load('persistent')['workers']);
+        self::assertStringContainsString('-ipc-', $this->instance['workers']['ipc_volume']);
+        self::assertSame([], glob($this->root . '/resource-*.json'));
+        self::assertSame([], glob($this->instance['workers']['directory'] . '/*-resources.json'));
     }
 
     /** @return iterable<string,array{string}> */
@@ -398,7 +549,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 ['namespace' => 'different', 'bootId' => 'saved-boot'],
             );
         }
-        $runner = new DevDataRunner(static function (array $arguments) use ($containers): string {
+        $runner = $this->runner(static function (array $arguments) use ($containers): string {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon"}';
             }
@@ -437,100 +588,146 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     #[DataProvider('qualifiedTopologies')]
     public function testGeneratedManifestPassesProductionRecipes(string $topology): void
     {
-        $image = getenv('BAANDER_TEST_OPERATOR_IMAGE');
-        if (!$image) {
-            self::markTestSkipped('Requires qualified operator image and disposable Docker resources.');
+        $environment = getenv();
+        $imageReference = $environment['BAANDER_TEST_OPERATOR_IMAGE'] ?? '';
+        if ($imageReference === '') {
+            self::markTestSkipped('Requires BAANDER_TEST_OPERATOR_IMAGE naming a qualified local operator image.');
         }
-        if ($topology === 'invoke' && !getenv('BAANDER_TEST_WORKER_DATABASE_URL')) {
-            self::markTestSkipped('Requires disposable migrated PostgreSQL.');
+        $borrowedNetwork = $environment['BAANDER_TEST_WORKER_NETWORK'] ?? '';
+        if ($topology === 'invoke' && (empty($environment['BAANDER_TEST_WORKER_DATABASE_URL']) || $borrowedNetwork === '')) {
+            self::markTestSkipped('Requires disposable migrated PostgreSQL via BAANDER_TEST_WORKER_DATABASE_URL and BAANDER_TEST_WORKER_NETWORK.');
         }
-        $runner = new Runner();
-        $context = getenv('BAANDER_TEST_DOCKER_CONTEXT') ?: 'default';
-        $docker = ['docker', '--context', $context];
-        $daemon = json_decode(
-            $runner->run([...$docker, 'info', '--format', '{{json .}}'])->stdout,
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-        $image = trim($runner->run([...$docker, 'image', 'inspect', '--format', '{{.Id}}', $image])->stdout);
-        $project = 'baander-worker-parser-' . bin2hex(random_bytes(6));
-        $this->instance['project'] = $project;
-        $this->instance['hostname'] = 'workers.baander.app';
-        $this->instance['network'] = getenv('BAANDER_TEST_WORKER_NETWORK') ?: $project;
-        $this->instance['docker'] = ['executable' => 'docker', 'context' => $context, 'daemon_id' => $daemon['ID']];
-        foreach (['app', 'worker', 'operator', 'postgres', 'redis', 'nginx', 'tool'] as $key) {
-            $this->release[$key . '_image'] = $image;
-        }
-        $environment = $this->environment();
-        $environment['DATABASE_URL'] = getenv('BAANDER_TEST_WORKER_DATABASE_URL') ?: $environment['DATABASE_URL'];
-        AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $environment);
-        if (in_array($topology, ['explicit', 'replace', 'overlap'], true)) {
-            mkdir($this->root . '/library');
-            $this->instance['media'] = [[
-                'source' => $this->root . '/library',
-                'target' => match ($topology) {
-                    'explicit' => '/media/library',
-                    'replace' => '/storage/media',
-                    default => '/storage/media/nested',
-                },
-            ]];
-        }
-        if ($topology === 'derived') {
-            $this->instance['state_mounts']['storage'] = ['type' => 'bind', 'source' => $this->root, 'target' => '/var/www/html/storage'];
-        }
+        $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__, 3), $environment);
+        $commandEnvironment = \Baander\Tooling\Development\Environment::clean($environment);
+        $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded(
+            $configuration->budgets->seconds('workerOperator'),
+            $commandEnvironment,
+        ));
         try {
-            $workers = new Workers($this->store, $runner);
-            if (in_array($topology, ['overlap', 'derived'], true)) {
-                try {
-                    $workers->prepare($this->instance, $this->release);
-                    self::fail('Unsafe production topology accepted');
-                } catch (WorkflowError $error) {
-                    self::assertStringContainsString(
-                        $topology === 'overlap' ? 'overlapping media paths' : 'requires a named volume',
-                        $error->getMessage(),
-                    );
+            $target = new \Baander\Tooling\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $this->root . '/transport');
+            $docker = new \Baander\Tooling\Docker\Client($executor, $target, $commandEnvironment);
+            $inspection = json_decode($docker->run(['image', 'inspect', $imageReference])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
+            $image = $inspection['Id'];
+            self::assertMatchesRegularExpression('/^sha256:[a-f0-9]{64}$/D', $image);
+            $layout = \Baander\Tooling\Configuration\ApplicationLayout::fromImage($inspection);
+            $project = 'baander-worker-parser-' . bin2hex(random_bytes(6));
+            $this->instance['project'] = $project;
+            $this->instance['hostname'] = 'workers.baander.app';
+            $this->instance['network'] = $borrowedNetwork === '' ? $project : $borrowedNetwork;
+            $this->instance['docker'] = $target->toArray();
+            $this->release['layout'] = $layout->toArray();
+            $this->release['target'] = $target->toArray();
+            $this->release['effective']['budgets'] = $configuration->budgets->toArray();
+            foreach ($this->release['images'] as &$role) {
+                $role['resolvedId'] = $image;
+                $role['daemonId'] = $target->daemonId;
+                $role['reference'] = $imageReference;
+            }
+            unset($role);
+            $applicationEnvironment = $this->environment();
+            $applicationEnvironment['DATABASE_URL'] = $environment['BAANDER_TEST_WORKER_DATABASE_URL'] ?? $applicationEnvironment['DATABASE_URL'];
+            AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $applicationEnvironment);
+            if (in_array($topology, ['explicit', 'replace', 'overlap'], true)) {
+                mkdir($this->root . '/library');
+                $this->instance['media'] = [['source' => $this->root . '/library', 'target' => match ($topology) {
+                    'explicit' => '/media/library', 'replace' => '/storage/media', default => '/storage/media/nested',
+                }]];
+            }
+            if ($topology === 'derived') {
+                $this->instance['state_mounts']['storage'] = ['type' => 'bind', 'source' => $this->root, 'target' => $layout->path('storage')];
+            }
+            $ledger = new \Baander\Tooling\Resources\ResourceLedger($this->root . '/qualification-resources.json', $docker, $commandEnvironment);
+            $recordingExecutor = new class ($executor, $ledger, 3 + count($target->transportArguments)) implements \Baander\Tooling\Process\CommandExecutor {
+                public function __construct(
+                    private readonly \Baander\Tooling\Process\CommandExecutor $executor,
+                    private readonly \Baander\Tooling\Resources\ResourceLedger $ledger,
+                    private readonly int $prefixLength,
+                ) {}
+                public function run(
+                    \Baander\Tooling\Process\ProcessSpec $command,
+                    \Baander\Tooling\Process\CompletionPolicy $policy = new \Baander\Tooling\Process\CompletionPolicy(),
+                ): \Baander\Tooling\Process\ProcessResult {
+                    $arguments = array_slice($command->argv, $this->prefixLength);
+                    if (array_slice($arguments, 0, 2) === ['volume', 'create']) {
+                        $name = array_pop($arguments);
+                        $id = $this->ledger->create(\Baander\Tooling\Resources\ResourceKind::Volume, $name, array_slice($arguments, 2));
+                        return $policy->complete(new \Baander\Tooling\Process\ProcessResult(0, null, false, false, $id, '', 0), $command);
+                    }
+                    return $this->executor->run($command, $policy);
                 }
-                self::assertArrayNotHasKey('workers', $this->instance);
-                return;
+                public function start(\Baander\Tooling\Process\ProcessSpec $command): \Baander\Tooling\Process\RunningProcess
+                {
+                    return $this->executor->start($command);
+                }
+                public function wait(
+                    \Baander\Tooling\Process\RunningProcess $process,
+                    \Baander\Tooling\Process\CompletionPolicy $policy = new \Baander\Tooling\Process\CompletionPolicy(),
+                ): \Baander\Tooling\Process\ProcessResult {
+                    return $this->executor->wait($process, $policy);
+                }
+                public function stop(\Baander\Tooling\Process\RunningProcess $process, int $signal = 15): \Baander\Tooling\Process\ProcessResult
+                {
+                    return $this->executor->stop($process, $signal);
+                }
+            };
+            $ledger->scoped(function () use ($topology, $borrowedNetwork, $project, $ledger, $recordingExecutor, $commandEnvironment, $layout, $applicationEnvironment): void {
+                if ($borrowedNetwork === '') {
+                    $ledger->create(\Baander\Tooling\Resources\ResourceKind::Network, $project, ['--internal']);
+                }
+                $workers = new Workers($this->store, $recordingExecutor, new \Baander\Tooling\Development\Connections($recordingExecutor, $commandEnvironment));
+                if (in_array($topology, ['overlap', 'derived'], true)) {
+                    try {
+                        $workers->prepare($this->instance, $this->release);
+                        self::fail('Unsafe production topology accepted');
+                    } catch (WorkflowError $error) {
+                        self::assertStringContainsString($topology === 'overlap' ? 'overlapping media paths' : 'requires a named volume', $error->getMessage());
+                    }
+                    if ($topology === 'overlap') {
+                        self::assertSame('preparing', $this->instance['workers']['phase']);
+                        self::assertSame($this->instance['workers'], $this->store->load('persistent')['workers']);
+                    } else {
+                        self::assertArrayNotHasKey('workers', $this->instance);
+                    }
+                    return;
+                }
+                $workers->prepare($this->instance, $this->release);
+                $directory = $this->instance['workers']['directory'];
+                $manifest = AtomicFile::readJson($directory . '/manifest.json');
+                $mounts = array_column($manifest['mediaMounts'], null, 'target');
+                self::assertSame('source', $mounts['/storage/media']['role']);
+                self::assertTrue($mounts['/storage/media']['readOnly']);
+                foreach (['/storage/conversions', $layout->path('storage'), $layout->path('var/transcode_state')] as $path) {
+                    self::assertSame('derived', $mounts[$path]['role']);
+                    self::assertFalse($mounts[$path]['readOnly']);
+                }
+                if (in_array($topology, ['explicit', 'replace'], true)) {
+                    self::assertSame($this->root . '/library', $mounts[$topology === 'explicit' ? '/media/library' : '/storage/media']['source']);
+                }
+                $credentials = AtomicFile::readJson($directory . '/credentials.json')['runtimeEnvironment'];
+                foreach (['VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET'] as $key) {
+                    self::assertSame($applicationEnvironment[$key], $credentials[$key]);
+                }
+                self::assertSame('https://workers.baander.app', $credentials['APP_URL']);
+                self::assertSame($credentials['APP_URL'], $credentials['DEFAULT_URI']);
+                if ($topology === 'invoke') {
+                    self::assertNotSame(0, stat('/proc/self')['uid'], 'Exercise the nonroot host to root operator boundary.');
+                    self::assertSame(stat('/proc/self')['uid'], fileowner($directory));
+                    self::assertSame(0700, fileperms($directory) & 0777);
+                    self::assertSame(0600, fileperms($directory . '/credentials.json') & 0777);
+                    $status = $workers->invoke($this->instance, 'status');
+                    self::assertSame('unregistered', $status['retirement']);
+                    self::assertSame('none', $status['reservation']);
+                }
+            }, $configuration->budgets->seconds('cleanup'));
+        } catch (\Throwable $error) {
+            $this->retainQualificationEvidence = file_exists($this->root . '/qualification-resources.json')
+                || (glob($this->store->directory('persistent') . '/workers/*/*-resources.json') ?: []) !== [];
+            if ($this->retainQualificationEvidence) {
+                fwrite(STDERR, 'Retained qualification ownership and transport: ' . $this->root . "\n");
             }
-            $workers->prepare($this->instance, $this->release);
-            $directory = $this->instance['workers']['directory'];
-            $manifest = AtomicFile::readJson($directory . '/manifest.json');
-            $mounts = array_column($manifest['mediaMounts'], null, 'target');
-            self::assertSame('source', $mounts['/storage/media']['role']);
-            self::assertTrue($mounts['/storage/media']['readOnly']);
-            foreach (['/storage/conversions', '/var/www/html/storage', '/var/www/html/var/transcode_state'] as $target) {
-                self::assertSame('derived', $mounts[$target]['role']);
-                self::assertFalse($mounts[$target]['readOnly']);
-            }
-            if (in_array($topology, ['explicit', 'replace'], true)) {
-                self::assertSame(
-                    $this->root . '/library',
-                    $mounts[$topology === 'explicit' ? '/media/library' : '/storage/media']['source'],
-                );
-            }
-            $credentials = AtomicFile::readJson($directory . '/credentials.json')['runtimeEnvironment'];
-            foreach (['VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY', 'STREAM_URL_HMAC_SECRET'] as $key) {
-                self::assertSame($environment[$key], $credentials[$key]);
-            }
-            self::assertSame('https://workers.baander.app', $credentials['APP_URL']);
-            self::assertSame($credentials['APP_URL'], $credentials['DEFAULT_URI']);
-            if ($topology === 'invoke') {
-                self::assertNotSame(0, stat('/proc/self')['uid'], 'Exercise the nonroot host to root operator boundary.');
-                self::assertSame(stat('/proc/self')['uid'], fileowner($directory));
-                self::assertSame(0700, fileperms($directory) & 0777);
-                self::assertSame(0600, fileperms($directory . '/credentials.json') & 0777);
-                $status = $workers->invoke($this->instance, 'status');
-                self::assertSame('unregistered', $status['retirement']);
-                self::assertSame('none', $status['reservation']);
-            }
+            throw $error;
         } finally {
-            $volumes = $runner->run([...$docker, 'volume', 'ls', '--format', '{{.Name}}'], check: false);
-            foreach (explode("\n", $volumes->stdout) as $volume) {
-                if (str_starts_with($volume, $project . '-')) {
-                    $runner->run([...$docker, 'volume', 'rm', $volume], check: false);
-                }
-            }
+            $executor->close();
         }
     }
 }

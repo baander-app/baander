@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
 class Bootstrap
 {
+    private readonly Connections $connections;
+
     public function __construct(
         private readonly StateStore $store,
-        private readonly Runner $runner,
-    ) {}
+        private readonly CommandExecutor $runner,
+        ?Connections $connections = null,
+    ) {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance
      * @param array<string,string>|null $environment
@@ -23,7 +30,7 @@ class Bootstrap
     {
         $directory = $this->store->directory($instance['id']);
         if (file_exists($directory . '/env.json')) {
-            $saved = new Runtime($this->store, $this->runner)->environment($instance);
+            $saved = new Runtime($this->store, $this->runner, $this->connections)->environment($instance);
             if ($environment !== null && $saved != $environment) {
                 throw new WorkflowError('Saved instance identity differs; reconcile configuration explicitly.');
             }
@@ -53,8 +60,8 @@ class Bootstrap
                 . ':' . rawurlencode($values['DB_PASSWORD'])
                 . '@database:5432/' . rawurlencode($values['DB_DATABASE'])
                 . '?serverVersion=18&charset=utf8';
-            $values['MEDIA_STORAGE_PATH'] = '/storage/media';
-            $values['CONVERT_STORAGE_PATH'] = '/storage/conversions';
+            $values['MEDIA_STORAGE_PATH'] ??= '/storage/media';
+            $values['CONVERT_STORAGE_PATH'] ??= '/storage/conversions';
             $values['REDIS_URL'] = 'redis://default:' . $values['REDIS_PASSWORD'] . '@redis:6379';
             $values['MESSENGER_TRANSPORT_DSN'] = $values['REDIS_URL'] . '/messages';
         }
@@ -70,7 +77,7 @@ class Bootstrap
         PrivateDirectory::prepare($directory);
         $key = $directory . '/private.pem';
         try {
-            $this->runner->run([
+            $this->runner->run(new ProcessSpec([
                 'openssl',
                 'genpkey',
                 '-algorithm',
@@ -79,9 +86,9 @@ class Bootstrap
                 'ec_paramgen_curve:P-256',
                 '-out',
                 $key,
-            ]);
+            ], processGroup: true));
             chmod($key, 0600);
-            $output = $this->runner->run(['openssl', 'ec', '-in', $key, '-text', '-noout'])->stdout;
+            $output = $this->runner->run(new ProcessSpec(['openssl', 'ec', '-in', $key, '-text', '-noout'], processGroup: true))->stdout;
             if (preg_match('/priv:(.*?)pub:(.*?)ASN1 OID:/s', $output, $parts) !== 1) {
                 throw new WorkflowError('Cannot generate the instance VAPID identity.');
             }
@@ -115,8 +122,8 @@ class Bootstrap
      */
     public function inventory(array $instance, array $adoption, array $environment): array
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $containers = $adoption['containers'] ?? [];
         if (
             array_diff(['postgres', 'redis', 'app'], array_keys($containers)) !== []
@@ -174,20 +181,21 @@ class Bootstrap
                 throw new WorkflowError('Selected PostgreSQL identity differs from the adoption configuration.');
             }
         }
+        $layout = $this->imageLayout($docker, $inspections['app']);
         $this->verifyApplicationIdentity($docker, $inspections['app'], $environment);
-        $storage = '/var/www/html/storage';
+        $storage = $layout->path('storage');
         foreach ([
             'MEDIA_STORAGE_PATH' => $storage . '/media',
             'CONVERT_STORAGE_PATH' => $storage . '/conversions',
         ] as $key => $default) {
-            $target = Environment::absolutePath($environment[$key] ?? $default);
+            $target = \Baander\Tooling\Filesystem\Paths::absolutePath($environment[$key] ?? $default);
             if (self::covers($target, $storage) || self::covers($storage, $target)) {
-                throw new WorkflowError('Unsupported adoption topology: ' . $key . ' overlaps writable storage at /var/www/html/storage. Preserve the original deployment and prepare distinct source, conversion and storage paths before adoption.');
+                throw new WorkflowError('Unsupported adoption topology: ' . $key . ' overlaps writable storage at ' . $storage . '. Preserve the original deployment and prepare distinct source, conversion and storage paths before adoption.');
             }
         }
         $targets = [
-            'var' => '/var/www/html/var',
-            'secrets' => '/var/www/html/config/secrets',
+            'var' => $layout->path('var'),
+            'secrets' => $layout->path('config/secrets'),
             'storage' => $storage,
             'media' => $environment['MEDIA_STORAGE_PATH'] ?? $storage . '/media',
             'conversions' => $environment['CONVERT_STORAGE_PATH'] ?? $storage . '/conversions',
@@ -195,9 +203,9 @@ class Bootstrap
         ];
         if (array_any(
             $inspections['app']['Mounts'],
-            static fn(array $mount): bool => $mount['Destination'] === '/var/www/html/var/transcode_state',
+            static fn(array $mount): bool => $mount['Destination'] === $layout->path('var/transcode_state'),
         )) {
-            $targets['transcode_state'] = '/var/www/html/var/transcode_state';
+            $targets['transcode_state'] = $layout->path('var/transcode_state');
         }
         $stateMounts = [];
         $volumes = array_replace($instance['volumes'] ?? [], ['database' => $dbMount['Name']]);
@@ -238,7 +246,7 @@ class Bootstrap
             if (
                 $mount['Type'] === 'bind'
                 && !in_array($mount['Destination'], $targets, true)
-                && !str_starts_with($mount['Destination'], '/var/www/html')
+                && !self::covers($mount['Destination'], $layout->root)
             ) {
                 $media[] = [
                     'source' => $mount['Source'],
@@ -254,7 +262,7 @@ class Bootstrap
             throw new WorkflowError('Record the current worker manifests and owner before adopting writable resources.');
         }
         $keyCheck = <<<'CODE'
-$base='/var/www/html';
+$base=$argv[3];
 $a=str_replace('%kernel.project_dir%',$base,$argv[1]);
 $b=str_replace('%kernel.project_dir%',$base,$argv[2]);
 if (!is_file($a)||!is_file($b)||is_link($a)||is_link($b)) { exit(2); }
@@ -268,8 +276,9 @@ CODE;
             'php',
             '-r',
             $keyCheck,
-            $environment['OAUTH_PRIVATE_KEY_PATH'] ?? '/var/www/html/config/secrets/oauth/private.key',
-            $environment['OAUTH_PUBLIC_KEY_PATH'] ?? '/var/www/html/config/secrets/oauth/public.key',
+            $environment['OAUTH_PRIVATE_KEY_PATH'] ?? $layout->path('config/secrets/oauth/private.key'),
+            $environment['OAUTH_PUBLIC_KEY_PATH'] ?? $layout->path('config/secrets/oauth/public.key'),
+            $layout->root,
         ]);
         return array_replace($instance, [
             'adoption' => $adoption,
@@ -286,6 +295,17 @@ CODE;
         ]);
     }
 
+    /** @param array<string,mixed> $app */
+    private function imageLayout(\Baander\Tooling\Docker\Client $docker, array $app): ApplicationLayout
+    {
+        $images = json_decode($docker->run(['image', 'inspect', $app['Image']])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        $image = $images[0] ?? null;
+        if (!is_array($image) || ($image['Id'] ?? null) !== $app['Image']) {
+            throw new WorkflowError('Selected application image identity could not be verified; preserve the original deployment.');
+        }
+        return ApplicationLayout::fromImage($image);
+    }
+
     private static function covers(string $target, string $parent): bool
     {
         return $target === $parent || str_starts_with($target, rtrim($parent, '/') . '/');
@@ -294,8 +314,9 @@ CODE;
     /** @param array<string,mixed> $app
      * @param array<string,string> $environment
      */
-    public function verifyApplicationIdentity(Docker $docker, array $app, array $environment): void
+    public function verifyApplicationIdentity(\Baander\Tooling\Docker\Client $docker, array $app, array $environment): void
     {
+        $layout = $this->imageLayout($docker, $app);
         $keys = ['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY'];
         $existing = [];
         foreach ($app['Config']['Env'] ?? [] as $entry) {
@@ -314,7 +335,7 @@ CODE;
             |> array_values(...);
         if ($missing !== []) {
             $probe = <<<'CODE'
-$base='/var/www/html';
+$base=$argv[2];
 require $base.'/vendor/autoload.php';
 (new \Symfony\Component\Dotenv\Dotenv())->bootEnv($base.'/.env');
 $result=[];
@@ -334,6 +355,7 @@ CODE;
                     '-r',
                     $probe,
                     json_encode($missing, JSON_THROW_ON_ERROR),
+                    $layout->root,
                 ], timeout: 30);
                 $digests = json_decode($response->stdout, true, flags: JSON_THROW_ON_ERROR);
                 if (
@@ -376,11 +398,16 @@ CODE;
         if (($checkpoint['verified'] ?? null) !== true) {
             throw new WorkflowError('Adoption transfer requires a verified checkpoint and isolated migration rehearsal.');
         }
+        foreach ($instance['adoption_transfer'] ?? [] as $transfer) {
+            if (!is_array($transfer) || !in_array($transfer['phase'] ?? null, ['planned', 'complete'], true)) {
+                throw new WorkflowError('Adoption extraction was interrupted; preserve the partial volume, original data and checkpoint for explicit reconciliation.');
+            }
+        }
         if (!empty($instance['ownership_transferred'])) {
             return $instance;
         }
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $inventory = $instance['adoption_inventory'];
         foreach ($inventory as $role => $recorded) {
             $actual = json_decode($docker->run(['inspect', $recorded['Id']])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
@@ -409,20 +436,18 @@ CODE;
                 continue;
             }
             $destination = $instance['project'] . '-adopted-' . $key . '-' . substr(basename($checkpoint['directory']), 0, 12);
-            $docker->run(['volume', 'create', $destination]);
-            $this->restoreArchive($docker, $release, $destination, $checkpoint['directory'] . '/' . $key . '.tar');
+            $this->transferVolume($instance, $release, $docker, $key, $destination, $checkpoint['directory'] . '/' . $key . '.tar');
             $mounts[$key] = array_replace($mount, ['type' => 'volume', 'source' => $destination]);
             $volumes[$key] = $destination;
         }
         if (!isset($mounts['transcode_state'])) {
             $transcode = $instance['project'] . '-adopted-transcode-' . substr(basename($checkpoint['directory']), 0, 12);
-            $docker->run(['volume', 'create', $transcode]);
-            $this->restoreArchive($docker, $release, $transcode, $checkpoint['directory'] . '/transcode_state.tar');
+            $this->transferVolume($instance, $release, $docker, 'transcode_state', $transcode, $checkpoint['directory'] . '/transcode_state.tar');
             $volumes['transcode_state'] = $transcode;
             $mounts['transcode_state'] = [
                 'type' => 'volume',
                 'source' => $transcode,
-                'target' => '/var/www/html/var/transcode_state',
+                'target' => ApplicationLayout::fromArray($release['layout'])->path('var/transcode_state'),
             ];
         }
         $transferred = array_replace($instance, [
@@ -434,35 +459,71 @@ CODE;
         return $transferred;
     }
 
+    /** Persist data-volume ownership before creation; an incomplete extraction is never reset automatically.
+     * @param array<string,mixed> $instance
+     * @param array<string,mixed> $release
+     */
+    private function transferVolume(array &$instance, array $release, \Baander\Tooling\Docker\Client $docker, string $key, string $destination, string $archive): void
+    {
+        $saved = $instance['adoption_transfer'][$key] ?? null;
+        if ($saved !== null) {
+            if (($saved['volume'] ?? null) !== $destination || ($saved['archive'] ?? null) !== $archive) {
+                throw new WorkflowError('Saved adoption transfer identity changed; preserve the checkpoint and original data.');
+            }
+            if (($saved['phase'] ?? null) === 'complete') {
+                return;
+            }
+            if (($saved['phase'] ?? null) === 'copying') {
+                throw new WorkflowError('Adoption extraction was interrupted; preserve the partial volume, original data and checkpoint for explicit reconciliation.');
+            }
+        } else {
+            $instance['adoption_transfer'][$key] = ['volume' => $destination, 'archive' => $archive, 'phase' => 'planned'];
+            $this->store->save($instance['id'], $instance);
+        }
+        $owner = $instance['id'];
+        $docker->run(['volume', 'create', '--label', 'app.baander.development.owner=' . $owner, $destination]);
+        $inspection = json_decode($docker->run(['volume', 'inspect', $destination])->stdout, true, flags: JSON_THROW_ON_ERROR)[0] ?? null;
+        if (!is_array($inspection) || ($inspection['Name'] ?? null) !== $destination
+            || ($inspection['Labels']['app.baander.development.owner'] ?? null) !== $owner) {
+            throw new WorkflowError('Adoption destination volume is not owned by this instance; preserve existing data and the checkpoint.');
+        }
+        $instance['adoption_transfer'][$key]['phase'] = 'copying';
+        $this->store->save($instance['id'], $instance);
+        $this->restoreArchive($docker, $release, $destination, $archive);
+        $instance['adoption_transfer'][$key]['phase'] = 'complete';
+        $this->store->save($instance['id'], $instance);
+    }
+
     /** @param array<string,mixed> $release */
-    public function restoreArchive(Docker $docker, array $release, string $destination, string $archive): void
+    public function restoreArchive(\Baander\Tooling\Docker\Client $docker, array $release, string $destination, string $archive): void
     {
         $helper = 'baander-adoption-copy-' . bin2hex(random_bytes(8));
-        $docker->run([
-            'create',
-            '--name',
-            $helper,
-            '--network',
-            'none',
-            '--user',
-            '0:0',
-            '--entrypoint',
-            '/bin/sh',
-            '--mount',
-            'type=volume,src=' . $destination . ',dst=/restore',
-            $release['app_image'],
-            '-ec',
-            'test -z "$(ls -A /restore)"; tar -xpf /tmp/checkpoint.tar -C /restore',
-        ]);
-        try {
+        $receipt = dirname($archive) . '/restore-' . hash('sha256', $destination) . '-resources.json';
+        if (file_exists($receipt) || is_link($receipt)) {
+            throw new WorkflowError('Recover the unresolved adoption helper before retrying: ' . $receipt);
+        }
+        $ledger = new \Baander\Tooling\Resources\ResourceLedger($receipt, $docker, $this->connections->environment());
+        $ledger->scoped(function () use ($ledger, $docker, $helper, $release, $destination, $archive): void {
+            $ledger->create(\Baander\Tooling\Resources\ResourceKind::Container, $helper, [
+                '--network',
+                'none',
+                '--user',
+                '0:0',
+                '--entrypoint',
+                '/bin/sh',
+                '--mount',
+                'type=volume,src=' . $destination . ',dst=/restore',
+                $release['images']['app_image']['resolvedId'],
+                '-ec',
+                'test -z "$(ls -A /restore)"; tar -xpf /tmp/checkpoint.tar -C /restore',
+            ]);
             $docker->run(['cp', $archive, $helper . ':/tmp/checkpoint.tar'], timeout: null);
             $docker->run(['start', '--attach', $helper], timeout: null);
             if (trim($docker->run(['inspect', '--format', '{{.State.ExitCode}}', $helper])->stdout) !== '0') {
                 throw new WorkflowError('Adoption archive extraction failed; retain the original resources and checkpoint for recovery.');
             }
-        } finally {
-            $docker->run(['rm', '--force', $helper], check: false);
-        }
+        }, $release['effective']['budgets']['cleanup'] ?? 120.0);
+
     }
 
     /** @param array<string,mixed> $instance
@@ -471,7 +532,7 @@ CODE;
      */
     public function initialize(array $instance, array $release): array
     {
-        $database = new Database($this->store, $this->runner);
+        $database = new Database($this->store, $this->runner, $this->connections);
         $catalog = $database->inspect($instance, $release);
         if (($instance['initialization'] ?? null) === 'adopted') {
             if ($catalog['fresh']) {
@@ -480,7 +541,7 @@ CODE;
             $clientId = str_replace(
                 "'",
                 "''",
-                new Runtime($this->store, $this->runner)->environment($instance)['AUTH_SPA_CLIENT_ID'],
+                new Runtime($this->store, $this->runner, $this->connections)->environment($instance)['AUTH_SPA_CLIENT_ID'],
             );
             $client = $database->sql(
                 $instance,
@@ -504,23 +565,23 @@ CODE;
             'phase' => 'database_mutating',
         ]);
         $this->store->save($instance['id'], $instance);
-        new Runtime($this->store, $this->runner)->prepare($instance, $release);
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        new Runtime($this->store, $this->runner, $this->connections)->prepare($instance, $release);
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $instance['database_mutation_started'] = true;
         $this->store->save($instance['id'], $instance);
         try {
-            $docker->compose($instance, [
-                'run',
-                '--rm',
-                '--no-deps',
-                'app',
-                'php',
-                'bin/console',
-                'app:dev:setup',
-                '--origin=https://' . $instance['hostname'],
-                '--no-interaction',
-            ], timeout: null);
+            $application = new Runtime($this->store, $this->runner, $this->connections)->applicationContainer($instance, $release, [
+                'php', 'bin/console', 'app:dev:setup', '--origin=https://' . $instance['hostname'], '--no-interaction',
+            ]);
+            \Baander\Tooling\Resources\DisposableContainer::run(
+                $docker,
+                $this->store->directory($instance['id']) . '/initialize-resources.json',
+                $application['arguments'],
+                $this->connections->environment(),
+                $release['effective']['budgets']['cleanup'] ?? 120.0,
+                containerEnvironment: $application['environment'],
+            );
         } catch (\Throwable $error) {
             $this->store->save($instance['id'], array_replace($instance, [
                 'phase' => 'blocked',

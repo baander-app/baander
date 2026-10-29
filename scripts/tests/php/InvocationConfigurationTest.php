@@ -48,4 +48,11 @@ final class InvocationConfigurationTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         ToolingConfiguration::forRepository($this->root, []);
     }
+
+    public function testMalformedLocalBudgetFailsAtTheInvocationBoundary(): void
+    {
+        file_put_contents($this->root . '/dev.local.json', '{"tooling":{"budgets":{"backend":"90"}}}');
+        $this->expectException(\InvalidArgumentException::class);
+        ToolingConfiguration::forRepository($this->root, []);
+    }
 }

@@ -15,6 +15,33 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentMediaMountsTest extends TestCase
 {
+    public function testUnavailableSourceStillAllowsSavedRecipeFingerprintAndRetirementIsolation(): void
+    {
+        $source = '/unavailable-media.baander.app';
+        $mounts = self::mounts();
+        $mounts[0] = ['source' => $source, 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
+        $recipe = self::recipe($mounts, 'local-development');
+        self::assertSame($recipe->fingerprint(), self::recipe($mounts, 'local-development')->fingerprint());
+        $containment = new DockerWorkerContainment(static function (array $arguments) use ($source): string {
+            if ($arguments[0] === 'container' && $arguments[1] === 'rm') {
+                return str_repeat('c', 64);
+            }
+            $inspection = self::inspection();
+            $inspection['mounts'][0] = ['Type' => 'bind', 'Source' => $source, 'Destination' => '/media/library', 'RW' => false, 'Propagation' => 'rprivate'];
+            return json_encode($arguments[0] === 'container' ? $inspection : self::volume($arguments[4]), JSON_THROW_ON_ERROR);
+        }, $recipe);
+        $containment->retire(str_repeat('c', 64), new \App\Shared\Infrastructure\Worker\DeploymentLease('worker.baander.app', str_repeat('a', 32), 1), DeploymentUnit::Control);
+        $this->expectException(InvalidArgumentException::class);
+        $containment->verifyAdmission(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
+    }
+
+    public function testUnavailableSourceCannotBeUsedForCreation(): void
+    {
+        $recipe = self::recipe([['source' => '/unavailable-media.baander.app', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source']], 'local-development');
+        $this->expectException(InvalidArgumentException::class);
+        $recipe->createArguments();
+    }
+
     public function testAuthorizedMountsProduceExplicitModesAndStableIdentity(): void
     {
         $mounts = self::mounts();
@@ -74,7 +101,7 @@ final class DeploymentMediaMountsTest extends TestCase
                 ['source' => '/tmp/../tmp'], ['source' => '/tmp/'], ['source' => $alias], ['source' => '/does-not-exist.baander.app']] as $changes) {
                 $rejected = false;
                 try {
-                    self::recipe([array_replace(['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'], $changes)], 'local-development');
+                    self::recipe([array_replace(['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'], $changes)], 'local-development')->createArguments();
                 } catch (InvalidArgumentException) {
                     $rejected = true;
                 }
@@ -210,6 +237,6 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts, string $sourceMountPolicy = 'production'): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, DeploymentUnit::Control, [0], 'worker-ipc', '/var/www/html', mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
     }
 }

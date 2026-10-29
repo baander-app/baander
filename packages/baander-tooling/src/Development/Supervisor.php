@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\CommandExecutor;
+use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Process\CommandFailure;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -13,7 +17,7 @@ final class Supervisor
 
     public function __construct(
         private readonly StateStore $store,
-        private readonly Runner $runner,
+        private readonly CommandExecutor $executor,
         private readonly ?string $sourceRoot = null,
         private readonly ?string $phpExecutable = null,
     ) {
@@ -54,7 +58,7 @@ final class Supervisor
         if (!is_file($root . '/scripts/dev-environment.php')) {
             throw new WorkflowError('The PHP development controller entrypoint is missing.');
         }
-        $this->runner->run(['systemctl', '--user', 'show-environment']);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'show-environment'], processGroup: true));
         $payload = new ControllerPayload($this->store->root);
         $payload->publish($root);
         $unitHome = (getenv('XDG_CONFIG_HOME') ?: (getenv('HOME') . '/.config')) . '/systemd/user';
@@ -76,7 +80,7 @@ final class Supervisor
         AtomicFile::write($unitHome . '/' . $this->unit . '.service', str_replace(['${COMMAND}', '${SEARCH_PATH}'], [$command, $searchPath], $template));
         $timer = (string) file_get_contents($root . '/docker/dev/systemd/baander-development.timer');
         AtomicFile::write($unitHome . '/' . $this->unit . '.timer', str_replace('Unit=baander-development.service', 'Unit=' . $this->unit . '.service', $timer));
-        $this->runner->run(['systemctl', '--user', 'daemon-reload']);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'daemon-reload'], processGroup: true));
     }
 
     /** Fence systemd starts and join its old invocation before taking an instance lock.
@@ -87,15 +91,16 @@ final class Supervisor
         if (!is_finite($timeoutSeconds) || $timeoutSeconds <= 0) {
             throw new WorkflowError('Legacy controller completion requires a positive finite timeout.');
         }
-        $this->runner->run(['systemctl', '--user', 'stop', $this->unit . '.timer']);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'stop', $this->unit . '.timer'], processGroup: true));
         try {
             $this->install();
             $deadline = hrtime(true) / 1_000_000_000 + $timeoutSeconds;
             do {
-                $state = $this->runner->run(
+                $state = $this->executor->run(new ProcessSpec(
                     ['systemctl', '--user', 'show', '--property=ActiveState', '--value', $this->unit . '.service'],
                     timeout: max(0.001, $deadline - hrtime(true) / 1_000_000_000),
-                );
+                    processGroup: true,
+                ));
                 if (in_array(trim($state->stdout), ['inactive', 'failed'], true)) {
                     return;
                 }
@@ -105,23 +110,23 @@ final class Supervisor
                 usleep(50_000);
             } while (true);
         } finally {
-            $this->runner->run([
+            $this->executor->run(new ProcessSpec([
                 'systemctl', '--user', $this->store->enabled('persistent') ? 'enable' : 'disable',
                 '--now', $this->unit . '.timer',
-            ]);
+            ], processGroup: true));
         }
     }
 
     public function refresh(): void
     {
         $this->install();
-        $this->runner->run([
+        $this->executor->run(new ProcessSpec([
             'systemctl',
             '--user',
             $this->store->enabled('persistent') ? 'enable' : 'disable',
             '--now',
             $this->unit . '.timer',
-        ]);
+        ], processGroup: true));
     }
 
     public function enable(): void
@@ -129,7 +134,7 @@ final class Supervisor
         $this->store->setEnabled('persistent', true);
         try {
             $this->refresh();
-        } catch (WorkflowError $error) {
+        } catch (WorkflowError|CommandFailure $error) {
             $this->store->setEnabled('persistent', false);
             throw $error;
         }
@@ -138,6 +143,6 @@ final class Supervisor
     public function disable(): void
     {
         $this->store->setEnabled('persistent', false);
-        $this->runner->run(['systemctl', '--user', 'disable', '--now', $this->unit . '.timer'], check: false);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'disable', '--now', $this->unit . '.timer'], processGroup: true), new CompletionPolicy(null));
     }
 }

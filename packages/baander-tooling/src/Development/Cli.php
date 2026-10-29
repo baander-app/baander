@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\CommandLine\Words;
-use Baander\Tooling\Development\Build\Source;
+use Baander\Tooling\Build\Source;
 
 final class Cli
 {
@@ -21,7 +22,9 @@ final class Cli
             'instance' => null,
             'media' => [],
             'share-path' => [],
-            'docker-context' => 'default',
+            'docker-context' => null,
+            'docker-host' => null,
+            'docker-executable' => null,
             'environment-file' => null,
             'adopt' => null,
             'install-trust' => false,
@@ -62,7 +65,7 @@ final class Cli
         };
         $values = match ($command) {
             'host-setup' => ['share-path'],
-            'up' => ['instance', 'media', 'docker-context', 'environment-file', 'adopt'],
+            'up' => ['instance', 'media', 'docker-context', 'docker-host', 'docker-executable', 'environment-file', 'adopt'],
             'exec' => ['instance', 'service', 'user', 'command-env', 'shell-command-env'],
             'logs', 'restart' => ['instance', 'service'], default => ['instance'],
         };
@@ -112,9 +115,10 @@ final class Cli
     }
 
     /** @param array<string,mixed> $options
+     * @param array<string,string>|null $environment
      * @return non-empty-list<string>
      */
-    public static function execCommand(array $options): array
+    public static function execCommand(array $options, ?array $environment = null): array
     {
         $command = $options['arguments'];
         $variable = $options['command-env'] ?? $options['shell-command-env'];
@@ -122,7 +126,7 @@ final class Cli
             if ($command !== []) {
                 throw new WorkflowError('Choose command arguments or a command environment variable.');
             }
-            $value = getenv($variable);
+            $value = ($environment ?? getenv())[$variable] ?? false;
             if ($value === false || trim($value) === '') {
                 throw new WorkflowError('The command environment variable is empty or missing.');
             }
@@ -135,29 +139,33 @@ final class Cli
     }
 
     /** @return array{string,string} */
-    public static function repositoryContext(Runner $runner, string $directory): array
+    public static function repositoryContext(CommandExecutor $runner, string $directory): array
     {
-        $root = trim($runner->run(['git', 'rev-parse', '--show-toplevel'], cwd: $directory)->stdout);
-        $remote = $runner->run(['git', 'remote', 'get-url', 'origin'], cwd: $root, check: false);
+        $root = trim($runner->run(new ProcessSpec(['git', 'rev-parse', '--show-toplevel'], cwd: $directory, processGroup: true))->stdout);
+        $remote = $runner->run(new ProcessSpec(['git', 'remote', 'get-url', 'origin'], cwd: $root, processGroup: true), new CompletionPolicy(null));
         if ($remote->exitCode === 0) {
             $identity = trim($remote->stdout);
         } else {
-            $common = trim($runner->run(['git', 'rev-parse', '--git-common-dir'], cwd: $root)->stdout);
-            $identity = Environment::resolvedPath(str_starts_with($common, '/') ? $common : $root . '/' . $common);
+            $common = trim($runner->run(new ProcessSpec(['git', 'rev-parse', '--git-common-dir'], cwd: $root, processGroup: true))->stdout);
+            $identity = \Baander\Tooling\Filesystem\Paths::resolvedPath(str_starts_with($common, '/') ? $common : $root . '/' . $common);
         }
         return [$root, $identity];
     }
 
-    /** @return array<string,string> */
-    public static function dockerTarget(Runner $runner, string $context): array
+    /** @param array<string,string> $environment
+     * @return array<string,mixed>
+     */
+    public static function dockerTarget(CommandExecutor $runner, \Baander\Tooling\Configuration\ToolingConfiguration $configuration, string $directory, array $environment): array
     {
-        $executable = Environment::executable('docker');
-        if ($executable === null) {
-            throw new WorkflowError('Install Docker with Compose before starting a development instance.');
+        $target = (new \Baander\Tooling\Docker\TargetResolver($runner, $environment))->resolve($configuration->docker, $directory);
+        $docker = new \Baander\Tooling\Docker\Client($runner, $target, Environment::clean($environment));
+        $docker->assertLocalPublishedPorts();
+        if (!str_starts_with($target->endpoint, 'unix:///') || preg_match('/[\x00-\x1f\x7f,"]/', substr($target->endpoint, 7)) === 1) {
+            throw new WorkflowError('The local development worker controller requires a representable daemon-visible Unix socket.');
         }
-        $information = json_decode($runner->run([$executable, '--context', $context, 'info', '--format', '{{json .}}'])->stdout, true, flags: JSON_THROW_ON_ERROR);
-        $runner->run([$executable, '--context', $context, 'compose', 'version']);
-        return ['executable' => $executable, 'context' => $context, 'daemon_id' => $information['ID']];
+        $docker->validateIdentity();
+        $docker->requireCompose();
+        return $target->toArray();
     }
 
     private static function within(string $path, string $parent): bool
@@ -167,7 +175,7 @@ final class Cli
 
     public static function validateStateRoot(StateStore $store, string $root): void
     {
-        if (self::within(Environment::resolvedPath($store->root), Environment::resolvedPath($root))) {
+        if (self::within(\Baander\Tooling\Filesystem\Paths::resolvedPath($store->root), \Baander\Tooling\Filesystem\Paths::resolvedPath($root))) {
             throw new WorkflowError('Development state must be outside the worktree.');
         }
     }
@@ -175,9 +183,9 @@ final class Cli
     /** @param list<array<string,mixed>> $media */
     public static function validateMediaState(array $media, string $stateRoot): void
     {
-        $state = Environment::resolvedPath($stateRoot);
+        $state = \Baander\Tooling\Filesystem\Paths::resolvedPath($stateRoot);
         foreach ($media as $mount) {
-            $source = Environment::resolvedPath($mount['source']);
+            $source = \Baander\Tooling\Filesystem\Paths::resolvedPath($mount['source']);
             if (self::within($source, $state) || self::within($state, $source)) {
                 throw new WorkflowError('Media directories must not contain development state or be inside it.');
             }
@@ -185,16 +193,23 @@ final class Cli
     }
 
     /** @param array<string,mixed> $options
+     * @param array<string,string>|null $environment
+     * @param array<string,mixed>|null $local
      * @return array<string,mixed>
      */
-    public static function configure(StateStore $store, Runner $runner, string $root, string $repository, array $options): array
+    public static function configure(StateStore $store, CommandExecutor $runner, string $root, string $repository, array $options, ?array $environment = null, ?\Baander\Tooling\Configuration\ToolingConfiguration $configuration = null, ?array $local = null): array
     {
         self::validateStateRoot($store, $root);
-        $libraries = LocalConfiguration::libraries($runner, $root);
+        $environment ??= getenv();
+        $local ??= LocalConfiguration::load($runner, $root, $environment);
+        $configuration ??= self::configuration($options, $environment, $local);
+        $connections = new Connections($runner, Environment::clean($environment));
+        $libraries = LocalConfiguration::libraries($runner, $root, $local);
+        $layout = \Baander\Tooling\Configuration\ApplicationLayout::load($root . '/packages/baander-tooling/resources/application-layout.json');
         $explicit = [];
         foreach ($options['media'] as $value) {
             $parts = explode('=', $value, 2);
-            $source = Environment::resolvedPath($parts[0]);
+            $source = \Baander\Tooling\Filesystem\Paths::resolvedPath($parts[0]);
             $explicit[] = ['source' => $source, 'target' => $parts[1] ?? $source];
         }
         $configured = array_map(
@@ -205,14 +220,10 @@ final class Cli
             $libraries ?? [],
         );
         self::validateMediaState([...$configured, ...$explicit], $store->root);
-        self::validateMediaMounts($configured);
-        self::validateMediaMounts($explicit);
-        $supplied = array_column([...$configured, ...$explicit], null, 'target');
-        self::validateMediaMounts(array_values($supplied));
         $identity = $options['instance'] ?? Environment::previewId($root, $repository);
-        $lock = $store->lock($identity);
+        $observed = $store->load($identity);
+        $instance = $observed;
         try {
-            $instance = $store->load($identity);
             if ($instance !== null && $instance['repository'] !== $repository) {
                 throw new WorkflowError('The saved instance belongs to another repository.');
             }
@@ -257,8 +268,35 @@ final class Cli
                     }
                 }
             }
-            self::validateMediaState($media, $store->root);
-            self::validateMediaMounts($media);
+            $applicationEnvironment = self::jsonOption($options['environment-file']) ?? [];
+            $adoption = self::jsonOption($options['adopt']);
+            if ($applicationEnvironment === [] && $instance !== null && is_file($store->directory($identity) . '/env.json')) {
+                $applicationEnvironment = new Runtime($store, $runner, $connections)->environment($instance);
+            }
+            $reservedTargets = array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target');
+            $media = new Mounts($layout)->preflight($media, $store->root, $applicationEnvironment, $reservedTargets);
+            new RetainedState($store, $runner, $environment)->convert($identity);
+            $converted = $store->load($identity);
+            if ($converted !== null && $converted != $observed) {
+                $previousConfiguration = $observed ?? [];
+                $currentConfiguration = $converted;
+                foreach (['version', 'docker', 'release', 'prepared_release'] as $field) {
+                    unset($previousConfiguration[$field], $currentConfiguration[$field]);
+                }
+                if ($previousConfiguration !== $currentConfiguration) {
+                    throw new WorkflowError('Instance configuration changed during preflight; retry with its current state.');
+                }
+                foreach (['version', 'docker', 'release', 'prepared_release'] as $field) {
+                    if (array_key_exists($field, $converted)) {
+                        $instance[$field] = $converted[$field];
+                    }
+                }
+                $observed = $converted;
+            }
+            $lock = $store->lock($identity);
+            if ($store->load($identity) != $observed) {
+                throw new WorkflowError('Instance configuration changed during preflight; retry with its current state.');
+            }
             if (
                 $instance !== null
                 && $media !== ($instance['media'] ?? [])
@@ -274,49 +312,21 @@ final class Cli
                 'repository' => $repository,
                 'worktree' => $root,
                 'phase' => 'configured',
-                'docker' => self::dockerTarget($runner, $options['docker-context']),
+                'version' => 1,
+                'docker' => self::dockerTarget($runner, $configuration, $store->directory($identity) . '/transport-' . bin2hex(random_bytes(8)), $environment),
             ];
+            $instance['tooling'] = $configuration->toArray();
             $instance['media'] = $media;
             $instance['libraries'] = $savedLibraries;
-            $instance = new Bootstrap($store, $runner)->configure(
+            $instance = new Bootstrap($store, $runner, $connections)->configure(
                 $instance,
-                environment: self::jsonOption($options['environment-file']),
-                adoption: self::jsonOption($options['adopt']),
+                environment: $applicationEnvironment,
+                adoption: $adoption,
             );
             $store->save($identity, $instance);
             return $instance;
         } finally {
-            $lock->release();
-        }
-    }
-
-    /** @param list<array<string,mixed>> $media */
-    private static function validateMediaMounts(array $media): void
-    {
-        $targets = [];
-        foreach ($media as $mount) {
-            $target = $mount['target'];
-            if (
-                !str_starts_with($mount['source'], '/')
-                || !is_dir($mount['source'])
-                || !is_readable($mount['source'])
-                || !str_starts_with($target, '/')
-            ) {
-                throw new WorkflowError('Configure an existing absolute readable media directory and absolute container path.');
-            }
-            if (
-                $target === '/var/www/html'
-                || str_starts_with($target, '/var/www/html/')
-                || in_array($target, ['/', '/var/run', '/run', '/etc'], true)
-            ) {
-                throw new WorkflowError('Media mount overlaps application or system state.');
-            }
-            foreach ($targets as $existing) {
-                if (self::within($target, $existing) || self::within($existing, $target)) {
-                    throw new WorkflowError('Media mount targets overlap.');
-                }
-            }
-            $targets[] = $target;
+            ($lock ?? null)?->release();
         }
     }
 
@@ -349,6 +359,7 @@ final class Cli
     /** @param list<string> $arguments */
     public static function main(array $arguments): int
     {
+        $environment = getenv();
         try {
             $options = self::parse($arguments);
         } catch (\InvalidArgumentException $error) {
@@ -365,14 +376,27 @@ final class Cli
             return 0;
         }
         try {
-            $store = $options['state-root'] === null ? StateStore::default() : new StateStore($options['state-root']);
-            $runner = new Runner();
+            $store = $options['state-root'] === null ? StateStore::default($environment) : new StateStore($options['state-root']);
+            $defaults = \Baander\Tooling\Configuration\JsonObject::read(dirname(__DIR__, 2) . '/resources/tooling-defaults.json');
+            $bootstrapBudget = $defaults['budgets']['process'] ?? null;
+            if (!is_int($bootstrapBudget) && !is_float($bootstrapBudget)) {
+                throw new WorkflowError('The installed controller has no numeric bootstrap process budget.');
+            }
+            $requestedBudget = $environment['BAANDER_TEST_TIMEOUT'] ?? null;
+            if (is_string($requestedBudget) && is_numeric($requestedBudget) && is_finite((float) $requestedBudget) && (float) $requestedBudget > 0) {
+                $bootstrapBudget = min($bootstrapBudget, (float) $requestedBudget);
+            }
+            $runner = self::executor($bootstrapBudget, $environment);
             $command = $options['command'];
             if ($command === 'host-setup') {
-                $worktree = $runner->run(['git', 'rev-parse', '--show-toplevel'], cwd: getcwd(), check: false);
+                $worktree = $runner->run(new ProcessSpec(['git', 'rev-parse', '--show-toplevel'], cwd: getcwd(), processGroup: true), new CompletionPolicy(null));
                 if ($worktree->exitCode === 0) {
                     self::validateStateRoot($store, trim($worktree->stdout));
                 }
+                $root = $worktree->exitCode === 0 ? trim($worktree->stdout) : getcwd();
+                $local = LocalConfiguration::load($runner, $root, $environment);
+                $configuration = self::configuration($options, $environment, $local);
+                $runner = self::executor($configuration->budgets->seconds('backend'), $environment);
                 $host = new Host($store, $runner);
                 if ($options['share-path'] !== []) {
                     $host->sharePaths($options['share-path']);
@@ -390,22 +414,47 @@ final class Cli
                 if ($options['instance'] !== 'persistent') {
                     throw new WorkflowError('Automatic updates require the persistent instance.');
                 }
-                new Updater($store, $runner)->update('persistent', automatic: true);
+                $instance = $store->load('persistent');
+                if ($instance === null) {
+                    throw new WorkflowError('Configure the persistent development instance first.');
+                }
+                if (!$store->enabled('persistent')) {
+                    return 0;
+                }
+                if (!isset($instance['tooling'])) {
+                    throw new WorkflowError('Run up to capture the persistent instance preparation settings before enabling automatic updates.');
+                }
+                $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::fromArray($instance['tooling']);
+                $runner = self::executor($configuration->budgets->seconds('backend'), $environment);
+                new Updater($store, $runner, $configuration, $environment)->update('persistent', automatic: true);
                 return 0;
             }
             [$root, $repository] = self::repositoryContext($runner, getcwd());
+            $configuration = null;
+            $local = [];
+            if (!in_array($command, ['status', 'down', 'recover', 'url'], true)) {
+                $local = LocalConfiguration::load($runner, $root, $environment);
+                $configuration = self::configuration($options, $environment, $local);
+                $runner = self::executor($configuration->budgets->seconds('backend'), $environment);
+            }
             if ($command === 'up') {
                 if (!is_file($store->root . '/gateway/tls/cert.pem')) {
                     throw new WorkflowError('Complete make dev-host-setup and certificate trust setup before starting an instance.');
                 }
-                $instance = self::configure($store, $runner, $root, $repository, $options);
+                $instance = self::configure($store, $runner, $root, $repository, $options, $environment, $configuration, $local);
                 self::enableSupervisor($store, $runner, $instance);
-                new Updater($store, $runner)->update($instance['id'], retry: true);
+                new Updater($store, $runner, $configuration, $environment)->update($instance['id'], retry: true);
                 $url = self::readyUrl($store->load($instance['id']));
                 echo 'Ready: ', $url, "\n";
                 return 0;
             }
             $instance = $store->resolveInstance($root, $repository, $options['instance']);
+            if (in_array($command, ['status', 'recover'], true)) {
+                $savedBudgets = $instance['prepared_release']['effective']['budgets'] ?? $instance['release']['effective']['budgets'] ?? [];
+                if ($savedBudgets !== []) {
+                    $runner = self::executor($savedBudgets['backend'] ?? $savedBudgets['process'] ?? 120.0, $environment);
+                }
+            }
             if ($command === 'status') {
                 self::status($store, $runner, $instance, $options['json']);
                 return 0;
@@ -418,32 +467,34 @@ final class Cli
                 return 0;
             }
             if ($command === 'down') {
+                $runner = self::executor($instance['release']['effective']['budgets']['cleanup'] ?? $instance['prepared_release']['effective']['budgets']['cleanup'] ?? 120.0, $environment, ignoreCancellation: true);
                 if ($instance['kind'] === 'persistent') {
                     new Supervisor($store, $runner)->disable();
                 }
-                new Updater($store, $runner)->down($instance['id']);
+                new Updater($store, $runner, environment: $environment)->down($instance['id']);
                 return 0;
             }
             if ($command === 'update') {
-                new Updater($store, $runner)->update($instance['id'], retry: $options['retry']);
+                new Updater($store, $runner, $configuration, $environment)->update($instance['id'], retry: $options['retry']);
                 return 0;
             }
             if ($command === 'recover') {
-                new Updater($store, $runner)->recover($instance['id']);
+                new Updater($store, $runner, environment: $environment)->recover($instance['id']);
                 return 0;
             }
             if ($command === 'restart') {
-                $updater = new Updater($store, $runner);
+                $updater = new Updater($store, $runner, $configuration, $environment);
                 $updater->down($instance['id']);
                 self::enableSupervisor($store, $runner, $instance);
                 $updater->update($instance['id'], retry: true);
                 return 0;
             }
             if ($command === 'logs') {
-                $docker = new Docker($runner, $instance['docker']);
-                $docker->validate();
+                $docker = (new Connections($runner, Environment::clean($environment)))->client($instance['docker']);
+                $docker->validateIdentity();
                 return $docker->compose(
-                    $instance,
+                    $instance['project'],
+                    $instance['compose_file'],
                     ['logs', '--tail', '100', ...($options['follow'] ? ['--follow'] : []), $options['service']],
                     check: false,
                     timeout: null,
@@ -456,27 +507,54 @@ final class Cli
                 if ($instance === null || $instance['phase'] !== 'ready') {
                     throw new WorkflowError('The instance is not ready for commands; inspect its status.');
                 }
-                $docker = new Docker($runner, $instance['docker']);
-                $docker->validate();
+                $docker = (new Connections($runner, Environment::clean($environment)))->client($instance['docker']);
+                $docker->validateIdentity();
                 $values = [
                     'exec',
                     ...(stream_isatty(STDIN) ? [] : ['-T']),
                     ...($options['user'] === null ? [] : ['--user', $options['user']]),
                     $options['service'],
-                    ...self::execCommand($options),
+                    ...self::execCommand($options, $environment),
                 ];
-                return $docker->compose($instance, $values, check: false, timeout: null, interactive: true)->exitCode;
+                return $docker->compose($instance['project'], $instance['compose_file'], $values, check: false, timeout: null, interactive: true)->exitCode;
             } finally {
                 $lock->release();
             }
         } catch (\RuntimeException|\InvalidArgumentException|\JsonException $error) {
             fwrite(STDERR, $error->getMessage() . "\n");
-            return 1;
+            return $error instanceof \Baander\Tooling\Process\CommandFailure ? $error->getCode() : ($error->getCode() >= 1 && $error->getCode() <= 255 ? $error->getCode() : 1);
         }
     }
 
+    /** @param array<string,mixed> $options
+     * @param array<string,string> $environment
+     * @param array<string,mixed> $local
+     */
+    private static function configuration(array $options, array $environment, array $local): \Baander\Tooling\Configuration\ToolingConfiguration
+    {
+        $dockerFlags = [];
+        foreach (['context', 'host', 'executable'] as $key) {
+            if (($options['docker-' . $key] ?? null) !== null) {
+                $dockerFlags[$key] = $options['docker-' . $key];
+            }
+        }
+        return \Baander\Tooling\Configuration\ToolingConfiguration::resolve(
+            flags: $dockerFlags === [] ? [] : ['docker' => $dockerFlags],
+            environment: $environment,
+            local: $local['tooling'] ?? [],
+        );
+    }
+
+    /** @param array<string,string> $environment */
+    private static function executor(float $seconds, array $environment, bool $ignoreCancellation = false): \Baander\Tooling\Process\EngineExecutor
+    {
+        return new \Baander\Tooling\Process\EngineExecutor(
+            \Baander\Tooling\Process\ExecutionContext::bounded($seconds, Environment::clean($environment), ignoreCancellation: $ignoreCancellation),
+        );
+    }
+
     /** @param array<string,mixed> $instance */
-    private static function enableSupervisor(StateStore $store, Runner $runner, array $instance): void
+    private static function enableSupervisor(StateStore $store, CommandExecutor $runner, array $instance): void
     {
         if ($instance['kind'] !== 'persistent') {
             return;
@@ -490,8 +568,12 @@ final class Cli
     }
 
     /** @param array<string,mixed> $instance */
-    private static function status(StateStore $store, Runner $runner, array $instance, bool $json): void
+    private static function status(StateStore $store, CommandExecutor $runner, array $instance, bool $json): void
     {
+        if (array_key_exists('version', $instance) && $instance['version'] !== 1) {
+            echo json_encode($instance, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), "\n";
+            return;
+        }
         $data = [];
         foreach ([
             'id',
@@ -511,7 +593,10 @@ final class Cli
         if ($instance['kind'] === 'preview') {
             try {
                 $data['worker_snapshot_current'] = Source::snapshotWorktree($runner, $instance['worktree'], null) === ($instance['worker_snapshot'] ?? null);
-            } catch (\RuntimeException) {
+            } catch (\RuntimeException $error) {
+                if ($error instanceof \Baander\Tooling\Process\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                    throw $error;
+                }
                 $data['worker_snapshot_current'] = 'unavailable';
             }
         }

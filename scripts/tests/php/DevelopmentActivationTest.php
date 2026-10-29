@@ -7,14 +7,20 @@ namespace Baander\Tooling\Tests;
 use Baander\Tooling\Development\Build\Builder;
 use Baander\Tooling\Development\Database;
 use Baander\Tooling\Development\Libraries;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\Updater;
 use Baander\Tooling\Development\Workers;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Inventory\Collector;
 use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/Fixtures/development-command-executor.php';
 
 final class DevelopmentActivationTest extends TestCase
 {
@@ -32,34 +38,13 @@ final class DevelopmentActivationTest extends TestCase
     {
         $this->root = sys_get_temp_dir() . '/baander-activation-' . bin2hex(random_bytes(8));
         $this->store = new StateStore($this->root);
-        $runner = new class extends Runner {
-            public function run(
-                array $arguments,
-                ?string $cwd = null,
-                ?array $env = null,
-                ?string $input = null,
-                ?float $timeout = 120,
-                bool $check = true,
-                ?string $logPath = null,
-                bool $interactive = false,
-            ): ProcessResult {
-                $output = '{}';
-                if (in_array('info', $arguments, true)) {
-                    $output = '{"ID":"daemon"}';
-                } elseif (in_array('network', $arguments, true) && in_array('inspect', $arguments, true)) {
-                    $name = $arguments[array_key_last($arguments)];
-                    $owner = 'gateway-' . substr($name, strlen('baander-development-gateway-'));
-                    $output = json_encode(
-                        [[
-                            'Labels' => ['app.baander.development.owner' => $owner],
-                            'IPAM' => ['Config' => [['Subnet' => '172.20.0.0/16']]],
-                        ]],
-                        JSON_THROW_ON_ERROR,
-                    );
-                }
-                return new ProcessResult(0, null, false, false, $output, '', 0);
-            }
-        };
+        PrivateDirectory::prepare($this->root);
+        $executable = $this->root . '/activation-docker';
+        file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\n\$_SERVER['argv'] = [\$_SERVER['argv'][0], "
+            . var_export($this->root, true) . ", ...array_slice(\$_SERVER['argv'], 1)];\nrequire "
+            . var_export(__DIR__ . '/Fixtures/activation-gateway-docker.php', true) . ";\n");
+        chmod($executable, 0700);
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
         $this->old = [
             'revision' => 'old',
             'postgres_image' => 'recorded-postgres',
@@ -80,13 +65,16 @@ final class DevelopmentActivationTest extends TestCase
             'project' => 'activation-test',
             'hostname' => 'baander.test',
             'compose_file' => '/disposable/compose.json',
-            'docker' => ['executable' => 'fake', 'context' => 'owned', 'daemon_id' => 'daemon'],
+            'docker' => DevelopmentCommandExecutor::target($executable, 'owned', 'daemon'),
             'phase' => 'ready',
             'running_revision' => 'old',
             'release' => $this->old,
             'readiness' => ['web_ready' => true],
             'initialization' => 'complete',
         ];
+        $this->old = DevelopmentCommandExecutor::release($this->old, $this->instance);
+        $this->new = DevelopmentCommandExecutor::release($this->new, $this->instance);
+        $this->instance['release'] = $this->old;
         $this->store->save('persistent', $this->instance);
         $this->store->setEnabled('persistent', true);
         $this->updater = new class ($this->store, $runner) extends Updater {
@@ -96,7 +84,7 @@ final class DevelopmentActivationTest extends TestCase
             }
         };
         $this->updater->builder = $this->createStub(Builder::class);
-        $this->updater->builder->method('prepare')->willReturn($this->new);
+        $this->updater->builder->method('prepare')->willReturnCallback(fn(): array => $this->new);
         $this->updater->runtime = $this->createStub(Runtime::class);
         $this->updater->runtime->method('write')->willReturnCallback(static fn(array $instance, array $release): array => $instance);
         $this->updater->runtime->method('ready')->willReturn(['web_ready' => true]);
@@ -115,7 +103,7 @@ final class DevelopmentActivationTest extends TestCase
 
     protected function tearDown(): void
     {
-        new Runner()->run(['rm', '-rf', '--', $this->root]);
+        Collector::remove($this->root);
     }
 
     public function testExistingDatabaseStartupReconcilesPersistedLibrariesWithoutInitialization(): void
@@ -124,13 +112,15 @@ final class DevelopmentActivationTest extends TestCase
             'slug' => 'music', 'name' => 'Music', 'type' => 'music',
             'source' => '/host/music', 'target' => '/media/music',
         ]];
+        $this->new['effective']['libraries'] = $this->instance['libraries'];
         $this->store->save('persistent', $this->instance);
         $database = $this->createMock(Database::class);
         $database->method('inspect')->willReturn(['fresh' => false, 'pending' => []]);
         $database->expects(self::never())->method('migrate');
         $this->updater->database = $database;
-        $runner = $this->createMock(Runner::class);
-        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (array $arguments): ProcessResult {
+        $runner = $this->createMock(DevelopmentCommandExecutor::class);
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (\Baander\Tooling\Process\ProcessSpec $command): ProcessResult {
+            $arguments = $command->argv;
             if (in_array('app:library:list', $arguments, true)) {
                 return new ProcessResult(0, null, false, false, '[]', '', 0);
             }
@@ -161,8 +151,9 @@ final class DevelopmentActivationTest extends TestCase
             return ['web_ready' => true];
         });
         $this->updater->runtime = $runtime;
-        $runner = $this->createMock(Runner::class);
-        $runner->expects(self::once())->method('run')->willReturnCallback(static function (array $arguments) use (&$runtimeReady): ProcessResult {
+        $runner = $this->createMock(DevelopmentCommandExecutor::class);
+        $runner->expects(self::once())->method('run')->willReturnCallback(static function (\Baander\Tooling\Process\ProcessSpec $command) use (&$runtimeReady): ProcessResult {
+            $arguments = $command->argv;
             self::assertTrue($runtimeReady);
             self::assertContains('app:library:list', $arguments);
             throw new WorkflowError('library catalog unavailable');
@@ -186,6 +177,9 @@ final class DevelopmentActivationTest extends TestCase
         $database->method('inspect')->willThrowException(new WorkflowError('incompatible history'));
         $this->updater->database = $database;
         $instance = array_replace($this->instance, ['postgres_image' => 'adopted-postgres', 'redis_image' => 'adopted-redis']);
+        $prepared = array_replace($this->new, ['postgres_image' => 'adopted-postgres', 'redis_image' => 'adopted-redis']);
+        unset($prepared['effective']);
+        $this->new = DevelopmentCommandExecutor::release($prepared, $instance);
         $this->store->save('persistent', $instance);
         try {
             $this->updater->update('persistent');
@@ -194,8 +188,8 @@ final class DevelopmentActivationTest extends TestCase
             self::assertSame('incompatible history', $error->getMessage());
             $saved = $this->store->load('persistent');
             self::assertEquals(['ready', 'old', $this->old], [$saved['phase'], $saved['running_revision'], $saved['release']]);
-            self::assertSame('adopted-postgres', $saved['prepared_release']['postgres_image']);
-            self::assertSame('adopted-redis', $saved['prepared_release']['redis_image']);
+            self::assertSame('adopted-postgres', $saved['prepared_release']['images']['postgres_image']['resolvedId']);
+            self::assertSame('adopted-redis', $saved['prepared_release']['images']['redis_image']['resolvedId']);
             self::assertSame('new', $saved['failed_revision']);
         }
     }

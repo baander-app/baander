@@ -164,6 +164,9 @@ final class ControllerPayload
     private function generations(): array
     {
         PrivateDirectory::assertNoSymlinks($this->root . '/generations');
+        if (!is_dir($this->root . '/generations')) {
+            return [];
+        }
         return array_values(array_filter(scandir($this->root . '/generations') ?: [], static fn(string $id): bool => preg_match('/\A[a-f0-9]{32}\z/D', $id) === 1));
     }
 

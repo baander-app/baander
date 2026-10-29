@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\Supervisor;
 use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Process\CommandFailure;
 use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Process\ProcessSpec;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/Fixtures/dev-core-runner.php';
+require_once __DIR__ . '/Fixtures/host-command-executor.php';
 
 final class DevelopmentSupervisorTest extends TestCase
 {
@@ -89,9 +91,9 @@ PHP,
     }
 
     /** @param (\Closure(array<string>):void)|null $callback */
-    private function runner(?\Closure $callback = null): DevCoreRunner
+    private function runner(?\Closure $callback = null): HostCommandExecutor
     {
-        return new DevCoreRunner(static function (array $arguments) use ($callback): ?ProcessResult {
+        return new HostCommandExecutor(static function (array $arguments) use ($callback): ?ProcessResult {
             if ($callback !== null) {
                 $callback($arguments);
             }
@@ -99,7 +101,7 @@ PHP,
         });
     }
 
-    private function supervisor(Runner $runner): Supervisor
+    private function supervisor(HostCommandExecutor $runner): Supervisor
     {
         return new Supervisor($this->store, $runner, $this->root . '/source');
     }
@@ -121,9 +123,9 @@ PHP,
         self::assertSame('../../../packages/baander-tooling', readlink($generation . '/scripts/vendor/baander/tooling'));
         rename($this->root . '/source', $this->root . '/source-offline');
         self::assertFileExists($generation . '/scripts/vendor/autoload.php');
-        self::assertSame('controller', new Runner()->run([PHP_BINARY, '-n', $controller])->stdout);
+        self::assertSame('controller', new ProcessRunner()->run(new ProcessSpec([PHP_BINARY, '-n', $controller]))->stdout);
         $probe = json_decode(
-            new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout,
+            new ProcessRunner()->run(new ProcessSpec([PHP_BINARY, $controller, '--probe-package']))->stdout,
             true,
             flags: JSON_THROW_ON_ERROR,
         );
@@ -152,7 +154,7 @@ PHP,
         $this->store->setEnabled('persistent', true);
         $writer = $this->store->lock('persistent');
         $observations = 0;
-        $runner = new DevCoreRunner(function (array $arguments) use (&$observations, $writer): ?ProcessResult {
+        $runner = new HostCommandExecutor(function (array $arguments) use (&$observations, $writer): ?ProcessResult {
             if ($arguments[2] === 'stop') {
                 self::assertStringEndsWith('.timer', $arguments[3]);
             }
@@ -293,6 +295,36 @@ PHP,
             ['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'],
             $runner->calls[array_key_last($runner->calls)]['arguments'],
         );
+    }
+
+    public function testCommandFailureRetainsExitStatusAndRollsBackEnableIntent(): void
+    {
+        $executor = new HostCommandExecutor(static function (array $arguments): ?ProcessResult {
+            return ($arguments[2] ?? '') === 'enable'
+                ? new ProcessResult(23, null, false, false, '', 'systemctl rejected enable', 0)
+                : null;
+        });
+        try {
+            $this->supervisor($executor)->enable();
+            self::fail('Failed systemctl command was accepted.');
+        } catch (CommandFailure $error) {
+            self::assertSame(23, $error->getCode());
+            self::assertStringContainsString('systemctl rejected enable', $error->getMessage());
+            self::assertFalse($this->store->enabled('persistent'));
+        }
+    }
+
+    public function testUncheckedDisableStillReportsTimeout(): void
+    {
+        $this->store->setEnabled('persistent', true);
+        $executor = new HostCommandExecutor(static fn(): ProcessResult => new ProcessResult(0, null, true, false, '', '', 0));
+        try {
+            $this->supervisor($executor)->disable();
+            self::fail('Timed out disable was accepted.');
+        } catch (CommandFailure $error) {
+            self::assertSame(124, $error->getCode());
+            self::assertFalse($this->store->enabled('persistent'));
+        }
     }
 
     public function testFailedEnableRollsBackIntent(): void

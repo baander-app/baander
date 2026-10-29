@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 
-final class DevDataRunner extends Runner
+require_once __DIR__ . '/development-command-executor.php';
+
+final class DevDataRunner extends DevelopmentCommandExecutor
 {
     /** @var list<array{arguments:non-empty-list<string>,input:?string,env:?array<string,string>,timeout:?float,check:bool}> */
     public array $calls = [];
     /** @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|ProcessResult) $callback */
     public function __construct(private readonly \Closure $callback) {}
-    public function run(
+    public function execute(
         array $arguments,
         ?string $cwd = null,
         ?array $env = null,
@@ -47,9 +49,9 @@ abstract class DevDataTestCase extends TestCase
     {
         $this->root = sys_get_temp_dir() . '/baander-dev-data-' . bin2hex(random_bytes(8));
         mkdir($this->root, 0700);
-        mkdir($this->root . '/migrations');
+        mkdir($this->root . '/source/migrations', 0700, true);
         foreach (['20261017000000', '20261017130000'] as $version) {
-            file_put_contents($this->root . '/migrations/Version' . $version . '.php', '<?php');
+            file_put_contents($this->root . '/source/migrations/Version' . $version . '.php', '<?php');
         }
         $this->store = new StateStore($this->root . '/state');
         $this->instance = [
@@ -58,12 +60,13 @@ abstract class DevDataTestCase extends TestCase
             'kind' => 'persistent',
             'compose_file' => 'compose.json',
             'hostname' => 'dev.baander.app',
-            'docker' => ['executable' => 'docker', 'context' => 'fixture', 'daemon_id' => 'daemon'],
+            'docker' => DevelopmentCommandExecutor::target('docker', 'fixture', 'daemon'),
         ];
-        $this->release = ['source' => $this->root, 'revision' => 'target'];
+        $this->release = ['source' => $this->root . '/source', 'revision' => 'target'];
         foreach (['postgres', 'redis', 'app', 'worker', 'operator', 'nginx', 'tool'] as $role) {
             $this->release[$role . '_image'] = 'fixture-image';
         }
+        $this->release = DevelopmentCommandExecutor::release($this->release, $this->instance);
     }
     protected function tearDown(): void
     {

@@ -4,64 +4,69 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
 class Workers
 {
-    public function __construct(private readonly StateStore $store, private readonly Runner $runner) {}
+    private readonly Connections $connections;
+
+    public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, ?Connections $connections = null)
+    {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance
      * @param array<string,mixed> $release
      */
     public function prepare(array &$instance, array $release): void
     {
+        $home = \Baander\Tooling\Configuration\ApplicationLayout::fromArray($release['layout'])->root;
+        $cleanupSeconds = $release['effective']['budgets']['cleanup'] ?? 120.0;
         $previous = $instance['workers'] ?? null;
         if ($previous && ($previous['phase'] ?? null) !== 'retired') {
             throw new WorkflowError('Retire the saved worker deployment before creating a fresh boot.');
         }
-        $docker = new Docker($this->runner, $instance['docker']);
-        $information = $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $information = $docker->validateIdentity();
         if (($information['NCPU'] ?? 0) < 2 || ($information['MemTotal'] ?? 0) < 8448 * 1024 ** 2) {
             throw new WorkflowError('A worker pair requires at least two CPUs and 8448 MiB of daemon RAM.');
         }
-        $endpoint = ($docker->run(['context', 'inspect', $instance['docker']['context']])->stdout
-            |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)))[0]['Endpoints']['docker']['Host'];
+        $endpoint = $docker->target->endpoint;
         if (!str_starts_with($endpoint, 'unix://')) {
             throw new WorkflowError('The local worker controller requires a daemon-visible Unix socket.');
         }
         $boot = bin2hex(random_bytes(16));
         $directory = $this->store->directory($instance['id']) . '/workers/' . $boot;
         PrivateDirectory::prepare($directory);
-        $profile = ($docker->run([
-            'run',
-            '--rm',
+        $profile = (\Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/profile-resources.json', [
             '--network',
             'none',
             '--entrypoint',
             'php',
-            $release['worker_image'],
+            $release['images']['worker_image']['resolvedId'],
             '-r',
             'require "vendor/autoload.php"; echo (new \\App\\Shared\\Application\\DTO\\WorkerAutoscalingProfile())->toJson();',
-        ])->stdout
+        ], $this->connections->environment(), $cleanupSeconds)->stdout
             |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
         $mounts = [];
         foreach ($instance['media'] ?? [] as $item) {
             $mounts[] = [
-                'source' => Environment::resolvedPath($item['source']),
+                'source' => \Baander\Tooling\Filesystem\Paths::resolvedPath($item['source']),
                 'target' => $item['target'],
                 'role' => 'source',
                 'readOnly' => true,
             ];
         }
-        $runtime = new Runtime($this->store, $this->runner);
+        $runtime = new Runtime($this->store, $this->runner, $this->connections);
         $environment = $runtime->environment($instance);
         $configuration = $runtime->config($instance, $release);
         foreach ([
             ['media', $environment['MEDIA_STORAGE_PATH'] ?? '/storage/media', 'source'],
-            ['storage', '/var/www/html/storage', 'derived'],
+            ['storage', $home . '/storage', 'derived'],
             ['conversions', $environment['CONVERT_STORAGE_PATH'] ?? '/storage/conversions', 'derived'],
-            ['transcode_state', '/var/www/html/var/transcode_state', 'derived'],
+            ['transcode_state', $home . '/var/transcode_state', 'derived'],
         ] as [$key, $defaultTarget, $role]) {
             $target = $instance['state_mounts'][$key]['target'] ?? $defaultTarget;
             if ($role === 'source' && array_any(
@@ -76,7 +81,7 @@ class Workers
             );
             if ($configured && $role === 'source' && $configured['type'] === 'bind' && !empty($configured['read_only'])) {
                 $mounts[] = [
-                    'source' => Environment::resolvedPath($configured['source']),
+                    'source' => \Baander\Tooling\Filesystem\Paths::resolvedPath($configured['source']),
                     'target' => $target,
                     'role' => 'source',
                     'readOnly' => true,
@@ -102,6 +107,17 @@ class Workers
             ];
         }
         $ipc = $instance['project'] . '-ipc-' . $boot;
+        $instance['workers'] = [
+            'directory' => $directory,
+            'operator_image' => $release['images']['operator_image']['resolvedId'],
+            'layout' => $release['layout'],
+            'socket' => substr($endpoint, strlen('unix://')),
+            'phase' => 'preparing',
+            'boot_id' => $boot,
+            'ipc_volume' => $ipc,
+            'cleanup_budget' => $cleanupSeconds,
+        ];
+        $this->store->save($instance['id'], $instance);
         $docker->run([
             'volume',
             'create',
@@ -115,9 +131,7 @@ $user = posix_getpwnam('www-data');
 if ($user === false || !chmod($directory, 0700)
     || !chgrp($directory, $user['gid']) || !chown($directory, $user['uid'])) { exit(1); }
 CODE;
-        $docker->run([
-            'run',
-            '--rm',
+        \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/ipc-initialize-resources.json', [
             '--network',
             'none',
             '--read-only',
@@ -133,17 +147,17 @@ CODE;
             'type=volume,src=' . $ipc . ',dst=/run/baander-worker,volume-nocopy',
             '--entrypoint',
             'php',
-            $release['worker_image'],
+            $release['images']['worker_image']['resolvedId'],
             '-r',
             $initializeIpc,
-        ]);
+        ], $this->connections->environment(), $cleanupSeconds);
         $manifest = [
             'version' => 5,
             'sourceMountPolicy' => 'local-development',
             'namespace' => $instance['project'],
             'bootId' => $boot,
-            'daemonId' => $instance['docker']['daemon_id'],
-            'imageId' => $release['worker_image'],
+            'daemonId' => $docker->target->daemonId,
+            'imageId' => $release['images']['worker_image']['resolvedId'],
             'network' => Runtime::networkName($instance),
             'dockerBinary' => '/usr/local/bin/docker',
             'dockerEndpoint' => 'unix:///var/run/docker.sock',
@@ -196,8 +210,6 @@ CODE;
             }
         }
         $validation = [
-            'run',
-            '--rm',
             '-i',
             '--network',
             'none',
@@ -213,11 +225,11 @@ CODE;
         ];
         $validator = <<<'CODE'
 try {
-require '/var/www/html/vendor/autoload.php';
+require $argv[1] . '/vendor/autoload.php';
 $input = stream_get_contents(STDIN, 32769);
 if ($input === false || strlen($input) > 32768) { exit(1); }
 $document = json_decode($input, true, 16, JSON_THROW_ON_ERROR);
-$manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson(json_encode($document['manifest'], JSON_THROW_ON_ERROR));
+$manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson(json_encode($document['manifest'], JSON_THROW_ON_ERROR), $argv[1]);
 $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment($document['environment']);
 foreach (\App\Shared\Application\DTO\DeploymentUnit::cases() as $unit) { $manifest->recipe($unit, $environment); }
 } catch (Throwable) { exit(1); }
@@ -229,27 +241,25 @@ CODE;
         if (strlen($payload) > 32768) {
             throw new WorkflowError('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = $docker->run(
-            [...$validation, $release['operator_image'], '-r', $validator],
-            input: $payload,
-            check: false,
-        );
+        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $directory . '/validation-resources.json', [...$validation, $release['images']['operator_image']['resolvedId'], '-r', $validator, $home], $this->connections->environment(), $cleanupSeconds, input: $payload, check: false);
         if ($result->exitCode !== 0) {
             throw new WorkflowError('Worker shared storage or runtime configuration is invalid; remove overlapping media paths and reconcile adopted storage before enabling workers.');
         }
         $docker->run([
             'image',
             'tag',
-            $release['operator_image'],
+            $release['images']['operator_image']['resolvedId'],
             'baander-development-controller:' . $instance['project'] . '-' . $boot,
         ]);
         AtomicFile::writeJson($directory . '/manifest.json', $manifest);
         AtomicFile::writeJson($directory . '/credentials.json', $credentials);
         $instance['workers'] = [
             'directory' => $directory,
-            'operator_image' => $release['operator_image'],
+            'operator_image' => $release['images']['operator_image']['resolvedId'],
+            'layout' => $release['layout'],
             'socket' => substr($endpoint, strlen('unix://')),
             'phase' => 'prepared',
+            'cleanup_budget' => $cleanupSeconds,
             'boot_id' => $boot,
             'ipc_volume' => $ipc,
         ];
@@ -282,18 +292,53 @@ CODE;
         return $arguments;
     }
 
+    /** Empty helper-only directories preserve historical retirement checks without exposing source data.
+     * @param array<string,mixed> $manifest
+     * @return list<string>
+     */
+    public static function retirementMountArguments(array $manifest, string $applicationRoot): array
+    {
+        $sources = [];
+        foreach ($manifest['mediaMounts'] ?? [] as $mount) {
+            if (!isset($mount['source'])) {
+                continue;
+            }
+            $source = $mount['source'];
+            if (($mount['role'] ?? null) !== 'source' || ($mount['readOnly'] ?? null) !== true
+                || !is_string($source) || strlen($source) > 4096
+                || preg_match('~\A/(?:[A-Za-z0-9_. -]+/)*[A-Za-z0-9_. -]+\z~D', $source) !== 1
+                || \Baander\Tooling\Filesystem\Paths::absolutePath($source) !== $source) {
+                throw new WorkflowError('Retirement source declarations require canonical saved read-only directory paths.');
+            }
+            foreach ([$applicationRoot, '/operator', '/var/run/docker.sock', '/run/docker.sock', '/etc', '/proc', '/sys', '/dev', '/bin', '/sbin', '/usr', '/lib', '/lib64'] as $reserved) {
+                if ($source === $reserved || str_starts_with($source, $reserved . '/') || str_starts_with($reserved, $source . '/')) {
+                    throw new WorkflowError('Retirement source placeholder overlaps helper runtime state: ' . $source);
+                }
+            }
+            $sources[$source] = true;
+        }
+        $paths = array_keys($sources);
+        sort($paths, SORT_STRING);
+        $arguments = [];
+        foreach ($paths as $source) {
+            if (array_any($paths, static fn(string $other): bool => str_starts_with($other, $source . '/'))) {
+                continue;
+            }
+            array_push($arguments, '--tmpfs', $source . ':ro,noexec,nosuid,nodev,size=1m,mode=0555');
+        }
+        return $arguments;
+    }
+
     /** @param array<string,mixed> $instance
      * @return array<string,mixed>
      */
     public function invoke(array $instance, string $action): array
     {
         $record = $instance['workers'];
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         // Preserve the daemon socket's existing SELinux label in the trusted controller.
         $arguments = [
-            'run',
-            '--rm',
             '-i',
             '--network',
             Runtime::networkName($instance),
@@ -321,7 +366,21 @@ CODE;
             $documents[$name] = $contents;
         }
         $manifest = json_decode($documents['manifest'], true, flags: JSON_THROW_ON_ERROR);
-        array_push($arguments, ...self::sourceMountArguments($manifest));
+        if (in_array($action, ['status', 'recover'], true)) {
+            $layout = $record['layout'] ?? null;
+            if ($layout === null) {
+                $image = json_decode($docker->run(['image', 'inspect', $record['operator_image']])->stdout, true, flags: JSON_THROW_ON_ERROR)[0] ?? null;
+                $root = $image['Config']['WorkingDir'] ?? null;
+                if (!is_string($root) || !in_array('APP_HOME=' . $root, $image['Config']['Env'] ?? [], true)
+                    || ($image['Id'] ?? null) !== $record['operator_image']) {
+                    throw new WorkflowError('Cannot establish the saved operator image runtime paths for retirement. Preserve its ownership record.');
+                }
+                $layout = ['version' => 1, 'root' => $root];
+            }
+            array_push($arguments, '--read-only', ...self::retirementMountArguments($manifest, \Baander\Tooling\Configuration\ApplicationLayout::fromArray($layout)->root));
+        } else {
+            array_push($arguments, ...self::sourceMountArguments($manifest));
+        }
         $decoder = <<<'CODE'
 try {
 $input = stream_get_contents(STDIN, 32769);
@@ -340,7 +399,7 @@ CODE;
             $arguments,
             $record['operator_image'],
             '-ec',
-            'php -r ' . escapeshellarg($decoder) . '; exec php /var/www/html/bin/worker-deployment.php "$1" /operator/manifest.json /operator/credentials.json',
+            'php -r ' . escapeshellarg($decoder) . '; exec php "${APP_HOME:?}/bin/worker-deployment.php" "$1" /operator/manifest.json /operator/credentials.json',
             'worker-controller',
             $action,
         );
@@ -351,7 +410,7 @@ CODE;
         if (strlen($payload) > 32768) {
             throw new WorkflowError('Worker operator input exceeds its bounded transfer size.');
         }
-        $result = $docker->run($arguments, input: $payload, timeout: 240, check: false);
+        $result = \Baander\Tooling\Resources\DisposableContainer::run($docker, $record['directory'] . '/operator-' . hash('sha256', $action) . '-resources.json', $arguments, $this->connections->environment(), $record['cleanup_budget'] ?? 120.0, input: $payload, timeout: 240, check: false);
         try {
             $response = ($result->stdout
                 |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
@@ -362,7 +421,7 @@ CODE;
                 || ($response['action'] ?? null) !== $action
                 || !is_array($response['result'] ?? null)
             ) {
-                throw new \RuntimeException('Unconfirmed operator result');
+                throw new \RuntimeException('Unconfirmed operator result', $result->exitCode);
             }
             return $response['result'];
         } catch (\Throwable $error) {
@@ -384,8 +443,8 @@ CODE;
         if ($manifest['namespace'] !== $instance['project'] || $manifest['bootId'] !== $record['boot_id']) {
             throw new WorkflowError('Worker observation identity differs from the saved manifest.');
         }
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $output = ($docker->run([
             'ps',
             '--all',
@@ -459,7 +518,10 @@ CODE;
                 }
                 $this->phase($instance, 'ready');
                 return;
-            } catch (WorkflowError $error) {
+            } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
+                if ($error instanceof \Baander\Tooling\Process\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                    throw $error;
+                }
                 if (hrtime(true) / 1e9 >= $deadline) {
                     throw $error;
                 }
@@ -490,8 +552,8 @@ CODE;
             ) {
                 throw new WorkflowError('Worker cleanup identity differs from the saved manifest.');
             }
-            $docker = new Docker($this->runner, $instance['docker']);
-            $docker->validate();
+            $docker = $this->connections->client($instance['docker']);
+            $docker->validateIdentity();
             if (($docker->run([
                 'ps',
                 '-aq',

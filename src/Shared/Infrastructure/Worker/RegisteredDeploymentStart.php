@@ -46,14 +46,14 @@ final readonly class RegisteredDeploymentStart
             return ($this->dockerExecutor)($arguments);
         };
         $containment = new DockerWorkerContainment($execute, $this->recipe);
-        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        $containment->verifyAdmission($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
         $this->verifyCreated($binding, $execute);
         if (!$this->inventory->register($binding) || !$this->inventory->claimStart($binding)) {
             return false;
         }
         // The one-shot claim is committed before any start call. A failed second
         // inspection burns that claim as well: automatic retries are unsafe.
-        $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        $containment->verifyAdmission($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
         $this->verifyCreated($binding, $execute);
         $started = $execute(['container', 'start', $binding->containerId]);
         if (trim($started) !== $binding->containerId) {
