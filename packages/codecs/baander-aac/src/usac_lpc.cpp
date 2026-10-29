@@ -480,7 +480,10 @@ void stage2_weights(const float* lsf, double factor, double* w) {
     d[i] = (double)lsf[i] - lsf[i - 1];
   }
   for (int i = 0; i < LPD_M; i++) {
-    w[i] = factor * sqrt(d[i] * d[i + 1]) / 400.0;
+    /* a prediction outside the scale (corrupt input) gives a negative
+     * distance; its weight is then zero rather than undefined */
+    const double p = d[i] * d[i + 1];
+    w[i] = p > 0.0 ? factor * sqrt(p) / 400.0 : 0.0;
   }
 }
 
@@ -518,7 +521,9 @@ void decode_abs(const LpdLpcSet* s, float* lsf) {
 }
 
 /* A relative set: lsf holds the prediction and gets the weighted
- * residual, kept ascending. */
+ * residual, kept ascending and, like an absolute set, apart from both
+ * ends: a conforming stream never leaves the scale, a corrupt one must
+ * not drift out of it from frame to frame. */
 void decode_rel(const LpdLpcSet* s, double factor, float* lsf) {
   double w[LPD_M];
   stage2_weights(lsf, factor, w);
@@ -526,6 +531,7 @@ void decode_rel(const LpdLpcSet* s, double factor, float* lsf) {
     lsf[i] = (float)(lsf[i] + w[i] * s->res[i]);
   }
   reorder_up(lsf);
+  reorder_down(lsf);
 }
 
 }  // namespace
