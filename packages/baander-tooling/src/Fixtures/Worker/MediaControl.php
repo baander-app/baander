@@ -12,13 +12,13 @@ final class MediaControl
     public static function main(array $arguments, string $root): int
     {
         if ($arguments === []) {
-            $runtime = new Runtime($root, 600);
+            $runtime = new Runtime($root, budget: 'workerCapacity');
             $artifacts = Runtime::artifacts($root, 'media-control');
             try {
                 $runtime->run(
                     [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
                     env: array_replace(
-                        $runtime->environment,
+                        Checkpoint::operatorEnvironment($runtime, $artifacts),
                         [
                             'BAANDER_TEST_ARTIFACTS' => $artifacts,
                             'BAANDER_TEST_TWO_COMMAND' => '1',
@@ -42,7 +42,7 @@ final class MediaControl
         $docker = $checkpoint->docker;
         try {
             $checkpoint->inspectBefore();
-            $checkpoint->background(
+            $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->control,
@@ -55,7 +55,7 @@ final class MediaControl
                 'control-sampler.log',
                 245,
             );
-            $checkpoint->background(
+            $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->execution,
@@ -68,21 +68,21 @@ final class MediaControl
                 'execution-sampler.log',
                 245,
             );
-            $checkpoint->background(
+            $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->execution,
                     'php',
                     'tests/Fixtures/Worker/MediaControlObservation.php',
                     'monitor',
-                    '/var/www/html/storage/two-command/media-native-state.json',
+                    $runtime->layout()->path('storage/two-command/media-native-state.json'),
                     '240',
                 ],
                 'native-monitor.log',
                 'native-monitor.log.stderr',
                 245,
             );
-            $checkpoint->background(
+            $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->web,
@@ -125,12 +125,14 @@ final class MediaControl
             $checkpoint->pressureReady($pressure);
             $docker->run(['exec', $checkpoint->web, 'touch', 'storage/two-command/capacity-pressure-start']);
             $runtime->wait($client);
+            $runtime->wait($pressure);
+            $checkpoint->measurements->finish();
             $checkpoint->copy(
-                $checkpoint->web . ':/var/www/html/storage/two-command/result-media-control.json',
+                $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/result-media-control.json'),
                 'media.json',
             );
             $checkpoint->copy(
-                $checkpoint->web . ':/var/www/html/storage/two-command/native-launches.jsonl',
+                $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/native-launches.jsonl'),
                 'native-launches.jsonl',
             );
             $checkpoint->capture(

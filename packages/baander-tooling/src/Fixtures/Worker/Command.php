@@ -23,9 +23,9 @@ final class Command
 
     private function __construct(string $root)
     {
-        $this->runtime = new Runtime($root, 600);
+        $this->runtime = new Runtime($root, budget: 'fixture');
         $this->resources = new Resources($this->runtime, 'worker-command');
-        $this->image = $this->runtime->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest';
+        $this->image = $this->runtime->image('application')->id;
         $this->profile = file_get_contents($root . '/tests/Fixtures/Worker/autoscaling-profile.json');
     }
 
@@ -57,11 +57,7 @@ final class Command
     /** @param list<string> $arguments */
     private function journal(string $action, array $arguments = []): ProcessResult
     {
-        return $this->docker([
-            'run',
-            '--rm',
-            '--name',
-            $this->resources->id . '-observer',
+        return $this->resources->runContainer($this->resources->id . '-observer', [
             ...$this->common,
             '--entrypoint',
             'php',
@@ -95,29 +91,19 @@ final class Command
     private function prepare(): void
     {
         $id = $this->resources->id;
-        $this->resources->networks[] = $id;
-        $this->resources->volumes[] = $id . '-workspace';
-        $this->resources->containers = [$id . '-redis', $id . '-postgres', $id . '-prepare', $id . '-observer'];
-        $this->docker(['network', 'create', '--internal', $id]);
-        $this->docker(['volume', 'create', $id . '-workspace']);
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $id . '-redis',
+
+        $this->resources->createNetwork($id, ['--internal']);
+        $this->resources->createVolume($id . '-workspace');
+        $this->resources->startContainer($id . '-redis', [
             '--network',
             $id,
             '--network-alias',
             'redis',
             '-e',
             'REDIS_ARGS=--requirepass test-only',
-            'redis/redis-stack-server:edge',
+            $this->runtime->image('fixtureRedis')->id,
         ]);
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $id . '-postgres',
+        $this->resources->startContainer($id . '-postgres', [
             '--network',
             $id,
             '--network-alias',
@@ -128,7 +114,7 @@ final class Command
             'POSTGRES_PASSWORD=test-only',
             '-e',
             'POSTGRES_DB=worker_command_test',
-            $this->runtime->environment['BAANDER_TEST_POSTGRES_IMAGE'] ?? 'baander-database:latest',
+            $this->runtime->image('postgres')->id,
             'postgres',
             '-c',
             'client_connection_check_interval=100ms',
@@ -181,23 +167,15 @@ final class Command
             '-e',
             'DATABASE_URL=postgresql://baander:test-only@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
         ];
-        array_push($this->resources->containers, $id . '-uid', $id . '-gid', $id . '-workspace-owner');
-        $this->uid = $this->docker([
-            'run',
-            '--rm',
-            '--name',
-            $id . '-uid',
+
+        $this->uid = $this->resources->runContainer($id . '-uid', [
             '--entrypoint',
             'id',
             $this->image,
             '-u',
         ])->stdout
             |> trim(...);
-        $this->gid = $this->docker([
-            'run',
-            '--rm',
-            '--name',
-            $id . '-gid',
+        $this->gid = $this->resources->runContainer($id . '-gid', [
             '--entrypoint',
             'id',
             $this->image,
@@ -205,11 +183,7 @@ final class Command
         ])->stdout
             |> trim(...);
         Runtime::require(ctype_digit($this->uid) && ctype_digit($this->gid), 'Invalid application UID/GID');
-        $this->docker([
-            'run',
-            '--rm',
-            '--name',
-            $id . '-workspace-owner',
+        $this->resources->runContainer($id . '-workspace-owner', [
             ...$this->common,
             '--user',
             '0',
@@ -222,10 +196,7 @@ final class Command
             $this->uid,
             $this->gid,
         ]);
-        $this->docker([
-            'create',
-            '--name',
-            $id . '-prepare',
+        $this->resources->createContainer($id . '-prepare', [
             ...$this->common,
             '--entrypoint',
             'sh',
@@ -240,7 +211,7 @@ final class Command
                 $id . '-prepare',
                 'sh',
                 '-ec',
-                'cd /var/www/html; tar -cf /tmp/worker-command-checkout.tar .; tar -xf /tmp/worker-command-checkout.tar -C /workspace; rm /tmp/worker-command-checkout.tar',
+                'cd ' . escapeshellarg($this->runtime->layout()->root) . '; tar -cf /tmp/worker-command-checkout.tar .; tar -xf /tmp/worker-command-checkout.tar -C /workspace; rm /tmp/worker-command-checkout.tar',
             ]);
         } else {
             $this->resources->stage(
@@ -295,14 +266,9 @@ final class Command
     private function launch(string $container, string $namespace, string $boot, bool $denied = false): void
     {
         $ipc = $container . '-ipc';
-        $this->resources->volumes[] = $ipc;
-        $this->resources->containers[] = $ipc . '-owner';
-        $this->docker(['volume', 'create', $ipc]);
-        $this->docker([
-            'run',
-            '--rm',
-            '--name',
-            $ipc . '-owner',
+
+        $this->resources->createVolume($ipc);
+        $this->resources->runContainer($ipc . '-owner', [
             '--user',
             '0',
             '--volume',
@@ -327,14 +293,11 @@ final class Command
                 '1,2',
                 '320',
             ];
-            $this->resources->containers[] = $name;
+
             if (!$denied) {
                 $this->journal('claim-unit', [$namespace, $boot, $unit]);
             }
-            $identity = $this->docker([
-                'create',
-                '--name',
-                $name,
+            $identity = $this->resources->createContainer($name, [
                 ...$this->common,
                 '--volume',
                 $ipc . ':/run/baander-worker',
@@ -365,8 +328,7 @@ final class Command
                 $pids,
                 $console,
                 $this->profile,
-            ])->stdout
-                |> trim(...);
+            ]);
             if (!$denied) {
                 $this->journal('register-unit', [$namespace, $boot, $unit, $identity]);
             }
@@ -515,12 +477,8 @@ final class Command
 
     private function gate(string $name, string $action, string $namespace, string $boot, string $message): void
     {
-        $this->resources->containers[] = $name;
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $name,
+
+        $this->resources->startContainer($name, [
             ...$this->common,
             '--entrypoint',
             'php',
@@ -544,11 +502,7 @@ final class Command
     private function removeGate(string $name): void
     {
         $this->docker(['rm', '-f', $name]);
-        $this->resources->containers = array_filter(
-            $this->resources->containers,
-            static fn(string $container): bool => $container !== $name,
-        )
-            |> array_values(...);
+
     }
 
     private function invalidTopology(): void
@@ -562,12 +516,8 @@ final class Command
                 'query' => 'redis://default:fixture-secret@redis:6379/messages?consumer=fixed',
                 'scheduler' => 'redis://default:fixture-secret@redis:6379/other',
             };
-            $this->resources->containers[] = $container;
-            $this->docker([
-                'run',
-                '-d',
-                '--name',
-                $container,
+
+            $this->resources->startContainer($container, [
                 ...$this->common,
                 '-e',
                 $setting . '=' . $dsn,

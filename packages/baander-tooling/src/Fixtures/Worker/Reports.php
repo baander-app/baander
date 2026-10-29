@@ -34,35 +34,49 @@ final class Reports
     }
 
     /** @return list<array<string,mixed>> */
-    public static function samples(string $path, bool $strictInterior = false): array
+    public static function samples(string $path, EvidenceMode $mode = EvidenceMode::Completed): array
     {
         $stream = @fopen($path, 'rb');
         self::require($stream !== false, 'Cannot read evidence: ' . $path);
         $samples = [];
-        $pendingError = null;
         try {
             while (($line = fgets($stream)) !== false) {
-                if ($pendingError !== null && rtrim($line, "\r\n") !== '') {
-                    throw new RuntimeException(
-                        'Malformed interior sample in ' . basename($path),
-                        previous: $pendingError,
-                    );
+                if (!str_ends_with($line, "\n")) {
+                    self::require($mode === EvidenceMode::Live, 'Incomplete final sample in ' . basename($path));
+                    break;
                 }
-                try {
-                    $sample = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-                    self::require(is_array($sample), 'Malformed sample in ' . $path);
-                    $samples[] = $sample;
-                } catch (JsonException $error) {
-                    if ($strictInterior) {
-                        $pendingError ??= $error;
-                    }
-                }
+                $samples[] = self::record($line, $path);
             }
             self::require(feof($stream), 'Cannot read evidence: ' . $path);
             return $samples;
         } finally {
             fclose($stream);
         }
+    }
+
+    /** @return list<array<string,mixed>> */
+    public static function records(string $contents, EvidenceMode $mode): array
+    {
+        $records = [];
+        $position = 0;
+        while (($end = strpos($contents, "\n", $position)) !== false) {
+            $records[] = self::record(substr($contents, $position, $end - $position), 'embedded evidence');
+            $position = $end + 1;
+        }
+        self::require($position === strlen($contents) || $mode === EvidenceMode::Live, 'Incomplete final sample in embedded evidence');
+        return $records;
+    }
+
+    /** @return array<string,mixed> */
+    private static function record(string $line, string $path): array
+    {
+        try {
+            $sample = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException $error) {
+            throw new RuntimeException('Malformed complete sample in ' . basename($path), previous: $error);
+        }
+        self::require(is_array($sample) && !array_is_list($sample), 'Malformed sample object in ' . basename($path));
+        return $sample;
     }
 
     /** @return array<string,int> */
@@ -123,9 +137,7 @@ final class Reports
     /** @param array<mixed> $report */
     public static function publish(string $path, array $report): void
     {
-        if (file_put_contents($path, json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n") === false) {
-            throw new RuntimeException('Cannot write qualification evidence: ' . $path);
-        }
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($path, $report);
     }
 
     public static function truth(mixed $value): bool

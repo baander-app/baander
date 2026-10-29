@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Fixtures\Runtime;
 use RuntimeException;
 
@@ -46,7 +46,7 @@ final class PostgresSampler
     private bool $contextRequested = false;
 
     public function __construct(
-        private readonly Docker $docker,
+        private readonly Client $docker,
         private readonly string $container,
         private readonly string $database,
     ) {}
@@ -97,6 +97,7 @@ final class PostgresSampler
             $sample['cgroup'][$name] = $records['/sys/fs/cgroup/' . $name] ?? null;
         }
         $growth = [];
+        $currentProcesses = [];
         foreach ($records as $path => $raw) {
             if (preg_match('~^/proc/([0-9]+)/status$~D', $path, $match) !== 1) {
                 continue;
@@ -138,8 +139,9 @@ final class PostgresSampler
             $pss = preg_split('/\s+/', trim($rollup['Pss'] ?? '0 kB'))
                 |> (static fn(array $parts): int => Reports::integer($parts[0]));
             $growth[] = [$pss - ($this->previous[$identity] ?? $pss), $pss, $pid];
-            $this->previous[$identity] = $pss;
+            $currentProcesses[$identity] = $pss;
         }
+        $this->previous = $currentProcesses;
         $current = $sample['cgroup']['memory.current'];
         if (!$this->contextRequested && $current !== null && Reports::integer($current) >= 1536 * 1024 * 1024 && $growth !== []) {
             $this->contextRequested = true;
@@ -210,7 +212,7 @@ final class PostgresSampler
         $database ??= 'worker_operator_test';
         $runtime = new Runtime($root, $seconds + 20);
         try {
-            $docker = $runtime->docker(true);
+            $docker = $runtime->docker();
             $units = json_decode($docker->run(['inspect', $container])->stdout, true, flags: JSON_THROW_ON_ERROR);
             Runtime::require(
                 count($units) === 1 && ($units[0]['State']['Running'] ?? false) === true,
@@ -241,9 +243,8 @@ final class PostgresSampler
             $readyWritten = false;
             while (Runtime::now() < $stop) {
                 $cycle = Runtime::now();
-                $collect = $runtime->start(
+                $collect = $docker->start(
                     [
-                        ...$docker->commandPrefix(),
                         'exec',
                         '--user',
                         'postgres',
@@ -254,9 +255,8 @@ final class PostgresSampler
                     ],
                     timeout: 5,
                 );
-                $timestamp = $runtime->start(
+                $timestamp = $docker->start(
                     [
-                        ...$docker->commandPrefix(),
                         'exec',
                         $clockId,
                         'php',
@@ -287,6 +287,10 @@ final class PostgresSampler
                         ],
                     );
                     $readyWritten = true;
+                }
+                unset($collect, $timestamp, $result, $stamp, $sample);
+                if (($stopFile = $runtime->environment['BAANDER_TEST_SAMPLER_STOP_FILE'] ?? '') !== '' && is_file($stopFile)) {
+                    break;
                 }
                 $runtime->pause(max(0, .5 - (Runtime::now() - $cycle)));
             }

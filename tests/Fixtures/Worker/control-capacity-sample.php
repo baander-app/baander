@@ -38,5 +38,6 @@ while (hrtime(true) < $deadline) {
     }
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
     flush();
+    if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) { break; }
     usleep(50000);
 }

@@ -30,9 +30,9 @@ final class AutoscalingVerifier
     ];
 
     /** @return list<array<string,mixed>> */
-    public static function samples(string $root, string $unit = 'control'): array
+    public static function samples(string $root, string $unit = 'control', EvidenceMode $mode = EvidenceMode::Completed): array
     {
-        return Reports::samples($root . '/' . $unit . '-samples.jsonl');
+        return Reports::samples($root . '/' . $unit . '-samples.jsonl', $mode);
     }
 
     /** @param list<array<string,mixed>> $values
@@ -42,11 +42,7 @@ final class AutoscalingVerifier
     {
         $receipts = [];
         foreach ($values as $sample) {
-            foreach (explode("\n", trim($sample['completions'] ?? '')) as $line) {
-                if ($line === '') {
-                    continue;
-                }
-                $receipt = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            foreach (Reports::records($sample['completions'] ?? '', EvidenceMode::Live) as $receipt) {
                 if ($receipt['batch'] === $batch) {
                     $key = $receipt['sequence'];
                     Reports::require(
@@ -64,10 +60,10 @@ final class AutoscalingVerifier
      * @param list<array<string,mixed>>|null $values
      * @return array<string,mixed>
      */
-    public static function burst(string $root, string $batch, ?array $values = null): array
+    public static function burst(string $root, string $batch, ?array $values = null, EvidenceMode $mode = EvidenceMode::Completed): array
     {
         $publication = Reports::json($root . '/' . $batch . '.json');
-        $completed = self::receipts($values ?? self::samples($root), $batch);
+        $completed = self::receipts($values ?? self::samples($root, mode: $mode), $batch);
         $expected = $batch === 'cpu' ? self::THRESHOLDS['cpuMessages'] : self::THRESHOLDS['messagesPerBurst'];
         $kind = $batch === 'cpu' ? 'cpu' : 'io';
         Reports::require(
@@ -119,9 +115,9 @@ final class AutoscalingVerifier
         ];
     }
 
-    public static function idle(string $root): void
+    public static function idle(string $root, EvidenceMode $mode = EvidenceMode::Completed): void
     {
-        $values = self::samples($root);
+        $values = self::samples($root, mode: $mode);
         Reports::require(count($values) >= 3, 'Missing idle samples');
         foreach (array_slice($values, -3) as $sample) {
             $state = $sample['admission'];
@@ -812,8 +808,8 @@ final class AutoscalingVerifier
         }
         $root = $arguments[1] ?? throw new InvalidArgumentException('Supply evidence directory');
         $result = match ($mode) {
-            'burst' => self::burst($root, $arguments[2] ?? throw new InvalidArgumentException('Supply batch')),
-            'idle' => self::idle($root),
+            'burst' => self::burst($root, $arguments[2] ?? throw new InvalidArgumentException('Supply batch'), mode: EvidenceMode::Live),
+            'idle' => self::idle($root, EvidenceMode::Live),
             'verify' => self::verify(
                 $root,
                 Reports::integer($arguments[2] ?? throw new InvalidArgumentException('Supply maximum')),

@@ -15,13 +15,12 @@ final readonly class LifecycleCheckpoint
     {
         $q = $this->qualification;
         $s = $q->state;
-        $result = $q->docker(
+        $clientName = $s->runId . '-client-' . bin2hex(random_bytes(8));
+        $result = $q->resources->startContainer(
+            $clientName,
             [
-                'run',
-                '--name',
-                $s['runId'] . '-client',
                 '--network',
-                $s['runId'],
+                $s->runId,
                 '--env-file',
                 $q->work('runtime.env'),
                 '--cap-drop',
@@ -35,22 +34,23 @@ final readonly class LifecycleCheckpoint
                 '-i',
                 '--entrypoint',
                 '/usr/local/bin/php',
-                $s['imageId'],
+                $s->imageId,
                 '-d',
                 'memory_limit=128M',
                 'tests/Fixtures/Worker/lifecycle-check.php',
                 $action,
-                $s['namespace'],
-                $s['boot'],
+                $s->namespace,
+                $s->boot,
                 (string) $epoch,
                 '/tmp/lifecycle-receipt.json',
             ],
             false,
             input: $input === null ? '' : $q->read($input),
             log: $q->artifact($label . '.log'),
+            attached: true,
         );
-        $copy = $q->docker(['cp', $s['runId'] . '-client:/tmp/lifecycle-receipt.json', $q->artifact($label . '.json')], false);
-        $remove = $q->docker(['rm', '-f', $s['runId'] . '-client'], false);
+        $copy = $q->docker(['cp', $clientName . ':/tmp/lifecycle-receipt.json', $q->artifact($label . '.json')], false);
+        $remove = $q->docker(['rm', '-f', $clientName], false);
         $passed = $result->exitCode === 0 && $copy->exitCode === 0 && $remove->exitCode === 0;
         if ($check && !$passed) {
             throw new Failure(
@@ -82,7 +82,7 @@ final readonly class LifecycleCheckpoint
         $q->operator('recover', 0);
         $q->operator('status', 0);
         $q->copy($q->work('status.json'), $q->artifact($label . '-status.json'));
-        $q->assertRetired();
+        $q->scenario->assertRetired();
         $result = $q->result();
         foreach (['control' => $control, 'execution' => $execution] as $role => $identity) {
             $q->expect(
@@ -114,17 +114,17 @@ final readonly class LifecycleCheckpoint
     public function run(): void
     {
         $q = $this->qualification;
-        $s = &$q->state;
-        $phase = $s['lifecyclePhase'];
+        $s = $q->state;
+        $phase = $s->lifecyclePhase;
         $started = OperatorCommands::now();
-        $predecessor = $s['boot'];
+        $predecessor = $s->boot;
         $q->copy($q->work('manifest.json'), $q->artifact('manifest.json'));
         $q->docker(
-            ['inspect', $s['controlName'], $s['workerName']],
+            ['inspect', $s->controlName, $s->workerName],
             stdout: $q->artifact('predecessor-containers.json'),
         );
-        $oldControl = $q->output(['inspect', '--format', '{{.Id}}', $s['controlName']]);
-        $oldExecution = $q->output(['inspect', '--format', '{{.Id}}', $s['workerName']]);
+        $oldControl = $q->output(['inspect', '--format', '{{.Id}}', $s->controlName]);
+        $oldExecution = $q->output(['inspect', '--format', '{{.Id}}', $s->workerName]);
         $q->docker(
             ['container', 'ls', '--all', '--format', '{{.Names}}'],
             stdout: $q->artifact('containers-before.txt'),
@@ -139,7 +139,7 @@ final readonly class LifecycleCheckpoint
             'Lifecycle requires the two-slot bounded worker pair',
         );
         $q->expect(
-            !in_array($s['webName'], explode("\n", $q->read($q->artifact('containers-before.txt'))), true),
+            !in_array($s->webName, explode("\n", $q->read($q->artifact('containers-before.txt'))), true),
             'HTTP must be absent',
         );
         $this->observe('lease', 'predecessor-lease', 1);
@@ -149,7 +149,7 @@ final readonly class LifecycleCheckpoint
                     'exec',
                     '-e',
                     'REDISCLI_AUTH=test-only',
-                    $s['runId'] . '-redis',
+                    $s->runId . '-redis',
                     'redis-cli',
                     '--raw',
                     'INFO',
@@ -158,11 +158,11 @@ final readonly class LifecycleCheckpoint
                 stdout: $q->artifact('redis-before.txt'),
             );
         }
-        $s['faultContainer'] = $q->output(['inspect', '--format', '{{.Id}}', $s['runId'] . '-' . $phase]);
-        $q->docker(['pause', $s['faultContainer']]);
+        $s->faultContainer = $q->output(['inspect', '--format', '{{.Id}}', $s->runId . '-' . $phase]);
+        $q->docker(['pause', $s->faultContainer]);
         $faultStarted = OperatorCommands::now();
         $q->expect(
-            $q->output(['inspect', '--format', '{{.State.Paused}}', $s['faultContainer']]) === 'true',
+            $q->output(['inspect', '--format', '{{.State.Paused}}', $s->faultContainer]) === 'true',
             'Dependency did not pause',
         );
         $stopStarted = $faultStarted;
@@ -218,15 +218,15 @@ final readonly class LifecycleCheckpoint
         }
         $q->docker(['logs', $oldControl], log: $q->artifact('predecessor-control.log'));
         $q->docker(['logs', $oldExecution], log: $q->artifact('predecessor-execution.log'));
-        $q->docker(['unpause', $s['faultContainer']]);
-        $s['faultContainer'] = '';
+        $q->docker(['unpause', $s->faultContainer]);
+        $s->faultContainer = '';
         if ($phase === 'redis') {
             $q->docker(
                 [
                     'exec',
                     '-e',
                     'REDISCLI_AUTH=test-only',
-                    $s['runId'] . '-redis',
+                    $s->runId . '-redis',
                     'redis-cli',
                     '--raw',
                     'INFO',
@@ -268,7 +268,7 @@ final readonly class LifecycleCheckpoint
         $q->operator('create', 0);
         $q->operator('start', 0);
         $q->awaitCheck('ready-recovered');
-        $q->awaitCheck('ready-recovered', $s['workerName']);
+        $q->awaitCheck('ready-recovered', $s->workerName);
         $this->observe('lease', 'successor-lease', 2);
         if ($phase === 'postgres') {
             $this->observe('seed', 'retained-work', 2);
@@ -277,8 +277,8 @@ final readonly class LifecycleCheckpoint
         OperatorConfiguration::write(
             $q->work('stale.json'),
             [
-                'predecessor' => ['namespace' => $s['namespace'], 'bootId' => $predecessor, 'epoch' => 1],
-                'successor' => ['namespace' => $s['namespace'], 'bootId' => $successor, 'epoch' => 2],
+                'predecessor' => ['namespace' => $s->namespace, 'bootId' => $predecessor, 'epoch' => 1],
+                'successor' => ['namespace' => $s->namespace, 'bootId' => $successor, 'epoch' => 2],
             ],
         );
         $this->observe('stale-lease', 'stale-renewal', 2, $q->work('stale.json'));
@@ -291,7 +291,7 @@ final readonly class LifecycleCheckpoint
         $this->observe('seed', 'subsequent-work', 2);
         $this->completed('subsequent-work', 'completed-subsequent-work');
         $q->docker(
-            ['inspect', $s['controlName'], $s['workerName']],
+            ['inspect', $s->controlName, $s->workerName],
             stdout: $q->artifact('successor-containers.json'),
         );
         $units = OperatorConfiguration::json($q->artifact('successor-containers.json'));
@@ -305,10 +305,10 @@ final readonly class LifecycleCheckpoint
         );
         $this->retired(
             'successor',
-            $q->output(['inspect', '--format', '{{.Id}}', $s['controlName']]),
-            $q->output(['inspect', '--format', '{{.Id}}', $s['workerName']]),
+            $q->output(['inspect', '--format', '{{.Id}}', $s->controlName]),
+            $q->output(['inspect', '--format', '{{.Id}}', $s->workerName]),
         );
-        OperatorConfiguration::write(
+        Reports::publish(
             $q->artifact('qualification.json'),
             [
                 'success' => true,

@@ -5,7 +5,11 @@ declare(strict_types=1);
 /** Bounded, test-only observations inside the disposable execution container. */
 final class MediaControlObservation
 {
-    public const LOG = '/var/www/html/storage/two-command/native-launches.jsonl';
+    private static function logPath(): string
+    {
+        $appHome = getenv('APP_HOME') ?: throw new RuntimeException('Observed APP_HOME is required.');
+        return $appHome . '/storage/two-command/native-launches.jsonl';
+    }
     private const MAX_BYTES = 4_194_304;
     private const MAX_RECORDS = 1024;
 
@@ -126,11 +130,11 @@ final class MediaControlObservation
     {
         $mask = umask(0077);
         try {
-            $handle = @fopen(self::LOG, 'a+b');
+            $handle = @fopen(self::logPath(), 'a+b');
         } finally {
             umask($mask);
         }
-        if ($handle === false || !chmod(self::LOG, 0600)) {
+        if ($handle === false || !chmod(self::logPath(), 0600)) {
             throw new RuntimeException('Native launch evidence file is unavailable.');
         }
         return $handle;
@@ -139,7 +143,7 @@ final class MediaControlObservation
     /** @return list<array<string,mixed>> */
     public static function records(): array
     {
-        $handle = @fopen(self::LOG, 'rb');
+        $handle = @fopen(self::logPath(), 'rb');
         if ($handle === false) {
             throw new RuntimeException('Native launch evidence is missing.');
         }
@@ -221,6 +225,7 @@ final class MediaControlObservation
             if (file_put_contents($path . '.part', $json) !== strlen($json) || !chmod($path . '.part', 0644) || !rename($path . '.part', $path)) {
                 throw new RuntimeException('Native observation snapshot could not be published.');
             }
+            if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) { break; }
             usleep(50_000);
         }
     }

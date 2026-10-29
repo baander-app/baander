@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
-use Baander\Tooling\Fixtures\Worker\{AutoscalingVerifier, ControlCapacityVerifier, MediaControlVerifier, Reports};
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, CompletionPolicy};
+use Baander\Tooling\Fixtures\Worker\{AutoscalingVerifier, ControlCapacityVerifier, MediaControlVerifier, Reports, EvidenceMode};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -24,7 +24,7 @@ final class WorkerFixtureTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Runner())->run(['rm', '-rf', '--', $this->root]);
+        (new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3))))->run(new ProcessSpec(['rm', '-rf', '--', $this->root]));
     }
 
     /** @param array<mixed> $data */
@@ -463,7 +463,41 @@ final class WorkerFixtureTest extends TestCase
         self::assertSame(1, $result['resourceStates']['unknown']);
     }
 
-    public function testEmptyReceivingPollAndPartialLastLineAreAccepted(): void
+    /** @return iterable<string,array{string,string}> */
+    public static function corruptFinalEvidence(): iterable
+    {
+        foreach (['autoscaling', 'capacity'] as $verifier) {
+            yield $verifier . ' interior corruption' => [$verifier, "{\n"];
+            yield $verifier . ' incomplete final record' => [$verifier, '{'];
+        }
+    }
+
+    #[DataProvider('corruptFinalEvidence')]
+    public function testActualVerifiersRejectCorruptFinalMeasurementRecords(string $verifier, string $suffix): void
+    {
+        if ($verifier === 'autoscaling') {
+            $this->autoscalingFixture();
+        } else {
+            $this->capacityFixture('memory');
+        }
+        $path = $this->root . '/control-samples.jsonl';
+        if (str_ends_with($suffix, "\n")) {
+            $contents = Reports::text($path);
+            $at = strpos($contents, "\n") + 1;
+            file_put_contents($path, substr($contents, 0, $at) . $suffix . substr($contents, $at));
+        } else {
+            file_put_contents($path, $suffix, FILE_APPEND);
+        }
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('sample');
+        if ($verifier === 'autoscaling') {
+            AutoscalingVerifier::verify($this->root, 2);
+        } else {
+            ControlCapacityVerifier::verify($this->root, 'memory');
+        }
+    }
+
+    public function testLiveReadingAcceptsOnlyUnterminatedTrailingWrites(): void
     {
         $this->autoscalingFixture();
         for ($at = 397; $at < 400; ++$at) {
@@ -474,10 +508,12 @@ final class WorkerFixtureTest extends TestCase
         }
         $this->writeValues();
         file_put_contents($this->root . '/control-samples.jsonl', '{', FILE_APPEND);
-        self::assertCount(400, AutoscalingVerifier::samples($this->root));
-        AutoscalingVerifier::idle($this->root);
+        self::assertCount(400, AutoscalingVerifier::samples($this->root, mode: EvidenceMode::Live));
+        AutoscalingVerifier::idle($this->root, EvidenceMode::Live);
         file_put_contents($this->root . '/control-samples.jsonl', "\n\n", FILE_APPEND);
-        self::assertCount(400, Reports::samples($this->root . '/control-samples.jsonl', true));
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Malformed complete sample');
+        Reports::samples($this->root . '/control-samples.jsonl', EvidenceMode::Live);
     }
 
     public function testMalformedInteriorJsonlStillFailsBeforeLaterEvidence(): void
@@ -485,8 +521,8 @@ final class WorkerFixtureTest extends TestCase
         $path = $this->root . '/evidence.jsonl';
         file_put_contents($path, "{\"monotonic\":0}\n{\n\n{\"monotonic\":1}\n");
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Malformed interior sample in evidence.jsonl');
-        Reports::samples($path, true);
+        $this->expectExceptionMessage('Malformed complete sample in evidence.jsonl');
+        Reports::samples($path, EvidenceMode::Live);
     }
 
     public function testLargeCumulativeJsonlEvidenceFitsTheDefaultCliMemoryBudget(): void
@@ -509,10 +545,7 @@ final class WorkerFixtureTest extends TestCase
             $samples = Baander\Tooling\Fixtures\Worker\Reports::samples($argv[2]);
             echo json_encode(['count' => count($samples), 'first' => $samples[0], 'last' => $samples[array_key_last($samples)]], JSON_THROW_ON_ERROR);
             PHP_CODE;
-        $result = new Runner()->run(
-            [PHP_BINARY, '-d', 'memory_limit=128M', '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $path],
-            check: false,
-        );
+        $result = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec([PHP_BINARY, '-d', 'memory_limit=128M', '-r', $code, dirname(__DIR__, 2) . '/bootstrap.php', $path]), new CompletionPolicy(null));
         self::assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
         $observed = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(4608, $observed['count']);
@@ -934,9 +967,9 @@ final class WorkerFixtureTest extends TestCase
 
     public function testThresholdCliAndMeasuredComparisonPreserveContracts(): void
     {
-        $runner = new Runner();
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         $entrypoint = dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-verify.php';
-        $thresholds = $runner->run([PHP_BINARY, $entrypoint, 'thresholds']);
+        $thresholds = $runner->run(new ProcessSpec([PHP_BINARY, $entrypoint, 'thresholds']));
         self::assertSame(AutoscalingVerifier::THRESHOLDS, json_decode($thresholds->stdout, true, flags: JSON_THROW_ON_ERROR));
         foreach ([1 => 100, 2 => 80, 4 => 60] as $maximum => $seconds) {
             mkdir($this->root . '/' . $maximum, 0700);
@@ -952,18 +985,18 @@ final class WorkerFixtureTest extends TestCase
 
     public function testVerifierCommandLinesPublishReportsAndRejectUnknownModes(): void
     {
-        $runner = new Runner();
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         $directory = dirname(__DIR__, 3) . '/tests/Fixtures/Worker/';
         $this->autoscalingFixture();
-        $autoscaling = $runner->run([PHP_BINARY, $directory . 'autoscaling-verify.php', 'verify', $this->root, '2']);
+        $autoscaling = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'autoscaling-verify.php', 'verify', $this->root, '2']));
         self::assertSame(400, json_decode($autoscaling->stdout, true, flags: JSON_THROW_ON_ERROR)['samples']);
         $this->capacityFixture('memory');
-        $capacity = $runner->run([PHP_BINARY, $directory . 'control-capacity-verify.php', 'verify', $this->root, 'memory']);
+        $capacity = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'control-capacity-verify.php', 'verify', $this->root, 'memory']));
         self::assertTrue(json_decode($capacity->stdout, true, flags: JSON_THROW_ON_ERROR)['controlSurvivedExecutionExhaustion']);
         $this->mediaFixture();
-        $media = $runner->run([PHP_BINARY, $directory . 'media-control-verify.php', $this->root]);
+        $media = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'media-control-verify.php', $this->root]));
         self::assertSame(2, json_decode($media->stdout, true, flags: JSON_THROW_ON_ERROR)['nativeLaunches']);
-        $invalid = $runner->run([PHP_BINARY, $directory . 'autoscaling-verify.php', 'unknown', $this->root], check: false);
+        $invalid = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'autoscaling-verify.php', 'unknown', $this->root]), new CompletionPolicy(null));
         self::assertSame(1, $invalid->exitCode);
         self::assertStringContainsString('Unknown autoscaling mode', $invalid->stderr);
     }

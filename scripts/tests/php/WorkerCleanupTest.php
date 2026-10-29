@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Fixtures\Worker\{OperatorCleanup, OperatorCommands, OperatorConfiguration, OperatorQualification};
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, CompletionPolicy};
+use Baander\Tooling\Fixtures\Worker\{OperatorCleanup, OperatorCommands, OperatorConfiguration, OperatorQualification, OperatorRun, OperatorResources};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Throwable;
@@ -33,10 +33,14 @@ final class WorkerCleanupTest extends TestCase
                 'PATH' => $this->directory . '/bin:' . $this->previousPath,
                 'WORKER_OPERATOR_STUB_STATE' => $this->statePath,
                 'BAANDER_TEST_OPERATOR_IN_CONTAINER' => '1',
+                'BAANDER_TEST_DOCKER_SOCKET_PATH' => '/fixture.sock',
                 'DOCKER_CONTEXT' => 'fixture',
                 'BAANDER_TEST_ARTIFACTS' => $this->directory . '/artifacts',
             ],
         );
+        $targetFile = $this->directory . '/target.json';
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($targetFile, new \Baander\Tooling\Docker\Target($this->directory . '/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null)->toArray());
+        $this->environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
         unset($this->environment['BAANDER_TEST_DOCKER_ENDPOINT']);
         putenv('PATH=' . $this->environment['PATH']);
     }
@@ -44,37 +48,17 @@ final class WorkerCleanupTest extends TestCase
     protected function tearDown(): void
     {
         putenv($this->previousPath === false ? 'PATH' : 'PATH=' . $this->previousPath);
-        new Runner()->run(['rm', '-rf', '--', $this->directory]);
+        new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec(['rm', '-rf', '--', $this->directory]));
     }
 
     /** @return array<string,list<string>> */
     private static function owned(): array
     {
         return [
-            'container' => [
-                'fixture-web',
-                'fixture-controller',
-                'fixture-media-prepare',
-                'fixture-host-probe',
-                'fixture-client',
-                'fixture-prepare',
-                'fixture-source',
-                'fixture-redis',
-                'fixture-postgres',
-                'worker-current',
-                'control-current',
-                'worker-retired',
-                'control-retired',
-            ],
-            'network' => ['fixture', 'fixture-control'],
-            'volume' => [
-                'fixture-source-media',
-                'fixture-storage',
-                'fixture-media-state',
-                'fixture-web-secrets',
-                'fixture-worker-ipc',
-            ],
-            'image' => ['fixture:controller', 'fixture:cli', 'fixture:fixture', 'fixture:base'],
+            'container' => ['fixture-controller', 'worker-current', 'control-current', 'worker-retired', 'control-retired'],
+            'network' => ['fixture'],
+            'volume' => ['fixture-source-media'],
+            'image' => ['fixture:controller'],
         ];
     }
 
@@ -98,20 +82,20 @@ final class WorkerCleanupTest extends TestCase
         }
     }
 
-    /** @return array<string,mixed> */
-    private function state(string $mode, ?string $blocked): array
+    private function state(string $mode, ?string $blocked): OperatorRun
     {
         $resources = [];
         foreach (self::owned() as $kind => $names) {
-            $resources[$kind] = [...($mode === 'absent' ? [] : $names), 'unrelated-' . $kind];
+            $resources[$kind] = [...($kind === 'container' ? ['worker-current', 'control-current', 'worker-retired', 'control-retired'] : []), 'unrelated-' . $kind];
         }
         OperatorConfiguration::write(
             $this->statePath,
-            ['mode' => $mode, 'blocked' => $blocked, 'resources' => $resources, 'calls' => [], 'queries' => []],
+            ['mode' => 'clean', 'blocked' => $blocked, 'resources' => $resources, 'calls' => [], 'queries' => []],
         );
         mkdir($this->directory . '/work', 0700);
         mkdir($this->directory . '/artifacts', 0700);
-        return [
+        $state = new OperatorRun();
+        foreach ([
             'runId' => 'fixture',
             'namespace' => 'fixture-namespace',
             'workerName' => 'worker-current',
@@ -132,7 +116,49 @@ final class WorkerCleanupTest extends TestCase
             'faultContainer' => str_starts_with($mode, 'paused-') ? hash('sha256', 'fixture-redis') : '',
             'work' => $this->directory . '/work',
             'artifacts' => $this->directory . '/artifacts',
-        ];
+        ] as $key => $value) {
+            $state->$key = $value;
+        }
+        return $state;
+    }
+
+    private function recordedResources(OperatorCommands $commands, OperatorRun $state, string $mode): OperatorResources
+    {
+        $fixture = OperatorConfiguration::json($this->statePath);
+        $target = $commands->client()->target->toArray();
+        $token = str_repeat('a', 32);
+        $recorded = [];
+        $images = [];
+        foreach (self::owned() as $kind => $names) {
+            foreach ($names as $name) {
+                if ($kind === 'container' && (str_starts_with($name, 'worker-') || str_starts_with($name, 'control-'))) {
+                    continue;
+                }
+                $fixture['resources'][$kind][] = $name;
+                $fixture['createdResources'][$kind][$name] = ['--label', 'org.baander.tooling.run=' . $token];
+                if ($kind === 'image') {
+                    $images[$name] = 'sha256:' . hash('sha256', $name);
+                } else {
+                    $recorded[] = ['kind' => $kind, 'name' => $name, 'id' => $kind === 'volume' ? $name : hash('sha256', $name)];
+                }
+            }
+        }
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($state->artifacts . '/resources.json', [
+            'version' => 1, 'token' => $token, 'target' => $target, 'resources' => $recorded,
+        ]);
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($state->artifacts . '/images.json', [
+            'version' => 1, 'token' => $token, 'target' => $target, 'images' => $images,
+        ]);
+        $fixture['mode'] = $mode;
+        $fixture['calls'] = [];
+        $fixture['queries'] = [];
+        if ($mode === 'absent') {
+            foreach (array_keys(self::owned()) as $kind) {
+                $fixture['resources'][$kind] = ['unrelated-' . $kind];
+            }
+        }
+        OperatorConfiguration::write($this->statePath, $fixture);
+        return new OperatorResources($commands, $state->artifacts);
     }
 
     #[DataProvider('outcomes')]
@@ -147,9 +173,10 @@ final class WorkerCleanupTest extends TestCase
         } else {
             unset($this->environment['BAANDER_TEST_TWO_COMMAND_CHECKPOINT']);
         }
-        $commands = new OperatorCommands(dirname(__DIR__, 3), $this->environment, 0);
+        $commands = new OperatorCommands(dirname(__DIR__, 3), $this->environment, 60);
+        $resources = $this->recordedResources($commands, $state, $mode);
         try {
-            self::assertSame($expected, new OperatorCleanup($commands, $state)->run($original));
+            self::assertSame($expected, new OperatorCleanup($commands, $state, $resources)->run($original));
         } finally {
             $commands->close();
         }
@@ -158,7 +185,7 @@ final class WorkerCleanupTest extends TestCase
         self::assertSame(in_array($mode, ['clean', 'absent', 'paused-clean'], true), $receipt['cleanupVerified']);
         $final = OperatorConfiguration::json($this->statePath);
         if (str_starts_with($mode, 'paused-')) {
-            self::assertSame(['unpause', hash('sha256', 'fixture-redis')], $final['calls'][0]);
+            self::assertSame(['unpause', hash('sha256', 'fixture-redis')], array_find($final['calls'], static fn(array $call): bool => $call[0] !== 'info'));
         }
         foreach ($final['calls'] as $call) {
             if (array_slice($call, 0, 3) === ['container', 'rm', '-f']) {
@@ -173,6 +200,29 @@ final class WorkerCleanupTest extends TestCase
         }
         if ($mode === 'remove-failure') {
             self::assertSame(['unrelated-volume'], $final['resources']['volume']);
+        }
+    }
+
+    public function testCleanupDoesNotInferOwnershipFromRunResourceNames(): void
+    {
+        $state = $this->state('clean', null);
+        $fixture = OperatorConfiguration::json($this->statePath);
+        foreach (self::owned() as $kind => $names) {
+            $fixture['resources'][$kind] = [...$names, 'unrelated-' . $kind];
+        }
+        OperatorConfiguration::write($this->statePath, $fixture);
+        $commands = new OperatorCommands(dirname(__DIR__, 3), $this->environment, 60);
+        $resources = new OperatorResources($commands, $state->artifacts);
+        try {
+            self::assertSame(0, new OperatorCleanup($commands, $state, $resources)->run(0));
+        } finally {
+            $commands->close();
+        }
+        $final = OperatorConfiguration::json($this->statePath);
+        foreach (self::owned() as $kind => $names) {
+            $expected = array_values(array_filter($names, static fn(string $name): bool => $kind !== 'container'
+                || (!str_starts_with($name, 'worker-') && !str_starts_with($name, 'control-'))));
+            self::assertSame([...$expected, 'unrelated-' . $kind], $final['resources'][$kind]);
         }
     }
 
@@ -195,7 +245,8 @@ final class WorkerCleanupTest extends TestCase
             ['mode' => $mode, 'calls' => [], 'queries' => [], 'resources' => [], 'outage' => true],
         );
         $q = new OperatorQualification(dirname(__DIR__, 3), $this->environment);
-        $q->state['imageId'] = 'fixture-image';
+        $q->state->imageId = 'fixture-image';
+        $q->state->appHome = '/fixture/application';
         $success = false;
         try {
             $q->combinedPhase('dependency');
@@ -205,7 +256,7 @@ final class WorkerCleanupTest extends TestCase
                 throw $error;
             }
         } finally {
-            new Runner()->run(['rm', '-rf', '--', $q->state['work']]);
+            new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec(['rm', '-rf', '--', $q->state->work]));
             $q->commands->close();
         }
         self::assertSame($expected, $success);
@@ -254,13 +305,14 @@ final class WorkerCleanupTest extends TestCase
         $this->environment['BAANDER_TEST_TWO_COMMAND_CHECKPOINT'] = $hook;
         $this->environment['WORKER_OPERATOR_CHECKPOINT_LOG'] = $this->directory . '/checkpoints';
         $q = new OperatorQualification(dirname(__DIR__, 3), $this->environment);
-        $q->state['imageId'] = 'fixture-image';
-        $q->state['workerName'] = 'worker-current';
-        $q->state['controlName'] = 'control-current';
+        $q->state->imageId = 'fixture-image';
+        $q->state->appHome = '/fixture/application';
+        $q->state->workerName = 'worker-current';
+        $q->state->controlName = 'control-current';
         try {
-            $q->finalDrill();
+            $q->scenario->finalDrill();
         } finally {
-            new Runner()->run(['rm', '-rf', '--', $q->state['work']]);
+            new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec(['rm', '-rf', '--', $q->state->work]));
             $q->commands->close();
         }
         self::assertTrue(OperatorConfiguration::json($q->artifact('final-containment.json'))['contained']);
@@ -290,6 +342,7 @@ final class WorkerCleanupTest extends TestCase
         yield 'direct image requires container' => [['BAANDER_TEST_USE_IMAGE' => '1']];
         yield 'observation requires fixture image' => [[
             'BAANDER_TEST_OPERATOR_IN_CONTAINER' => '1',
+            'BAANDER_TEST_DOCKER_SOCKET_PATH' => '/fixture.sock',
             'BAANDER_TEST_CHECKOUT_IN_IMAGE' => '1',
             'BAANDER_TEST_USE_IMAGE' => '1',
             'BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1',
@@ -315,14 +368,10 @@ final class WorkerCleanupTest extends TestCase
     public function testCliPreservesRuntimeConfigurationFailureStatus(string $flag): void
     {
         $environment = array_replace($this->environment, [$flag => '2']);
-        $result = new Runner()->run(
-            [
-                PHP_BINARY,
-                dirname(__DIR__, 2) . '/test-worker-operator-container.php',
-            ],
-            env: $environment,
-            check: false,
-        );
+        $result = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec([
+            PHP_BINARY,
+            dirname(__DIR__, 2) . '/test-worker-operator-container.php',
+        ], environment: $environment), new CompletionPolicy(null));
         self::assertSame(1, $result->exitCode);
         self::assertStringContainsString($flag . ' must be 0 or 1', $result->stderr);
         self::assertFileDoesNotExist($this->statePath);
@@ -367,7 +416,7 @@ final class WorkerCleanupTest extends TestCase
             PHP_HARNESS,
         );
         $environment = array_replace($this->environment, ['WORKER_OPERATOR_STATUS_LOG' => $this->directory . '/status.log']);
-        $result = new Runner()->run([PHP_BINARY, $harness, dirname(__DIR__, 3), $mode], env: $environment, check: false);
+        $result = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)))->run(new ProcessSpec([PHP_BINARY, $harness, dirname(__DIR__, 3), $mode], environment: $environment), new CompletionPolicy(null));
         self::assertSame($expected, $result->exitCode, $result->stdout . $result->stderr);
         self::assertSame('status ready', file_get_contents($this->directory . '/status.log'));
     }

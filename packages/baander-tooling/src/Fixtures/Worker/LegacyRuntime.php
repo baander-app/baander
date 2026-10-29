@@ -12,32 +12,23 @@ final class LegacyRuntime
     public static function main(array $arguments, string $root): int
     {
         Runtime::require($arguments === [], 'Historical worker transport qualification takes no arguments');
-        $runtime = new Runtime($root, 400);
+        $runtime = new Runtime($root, budget: 'fixture');
         $resources = new Resources($runtime, 'worker');
         $docker = $resources->docker;
         $id = $resources->id;
-        $resources->networks[] = $id;
-        $resources->containers = [$id . '-redis', $id . '-postgres', $id . '-app'];
+
         try {
-            $docker->run(['network', 'create', '--internal', $id]);
-            $docker->run([
-                'run',
-                '-d',
-                '--name',
-                $id . '-redis',
+            $resources->createNetwork($id, ['--internal']);
+            $resources->startContainer($id . '-redis', [
                 '--network',
                 $id,
                 '--network-alias',
                 'redis',
                 '-e',
                 'REDIS_ARGS=--requirepass test-only',
-                'redis/redis-stack-server:edge',
+                $runtime->image('fixtureRedis')->id,
             ]);
-            $docker->run([
-                'run',
-                '-d',
-                '--name',
-                $id . '-postgres',
+            $resources->startContainer($id . '-postgres', [
                 '--network',
                 $id,
                 '--network-alias',
@@ -48,7 +39,7 @@ final class LegacyRuntime
                 'POSTGRES_PASSWORD=test-only',
                 '-e',
                 'POSTGRES_DB=worker_test',
-                $runtime->environment['BAANDER_TEST_POSTGRES_IMAGE'] ?? 'baander-database:latest',
+                $runtime->image('postgres')->id,
             ]);
             $runtime->await(
                 fn(): bool => $docker->run(
@@ -97,11 +88,8 @@ final class LegacyRuntime
                 input: file_get_contents($root . '/tests/Fixtures/postgres-extensions.sql'),
             );
             $checkout = ($runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1';
-            $directory = $checkout ? '/var/www/html' : '/tmp/baander-worker-runtime';
-            $docker->run([
-                'create',
-                '--name',
-                $id . '-app',
+            $directory = $checkout ? $runtime->layout()->root : '/tmp/baander-worker-runtime';
+            $resources->createContainer($id . '-app', [
                 '--privileged',
                 '--network',
                 $id,
@@ -123,7 +111,7 @@ final class LegacyRuntime
                 'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
                 '-e',
                 'DATABASE_URL=postgresql://baander:test-only@postgres:5432/worker_test?serverVersion=18&charset=utf8',
-                $runtime->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest',
+                $runtime->image('application')->id,
                 '-c',
                 'exec sleep infinity',
             ]);
@@ -153,9 +141,8 @@ final class LegacyRuntime
                 );
                 $docker->run(['exec', '--user', '0', $id . '-app', 'chown', '-R', 'www-data:www-data', $directory]);
             }
-            $runtime->run(
+            $docker->run(
                 [
-                    ...$docker->commandPrefix(),
                     'exec',
                     '-e',
                     'BAANDER_TEST_ARTIFACTS=/tmp/' . $id . '-supervisor',
@@ -171,6 +158,7 @@ final class LegacyRuntime
             return 0;
         } finally {
             $runtime->cleaning = true;
+            $docker = new \Baander\Tooling\Docker\Client($runtime->cleanupExecutor(), $docker->target, $runtime->environment);
             try {
                 $collected = $docker->run(
                     ['cp', $id . '-app:/tmp/' . $id . '-supervisor', $resources->artifacts . '/supervisor'],

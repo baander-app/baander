@@ -11,8 +11,10 @@ if (!in_array($unit, ['control', 'execution'], true) || $seconds < 1 || $seconds
 }
 $db = $unit === 'control' ? Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL'))) : null;
 $directory = (getenv('BAANDER_WORKER_IPC_DIRECTORY') ?: '/run/baander-worker') . '/' . getenv('BAANDER_WORKER_BOOT_ID');
+$completions = new \Baander\Tooling\Fixtures\Worker\CompletionCursor($directory . '/autoscaling-completions.jsonl');
 $deadline = hrtime(true) / 1e9 + $seconds;
-while (hrtime(true) / 1e9 < $deadline) {
+while (true) {
+    $stopping = hrtime(true) / 1e9 >= $deadline || (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile));
     $sample = ['monotonic' => hrtime(true) / 1e9, 'wallTime' => microtime(true), 'unit' => $unit];
     foreach (['cpu.stat', 'memory.current', 'memory.events', 'memory.peak', 'pids.current', 'pids.events', 'cpuset.cpus.effective', 'cpu.max', 'memory.max', 'pids.max'] as $name) {
         $sample[$name] = @file_get_contents('/sys/fs/cgroup/' . $name);
@@ -46,10 +48,11 @@ while (hrtime(true) / 1e9 < $deadline) {
     if ($db !== null) {
         $sample['lease'] = $db->fetchAssociative('SELECT owner_boot_id, epoch, state, expires_at > clock_timestamp() AS unexpired FROM worker_deployment_leases WHERE namespace = ?', [getenv('BAANDER_WORKER_NAMESPACE')]);
         $sample['connections'] = (int) $db->fetchOne('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()');
-        $sample['completions'] = @file_get_contents($directory . '/autoscaling-completions.jsonl', false, null, 0, 65537) ?: '';
+        $sample['completions'] = $completions->read($stopping ? \Baander\Tooling\Fixtures\Worker\EvidenceMode::Completed : \Baander\Tooling\Fixtures\Worker\EvidenceMode::Live);
     }
     $sample['capturedAt'] = hrtime(true) / 1e9;
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
     flush();
+    if ($stopping) { break; }
     usleep(250000);
 }

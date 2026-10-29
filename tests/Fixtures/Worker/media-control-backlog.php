@@ -21,5 +21,6 @@ while (hrtime(true) < $deadline) {
     $depth = $redis->xLen('messages');
     echo json_encode(['monotonic' => hrtime(true) / 1e9, 'receiverDepth' => $depth, 'sent' => $sent, 'acknowledged' => $sent - $depth], JSON_THROW_ON_ERROR) . "\n";
     flush();
+    if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) { break; }
     usleep(100000);
 }

@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\Client;
 use Baander\Tooling\Fixtures\Runtime;
 use Baander\Tooling\Process\RunningProcess;
 
 final readonly class Checkpoint
 {
     public Runtime $runtime;
-    public Docker $docker;
+    public Client $docker;
     public string $artifacts;
     public string $control;
     public string $execution;
     public string $postgres;
     public string $database;
     public string $web;
+    public Measurements $measurements;
 
     /** @param list<string> $arguments */
     public function __construct(array $arguments, string $root, float $seconds)
@@ -28,7 +29,8 @@ final readonly class Checkpoint
         [$this->artifacts, $this->control, $this->execution, , $this->postgres, $this->database] = $arguments;
         $this->web = preg_replace('/-postgres$/D', '-web', $this->postgres);
         $this->runtime = new Runtime($root, $seconds);
-        $this->docker = $this->runtime->docker(true);
+        $this->docker = $this->runtime->docker();
+        $this->measurements = new Measurements($this->runtime, $this->docker, $this->artifacts);
         if (!is_dir($this->artifacts)) {
             mkdir($this->artifacts, 0700, true);
         }
@@ -52,8 +54,8 @@ final readonly class Checkpoint
     /** @param list<string> $arguments */
     public function background(array $arguments, string $output, string $errors, float $seconds): RunningProcess
     {
-        return $this->runtime->start(
-            [...$this->docker->commandPrefix(), ...$arguments],
+        return $this->docker->start(
+            $arguments,
             timeout: $seconds,
             logPath: $this->artifacts . '/' . $output,
             stderrLogPath: $this->artifacts . '/' . $errors,
@@ -132,7 +134,7 @@ final readonly class Checkpoint
         }
         $runtime->run(
             [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
-            env: array_replace($runtime->environment, $environment, [
+            env: array_replace(self::operatorEnvironment($runtime, $artifacts), $environment, [
                 'BAANDER_TEST_ARTIFACTS' => $artifacts,
             ]),
             timeout: $seconds,
@@ -140,4 +142,13 @@ final readonly class Checkpoint
             terminationGrace: 40,
         );
     }
+
+    /** @return array<string,string> */
+    public static function operatorEnvironment(Runtime $runtime, string $artifacts): array
+    {
+        $targetFile = $artifacts . '-target.json';
+        \Baander\Tooling\Filesystem\AtomicFile::writeJson($targetFile, $runtime->docker()->target->toArray());
+        return array_replace($runtime->environment, ['BAANDER_TOOLING_TARGET_FILE' => $targetFile]);
+    }
+
 }

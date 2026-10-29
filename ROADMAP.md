@@ -259,6 +259,25 @@ full 376-file static-analysis result and 12-file formatting normalization are
 recorded in U6 above. U8/U11 delivery, final CI-image and live qualification, and
 final code review remain open.
 
+Worker migration checkpoint (U8), 2026-10-29: worker workflows use shared
+transport, image catalog, layout and named budgets. Typed operator run, topology,
+provisioning, scenario, command and resource collaborators replace the untyped
+parameter bag. Explicit container provisioning preserves PHP `-d` arguments and
+literal `--rm` arguments.
+
+Live and completed evidence modes reject corrupt complete records; only live
+mode tolerates an incomplete trailing record. A bounded completion cursor avoids
+replaying historical output. Measurements stop cooperatively and join/drain the
+producer before final verification; reports publish atomically. PostgreSQL
+sampling releases completed captures.
+
+The final worker, drill, sampler, legacy and resource group passes 116 tests and
+532 assertions. The earlier canonical cleanup/resource group passes 41 tests and
+263 assertions. Full 376-file static analysis and the 12-file formatting
+normalization are recorded above. U11 delivery, live worker/cgroup/operator
+qualification, final CI-image and preview acceptance, and final code review remain
+open.
+
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
 14 core factual claims with their stated limits. Safe host-only probes reproduced

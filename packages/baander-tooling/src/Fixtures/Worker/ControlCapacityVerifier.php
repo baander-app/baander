@@ -11,7 +11,7 @@ final class ControlCapacityVerifier
     /** @return array<string,mixed> */
     public static function exhausted(string $root, string $phase, bool $final = false): array
     {
-        $execution = Reports::samples($root . '/execution-samples.jsonl');
+        $execution = Reports::samples($root . '/execution-samples.jsonl', $final ? EvidenceMode::Completed : EvidenceMode::Live);
         [$key, $event] = $phase === 'memory' ? ['memory.events', 'oom_kill'] : ['pids.events', 'max'];
         Reports::require(count($execution) > 1, 'Missing execution cgroup samples');
         $baseline = Reports::counters($execution[0][$key])[$event] ?? 0;
@@ -29,7 +29,7 @@ final class ControlCapacityVerifier
         }
         $before = Reports::json($root . '/containers-before.json');
         if ($phase === 'pid') {
-            $pressure = is_file($root . '/pressure.log') ? Reports::samples($root . '/pressure.log') : [];
+            $pressure = is_file($root . '/pressure.log') ? Reports::samples($root . '/pressure.log', $final ? EvidenceMode::Completed : EvidenceMode::Live) : [];
             $configured = $before[1]['HostConfig']['PidsLimit'];
             Reports::require(
                 Reports::integer($execution[0]['pids.max']) === $configured,
@@ -71,7 +71,7 @@ final class ControlCapacityVerifier
         Reports::require($phase === 'memory', 'No execution ' . $event . ' event observed');
         $identity = $before[1]['Id'];
         $eventPath = $root . ($final ? '/worker-oom-events-final.jsonl' : '/worker-oom-events.jsonl');
-        $events = is_file($eventPath) ? Reports::samples($eventPath) : [];
+        $events = is_file($eventPath) ? Reports::samples($eventPath, $final ? EvidenceMode::Completed : EvidenceMode::Live) : [];
         $matches = array_filter(
             $events,
             static fn(array $entry): bool => self::oomEvent(

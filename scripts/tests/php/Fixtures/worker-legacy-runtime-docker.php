@@ -12,6 +12,8 @@ file_put_contents(
     json_encode($arguments, JSON_THROW_ON_ERROR) . "\n",
     FILE_APPEND | LOCK_EX,
 );
+require __DIR__ . '/worker-resource-state.php';
+workerResourceState($arguments);
 if (in_array('redis-cli', $arguments, true)) {
     echo 'PONG';
 }
