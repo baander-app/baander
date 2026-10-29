@@ -104,21 +104,23 @@ PHP,
         return new Supervisor($this->store, $runner, $this->root . '/source');
     }
 
-    public function testCopiedPhpControllerReplacesLegacyWithAbsoluteQuotedExecutable(): void
+    public function testCopiedPhpControllerPreservesLegacyWithAbsoluteQuotedExecutable(): void
     {
         mkdir($this->store->root . '/controller/scripts/dev_environment', 0700, true);
         file_put_contents($this->store->root . '/controller/scripts/dev_environment/updater.py', 'legacy');
         file_put_contents($this->store->root . '/controller/scripts/dev-environment.py', 'legacy');
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
-        $controller = $this->store->root . '/controller/scripts/dev-environment.php';
+        $payload = new \Baander\Tooling\Development\ControllerPayload($this->store->root);
+        $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
+        $controller = $payload->launcher();
         $unit = (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.service');
         self::assertFileExists($controller);
-        self::assertFileExists(dirname($controller) . '/bootstrap.php');
-        self::assertFileExists($this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php');
-        self::assertSame('../../../packages/baander-tooling', readlink(dirname($controller) . '/vendor/baander/tooling'));
+        self::assertFileExists($generation . '/scripts/bootstrap.php');
+        self::assertFileExists($generation . '/packages/baander-tooling/src/Process/ProcessRunner.php');
+        self::assertSame('../../../packages/baander-tooling', readlink($generation . '/scripts/vendor/baander/tooling'));
         rename($this->root . '/source', $this->root . '/source-offline');
-        self::assertFileExists(dirname($controller) . '/vendor/autoload.php');
+        self::assertFileExists($generation . '/scripts/vendor/autoload.php');
         self::assertSame('controller', new Runner()->run([PHP_BINARY, '-n', $controller])->stdout);
         $probe = json_decode(
             new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout,
@@ -128,12 +130,12 @@ PHP,
         self::assertSame('package-helper', $probe['stdout']);
         self::assertSame(0, $probe['exit']);
         self::assertSame(
-            $this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php',
+            $generation . '/packages/baander-tooling/src/Process/ProcessRunner.php',
             $probe['source'],
         );
-        self::assertFileDoesNotExist(dirname($controller) . '/dev-environment.py');
-        self::assertDirectoryDoesNotExist(dirname($controller) . '/dev_environment');
-        self::assertFileDoesNotExist($this->store->root . '/controller/docker/dev/private.key');
+        self::assertFileExists($this->store->root . '/controller/scripts/dev-environment.py');
+        self::assertDirectoryExists($this->store->root . '/controller/scripts/dev_environment');
+        self::assertFileDoesNotExist($generation . '/docker/dev/private.key');
         self::assertStringContainsString(Supervisor::systemdArgument((string) realpath(PHP_BINARY)), $unit);
         self::assertStringContainsString(Supervisor::systemdArgument($controller), $unit);
         self::assertStringNotContainsString($this->root . '/source', $unit);
@@ -141,6 +143,37 @@ PHP,
             'Unit=' . $supervisor->unit . '.service',
             (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.timer'),
         );
+    }
+
+    public function testLegacyServiceFenceLetsWaitingWriterFinishOutsideInstanceLock(): void
+    {
+        mkdir($this->store->root . '/controller/scripts', 0700, true);
+        file_put_contents($this->store->root . '/controller/scripts/dev-environment.php', '<?php // legacy');
+        $this->store->setEnabled('persistent', true);
+        $writer = $this->store->lock('persistent');
+        $observations = 0;
+        $runner = new DevCoreRunner(function (array $arguments) use (&$observations, $writer): ?ProcessResult {
+            if ($arguments[2] === 'stop') {
+                self::assertStringEndsWith('.timer', $arguments[3]);
+            }
+            if ($arguments[2] === 'show') {
+                ++$observations;
+                if ($observations === 1) {
+                    $writer->release();
+                    $operation = $this->store->lock('persistent');
+                    $this->store->save('persistent', ['id' => 'persistent', 'phase' => 'ready']);
+                    $operation->release();
+                    return new ProcessResult(0, null, false, false, "active\n", '', 0);
+                }
+                return new ProcessResult(0, null, false, false, "inactive\n", '', 0);
+            }
+            return null;
+        });
+        $this->supervisor($runner)->fenceLegacyService();
+        self::assertSame(2, $observations);
+        self::assertSame('ready', $this->store->load('persistent')['phase']);
+        self::assertTrue($this->store->enabled('persistent'));
+        self::assertFileExists($this->store->root . '/controller/scripts/dev-environment.php');
     }
 
     public function testOnlyTheDeclaredComposerPackageLinkCanEnterThePayload(): void
@@ -159,9 +192,11 @@ PHP,
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
         $supervisor->install();
+        $payload = new \Baander\Tooling\Development\ControllerPayload($this->store->root);
+        $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
         self::assertSame(
-            realpath($this->store->root . '/controller/packages/baander-tooling'),
-            realpath($this->store->root . '/controller/scripts/vendor/baander/tooling'),
+            realpath($generation . '/packages/baander-tooling'),
+            realpath($generation . '/scripts/vendor/baander/tooling'),
         );
     }
 
