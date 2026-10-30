@@ -217,6 +217,11 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     add_executable(mps-enc tools/mps-enc.cpp)
     target_include_directories(mps-enc PRIVATE src)
     target_link_libraries(mps-enc PRIVATE baander-aac)
+    # Bitstream probe: per-frame side information of an AAC-LC ADTS
+    # stream and the quantisation it chose against the source spectrum,
+    # for comparing encoders by their output.
+    add_executable(aac-probe tools/aac-probe.cpp)
+    target_link_libraries(aac-probe PRIVATE baander-aac)
     # The fuzz harnesses and their seed generator (tools/fuzz/README.md),
     # which use POSIX processes, signals and directories.
     if(NOT WIN32)

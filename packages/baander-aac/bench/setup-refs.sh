@@ -7,7 +7,7 @@
 # development packages (GstPEAQ), wine and 7z (Apple AAC), curl, and
 # Python 3 with numpy, scipy and soundfile.  On Ubuntu 24.04:
 #   apt-get install cmake ninja-build autoconf automake libtool pkg-config \
-#     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base \
+#     libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gtk-doc-tools \
 #     wine wine64 p7zip-full osslsigncode flac sox ffmpeg time
 #   pip install numpy scipy soundfile
 #
@@ -56,7 +56,8 @@ ninja -C libxaac/build xaacenc xaacdec >/dev/null
 # GstPEAQ (ITU-R BS.1387 PEAQ, basic and advanced versions).  The
 # documentation target needs gtk-doc, so only src/ is built.
 fetch HSU-ANT/gstpeaq gstpeaq 7397e49f5ede2f2429fb78f6663784e548401fec
-(cd gstpeaq && autoreconf -fi >/dev/null 2>&1 && ./configure -q --prefix="$ext/prefix" \
+# automake wants the GNU files and gtk-doc.make (gtk-doc-tools) even so.
+(cd gstpeaq && touch ChangeLog NEWS README AUTHORS && autoreconf -fi >/dev/null 2>&1 && ./configure -q --prefix="$ext/prefix" \
   && make -s -C src -j"$(nproc)" && make -s -C src install) >/dev/null
 
 # qaac 2.85 and Core Audio (iTunes 12.13.9.1) for Wine.
@@ -79,7 +80,9 @@ cp qaac/qaac_2.85/x64/* run/
 cp qt/*.dll run/QTfiles64/
 if command -v osslsigncode >/dev/null; then
   for f in CoreAudioToolbox CoreFoundation; do
-    osslsigncode verify -CAfile /etc/ssl/certs/ca-certificates.crt -in "run/QTfiles64/$f.dll" \
+    # The verification exits non-zero when only the timestamp
+    # countersignature fails to verify, so read its output instead.
+    { osslsigncode verify -CAfile /etc/ssl/certs/ca-certificates.crt -in "run/QTfiles64/$f.dll" || true; } \
       | grep -q "O=Apple Inc." || { echo "$f.dll: Apple signature not found" >&2; exit 1; }
   done
 fi
