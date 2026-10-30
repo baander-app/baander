@@ -12,9 +12,13 @@ export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
     matches: key => [
       'admin-album-duplicates',
       'admin-genres',
-      'admin-metadata-providers',
-    ].some(prefix => keyStartsWith(key, prefix))
-      || (keyStartsWith(key, 'admin', 'recommendations') && (key[2] === 'jobs' || key[2] === 'job')),
+    ].some(prefix => keyStartsWith(key, prefix)),
+  },
+  {
+    family: 'admin-metadata',
+    sampleIntervalMs: 5000,
+    matches: key => keyStartsWith(key, 'admin', 'recommendations')
+      && (key[2] === 'jobs' || key[2] === 'job'),
   },
   {
     family: 'admin-metadata',
@@ -28,10 +32,15 @@ export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
     family: 'deployment-definitions',
     deploymentFixed: true,
     matches: key => [
-      'config-check',
+      'admin-metadata-providers',
       'admin-scheduler-commands',
       '/api/admin/settings/definitions',
     ].some(prefix => keyStartsWith(key, prefix)),
+  },
+  {
+    family: 'admin-runtime',
+    sampleIntervalMs: 30000,
+    matches: key => keyStartsWith(key, 'config-check'),
   },
   {
     family: 'admin-runtime',

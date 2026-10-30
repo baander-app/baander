@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -183,10 +183,9 @@ function signIn(roles: string[]) {
   })
 }
 
-function renderPage() {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  })
+function renderPage(client = new QueryClient({
+  defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+})) {
 
   return render(
     <QueryClientProvider client={client}>
@@ -230,6 +229,56 @@ describe('AdminSettingsPage', () => {
   afterEach(() => {
     cleanup()
     useAuthStore.setState(initialAuthState, true)
+  })
+
+  it('retains a newer text edit after an earlier pending settings save completes', async () => {
+    const server = mockRequest.getMockImplementation()!
+    let finish: (() => void) | undefined
+    mockRequest.mockImplementation(async (url, options) => {
+      if (options.method === 'PATCH' && !finish) {
+        await new Promise<void>(resolve => { finish = resolve })
+      }
+      return server(url, options)
+    })
+    renderPage()
+    const user = userEvent.setup()
+    const input = await screen.findByRole('spinbutton', { name: 'Scan workers' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await user.tab()
+    await waitFor(() => expect(finish).toBeDefined())
+    await user.clear(input)
+    await user.type(input, '12')
+    await user.tab()
+    expect(patchCalls()).toHaveLength(1)
+    await act(async () => { finish!() })
+    await waitFor(() => expect(stored.get('library.scan_workers')).toBe(8))
+    expect(input).toHaveValue(12)
+    await user.click(input)
+    await user.tab()
+    await waitFor(() => expect(stored.get('library.scan_workers')).toBe(12))
+    expect(patchCalls().map(call => call.body.settings['library.scan_workers'])).toEqual([8, 12])
+  })
+
+  it('keeps typed settings across a server update and pauses blur save until resolved', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    renderPage(client)
+    const user = userEvent.setup()
+    const input = await screen.findByRole('spinbutton', { name: 'Scan workers' })
+    await user.clear(input)
+    await user.type(input, '8')
+    await act(async () => {
+      stored.set('library.scan_workers', 6)
+      client.setQueryData(['/api/admin/settings'], { data: entries() })
+    })
+    await waitFor(() => expect(screen.getByText('Changed on the server.')).toBeInTheDocument())
+    await user.tab()
+    expect(input).toHaveValue(8)
+    expect(patchCalls()).toHaveLength(0)
+    await user.click(screen.getByRole('button', { name: 'Keep my text' }))
+    await user.click(input)
+    await user.tab()
+    await waitFor(() => expect(patchCalls()).toHaveLength(1))
   })
 
   it('renders one control per served system definition, grouped and labelled by the definitions', async () => {

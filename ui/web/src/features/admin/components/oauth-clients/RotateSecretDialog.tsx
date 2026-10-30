@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
+import { useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import {
@@ -27,6 +28,11 @@ interface RotateSecretDialogProps {
 
 export function RotateSecretDialog({ client, open, onOpenChange }: RotateSecretDialogProps) {
   const rotate = useRotateOAuthClientSecret()
+  const { reset: resetSecret } = rotate
+  useEffect(() => subscribeOwnership(() => {
+    resetSecret()
+    onOpenChange(false)
+  }), [resetSecret, onOpenChange])
   const [error, setError] = useState<string | null>(null)
   const secret = rotate.data?.clientSecret ?? null
 
@@ -41,9 +47,11 @@ export function RotateSecretDialog({ client, open, onOpenChange }: RotateSecretD
     if (!client) return
 
     setError(null)
+    const stamp = captureOwnership()
     try {
       await rotate.mutateAsync(client.clientId)
     } catch (err: unknown) {
+      if (!isCurrentOwnership(stamp)) return
       setError(parseApiError(err, 'Could not rotate the secret.').message)
     }
   }

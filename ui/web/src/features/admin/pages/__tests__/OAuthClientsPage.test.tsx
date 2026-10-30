@@ -1,4 +1,5 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { advanceAuthorization } from '@/shared/live/ownership'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'styled-components'
@@ -244,6 +245,20 @@ describe('OAuthClientsPage', () => {
     await user.click(within(row('Bånder Sync')).getByRole('button', { name: 'Rotate secret' }))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     expect(screen.queryByText('cs_r0tated')).not.toBeInTheDocument()
+  })
+
+  it('removes a revealed rotation secret immediately when authorization changes', async () => {
+    authState.roles = ['ROLE_SUPER_ADMIN']
+    post = () => ({ data: { ...SYNC, clientSecret: 'cs_revoked' } })
+    mount()
+    const user = userEvent.setup()
+    await screen.findByText('Bånder Sync')
+    await user.click(within(row('Bånder Sync')).getByRole('button', { name: 'Rotate secret' }))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Rotate secret' }))
+    expect(await screen.findByLabelText('Client secret')).toHaveTextContent('cs_revoked')
+    act(() => { advanceAuthorization() })
+    expect(screen.queryByLabelText('Client secret')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('revokes a client only after confirmation', async () => {

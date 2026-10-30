@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { loginBlockAdminApi } from '../api/login-block-admin-api'
 
 const BLOCKS_KEY = ['admin-login-blocks']
@@ -6,22 +7,24 @@ const BLOCKS_KEY = ['admin-login-blocks']
 export function useLoginBlocks(params?: { limit?: number; offset?: number }) {
   return useQuery({
     queryKey: [...BLOCKS_KEY, params],
-    queryFn: () => loginBlockAdminApi.list(params),
+    queryFn: ({ signal }) => loginBlockAdminApi.list(params, signal),
   })
 }
 
 export function useDeleteLoginBlock() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-security'])
+
   return useMutation({
-    mutationFn: loginBlockAdminApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: BLOCKS_KEY }),
+    mutationFn: (variables: Parameters<typeof loginBlockAdminApi.delete>[0]) => run(() => loginBlockAdminApi.delete(variables)),
+    onSuccess: () => invalidate(BLOCKS_KEY),
   })
 }
 
 export function useDeleteAllLoginBlocks() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-security'])
+
   return useMutation({
-    mutationFn: loginBlockAdminApi.deleteAll,
-    onSuccess: () => qc.invalidateQueries({ queryKey: BLOCKS_KEY }),
+    mutationFn: () => run(() => loginBlockAdminApi.deleteAll()),
+    onSuccess: () => invalidate(BLOCKS_KEY),
   })
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -123,6 +123,28 @@ describe('LibraryAccessDialog', () => {
     cleanup()
   })
 
+  it('preserves toggles during a remote access change and blocks saving until resolved', async () => {
+    const user = userEvent.setup()
+    const { client } = renderDialog()
+    await user.click(await screen.findByRole('checkbox', { name: 'Rock' }))
+    await act(async () => {
+      client.setQueryData(['admin-user-libraries', ALICE.publicId], [JAZZ, ROCK, { ...FILMS, granted: false }])
+    })
+    expect(screen.getByRole('checkbox', { name: 'Rock' })).toBeChecked()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled())
+    await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('disables saving when an edited library is deleted from the authoritative access list', async () => {
+    const user = userEvent.setup()
+    const { client } = renderDialog()
+    await user.click(await screen.findByRole('checkbox', { name: 'Rock' }))
+    await act(async () => { client.setQueryData(['admin-user-libraries', ALICE.publicId], [JAZZ, FILMS]) })
+    expect(await screen.findByRole('alert')).toHaveTextContent('no longer available')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
   it('lists every library with its access and saves only the rows that changed', async () => {
     const user = userEvent.setup()
     const { client, onOpenChange } = renderDialog()
@@ -156,7 +178,7 @@ describe('LibraryAccessDialog', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
   })
 
-  it('keeps a failed revoke checked, names the library and stays open', async () => {
+  it('keeps a failed revoke draft, names the library and stays open', async () => {
     failing = new Set([FILMS.libraryId])
     const user = userEvent.setup()
     const { onOpenChange } = renderDialog()
@@ -165,9 +187,8 @@ describe('LibraryAccessDialog', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Rock' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Access to Films was not saved.')
-    expect(screen.getByRole('alert')).not.toHaveTextContent('Rock')
-    expect(screen.getByRole('checkbox', { name: 'Films' })).toBeChecked()
+    expect(await screen.findByText('Access to Films was not saved.')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Films' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Rock' })).toBeChecked()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(onOpenChange).not.toHaveBeenCalled()
@@ -176,7 +197,7 @@ describe('LibraryAccessDialog', () => {
     mockPut.mockClear()
     mockDelete.mockClear()
     failing = new Set()
-    await user.click(screen.getByRole('checkbox', { name: 'Films' }))
+    await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
@@ -185,23 +206,28 @@ describe('LibraryAccessDialog', () => {
     expect(mockDelete).toHaveBeenCalledWith(`${LIBRARIES_URL}/${FILMS.libraryId}`)
   })
 
-  it('disables the checkboxes and Save while saving', async () => {
+  it('retains a newer checkbox edit after the pending save completes', async () => {
     let finish: (value: unknown) => void = () => {}
     mockPut.mockImplementation(() => new Promise((resolve) => {
       finish = resolve
     }))
     const user = userEvent.setup()
-    renderDialog()
+    const { onOpenChange } = renderDialog()
 
     await user.click(await screen.findByRole('checkbox', { name: 'Rock' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByRole('button', { name: 'Saving...' })).toBeDisabled()
     for (const checkbox of screen.getAllByRole('checkbox')) {
-      expect(checkbox).toBeDisabled()
+      expect(checkbox).toBeEnabled()
     }
 
-    finish({ data: { data: { ...ROCK, granted: true } } })
+    await user.click(screen.getByRole('checkbox', { name: 'Rock' }))
+    served = served.map(row => row.libraryId === ROCK.libraryId ? { ...row, granted: true } : row)
+    await act(async () => { finish({ data: { data: { ...ROCK, granted: true } } }) })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled())
+    expect(screen.getByRole('checkbox', { name: 'Rock' })).not.toBeChecked()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('returns focus to the row action when it closes', async () => {

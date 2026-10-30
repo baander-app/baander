@@ -15,15 +15,13 @@ export interface DashboardSummary {
 export function useDashboardSummary() {
   const { data: stats } = useQuery({
     queryKey: ['server-stats'],
-    queryFn: getServerStats,
-    refetchInterval: 10_000,
+    queryFn: ({ signal }) => getServerStats(signal),
     retry: false,
   })
 
   const { data: statusOverview } = useQuery({
     queryKey: ['status-overview'],
-    queryFn: getStatusOverview,
-    refetchInterval: 10_000,
+    queryFn: ({ signal }) => getStatusOverview(signal),
     retry: false,
   })
 

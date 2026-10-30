@@ -25,13 +25,14 @@ export interface DuplicateGroup {
 }
 
 export const albumDuplicatesApi = {
-  getDuplicates: (libraryId: string) =>
+  getDuplicates: (libraryId: string, signal?: AbortSignal) =>
     AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>('/api/admin/albums/duplicates', {
+      signal,
       params: { libraryId },
     }).then((r) => r.data.data),
 
-  getAlbumDuplicates: (albumPublicId: string) =>
-    AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(`/api/albums/${albumPublicId}/duplicates`).then(
+  getAlbumDuplicates: (albumPublicId: string, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(`/api/albums/${albumPublicId}/duplicates`, { signal }).then(
       (r) => r.data.data,
     ),
 }

@@ -22,8 +22,8 @@ export interface ClearAllRateLimitersResponse {
 
 // API Functions
 
-export async function getRateLimiters(): Promise<RateLimitersResponse> {
-  const { data } = await AXIOS_INSTANCE.get('/api/monitor/rate-limiters')
+export async function getRateLimiters(signal?: AbortSignal): Promise<RateLimitersResponse> {
+  const { data } = await AXIOS_INSTANCE.get('/api/monitor/rate-limiters', { signal })
   return data.data
 }
 

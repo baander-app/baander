@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
@@ -291,7 +292,7 @@ export function LoginBlocksPage() {
               variant="destructive"
               disabled={deleteAll.isPending}
               onClick={() => {
-                deleteAll.mutate(undefined, { onSuccess: () => setShowClearAll(false) })
+                deleteAll.mutate(undefined, guardMutationCallbacks({ onSuccess: () => setShowClearAll(false) }))
               }}
             >
               {deleteAll.isPending ? 'Deleting...' : 'Delete All'}

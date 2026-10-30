@@ -1,6 +1,9 @@
-import { useState } from 'react'
+import { guardMutationCallbacks } from '@/shared/live/ownership'
+import { useEffect, useRef } from 'react'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
-import { useUpdateScheduledJob, useSchedulableCommands } from '../../hooks/use-scheduler-admin'
+import { useUpdateScheduledJob, useSchedulableCommands, useScheduledJob } from '../../hooks/use-scheduler-admin'
 import type { ScheduledJob, UpdateScheduledJobPayload } from '../../api/scheduler-admin-api'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -62,26 +65,54 @@ const DescriptionHint = styled.span`
 `
 
 export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob | null; open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [name, setName] = useState('')
-  const [expression, setExpression] = useState('')
-  const [jobType, setJobType] = useState<'messenger' | 'console'>('messenger')
-  const [command, setCommand] = useState('')
-  const [description, setDescription] = useState('')
-  const [params, setParams] = useState<Record<string, unknown>>({})
-
+  const current = useScheduledJob(job?.publicId, open)
+  const draft = useDraft({
+    identity: job?.publicId ?? 'none',
+    initialData: {
+      name: job?.name ?? '',
+      expression: job?.expression ?? '',
+      jobType: job?.jobType ?? 'messenger',
+      command: job?.command ?? '',
+      description: job?.description ?? '',
+      params: job?.parameters ?? {},
+    },
+  })
+  const { receive, revokeAccess } = draft
+  const { name = '', expression = '', jobType = 'messenger', command = '', description = '', params = {} } = draft.values
+  const setName = (value: string) => draft.updateField('name', value)
+  const setExpression = (value: string) => draft.updateField('expression', value)
+  const setJobType = (value: 'messenger' | 'console') => draft.updateField('jobType', value)
+  const setCommand = (value: string) => draft.updateField('command', value)
+  const setDescription = (value: string) => draft.updateField('description', value)
   const updateJob = useUpdateScheduledJob()
   const { data: commandsData } = useSchedulableCommands()
-
-  const [initialized, setInitialized] = useState(false)
-  if (job && !initialized) {
-    setName(job.name)
-    setExpression(job.expression)
-    setJobType(job.jobType)
-    setCommand(job.command)
-    setDescription(job.description ?? '')
-    setParams(job.parameters)
-    setInitialized(true)
-  }
+  const latestSnapshot = useRef(current.data ?? job ?? undefined)
+  const revokedSnapshot = useRef<ScheduledJob | undefined>(undefined)
+  useEffect(() => {
+    if (!current.data || current.data === revokedSnapshot.current) return
+    latestSnapshot.current = current.data
+    const snapshot = current.data
+    receive({ name: snapshot.name, expression: snapshot.expression, jobType: snapshot.jobType,
+      command: snapshot.command, description: snapshot.description ?? '', params: snapshot.parameters })
+  }, [current.data, receive])
+  useEffect(() => {
+    if (!current.error || !('status' in current.error)) return
+    if (Number(current.error.status) === 403) {
+      revokedSnapshot.current = latestSnapshot.current
+      revokeAccess()
+    } else if (Number(current.error.status) === 404) {
+      receive(null)
+    }
+  }, [current.error, receive, revokeAccess])
+  useEffect(() => {
+    const owner = captureOwnership()
+    return subscribeOwnership(() => {
+      if (!isCurrentOwnership(owner)) {
+        revokedSnapshot.current = latestSnapshot.current
+        revokeAccess()
+      }
+    })
+  }, [revokeAccess])
 
   const availableCommands = jobType === 'messenger'
     ? commandsData?.messenger ?? {}
@@ -92,6 +123,8 @@ export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob |
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!job) return
+    const submission = draft.beginSave()
+    if (!submission) return
     const payload: UpdateScheduledJobPayload = {
       name,
       expression,
@@ -102,20 +135,28 @@ export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob |
     }
     updateJob.mutate(
       { id: job.publicId, payload },
-      { onSuccess: () => { onOpenChange(false); setInitialized(false) } },
+      guardMutationCallbacks({
+        onSuccess: () => { draft.completeSave(submission) },
+        onError: () => { draft.failSave(submission) },
+      }),
     )
   }
 
   if (!job) return null
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) setInitialized(false); onOpenChange(v) }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent style={{ maxWidth: '32rem' }}>
         <DialogHeader>
           <DialogTitle>Edit Scheduled Job</DialogTitle>
-          <DialogDescription>Update configuration for {job.name}.</DialogDescription>
+          <DialogDescription>Update configuration for {name}.</DialogDescription>
         </DialogHeader>
         <Form onSubmit={handleSubmit}>
+          {draft.status === 'conflict' && <div role="alert">This job changed. Your edits are preserved.
+            <Button type="button" onClick={() => draft.resolveConflict('local')}>Keep my edits</Button>
+            <Button type="button" onClick={() => draft.resolveConflict('server')}>Use server values</Button>
+          </div>}
+          {draft.status === 'unavailable' && <p role="alert">This job is unavailable. Your edits are preserved.</p>}
           <FieldGroup>
             <Label>Name</Label>
             <StyledInput value={name} onChange={(e) => setName(e.target.value)} required />
@@ -167,10 +208,10 @@ export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob |
                 type={schema.type === 'integer' ? 'number' : 'text'}
                 value={(params[key] ?? schema.default ?? '') as string}
                 onChange={(e) =>
-                  setParams((prev) => ({
-                    ...prev,
+                  draft.updateField('params', {
+                    ...params,
                     [key]: schema.type === 'integer' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value,
-                  }))
+                  })
                 }
                 placeholder={schema.default != null ? String(schema.default) : ''}
               />
@@ -178,7 +219,7 @@ export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob |
           ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateJob.isPending}>
+            <Button type="submit" disabled={!draft.canSave || updateJob.isPending}>
               {updateJob.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

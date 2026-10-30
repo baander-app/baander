@@ -188,3 +188,34 @@ it('clears validation state on authorization change without letting an old reply
   unmount()
   act(() => advanceAuthorization())
 })
+
+it('preserves library text across remote conflicts and disables unavailable saves', () => {
+  const props = { onClose: vi.fn(), onSubmit: vi.fn(), isPending: false }
+  const { rerender } = render(<EditLibraryDialog library={library} {...props} />, { wrapper })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My draft' } })
+  rerender(<EditLibraryDialog library={{ ...library, name: 'Remote name' }} {...props} />)
+  expect(screen.getByRole('textbox')).toHaveValue('My draft')
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Keep my changes' }))
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  rerender(<EditLibraryDialog library={library} unavailable {...props} />)
+  expect(screen.getByRole('textbox')).toHaveValue('My draft')
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+})
+
+it('retains edits made during a library save and purges server fields on authority loss', async () => {
+  let finish!: () => void
+  const onSubmit = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  render(<EditLibraryDialog library={library} onClose={vi.fn()} onSubmit={onSubmit} isPending={false} />, { wrapper })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Submitted' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Newer text' } })
+  await act(async () => { finish() })
+  expect(screen.getByRole('textbox')).toHaveValue('Newer text')
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  act(() => { advanceAuthorization() })
+  expect(screen.getByRole('textbox')).toHaveValue('Newer text')
+  expect(screen.getByRole('spinbutton')).toHaveValue(0)
+  expect(screen.queryByText('/music')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+})

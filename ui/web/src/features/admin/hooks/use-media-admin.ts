@@ -1,10 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { mediaAdminApi } from '../api/media-admin-api'
 
 export function useMediaStorageStats() {
   return useQuery({
     queryKey: ['admin-media-storage-stats'],
-    queryFn: mediaAdminApi.getStorageStats,
+    queryFn: ({ signal }) => mediaAdminApi.getStorageStats(signal),
     staleTime: 30_000,
     retry: false,
   })
@@ -13,7 +14,7 @@ export function useMediaStorageStats() {
 export function useCheckMissingImages() {
   return useQuery({
     queryKey: ['admin-media-missing-check'],
-    queryFn: mediaAdminApi.checkMissing,
+    queryFn: ({ signal }) => mediaAdminApi.checkMissing(signal),
     staleTime: 0,
     retry: false,
     enabled: false,
@@ -21,12 +22,13 @@ export function useCheckMissingImages() {
 }
 
 export function usePruneMissingImages() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-media', 'admin-jobs', 'catalog'])
+
   return useMutation({
-    mutationFn: mediaAdminApi.pruneMissing,
+    mutationFn: () => run(() => mediaAdminApi.pruneMissing()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-media-storage-stats'] })
-      queryClient.invalidateQueries({ queryKey: ['admin-media-missing-check'] })
+      invalidate(['admin-media-storage-stats'])
+      invalidate(['admin-media-missing-check'])
     },
   })
 }

@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { focusVisibleRing } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
@@ -220,9 +221,9 @@ export function TransportHealth() {
               <FlushActions>
                 <DestructiveButton
                   onClick={() => {
-                    flushMutation.mutate(undefined, {
+                    flushMutation.mutate(undefined, guardMutationCallbacks({
                       onSuccess: () => { setShowFlushConfirm(false) },
-                    })
+                    }))
                   }}
                   disabled={flushMutation.isPending}
                 >

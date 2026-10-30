@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { isAxiosError } from 'axios'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
+import { useAdminMutationTools } from '../../hooks/use-admin-mutation'
 import styled from 'styled-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { userAdminApi, type AdminUser, type AdminUserLibraryAccess } from '../../api/user-admin-api'
@@ -104,45 +108,10 @@ export function LibraryAccessDialog({ user, open, onOpenChange, returnFocusTo }:
 
 /** Mounted only while the dialog is open, so every opening starts from the server's state. */
 function LibraryAccessForm({ userId, onClose }: { userId: string; onClose: () => void }) {
-  const queryClient = useQueryClient()
-  const queryKey = libraryAccessKey(userId)
-  const { data: libraries, isPending, isError, isFetching, refetch } = useQuery({
-    queryKey,
+  const { data: libraries, isPending, isError, isFetching, refetch, error } = useQuery({
+    queryKey: libraryAccessKey(userId),
     queryFn: ({ signal }) => userAdminApi.libraryAccess(userId, signal),
   })
-  /** The checked state of rows the admin toggled, keyed by library id. */
-  const [edits, setEdits] = useState<Record<string, boolean>>({})
-  const [unsaved, setUnsaved] = useState<string[]>([])
-
-  const save = useMutation({
-    mutationFn: (changes: AccessChange[]) => Promise.allSettled(
-      changes.map(({ library, granted }) => (granted
-        ? userAdminApi.grantLibraryAccess(userId, library.libraryId)
-        : userAdminApi.revokeLibraryAccess(userId, library.libraryId))),
-    ),
-    onSuccess: async (results, changes) => {
-      const saved = new Map<string, AdminUserLibraryAccess>()
-      const failed: string[] = []
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          saved.set(result.value.libraryId, result.value)
-        } else {
-          failed.push(changes[index].library.name)
-        }
-      })
-
-      // Saved rows become the loaded state; failed rows drop their edit and show the loaded state again.
-      queryClient.setQueryData<AdminUserLibraryAccess[]>(queryKey, (current) => current?.map(
-        (library) => saved.get(library.libraryId) ?? library,
-      ))
-      setEdits({})
-      setUnsaved(failed)
-      await queryClient.invalidateQueries({ queryKey })
-
-      if (failed.length === 0) onClose()
-    },
-  })
-
   if (isPending) {
     return (
       <LibraryList aria-busy="true" aria-label="Loading libraries">
@@ -153,7 +122,7 @@ function LibraryAccessForm({ userId, onClose }: { userId: string; onClose: () =>
     )
   }
 
-  if (isError) {
+  if (isError && !libraries) {
     return (
       <>
         <ErrorRow>
@@ -180,23 +149,82 @@ function LibraryAccessForm({ userId, onClose }: { userId: string; onClose: () =>
     )
   }
 
-  const isChecked = (library: AdminUserLibraryAccess) => edits[library.libraryId] ?? library.granted
+  return <LibraryAccessEditor userId={userId} libraries={libraries} onClose={onClose} unavailable={isAxiosError(error) && error.response?.status === 404} />
+}
+
+function LibraryAccessEditor({ userId, libraries, onClose, unavailable }: {
+  userId: string
+  libraries: AdminUserLibraryAccess[]
+  unavailable: boolean
+  onClose: () => void
+}) {
+  const queryClient = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
+  const queryKey = libraryAccessKey(userId)
+  const draft = useDraft<Record<string, boolean>>({ identity: userId, initialData: Object.fromEntries(libraries.map(row => [row.libraryId, row.granted])) })
+  const latestValues = useRef(draft.values)
+  useEffect(() => {
+    latestValues.current = draft.values
+  }, [draft.values])
+  const { receive, pending } = draft
+  const lastLibraries = useRef(libraries)
+  const revokedLibraries = useRef<typeof libraries | undefined>(undefined)
+  const { revokeAccess } = draft
+  useEffect(() => subscribeOwnership(() => {
+    revokedLibraries.current = lastLibraries.current
+    revokeAccess()
+  }), [revokeAccess])
+  useEffect(() => {
+    lastLibraries.current = libraries
+    if (!libraries || pending || revokedLibraries.current === libraries) return
+    if (unavailable) receive(null)
+    else if ([...draft.dirty].some(id => !libraries.some(row => row.libraryId === id))) receive(null)
+    else receive(Object.fromEntries(libraries.map(row => [row.libraryId, row.granted])))
+  }, [libraries, receive, pending, draft.dirty, unavailable])
+  const [unsaved, setUnsaved] = useState<string[]>([])
+
+  const save = useMutation({
+    mutationFn: (changes: AccessChange[]) => live.run(() => Promise.allSettled(
+      changes.map(({ library, granted }) => (granted
+        ? userAdminApi.grantLibraryAccess(userId, library.libraryId)
+        : userAdminApi.revokeLibraryAccess(userId, library.libraryId))),
+    )),
+  })
+
+  const isChecked = (library: AdminUserLibraryAccess) => draft.values[library.libraryId] ?? library.granted
   const changes: AccessChange[] = libraries
     .filter((library) => isChecked(library) !== library.granted)
     .map((library) => ({ library, granted: isChecked(library) }))
 
   const toggle = (library: AdminUserLibraryAccess) => {
-    setEdits((current) => ({ ...current, [library.libraryId]: !isChecked(library) }))
+    draft.updateField(library.libraryId, !isChecked(library))
   }
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (changes.length === 0) {
-      onClose()
-      return
-    }
+    const submission = draft.beginSave()
+    if (!submission) return
+    const stamp = captureOwnership()
     setUnsaved([])
-    save.mutate(changes)
+    try {
+      const results = await save.mutateAsync(changes)
+      if (!isCurrentOwnership(stamp)) return
+      const saved = new Map<string, AdminUserLibraryAccess>()
+      const failed: string[] = []
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') saved.set(result.value.libraryId, result.value)
+        else failed.push(changes[index].library.name)
+      })
+      if (failed.length) draft.failSave(submission)
+      else draft.completeSave(submission)
+      queryClient.setQueryData<AdminUserLibraryAccess[]>(queryKey, current => current?.map(row => saved.get(row.libraryId) ?? row))
+      setUnsaved(failed)
+      await live.invalidate(queryKey)
+      if (!isCurrentOwnership(stamp)) return
+      if (!failed.length && Object.keys(latestValues.current).every(id => latestValues.current[id] === submission.values[id])) onClose()
+    } catch {
+      if (isCurrentOwnership(stamp)) draft.failSave(submission)
+    }
   }
 
   return (
@@ -207,7 +235,7 @@ function LibraryAccessForm({ userId, onClose }: { userId: string; onClose: () =>
             <Checkbox
               checked={isChecked(library)}
               onChange={() => toggle(library)}
-              disabled={save.isPending}
+              disabled={draft.status === 'unavailable'}
             />
             <LibraryName>{library.name}</LibraryName>
           </LibraryLabel>
@@ -218,9 +246,15 @@ function LibraryAccessForm({ userId, onClose }: { userId: string; onClose: () =>
           {`Access to ${unsaved.join(', ')} was not saved.`}
         </ErrorText>
       )}
+      {draft.status === 'unavailable' && <ErrorText role="alert">Library access is no longer available. Your changes are retained.</ErrorText>}
+      {draft.status === 'conflict' && <div role="alert">
+        Access changed on the server.
+        <Button type="button" onClick={() => draft.resolveConflict('local')}>Keep my changes</Button>
+        <Button type="button" onClick={() => draft.resolveConflict('server')}>Use server values</Button>
+      </div>}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={save.isPending}>
+        <Button type="submit" disabled={!draft.canSave}>
           {save.isPending ? 'Saving...' : 'Save'}
         </Button>
       </DialogFooter>

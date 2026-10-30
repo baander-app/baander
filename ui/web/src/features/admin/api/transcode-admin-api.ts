@@ -21,13 +21,13 @@ export interface TranscodeSession {
 }
 
 export const transcodeAdminApi = {
-  getSessions: () =>
-    AXIOS_INSTANCE.get<{ data: TranscodeSession[] }>('/api/transcode/sessions').then(
+  getSessions: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: TranscodeSession[] }>('/api/transcode/sessions', { signal }).then(
       (r) => r.data.data ?? [],
     ),
 
-  getSession: (publicId: string) =>
-    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(`/api/transcode/sessions/${publicId}`).then(
+  getSession: (publicId: string, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(`/api/transcode/sessions/${publicId}`, { signal }).then(
       (r) => r.data.data,
     ),
 }

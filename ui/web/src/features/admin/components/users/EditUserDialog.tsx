@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { isAxiosError } from 'axios'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
@@ -6,7 +9,7 @@ import { EMAIL_LANGUAGE_KEY } from '@/features/settings/email-language'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useChangeUserSetting, useUpdateUser, useUserSettings } from '../../hooks/use-users'
 import { UserLanguageField } from './UserLanguageField'
-import { languageChange } from './user-language'
+import { initialLanguageSelection, languageChange } from './user-language'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import {
@@ -75,19 +78,60 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
 }
 
 function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void }) {
-  const [email, setEmail] = useState(user.email)
-  const [name, setName] = useState(user.name)
-  const [languageSelection, setLanguageSelection] = useState<string | null>(null)
+  const draft = useDraft({ identity: user.publicId, initialData: { email: user.email, name: user.name } })
+  const languageDraft = useDraft<{ selection: string | null }>({ identity: user.publicId, initialData: { selection: null } })
+  const latestValues = useRef(draft.values)
+  useEffect(() => {
+    latestValues.current = draft.values
+  }, [draft.values])
   const { isSuperAdmin } = useAdminCheck()
+  const wasSuperAdmin = useRef(isSuperAdmin)
   const updateUser = useUpdateUser()
   const settings = useUserSettings(user.publicId)
   const changeSetting = useChangeUserSetting()
   const language = settings.data?.find((setting) => setting.key === EMAIL_LANGUAGE_KEY)
   const saving = updateUser.isPending || changeSetting.isPending
-
+  const { receive, revokeAccess } = draft
+  const { receive: receiveLanguage, revokeAccess: revokeLanguage } = languageDraft
+  const lastUser = useRef(user)
+  const revokedUser = useRef<AdminUser | null>(null)
+  const lastLanguage = useRef(language)
+  const revokedLanguage = useRef<typeof language>(undefined)
+  useEffect(() => subscribeOwnership(() => {
+    revokedUser.current = lastUser.current
+    revokedLanguage.current = lastLanguage.current
+    revokeAccess()
+    revokeLanguage()
+  }), [revokeAccess, revokeLanguage])
+  useEffect(() => {
+    lastUser.current = user
+    if (isAxiosError(settings.error) && settings.error.response?.status === 404) {
+      receive(null)
+      return
+    }
+    if (revokedUser.current !== user && (isSuperAdmin || revokedUser.current === null)) {
+      receive({ email: user.email, name: user.name })
+    }
+  }, [receive, user, isSuperAdmin, settings.error])
+  useEffect(() => {
+    lastLanguage.current = language
+    if (language && !saving && revokedLanguage.current !== language && (isSuperAdmin || revokedUser.current === null)) {
+      receiveLanguage({ selection: initialLanguageSelection(language) })
+    }
+  }, [language, receiveLanguage, saving, isSuperAdmin])
+  useEffect(() => {
+    if (wasSuperAdmin.current && !isSuperAdmin) {
+      revokedUser.current = lastUser.current
+      revokedLanguage.current = lastLanguage.current
+      revokeAccess()
+      revokeLanguage()
+    }
+    wasSuperAdmin.current = isSuperAdmin
+  }, [isSuperAdmin, revokeAccess, revokeLanguage])
+  const languageSelection = languageDraft.values.selection
   const selectLanguage = (selection: string) => {
     changeSetting.reset()
-    setLanguageSelection(selection)
+    languageDraft.updateField('selection', selection)
   }
 
   const retryLoad = async () => {
@@ -96,37 +140,52 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isSuperAdmin || draft.status === 'conflict' || draft.status === 'unavailable'
+      || languageDraft.status === 'conflict' || languageDraft.status === 'unavailable') return
     updateUser.reset()
-    const change = isSuperAdmin && language && languageSelection !== null
-      ? languageChange(user.publicId, language, languageSelection)
+    const stamp = captureOwnership()
+    const submission = draft.beginSave()
+    const languageSubmission = languageDraft.beginSave()
+    const userPayload = {
+      id: user.publicId,
+      email: submission?.values.email ?? draft.values.email,
+      name: submission?.values.name ?? draft.values.name,
+    }
+    const change = language && languageSubmission?.values.selection
+      ? languageChange(user.publicId, language, languageSubmission.values.selection)
       : null
-
     try {
-      // The language goes first: if it is rejected, nothing else has been saved yet.
       if (change) {
         await changeSetting.mutateAsync(change)
-        setLanguageSelection(null)
+        if (!isCurrentOwnership(stamp)) return
       }
-      await updateUser.mutateAsync({ id: user.publicId, email, name })
+      if (languageSubmission) languageDraft.completeSave(languageSubmission)
+      await updateUser.mutateAsync(userPayload)
+      if (!isCurrentOwnership(stamp)) return
+      if (submission) draft.completeSave(submission)
     } catch {
-      // Both mutations keep their error, which the form shows next to the field that failed.
+      if (!isCurrentOwnership(stamp)) return
+      if (submission) draft.failSave(submission)
+      if (languageSubmission) languageDraft.failSave(languageSubmission)
       return
     }
-    onDone()
+    if (latestValues.current.email === userPayload.email && latestValues.current.name === userPayload.name) {
+      onDone()
+    }
   }
 
   return (
     <Form onSubmit={handleSubmit}>
       <FieldGroup>
         <Label htmlFor="edituserdialog-email">Email</Label>
-        <StyledInput id="edituserdialog-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required readOnly={!isSuperAdmin} />
+        <StyledInput id="edituserdialog-email" type="email" value={draft.values.email ?? ''} onChange={(e) => draft.updateField('email', e.target.value)} required readOnly={!isSuperAdmin} />
       </FieldGroup>
       <FieldGroup>
         <Label htmlFor="edituserdialog-name">Name</Label>
-        <StyledInput id="edituserdialog-name" value={name} onChange={(e) => setName(e.target.value)} required readOnly={!isSuperAdmin} />
+        <StyledInput id="edituserdialog-name" value={draft.values.name ?? ''} onChange={(e) => draft.updateField('name', e.target.value)} required readOnly={!isSuperAdmin} />
       </FieldGroup>
       <UserLanguageField
-        setting={language}
+        setting={languageDraft.status === 'unavailable' ? undefined : language}
         loading={settings.isPending}
         loadFailed={settings.isError}
         onRetry={retryLoad}
@@ -141,10 +200,21 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
           {`Could not save: ${parseApiError(updateUser.error, updateUser.error.message).message}`}
         </ErrorText>
       )}
+      {(draft.status === 'conflict' || languageDraft.status === 'conflict') && <div role="alert">
+        Changed on the server.
+        <Button type="button" onClick={() => {
+          draft.resolveConflict('local')
+          languageDraft.resolveConflict('local')
+        }}>Keep my changes</Button>
+        <Button type="button" onClick={() => {
+          draft.resolveConflict('server')
+          languageDraft.resolveConflict('server')
+        }}>Use server values</Button>
+      </div>}
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>{isSuperAdmin ? 'Cancel' : 'Close'}</Button>
         {isSuperAdmin && (
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || draft.status === 'conflict' || draft.status === 'unavailable' || languageDraft.status === 'conflict'}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
         )}

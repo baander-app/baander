@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { genreAdminApi } from '../api/genre-admin-api'
 
 const GENRES_KEY = ['admin-genres']
@@ -6,43 +7,47 @@ const GENRES_KEY = ['admin-genres']
 export function useGenres(flat = true) {
   return useQuery({
     queryKey: [...GENRES_KEY, { flat }],
-    queryFn: () => genreAdminApi.list(flat),
+    queryFn: ({ signal }) => genreAdminApi.list(flat, signal),
   })
 }
 
 export function useCreateGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
-    mutationFn: genreAdminApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    mutationFn: (variables: Parameters<typeof genreAdminApi.create>[0]) => run(() => genreAdminApi.create(variables)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useUpdateGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
     mutationFn: (params: {
       slug: string
       name?: string
       newSlug?: string
-    }) => {
+    }) => run(() => {
       const { slug, newSlug, ...payload } = params
       return genreAdminApi.update(slug, newSlug ? { ...payload, slug: newSlug } : payload)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    }),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useDeleteGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
-    mutationFn: genreAdminApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    mutationFn: (variables: Parameters<typeof genreAdminApi.delete>[0]) => run(() => genreAdminApi.delete(variables)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useAddAlbumToGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
     mutationFn: ({
       slug,
@@ -50,13 +55,14 @@ export function useAddAlbumToGenre() {
     }: {
       slug: string
       albumId: string
-    }) => genreAdminApi.addAlbum(slug, albumId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    }) => run(() => genreAdminApi.addAlbum(slug, albumId)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useRemoveAlbumFromGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
     mutationFn: ({
       slug,
@@ -64,13 +70,14 @@ export function useRemoveAlbumFromGenre() {
     }: {
       slug: string
       albumId: string
-    }) => genreAdminApi.removeAlbum(slug, albumId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    }) => run(() => genreAdminApi.removeAlbum(slug, albumId)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useAddSongToGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
     mutationFn: ({
       slug,
@@ -78,13 +85,14 @@ export function useAddSongToGenre() {
     }: {
       slug: string
       songId: string
-    }) => genreAdminApi.addSong(slug, songId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    }) => run(() => genreAdminApi.addSong(slug, songId)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }
 
 export function useRemoveSongFromGenre() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'catalog'])
+
   return useMutation({
     mutationFn: ({
       slug,
@@ -92,7 +100,7 @@ export function useRemoveSongFromGenre() {
     }: {
       slug: string
       songId: string
-    }) => genreAdminApi.removeSong(slug, songId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: GENRES_KEY }),
+    }) => run(() => genreAdminApi.removeSong(slug, songId)),
+    onSuccess: () => invalidate(GENRES_KEY),
   })
 }

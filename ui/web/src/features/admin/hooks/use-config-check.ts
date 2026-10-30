@@ -4,7 +4,7 @@ import { getConfigCheck } from '../api/config-check-api'
 export function useConfigCheck() {
   const query = useQuery({
     queryKey: ['config-check'],
-    queryFn: getConfigCheck,
+    queryFn: ({ signal }) => getConfigCheck(signal),
     retry: false,
   })
 

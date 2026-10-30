@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
@@ -225,9 +226,9 @@ export function RateLimitersPage() {
           <ButtonRow>
             <ConfirmDanger
               onClick={() => {
-                clearMutation.mutate(undefined, {
+                clearMutation.mutate(undefined, guardMutationCallbacks({
                   onSuccess: () => setShowClearConfirm(false),
-                })
+                }))
               }}
               disabled={clearMutation.isPending}
             >

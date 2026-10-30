@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   getJobList,
   getJobDetail,
@@ -17,8 +18,8 @@ import type { JobFilters } from '../api/job-monitor-api'
 export function useJobList(filters: JobFilters) {
   return useQuery({
     queryKey: ['job-list', filters],
-    queryFn: () => getJobList(filters),
-    refetchInterval: (query) => (query.state.data ? 15_000 : false),
+    queryFn: ({ signal }) => getJobList(filters, signal),
+
     retry: false,
   })
 }
@@ -26,31 +27,33 @@ export function useJobList(filters: JobFilters) {
 export function useJobDetail(jobId: string | null) {
   return useQuery({
     queryKey: ['job-detail', jobId],
-    queryFn: () => getJobDetail(jobId!),
+    queryFn: ({ signal }) => getJobDetail(jobId!, signal),
     enabled: !!jobId,
   })
 }
 
 export function useRetryJob() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-jobs'])
+
   return useMutation({
-    mutationFn: retryJob,
+    mutationFn: (variables: Parameters<typeof retryJob>[0]) => run(() => retryJob(variables)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-list'] })
-      queryClient.invalidateQueries({ queryKey: ['status-overview'] })
+      invalidate(['job-list'])
+      invalidate(['status-overview'])
     },
   })
 }
 
 export function useCancelJob() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-jobs'])
+
   return useMutation({
-    mutationFn: cancelJob,
+    mutationFn: (variables: Parameters<typeof cancelJob>[0]) => run(() => cancelJob(variables)),
     onSuccess: (_result, jobId) => {
       // A finished job becomes cancelled at once and is no longer cancellable.
-      queryClient.invalidateQueries({ queryKey: ['job-detail', jobId] })
-      queryClient.invalidateQueries({ queryKey: ['job-list'] })
-      queryClient.invalidateQueries({ queryKey: ['status-overview'] })
+      invalidate(['job-detail', jobId])
+      invalidate(['job-list'])
+      invalidate(['status-overview'])
     },
   })
 }
@@ -58,8 +61,7 @@ export function useCancelJob() {
 export function useStatusOverview() {
   return useQuery({
     queryKey: ['status-overview'],
-    queryFn: getStatusOverview,
-    refetchInterval: (query) => (query.state.data ? 15_000 : false),
+    queryFn: ({ signal }) => getStatusOverview(signal),
     retry: false,
   })
 }
@@ -67,8 +69,8 @@ export function useStatusOverview() {
 export function useAnalyticsSummary(from: string, to: string) {
   return useQuery({
     queryKey: ['analytics-summary', from, to],
-    queryFn: () => getAnalyticsSummary(from, to),
-    refetchInterval: (query) => (query.state.data ? 30_000 : false),
+    queryFn: ({ signal }) => getAnalyticsSummary(from, to, signal),
+
     retry: false,
   })
 }
@@ -76,8 +78,8 @@ export function useAnalyticsSummary(from: string, to: string) {
 export function useAnalyticsTiming(from: string, to: string) {
   return useQuery({
     queryKey: ['analytics-timing', from, to],
-    queryFn: () => getAnalyticsTiming(from, to),
-    refetchInterval: (query) => (query.state.data ? 30_000 : false),
+    queryFn: ({ signal }) => getAnalyticsTiming(from, to, signal),
+
     retry: false,
   })
 }
@@ -85,8 +87,8 @@ export function useAnalyticsTiming(from: string, to: string) {
 export function useAnalyticsFailures(from: string, to: string, limit = 50) {
   return useQuery({
     queryKey: ['analytics-failures', from, to, limit],
-    queryFn: () => getAnalyticsFailures(from, to, limit),
-    refetchInterval: (query) => (query.state.data ? 30_000 : false),
+    queryFn: ({ signal }) => getAnalyticsFailures(from, to, limit, signal),
+
     retry: false,
   })
 }
@@ -94,29 +96,31 @@ export function useAnalyticsFailures(from: string, to: string, limit = 50) {
 export function useTransportStatus() {
   return useQuery({
     queryKey: ['transport-status'],
-    queryFn: getTransportStatus,
-    refetchInterval: (query) => (query.state.data ? 15_000 : false),
+    queryFn: ({ signal }) => getTransportStatus(signal),
+
     retry: false,
   })
 }
 
 export function useFlushFailedQueue() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-jobs'])
+
   return useMutation({
-    mutationFn: flushFailedQueue,
+    mutationFn: () => run(() => flushFailedQueue()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transport-status'] })
+      invalidate(['transport-status'])
     },
   })
 }
 
 export function useRetryFailedMessage() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-jobs'])
+
   return useMutation({
-    mutationFn: retryFailedMessage,
+    mutationFn: (variables: Parameters<typeof retryFailedMessage>[0]) => run(() => retryFailedMessage(variables)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transport-status'] })
-      queryClient.invalidateQueries({ queryKey: ['job-list'] })
+      invalidate(['transport-status'])
+      invalidate(['job-list'])
     },
   })
 }

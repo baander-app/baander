@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { isAxiosError } from 'axios'
+import { useLibrary } from '../hooks/use-library'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import styled from 'styled-components'
@@ -140,6 +143,9 @@ export function LibrariesPage() {
   const [editTarget, setEditTarget] = useState<Library | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Library | null>(null)
   const [scanTarget, setScanTarget] = useState<Library | null>(null)
+  const editDetail = useLibrary(editTarget?.publicId ?? '')
+  const editUnavailable = isAxiosError(editDetail.error)
+    && [403, 404].includes(editDetail.error.response?.status ?? 0)
 
   // Start/stop polling based on whether any scan is active
   useEffect(() => {
@@ -244,22 +250,21 @@ export function LibrariesPage() {
       />
 
       <EditLibraryDialog
-        library={editTarget}
+        library={editTarget ? editDetail.data ?? libraries?.find(library => library.publicId === editTarget.publicId) ?? editTarget : null}
+        unavailable={editUnavailable}
+        unauthorized={isAxiosError(editDetail.error) && editDetail.error.response?.status === 403}
         onClose={() => setEditTarget(null)}
-        onSubmit={(data) => {
+        onSubmit={async (data) => {
           if (!editTarget) return
-          updateMutation.mutate(
-            { id: editTarget.publicId, payload: data },
-            {
-              onSuccess: () => {
-                setEditTarget(null)
-                toast.success('Library updated')
-              },
-              onError: () => {
-                toast.error('Failed to update library')
-              },
-            },
-          )
+          const owner = captureOwnership()
+          try {
+            await updateMutation.mutateAsync({ id: editTarget.publicId, payload: data })
+            if (!isCurrentOwnership(owner)) return
+            toast.success('Library updated')
+          } catch (error) {
+            if (isCurrentOwnership(owner)) toast.error('Failed to update library')
+            throw error
+          }
         }}
         isPending={updateMutation.isPending}
       />

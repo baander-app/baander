@@ -243,7 +243,7 @@ describe('ServerDiagnosticsPage', () => {
     expect(await within(spans).findByText('GET api_albums_index')).toBeInTheDocument()
     expect(within(spans).getByText('200')).toBeInTheDocument()
     expect(within(spans).getByText('12.3 ms')).toBeInTheDocument()
-    expect(mockSpans).toHaveBeenCalledWith(30)
+    expect(mockSpans).toHaveBeenCalledWith(30, expect.any(AbortSignal))
 
     await userEvent.click(within(spans).getByRole('button', { name: 'Clear' }))
     expect(mockClearSpans).toHaveBeenCalledTimes(1)

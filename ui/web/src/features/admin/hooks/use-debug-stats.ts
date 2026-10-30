@@ -1,11 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { getCoroutineStats, getWorkerStats, getSpans, clearSpans } from '../api/debug-api'
 
 export function useCoroutineStats() {
   return useQuery({
     queryKey: ['debug', 'coroutines'],
-    queryFn: getCoroutineStats,
-    refetchInterval: 5_000,
+    queryFn: ({ signal }) => getCoroutineStats(signal),
+
     retry: false,
   })
 }
@@ -13,8 +14,8 @@ export function useCoroutineStats() {
 export function useWorkerStats() {
   return useQuery({
     queryKey: ['debug', 'workers'],
-    queryFn: getWorkerStats,
-    refetchInterval: 5_000,
+    queryFn: ({ signal }) => getWorkerStats(signal),
+
     retry: false,
   })
 }
@@ -22,16 +23,17 @@ export function useWorkerStats() {
 export function useSpans(limit = 50) {
   return useQuery({
     queryKey: ['debug', 'spans', limit],
-    queryFn: () => getSpans(limit),
-    refetchInterval: 10_000,
+    queryFn: ({ signal }) => getSpans(limit, signal),
+
     retry: false,
   })
 }
 
 export function useClearSpans() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-runtime'])
+
   return useMutation({
-    mutationFn: clearSpans,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['debug', 'spans'] }),
+    mutationFn: () => run(() => clearSpans()),
+    onSuccess: () => invalidate(['debug', 'spans']),
   })
 }

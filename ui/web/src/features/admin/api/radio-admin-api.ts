@@ -31,10 +31,10 @@ export interface RadioSource {
 }
 
 export const radioAdminApi = {
-  getStations: (params?: { country?: string; q?: string }) =>
-    AXIOS_INSTANCE.get<{ data: RadioStation[] }>('/api/radio/stations', { params }),
-  getCountries: () =>
-    AXIOS_INSTANCE.get<{ data: { code: string; name: string }[] }>('/api/radio/countries'),
-  getSources: () =>
-    AXIOS_INSTANCE.get<{ data: RadioSource[] }>('/api/radio/sources'),
+  getStations: (params?: { country?: string; q?: string }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RadioStation[] }>('/api/radio/stations', { signal, params }),
+  getCountries: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: { code: string; name: string }[] }>('/api/radio/countries', { signal }),
+  getSources: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RadioSource[] }>('/api/radio/sources', { signal }),
 }

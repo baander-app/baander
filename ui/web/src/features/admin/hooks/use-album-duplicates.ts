@@ -6,7 +6,7 @@ const DUPLICATES_KEY = ['admin-album-duplicates']
 export function useAlbumDuplicates(libraryId: string | null) {
   return useQuery({
     queryKey: [...DUPLICATES_KEY, libraryId],
-    queryFn: () => albumDuplicatesApi.getDuplicates(libraryId!),
+    queryFn: ({ signal }) => albumDuplicatesApi.getDuplicates(libraryId!, signal),
     enabled: libraryId !== null,
     staleTime: 60_000,
     retry: false,

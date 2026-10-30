@@ -26,12 +26,12 @@ export interface Engagement {
 }
 
 export const activityAdminApi = {
-  getSummary: (params?: { from?: string; to?: string }) =>
-    AXIOS_INSTANCE.get<{ data: ActivitySummary }>('/api/admin/activity/summary', { params }),
-  getTopTracks: (params?: { from?: string; to?: string; limit?: number }) =>
-    AXIOS_INSTANCE.get<{ data: TopTrack[] }>('/api/admin/activity/top-tracks', { params }),
-  getTopArtists: (params?: { from?: string; to?: string; limit?: number }) =>
-    AXIOS_INSTANCE.get<{ data: TopArtist[] }>('/api/admin/activity/top-artists', { params }),
-  getEngagement: (params?: { from?: string; to?: string }) =>
-    AXIOS_INSTANCE.get<{ data: Engagement }>('/api/admin/activity/engagement', { params }),
+  getSummary: (params?: { from?: string; to?: string }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: ActivitySummary }>('/api/admin/activity/summary', { signal, params }),
+  getTopTracks: (params?: { from?: string; to?: string; limit?: number }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: TopTrack[] }>('/api/admin/activity/top-tracks', { signal, params }),
+  getTopArtists: (params?: { from?: string; to?: string; limit?: number }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: TopArtist[] }>('/api/admin/activity/top-artists', { signal, params }),
+  getEngagement: (params?: { from?: string; to?: string }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: Engagement }>('/api/admin/activity/engagement', { signal, params }),
 }

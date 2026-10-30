@@ -185,7 +185,7 @@ export function AdminUsersPage() {
   if (total !== undefined && offset > 0 && offset >= total) {
     setOffset(Math.max(0, Math.floor((total - 1) / limit) * limit))
   }
-  const activeUser = activeDialog?.user ?? null
+  const activeUser = activeDialog ? users.find(user => user.publicId === activeDialog.user.publicId) ?? activeDialog.user : null
 
   return (
     <Container>

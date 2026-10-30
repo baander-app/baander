@@ -1,4 +1,6 @@
-import { useId, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent } from 'react'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { parseFieldViolations } from '@/features/auth/lib/parse-api-error'
 import { Badge } from '@/shared/components/ui/badge'
@@ -75,12 +77,13 @@ interface SystemSettingRowProps {
 
 interface ControlProps {
   definition: SettingDefinitionResource
+  snapshot: SystemSettingResource | undefined
   value: SystemSettingValue | null
   labelId: string
   describedBy: string
   invalid: boolean
   disabled: boolean
-  onSave: (value: SystemSettingValue) => void
+  onSave: (value: SystemSettingValue) => Promise<unknown>
 }
 
 /** One server-wide setting: its control, reset action and save errors. */
@@ -92,10 +95,12 @@ export function SystemSettingRow({ definition, setting, canEdit }: SystemSetting
   const reset = useResetSystemSetting()
   const { key } = definition
 
-  // While a save is pending or after it failed, show what the admin chose.
   const attempted = update.variables?.data.settings[key]
-  const showAttempted = (update.isPending || update.isError) && isSettingValue(attempted)
-  const value = showAttempted ? attempted : (setting?.value ?? definition.default)
+  const showAttempted = (update.isPending || update.isError) && (definition.type === 'boolean' || definition.type === 'enum')
+  const supportedAttempt = typeof attempted === 'boolean'
+    || typeof attempted === 'number'
+    || typeof attempted === 'string'
+  const value = showAttempted && supportedAttempt ? attempted : setting?.value ?? definition.default
 
   const violations = parseFieldViolations(update.error, key)
   const errors = [...violations]
@@ -110,7 +115,7 @@ export function SystemSettingRow({ definition, setting, canEdit }: SystemSetting
 
   const save = (next: SystemSettingValue) => {
     reset.reset()
-    update.mutate({ data: { settings: { [key]: next } } })
+    return update.mutateAsync({ data: { settings: { [key]: next } } })
   }
 
   const resetToDefault = () => {
@@ -120,11 +125,12 @@ export function SystemSettingRow({ definition, setting, canEdit }: SystemSetting
 
   const controlProps: ControlProps = {
     definition,
+    snapshot: setting,
     value,
     labelId,
     describedBy: errors.length > 0 ? `${descriptionId} ${errorId}` : descriptionId,
     invalid: violations.length > 0,
-    disabled: !canEdit || busy,
+    disabled: !canEdit,
     onSave: save,
   }
 
@@ -179,7 +185,7 @@ function BooleanControl({ value, labelId, describedBy, invalid, disabled, onSave
   return (
     <Switch
       checked={value === true}
-      onCheckedChange={onSave}
+      onCheckedChange={(next) => { onSave(next).catch(() => {}) }}
       disabled={disabled}
       aria-labelledby={labelId}
       aria-describedby={describedBy}
@@ -192,7 +198,7 @@ function EnumControl({ definition, value, labelId, describedBy, invalid, disable
   const choose = (chosen: string) => {
     const option = definition.options.find((candidate) => String(candidate.value) === chosen)
     if (option) {
-      onSave(option.value)
+      onSave(option.value).catch(() => {})
     }
   }
 
@@ -217,6 +223,7 @@ function EnumControl({ definition, value, labelId, describedBy, invalid, disable
 /** Integer and string settings save when the field is left or Enter is pressed. */
 function TextControl({
   definition,
+  snapshot,
   value,
   labelId,
   describedBy,
@@ -225,18 +232,39 @@ function TextControl({
   onSave,
   numeric,
 }: ControlProps & { numeric: boolean }) {
-  const [draft, setDraft] = useState<string | null>(null)
-  const shown = draft ?? (value === null ? '' : String(value))
+  const serverText = value === null ? '' : String(value)
+  const draft = useDraft({ identity: definition.key, initialData: { text: serverText } })
+  const { receive, revokeAccess, pending } = draft
+  const lastSnapshot = useRef(snapshot)
+  const revokedSnapshot = useRef<SystemSettingResource | undefined>(undefined)
+  useEffect(() => subscribeOwnership(() => {
+    revokedSnapshot.current = lastSnapshot.current
+    revokeAccess()
+  }), [revokeAccess])
+  useEffect(() => {
+    lastSnapshot.current = snapshot
+    if (!pending && snapshot !== revokedSnapshot.current) receive({ text: serverText })
+  }, [receive, serverText, snapshot, pending])
+  const wasDisabled = useRef(disabled)
+  useEffect(() => {
+    if (!wasDisabled.current && disabled) {
+      revokedSnapshot.current = lastSnapshot.current
+      revokeAccess()
+    }
+    wasDisabled.current = disabled
+  }, [disabled, revokeAccess])
 
-  const commit = () => {
-    if (draft === null) {
-      return
+  const commit = async () => {
+    if (disabled) return
+    const submission = draft.beginSave()
+    if (!submission) return
+    const stamp = captureOwnership()
+    try {
+      await onSave(numeric ? toInteger(submission.values.text) : submission.values.text)
+      if (isCurrentOwnership(stamp)) draft.completeSave(submission)
+    } catch {
+      if (isCurrentOwnership(stamp)) draft.failSave(submission)
     }
-    setDraft(null)
-    if (draft === (value === null ? '' : String(value))) {
-      return
-    }
-    onSave(numeric ? toInteger(draft) : draft)
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -247,19 +275,26 @@ function TextControl({
 
   return (
     <InputSlot>
+      {draft.status === 'conflict' && (
+        <div role="alert">
+          Changed on the server.
+          <Button size="sm" onClick={() => draft.resolveConflict('local')}>Keep my text</Button>
+          <Button size="sm" onClick={() => draft.resolveConflict('server')}>Use server value</Button>
+        </div>
+      )}
       <Input
         type={numeric ? 'number' : 'text'}
         inputMode={numeric ? 'numeric' : undefined}
         min={definition.min ?? undefined}
         max={definition.max ?? undefined}
         step={numeric ? 1 : undefined}
-        value={shown}
+        value={draft.values.text ?? ''}
         disabled={disabled}
         aria-labelledby={labelId}
         aria-describedby={describedBy}
         aria-invalid={invalid}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
+        onChange={(event) => draft.updateField('text', event.target.value)}
+        onBlur={() => { commit() }}
         onKeyDown={onKeyDown}
       />
     </InputSlot>
@@ -274,9 +309,6 @@ function toInteger(text: string): SystemSettingValue {
   return trimmed !== '' && Number.isInteger(parsed) ? parsed : text
 }
 
-function isSettingValue(value: unknown): value is SystemSettingValue {
-  return typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string'
-}
 
 interface ErrorBody {
   error?: {

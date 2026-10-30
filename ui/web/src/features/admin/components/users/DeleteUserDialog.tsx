@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useDeleteUser } from '../../hooks/use-users'
@@ -35,7 +36,7 @@ export function DeleteUserDialog({ user, open, onOpenChange }: { user: AdminUser
           <Button
             variant="destructive"
             disabled={deleteUser.isPending}
-            onClick={() => deleteUser.mutate(user.publicId, { onSuccess: () => onOpenChange(false) })}
+            onClick={() => deleteUser.mutate(user.publicId, guardMutationCallbacks({ onSuccess: () => onOpenChange(false) }))}
           >
             {deleteUser.isPending ? 'Deleting...' : 'Delete'}
           </Button>

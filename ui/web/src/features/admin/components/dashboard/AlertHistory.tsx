@@ -36,9 +36,8 @@ const RowTime = styled.div`
 export function AlertHistory() {
   const { data: alerts } = useQuery({
     queryKey: ['admin-alerts'],
-    queryFn: () =>
-      notificationApi.list({ category: 'admin_operations', limit: 10 }).then((page) => page.data),
-    refetchInterval: 30_000,
+    queryFn: ({ signal }) =>
+      notificationApi.list({ category: 'admin_operations', limit: 10 }, signal).then((page) => page.data),
     retry: false,
   })
 

@@ -212,6 +212,34 @@ StrictMode checks distinguish a canceled initial read from the successful read,
 and the mutation executes once. The playlist dialog's six tests pass with the
 required query provider added to its fixture; their behavior assertions remain.
 
+U8 implementation checkpoint, 2026-10-30: administrative readers now share
+mutation holds, cancellation and freshness scheduling. Persisted job, user,
+library-access, scheduler, media and settings changes refresh their declared
+families. Runtime gauges use the coordinator's visible sampling policy. Provider
+credentials come from deployment configuration; configuration checks sample
+mutable key-file state. Admin editors preserve drafts and newer pending edits,
+and access loss clears protected snapshots and one-time OAuth secrets.
+
+Focused admin verification passes 114 distinct tests across sixteen files,
+including rendered draft, role-loss, sampling and demand-driven checks. These
+results were collected in focused groups. Library editing, user editing and
+role editing each have a recorded failing regression followed by a passing fix.
+The final inventory audit passes all 76 coverage and descriptor tests. It caught
+and corrected two missing admin consumer entries and two obsolete family
+expectations. Existing playlist and radio fixtures were also updated to exercise
+the shared query lifecycle while preserving their behavior assertions.
+
+The integrated frontend suite passes 2,850 tests across 229 files in
+`/tmp/live-adoption-frontend-stable.log`. Both TypeScript projects and the
+production frontend build pass in `/tmp/live-adoption-build-final.log`.
+Full ESLint reports zero errors and eight existing warnings in
+`/tmp/live-adoption-lint-stable.log`. Prose and whitespace audits pass; additions
+record the delivered behavior and checks without changing earlier checkpoints.
+The application now enables the shared freshness coordinator. U9 remains open
+for real-browser and capacity qualification. Its asset audit also identified
+stable cover URLs and retained palettes that need live refresh and access-reset
+handling; those corrections remain required before completion.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

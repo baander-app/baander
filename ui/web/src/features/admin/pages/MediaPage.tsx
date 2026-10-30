@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { useMediaStorageStats, useCheckMissingImages, usePruneMissingImages } from '../hooks/use-media-admin'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
@@ -162,11 +163,11 @@ export function MediaPage() {
 
   const handlePrune = () => {
     setConfirmPrune(false)
-    pruneMissing.mutate(undefined, {
+    pruneMissing.mutate(undefined, guardMutationCallbacks({
       onSuccess: () => {
         setShowMissing(false)
       },
-    })
+    }))
   }
 
   if (isLoading) {

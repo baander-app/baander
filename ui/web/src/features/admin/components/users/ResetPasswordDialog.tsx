@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
 import { type AdminUser } from '../../api/user-admin-api'
@@ -55,13 +56,13 @@ export function ResetPasswordDialog({ user, open, onOpenChange }: { user: AdminU
     e.preventDefault()
     resetPassword.mutate(
       { id: user.publicId, password },
-      {
+      guardMutationCallbacks({
         onSuccess: () => {
           setPassword('')
           setConfirm('')
           onOpenChange(false)
         },
-      },
+      }),
     )
   }
 

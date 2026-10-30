@@ -62,13 +62,13 @@ export interface UpdateScheduledJobPayload {
 }
 
 export const schedulerAdminApi = {
-  list: async (): Promise<ScheduledJob[]> => {
-    const { data } = await AXIOS_INSTANCE.get('/api/admin/scheduler/jobs')
+  list: async (signal?: AbortSignal): Promise<ScheduledJob[]> => {
+    const { data } = await AXIOS_INSTANCE.get('/api/admin/scheduler/jobs', { signal })
     return data.data
   },
 
-  show: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.get(`/api/admin/scheduler/jobs/${id}`)
+  show: async (id: string, signal?: AbortSignal): Promise<ScheduledJob> => {
+    const { data } = await AXIOS_INSTANCE.get(`/api/admin/scheduler/jobs/${id}`, { signal })
     return data.data
   },
 
@@ -114,8 +114,8 @@ export const schedulerAdminApi = {
     return data.data
   },
 
-  commands: async (): Promise<SchedulableCommands> => {
-    const { data } = await AXIOS_INSTANCE.get('/api/admin/scheduler/jobs/commands')
+  commands: async (signal?: AbortSignal): Promise<SchedulableCommands> => {
+    const { data } = await AXIOS_INSTANCE.get('/api/admin/scheduler/jobs/commands', { signal })
     return data.data
   },
 }

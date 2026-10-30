@@ -7,6 +7,7 @@ import {
   type GetAdminUserSettingsIndex200,
   type SetAdminUserSettingRequest,
 } from '@/shared/api-client/gen/endpoints'
+import { useAdminMutationTools } from './use-admin-mutation'
 import { userAdminApi, type AdminUserListParams } from '../api/user-admin-api'
 
 const USERS_KEY = ['admin-users']
@@ -19,57 +20,58 @@ export function useUsers(params?: AdminUserListParams) {
 }
 
 export function useCreateUser() {
-  const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: userAdminApi.create,
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+    mutationFn: (payload: Parameters<typeof userAdminApi.create>[0]) => live.run(() => userAdminApi.create(payload)),
+    onSuccess: () => live.invalidate(USERS_KEY),
   })
 }
 
 export function useUpdateUser() {
-  const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
     mutationFn: ({ id, ...payload }: { id: string; email?: string; name?: string }) =>
-      userAdminApi.update(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+      live.run(() => userAdminApi.update(id, payload)),
+    onSuccess: () => live.invalidate(USERS_KEY),
   })
 }
 
 export function useDeleteUser() {
-  const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: userAdminApi.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+    mutationFn: (id: string) => live.run(() => userAdminApi.delete(id)),
+    onSuccess: () => live.invalidate(USERS_KEY),
   })
 }
 
 export function useAssignRoles() {
-  const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
     mutationFn: ({ id, roles }: { id: string; roles: string[] }) =>
-      userAdminApi.assignRoles(id, roles),
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+      live.run(() => userAdminApi.assignRoles(id, roles)),
+    onSuccess: () => live.invalidate(USERS_KEY),
   })
 }
 
 export function useResetPassword() {
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
     mutationFn: ({ id, password }: { id: string; password: string }) =>
-      userAdminApi.resetPassword(id, password),
+      live.run(() => userAdminApi.resetPassword(id, password)),
   })
 }
 
 export function useToggleUser() {
-  const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: async ({ id, disabled }: { id: string; disabled: boolean }) => {
+    mutationFn: ({ id, disabled }: { id: string; disabled: boolean }) => live.run(async () => {
       if (disabled) {
         await userAdminApi.enable(id)
       } else {
         await userAdminApi.disable(id)
       }
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+    }),
+    onSuccess: () => live.invalidate(USERS_KEY),
   })
 }
 
@@ -90,11 +92,12 @@ export type UserSettingChange =
 /** Sets or resets one of a user's settings and stores the setting the server answers with. */
 export function useChangeUserSetting() {
   const qc = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
     mutationFn: (change: UserSettingChange) =>
-      change.action === 'set'
+      live.run(() => change.action === 'set'
         ? putAdminUserSettingsSet(change.id, change.key, { value: change.value })
-        : deleteAdminUserSettingsReset(change.id, change.key),
+        : deleteAdminUserSettingsReset(change.id, change.key)),
     onSuccess: (response, change) => {
       const setting = response.data
       const queryKey = getGetAdminUserSettingsIndexQueryKey(change.id)
@@ -105,7 +108,7 @@ export function useChangeUserSetting() {
         })
       }
 
-      return qc.invalidateQueries({ queryKey })
+      return live.invalidate(queryKey)
     },
   })
 }

@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { guardMutationCallbacks, subscribeOwnership } from '@/shared/live/ownership'
+import { useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useAssignRoles } from '../../hooks/use-users'
@@ -52,34 +55,68 @@ const HintText = styled.span`
 `
 
 export function AssignRolesDialog({ user, open, onOpenChange }: { user: AdminUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [roles, setRoles] = useState<string[]>([])
+  const { isSuperAdmin } = useAdminCheck()
+  const draft = useDraft({ identity: user?.publicId ?? '', initialData: { roles: user?.roles ?? [] } })
+  const { receive, pending } = draft
+  const latestRoles = useRef(draft.values.roles)
+  useEffect(() => {
+    latestRoles.current = draft.values.roles
+  }, [draft.values.roles])
+  const lastUser = useRef(user)
+  const revokedUser = useRef<AdminUser | null>(null)
+  const { revokeAccess } = draft
+  useEffect(() => subscribeOwnership(() => {
+    revokedUser.current = lastUser.current
+    revokeAccess()
+  }), [revokeAccess])
+  useEffect(() => {
+    lastUser.current = user
+    if (!isSuperAdmin) {
+      revokedUser.current = user
+      revokeAccess()
+    } else if (user && revokedUser.current !== user) {
+      const confirmsPending = pending && user.roles.length === pending.values.roles.length
+        && user.roles.every(role => pending.values.roles.includes(role))
+      if (!confirmsPending) receive({ roles: user.roles })
+    }
+  }, [receive, revokeAccess, user, isSuperAdmin, pending])
+  const roles = draft.values.roles ?? []
   const assignRoles = useAssignRoles()
 
   const handleOpen = (val: boolean) => {
-    if (val && user) {
-      setRoles([...user.roles])
-    }
     onOpenChange(val)
   }
 
   if (!user) return null
 
   const toggleRole = (role: string) => {
-    setRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    )
+    draft.updateField('roles', roles.includes(role) ? roles.filter(r => r !== role) : [...roles, role])
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isSuperAdmin || !draft.canSave) return
     const finalRoles = roles.includes('ROLE_SUPER_ADMIN')
       ? ALL_ROLES
       : roles.includes('ROLE_ADMIN')
         ? ['ROLE_USER', 'ROLE_ADMIN'].filter((r) => roles.includes(r))
         : ['ROLE_USER']
+    draft.updateField('roles', finalRoles)
+    const submission = draft.beginSave()
+    if (!submission) return
     assignRoles.mutate(
       { id: user.publicId, roles: finalRoles },
-      { onSuccess: () => onOpenChange(false) },
+      guardMutationCallbacks({
+        onSuccess: () => {
+          draft.completeSave(submission)
+          const latest = latestRoles.current
+          if (latest && latest.length === submission.values.roles.length
+            && latest.every(role => submission.values.roles.includes(role))) {
+            onOpenChange(false)
+          }
+        },
+        onError: () => draft.failSave(submission),
+      }),
     )
   }
 
@@ -100,7 +137,7 @@ export function AssignRolesDialog({ user, open, onOpenChange }: { user: AdminUse
                     type="checkbox"
                     checked={roles.includes(role)}
                     onChange={() => toggleRole(role)}
-                    disabled={isUser}
+                    disabled={isUser || !isSuperAdmin || draft.status === 'unavailable'}
                     style={{ borderRadius: '0.25rem', borderColor: 'var(--color-border)' }}
                   />
                   <RoleName>{role.replace('ROLE_', '')}</RoleName>
@@ -114,9 +151,14 @@ export function AssignRolesDialog({ user, open, onOpenChange }: { user: AdminUse
               )
             })}
           </RoleList>
+          {draft.status === 'conflict' && <div role="alert">
+            Roles changed on the server.
+            <Button type="button" onClick={() => draft.resolveConflict('local')}>Keep my changes</Button>
+            <Button type="button" onClick={() => draft.resolveConflict('server')}>Use server roles</Button>
+          </div>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={assignRoles.isPending}>
+            <Button type="submit" disabled={assignRoles.isPending || !draft.canSave}>
               {assignRoles.isPending ? 'Saving...' : 'Save Roles'}
             </Button>
           </DialogFooter>

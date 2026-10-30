@@ -24,12 +24,12 @@ export interface SyncStatus {
 }
 
 export const lyricsAdminApi = {
-  getCoverage: () =>
-    AXIOS_INSTANCE.get<{ data: LyricsCoverage }>('/api/admin/lyrics/coverage').then((r) => r.data.data),
+  getCoverage: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: LyricsCoverage }>('/api/admin/lyrics/coverage', { signal }).then((r) => r.data.data),
 
   triggerBulkFetch: () =>
     AXIOS_INSTANCE.post<{ data: { jobsEnqueued: number } }>('/api/admin/lyrics/bulk-fetch').then((r) => r.data.data),
 
-  getSyncStatus: () =>
-    AXIOS_INSTANCE.get<{ data: SyncStatus }>('/api/admin/lyrics/sync-status').then((r) => r.data.data),
+  getSyncStatus: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: SyncStatus }>('/api/admin/lyrics/sync-status', { signal }).then((r) => r.data.data),
 }

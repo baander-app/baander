@@ -62,7 +62,7 @@ export interface ServerStats {
   redis: RedisStats
 }
 
-export async function getServerStats(): Promise<ServerStats> {
-  const { data } = await AXIOS_INSTANCE.get<{ data: ServerStats }>('/api/debug/stats')
+export async function getServerStats(signal?: AbortSignal): Promise<ServerStats> {
+  const { data } = await AXIOS_INSTANCE.get<{ data: ServerStats }>('/api/debug/stats', { signal })
   return data.data
 }

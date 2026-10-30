@@ -9,8 +9,9 @@ export interface Genre {
 }
 
 export const genreAdminApi = {
-  list: async (flat = true): Promise<Genre[]> => {
+  list: async (flat = true, signal?: AbortSignal): Promise<Genre[]> => {
     const { data } = await AXIOS_INSTANCE.get('/api/genres/', {
+      signal,
       params: { flat },
     })
     return data.data

@@ -23,7 +23,7 @@ export interface ConfigCheckResponse {
   summary: ConfigCheckSummary
 }
 
-export async function getConfigCheck(): Promise<ConfigCheckResponse> {
-  const { data } = await AXIOS_INSTANCE.get('/api/debug/config-check')
+export async function getConfigCheck(signal?: AbortSignal): Promise<ConfigCheckResponse> {
+  const { data } = await AXIOS_INSTANCE.get('/api/debug/config-check', { signal })
   return data.data
 }

@@ -1,12 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { recommendationsAdminApi } from '../api/recommendations-admin-api'
 import type { RecommendationJob } from '../api/recommendations-admin-api'
 
 export function useRecommendationCoverage() {
   return useQuery({
     queryKey: ['admin', 'recommendations', 'coverage'],
-    queryFn: async () => {
-      const { data } = await recommendationsAdminApi.getCoverage()
+    queryFn: async ({ signal }) => {
+      const { data } = await recommendationsAdminApi.getCoverage(signal)
       return data.data
     },
   })
@@ -15,8 +16,8 @@ export function useRecommendationCoverage() {
 export function useSourceQuality() {
   return useQuery({
     queryKey: ['admin', 'recommendations', 'source-quality'],
-    queryFn: async () => {
-      const { data } = await recommendationsAdminApi.getSourceQuality()
+    queryFn: async ({ signal }) => {
+      const { data } = await recommendationsAdminApi.getSourceQuality(signal)
       return data.data
     },
   })
@@ -25,8 +26,8 @@ export function useSourceQuality() {
 export function useRecommendationFreshness() {
   return useQuery({
     queryKey: ['admin', 'recommendations', 'freshness'],
-    queryFn: async () => {
-      const { data } = await recommendationsAdminApi.getFreshness()
+    queryFn: async ({ signal }) => {
+      const { data } = await recommendationsAdminApi.getFreshness(signal)
       return data.data
     },
   })
@@ -35,67 +36,58 @@ export function useRecommendationFreshness() {
 export function useRecommendationJobs(limit = 10) {
   return useQuery<RecommendationJob[]>({
     queryKey: ['admin', 'recommendations', 'jobs', limit],
-    queryFn: async () => {
-      const { data } = await recommendationsAdminApi.listJobs({ limit })
+    queryFn: async ({ signal }) => {
+      const { data } = await recommendationsAdminApi.listJobs({ limit }, signal)
       return data.data
     },
-    refetchInterval: (query) => {
-      // Poll every 2 seconds if there are any active/in_progress jobs
-      const hasActiveJobs = query.state.data?.some(
-        (job) => job.status === 'pending' || job.status === 'in_progress'
-      )
-      return hasActiveJobs ? 2000 : false
-    },
+
   })
 }
 
 export function useRecommendationJob(publicId: string) {
   return useQuery<RecommendationJob>({
     queryKey: ['admin', 'recommendations', 'job', publicId],
-    queryFn: async () => {
-      const { data } = await recommendationsAdminApi.getJob(publicId)
+    queryFn: async ({ signal }) => {
+      const { data } = await recommendationsAdminApi.getJob(publicId, signal)
       return data.data
     },
     enabled: !!publicId,
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return (status === 'pending' || status === 'in_progress') ? 2000 : false
-    },
+
   })
 }
 
 export function useGenerateRecommendations() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'recommendations'])
 
   return useMutation({
     mutationFn: (params: { mode: 'full' | 'incremental' }) =>
-      recommendationsAdminApi.generate(params),
+      run(() => recommendationsAdminApi.generate(params)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'recommendations', 'jobs'] })
+      invalidate(['admin', 'recommendations', 'jobs'])
     },
   })
 }
 
 export function useCancelRecommendationJob() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'recommendations'])
 
   return useMutation({
     mutationFn: (publicId: string) =>
-      recommendationsAdminApi.cancelJob(publicId),
+      run(() => recommendationsAdminApi.cancelJob(publicId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'recommendations', 'jobs'] })
+      invalidate(['admin', 'recommendations', 'jobs'])
     },
   })
 }
 
 export function useRequeueRecommendationJob() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'recommendations'])
 
   return useMutation({
     mutationFn: (publicId: string) =>
-      recommendationsAdminApi.requeueJob(publicId),
+      run(() => recommendationsAdminApi.requeueJob(publicId)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'recommendations', 'jobs'] })
+      invalidate(['admin', 'recommendations', 'jobs'])
     },
   })
 }

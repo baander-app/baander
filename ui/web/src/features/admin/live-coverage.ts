@@ -39,18 +39,22 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-activity-admin.ts#useQuery:['admin','activity','engagement',range]",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-metadata",
     family: "admin-metadata",
     policy: {
       kind: "stored",
-      reason: "Metadata provider configuration, import jobs, lyrics and recommendation projections affect management coverage and lists.",
+      reason: "Import jobs, lyrics and recommendation projections affect management coverage and lists.",
     },
     audiences: ["admin"],
     sourceTables: [
-      "third_party_credentials",
       "lyrics",
       "recommendation_jobs",
       "recommendations",
@@ -67,16 +71,10 @@ export const adminLiveCoverage = [
       "'/api/admin/albums/duplicates'",
       "`/api/albums/${albumPublicId}/duplicates`",
       "'/api/genres/'",
-      "'/api/admin/metadata/providers'",
-      "`/api/admin/recommendations/jobs/${publicId}`",
-      "'/api/admin/recommendations/jobs'",
     ],
     keyVariants: [
       "[...DUPLICATES_KEY,libraryId];DUPLICATES_KEY=['admin-album-duplicates']",
       "[...GENRES_KEY,{flat}];GENRES_KEY=['admin-genres']",
-      "['admin-metadata-providers']",
-      "['admin','recommendations','jobs',limit]",
-      "['admin','recommendations','job',publicId]",
     ],
     dependentFamilies: [],
     mirrors: [],
@@ -85,36 +83,67 @@ export const adminLiveCoverage = [
       "src/features/admin/api/album-duplicates-api.ts#AXIOS_INSTANCE.get:'/api/admin/albums/duplicates'",
       "src/features/admin/api/album-duplicates-api.ts#AXIOS_INSTANCE.get:`/api/albums/${albumPublicId}/duplicates`",
       "src/features/admin/api/genre-admin-api.ts#AXIOS_INSTANCE.get:'/api/genres/'",
-      "src/features/admin/api/metadata-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/metadata/providers'",
-      "src/features/admin/api/recommendations-admin-api.ts#AXIOS_INSTANCE.get:`/api/admin/recommendations/jobs/${publicId}`",
-      "src/features/admin/api/recommendations-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/recommendations/jobs'",
       "src/features/admin/hooks/use-album-duplicates.ts#useQuery:[...DUPLICATES_KEY,libraryId];DUPLICATES_KEY=['admin-album-duplicates']",
       "src/features/admin/hooks/use-genre-admin.ts#useQuery:[...GENRES_KEY,{flat}];GENRES_KEY=['admin-genres']",
-      "src/features/admin/hooks/use-metadata-admin.ts#useQuery:['admin-metadata-providers']",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "src/features/admin/components/media/__tests__/GenreDialog.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
+  },
+  {
+    id: "admin.admin-recommendation-jobs",
+    family: "admin-metadata",
+    policy: {
+      kind: "sampled",
+      intervalMs: 5000,
+      reason: "Stored recommendation job transitions produce hints; active runtime progress is also sampled while visible.",
+    },
+    audiences: ["admin"],
+    sourceTables: ["recommendation_jobs"],
+    deploymentTables: [],
+    sources: ["'/api/admin/recommendations/jobs'", "`/api/admin/recommendations/jobs/${publicId}`"],
+    keyVariants: ["['admin','recommendations','jobs',limit]", "['admin','recommendations','job',publicId]"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ["authoritative-read"],
+    consumers: [
+      "src/features/admin/api/recommendations-admin-api.ts#AXIOS_INSTANCE.get:`/api/admin/recommendations/jobs/${publicId}`",
+      "src/features/admin/api/recommendations-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/recommendations/jobs'",
       "src/features/admin/hooks/use-recommendations-admin.ts#useQuery:['admin','recommendations','jobs',limit]",
       "src/features/admin/hooks/use-recommendations-admin.ts#useQuery:['admin','recommendations','job',publicId]",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.deployment",
     family: "deployment-definitions",
     policy: {
       kind: "deployment",
-      reason: "Definitions, scheduler command metadata and configuration checks are fixed for the server incarnation and reload when it changes.",
+      reason: "Definitions, scheduler command metadata and provider credential presence are fixed for the server incarnation and reload when it changes.",
     },
     audiences: ["admin"],
     sourceTables: [],
     deploymentTables: [],
     sources: [
       "compiled setting definitions; registered console command catalog; deployment configuration",
-      "'/api/debug/config-check'",
+      "'/api/admin/metadata/providers'",
       "'/api/admin/scheduler/jobs/commands'",
       "[ `/api/admin/settings/definitions` ]",
     ],
     keyVariants: [
-      "['config-check']",
+      "['admin-metadata-providers']",
       "COMMANDS_KEY=['admin-scheduler-commands']",
       "[ `/api/admin/settings/definitions` ]",
     ],
@@ -122,14 +151,48 @@ export const adminLiveCoverage = [
     mirrors: [],
     responseCaches: [],
     consumers: [
-      "src/features/admin/api/config-check-api.ts#AXIOS_INSTANCE.get:'/api/debug/config-check'",
+      "src/features/admin/api/metadata-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/metadata/providers'",
       "src/features/admin/api/scheduler-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/scheduler/jobs/commands'",
-      "src/features/admin/hooks/use-config-check.ts#useQuery:['config-check']",
+      "src/features/admin/hooks/use-metadata-admin.ts#useQuery:['admin-metadata-providers']",
       "src/features/admin/hooks/use-scheduler-admin.ts#useQuery:COMMANDS_KEY=['admin-scheduler-commands']",
       "src/features/admin/hooks/use-system-settings.ts#useGetAdminSettingsDefinitions:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+      endToEnd: "pending",
+    },
+  },
+  {
+    id: "admin.admin-configuration",
+    family: "admin-runtime",
+    policy: {
+      kind: "sampled",
+      intervalMs: 30000,
+      reason: "OAuth key-file existence and readability can change within a server incarnation; sample current configuration checks while active and visible.",
+    },
+    audiences: ["admin"],
+    sourceTables: [],
+    deploymentTables: [],
+    sources: ["'/api/debug/config-check'"],
+    keyVariants: ["['config-check']"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: [],
+    consumers: [
+      "src/features/admin/api/config-check-api.ts#AXIOS_INSTANCE.get:'/api/debug/config-check'",
+      "src/features/admin/hooks/use-config-check.ts#useQuery:['config-check']",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-runtime",
@@ -162,7 +225,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-server-stats.ts#useQuery:['server-stats']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-spans",
@@ -185,7 +254,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-debug-stats.ts#useQuery:['debug','spans',limit]",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-jobs-sampled",
@@ -217,7 +292,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-job-monitor.ts#useQuery:['status-overview']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-analytics",
@@ -257,14 +338,20 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-job-monitor.ts#useQuery:['transport-status']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-security",
     family: "admin-security",
     policy: {
       kind: "stored",
-      reason: "Stored login blocks refresh list and expiry-related visibility.",
+      reason: "Persisted honeypot login-block history refreshes after committed writes; the endpoint has no expiry semantics.",
     },
     audiences: ["admin"],
     sourceTables: ["login_blocks"],
@@ -279,7 +366,12 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-login-blocks.ts#useQuery:[...BLOCKS_KEY,params];BLOCKS_KEY=['admin-login-blocks']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-metadata-sampled",
@@ -291,7 +383,6 @@ export const adminLiveCoverage = [
     },
     audiences: ["admin"],
     sourceTables: [
-      "third_party_credentials",
       "lyrics",
       "recommendation_jobs",
       "recommendations",
@@ -335,7 +426,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-recommendations-admin.ts#useQuery:['admin','recommendations','freshness']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-media",
@@ -372,7 +469,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-transcode-admin.ts#useQuery:['admin-transcode-sessions']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-media-demand",
@@ -394,7 +497,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-media-admin.ts#useQuery:['admin-media-missing-check']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-demand.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.radio-global",
@@ -420,7 +529,12 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-radio-admin.ts#useQuery:['admin','radio','sources']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-security-sampled",
@@ -443,7 +557,13 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-rate-limiter.ts#useQuery:['rate-limiters']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-sampling.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-jobs",
@@ -462,7 +582,7 @@ export const adminLiveCoverage = [
     ],
     deploymentTables: [],
     sources: ["'/api/admin/scheduler/jobs'", "`/api/admin/scheduler/jobs/${id}`"],
-    keyVariants: ["['status-overview']", "SCHEDULER_KEY=['admin-scheduler']"],
+    keyVariants: ["['status-overview']", "SCHEDULER_KEY=['admin-scheduler']", "['admin-scheduler',id]"],
     dependentFamilies: [],
     mirrors: [],
     responseCaches: ["authoritative-read"],
@@ -471,9 +591,16 @@ export const adminLiveCoverage = [
       "src/features/admin/api/scheduler-admin-api.ts#AXIOS_INSTANCE.get:`/api/admin/scheduler/jobs/${id}`",
       "src/features/admin/hooks/use-dashboard-summary.ts#useQuery:['status-overview']",
       "src/features/admin/hooks/use-scheduler-admin.ts#useQuery:SCHEDULER_KEY=['admin-scheduler']",
+      "src/features/admin/hooks/use-scheduler-admin.ts#useQuery:['admin-scheduler',id]",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "src/features/admin/components/scheduler/__tests__/EditJobDialog.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-users",
@@ -492,7 +619,7 @@ export const adminLiveCoverage = [
       "[ `/api/admin/users/${publicId}/settings` ]",
     ],
     keyVariants: [
-      "queryKey=libraryAccessKey(userId)",
+      "libraryAccessKey(userId)",
       "[ `/api/admin/oauth/clients` ]",
       "[...USERS_KEY,params];USERS_KEY=['admin-users']",
       "[ `/api/admin/users/${publicId}/settings` ]",
@@ -503,13 +630,22 @@ export const adminLiveCoverage = [
     consumers: [
       "src/features/admin/api/user-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/users'",
       "src/features/admin/api/user-admin-api.ts#AXIOS_INSTANCE.get:`/api/admin/users/${id}/libraries`",
-      "src/features/admin/components/users/LibraryAccessDialog.tsx#useQuery:queryKey=libraryAccessKey(userId)",
+      "src/features/admin/components/users/LibraryAccessDialog.tsx#useQuery:libraryAccessKey(userId)",
       "src/features/admin/hooks/use-oauth-clients.ts#useGetAdminOauthClientsList:generated",
       "src/features/admin/hooks/use-users.ts#useQuery:[...USERS_KEY,params];USERS_KEY=['admin-users']",
       "src/features/admin/hooks/use-users.ts#useGetAdminUserSettingsIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "src/features/admin/components/users/__tests__/EditUserDialog.test.tsx",
+        "src/features/admin/components/users/__tests__/AssignRolesDialog.test.tsx",
+        "src/features/admin/components/users/__tests__/LibraryAccessDialog.test.tsx",
+        "src/features/admin/pages/__tests__/OAuthClientsPage.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-alerts",
@@ -531,7 +667,12 @@ export const adminLiveCoverage = [
       "src/features/admin/hooks/use-admin-notifications.ts#useQuery:['admin-notifications']",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-health-demand",
@@ -550,7 +691,13 @@ export const adminLiveCoverage = [
     responseCaches: [],
     consumers: ["src/features/admin/components/dashboard/QuickActions.tsx#AXIOS_INSTANCE.get:'/health'"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "tests/live-updates/admin-demand.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
   {
     id: "admin.admin-settings",
@@ -572,6 +719,12 @@ export const adminLiveCoverage = [
       "src/features/admin/pages/AdminUsersPage.tsx#useGetAdminSettingsIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/admin-routing.test.ts",
+        "src/features/admin/pages/__tests__/AdminSettingsPage.test.tsx",
+      ],
+      endToEnd: "pending",
+    },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

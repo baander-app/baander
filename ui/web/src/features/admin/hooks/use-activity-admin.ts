@@ -15,8 +15,8 @@ export function useActivitySummary(params?: { from?: string; to?: string }) {
   const range = { ...defaultRange(), ...params }
   return useQuery({
     queryKey: ['admin', 'activity', 'summary', range],
-    queryFn: async () => {
-      const { data } = await activityAdminApi.getSummary(range)
+    queryFn: async ({ signal }) => {
+      const { data } = await activityAdminApi.getSummary(range, signal)
       return data.data
     },
     staleTime: 60_000,
@@ -27,8 +27,8 @@ export function useTopTracks(params?: { from?: string; to?: string; limit?: numb
   const range = { ...defaultRange(), ...params }
   return useQuery({
     queryKey: ['admin', 'activity', 'top-tracks', range],
-    queryFn: async () => {
-      const { data } = await activityAdminApi.getTopTracks(range)
+    queryFn: async ({ signal }) => {
+      const { data } = await activityAdminApi.getTopTracks(range, signal)
       return data.data
     },
     staleTime: 60_000,
@@ -39,8 +39,8 @@ export function useTopArtists(params?: { from?: string; to?: string; limit?: num
   const range = { ...defaultRange(), ...params }
   return useQuery({
     queryKey: ['admin', 'activity', 'top-artists', range],
-    queryFn: async () => {
-      const { data } = await activityAdminApi.getTopArtists(range)
+    queryFn: async ({ signal }) => {
+      const { data } = await activityAdminApi.getTopArtists(range, signal)
       return data.data
     },
     staleTime: 60_000,
@@ -51,8 +51,8 @@ export function useEngagement(params?: { from?: string; to?: string }) {
   const range = { ...defaultRange(), ...params }
   return useQuery({
     queryKey: ['admin', 'activity', 'engagement', range],
-    queryFn: async () => {
-      const { data } = await activityAdminApi.getEngagement(range)
+    queryFn: async ({ signal }) => {
+      const { data } = await activityAdminApi.getEngagement(range, signal)
       return data.data
     },
     staleTime: 60_000,

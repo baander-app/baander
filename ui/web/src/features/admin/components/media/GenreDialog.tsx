@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { guardMutationCallbacks } from '@/shared/live/ownership'
+import { useEffect, useRef, useState } from 'react'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -60,12 +63,33 @@ export function GenreDialog({
   genres: Genre[]
 }) {
   const isEdit = genre !== null && genre !== undefined
-  const [name, setName] = useState(genre?.name ?? '')
-  const [slug, setSlug] = useState(genre?.slug ?? '')
-  const [parentId, setParentId] = useState<string | null>(
-    genre?.parentId ?? null,
-  )
-  const [mbid, setMbid] = useState(genre?.mbid ?? '')
+  const draft = useDraft({ identity: genre?.publicId ?? 'create', initialData: {
+    name: genre?.name ?? '', slug: genre?.slug ?? '', parentId: genre?.parentId ?? null,
+    mbid: genre?.mbid ?? '',
+  } })
+  const { receive, revokeAccess } = draft
+  const { name = '', slug = '', parentId = null, mbid = '' } = draft.values
+  const setName = (value: string) => draft.updateField('name', value)
+  const setSlug = (value: string) => draft.updateField('slug', value)
+  const setParentId = (value: string | null) => draft.updateField('parentId', value)
+  const setMbid = (value: string) => draft.updateField('mbid', value)
+  const current = genre ? genres.find(row => row.publicId === genre.publicId) : undefined
+  const latestSnapshot = useRef(current ?? genre ?? undefined)
+  const revokedSnapshot = useRef<Genre | undefined>(undefined)
+  useEffect(() => {
+    if (!genre || (current && current === revokedSnapshot.current)) return
+    if (current) latestSnapshot.current = current
+    receive(current ? { name: current.name, slug: current.slug, parentId: current.parentId, mbid: current.mbid ?? '' } : null)
+  }, [genre, current, receive])
+  useEffect(() => {
+    const owner = captureOwnership()
+    return subscribeOwnership(() => {
+      if (!isCurrentOwnership(owner)) {
+        revokedSnapshot.current = latestSnapshot.current
+        revokeAccess()
+      }
+    })
+  }, [revokeAccess])
   const [slugEdited, setSlugEdited] = useState(isEdit)
 
   const createGenre = useCreateGenre()
@@ -80,24 +104,23 @@ export function GenreDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const submission = draft.beginSave()
+    if (!submission) return
     const payload = { name, slug, parentId: parentId || null, mbid: mbid || null }
 
     if (isEdit && genre) {
       updateGenre.mutate(
-        { slug: genre.slug, name, newSlug: slug },
-        { onSuccess: () => onOpenChange(false) },
+        { slug: current?.slug ?? genre.slug, name, newSlug: slug },
+        guardMutationCallbacks({
+          onSuccess: () => draft.completeSave(submission),
+          onError: () => draft.failSave(submission),
+        }),
       )
     } else {
-      createGenre.mutate(payload, {
-        onSuccess: () => {
-          setName('')
-          setSlug('')
-          setParentId(null)
-          setMbid('')
-          setSlugEdited(false)
-          onOpenChange(false)
-        },
-      })
+      createGenre.mutate(payload, guardMutationCallbacks({
+        onSuccess: () => { draft.completeSave(submission) },
+        onError: () => { draft.failSave(submission) },
+      }))
     }
   }
 
@@ -108,6 +131,11 @@ export function GenreDialog({
           <DialogTitle>{isEdit ? 'Edit Genre' : 'Create Genre'}</DialogTitle>
         </DialogHeader>
         <Form onSubmit={handleSubmit}>
+          {draft.status === 'conflict' && <div role="alert">This genre changed. Your edits are preserved.
+            <Button type="button" onClick={() => draft.resolveConflict('local')}>Keep my edits</Button>
+            <Button type="button" onClick={() => draft.resolveConflict('server')}>Use server values</Button>
+          </div>}
+          {draft.status === 'unavailable' && <p role="alert">This genre is unavailable. Your edits are preserved.</p>}
           <FieldGroup>
             <Label>Name</Label>
             <Input
@@ -161,7 +189,7 @@ export function GenreDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!name || !slug}>
+            <Button type="submit" disabled={!name || !slug || !draft.canSave}>
               {isEdit ? 'Save' : 'Create'}
             </Button>
           </DialogFooter>

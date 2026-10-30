@@ -1,10 +1,11 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { lyricsAdminApi } from '../api/lyrics-admin-api'
 
 export function useLyricsCoverage() {
   return useQuery({
     queryKey: ['admin', 'lyrics', 'coverage'],
-    queryFn: lyricsAdminApi.getCoverage,
+    queryFn: ({ signal }) => lyricsAdminApi.getCoverage(signal),
     staleTime: 60_000,
   })
 }
@@ -12,18 +13,18 @@ export function useLyricsCoverage() {
 export function useLyricsSyncStatus() {
   return useQuery({
     queryKey: ['admin', 'lyrics', 'sync-status'],
-    queryFn: lyricsAdminApi.getSyncStatus,
+    queryFn: ({ signal }) => lyricsAdminApi.getSyncStatus(signal),
     staleTime: 30_000,
   })
 }
 
 export function useBulkFetchLyrics() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'lyrics'])
 
   return useMutation({
-    mutationFn: lyricsAdminApi.triggerBulkFetch,
+    mutationFn: () => run(() => lyricsAdminApi.triggerBulkFetch()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'lyrics'] })
+      invalidate(['admin', 'lyrics'])
     },
   })
 }

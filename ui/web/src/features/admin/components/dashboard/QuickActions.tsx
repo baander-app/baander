@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { assertCurrentOwnership, captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
+import { useAdminMutationTools } from '../../hooks/use-admin-mutation'
 import styled, { keyframes } from 'styled-components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
@@ -12,22 +14,43 @@ type ActionState = 'idle' | 'loading' | 'success' | 'error'
 interface ActionButtonConfig {
   label: string
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
-  action: () => Promise<unknown>
+  action: (signal: AbortSignal) => Promise<unknown>
 }
 
 function useActionButton(config: ActionButtonConfig) {
   const [state, setState] = useState<ActionState>('idle')
+  const active = useRef<AbortController | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => {
+    active.current?.abort()
+    clearTimeout(timer.current)
+  }, [])
 
   const mutation = useMutation({
-    mutationFn: config.action,
+    mutationFn: async () => {
+      const controller = new AbortController()
+      active.current = controller
+      const owner = captureOwnership()
+      const unsubscribe = subscribeOwnership(() => {
+        if (!isCurrentOwnership(owner)) controller.abort()
+      })
+      try {
+        const result = await config.action(controller.signal)
+        assertCurrentOwnership(owner)
+        return result
+      } finally {
+        unsubscribe()
+        if (active.current === controller) active.current = null
+      }
+    },
     onMutate: () => setState('loading'),
     onSuccess: () => {
       setState('success')
-      setTimeout(() => setState('idle'), 2000)
+      timer.current = setTimeout(() => setState('idle'), 2000)
     },
     onError: () => {
       setState('error')
-      setTimeout(() => setState('idle'), 3000)
+      timer.current = setTimeout(() => setState('idle'), 3000)
     },
   })
 
@@ -104,6 +127,7 @@ function ActionButton({ config }: { config: ActionButtonConfig }) {
 
 export function QuickActions() {
   const queryClient = useQueryClient()
+  const { invalidate } = useAdminMutationTools(['admin-runtime', 'admin-jobs', 'admin-alerts'])
   const bulkFetchLyrics = useBulkFetchLyrics()
   const flushFailedQueue = useFlushFailedQueue()
 
@@ -111,9 +135,11 @@ export function QuickActions() {
     {
       label: 'Run Health Check',
       icon: Stethoscope,
-      action: async () => {
-        const result = await AXIOS_INSTANCE.get('/health')
-        queryClient.invalidateQueries({ queryKey: ['server-stats'] })
+      action: async (signal) => {
+        const owner = captureOwnership()
+        const result = await AXIOS_INSTANCE.get('/health', { signal })
+        assertCurrentOwnership(owner)
+        invalidate(['server-stats'])
         return result
       },
     },
@@ -123,8 +149,10 @@ export function QuickActions() {
       // Use the shared hook so transport-status invalidation stays consistent with
       // the rest of the admin UI; add status-overview refresh on top.
       action: async () => {
+        const owner = captureOwnership()
         const result = await flushFailedQueue.mutateAsync()
-        queryClient.invalidateQueries({ queryKey: ['status-overview'] })
+        assertCurrentOwnership(owner)
+        invalidate(['status-overview'])
         return result
       },
     },

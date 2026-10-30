@@ -1,4 +1,5 @@
-import { type FormEvent, useState } from 'react'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
+import { type FormEvent, useState, useEffect } from 'react'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -79,6 +80,11 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
   const [redirectText, setRedirectText] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const createClient = useCreateOAuthClient()
+  const { reset: resetSecret } = createClient
+  useEffect(() => subscribeOwnership(() => {
+    resetSecret()
+    onOpenChange(false)
+  }), [resetSecret, onOpenChange])
 
   const created = createClient.data
   const secret = created?.clientSecret ?? null
@@ -115,14 +121,17 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
       }
     }
 
+    const stamp = captureOwnership()
     try {
       const result = await createClient.mutateAsync({
         name: name.trim(),
         type,
         ...(needsRedirectUris(type) ? { redirectUris } : {}),
       })
+      if (!isCurrentOwnership(stamp)) return
       if (result.clientSecret === null) close()
     } catch (err: unknown) {
+      if (!isCurrentOwnership(stamp)) return
       setFormError(parseApiError(err, 'Could not create the client.').message)
     }
   }

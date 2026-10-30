@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
 import {
   type AdminCreateOAuthClientRequest,
   getGetAdminOauthClientsListQueryKey,
@@ -20,27 +21,27 @@ export function useOAuthClients() {
  */
 
 export function useCreateOAuthClient() {
-  const queryClient = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: async (payload: AdminCreateOAuthClientRequest) => (await postAdminOauthClientsCreate(payload)).data,
+    mutationFn: async (payload: AdminCreateOAuthClientRequest) => live.run(async () => (await postAdminOauthClientsCreate(payload)).data),
     gcTime: 0,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    onSettled: () => live.invalidate(getGetAdminOauthClientsListQueryKey()),
   })
 }
 
 export function useRotateOAuthClientSecret() {
-  const queryClient = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: async (clientId: string) => (await postAdminOauthClientsRotateSecret(clientId)).data,
+    mutationFn: async (clientId: string) => live.run(async () => (await postAdminOauthClientsRotateSecret(clientId)).data),
     gcTime: 0,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    onSettled: () => live.invalidate(getGetAdminOauthClientsListQueryKey()),
   })
 }
 
 export function useRevokeOAuthClient() {
-  const queryClient = useQueryClient()
+  const live = useAdminMutationTools(['admin-users'])
   return useMutation({
-    mutationFn: async (clientId: string) => (await postAdminOauthClientsRevoke(clientId)).data,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    mutationFn: async (clientId: string) => live.run(async () => (await postAdminOauthClientsRevoke(clientId)).data),
+    onSettled: () => live.invalidate(getGetAdminOauthClientsListQueryKey()),
   })
 }

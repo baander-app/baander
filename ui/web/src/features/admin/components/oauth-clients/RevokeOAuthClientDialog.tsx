@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
@@ -38,10 +39,13 @@ export function RevokeOAuthClientDialog({ client, open, onOpenChange }: RevokeOA
     if (!client) return
 
     setError(null)
+    const stamp = captureOwnership()
     try {
       await revoke.mutateAsync(client.clientId)
+      if (!isCurrentOwnership(stamp)) return
       close()
     } catch (err: unknown) {
+      if (!isCurrentOwnership(stamp)) return
       setError(parseApiError(err, 'Could not revoke the client.').message)
     }
   }

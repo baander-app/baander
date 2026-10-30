@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { focusVisibleRing } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
@@ -345,7 +346,7 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
 
   function handleRetry() {
     if (!jobId) return
-    retryMutation.mutate(jobId, {
+    retryMutation.mutate(jobId, guardMutationCallbacks({
       onSuccess: (result) => {
         toast.success(`Job retried. New job ID: ${result.newJobId}`)
         setConfirmAction(null)
@@ -355,12 +356,12 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
         toast.error('Failed to retry job.')
         setConfirmAction(null)
       },
-    })
+    }))
   }
 
   function handleCancel() {
     if (!jobId) return
-    cancelMutation.mutate(jobId, {
+    cancelMutation.mutate(jobId, guardMutationCallbacks({
       onSuccess: () => {
         toast.success('Job cancelled.')
         setConfirmAction(null)
@@ -370,7 +371,7 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
         toast.error('Failed to cancel job.')
         setConfirmAction(null)
       },
-    })
+    }))
   }
 
   function handleConfirm() {

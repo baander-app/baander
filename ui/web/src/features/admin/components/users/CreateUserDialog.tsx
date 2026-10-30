@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
 import { useCreateUser } from '../../hooks/use-users'
@@ -54,7 +55,7 @@ export function CreateUserDialog({ open, onOpenChange, canAssignRoles }: CreateU
     e.preventDefault()
     createUser.mutate(
       { email, name, password, roles: [canAssignRoles ? role : 'ROLE_USER'] },
-      {
+      guardMutationCallbacks({
         onSuccess: () => {
           setEmail('')
           setName('')
@@ -62,7 +63,7 @@ export function CreateUserDialog({ open, onOpenChange, canAssignRoles }: CreateU
           setRole('ROLE_USER')
           onOpenChange(false)
         },
-      },
+      }),
     )
   }
 

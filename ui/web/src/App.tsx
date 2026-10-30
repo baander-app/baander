@@ -9,7 +9,7 @@ const router = createRouter(routes);
 
 function App() {
   return (
-    <AuthenticatedClientProvider>
+    <AuthenticatedClientProvider freshnessEnabled>
       <PreferenceSyncProvider>
         <ThemeProvider>
           <RouterProvider router={router}/>

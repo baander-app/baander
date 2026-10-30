@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
 import {
@@ -47,9 +48,9 @@ export function DeleteGenreDialog({
           <Button
             variant="destructive"
             onClick={() =>
-              deleteGenre.mutate(genre.slug, {
+              deleteGenre.mutate(genre.slug, guardMutationCallbacks({
                 onSuccess: () => onOpenChange(false),
-              })
+              }))
             }
           >
             Delete

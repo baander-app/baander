@@ -85,18 +85,18 @@ export interface TransportStatus {
 
 // API Functions
 
-export async function getStatusOverview(): Promise<StatusOverview> {
-  const {data} = await AXIOS_INSTANCE.get('/api/monitor/status');
+export async function getStatusOverview(signal?: AbortSignal): Promise<StatusOverview> {
+  const {data} = await AXIOS_INSTANCE.get('/api/monitor/status', { signal });
   return data.data;
 }
 
-export async function getJobList(params: JobFilters = {}): Promise<JobListResponse> {
-  const {data} = await AXIOS_INSTANCE.get('/api/monitor/jobs', {params});
+export async function getJobList(params: JobFilters = {}, signal?: AbortSignal): Promise<JobListResponse> {
+  const {data} = await AXIOS_INSTANCE.get('/api/monitor/jobs', { signal, params});
   return data.data;
 }
 
-export async function getJobDetail(jobId: string): Promise<JobDetail> {
-  const {data} = await AXIOS_INSTANCE.get(`/api/monitor/jobs/${jobId}`);
+export async function getJobDetail(jobId: string, signal?: AbortSignal): Promise<JobDetail> {
+  const {data} = await AXIOS_INSTANCE.get(`/api/monitor/jobs/${jobId}`, { signal });
   return data.data;
 }
 
@@ -110,13 +110,13 @@ export async function cancelJob(jobId: string): Promise<{ cancelled: boolean }> 
   return data.data;
 }
 
-export async function getAnalyticsSummary(from: string, to: string): Promise<AnalyticsSummary> {
-  const {data} = await AXIOS_INSTANCE.get('/api/monitor/analytics/summary', {params: {from, to}});
+export async function getAnalyticsSummary(from: string, to: string, signal?: AbortSignal): Promise<AnalyticsSummary> {
+  const {data} = await AXIOS_INSTANCE.get('/api/monitor/analytics/summary', { signal, params: {from, to}});
   return data.data;
 }
 
-export async function getAnalyticsTiming(from: string, to: string): Promise<AnalyticsTiming> {
-  const {data} = await AXIOS_INSTANCE.get('/api/monitor/analytics/timing', {params: {from, to}});
+export async function getAnalyticsTiming(from: string, to: string, signal?: AbortSignal): Promise<AnalyticsTiming> {
+  const {data} = await AXIOS_INSTANCE.get('/api/monitor/analytics/timing', { signal, params: {from, to}});
   return data.data;
 }
 
@@ -124,15 +124,17 @@ export async function getAnalyticsFailures(
   from: string,
   to: string,
   limit = 50,
+  signal?: AbortSignal,
 ): Promise<AnalyticsFailures> {
   const {data} = await AXIOS_INSTANCE.get('/api/monitor/analytics/failures', {
+      signal,
     params: {from, to, limit},
   });
   return data.data;
 }
 
-export async function getTransportStatus(): Promise<TransportStatus> {
-  const {data} = await AXIOS_INSTANCE.get('/api/monitor/transport/status');
+export async function getTransportStatus(signal?: AbortSignal): Promise<TransportStatus> {
+  const {data} = await AXIOS_INSTANCE.get('/api/monitor/transport/status', { signal });
   return data.data;
 }
 

@@ -22,8 +22,8 @@ export interface MetadataProvider {
 }
 
 export const metadataAdminApi = {
-  getSyncStatus: () =>
-    AXIOS_INSTANCE.get<{ data: MetadataSyncStatus }>('/api/admin/metadata/sync-status').then(
+  getSyncStatus: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: MetadataSyncStatus }>('/api/admin/metadata/sync-status', { signal }).then(
       (r) => r.data.data,
     ),
 
@@ -37,8 +37,8 @@ export const metadataAdminApi = {
       source: 'genres',
     }).then((r) => r.data.data),
 
-  getProviders: () =>
-    AXIOS_INSTANCE.get<{ data: MetadataProvider[] }>('/api/admin/metadata/providers').then(
+  getProviders: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: MetadataProvider[] }>('/api/admin/metadata/providers', { signal }).then(
       (r) => r.data.data,
     ),
 }

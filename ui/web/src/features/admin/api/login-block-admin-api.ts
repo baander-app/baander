@@ -15,8 +15,8 @@ export interface LoginBlockListResponse {
 }
 
 export const loginBlockAdminApi = {
-  list: async (params?: { limit?: number; offset?: number }): Promise<LoginBlockListResponse> => {
-    const { data: response } = await AXIOS_INSTANCE.get('/api/admin/login-blocks', { params })
+  list: async (params?: { limit?: number; offset?: number }, signal?: AbortSignal): Promise<LoginBlockListResponse> => {
+    const { data: response } = await AXIOS_INSTANCE.get('/api/admin/login-blocks', { signal, params })
     return response
   },
 

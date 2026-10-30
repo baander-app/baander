@@ -1,18 +1,20 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { getRateLimiters, clearAllRateLimiters } from '../api/rate-limiter-api'
 
 export function useRateLimiters() {
   return useQuery({
     queryKey: ['rate-limiters'],
-    queryFn: getRateLimiters,
+    queryFn: ({ signal }) => getRateLimiters(signal),
     retry: false,
   })
 }
 
 export function useClearRateLimiters() {
-  const qc = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-security'])
+
   return useMutation({
-    mutationFn: clearAllRateLimiters,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['rate-limiters'] }),
+    mutationFn: () => run(() => clearAllRateLimiters()),
+    onSuccess: () => invalidate(['rate-limiters']),
   })
 }

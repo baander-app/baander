@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { useState } from 'react'
 import styled from 'styled-components'
 import { useCreateScheduledJob, useSchedulableCommands } from '../../hooks/use-scheduler-admin'
@@ -88,10 +89,10 @@ export function CreateJobDialog({ open, onOpenChange }: { open: boolean; onOpenC
       description: description || null,
       parameters: Object.keys(parameterSchema).length > 0 ? params : undefined,
     }
-    createJob.mutate(payload, { onSuccess: () => {
+    createJob.mutate(payload, guardMutationCallbacks({ onSuccess: () => {
       onOpenChange(false)
       setName(''); setExpression(''); setCommand(''); setDescription(''); setParams({})
-    }})
+    }}))
   }
 
   return (

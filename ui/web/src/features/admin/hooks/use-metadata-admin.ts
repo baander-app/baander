@@ -1,11 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAdminMutationTools } from './use-admin-mutation'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { metadataAdminApi } from '../api/metadata-admin-api'
 
 export function useMetadataSyncStatus() {
   return useQuery({
     queryKey: ['admin-metadata-sync-status'],
-    queryFn: metadataAdminApi.getSyncStatus,
-    refetchInterval: (q) => (q.state.data ? 30_000 : false),
+    queryFn: ({ signal }) => metadataAdminApi.getSyncStatus(signal),
+
     retry: false,
   })
 }
@@ -13,28 +14,30 @@ export function useMetadataSyncStatus() {
 export function useMetadataProviders() {
   return useQuery({
     queryKey: ['admin-metadata-providers'],
-    queryFn: metadataAdminApi.getProviders,
+    queryFn: ({ signal }) => metadataAdminApi.getProviders(signal),
     staleTime: 60_000,
     retry: false,
   })
 }
 
 export function useTriggerMetadataSync() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'catalog'])
+
   return useMutation({
-    mutationFn: (source?: string) => metadataAdminApi.triggerSync(source),
+    mutationFn: (source?: string) => run(() => metadataAdminApi.triggerSync(source)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-metadata-sync-status'] })
+      invalidate(['admin-metadata-sync-status'])
     },
   })
 }
 
 export function useTriggerGenreSync() {
-  const queryClient = useQueryClient()
+  const { run, invalidate } = useAdminMutationTools(['admin-metadata', 'admin-jobs', 'catalog'])
+
   return useMutation({
-    mutationFn: metadataAdminApi.triggerGenreSync,
+    mutationFn: () => run(() => metadataAdminApi.triggerGenreSync()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-metadata-sync-status'] })
+      invalidate(['admin-metadata-sync-status'])
     },
   })
 }

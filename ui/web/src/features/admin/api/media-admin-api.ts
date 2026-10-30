@@ -29,13 +29,13 @@ export interface PruneResult {
 }
 
 export const mediaAdminApi = {
-  getStorageStats: () =>
-    AXIOS_INSTANCE.get<{ data: StorageStats }>('/api/admin/media/storage-stats').then(
+  getStorageStats: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: StorageStats }>('/api/admin/media/storage-stats', { signal }).then(
       (r) => r.data.data,
     ),
 
-  checkMissing: () =>
-    AXIOS_INSTANCE.get<{ data: MissingCheckResult }>('/api/admin/media/missing-check').then(
+  checkMissing: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: MissingCheckResult }>('/api/admin/media/missing-check', { signal }).then(
       (r) => r.data.data,
     ),
 

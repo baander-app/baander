@@ -1,4 +1,5 @@
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { advanceAuthorization } from '@/shared/live/ownership'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -154,6 +155,60 @@ describe('EditUserDialog', () => {
   afterEach(() => {
     cleanup()
     useAuthStore.setState(initialAuthState, true)
+  })
+
+  it('preserves typed names when the current server snapshot changes and requires conflict resolution', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const onOpenChange = vi.fn()
+    const view = render(<QueryClientProvider client={client}><EditUserDialog user={ALICE} open onOpenChange={onOpenChange} /></QueryClientProvider>)
+    const user = userEvent.setup()
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'My name')
+    view.rerender(<QueryClientProvider client={client}><EditUserDialog user={{ ...ALICE, name: 'Server name' }} open onOpenChange={onOpenChange} /></QueryClientProvider>)
+    expect(screen.getByLabelText('Name')).toHaveValue('My name')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Keep my changes' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('keeps a name typed during a language-only pending save after it completes', async () => {
+    let finish: (() => void) | undefined
+    const server = mockRequest.getMockImplementation()!
+    mockRequest.mockImplementation(async (url, options) => {
+      if (options.method === 'PUT') await new Promise<void>(resolve => { finish = resolve })
+      return server(url, options)
+    })
+    const onOpenChange = renderDialog()
+    const user = userEvent.setup()
+    await chooseLanguage('Dansk')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(finish).toBeDefined())
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Newer name')
+    await act(async () => { finish!() })
+    await waitFor(() => expect(mockPatch).toHaveBeenCalled())
+    expect(screen.getByLabelText('Name')).toHaveValue('Newer name')
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(mockPatch).toHaveBeenCalledWith(`/api/admin/users/${ALICE.publicId}`, {
+      email: ALICE.email,
+      name: ALICE.name,
+    })
+  })
+
+  it('stops the sequential user write and close after authority changes during the language save', async () => {
+    let finish: (() => void) | undefined
+    const server = mockRequest.getMockImplementation()!
+    mockRequest.mockImplementation(async (url, options) => {
+      if (options.method === 'PUT') await new Promise<void>(resolve => { finish = resolve })
+      return server(url, options)
+    })
+    const onOpenChange = renderDialog()
+    await chooseLanguage('Dansk')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(finish).toBeDefined())
+    await act(async () => { advanceAuthorization(); finish!() })
+    expect(mockPatch).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('opens with the user’s name and email filled in', async () => {

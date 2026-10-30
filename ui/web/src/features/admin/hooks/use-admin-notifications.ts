@@ -7,10 +7,10 @@ export function useAdminNotifications() {
 
   const query = useQuery({
     queryKey: ['admin-notifications'],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [items, count] = await Promise.all([
-        notificationApi.list({ category: 'admin_operations', limit: 20 }),
-        notificationApi.unreadCount(),
+        notificationApi.list({ category: 'admin_operations', limit: 20 }, signal),
+        notificationApi.unreadCount(signal),
       ])
       return { items: items.data, count }
     },

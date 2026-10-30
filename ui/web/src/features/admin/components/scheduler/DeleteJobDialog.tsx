@@ -1,3 +1,4 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import type { ScheduledJob } from '../../api/scheduler-admin-api'
 import { useDeleteScheduledJob } from '../../hooks/use-scheduler-admin'
@@ -35,7 +36,7 @@ export function DeleteJobDialog({ job, open, onOpenChange }: { job: ScheduledJob
           <Button
             variant="destructive"
             disabled={deleteJob.isPending}
-            onClick={() => deleteJob.mutate(job.publicId, { onSuccess: () => onOpenChange(false) })}
+            onClick={() => deleteJob.mutate(job.publicId, guardMutationCallbacks({ onSuccess: () => onOpenChange(false) }))}
           >
             {deleteJob.isPending ? 'Deleting...' : 'Delete'}
           </Button>

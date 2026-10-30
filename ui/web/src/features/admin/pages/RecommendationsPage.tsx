@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { Sparkles, Play, Loader2 } from 'lucide-react'
 import { AdminPageHeader } from '../components/layout/AdminPageHeader'
@@ -162,25 +163,31 @@ export function RecommendationsPage() {
   const [mode, setMode] = useState<'full' | 'incremental'>('incremental')
 
   const handleGenerate = async () => {
+    const owner = captureOwnership()
     try {
       await generateMutation.mutateAsync({ mode })
     } catch (error) {
+      if (!isCurrentOwnership(owner)) return
       console.error('Failed to generate recommendations:', error)
     }
   }
 
   const handleCancel = async (publicId: string) => {
+    const owner = captureOwnership()
     try {
       await cancelMutation.mutateAsync(publicId)
     } catch (error) {
+      if (!isCurrentOwnership(owner)) return
       console.error('Failed to cancel job:', error)
     }
   }
 
   const handleRequeue = async (publicId: string) => {
+    const owner = captureOwnership()
     try {
       await requeueMutation.mutateAsync(publicId)
     } catch (error) {
+      if (!isCurrentOwnership(owner)) return
       console.error('Failed to requeue job:', error)
     }
   }

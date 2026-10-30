@@ -53,18 +53,18 @@ export interface SyncJobResponse {
 export type GenerateRecommendationsResponse = AsyncJobResponse | SyncJobResponse
 
 export const recommendationsAdminApi = {
-  getCoverage: () =>
-    AXIOS_INSTANCE.get<{ data: RecommendationCoverage }>('/api/admin/recommendations/coverage'),
-  getSourceQuality: () =>
-    AXIOS_INSTANCE.get<{ data: SourceQuality }>('/api/admin/recommendations/source-quality'),
-  getFreshness: () =>
-    AXIOS_INSTANCE.get<{ data: RecommendationFreshness }>('/api/admin/recommendations/freshness'),
+  getCoverage: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RecommendationCoverage }>('/api/admin/recommendations/coverage', { signal }),
+  getSourceQuality: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: SourceQuality }>('/api/admin/recommendations/source-quality', { signal }),
+  getFreshness: (signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RecommendationFreshness }>('/api/admin/recommendations/freshness', { signal }),
   generate: (request: GenerateRecommendationsRequest) =>
     AXIOS_INSTANCE.post<{ data: GenerateRecommendationsResponse }>('/api/admin/recommendations/generate', request),
-  getJob: (publicId: string) =>
-    AXIOS_INSTANCE.get<{ data: RecommendationJob }>(`/api/admin/recommendations/jobs/${publicId}`),
-  listJobs: (params?: { limit?: number; status?: string }) =>
-    AXIOS_INSTANCE.get<{ data: RecommendationJob[] }>('/api/admin/recommendations/jobs', { params }),
+  getJob: (publicId: string, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RecommendationJob }>(`/api/admin/recommendations/jobs/${publicId}`, { signal }),
+  listJobs: (params?: { limit?: number; status?: string }, signal?: AbortSignal) =>
+    AXIOS_INSTANCE.get<{ data: RecommendationJob[] }>('/api/admin/recommendations/jobs', { signal, params }),
   cancelJob: (publicId: string) =>
     AXIOS_INSTANCE.delete(`/api/admin/recommendations/jobs/${publicId}`),
   requeueJob: (publicId: string) =>

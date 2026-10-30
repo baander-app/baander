@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import styled, { css } from 'styled-components'
 import {
   Dialog,
@@ -11,6 +11,8 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 import { LIBRARY_TYPES, type Library } from '../api/library-api'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { usePathValidation } from '../hooks/use-path-validation'
 
 const DialogBody = styled.div`
@@ -241,8 +243,10 @@ function CreateLibraryForm({ open, onClose, onSubmit, isPending }: CreateLibrary
 interface EditLibraryDialogProps {
   library: Library | null
   onClose: () => void
-  onSubmit: (data: { name: string; sortOrder: number }) => void
+  onSubmit: (data: { name: string; sortOrder: number }) => Promise<unknown> | void
   isPending: boolean
+  unavailable?: boolean
+  unauthorized?: boolean
 }
 
 export function EditLibraryDialog(props: EditLibraryDialogProps) {
@@ -255,13 +259,39 @@ type EditLibraryFormProps = Omit<EditLibraryDialogProps, 'library'> & {
   library: Library
 }
 
-function EditLibraryForm({ library, onClose, onSubmit, isPending }: EditLibraryFormProps) {
-  const [name, setName] = useState(library?.name ?? '')
-  const [sortOrder, setSortOrder] = useState(library?.sortOrder ?? 0)
+function EditLibraryForm({ library, onClose, onSubmit, isPending, unavailable, unauthorized }: EditLibraryFormProps) {
+  const draft = useDraft({
+    identity: library.publicId,
+    initialData: { name: library.name, sortOrder: library.sortOrder },
+  })
+  const { receive, revokeAccess, beginSave, completeSave, failSave } = draft
+  const revokedSnapshot = useRef<Library | null>(null)
+  const lastSnapshot = useRef(library)
+  useEffect(() => subscribeOwnership(() => {
+    revokedSnapshot.current = lastSnapshot.current
+    revokeAccess()
+  }), [revokeAccess])
+  useEffect(() => {
+    lastSnapshot.current = library
+    if (unauthorized) {
+      revokedSnapshot.current = library
+      revokeAccess()
+    } else if (revokedSnapshot.current !== library) {
+      receive(unavailable ? null : { name: library.name, sortOrder: library.sortOrder })
+    }
+  }, [library, unavailable, unauthorized, receive, revokeAccess])
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    onSubmit({ name, sortOrder })
+    const submission = beginSave()
+    if (!submission) return
+    const owner = captureOwnership()
+    try {
+      await onSubmit(submission.values)
+      if (isCurrentOwnership(owner)) completeSave(submission)
+    } catch {
+      if (isCurrentOwnership(owner)) failSave(submission)
+    }
   }
 
   return (
@@ -270,16 +300,24 @@ function EditLibraryForm({ library, onClose, onSubmit, isPending }: EditLibraryF
         <DialogHeader>
           <DialogTitle>Edit Library</DialogTitle>
           <DialogDescription>
-            Update name and sort order for <span style={{ fontWeight: 500 }}>{library.name}</span>.
+            Update the library name and sort order.
           </DialogDescription>
         </DialogHeader>
 
         <Form onSubmit={handleSubmit}>
+          {draft.status === 'conflict' && (
+            <div role="alert">
+              <p>This library changed while you were editing.</p>
+              <Button type="button" onClick={() => draft.resolveConflict('local')}>Keep my changes</Button>
+              <Button type="button" onClick={() => draft.resolveConflict('server')}>Use server values</Button>
+            </div>
+          )}
+          {draft.status === 'unavailable' && <p role="alert">This library is unavailable. Your edits are retained.</p>}
           <FieldGroup>
             <Label>Name</Label>
             <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={draft.values.name ?? ''}
+              onChange={(e) => draft.updateField('name', e.target.value)}
               required
             />
           </FieldGroup>
@@ -288,22 +326,22 @@ function EditLibraryForm({ library, onClose, onSubmit, isPending }: EditLibraryF
             <Label>Sort Order</Label>
             <Input
               type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(Number(e.target.value))}
+              value={draft.values.sortOrder ?? 0}
+              onChange={(e) => draft.updateField('sortOrder', Number(e.target.value))}
             />
           </FieldGroup>
 
-          <InfoBox>
+          {draft.status !== 'unavailable' && <InfoBox>
             <p>Slug: <span className="mono">/{library.slug}</span></p>
             <p>Path: <span className="mono">{library.path}</span></p>
             <p>Type: <span className="capitalize">{library.type.replace('_', ' ')}</span></p>
-          </InfoBox>
+          </InfoBox>}
 
           <Actions>
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !name}>
+            <Button type="submit" disabled={isPending || !draft.canSave || !draft.values.name}>
               {isPending ? 'Saving...' : 'Save'}
             </Button>
           </Actions>

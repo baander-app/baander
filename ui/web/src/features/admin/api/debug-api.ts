@@ -38,8 +38,8 @@ export interface CoroutineStats {
   worker_errors: WorkerError[]
 }
 
-export async function getCoroutineStats(): Promise<CoroutineStats> {
-  const { data } = await AXIOS_INSTANCE.get<CoroutineStats>('/api/debug/coroutines')
+export async function getCoroutineStats(signal?: AbortSignal): Promise<CoroutineStats> {
+  const { data } = await AXIOS_INSTANCE.get<CoroutineStats>('/api/debug/coroutines', { signal })
   return data
 }
 
@@ -70,8 +70,8 @@ export interface WorkerStats {
   user_workers: UserWorkerStats
 }
 
-export async function getWorkerStats(): Promise<WorkerStats> {
-  const { data } = await AXIOS_INSTANCE.get<WorkerStats>('/api/debug/workers')
+export async function getWorkerStats(signal?: AbortSignal): Promise<WorkerStats> {
+  const { data } = await AXIOS_INSTANCE.get<WorkerStats>('/api/debug/workers', { signal })
   return data
 }
 
@@ -94,8 +94,8 @@ export interface Span {
 }
 
 /** Recorded spans, newest first. */
-export async function getSpans(limit = 50): Promise<Span[]> {
-  const { data } = await AXIOS_INSTANCE.get<Span[]>('/api/debug/spans', { params: { limit } })
+export async function getSpans(limit = 50, signal?: AbortSignal): Promise<Span[]> {
+  const { data } = await AXIOS_INSTANCE.get<Span[]>('/api/debug/spans', { signal, params: { limit } })
   return data
 }
 
