@@ -1154,7 +1154,32 @@ static void test_fdk_stream() {
         snr_high);
 }
 
+/* The covariance predictor of a band far below any audible level, such
+ * as the noise filling of a silent frame leaves, is zero rather than
+ * the overflow its tiny correlations divide into. */
+static void test_lpc_silent_band() {
+  float x[40][2];
+  for (int t = 0; t < 40; t++) {
+    const float v = (t % 3 == 0 ? 1.0f : -0.5f) * 1e-20f;
+    x[t][0] = v;
+    x[t][1] = -v * 0.5f;
+  }
+  float alpha0[2] = {1.0f, 1.0f};
+  float alpha1[2] = {1.0f, 1.0f};
+  aac_sbr_lpc_band(alpha0, alpha1, x, 40);
+  CHECK(alpha0[0] == 0.0f && alpha0[1] == 0.0f && alpha1[0] == 0.0f && alpha1[1] == 0.0f,
+        "silent band predicts nothing (%g %g %g %g)", alpha0[0], alpha0[1], alpha1[0], alpha1[1]);
+  /* an audible band keeps its predictor */
+  for (int t = 0; t < 40; t++) {
+    x[t][0] = cosf(0.3f * (float)t) * 0.1f;
+    x[t][1] = sinf(0.3f * (float)t) * 0.1f;
+  }
+  aac_sbr_lpc_band(alpha0, alpha1, x, 40);
+  CHECK(alpha0[0] != 0.0f || alpha1[0] != 0.0f, "a tone is predicted");
+}
+
 int main() {
+  test_lpc_silent_band();
   test_qmf_banks();
   test_freq_tables();
   test_syntax_roundtrip();

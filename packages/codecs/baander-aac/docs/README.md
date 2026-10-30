@@ -517,6 +517,39 @@ are on, off or chosen by bitrate; `aac_encoder_set_loudness_info` adds the
 loudness info set (see Loudness). The AAC-LC output is unchanged byte for
 byte.
 
+Below 64 kbit/s per channel the xHE-AAC encoder runs enhanced SBR at the
+2:1 ratio (`coreSbrFrameLengthIndex` 3): the core codes 1024 lines at
+half the output rate and each frame carries 2048 output samples, the
+delay is HE-AAC's 5635 samples, and the HE-AAC encoder's analysis, grid
+and envelope estimation feed the USAC form of the data (`UsacSbrData`,
+with `SbrConfig` carrying the default header and neither the harmonic
+transposer, inter-TES nor PVC). An independent frame sends `SbrInfo`,
+takes the default header and codes its first envelope and noise floor
+along frequency; the other frames send neither header nor info. The
+crossover and bandwidth come from the HE-AAC tuning table for the core
+rate and bitrate. With `mps212` on, a stereo pair adds MPEG Surround
+2-1-2 (`stereoConfigIndex` 1): the pair is analysed in the SBR encoder's
+QMF domain, the level difference and coherence of twenty parameter bands
+are estimated per frame (the three lowest QMF bands through a windowed
+transform across the frame, since the decoder's hybrid filter bank would
+understate the separation of sounds near a band border), and the
+energy-preserving downmix, scaled per band group so that it carries the
+energy of both channels and divided by the fixed downmix gain of 4.5 dB,
+is what the core and SBR code. `Mps212Data` carries one parameter set per
+frame with the decoder's Huffman codes, without residual, phase coding
+or temporal shaping. An SBR stream pre-rolls two frames, the plain core
+one, and the independent frame interval of one second counts the longer
+frames. The SBR rule is overridden with `sbr` in `AacUsacEncoderOptions`;
+a 2-1-2 pair always has SBR, and an input rate whose half is not an AAC
+rate keeps the plain core. 2-1-2 is never chosen by bitrate: FFmpeg's
+USAC decoder (master at the time of writing) reads a second `core_mode`
+bit for the absent second core channel of a `stereoConfigIndex` 1 pair
+and has no 2-1-2 upmix, so it rejects every such stream, ours and the
+FDK encoder's alike, while the FDK decoder and libxaac decode them. A
+caller who knows the players sets `mps212` to 1 for a stereo pair at
+24 or 32 kbit/s, where it buys 1.5 to 2 kHz of bandwidth over the SBR
+pair.
+
 ## API
 
 All functions are declared in `include/aac.h` with C linkage.
@@ -977,14 +1010,23 @@ and decorrelator, the regrouped low band, and the four stereo streams
 against the FDK decodes) and MPEG-D DRC (`test_unidrc`: the parsers with
 a mutation fuzz, the gain decoder, the selection process, and the
 loudness and normalisation gain of two committed streams), and the
-xHE-AAC encoder in one (`test_usac_enc`: the arithmetic coder against
+xHE-AAC encoder in three (`test_usac_enc`: the arithmetic coder against
 the decoder's with escapes, short windows and mixed lengths, the
 UsacConfig writer against the reader, encode and decode round trips
-through the public API against AAC-LC at the same bitrate, noise
-filling, the raw access unit bitrates at 48 to 128 kbit/s, the API's
-refusals, and the two committed streams `usac_enc_*.loas`, which a fresh
-encode reproduces byte for byte; `test_usac_enc --write-streams
-tests/data` regenerates them) and its loudness metadata in another
+of the plain core through the public API against AAC-LC at the same
+bitrate, noise filling, the raw access unit bitrates at 48 to
+128 kbit/s, the API's refusals, and the two committed streams
+`usac_enc_sce_64k.loas` and `usac_enc_cpe_96k.loas`;
+`test_usac_enc_sbr`: the SBR and 2-1-2 configurations the bitrate rule
+and the options produce, read back and rewritten, the pre-roll frame
+count of an SBR stream, round trips at 16 to 64 kbit/s with SNR and
+replicated-band bounds, the 2-1-2 on a panned pair and on unrelated
+channels, frequent independent frames, digital silence, the raw access
+unit bitrates at 16 to 96 kbit/s, and the committed streams
+`usac_enc_sbr_sce_32k.loas`, `usac_enc_sbr_cpe_64k.loas` and
+`usac_enc_mps_cpe_32k.loas`; a fresh encode reproduces every committed
+stream byte for byte, and `--write-streams tests/data` on either suite
+regenerates its own) and its loudness metadata in another
 (`test_encoder_loudness`: the two-pass set in the configuration as the
 writer's bytes and read back by the decoder as the declared loudness
 with its normalisation gain, the set's removal and replacement and its
@@ -1054,7 +1096,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac and the 2-1-2 encoder in mps212_enc), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool, mps-enc test stream writer for MPEG Surround
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)

@@ -223,7 +223,7 @@ export interface AacUsacOptions {
   streamId?: number;
   /** Enhanced SBR at 2:1; 'auto' (default) uses it below 64 kbit/s per channel. */
   sbr?: AacUsacTool;
-  /** MPEG Surround 2-1-2 for stereo input; 'auto' (default) uses it below 48 kbit/s. */
+  /** MPEG Surround 2-1-2 for stereo input; 'auto' (default) leaves it off, as FFmpeg cannot decode it. */
   mps212?: AacUsacTool;
 }
 

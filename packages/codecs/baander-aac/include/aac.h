@@ -215,8 +215,9 @@ typedef struct AacUsacEncoderOptions_ {
    * channel). */
   int sbr;
   /* MPEG Surround 2-1-2 for stereo input (one core channel plus the
-   * spatial parameters, stereoConfigIndex 1): 1 on, 0 off, -1 by bitrate
-   * (default: on below 48 kbit/s for stereo). */
+   * spatial parameters, stereoConfigIndex 1): 1 on, 0 or -1 off (the
+   * default: the stock FFmpeg decoder cannot decode such a pair, so the
+   * tool is only ever opted into for players known to handle it). */
   int mps212;
 } AacUsacEncoderOptions;
 /* Applies the options before the first frame (AAC_ERR_STATE after it);

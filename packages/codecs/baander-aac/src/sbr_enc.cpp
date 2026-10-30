@@ -5,6 +5,9 @@
 #include <cstring>
 #include <mutex>
 
+#include "mps212_enc.h"
+#include "sbr_enc_internal.h"
+
 /* SBR encoder (ISO/IEC 14496-3 4.6.18, 3GPP TS 26.404).  The frame the
  * core encoder emits for an input block decodes two blocks later, so the
  * extension of a frame describes the QMF slots of the block before the
@@ -301,7 +304,9 @@ void make_grid(AacSbrGrid* g, int start, int tran, int amp_res_header, int slots
   }
 }
 
-void write_grid(AacBitWriter* w, const AacSbrGrid* g, int slots) {
+}  // namespace
+
+void aac_sbr_enc_write_grid(AacBitWriter* w, const AacSbrGrid* g, int slots) {
   aac_bitwriter_write(w, (uint32_t)g->frame_class, 2);
   switch (g->frame_class) {
     case 0:
@@ -348,6 +353,8 @@ void write_grid(AacBitWriter* w, const AacSbrGrid* g, int slots) {
       return;
   }
 }
+
+namespace {
 
 /* ── tonality (4.6.18.6.2 prediction, as the detector of TS 26.404) ── */
 
@@ -627,23 +634,25 @@ void write_header(const AacSbrEncoder* s, AacBitWriter* w) {
   }
 }
 
-void write_dtdf(AacBitWriter* w, const AacSbrEncChannel* ch) {
-  for (int e = 0; e < ch->grid.num_env; e++) {
+}  // namespace
+
+void aac_sbr_enc_write_dtdf(AacBitWriter* w, const AacSbrEncChannel* ch, int skip_first) {
+  for (int e = skip_first ? 1 : 0; e < ch->grid.num_env; e++) {
     aac_bitwriter_write(w, (uint32_t)ch->df_env[e], 1);
   }
-  for (int i = 0; i < ch->grid.num_noise; i++) {
+  for (int i = skip_first ? 1 : 0; i < ch->grid.num_noise; i++) {
     aac_bitwriter_write(w, (uint32_t)ch->df_noise[i], 1);
   }
 }
 
-void write_invf(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch) {
+void aac_sbr_enc_write_invf(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch) {
   for (int j = 0; j < s->freq.n_q; j++) {
     aac_bitwriter_write(w, (uint32_t)ch->invf[j], 2);
   }
 }
 
-void write_envelope(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch,
-                    const int* prev_in, int prev_res_in) {
+void aac_sbr_enc_write_envelope(const AacSbrEncoder* s, AacBitWriter* w,
+                                const AacSbrEncChannel* ch, const int* prev_in, int prev_res_in) {
   const AacSbrGrid* g = &ch->grid;
   const AacSbrFreq* f = &s->freq;
   const HuffCode* t_huff = g->amp_res ? &g_env_30_t : &g_env_15_t;
@@ -672,8 +681,8 @@ void write_envelope(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChan
   }
 }
 
-void write_noise(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch,
-                 const int* prev_in) {
+void aac_sbr_enc_write_noise(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel* ch,
+                             const int* prev_in) {
   const AacSbrGrid* g = &ch->grid;
   const int n = s->freq.n_q;
   int prev[AAC_SBR_MAX_NOISE_BANDS];
@@ -694,6 +703,8 @@ void write_noise(const AacSbrEncoder* s, AacBitWriter* w, const AacSbrEncChannel
   }
 }
 
+namespace {
+
 /* The per-channel data of the element in the order of
  * sbr_single_channel_element() / sbr_channel_pair_element() without
  * coupling.  `prev_env`/`prev_noise` are the values the decoder holds
@@ -706,22 +717,22 @@ void write_channel_data(const AacSbrEncoder* s, AacBitWriter* w, int nch,
     aac_bitwriter_write(w, 0, 1); /* bs_coupling */
   }
   for (int c = 0; c < nch; c++) {
-    write_grid(w, &s->ch[c].grid, s->time_slots);
+    aac_sbr_enc_write_grid(w, &s->ch[c].grid, s->time_slots);
   }
   for (int c = 0; c < nch; c++) {
-    write_dtdf(w, &s->ch[c]);
+    aac_sbr_enc_write_dtdf(w, &s->ch[c], 0);
   }
   for (int c = 0; c < nch; c++) {
-    write_invf(s, w, &s->ch[c]);
+    aac_sbr_enc_write_invf(s, w, &s->ch[c]);
   }
   if (nch == 1) {
-    write_envelope(s, w, &s->ch[0], prev_env[0], prev_res[0]);
-    write_noise(s, w, &s->ch[0], prev_noise[0]);
+    aac_sbr_enc_write_envelope(s, w, &s->ch[0], prev_env[0], prev_res[0]);
+    aac_sbr_enc_write_noise(s, w, &s->ch[0], prev_noise[0]);
   } else {
-    write_envelope(s, w, &s->ch[0], prev_env[0], prev_res[0]);
-    write_envelope(s, w, &s->ch[1], prev_env[1], prev_res[1]);
-    write_noise(s, w, &s->ch[0], prev_noise[0]);
-    write_noise(s, w, &s->ch[1], prev_noise[1]);
+    aac_sbr_enc_write_envelope(s, w, &s->ch[0], prev_env[0], prev_res[0]);
+    aac_sbr_enc_write_envelope(s, w, &s->ch[1], prev_env[1], prev_res[1]);
+    aac_sbr_enc_write_noise(s, w, &s->ch[0], prev_noise[0]);
+    aac_sbr_enc_write_noise(s, w, &s->ch[1], prev_noise[1]);
   }
   for (int c = 0; c < nch; c++) {
     aac_bitwriter_write(w, 0, 1); /* bs_add_harmonic_flag */
@@ -875,7 +886,7 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
   const int pos = s->pos;
   const int nch = s->channels;
   const int slots = s->slots;
-  if (s->ps) {
+  if (s->ps || s->mps) {
     /* both channels are analysed for the parameters; their downmix is
      * coded as channel 0, the left channel kept aside */
     AacSbrEncChannel* l = &s->ch[0];
@@ -884,8 +895,15 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
     analyze_block(s, r, in ? in[1] : nullptr, pos);
     for (int i = 0; i < slots; i++) {
       const int idx = (pos + i) & kRingMask;
-      memcpy(s->ps_left[idx], l->W[idx], sizeof(s->ps_left[idx]));
-      aac_ps_enc_downmix(&s->ps_enc, s->ps_left[idx], r->W[idx], l->W[idx]);
+      memcpy(s->left[idx], l->W[idx], sizeof(s->left[idx]));
+      if (s->ps) {
+        aac_ps_enc_downmix(&s->ps_enc, s->left[idx], r->W[idx], l->W[idx]);
+      }
+    }
+    if (s->mps) {
+      /* a block never wraps the ring: 1024-line frames fill 32 of its
+       * 128 slots and start at a multiple of 32 */
+      aac_mps212_enc_downmix(s->mps, s->left + pos, r->W + pos, l->W + pos, slots);
     }
     slot_energy(s, l, pos);
     synthesize_core(l, pos, core[0], slots);
@@ -900,9 +918,11 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
 
   /* the extension of the frame emitted now */
   const int base = (pos - kCoreDelayBlocks * slots + kGridOffset) & kRingMask;
-  const bool header = s->frames_since_header >= s->header_interval;
+  /* xHE-AAC sends the header with every independent frame and codes
+   * nothing against the previous frame there */
+  const bool header = s->usac ? s->usac_indep != 0 : s->frames_since_header >= s->header_interval;
   s->frames_since_header = header ? 1 : s->frames_since_header + 1;
-  const int coded = s->ps ? 1 : nch;
+  const int coded = s->ps || s->mps ? 1 : nch;
   int prev_env[2][AAC_SBR_MAX_BANDS];
   int prev_res[2];
   int prev_noise[2][AAC_SBR_MAX_NOISE_BANDS];
@@ -912,13 +932,18 @@ void aac_sbr_enc_process(AacSbrEncoder* s, const float* const* in, float* const*
     memcpy(prev_noise[c], s->ch[c].prev_noise_q, sizeof(prev_noise[c]));
     frame_data(s, &s->ch[c], base, header);
   }
+  if (s->usac) {
+    aac_sbr_enc_usac_frame(s, base, prev_env, prev_res, prev_noise);
+    s->frame_count++;
+    return;
+  }
   if (s->ps) {
     float L[2][38][64], R[2][38][64];
     for (int i = 0; i < slots + 6; i++) {
       const int idx = (base + i) & kRingMask;
       for (int k = 0; k < 64; k++) {
-        L[0][i][k] = s->ps_left[idx][k][0];
-        L[1][i][k] = s->ps_left[idx][k][1];
+        L[0][i][k] = s->left[idx][k][0];
+        L[1][i][k] = s->left[idx][k][1];
         R[0][i][k] = s->ch[1].W[idx][k][0];
         R[1][i][k] = s->ch[1].W[idx][k][1];
       }

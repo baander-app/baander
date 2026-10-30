@@ -897,7 +897,10 @@ int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTranspor
      * channel configuration names the layout as the config does. */
     asc->aot = AAC_AOT_USAC;
     asc->frame_length = s->frame_length;
-    asc->channel_config = s->channels;
+    /* the output rate and channels: with SBR the core runs at half the
+     * rate, with MPS 212 a stereo pair is one core channel */
+    asc->sample_rate = s->input_rate;
+    asc->channel_config = s->input_channels;
     aac_usac_enc_config(s, &asc->usac);
     return AAC_OK;
   }

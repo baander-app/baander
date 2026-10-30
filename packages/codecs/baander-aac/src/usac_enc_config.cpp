@@ -18,12 +18,6 @@ const int kUsacSampleRates[31] = {96000, 88200, 64000, 48000, 44100, 32000, 2400
 const int kSbrRatioIndex[5] = {AAC_USAC_SBR_NONE, AAC_USAC_SBR_NONE, AAC_USAC_SBR_8_3,
                                AAC_USAC_SBR_2_1, AAC_USAC_SBR_4_1};
 
-void write_bytes(AacBitWriter* w, const uint8_t* data, int len) {
-  for (int i = 0; i < len; i++) {
-    aac_bitwriter_write(w, data[i], 8);
-  }
-}
-
 /* SbrConfig() (Table 10) with SbrDfltHeader() (Table 11): the extension
  * fields are sent only where a value differs from the defaults. */
 void write_sbr_config(AacBitWriter* w, const AacUsacSbrConfig* c) {
@@ -98,7 +92,7 @@ void write_ext_element_config(AacBitWriter* w, const AacUsacElementConfig* e) {
     aac_usac_write_escaped(w, (unsigned)(e->ext_default_length - 1), 8, 16, 0);
   }
   aac_bitwriter_write(w, e->ext_payload_frag ? 1u : 0u, 1);
-  write_bytes(w, e->ext_config, e->ext_config_len);
+  aac_bitwriter_write_bytes(w, e->ext_config, e->ext_config_len);
 }
 
 }  // namespace
@@ -186,7 +180,7 @@ int aac_usac_config_write(const AacUsacConfig* c, AacBitWriter* w) {
       }
       aac_usac_write_escaped(w, (unsigned)x->type, 4, 8, 16);
       aac_usac_write_escaped(w, (unsigned)x->len, 4, 8, 16);
-      write_bytes(w, x->data, x->len);
+      aac_bitwriter_write_bytes(w, x->data, x->len);
     }
   }
   if (aac_bitwriter_overflow(w)) {

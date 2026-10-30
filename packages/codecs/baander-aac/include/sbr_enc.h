@@ -7,6 +7,7 @@
 #include "ps_enc.h"
 #include "qmf.h"
 #include "sbr.h"
+#include "usac.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,7 +22,9 @@ extern "C" {
  * and describes the upper half as envelope energies, noise floors and
  * inverse filtering levels per frame.  For HE-AAC v2 the stereo pair is
  * downmixed to one channel and its parametric stereo data is added to
- * the SBR extension. */
+ * the SBR extension.  For xHE-AAC (sbr_enc_usac.cpp) the same analysis
+ * is written as UsacSbrData() at the 2:1 ratio, and a stereo pair may
+ * be downmixed by the MPS 212 encoder instead. */
 
 #define AAC_SBR_ENC_RING 128   /* QMF slots kept per channel */
 #define AAC_SBR_ENC_MAX_BYTES 270 /* largest fill element payload */
@@ -84,9 +87,16 @@ using AacSbrEncoder = struct AacSbrEncoder_ {
   int frame_count;
   int pos; /* ring position of the next analysis slot */
   int source_band[64]; /* QMF band each SBR band is copied from */
-  AacSbrEncChannel ch[2]; /* with PS: [0] the downmix, [1] the right channel */
-  float ps_left[AAC_SBR_ENC_RING][64][2]; /* the left channel with PS */
+  AacSbrEncChannel ch[2]; /* with PS or MPS 212: [0] the downmix, [1] the right channel */
+  float left[AAC_SBR_ENC_RING][64][2]; /* the left channel with PS or MPS 212 */
   AacPsEncoder ps_enc;
+  /* xHE-AAC: the payload is UsacSbrData() of the element (its exact bit
+   * count in payload_bits), written with the frame's usacIndependencyFlag
+   * in usac_indep; with `mps` the stereo input is downmixed by the MPS
+   * 212 encoder (owned by the caller) and coded as one channel. */
+  int usac;
+  int usac_indep;
+  struct AacMps212Encoder_* mps;
   /* the extension payload of the frame */
   uint8_t payload[AAC_SBR_ENC_MAX_BYTES];
   int payload_bits;
@@ -127,6 +137,34 @@ int aac_sbr_enc_bits(const AacSbrEncoder* s);
 
 /* Writes the fill element carrying this frame's extension. */
 void aac_sbr_enc_write(const AacSbrEncoder* s, AacBitWriter* w);
+
+/* ── xHE-AAC (sbr_enc_usac.cpp) ─────────────────────────────────── */
+
+/* Prepares the encoder for UsacSbrData() at the 2:1 ratio with 1024-line
+ * core frames: `channels` input channels (1 or 2), coded as one channel
+ * through the MPS 212 encoder `mps` when it is given (stereo input only).
+ * Returns 0 or AAC_ERR_UNSUPPORTED. */
+int aac_sbr_enc_init_usac(AacSbrEncoder* s, int sample_rate, int channels, int bitrate,
+                          struct AacMps212Encoder_* mps);
+
+/* SbrConfig() of the stream: harmonic SBR, inter-TES and PVC off, the
+ * encoder's header as the default header. */
+void aac_sbr_enc_usac_config(const AacSbrEncoder* s, AacUsacSbrConfig* c);
+
+/* The frame's UsacSbrData() into the payload, and the MPS 212 analysis
+ * of the frame when the encoder has one; called by aac_sbr_enc_process
+ * after the envelope data of every coded channel is known.  `base` is
+ * the ring position of the frame's first slot, `prev_*` the values the
+ * decoder holds before the frame. */
+void aac_sbr_enc_usac_frame(AacSbrEncoder* s, int base, const int (*prev_env)[AAC_SBR_MAX_BANDS],
+                            const int* prev_res, const int (*prev_noise)[AAC_SBR_MAX_NOISE_BANDS]);
+
+/* The payload bits of the frame into the element's bitstream. */
+void aac_sbr_enc_usac_write(const AacSbrEncoder* s, AacBitWriter* w);
+
+/* UsacSbrData() of an independent frame describing silence: the header
+ * and one flat envelope at the lowest level, for a silent access unit. */
+void aac_sbr_enc_usac_write_silent(const AacSbrEncoder* s, AacBitWriter* w);
 
 #ifdef __cplusplus
 }

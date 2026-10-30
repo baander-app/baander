@@ -300,6 +300,80 @@ clicks signal come to 44.6, 60.3, 92.9 and 125.6 kbit/s at 48, 64, 96
 and 128 kbit/s; LOAS adds about 5 kbit/s for the StreamMuxConfig every
 frame.
 
+#### Enhanced SBR and MPEG Surround 2-1-2
+
+Measured on 2026-10-30 on the three committed streams of
+`test_usac_enc_sbr` (the same one-second clicks signal at half level,
+25 frames of 2048 samples each; the two-channel ones from the stereo
+form of the signal, whose channels differ) and, for the bitrate
+ladders, on a six-second stereo music excerpt at 48 kHz and its mono
+mix. The same four decoders; the FDK decoder and libxaac decode every
+stream without an error, FFmpeg the SBR streams, and the FDK decoder
+starts cleanly at the second and third immediate playout frame of the
+music streams from their two pre-roll frames (30 to 73 dB against the
+continuous decode in the first frame, the same as our decoder). Against
+the source the 2-1-2 stream is measured per channel and on the sum of
+the channels, which the single core channel carries.
+
+| Stream | Tools | Against the source | FDK / libxaac / FFmpeg against our decode |
+|--------|-------|-------------------:|------------------------------------------:|
+| `usac_enc_sbr_sce_32k` (mono 32 kbit/s) | 2:1 SBR | 17.5 dB | 58.0 / 80.5 / 26.0 dB |
+| `usac_enc_sbr_cpe_64k` (stereo 64 kbit/s) | 2:1 SBR | 19.4 dB | 74.1 / 80.3 / 26.7 dB |
+| `usac_enc_mps_cpe_32k` (stereo 32 kbit/s) | 2:1 SBR, 2-1-2 | 12.6 / 12.4 dB L/R, 20.5 dB on the sum | 77.3 / 79.4 / rejected |
+
+FFmpeg's USAC decoder reads two `core_mode` bits for a
+`stereoConfigIndex` 1 pair, whose second core channel is absent, and
+has no 2-1-2 upmix (it copies the downmix to both channels), so it
+rejects the 2-1-2 streams of every encoder; our decoder, the FDK decoder
+and libxaac read one bit, and the FDK encoder's own 2-1-2 streams decode
+in those three alike.
+
+The ladders, with the configuration each bitrate takes, the bitrate of
+the raw access units, the SNR against the source after the encoder's
+delay (for the 2-1-2 points on the sum of the channels, since the
+excerpt's channels are offset by a fraction of a millisecond, which
+level and coherence parameters cannot carry) and the highest frequency
+whose long-term spectrum stays within 50 dB of the peak. The FDK
+xHE-AAC encoder's figures on the same excerpt follow for reference;
+below 48 kbit/s it codes the pair at the 8:3 ratio with the 2-1-2's
+phase coding, which keeps the channel offset and costs the sum.
+
+| Stereo | Ours: tools (SBR start, stop index) | kbit/s | SNR | Bandwidth | FDK: tools | SNR | Bandwidth |
+|-------:|-------------------------------------|-------:|----:|----------:|------------|----:|----------:|
+| 24 | 2:1 SBR (default) | 28.2 (LOAS) | 13.0 dB | 9.8 kHz | 8:3 SBR, 2-1-2 with phase | 12.5 dB | 8.4 kHz |
+| 24 | 2:1 SBR (7, 8), 2-1-2 (opted in) | 24.0 | 16.7 dB (sum) | 11.4 kHz | | | |
+| 32 | 2:1 SBR (default) | 37.0 (LOAS) | 17.8 dB | 11.3 kHz | 8:3 SBR, 2-1-2 with phase | 14.9 dB | 8.6 kHz |
+| 32 | 2:1 SBR (10, 9), 2-1-2 (opted in) | 32.3 | 17.2 dB (sum) | 13.2 kHz | | | |
+| 48 | 2:1 SBR (12, 9) | 49.4 | 23.2 dB | 15.6 kHz | 2:1 SBR, 2-1-2 with residual | 24.6 dB | 16.8 kHz |
+| 64 | 2:1 SBR (14, 12) | 66.1 | 24.4 dB | 21.6 kHz | 2:1 SBR, 2-1-2 with residual | 25.9 dB | 19.9 kHz |
+| 96 | 2:1 SBR (14, 12) | 99.6 | 25.5 dB | 21.2 kHz | plain core | 30.1 dB | 13.9 kHz |
+| 128 | plain core | 126.6 | 27.5 dB | 13.9 kHz | plain core | 31.3 dB | 13.9 kHz |
+
+| Mono | Ours: tools (SBR start, stop index) | kbit/s | SNR | Bandwidth | FDK: tools | SNR | Bandwidth |
+|-----:|-------------------------------------|-------:|----:|----------:|------------|----:|----------:|
+| 16 | 2:1 SBR (3, 5) | 15.6 | 22.3 dB | 8.5 kHz | 4:1 SBR | 14.0 dB | 13.5 kHz |
+| 24 | 2:1 SBR (7, 8) | 24.2 | 25.4 dB | 11.4 kHz | 2:1 SBR | 16.3 dB | 13.9 kHz |
+| 32 | 2:1 SBR (10, 9) | 32.6 | 26.4 dB | 13.5 kHz | 2:1 SBR | 16.4 dB | 13.1 kHz |
+| 48 | 2:1 SBR (13, 11) | 49.0 | 26.9 dB | 17.3 kHz | 2:1 SBR | 28.7 dB | 17.2 kHz |
+| 64 | plain core | 62.4 | 28.7 dB | 13.9 kHz | plain core | 31.9 dB | 13.9 kHz |
+
+Every one of these streams decodes in the FDK decoder and libxaac at
+63 to 84 dB against our decoder (libxaac at 46.7 dB on the stereo
+48 kbit/s stream, both at 44 to 49 dB on the default stereo 24 and
+32 kbit/s points), and in FFmpeg at 31 to 50 dB except the two 2-1-2
+points it rejects. The 2-1-2 is therefore never chosen by bitrate; the
+default stereo points below 48 kbit/s are SBR pairs, whose LOAS bitrate
+is given (the per-frame StreamMuxConfig adds about four kbit/s to the
+access units), and a caller who knows the players opts into the 2-1-2
+for 1.5 to 2 kHz more bandwidth at the same rate. At 96 kbit/s stereo our rule keeps SBR, which codes
+the full band where the FDK encoder's plain core stops at 14 kHz; the
+SNR on music is lower there because the replicated band carries no
+waveform. The mono SBR points sit 8 to 10 dB above the FDK encoder's at
+16 to 32 kbit/s on this excerpt, where its lower crossover leaves more
+of the band to replication; the 2-1-2 points carry the sum of the
+channels 3 dB better than the FDK encoder's and the channels themselves
+worse, for want of phase coding.
+
 ## MPEG Surround
 
 Measured on 2026-10-30 against the Ittiam libxaac decoder (AOSP

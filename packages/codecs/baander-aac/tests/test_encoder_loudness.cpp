@@ -78,6 +78,24 @@ std::vector<uint8_t> encode_all(AacEncoderHandle enc, const std::vector<float>& 
 /* Decodes a LOAS stream through the public FIFO with concealment off and
  * returns the declared program loudness (LUFS times 100, INT32_MIN for
  * none) and the normalisation gain after the last frame. */
+/* The suite exercises the plain frequency-domain core: SBR, which the
+ * bitrate rule would pick for these rates, changes the frame length and
+ * the delay the checks assume. */
+AacEncoderHandle create_plain(int channels, int bitrate, AacObjectType aot) {
+  AacEncoderHandle enc = aac_encoder_create(kRate, channels, bitrate, aot, AAC_RC_CBR);
+  if (enc && aot == AAC_AOT_USAC) {
+    AacUsacEncoderOptions o;
+    memset(&o, 0, sizeof(o));
+    o.noise_filling = -1;
+    o.preroll = -1;
+    o.stream_id = -1;
+    o.sbr = 0;
+    o.mps212 = 0;
+    aac_encoder_set_usac(enc, &o);
+  }
+  return enc;
+}
+
 int decode_loudness(const std::vector<uint8_t>& stream, int* program_x100, int* gain_x100,
                     std::vector<float>* pcm_out = nullptr) {
   AacDecoderHandle dec = aac_decoder_create(kRate, 0);
@@ -137,7 +155,7 @@ void test_two_pass() {
   CHECK(info.has_true_peak && info.has_momentary && info.has_short_term && info.has_range,
         "a four second programme has every figure");
 
-  AacEncoderHandle enc = aac_encoder_create(kRate, 2, 96000, AAC_AOT_USAC, AAC_RC_CBR);
+  AacEncoderHandle enc = create_plain(2, 96000, AAC_AOT_USAC);
   CHECK(enc != nullptr, "xHE-AAC encoder");
   if (!enc) {
     return;
@@ -232,7 +250,7 @@ void test_two_pass() {
   CHECK(program == -2000, "the second set's loudness (%d)", program);
   aac_encoder_destroy(enc);
   /* The stream id extension and the loudness set share the list. */
-  enc = aac_encoder_create(kRate, 1, 64000, AAC_AOT_USAC, AAC_RC_CBR);
+  enc = create_plain(1, 64000, AAC_AOT_USAC);
   if (enc) {
     AacUsacEncoderOptions opt;
     memset(&opt, -1, sizeof(opt));
@@ -255,7 +273,7 @@ void test_two_pass_refusals() {
   CHECK(aac_encoder_set_loudness_info(nullptr, &info) == AAC_ERR_INVALID_ARG, "no handle");
   const AacObjectType others[] = {AAC_AOT_LC, AAC_AOT_SBR, AAC_AOT_PS, AAC_AOT_ER_LD, AAC_AOT_ER_ELD};
   for (AacObjectType aot : others) {
-    AacEncoderHandle enc = aac_encoder_create(kRate, 2, 64000, aot, AAC_RC_CBR);
+    AacEncoderHandle enc = create_plain(2, 64000, aot);
     CHECK(enc != nullptr, "encoder of type %d", (int)aot);
     if (!enc) {
       continue;
@@ -275,7 +293,7 @@ void test_one_pass() {
   const std::vector<float> quiet = stereo_sine(1.0, -33.0);
   const AacObjectType types[] = {AAC_AOT_USAC, AAC_AOT_LC};
   for (AacObjectType aot : types) {
-    AacEncoderHandle enc = aac_encoder_create(kRate, 2, 96000, aot, AAC_RC_CBR);
+    AacEncoderHandle enc = create_plain(2, 96000, aot);
     CHECK(enc != nullptr, "encoder of type %d", (int)aot);
     if (!enc) {
       continue;
@@ -340,7 +358,7 @@ void test_one_pass() {
   /* A meter measures a whole stream, so none can start in the middle of
    * one; after the flush it can. */
   {
-    AacEncoderHandle enc = aac_encoder_create(kRate, 2, 96000, AAC_AOT_USAC, AAC_RC_CBR);
+    AacEncoderHandle enc = create_plain(2, 96000, AAC_AOT_USAC);
     CHECK(enc != nullptr, "encoder");
     if (enc) {
       std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) * 4);
@@ -390,8 +408,8 @@ void test_bytes_unchanged() {
   const std::vector<float> pcm = gen_wideband(kRate * 2, kRate, 2);
   const AacObjectType types[] = {AAC_AOT_LC, AAC_AOT_SBR, AAC_AOT_USAC};
   for (AacObjectType aot : types) {
-    AacEncoderHandle plain = aac_encoder_create(kRate, 2, 96000, aot, AAC_RC_CBR);
-    AacEncoderHandle metered = aac_encoder_create(kRate, 2, 96000, aot, AAC_RC_CBR);
+    AacEncoderHandle plain = create_plain(2, 96000, aot);
+    AacEncoderHandle metered = create_plain(2, 96000, aot);
     CHECK(plain && metered, "encoders of type %d", (int)aot);
     if (!plain || !metered) {
       continue;
@@ -403,8 +421,8 @@ void test_bytes_unchanged() {
     aac_encoder_destroy(plain);
     aac_encoder_destroy(metered);
   }
-  AacEncoderHandle plain = aac_encoder_create(kRate, 2, 96000, AAC_AOT_USAC, AAC_RC_CBR);
-  AacEncoderHandle with_set = aac_encoder_create(kRate, 2, 96000, AAC_AOT_USAC, AAC_RC_CBR);
+  AacEncoderHandle plain = create_plain(2, 96000, AAC_AOT_USAC);
+  AacEncoderHandle with_set = create_plain(2, 96000, AAC_AOT_USAC);
   if (plain && with_set) {
     AacUsacEncoderOptions opt;
     memset(&opt, -1, sizeof(opt));

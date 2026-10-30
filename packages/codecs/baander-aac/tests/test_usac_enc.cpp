@@ -1,7 +1,10 @@
-/* The xHE-AAC encoder: the arithmetic coder against the decoder's, the
- * UsacConfig writer against the reader, encode and decode round trips
- * through the library's own decoder, the bitrate of the raw access
- * units, the API's refusals, and the committed streams.
+/* The xHE-AAC encoder's core: the arithmetic coder against the
+ * decoder's, the UsacConfig writer against the reader, encode and decode
+ * round trips through the library's own decoder, the bitrate of the raw
+ * access units, the API's refusals, and the committed streams.  The
+ * tests that need the plain core ask for it, since SBR and the 2-1-2 are
+ * on by default below 64 kbit/s per channel (test_usac_enc_sbr covers
+ * them).
  *
  * With arguments the program writes the committed streams instead:
  *   test_usac_enc --write-streams <dir>
@@ -37,6 +40,19 @@ namespace {
 
 constexpr int kRate = 48000;
 constexpr int kFrame = 1024;
+
+/* The defaults with SBR and the 2-1-2 off: the plain core. */
+AacUsacEncoderOptions plain_options() {
+  AacUsacEncoderOptions o;
+  o.noise_filling = 1;
+  o.preroll = 1;
+  o.independent_interval_frames = 0;
+  o.stream_id = -1;
+  o.sbr = 0;
+  o.mps212 = 0;
+  return o;
+}
+const AacUsacEncoderOptions kPlain = plain_options();
 
 /* ── the arithmetic coder ───────────────────────────────────────── */
 
@@ -201,8 +217,8 @@ AacEncoderHandle make_encoder(int channels, int bitrate, const AacUsacEncoderOpt
   return enc;
 }
 
-void check_config(int channels, const AacUsacEncoderOptions* opt, const char* name) {
-  AacEncoderHandle enc = make_encoder(channels, 64000, opt);
+void check_config(int channels, int bitrate, const AacUsacEncoderOptions* opt, const char* name) {
+  AacEncoderHandle enc = make_encoder(channels, bitrate, opt);
   if (!enc) {
     return;
   }
@@ -253,18 +269,19 @@ void check_config(int channels, const AacUsacEncoderOptions* opt, const char* na
 }
 
 void test_config() {
-  check_config(1, nullptr, "mono defaults");
-  check_config(2, nullptr, "stereo defaults");
-  AacUsacEncoderOptions o;
+  /* The defaults at the lowest bitrates that keep the plain core. */
+  check_config(1, 64000, nullptr, "mono defaults");
+  check_config(2, 128000, nullptr, "stereo defaults");
+  AacUsacEncoderOptions o = kPlain;
   o.noise_filling = 0;
   o.preroll = 0;
   o.independent_interval_frames = 10;
   o.stream_id = 0x1234;
-  check_config(2, &o, "stereo without pre-roll or noise filling");
+  check_config(2, 64000, &o, "stereo without pre-roll or noise filling");
   o.noise_filling = 1;
   o.preroll = 1;
   o.stream_id = 0;
-  check_config(1, &o, "mono with stream id 0");
+  check_config(1, 64000, &o, "mono with stream id 0");
   /* The reader's own structure writes back to the same bits: every
    * element kind the writer covers. */
   {
@@ -459,16 +476,16 @@ void test_round_trips() {
   const std::vector<float> noise_mono = gen_noise(n, 1);
   const std::vector<float> noise_stereo = gen_noise(n, 2, 777u);
   const std::vector<float> he_stereo = gen_he_signal(2);
-  round_trip("mono tones 64k", tones_mono, 1, 64000, nullptr, 30.0);
-  round_trip("stereo tones 96k", tones_stereo, 2, 96000, nullptr, 30.0);
+  round_trip("mono tones 64k", tones_mono, 1, 64000, &kPlain, 30.0);
+  round_trip("stereo tones 96k", tones_stereo, 2, 96000, &kPlain, 30.0);
   /* White noise loses what lies above the encoder's lowpass, so its SNR
    * is bounded by the bandwidth rather than the quantisation. */
-  round_trip("mono noise 64k", noise_mono, 1, 64000, nullptr, 2.0);
-  round_trip("stereo noise 128k", noise_stereo, 2, 128000, nullptr, 2.0);
-  round_trip("stereo transients 96k", he_stereo, 2, 96000, nullptr, 18.0);
+  round_trip("mono noise 64k", noise_mono, 1, 64000, &kPlain, 2.0);
+  round_trip("stereo noise 128k", noise_stereo, 2, 128000, &kPlain, 2.0);
+  round_trip("stereo transients 96k", he_stereo, 2, 96000, &kPlain, 18.0);
   /* The same without noise filling and pre-roll, and with independent
    * frames every eight frames. */
-  AacUsacEncoderOptions o;
+  AacUsacEncoderOptions o = kPlain;
   o.noise_filling = 0;
   o.preroll = 0;
   o.independent_interval_frames = 8;
@@ -486,7 +503,7 @@ void test_round_trips() {
       pcm[(size_t)i * 2] = v;
       pcm[(size_t)i * 2 + 1] = -v;
     }
-    const Encoded e = encode(pcm, 2, 64000, nullptr);
+    const Encoded e = encode(pcm, 2, 64000, &kPlain);
     const Decoded d = decode_loas(e.stream, 2);
     CHECK(e.error == 0 && d.errors == 0, "silence then tone decodes");
     double silent = 0.0;
@@ -498,8 +515,8 @@ void test_round_trips() {
   }
   /* Encoding is deterministic. */
   {
-    const Encoded a = encode(he_stereo, 2, 64000, nullptr);
-    const Encoded b = encode(he_stereo, 2, 64000, nullptr);
+    const Encoded a = encode(he_stereo, 2, 64000, &kPlain);
+    const Encoded b = encode(he_stereo, 2, 64000, &kPlain);
     CHECK(a.stream == b.stream, "two encodes of one signal are byte identical");
   }
 }
@@ -510,12 +527,9 @@ void test_round_trips() {
 void test_noise_filling() {
   const int n = kRate * 2;
   const std::vector<float> pcm = gen_noise(n, 1);
-  AacUsacEncoderOptions off;
+  AacUsacEncoderOptions off = kPlain;
   off.noise_filling = 0;
-  off.preroll = 1;
-  off.independent_interval_frames = 0;
-  off.stream_id = -1;
-  const Encoded with = encode(pcm, 1, 24000, nullptr);
+  const Encoded with = encode(pcm, 1, 24000, &kPlain);
   const Encoded without = encode(pcm, 1, 24000, &off);
   const Decoded dw = decode_loas(with.stream, 1);
   const Decoded dwo = decode_loas(without.stream, 1);
@@ -539,7 +553,7 @@ void test_bitrates() {
   const double seconds = (double)pcm.size() / 2.0 / (double)kRate;
   const int targets[4] = {48000, 64000, 96000, 128000};
   for (int target : targets) {
-    const Encoded e = encode(pcm, 2, target, nullptr, AAC_TRANSPORT_RAW);
+    const Encoded e = encode(pcm, 2, target, &kPlain, AAC_TRANSPORT_RAW);
     CHECK(e.error == 0 && !e.aus.empty(), "%d: raw access units", target);
     size_t bytes = 0;
     size_t largest = 0;
@@ -557,7 +571,7 @@ void test_bitrates() {
     CHECK(largest <= 2 * 768 * 2 + 64, "%d: largest unit %zu within the budget", target, largest);
     /* Each unit decodes on its own call, after the configuration. */
     AacDecoderHandle dec = aac_decoder_create(kRate, 2);
-    AacEncoderHandle enc = make_encoder(2, target, nullptr, AAC_TRANSPORT_RAW);
+    AacEncoderHandle enc = make_encoder(2, target, &kPlain, AAC_TRANSPORT_RAW);
     uint8_t asc[64];
     const int asc_len = aac_encoder_config(enc, asc, (int)sizeof(asc));
     aac_encoder_destroy(enc);
@@ -585,7 +599,7 @@ void test_bitrates() {
 /* ── the API ───────────────────────────────────────────────────── */
 
 void test_api() {
-  AacEncoderHandle enc = aac_encoder_create(kRate, 2, 96000, AAC_AOT_USAC, AAC_RC_CBR);
+  AacEncoderHandle enc = aac_encoder_create(kRate, 2, 128000, AAC_AOT_USAC, AAC_RC_CBR);
   CHECK(enc != nullptr, "stereo encoder");
   if (!enc) {
     return;
@@ -601,9 +615,7 @@ void test_api() {
   CHECK(aac_encoder_delay(enc) == 2 * kFrame && aac_encoder_frame_size(enc) == kFrame,
         "delay and frame size");
   CHECK(aac_encoder_set_frame_length(enc, 960) != AAC_OK, "960 frames refused");
-  AacUsacEncoderOptions o;
-  o.noise_filling = 1;
-  o.preroll = 1;
+  AacUsacEncoderOptions o = kPlain;
   o.independent_interval_frames = 4;
   o.stream_id = 5;
   CHECK(aac_encoder_set_usac(enc, &o) == AAC_OK, "options before the first frame");
@@ -618,7 +630,7 @@ void test_api() {
   CHECK(aac_encoder_set_usac(enc, &o) == AAC_OK, "options after a flush");
   aac_encoder_destroy(enc);
 
-  AacEncoderHandle lc = aac_encoder_create(kRate, 2, 96000, AAC_AOT_LC, AAC_RC_CBR);
+  AacEncoderHandle lc = aac_encoder_create(kRate, 2, 128000, AAC_AOT_LC, AAC_RC_CBR);
   CHECK(lc && aac_encoder_set_usac(lc, &o) == AAC_ERR_UNSUPPORTED, "options refused for AAC-LC");
   aac_encoder_destroy(lc);
   CHECK(aac_encoder_create(kRate, 6, 256000, AAC_AOT_USAC, AAC_RC_CBR) == nullptr,
@@ -651,7 +663,7 @@ std::vector<float> committed_signal(int channels) {
 
 int write_streams(const char* dir) {
   for (const Committed& s : kCommitted) {
-    const Encoded e = encode(committed_signal(s.channels), s.channels, s.bitrate, nullptr);
+    const Encoded e = encode(committed_signal(s.channels), s.channels, s.bitrate, &kPlain);
     const std::string path = std::string(dir) + "/" + s.name;
     if (e.error || !write_file(path, e.stream.data(), e.stream.size())) {
       fprintf(stderr, "%s: not written\n", path.c_str());
@@ -681,7 +693,7 @@ void test_committed() {
     const double snr = aligned_snr_db(pcm, d.pcm, s.channels, 2 * kFrame);
     CHECK(d.errors == 0 && d.frames > 48 && snr > 18.0, "%s: %d frames, %d errors, %.1f dB", s.name,
           d.frames, d.errors, snr);
-    const Encoded e = encode(pcm, s.channels, s.bitrate, nullptr);
+    const Encoded e = encode(pcm, s.channels, s.bitrate, &kPlain);
 #if defined(__OPTIMIZE__) && defined(__FAST_MATH__) && !BAAC_SANITIZED
     CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
           e.stream.size(), stream.size());

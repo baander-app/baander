@@ -1406,21 +1406,50 @@ int create_sbr_encoders(AacEncoderState* s) {
   return AAC_OK;
 }
 
+/* xHE-AAC with SBR: one SBR encoder per element writing the USAC
+ * syntax; with MPS 212 the single element takes both input channels
+ * through the USAC encoder's MPS 212 encoder. */
+int create_usac_sbr_encoders(AacEncoderState* s) {
+  AacUsacEncoder* u = s->usac;
+  for (int e = 0; e < s->num_elements; e++) {
+    const AacEncElement* el = &s->elem[e];
+    if (el->type == AAC_ELEM_LFE) {
+      s->lfe_down[e] = new AacSbrDownsampler();
+      continue;
+    }
+    const int in_ch = u->mps_active ? 2 : el->num_ch;
+    const int el_bitrate = (int)((long long)s->bitrate * el->num_ch / s->channels);
+    s->sbr[e] = new AacSbrEncoder();
+    if (aac_sbr_enc_init_usac(s->sbr[e], s->input_rate, in_ch, el_bitrate,
+                              u->mps_active ? &u->mps : nullptr)) {
+      return AAC_ERR_INIT;
+    }
+  }
+  return AAC_OK;
+}
+
+/* Whether the core codes the half-rate signal of the SBR encoders. */
+bool state_has_sbr(const AacEncoderState* s) {
+  return aac_encoder_aot_has_sbr(s->aot) || (s->usac && s->usac->sbr_active);
+}
+
 /* Lines of an LFE channel that are coded: the lowest twelve of a
  * 1024-line spectrum, as FFmpeg and FDK limit it, scaled with the frame
  * length. */
 int lfe_lines(int frame_length) { return 12 * frame_length / AAC_FRAME_SIZE_LONG; }
 
-/* Bits per second one SBR channel is expected to take from the bitrate
- * when the core's bandwidth and noise targets are chosen. */
+/* Bits per second one SBR channel, and the MPS 212 data of a pair, are
+ * expected to take from the bitrate when the core's bandwidth and noise
+ * targets are chosen. */
 constexpr int kSbrBitrateEstimate = 1500;
+constexpr int kMpsBitrateEstimate = 2500;
 
 /* Everything that follows from the frame length: the input block size,
  * the delay, the transforms, the LFE downsamplers and the bit budget per
  * frame (ISO/IEC 14496-3 4.5.3.1 allows 6144 bits per channel for 1024
  * samples, scaled with the frame length). */
 void apply_frame_length(AacEncoderState* s) {
-  const bool sbr = aac_encoder_aot_has_sbr(s->aot);
+  const bool sbr = state_has_sbr(s);
   const int fl = s->frame_length;
   const bool is960 = fl == AAC_FRAME_SIZE_LONG_960;
   s->frame_size = sbr ? 2 * fl : fl;
@@ -1448,6 +1477,45 @@ void apply_frame_length(AacEncoderState* s) {
    * count; the hard limit per frame still counts the coded channels. */
   s->reservoir_max =
       std::max(0, aac_max_bits_per_channel(fl) * s->input_channels - s->avg_frame_bits);
+}
+
+/* xHE-AAC: the SBR and MPS 212 choice of the options and the bitrate,
+ * and everything that follows from it: the core rate (half the input
+ * rate with SBR), the coded channel count (one with MPS 212), the
+ * layout, the SBR encoders, the frame size and the bit budget.  Called
+ * from the reset, so that a change of the options before the first
+ * frame takes effect; nothing changes when the choice stands. */
+void apply_usac_tools(AacEncoderState* s) {
+  AacUsacEncoder* u = s->usac;
+  int sbr = 0;
+  int mps = 0;
+  aac_usac_enc_choose_tools(u, s->input_rate, s->input_channels, s->bitrate, &sbr, &mps);
+  if (sbr == u->sbr_active && mps == u->mps_active) {
+    return;
+  }
+  for (int attempt = 0; attempt < 2; attempt++) {
+    destroy_sbr_encoders(s);
+    s->sample_rate = sbr ? s->input_rate / 2 : s->input_rate;
+    s->rate_index = aac_asc_rate_index(s->sample_rate);
+    s->channels = mps ? 1 : s->input_channels;
+    setup_layout(s, AAC_MODE_DEFAULT);
+    u->sbr_active = sbr;
+    u->mps_active = mps;
+    u->preroll_frames = sbr ? AAC_USAC_ENC_PREROLL_FRAMES_SBR : AAC_USAC_ENC_PREROLL_FRAMES;
+    if (mps) {
+      aac_mps212_enc_init(&u->mps, s->bitrate);
+    }
+    if (!sbr || create_usac_sbr_encoders(s) == AAC_OK) {
+      break;
+    }
+    /* no SBR tuning for this rate and bitrate: the plain core */
+    sbr = 0;
+    mps = 0;
+  }
+  const AacUsacEncoderOptions opt = u->opt;
+  aac_usac_enc_set_options(u, &opt, s->sample_rate);
+  apply_frame_length(s);
+  aac_encoder_state_configure(s);
 }
 
 }  // namespace
@@ -1584,7 +1652,11 @@ void aac_encoder_state_configure(AacEncoderState* s) {
   int core_bitrate = s->bitrate;
   for (int e = 0; e < s->num_elements; e++) {
     if (s->sbr[e]) {
-      core_bitrate -= kSbrBitrateEstimate * (s->sbr[e]->ps ? 1 : s->sbr[e]->channels);
+      const AacSbrEncoder* sbr = s->sbr[e];
+      core_bitrate -= kSbrBitrateEstimate * (sbr->ps || sbr->mps ? 1 : sbr->channels);
+      if (sbr->mps) {
+        core_bitrate -= kMpsBitrateEstimate;
+      }
     }
     if (s->ld_sbr && s->elem[e].type != AAC_ELEM_LFE) {
       core_bitrate -= kSbrBitrateEstimate * s->elem[e].num_ch;
@@ -1650,6 +1722,9 @@ void aac_encoder_state_configure(AacEncoderState* s) {
 }
 
 void aac_encoder_state_reset(AacEncoderState* s) {
+  if (s->usac) {
+    apply_usac_tools(s);
+  }
   for (int c = 0; c < s->channels; c++) {
     AacEncChannel* ch = &s->ch[c];
     memset(ch->pcm, 0, sizeof(ch->pcm));
@@ -1820,7 +1895,8 @@ void sbr_process(AacEncoderState* s, const float* pcm) {
     const float* in[2];
     float* core[2];
     for (int k = 0; k < sbr->channels; k++) {
-      in[k] = s->sbr_in[sbr->ps ? k : el->ch[k]];
+      /* a downmixed pair takes both input channels */
+      in[k] = s->sbr_in[sbr->ps || sbr->mps ? k : el->ch[k]];
     }
     for (int k = 0; k < el->num_ch; k++) {
       core[k] = s->core_in[el->ch[k]];
@@ -1861,8 +1937,8 @@ void ld_sbr_process(AacEncoderState* s, const float* pcm) {
 }  // namespace
 
 int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
-  /* with SBR of either kind the core codes the signal in core_in */
-  const bool sbr = aac_encoder_aot_has_sbr(s->aot) || s->ld_sbr;
+  /* with SBR of any kind the core codes the signal in core_in */
+  const bool sbr = state_has_sbr(s) || s->ld_sbr;
   const int fl = s->frame_length;
   s->started = 1;
   if (s->usac) {

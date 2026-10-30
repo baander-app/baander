@@ -6,6 +6,7 @@
 #include "aac.h"
 #include "bitstream.h"
 #include "ics.h"
+#include "mps212_enc.h"
 #include "usac.h"
 #include "usac_fd.h"
 
@@ -17,8 +18,11 @@ extern "C" {
  * writer that mirrors the decoder's reader, the spectral noiseless
  * encoder that mirrors the arithmetic decoder, and the frame writer that
  * turns the AAC-LC encoder's analysis and quantisation of a frame into
- * UsacFrame() with the frequency-domain core.  The encoder state of
- * encoder.h owns one AacUsacEncoder when its object type is USAC. */
+ * UsacFrame() with the frequency-domain core, followed in each element
+ * by the enhanced SBR data of the SBR encoder (sbr_enc_usac.cpp) and
+ * the MPS 212 data of a parametric stereo pair (mps212_enc.cpp).  The
+ * encoder state of encoder.h owns one AacUsacEncoder when its object
+ * type is USAC. */
 
 /* ── UsacConfig() (usac_enc_config.cpp) ───────────────────────── */
 
@@ -51,11 +55,21 @@ struct AacEncoderState_;
 struct AacEncElement_;
 
 #define AAC_USAC_ENC_MAX_CONFIG_EXTS 4
-/* The largest access unit: the bit budget of the channels, written twice
- * at an immediate playout frame (the frame itself and the pre-roll
- * access unit it carries) plus the embedded configuration. */
+/* Pre-roll access units an immediate playout frame carries: the one
+ * frame the core's overlap needs, two when the SBR's filterbank and
+ * envelope history have to be warm too. */
+#define AAC_USAC_ENC_PREROLL_FRAMES 1
+#define AAC_USAC_ENC_PREROLL_FRAMES_SBR 2
+/* The largest access unit of a stream without its pre-roll: the bit
+ * budget of the core channels, the SBR data of up to `channels` SBR
+ * channels and the MPS 212 data. */
 #define AAC_USAC_ENC_MAX_AU_BYTES(channels) \
-  (2 * (6144 / 8) * (channels) + AAC_USAC_MAX_CONFIG_BYTES + 32)
+  ((6144 / 8) * (channels) + AAC_SBR_ENC_MAX_BYTES * (channels) + AAC_MPS212_ENC_MAX_BYTES)
+/* ... and with the pre-roll of an immediate playout frame: the embedded
+ * configuration and the previous access units. */
+#define AAC_USAC_ENC_MAX_IPF_BYTES(channels) \
+  ((1 + AAC_USAC_ENC_PREROLL_FRAMES_SBR) * AAC_USAC_ENC_MAX_AU_BYTES(channels) + \
+   AAC_USAC_MAX_CONFIG_BYTES + 32)
 
 /* Per channel: the arithmetic coder context after the last written
  * frame, and the scale factors and noise filling parameters of the
@@ -73,13 +87,21 @@ using AacUsacEncoder = struct AacUsacEncoder_ {
   int frame_index; /* frames since the start of the stream */
   int indep;       /* the frame being coded has usacIndependencyFlag set */
   int ipf;         /* ... and carries the audio pre-roll */
+  /* The tools in use, resolved from the options and the bitrate by the
+   * encoder state (encoder.cpp): enhanced SBR at the 2:1 ratio, and MPS
+   * 212 coding a stereo input as one core channel through `mps`. */
+  int sbr_active;
+  int mps_active;
+  AacMps212Encoder mps;
+  int preroll_frames; /* access units an immediate playout frame carries */
   AacUsacEncChannel ch[AAC_MAX_CHANNELS];
   int num_config_exts;
   AacUsacConfigExt config_ext[AAC_USAC_ENC_MAX_CONFIG_EXTS];
-  /* The last written access unit without its pre-roll element, which
-   * the next immediate playout frame carries as its pre-roll. */
-  uint8_t* last_au;
-  int last_au_len;
+  /* The last written access units without their pre-roll element,
+   * oldest first, which the next immediate playout frame carries as its
+   * pre-roll. */
+  uint8_t* last_au[AAC_USAC_MAX_PREROLL_FRAMES];
+  int last_au_len[AAC_USAC_MAX_PREROLL_FRAMES];
   int last_au_cap;
   uint8_t* scratch; /* the channel elements of the frame being written */
   int scratch_cap;
@@ -97,10 +119,19 @@ void aac_usac_enc_destroy(AacUsacEncoder* u);
 
 /* Applies the options, with the defaults for every field outside its
  * range (noise filling on, pre-roll on, one second between independent
- * frames, no stream id); `sample_rate` turns the default interval into
- * frames.  Before the first frame only. */
+ * frames, no stream id, SBR and MPS 212 by bitrate); `sample_rate`, the
+ * core rate, turns the default interval into frames.  Before the first
+ * frame only.  The SBR and MPS 212 choices are resolved by the encoder
+ * state (aac_usac_enc_choose_tools), which configures the core rate and
+ * the element layout for them. */
 void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt,
                               int sample_rate);
+/* The tools the options and the bitrate ask for: SBR below 64 kbit/s
+ * per input channel, MPS 212 for a stereo input below 48 kbit/s (which
+ * needs SBR), each overridden by its option; SBR only when the input
+ * rate halves to a rate with core tables. */
+void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int input_channels,
+                               int bitrate, int* sbr, int* mps);
 /* Keeps a configuration extension (usacConfigExtType, payload bytes)
  * for the UsacConfig; a second one of the same type replaces the first.
  * AAC_ERR_INVALID_ARG when it does not fit, AAC_ERR_OVERFLOW when the
@@ -111,7 +142,8 @@ void aac_usac_enc_reset(AacUsacEncoder* u, int channels);
 
 /* The UsacConfig() of the encoder's stream. */
 void aac_usac_enc_config(const struct AacEncoderState_* s, AacUsacConfig* c);
-/* Largest access unit the encoder's stream can produce. */
+/* Largest access unit the encoder's stream can produce, pre-roll
+ * included. */
 int aac_usac_enc_max_au_bytes(const struct AacEncoderState_* s);
 /* TNS_MAX_BANDS of the USAC core for a sampling frequency index. */
 int aac_usac_enc_tns_max_bands(int rate_index, int is_short);

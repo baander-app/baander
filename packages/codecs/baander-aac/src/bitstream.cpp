@@ -357,6 +357,12 @@ void aac_bitwriter_write_scalefactor(AacBitWriter* w, int diff) {
   aac_bitwriter_write(w, aac_scalefactor_code[idx], aac_scalefactor_bits[idx]);
 }
 
+void aac_bitwriter_write_bytes(AacBitWriter* w, const uint8_t* data, int len) {
+  for (int i = 0; i < len; i++) {
+    aac_bitwriter_write(w, data[i], 8);
+  }
+}
+
 void aac_bitwriter_byte_align(AacBitWriter* w) {
   if (w->bit_pos > 0) {
     w->byte_pos++;

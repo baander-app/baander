@@ -7,8 +7,11 @@
  * delta coded scale factor for every band below max_sfb) and the
  * context based arithmetic coder, adds the noise filling parameters,
  * and writes the element syntax: UsacSingleChannelElement,
- * UsacChannelPairElement with StereoCoreToolInfo, and the audio
- * pre-roll extension element of the immediate playout frames. */
+ * UsacChannelPairElement with StereoCoreToolInfo (or with one core
+ * channel when MPS 212 codes the pair), the UsacSbrData() and
+ * Mps212Data() the SBR and MPS 212 encoders prepared for the element,
+ * and the audio pre-roll extension element of the immediate playout
+ * frames. */
 #include "usac_enc.h"
 
 #include <algorithm>
@@ -16,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "asc.h"
 #include "encoder.h"
 
 namespace {
@@ -28,6 +32,7 @@ constexpr int kLong = AAC_FRAME_SIZE_LONG;
 constexpr int kTransportBits = 8 * AAC_ADTS_HEADER_SIZE;
 constexpr int kMaxSfDelta = 60;
 constexpr int kMaxSf = 255;
+constexpr int kUnaffordableBits = 1 << 24; /* more than any frame budget */
 constexpr int kNeutralNoiseOffset = 16;
 constexpr int kMaxNoiseLevel = 7;
 /* The noise level when no coded band above the start has a line
@@ -45,6 +50,10 @@ constexpr int kFillByte = 0xA5;
 /* No channel codes fewer bands than this: lg stays above zero, which
  * decoders treat alike only for a coded range. */
 constexpr int kMinMaxSfb = 1;
+/* An empty band whose lines are quieter than this (about 150 dB below
+ * full scale in the coefficient domain) is silence and gets no noise:
+ * digital silence decodes to digital silence. */
+constexpr double kSilentBandRms = 1e-3;
 
 /* TNS_MAX_BANDS of the USAC core (ISO/IEC 23003-3, the TNS tool); the
  * decoder's table, repeated here. */
@@ -69,12 +78,6 @@ void copy_bits(AacBitWriter* w, const uint8_t* src, int nbits) {
   if (i < nbits) {
     const int rest = nbits - i;
     aac_bitwriter_write(w, (uint32_t)(src[i >> 3] >> (8 - rest)), rest);
-  }
-}
-
-void write_bytes(AacBitWriter* w, const uint8_t* data, int len) {
-  for (int i = 0; i < len; i++) {
-    aac_bitwriter_write(w, data[i], 8);
   }
 }
 
@@ -183,9 +186,10 @@ int ms_mode(const AacEncElement* el, const AacIcsInfo* ics, int max_sfb) {
  * decoder inserts has the band's energy; the noise level is the mean
  * level, in quantiser steps, of the lines quantised to zero inside the
  * coded bands above the start, and the noise offset centres the zero
- * bands' scale factors on their neighbours.  Every other empty band
- * repeats the previous scale factor.  The chain of differences is kept
- * within the codebook's range of 60 in both directions. */
+ * bands' scale factors on their neighbours.  Every other empty band,
+ * and one holding silence, repeats the previous scale factor.  The
+ * chain of differences is kept within the codebook's range of 60 in
+ * both directions. */
 void assign_scale_factors(const AacEncChannel* c, AacUsacEncChannel* uc, int max_sfb,
                           int noise_filling) {
   const AacIcsInfo* ics = &c->ics;
@@ -195,19 +199,30 @@ void assign_scale_factors(const AacEncChannel* c, AacUsacEncChannel* uc, int max
   const int start_line = noise_fill_start(is_short);
   const int ngroups = ics->num_window_groups;
 
-  /* the level of the zeroed lines inside the coded bands */
+  /* the level of the zeroed lines inside the coded bands, and the
+   * level of every empty band */
   double zero_sum = 0.0;
   int zero_count = 0;
   int empty_bands = 0;
+  double band_rms[AAC_MAX_BANDS];
   int w0 = 0;
   for (int g = 0; g < ngroups; g++) {
     for (int b = 0; b < max_sfb; b++) {
       const int idx = g * nswb + b;
+      band_rms[idx] = 0.0;
       if (off[b] < start_line) {
         continue;
       }
       if (c->cb[idx] == 0) {
-        empty_bands++;
+        double energy = 0.0;
+        for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+          for (int i = w * kShort + off[b]; i < w * kShort + off[b + 1]; i++) {
+            energy += (double)c->coef[i] * c->coef[i];
+          }
+        }
+        const double lines = (double)ics->group_len[g] * (off[b + 1] - off[b]);
+        band_rms[idx] = sqrt(energy / lines);
+        empty_bands += band_rms[idx] > kSilentBandRms;
         continue;
       }
       const float inv_gain = 1.0f / sf_gain(c->sf[idx]);
@@ -252,22 +267,12 @@ void assign_scale_factors(const AacEncChannel* c, AacUsacEncChannel* uc, int max
         ref = c->sf[idx];
         continue;
       }
-      if (noise_level == 0 || off[b] < start_line) {
+      if (noise_level == 0 || off[b] < start_line || band_rms[idx] <= kSilentBandRms) {
         continue;
       }
-      double energy = 0.0;
-      for (int w = w0; w < w0 + ics->group_len[g]; w++) {
-        for (int i = w * kShort + off[b]; i < w * kShort + off[b + 1]; i++) {
-          energy += (double)c->coef[i] * c->coef[i];
-        }
-      }
-      const double lines = (double)ics->group_len[g] * (off[b + 1] - off[b]);
-      const double rms = sqrt(energy / lines);
       fill[idx] = true;
-      target[idx] = rms > 0.0
-                        ? std::clamp((int)lround(100.0 + 4.0 * log2(rms / (double)noise_val)),
-                                     0, kMaxSf)
-                        : 0;
+      target[idx] = std::clamp(
+          (int)lround(100.0 + 4.0 * log2(band_rms[idx] / (double)noise_val)), 0, kMaxSf);
       if (ref >= 0) {
         offset_sum += target[idx] - ref;
         offset_count++;
@@ -439,10 +444,38 @@ void write_fill_element(AacBitWriter* w, int tail_bits) {
 
 int fill_element_bits(int tail_bits) { return tail_bits >= kMinTailBits ? 1 : 18; }
 
-/* UsacSingleChannelElement() and UsacChannelPairElement() (Tables 17
- * and 18) with both channels in the frequency domain. */
-int write_element(AacEncoderState* s, const AacEncElement* el, AacBitWriter* w) {
+/* The SBR and MPS 212 data of the element after its core (Tables 17
+ * and 18): UsacSbrData() of the SBR encoder's channels, then Mps212Data()
+ * when the pair is coded as its downmix. */
+void write_element_tools(AacEncoderState* s, int e, AacBitWriter* w) {
   AacUsacEncoder* u = s->usac;
+  const AacSbrEncoder* sbr = s->sbr[e];
+  if (!sbr) {
+    return;
+  }
+  aac_sbr_enc_usac_write(sbr, w);
+  u->tail_bits += sbr->payload_bits;
+  if (sbr->mps) {
+    aac_mps212_enc_write(&u->mps, w);
+    u->tail_bits += aac_mps212_enc_bits(&u->mps);
+  }
+}
+
+int element_tool_bits(const AacEncoderState* s, int e) {
+  const AacSbrEncoder* sbr = s->sbr[e];
+  if (!sbr) {
+    return 0;
+  }
+  return sbr->payload_bits + (sbr->mps ? aac_mps212_enc_bits(&s->usac->mps) : 0);
+}
+
+/* UsacSingleChannelElement() and UsacChannelPairElement() (Tables 17
+ * and 18) with both channels in the frequency domain.  A pair coded
+ * through MPS 212 (stereoConfigIndex 1) carries one core channel, whose
+ * syntax is the single channel's. */
+int write_element(AacEncoderState* s, int e, AacBitWriter* w) {
+  AacUsacEncoder* u = s->usac;
+  const AacEncElement* el = &s->elem[e];
   const int nf = u->opt.noise_filling;
   const int indep = u->indep;
   const int max_sfb = el->max_sfb;
@@ -451,7 +484,12 @@ int write_element(AacEncoderState* s, const AacEncElement* el, AacBitWriter* w) 
     AacUsacEncChannel* uc = &u->ch[el->ch[0]];
     aac_bitwriter_write(w, 0, 1); /* core_mode */
     aac_bitwriter_write(w, c->tns_present ? 1u : 0u, 1);
-    return write_fd_channel_stream(w, c, uc, max_sfb, 0, 0, nf, indep, &u->tail_bits);
+    const int ret = write_fd_channel_stream(w, c, uc, max_sfb, 0, 0, nf, indep, &u->tail_bits);
+    if (ret) {
+      return ret;
+    }
+    write_element_tools(s, e, w);
+    return AAC_OK;
   }
   const AacEncChannel* c0 = &s->ch[el->ch[0]];
   const AacEncChannel* c1 = &s->ch[el->ch[1]];
@@ -491,13 +529,15 @@ int write_element(AacEncoderState* s, const AacEncElement* el, AacBitWriter* w) 
       return ret;
     }
   }
+  write_element_tools(s, e, w);
   return AAC_OK;
 }
 
 /* An access unit of silence with the stream's element list: one long
- * window per channel with the lowest band coded as zeros, independent.
- * The pre-roll of the first immediate playout frame, which warms the
- * decoder's filterbank with nothing. */
+ * window per channel with the lowest band coded as zeros, independent,
+ * with the SBR and MPS 212 data of silence.  The pre-roll of the first
+ * immediate playout frame, which warms the decoder's filterbanks with
+ * nothing. */
 int write_silent_au(const AacEncoderState* s, uint8_t* out, int cap) {
   const AacUsacEncoder* u = s->usac;
   static const int kZero[kLong] = {0};
@@ -542,6 +582,15 @@ int write_silent_au(const AacEncoderState* s, uint8_t* out, int cap) {
       aac_bitwriter_write(&w, 0, 1); /* fac_data_present */
       tail_bits = 1;
     }
+    const AacSbrEncoder* sbr = s->sbr[e];
+    if (sbr) {
+      const int before = aac_bitwriter_bits_written(&w);
+      aac_sbr_enc_usac_write_silent(sbr, &w);
+      if (sbr->mps) {
+        aac_mps212_enc_write_silent(&w);
+      }
+      tail_bits += aac_bitwriter_bits_written(&w) - before;
+    }
   }
   write_fill_element(&w, tail_bits);
   aac_bitwriter_byte_align(&w);
@@ -549,7 +598,7 @@ int write_silent_au(const AacEncoderState* s, uint8_t* out, int cap) {
 }
 
 /* AudioPreRoll() (5.5.2.2): the configuration in whole bytes, no
- * crossfade, and the one access unit before the frame. */
+ * crossfade, and the access units before the frame, oldest first. */
 int write_preroll_payload(const AacEncoderState* s, uint8_t* out, int cap) {
   const AacUsacEncoder* u = s->usac;
   uint8_t cfg[AAC_USAC_MAX_CONFIG_BYTES];
@@ -565,12 +614,15 @@ int write_preroll_payload(const AacEncoderState* s, uint8_t* out, int cap) {
   AacBitWriter w;
   aac_bitwriter_init(&w, out, cap);
   aac_usac_write_escaped(&w, (unsigned)cfg_len, 4, 4, 8);
-  write_bytes(&w, cfg, cfg_len);
+  aac_bitwriter_write_bytes(&w, cfg, cfg_len);
   aac_bitwriter_write(&w, 0, 1); /* applyCrossfade */
   aac_bitwriter_write(&w, 0, 1); /* reserved */
-  aac_usac_write_escaped(&w, 1, 2, 4, 0); /* numPreRollFrames */
-  aac_usac_write_escaped(&w, (unsigned)u->last_au_len, 16, 16, 0);
-  write_bytes(&w, u->last_au, u->last_au_len);
+  const int n = u->preroll_frames;
+  aac_usac_write_escaped(&w, (unsigned)n, 2, 4, 0); /* numPreRollFrames */
+  for (int i = 0; i < n; i++) {
+    aac_usac_write_escaped(&w, (unsigned)u->last_au_len[i], 16, 16, 0);
+    aac_bitwriter_write_bytes(&w, u->last_au[i], u->last_au_len[i]);
+  }
   aac_bitwriter_byte_align(&w);
   return aac_bitwriter_overflow(&w) ? AAC_ERR_OVERFLOW : aac_bitwriter_bytes_written(&w);
 }
@@ -596,14 +648,19 @@ AacUsacEncoder* aac_usac_enc_create(void) {
   }
   u->last_au_cap = AAC_USAC_ENC_MAX_AU_BYTES(AAC_MAX_CHANNELS);
   u->scratch_cap = AAC_USAC_ENC_MAX_AU_BYTES(AAC_MAX_CHANNELS);
-  u->preroll_cap = AAC_USAC_ENC_MAX_AU_BYTES(AAC_MAX_CHANNELS);
-  u->last_au = (uint8_t*)calloc((size_t)u->last_au_cap, 1);
+  u->preroll_cap = AAC_USAC_ENC_MAX_IPF_BYTES(AAC_MAX_CHANNELS);
+  bool ok = true;
+  for (int i = 0; i < AAC_USAC_MAX_PREROLL_FRAMES; i++) {
+    u->last_au[i] = (uint8_t*)calloc((size_t)u->last_au_cap, 1);
+    ok = ok && u->last_au[i];
+  }
   u->scratch = (uint8_t*)calloc((size_t)u->scratch_cap, 1);
   u->preroll = (uint8_t*)calloc((size_t)u->preroll_cap, 1);
-  if (!u->last_au || !u->scratch || !u->preroll) {
+  if (!ok || !u->scratch || !u->preroll) {
     aac_usac_enc_destroy(u);
     return nullptr;
   }
+  u->preroll_frames = AAC_USAC_ENC_PREROLL_FRAMES;
   aac_usac_enc_set_options(u, nullptr, 48000);
   aac_usac_enc_reset(u, AAC_MAX_CHANNELS);
   return u;
@@ -613,7 +670,9 @@ void aac_usac_enc_destroy(AacUsacEncoder* u) {
   if (!u) {
     return;
   }
-  free(u->last_au);
+  for (int i = 0; i < AAC_USAC_MAX_PREROLL_FRAMES; i++) {
+    free(u->last_au[i]);
+  }
   free(u->scratch);
   free(u->preroll);
   free(u);
@@ -624,14 +683,35 @@ void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* op
   AacUsacEncoderOptions o;
   o.noise_filling = !opt || opt->noise_filling < 0 ? 1 : (opt->noise_filling != 0);
   o.preroll = !opt || opt->preroll < 0 ? 1 : (opt->preroll != 0);
-  o.independent_interval_frames = opt && opt->independent_interval_frames > 0
-                                      ? opt->independent_interval_frames
-                                      : (sample_rate + kLong - 1) / kLong;
+  /* the interval stays 0 for the default, so that a change of the core
+   * rate can turn it into frames again */
+  o.independent_interval_frames =
+      opt && opt->independent_interval_frames > 0 ? opt->independent_interval_frames : 0;
   o.stream_id = opt && opt->stream_id >= 0 && opt->stream_id <= 65535 ? opt->stream_id : -1;
   o.sbr = !opt || opt->sbr < 0 ? -1 : (opt->sbr != 0);
   o.mps212 = !opt || opt->mps212 < 0 ? -1 : (opt->mps212 != 0);
   u->opt = o;
-  u->interval = std::max(1, o.independent_interval_frames);
+  u->interval = std::max(1, o.independent_interval_frames > 0 ? o.independent_interval_frames
+                                                               : (sample_rate + kLong - 1) / kLong);
+}
+
+void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int input_channels,
+                               int bitrate, int* sbr, int* mps) {
+  const AacUsacEncoderOptions* o = &u->opt;
+  int want_sbr = o->sbr >= 0 ? o->sbr : bitrate < 64000 * input_channels;
+  /* The 2-1-2 is never chosen by bitrate: FFmpeg's USAC decoder rejects
+   * every stereoConfigIndex 1 stream, so a caller opts in knowing the
+   * players. */
+  int want_mps = input_channels == 2 && o->mps212 > 0;
+  if (want_mps) {
+    want_sbr = 1; /* stereoConfigIndex exists only with an SBR ratio */
+  }
+  if (want_sbr && (input_rate % 2 || aac_asc_rate_index(input_rate / 2) < 0)) {
+    want_sbr = 0;
+    want_mps = 0;
+  }
+  *sbr = want_sbr;
+  *mps = want_mps;
 }
 
 int aac_usac_enc_set_config_ext(AacUsacEncoder* u, int type, const uint8_t* data, int len) {
@@ -671,23 +751,31 @@ void aac_usac_enc_reset(AacUsacEncoder* u, int channels) {
   u->frame_index = 0;
   u->indep = 1;
   u->ipf = 0;
-  u->last_au_len = 0;
+  for (int i = 0; i < AAC_USAC_MAX_PREROLL_FRAMES; i++) {
+    u->last_au_len[i] = 0;
+  }
   u->preroll_bytes = 0;
+  if (u->mps_active) {
+    aac_mps212_enc_reset(&u->mps);
+  }
 }
 
 /* ── the configuration ─────────────────────────────────────────── */
 
 void aac_usac_enc_config(const AacEncoderState* s, AacUsacConfig* c) {
   const AacUsacEncoder* u = s->usac;
+  const int sbr = u->sbr_active;
   memset(c, 0, sizeof(*c));
-  c->sample_rate = s->sample_rate;
-  c->core_sbr_frame_length_index = 1; /* 1024-line core, no SBR */
+  /* the output rate is the input's; with SBR the core runs at half of it
+   * and a frame yields 2048 samples (coreSbrFrameLengthIndex 3) */
+  c->sample_rate = s->input_rate;
+  c->core_sbr_frame_length_index = sbr ? 3 : 1;
   c->frame_length = kLong;
-  c->output_frame_length = kLong;
-  c->sbr_ratio_index = AAC_USAC_SBR_NONE;
+  c->output_frame_length = sbr ? 2 * kLong : kLong;
+  c->sbr_ratio_index = sbr ? AAC_USAC_SBR_2_1 : AAC_USAC_SBR_NONE;
   c->core_sample_rate = s->sample_rate;
-  c->channel_config_index = s->channels;
-  c->num_channels = s->channels;
+  c->channel_config_index = s->input_channels;
+  c->num_channels = s->input_channels;
   int n = 0;
   if (u->opt.preroll) {
     AacUsacElementConfig* e = &c->elem[n++];
@@ -697,8 +785,19 @@ void aac_usac_enc_config(const AacEncoderState* s, AacUsacConfig* c) {
   for (int i = 0; i < s->num_elements && n < AAC_USAC_MAX_ELEMENTS; i++) {
     AacUsacElementConfig* e = &c->elem[n++];
     const int type = s->elem[i].type;
+    const AacSbrEncoder* sbr_enc = s->sbr[i];
     e->type = type == AAC_ELEM_CPE ? AAC_USAC_CPE : type == AAC_ELEM_LFE ? AAC_USAC_LFE : AAC_USAC_SCE;
     e->noise_filling = e->type == AAC_USAC_LFE ? 0 : u->opt.noise_filling;
+    if (sbr_enc) {
+      aac_sbr_enc_usac_config(sbr_enc, &e->sbr);
+      if (sbr_enc->mps) {
+        /* the stereo pair coded as its downmix: a channel pair element
+         * with one core channel and the MPS 212 parameters */
+        e->type = AAC_USAC_CPE;
+        e->stereo_config_index = 1;
+        aac_mps212_enc_config(&u->mps, &e->mps);
+      }
+    }
   }
   if (n < AAC_USAC_MAX_ELEMENTS) {
     AacUsacElementConfig* e = &c->elem[n++];
@@ -722,7 +821,16 @@ void aac_usac_enc_config(const AacEncoderState* s, AacUsacConfig* c) {
 }
 
 int aac_usac_enc_max_au_bytes(const AacEncoderState* s) {
-  return AAC_USAC_ENC_MAX_AU_BYTES(s->channels);
+  const AacUsacEncoder* u = s->usac;
+  int per_au = (6144 / 8) * s->channels;
+  for (int e = 0; e < s->num_elements; e++) {
+    if (s->sbr[e]) {
+      per_au += AAC_SBR_ENC_MAX_BYTES * (s->sbr[e]->mps ? 1 : s->elem[e].num_ch) +
+                (s->sbr[e]->mps ? AAC_MPS212_ENC_MAX_BYTES : 0);
+    }
+  }
+  const int preroll = u->opt.preroll ? u->preroll_frames : 0;
+  return (1 + preroll) * per_au + AAC_USAC_MAX_CONFIG_BYTES + 32;
 }
 
 int aac_usac_enc_tns_max_bands(int rate_index, int is_short) {
@@ -737,13 +845,23 @@ int aac_usac_enc_tns_max_bands(int rate_index, int is_short) {
 void aac_usac_enc_begin_frame(AacEncoderState* s) {
   AacUsacEncoder* u = s->usac;
   const int k = u->frame_index % u->interval;
+  const int n = u->preroll_frames;
   u->ipf = k == 0 && u->opt.preroll;
-  /* The frame before an immediate playout frame is independent too, as
-   * it is the pre-roll a decoder starts from. */
-  u->indep = k == 0 || (u->opt.preroll && k == u->interval - 1);
+  /* The first pre-roll frame of an immediate playout frame is
+   * independent too, as it is the frame a decoder starts from. */
+  u->indep = k == 0 || (u->opt.preroll && k == u->interval - n);
   if (u->frame_index == 0 && u->opt.preroll) {
-    const int len = write_silent_au(s, u->last_au, u->last_au_cap);
-    u->last_au_len = len > 0 ? len : 0;
+    const int len = write_silent_au(s, u->last_au[0], u->last_au_cap);
+    u->last_au_len[0] = len > 0 ? len : 0;
+    for (int i = 1; i < n; i++) {
+      memcpy(u->last_au[i], u->last_au[0], (size_t)u->last_au_len[0]);
+      u->last_au_len[i] = u->last_au_len[0];
+    }
+  }
+  for (int e = 0; e < s->num_elements; e++) {
+    if (s->sbr[e]) {
+      s->sbr[e]->usac_indep = u->indep;
+    }
   }
 }
 
@@ -776,10 +894,13 @@ int aac_usac_enc_element_bits(AacEncoderState* s, AacEncElement* el) {
     bits += scale_factor_bits(c, uc, max_sfb);
     AacUsacArithContext ctx = uc->arith;
     const int spectral = spectral_data(&ctx, c, max_sfb, u->indep, nullptr, &signs);
-    bits += spectral < 0 ? 0 : spectral;
+    /* a spectrum the arithmetic coder cannot carry (a line beyond the
+     * escape range) counts as unaffordable, so the rate loop moves to a
+     * coarser quantisation instead of writing a frame that fails */
+    bits += spectral < 0 ? kUnaffordableBits : spectral;
   }
   if (el == &s->elem[s->num_elements - 1]) {
-    bits += fill_element_bits(signs + 1);
+    bits += fill_element_bits(signs + 1 + element_tool_bits(s, (int)(el - s->elem)));
   }
   return bits;
 }
@@ -796,6 +917,7 @@ int aac_usac_enc_overhead_bits(const AacEncoderState* s) {
   for (int e = 0; e < s->num_elements; e++) {
     const AacEncElement* el = &s->elem[e];
     const AacEncChannel* c0 = &s->ch[el->ch[0]];
+    bits += element_tool_bits(s, e);
     if (el->num_ch == 1) {
       bits += 1 + 1 + 8 + nf_bits + ics_info_bits(&c0->ics) + tns_bits(c0) + reset_bits + 1;
       continue;
@@ -817,7 +939,7 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   AacBitWriter ew;
   aac_bitwriter_init(&ew, u->scratch, u->scratch_cap);
   for (int e = 0; e < s->num_elements; e++) {
-    const int ret = write_element(s, &s->elem[e], &ew);
+    const int ret = write_element(s, e, &ew);
     if (ret) {
       return ret;
     }
@@ -843,7 +965,7 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
       }
       aac_bitwriter_write(&w, 0, 1); /* usacExtElementUseDefaultLength */
       write_ext_payload_length(&w, len);
-      write_bytes(&w, u->preroll, len);
+      aac_bitwriter_write_bytes(&w, u->preroll, len);
       u->preroll_bytes = len + (len < 255 ? 1 : 3);
     }
   }
@@ -854,16 +976,24 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   }
   const int au_len = aac_bitwriter_bytes_written(&w);
 
-  /* The frame without its pre-roll, for the next immediate playout frame. */
+  /* The frame without its pre-roll into the ring of the last access
+   * units, for the next immediate playout frame. */
+  const int n = u->preroll_frames;
+  uint8_t* oldest = u->last_au[0];
+  for (int i = 0; i + 1 < n; i++) {
+    u->last_au[i] = u->last_au[i + 1];
+    u->last_au_len[i] = u->last_au_len[i + 1];
+  }
+  u->last_au[n - 1] = oldest;
   AacBitWriter lw;
-  aac_bitwriter_init(&lw, u->last_au, u->last_au_cap);
+  aac_bitwriter_init(&lw, oldest, u->last_au_cap);
   aac_bitwriter_write(&lw, u->indep ? 1u : 0u, 1);
   if (u->opt.preroll) {
     aac_bitwriter_write(&lw, 0, 1);
   }
   copy_bits(&lw, u->scratch, elem_bits);
   aac_bitwriter_byte_align(&lw);
-  u->last_au_len = aac_bitwriter_overflow(&lw) ? 0 : aac_bitwriter_bytes_written(&lw);
+  u->last_au_len[n - 1] = aac_bitwriter_overflow(&lw) ? 0 : aac_bitwriter_bytes_written(&lw);
   u->frame_index++;
   return au_len + AAC_ADTS_HEADER_SIZE;
 }

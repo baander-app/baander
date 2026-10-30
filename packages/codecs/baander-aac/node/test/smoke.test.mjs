@@ -408,8 +408,9 @@ test('encodes xHE-AAC with loudness metadata and meters the input', () => {
   const pcm = tones(188 * 1024, sampleRate, channels);
   const encoder = new AacEncoder({ sampleRate, channels, bitrate: 96000, profile: 'xhe', measureLoudness: true });
   assert.equal(encoder.profile, 'xhe');
-  assert.equal(encoder.frameSize, 1024);
-  assert.equal(encoder.delay, 2048);
+  /* below 64 kbit/s per channel the encoder takes SBR: 2048-sample frames at the HE-AAC delay */
+  assert.equal(encoder.frameSize, 2048);
+  assert.equal(encoder.delay, 5635);
   assert.equal(encoder.loudness, null, 'no figures before any input');
   const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
   assert.equal(stream[0], 0x56, 'LOAS by default');

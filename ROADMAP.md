@@ -920,7 +920,7 @@ context arithmetic coder (bit-exact against the decoder's), noise filling,
 TNS, per-band M/S, independent frames with the audio pre-roll, the
 UsacConfig with the stream id and loudness info extensions, LOAS/LATM and
 raw access units for MP4, never ADTS; enhanced SBR at 2:1 and MPS 212 at
-stereoConfigIndex 1, chosen by bitrate or by the caller; loudness
+stereoConfigIndex 1, opted into by the caller (FFmpeg's USAC decoder rejects every such stream, so never chosen by bitrate); loudness
 measurement per ITU-R BS.1770-4 and EBU Tech 3341/3342 (the K-weighting
 derived per sample rate, the gated integrated loudness, the range, the
 maxima, the 4x oversampled true peak) with the loudnessInfoSet() writer,

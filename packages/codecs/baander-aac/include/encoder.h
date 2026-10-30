@@ -20,7 +20,8 @@ extern "C" {
 
 /* Samples of lookahead and transform overlap before the first input sample
  * appears in the decoded output of an AAC-LC stream: two frames, 2048 for
- * 1024-sample frames and 1920 for 960-sample frames. */
+ * 1024-sample frames and 1920 for 960-sample frames.  An xHE-AAC stream
+ * without SBR has the same delay; with SBR at 2:1 it has HE-AAC's. */
 #define AAC_ENCODER_DELAY 2048
 #define AAC_ENCODER_DELAY_960 1920
 /* The same for an HE-AAC stream, in samples at the full rate: the core
@@ -46,6 +47,12 @@ extern "C" {
   (AAC_ENCODER_ELD_DELAY(frame_length) + AAC_CLDFB_DELAY + 1)
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
+/* The output buffer holds that, or the largest xHE-AAC immediate playout
+ * frame: a stereo pair with SBR and MPS 212 data with its two pre-roll
+ * access units and the embedded configuration (usac_enc.h), which is
+ * the larger of the two. */
+#define AAC_ENCODER_OUTPUT_BUF_BYTES \
+  (3 * (2 * 6144 / 8 + 2 * AAC_SBR_ENC_MAX_BYTES + 128) + 1024 + 64 + AAC_ADTS_HEADER_SIZE)
 /* The extension_payload() an AAC-ELD frame carries (ELD v2's spatial frame). */
 #define AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES 1024
 
@@ -163,7 +170,8 @@ using AacEncoderState = struct AacEncoderState_ {
   int reservoir_max;
   float pe_min, pe_max; /* running range of the frames' perceptual entropy */
   int pending_flush;    /* frames the flush still has to emit */
-  /* HE-AAC: the SBR encoder of each SCE or CPE, NULL for LFE and AAC-LC */
+  /* HE-AAC, and xHE-AAC with SBR: the SBR encoder of each SCE or CPE,
+   * NULL for LFE and AAC-LC */
   AacSbrEncoder* sbr[AAC_MAX_ELEMENTS];
   AacSbrDownsampler* lfe_down[AAC_MAX_ELEMENTS]; /* HE-AAC: the LFE's half-rate signal */
   /* AAC-ELD with LD-SBR (aac_encoder_set_ld_sbr): one low-delay SBR
@@ -182,7 +190,7 @@ using AacEncoderState = struct AacEncoderState_ {
   float core_in[AAC_MAX_CHANNELS][AAC_FRAME_SIZE_LONG];    /* half-rate core signal */
   AacMdct mdct_long, mdct_short;
   const AacDSP* dsp;
-  uint8_t output_buf[AAC_ENCODER_MAX_FRAME_BYTES];
+  uint8_t output_buf[AAC_ENCODER_OUTPUT_BUF_BYTES];
   /* Element boundaries of the raw data block in output_buf (bit offsets
    * from the block's start), for the ADTS CRC of the transport layer. */
   AacCrcRegion crc_region[AAC_CRC_MAX_REGIONS];
