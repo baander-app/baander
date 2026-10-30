@@ -1685,6 +1685,61 @@ prebuild workflow runs only once pushed. Not run: listening tests and the
 ISO conformance suite. Figures and limits are in the
 [reference comparison](packages/baander-aac/docs/reference-comparison.md).
 
+Checkpoint, 2026-10-30, player-grade controls: the third tier's fourth
+plan, per the
+[plan](docs/plans/2026-10-30-008-feat-aac-codec-player-grade-controls-plan.md),
+is delivered. Decoder: `aac_decoder_flush` drains the delayed tail at the
+end of a stream and `aac_decoder_clear_history` prepares a seek, after
+which a random access frame decodes bit for bit as in a fresh decoder
+(checked on ten profiles and the surround streams); the decoder delay is
+documented per configuration; the field tolerance rules (a PCE in any
+element order, a mid-stream ADTS PCE layout change, implicit SBR that
+disappears, an SBR header that cannot be built); MPEG-D DRC gains apply
+to the frame after the access unit that carries them, as in FDK and
+libxaac (the gain curve within 0.015 dB rms of libxaac's and 0.07 dB of
+FDK's, from 0.2 to 0.28 dB before). Encoder: xHE-AAC random access (the
+immediate playout frame interval in frames, milliseconds or samples, a
+maximum distance, a per-segment byte ceiling, independent frames on
+request, per-frame info for a muxer; a cut at any immediate playout
+frame decodes in FDK, libxaac and ours); the StreamMuxConfig only at the
+first frame and the immediate playout frames, which saves 2.5 to
+15 kbit/s and brings the FDK decoder's partial-input failures down to
+its own rate; a peak bitrate cap per frame, a bandwidth override and the
+VBR modes 1 to 5 under their FDK names; MPEG-D DRC gain sets ("general
+compression" and "night", a 6 to 16 LU target range, one- and
+two-pass), applied alike by FDK and libxaac and ignored by FFmpeg, for
+0.5 to 0.7 kbit/s. Robustness: five fuzz harnesses with a seed
+generator, the `BAAC_FUZZ` sanitizer build and `test_fuzz_smoke`; the
+first runs found seven bugs, and the finite-output check, once the
+review had it survive the Release flags, found damaged USAC frames
+turning the output into NaN or infinity in the SBR linear prediction
+(float products overflowing) and the speech core (synthesis filters
+made unstable by rounding to float); all are fixed and their inputs
+replayed on every run. Release builds drop
+`-funsafe-math-optimizations`, whose approximate 1/sqrt encoded
+differently on Intel and AMD runners. Client: the binding and
+the Electron service, IPC validation and bridge take every new call and
+option. The codec package moved to `packages/baander-aac`. A three-part
+review (decoder and client, encoder, tools and fuzz build) found
+sixteen findings; fifteen are fixed, among them a VBR mode refused with
+a peak bitrate in the binding and `baac`, the fuzz harnesses' finite
+check compiled out under the Release flags, the CMake tools not
+building on Windows, and the afterburner spending surplus bits in a VBR
+mode. Figures are in the
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
+Verification: CTest 46/46 in the Release build and in the Debug build
+under ASan and UBSan, the binding's smoke test (14 tests),
+the Electron AAC service (9 tests), IPC and bridge suites (4 tests)
+under Node's type stripping, CI green on the four prebuild
+platforms. Open: the night set's gain codes stop at -31.875 dB, so a
+programme anchored near -47 LUFS or lower cannot hold -1 dBTP; the FDK
+decoder's front end still loses frames where a chunk boundary lands
+just after a configuration (its own fault, fed frame by frame it
+decodes whole); on corrupt speech frames the stabilised synthesis
+filters keep the output finite, but it can still peak near 1e13. Not
+run: the ten-minute fuzz runs per harness under libFuzzer (no clang
+runtime here), listening tests, the ISO conformance suite.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

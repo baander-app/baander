@@ -1,7 +1,7 @@
 ---
 title: AAC codec player-grade controls: decoder flush and seek, streaming random access, DRC gain sets, encoder tuning, fuzzing
 date: 2026-10-30
-status: draft
+status: delivered
 execution: code
 ---
 

@@ -440,6 +440,30 @@ The encoder side of USAC in compatible mode: the AAC-LC analysis and rate loop f
 The loudnessInfoSet() of ISO/IEC 23003-4 that a USAC configuration carries as an extension, for the programme as coded: the sample peak, the true peak, the integrated loudness of ITU-R BS.1770-4, the anchor loudness when supplied, the loudness range of EBU Tech 3342 and the momentary and short-term maxima of EBU Tech 3341, each at 0.25 dB. A player normalises the programme by its integrated loudness. The xHE-AAC encoder writes it in the two-pass form, with the whole programme measured first; the one-pass meter inside the encoder measures the input as it is coded, and its figures serve an MP4 header or a second encode, since a stream's configuration cannot change once it has begun.
 *Avoid: loudness metadata alone, which also names the MPEG-4 program reference level.*
 
+### Immediate playout frame
+
+The independent USAC frame that carries the audio pre-roll and, in LOAS and LATM, the StreamMuxConfig: the point where a decoder can start and a muxer cuts a segment (an HLS or DASH segment, an MP4 fragment). The xHE-AAC encoder places them by an interval in frames, milliseconds or samples, a maximum distance and a per-segment byte ceiling, adds one on request, and reports each frame's index, independence, pre-roll bytes and sample position so that a muxer can find them. The frames the pre-roll repeats are independent too.
+*Avoid: keyframe, which belongs to video; independent frame alone, which also names the frames before it.*
+
+### DRC gain set
+
+An MPEG-D DRC set the xHE-AAC encoder writes when asked: a gain sequence per access unit plus a set description in the uniDrcConfig that names its effect, from which a decoder picks the set that matches the listener's request. The encoder writes two: drcSetId 1, "general compression", which brings the programme's loudness range towards a target of 6 to 16 LU, and drcSetId 2, "night", which adds a limiter holding the true peak at -1 dBTP after normalising to -16 LUFS. The gains of an access unit apply to the frame after it.
+*Avoid: DRC profile, which names the MPEG-4 DRC metadata's compression curves.*
+
+### VBR mode
+
+One of the five variable bitrate modes the FDK encoder names, 1 to 5, which the AAC encoder takes as stereo targets of 32, 72, 112, 148 and 228 kbit/s scaled per channel. Each frame's thresholds come from the mode's quality, and the target becomes the nominal bitrate whose reservoir bounds every frame. A peak bitrate lowers the mode to the highest one that fits.
+*Avoid: quality alone, which names the TVBR setting the modes are built on.*
+
+### Peak bitrate
+
+The per-frame cap of the AAC encoder's rate loop, in bit/s: no frame takes more than its share of it, and the bit reservoir never lends a frame more, in every profile and rate control mode whenever the frame's side information fits. Transport headers and the pre-roll of an immediate playout frame stay outside it. It bounds the burst a transport must carry; the segment byte ceiling bounds a segment instead.
+
+### Decoder flush and seek reset
+
+The two ends of a decoder's playback: the flush drains the samples the decoder still holds at the end of a stream, the decoder delay of them per channel, and then resets it; the seek reset (`aac_decoder_clear_history`) drops the input and the audio history and keeps the configuration, so that a random access frame fed next decodes as in a fresh decoder. The binding and the Electron service name them `flush` and `clearHistory`.
+*Avoid: reset alone, which also clears the configuration and the counters.*
+
 ### Prebuilt binding
 
 The native addon compiled per platform and architecture by the `aac-native` GitHub Actions workflow and attached to an `aac-native-v*` release: `prebuilds/<platform>-<arch>/baander_aac.node`, which the package's install script fetches and the loader tries before a local node-gyp build. One binary serves Node and Electron, since the Node-API ABI is the version the binding declares rather than the runtime it was compiled against.
