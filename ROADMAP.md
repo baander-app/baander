@@ -246,6 +246,23 @@ redundant comments were removed. Behavioral proof tests were retained. The final
 frontend results above cover the integrated changes; final code review remains
 open after U9 qualification.
 
+U9 fixture checkpoint, 2026-10-30: the managed preview executor now supports
+isolated live-update qualification fixtures: 32 ordinary accounts and an admin
+observer, owned media and catalog records, exact notification capture counts,
+controlled projector pausing, and cleanup limited to the recorded run. Interrupted
+cleanup retains its manifest. The fixture uses the configured password hasher
+and preserves other runs and revision tombstones.
+
+The authoritative backend group passes 75 tests with 2,244 assertions across
+ordinary, native and PostgreSQL lanes in `/tmp/live-u9-backend-authoritative.log`.
+The artifact is `var/test-runs/20261030-213032-f3d30cb6`. A subsequent preview
+smoke check creates all accounts, commits exactly 32 notification captures and
+cleans up with zero surviving owned resources. It also verifies the producer-start
+timestamp added after the suite snapshot; its receipt is
+`/tmp/live-u9-fixture-preview-smoke.log`. Scoped PHPStan, formatting and syntax
+checks pass. Full browser, capacity, pool-release and recovery acceptance remain
+open; these fixture results do not establish those outcomes.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
