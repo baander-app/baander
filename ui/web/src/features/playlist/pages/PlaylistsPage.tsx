@@ -196,7 +196,7 @@ export function PlaylistsPage() {
   const [isSmart, setIsSmart] = useState(false)
   const [smartRules, setSmartRules] = useState<SmartRule[]>([])
   const draftRevision = useRef(0)
-  const { data, isLoading } = useGetPlaylistIndex()
+  const { data, isPending: isLoading } = useGetPlaylistIndex()
   const createPlaylist = usePostPlaylistStore()
   const deletePlaylist = useDeletePlaylistDestroy()
 

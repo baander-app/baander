@@ -92,7 +92,7 @@ const EmptyTitle = styled.p`
 `
 
 export function GenresPage() {
-  const { data, isLoading, refetch } = useGetGenreIndex()
+  const { data, isPending: isLoading, refetch } = useGetGenreIndex()
   const navigate = useNavigate()
   const items = data?.data as Record<string, unknown>[] | undefined
   const isAdmin = useAuthStore((s) => s.user?.roles?.includes('ROLE_ADMIN') ?? false)

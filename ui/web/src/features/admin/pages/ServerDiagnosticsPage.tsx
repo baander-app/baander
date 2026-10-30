@@ -60,7 +60,7 @@ const ErrorText = styled.p`
 `
 
 export function ServerDiagnosticsPage() {
-  const { data: stats, isLoading, error, refetch, dataUpdatedAt } = useServerStats()
+  const { data: stats, isPending: isLoading, error, refetch, dataUpdatedAt } = useServerStats()
 
   if (isLoading) {
     return (

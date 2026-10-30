@@ -83,7 +83,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
-  const { data, isLoading } = useGetPlaylistIndex({
+  const { data, isPending: isLoading } = useGetPlaylistIndex({
     query: { enabled: open },
   })
   const addSong = usePostPlaylistAddSong()

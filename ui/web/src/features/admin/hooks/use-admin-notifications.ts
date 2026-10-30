@@ -26,7 +26,7 @@ export function useAdminNotifications() {
   return {
     notifications: adminNotifications,
     unreadCount: adminUnreadCount,
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
     markRead: markRead.mutate,
     markAllRead: markAllRead.mutate,
     isMarkingAll: markAllRead.isPending,

@@ -40,6 +40,7 @@ function mockQueryResult(data: unknown) {
   return {
     data,
     isLoading: false,
+    isPending: false,
     isError: false,
     error: null,
     isFetching: false,
@@ -68,7 +69,8 @@ describe('AlbumsPage', () => {
   it('shows loading skeleton while fetching', () => {
     mockUseGetAlbumIndex.mockReturnValue({
       data: undefined,
-      isLoading: true,
+      isLoading: false,
+      isPending: true,
       isError: false,
       error: null,
     })

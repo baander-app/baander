@@ -184,7 +184,7 @@ export function LyricsDialog({
   const coordinator = useLiveCoordinator()
 
   // Fetch cached lyrics
-  const { data: lyricsData, isLoading: lyricsLoading, isError: lyricsError } = useGetLyricsSongLyrics(songPublicId, {
+  const { data: lyricsData, isPending: lyricsLoading, isError: lyricsError } = useGetLyricsSongLyrics(songPublicId, {
     query: { enabled: open },
   })
 
@@ -221,10 +221,12 @@ export function LyricsDialog({
   })
 
   // Search LRCLIB
-  const { data: searchData, isLoading: searchLoading, error: searchError } = useGetLyricsSearch(
+  const searchEnabled = open && isAdmin && activeTab === 'search' && searchQuery.length >= 2
+  const { data: searchData, isPending: searchPending, error: searchError } = useGetLyricsSearch(
     { q: searchQuery },
-    { query: { enabled: open && isAdmin && activeTab === 'search' && searchQuery.length >= 2 } },
+    { query: { enabled: searchEnabled } },
   )
+  const searchLoading = searchEnabled && searchPending
 
   const searchResults = extractSearchResults(searchData)
 

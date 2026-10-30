@@ -149,5 +149,5 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
   const refetch = () => {
     query.refetch({ cancelRefetch: false }).catch(() => undefined)
   }
-  return { decades, isLoading: query.isLoading, error: query.error, refetch }
+  return { decades, isLoading: query.isPending, error: query.error, refetch }
 }

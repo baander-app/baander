@@ -247,7 +247,7 @@ const ErrorText = styled.p`
 `
 
 export function ConfigurationPage() {
-  const { data, isLoading, error, refetch, isRefetching, dataUpdatedAt } = useConfigCheck()
+  const { data, isPending: isLoading, error, refetch, isRefetching, dataUpdatedAt } = useConfigCheck()
 
   if (isLoading) {
     return <CenteredSpinner><Spinner /></CenteredSpinner>

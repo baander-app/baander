@@ -165,7 +165,7 @@ export function LyricsTab() {
   const queryClient = useQueryClient()
   const toggleFullscreen = useLyricsFullscreenStore((s) => s.toggle)
 
-  const { data: lyricsData, isLoading, isError } = useGetLyricsSongLyrics(publicId, {
+  const { data: lyricsData, isPending: isLoading, isError } = useGetLyricsSongLyrics(publicId, {
     query: { enabled: !!publicId },
   })
 

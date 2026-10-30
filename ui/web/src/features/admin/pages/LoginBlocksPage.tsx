@@ -173,7 +173,7 @@ export function LoginBlocksPage() {
   const [page, setPage] = useState(0)
   const limit = 25
 
-  const { data, isLoading } = useLoginBlocks({ limit, offset: page * limit })
+  const { data, isPending: isLoading } = useLoginBlocks({ limit, offset: page * limit })
   const deleteBlock = useDeleteLoginBlock()
   const deleteAll = useDeleteAllLoginBlocks()
 

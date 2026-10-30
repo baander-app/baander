@@ -161,9 +161,10 @@ const StatCardSub = styled.p`
 `
 
 export function AlbumDuplicatesPage() {
-  const { data: libraries } = useLibraries()
+  const { data: libraries, isPending: librariesPending } = useLibraries()
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null)
-  const { data: duplicateGroups, isLoading, error, refetch } = useAlbumDuplicates(selectedLibraryId)
+  const { data: duplicateGroups, isPending: duplicatesPending, error, refetch } = useAlbumDuplicates(selectedLibraryId)
+  const isLoading = librariesPending || (selectedLibraryId !== null && duplicatesPending)
 
   // Auto-select first library if available and none selected
   if (libraries && libraries.length > 0 && selectedLibraryId === null) {

@@ -157,7 +157,7 @@ const DialogSpinnerIcon = styled(Loader2)`
 export function DeviceManagement() {
   const queryClient = useQueryClient()
   const coordinator = useLiveCoordinator()
-  const { data: devices = [], isLoading, isSuccess, error } = useGetDeviceList({
+  const { data: devices = [], isPending: isLoading, isSuccess, error } = useGetDeviceList({
     query: {
       select: (res): Device[] => res.data ?? [],
     },

@@ -153,7 +153,7 @@ export function MoviesBrowsePage() {
   const sortBy = searchParams.get('sort') ?? 'title_asc'
 
   const limit = 24
-  const { data, isLoading, isError, refetch } = useGetMovieIndex({
+  const { data, isPending: isLoading, isError, refetch } = useGetMovieIndex({
     page,
     limit,
   })

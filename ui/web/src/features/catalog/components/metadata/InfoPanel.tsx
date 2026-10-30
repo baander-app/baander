@@ -100,9 +100,9 @@ function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
   })
 
   const isLoading =
-    (entityType === 'song' && songQuery.isLoading) ||
-    (entityType === 'album' && albumQuery.isLoading) ||
-    (entityType === 'artist' && artistQuery.isLoading)
+    (entityType === 'song' && songQuery.isPending) ||
+    (entityType === 'album' && albumQuery.isPending) ||
+    (entityType === 'artist' && artistQuery.isPending)
 
   const isError =
     (entityType === 'song' && songQuery.isError) ||

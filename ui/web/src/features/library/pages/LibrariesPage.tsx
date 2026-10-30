@@ -130,7 +130,7 @@ function Skeleton() {
 
 export function LibrariesPage() {
   const navigate = useNavigate()
-  const { data: libraries, isLoading, error, refetch } = useLibraries()
+  const { data: libraries, isPending: isLoading, error, refetch } = useLibraries()
   const createMutation = useCreateLibrary()
   const updateMutation = useUpdateLibrary()
   const deleteMutation = useDeleteLibrary()

@@ -187,7 +187,7 @@ const RetryLink = styled.button`
 `
 
 export function RateLimitersPage() {
-  const { data, isLoading, error, refetch } = useRateLimiters()
+  const { data, isPending: isLoading, error, refetch } = useRateLimiters()
   const clearMutation = useClearRateLimiters()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 

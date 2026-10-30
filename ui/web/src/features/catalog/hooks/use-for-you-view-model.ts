@@ -13,7 +13,7 @@ export interface ForYouSong {
 }
 
 export function useForYouViewModel(limit = 12) {
-  const { data, isLoading, error } = useGetRecommendationForYou(
+  const { data, isPending: isLoading, error } = useGetRecommendationForYou(
     { limit },
     { query: { staleTime: 5 * 60 * 1000 } }
   )

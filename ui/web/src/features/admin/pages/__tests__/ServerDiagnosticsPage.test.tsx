@@ -15,6 +15,10 @@ import {
   type WorkerStats,
 } from '../../api/debug-api'
 import { ServerDiagnosticsPage } from '../ServerDiagnosticsPage'
+import { OwnedQueryClient } from '@/shared/live/query-client'
+import { LiveQueryCoordinator } from '@/shared/live/query-coordinator'
+import { adminLiveDescriptors } from '@/features/admin/live-descriptors'
+import type { LiveSnapshot } from '@/shared/live/recovery'
 
 vi.mock('../../api/server-stats-api', () => ({ getServerStats: vi.fn() }))
 vi.mock('../../api/debug-api', () => ({
@@ -155,6 +159,29 @@ function region(name: string) {
 }
 
 describe('ServerDiagnosticsPage', () => {
+  it('waits for initial diagnostic admission without showing a failed read', async () => {
+    const client = new OwnedQueryClient()
+    queryClient = client
+    const snapshot: LiveSnapshot = {
+      status: 'current', authorityReady: true, families: ['admin-runtime'],
+      authorizationFingerprint: 'a'.repeat(64), health: { state: 'current', oldestPendingAgeMs: null },
+    }
+    const coordinator = new LiveQueryCoordinator(client, {
+      getSnapshot: () => snapshot, subscribe: () => () => {}, subscribeEvents: () => () => {},
+      completeRecovery: () => {}, resourceReadFailed: () => {},
+    }, adminLiveDescriptors)
+    client.setCoordinator(coordinator)
+    const stop = coordinator.start()
+    const release = coordinator.beginMutation(['admin-runtime'])
+    render(<QueryClientProvider client={client}><ServerDiagnosticsPage /></QueryClientProvider>)
+    try {
+      expect(screen.queryByText('Failed to load server diagnostics.')).toBeNull()
+      expect(mockServerStats).not.toHaveBeenCalled()
+      release()
+      await screen.findByRole('table', { name: 'HTTP workers' })
+    } finally { release(); stop(); client.dispose() }
+  })
+
   beforeEach(() => {
     mockServerStats.mockReset()
     mockCoroutineStats.mockReset()

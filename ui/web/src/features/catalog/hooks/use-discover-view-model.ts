@@ -29,7 +29,7 @@ interface UseDiscoverViewModelReturn {
 }
 
 export function useDiscoverViewModel(): UseDiscoverViewModelReturn {
-  const { data, isLoading, error, refetch } = useGetRecommendationIndex({ limit: 200 })
+  const { data, isPending: isLoading, error, refetch } = useGetRecommendationIndex({ limit: 200 })
 
   const clusters = useMemo(() => {
     const response = data as { data?: ApiRecommendation[] } | undefined

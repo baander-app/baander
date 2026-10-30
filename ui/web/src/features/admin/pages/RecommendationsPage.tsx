@@ -151,10 +151,10 @@ const SkeletonStack = styled.div<{ $gap?: string }>`
 `
 
 export function RecommendationsPage() {
-  const { data: coverage, isLoading: coverageLoading } = useRecommendationCoverage()
-  const { data: quality, isLoading: qualityLoading } = useSourceQuality()
-  const { data: freshness, isLoading: freshnessLoading } = useRecommendationFreshness()
-  const { data: jobs, isLoading: jobsLoading } = useRecommendationJobs(5)
+  const { data: coverage, isPending: coverageLoading } = useRecommendationCoverage()
+  const { data: quality, isPending: qualityLoading } = useSourceQuality()
+  const { data: freshness, isPending: freshnessLoading } = useRecommendationFreshness()
+  const { data: jobs, isPending: jobsLoading } = useRecommendationJobs(5)
 
   const generateMutation = useGenerateRecommendations()
   const cancelMutation = useCancelRecommendationJob()

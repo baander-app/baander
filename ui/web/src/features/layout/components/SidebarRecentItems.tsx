@@ -109,6 +109,7 @@ const ItemTime = styled.span`
 
 interface SidebarRecentItemsProps {
   items: RecentItem[]
+  isLoading?: boolean
 }
 
 function RecentItemThumbnail({ url }: { url: string }) {
@@ -140,13 +141,13 @@ function RecentItemThumbnail({ url }: { url: string }) {
   )
 }
 
-export function SidebarRecentItems({ items }: SidebarRecentItemsProps) {
+export function SidebarRecentItems({ items, isLoading = false }: SidebarRecentItemsProps) {
   return (
     <div role="group" aria-labelledby="recent-header">
       <SectionHeader id="recent-header">Recent</SectionHeader>
       <SectionWrapper>
         {items.length === 0 ? (
-          <EmptyText>Nothing played yet</EmptyText>
+          isLoading ? <EmptyText role="status">Loading recent items…</EmptyText> : <EmptyText>Nothing played yet</EmptyText>
         ) : (
           items.map((item) => (
             <RecentRow

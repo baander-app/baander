@@ -22,7 +22,6 @@ export function useAuthenticatedImage(imageUrl?: string | null) {
         const response = await AXIOS_INSTANCE.get<Blob>(source, { responseType: 'blob', signal })
         return response.data
       } catch (error) {
-        // The image endpoints use 404 for ordinary artwork absence.
         const status = (error as { response?: { status?: number } } | null)?.response?.status
         if (status === 404) return null
         throw error

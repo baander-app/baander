@@ -14,7 +14,7 @@ const Stack = styled.div`
 `
 
 export function CoroutinesSection() {
-  const { data, isLoading, error, refetch } = useCoroutineStats()
+  const { data, isPending: isLoading, error, refetch } = useCoroutineStats()
 
   if (isLoading) {
     return (

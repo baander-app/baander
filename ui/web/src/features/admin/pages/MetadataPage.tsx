@@ -157,7 +157,7 @@ function formatTime(iso: string | null): string {
 }
 
 export function MetadataPage() {
-  const { data: syncStatus, isLoading, error } = useMetadataSyncStatus()
+  const { data: syncStatus, isPending: isLoading, error } = useMetadataSyncStatus()
   const { data: providers } = useMetadataProviders()
   const triggerSync = useTriggerMetadataSync()
   const triggerGenreSync = useTriggerGenreSync()

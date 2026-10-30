@@ -173,7 +173,7 @@ export function AdminUsersPage() {
   if (statusFilter === 'active') params.disabled = false
   if (statusFilter === 'disabled') params.disabled = true
 
-  const { data, error, isLoading, isFetching, isError, refetch } = useUsers(params)
+  const { data, error, isPending: isLoading, isFetching, isError, refetch } = useUsers(params)
   // admin.can_view_users is enforced by the list endpoint, so its 403 is the source of truth.
   const listDenied = isAxiosError(error) && error.response?.status === 403
   const users = isError ? [] : data?.data ?? []

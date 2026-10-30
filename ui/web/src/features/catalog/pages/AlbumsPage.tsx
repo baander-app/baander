@@ -173,7 +173,7 @@ export function AlbumsPage() {
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [genreData])
 
-  const { data, isLoading, isError, refetch } = useGetAlbumIndex({
+  const { data, isPending: isLoading, isError, refetch } = useGetAlbumIndex({
     page,
     ...(genre ? { genre } : {}),
     sort,

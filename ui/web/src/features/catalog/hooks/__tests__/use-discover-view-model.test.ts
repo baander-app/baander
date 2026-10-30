@@ -5,7 +5,7 @@ const mockRefetch = vi.fn()
 
 type MockConfig = {
   data?: unknown
-  isLoading?: boolean
+  isPending?: boolean
   error?: unknown
 }
 
@@ -14,7 +14,7 @@ let mockConfig: MockConfig = {}
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
   useGetRecommendationIndex: () => ({
     data: mockConfig.data ?? undefined,
-    isLoading: mockConfig.isLoading ?? false,
+    isPending: mockConfig.isPending ?? false,
     error: mockConfig.error ?? null,
     refetch: mockRefetch,
   }),
@@ -112,7 +112,7 @@ describe('useDiscoverViewModel', () => {
   })
 
   it('returns isLoading true when loading', () => {
-    mockConfig.isLoading = true
+    mockConfig.isPending = true
     mockConfig.data = undefined
     const { result } = renderHook(() => useDiscoverViewModel())
     expect(result.current.isLoading).toBe(true)

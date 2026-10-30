@@ -124,7 +124,7 @@ export function SongPreviewPanel({ publicId }: SongPreviewPanelProps) {
   const navigate = useNavigate()
   const playTrack = usePlayerStore((s) => s.playTrack)
 
-  const { data: songData, isLoading: songLoading, isError, refetch } = useGetSongShow(publicId, {
+  const { data: songData, isPending: songLoading, isError, refetch } = useGetSongShow(publicId, {
     query: { enabled: !!publicId },
   })
   const song = asSongFromData(songData)

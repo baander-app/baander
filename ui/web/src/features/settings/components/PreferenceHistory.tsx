@@ -84,13 +84,14 @@ export function PreferenceHistory({
   const [opened, setOpened] = useState(false)
   const {
     data: history = [],
-    isLoading,
+    isPending,
     refetch,
   } = useQuery({
     queryKey: ['preference-history', label],
     queryFn: ({ signal }) => fetchHistory(signal),
     enabled: opened,
   })
+  const isLoading = opened && isPending
 
   if (history.length === 0) {
     return (

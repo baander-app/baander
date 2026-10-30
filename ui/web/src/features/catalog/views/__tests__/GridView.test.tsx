@@ -30,7 +30,7 @@ function makeAlbumData(count: number, currentPage = 1, lastPage = 2) {
 
 type MockConfig = {
   data?: unknown
-  isLoading?: boolean
+  isPending?: boolean
   isError?: boolean
 }
 
@@ -41,8 +41,8 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
     mockQuery(params)
 
     return {
-      data: mockConfig.data ?? makeAlbumData(6),
-      isLoading: mockConfig.isLoading ?? false,
+      data: mockConfig.isPending ? undefined : mockConfig.data ?? makeAlbumData(6),
+      isPending: mockConfig.isPending ?? false,
       isError: mockConfig.isError ?? false,
       error: null,
       refetch: mockRefetch,
@@ -104,7 +104,7 @@ describe('GridView', () => {
 
   it('shows skeleton cards in loading state', () => {
     mockConfig.data = undefined
-    mockConfig.isLoading = true
+    mockConfig.isPending = true
     render(<SCTypedThemeProvider theme={testTheme}><GridView /></SCTypedThemeProvider>)
     const skeletons = screen.getAllByRole('generic').filter(
       (el) => el.getAttribute('data-slot') === 'skeleton',

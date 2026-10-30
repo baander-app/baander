@@ -373,9 +373,9 @@ function SectionSkeleton() {
 // ── Home Page ────────────────────────────────────────────
 
 export function HomePage() {
-  const { data: albumData, isLoading: albumsLoading } = useGetAlbumIndex({ page: 1, limit: 20 })
-  const { data: activityData, isLoading: activityLoading } = useGetActivityHistory({ limit: 10 })
-  const { data: playlistData, isLoading: playlistsLoading } = useGetPlaylistIndex()
+  const { data: albumData, isPending: albumsLoading } = useGetAlbumIndex({ page: 1, limit: 20 })
+  const { data: activityData, isPending: activityLoading } = useGetActivityHistory({ limit: 10 })
+  const { data: playlistData, isPending: playlistsLoading } = useGetPlaylistIndex()
 
   const albums = useMemo(() => {
     const response = albumData as Record<string, unknown> | undefined
@@ -394,7 +394,7 @@ export function HomePage() {
   }, [playlistData])
 
   // Radio stations: starred stations via React Query
-  const { data: radioStations = [], isLoading: radioLoading } = useStarredStations()
+  const { data: radioStations = [], isPending: radioLoading } = useStarredStations()
   const { songs: forYouSongs, isLoading: forYouLoading } = useForYouViewModel(12)
 
   const isLoading = albumsLoading || activityLoading || playlistsLoading || radioLoading || forYouLoading

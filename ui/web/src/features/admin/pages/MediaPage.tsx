@@ -148,7 +148,7 @@ const StyledLink = styled(Link)`
 `
 
 export function MediaPage() {
-  const { data: stats, isLoading, error } = useMediaStorageStats()
+  const { data: stats, isPending: isLoading, error } = useMediaStorageStats()
   const checkMissing = useCheckMissingImages()
   const pruneMissing = usePruneMissingImages()
   const roles = useAuthStore((s) => s.user?.roles) ?? []

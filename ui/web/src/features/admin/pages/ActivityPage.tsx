@@ -166,10 +166,10 @@ export function ActivityPage() {
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
 
   const params = { from, to }
-  const { data: summary, isLoading: summaryLoading } = useActivitySummary(params)
-  const { data: tracks, isLoading: tracksLoading } = useTopTracks(params)
-  const { data: artists, isLoading: artistsLoading } = useTopArtists(params)
-  const { data: engagement, isLoading: engagementLoading } = useEngagement(params)
+  const { data: summary, isPending: summaryLoading } = useActivitySummary(params)
+  const { data: tracks, isPending: tracksLoading } = useTopTracks(params)
+  const { data: artists, isPending: artistsLoading } = useTopArtists(params)
+  const { data: engagement, isPending: engagementLoading } = useEngagement(params)
 
   return (
     <Container>

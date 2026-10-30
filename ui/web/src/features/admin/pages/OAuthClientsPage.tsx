@@ -131,7 +131,7 @@ export function OAuthClientsPage() {
   const { isSuperAdmin } = useAdminCheck()
   const [showCreate, setShowCreate] = useState(false)
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
-  const { data, isLoading, isFetching, isError, refetch } = useOAuthClients()
+  const { data, isPending: isLoading, isFetching, isError, refetch } = useOAuthClients()
   const clients = isError ? [] : data ?? []
   const columns = isSuperAdmin ? MANAGE_COLUMNS : READ_ONLY_COLUMNS
   const closeDialog = (open: boolean) => {

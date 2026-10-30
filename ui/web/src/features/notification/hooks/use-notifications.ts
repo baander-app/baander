@@ -43,7 +43,7 @@ export function useNotifications() {
   return {
     notifications,
     unreadCount,
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
     isError: query.isError,
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,

@@ -177,13 +177,13 @@ export function AnalyticsSection() {
         <TimeRangePicker from={from} to={to} onChange={handleRangeChange} />
       </Header>
 
-      {!summaryQuery.isLoading && !summaryQuery.isError && !hasAnyData && (
+      {!summaryQuery.isPending && !summaryQuery.isError && !hasAnyData && (
         <SectionEmpty message="No job data in the selected time range." />
       )}
 
       <ChartGrid>
         <div>
-          {summaryQuery.isLoading ? (
+          {summaryQuery.isPending ? (
             <ThroughputSkeleton />
           ) : summaryQuery.isError ? (
             <SectionError message="Failed to load summary data." onRetry={() => summaryQuery.refetch()} />
@@ -192,7 +192,7 @@ export function AnalyticsSection() {
           )}
         </div>
         <div>
-          {summaryQuery.isLoading ? (
+          {summaryQuery.isPending ? (
             <ChartSkeleton />
           ) : summaryQuery.isError ? (
             <SectionError message="Failed to load status distribution." onRetry={() => summaryQuery.refetch()} />
@@ -203,7 +203,7 @@ export function AnalyticsSection() {
       </ChartGrid>
 
       <div>
-        {timingQuery.isLoading ? (
+        {timingQuery.isPending ? (
           <ChartSkeleton />
         ) : timingQuery.isError ? (
           <SectionError message="Failed to load timing data." onRetry={() => timingQuery.refetch()} />
@@ -213,7 +213,7 @@ export function AnalyticsSection() {
       </div>
 
       <div>
-        {failuresQuery.isLoading ? (
+        {failuresQuery.isPending ? (
           <ChartSkeleton />
         ) : failuresQuery.isError ? (
           <SectionError message="Failed to load failure data." onRetry={() => failuresQuery.refetch()} />

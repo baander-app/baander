@@ -54,7 +54,7 @@ export function GridView({ params }: GridViewProps) {
     setPagination({ filters, page: 1 })
   }
 
-  const { data, isLoading, isError, refetch } = useGetAlbumIndex({
+  const { data, isPending: isLoading, isError, refetch } = useGetAlbumIndex({
     ...params,
     page,
     limit: PER_PAGE,

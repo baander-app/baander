@@ -77,6 +77,23 @@ async function applyFirstSearchResult() {
 }
 
 describe('LyricsDialog', () => {
+  it('leaves disabled search usable and shows an empty result only after the requested search finishes', async () => {
+    let finish!: (value: unknown) => void
+    answers.search = () => new Promise(resolve => { finish = resolve })
+    const user = userEvent.setup()
+    mount()
+    await user.click(await screen.findByRole('tab', { name: 'Search' }))
+    const panel = screen.getByRole('tabpanel', { name: 'Search' })
+    expect(panel.querySelector('[data-slot="skeleton"]')).toBeNull()
+    expect(mockRequest.mock.calls.some(([url]) => String(url).startsWith('/api/lyrics/search?'))).toBe(false)
+    await user.type(screen.getByRole('textbox'), 'zz')
+    await waitFor(() => expect(finish).toBeDefined())
+    expect(panel.querySelector('[data-slot="skeleton"]')).not.toBeNull()
+    expect(screen.queryByText(/No results found for/)).toBeNull()
+    await act(async () => { finish({ data: [] }) })
+    await screen.findByText(/No results found for/)
+  })
+
   beforeEach(() => {
     vi.mocked(toast.success).mockReset()
     vi.mocked(toast.error).mockReset()

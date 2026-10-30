@@ -329,7 +329,13 @@ it('keeps opened preference history live while leaving rollback an explicit user
   }
   render(<History />, { wrapper })
   expect(historySignals).toEqual([])
-  fireEvent.click(screen.getByRole('button', { name: 'History' }))
+  expect(screen.getByRole('button', { name: 'History' })).toBeEnabled()
+  const release = coordinator.beginMutation(['preferences'])
+  try {
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByRole('button', { name: 'History' })).toBeDisabled()
+    expect(historySignals).toEqual([])
+  } finally { release() }
   await screen.findByText(/v1/)
   historyVersion = 2
   act(() => coordinator.hint(['preferences']))

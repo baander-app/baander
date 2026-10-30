@@ -107,7 +107,7 @@ const SkeletonStack = styled.div`
 export function RadioAdminPage() {
   const [countryFilter, setCountryFilter] = useState<string>('')
   const [search, setSearch] = useState('')
-  const { data: stations, isLoading } = useRadioStations({
+  const { data: stations, isPending: isLoading } = useRadioStations({
     country: countryFilter || undefined,
     q: search || undefined,
   })

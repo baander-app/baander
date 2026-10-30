@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@t
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { TestThemeProvider } from '../TestThemeProvider'
 import { CountryPicker } from '@/features/radio/components/CountryPicker'
+import { StationBrowser } from '@/features/radio/components/StationBrowser'
 import { PlaylistsPage } from '@/features/playlist/pages/PlaylistsPage'
 import { PlaylistDetailPage } from '@/features/playlist/pages/PlaylistDetailPage'
 import { SharePlaylistDialog } from '@/features/playlist/components/SharePlaylistDialog'
@@ -78,6 +79,42 @@ function setup(coordinated = true) {
 }
 
 describe('personal collection freshness', () => {
+  it('keeps station search inactive until its debounce and waits for an admitted first result', async () => {
+    http.onGet('/api/radio/subscriptions').reply(200, { data: [] })
+    http.onGet('/api/radio/starred').reply(200, { data: [] })
+    http.onGet('/api/radio/stations').reply(200, { data: [] })
+    const { client, coordinator, wrapper: Wrapper } = setup()
+    const release = coordinator.beginMutation(['radio'])
+    render(<Wrapper><TestThemeProvider><StationBrowser /></TestThemeProvider></Wrapper>)
+    try {
+      expect(screen.getByText('Search or select a country to browse stations.')).toBeVisible()
+      const input = screen.getByPlaceholderText('Search stations...')
+      expect(input).toBeEnabled()
+      fireEvent.change(input, { target: { value: 'jazz' } })
+      expect(http.history.get.filter(request => request.url === '/api/radio/stations')).toHaveLength(0)
+      await waitFor(() => expect(client.getQueryState(['radio', 'stations', { country: '', query: 'jazz' }])).toMatchObject({ status: 'pending', fetchStatus: 'idle' }))
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 100)) })
+      expect(screen.queryByText('No stations found.')).toBeNull()
+      expect(http.history.get.filter(request => request.url === '/api/radio/stations')).toHaveLength(0)
+    } finally { release() }
+    await screen.findByText('No stations found.')
+    expect(http.history.get.filter(request => request.url === '/api/radio/stations')).toHaveLength(1)
+  })
+
+  it('shows an empty playlist list only after its first held read succeeds', async () => {
+    http.onGet('/api/playlists/').reply(200, { data: [] })
+    const { client, coordinator, wrapper: Wrapper } = setup()
+    const release = coordinator.beginMutation(['playlists'])
+    render(<Wrapper><TestThemeProvider><MemoryRouter><PlaylistsPage /></MemoryRouter></TestThemeProvider></Wrapper>)
+    try {
+      await waitFor(() => expect(client.getQueryState(['/api/playlists/'])).toMatchObject({ status: 'pending', fetchStatus: 'idle' }))
+      expect(screen.queryByText('No playlists yet')).toBeNull()
+      expect(http.history.get).toHaveLength(0)
+    } finally { release() }
+    await screen.findByText('No playlists yet')
+    expect(http.history.get.filter(request => request.url === '/api/playlists/')).toHaveLength(1)
+  })
+
   it('waits for an initial held playlist read without claiming the playlist is missing', async () => {
     http.onGet('/api/playlists/mix').reply(200, { data: { publicId: 'mix', name: 'Available mix', songs: [] } })
     const { client, coordinator, wrapper: Wrapper } = setup()

@@ -38,7 +38,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
   const [focusedColumn, setFocusedColumn] = useState<ColumnFocus>('genre')
 
   // ── Genres ──────────────────────────────────────────────
-  const { data: genreData, isLoading: genresLoading } = useGetGenreIndex()
+  const { data: genreData, isPending: genresLoading } = useGetGenreIndex()
 
   const genreItems: BrowserItem[] = useMemo(() => {
     const genres = asGenres(genreData)
@@ -64,7 +64,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
   const genreSlug = selectedGenre ? genreSlugLookup.get(selectedGenre) : undefined
 
   // ── Artists (filtered by genre) ─────────────────────────
-  const { data: artistData, isLoading: artistsLoading } = useGetArtistIndex({
+  const { data: artistData, isPending: artistsLoading } = useGetArtistIndex({
     limit: 100,
     ...(genreSlug ? { genre: genreSlug } : {}),
   })
@@ -86,7 +86,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
   }, [artistData])
 
   // ── Albums (filtered by artist) ─────────────────────────
-  const { data: albumData, isLoading: albumsLoading } = useGetAlbumIndex({
+  const { data: albumData, isPending: albumsLoading } = useGetAlbumIndex({
     limit: 100,
     ...(selectedArtist ? { artistId: selectedArtist } : {}),
   })
@@ -127,7 +127,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
   }, [allAlbums])
 
   // ── Songs (filtered by album) ───────────────────────────
-  const { data: songsData, isLoading: songsLoading } = useGetSongIndex({
+  const { data: songsData, isPending: songsLoading } = useGetSongIndex({
     limit: 100,
     ...(selectedAlbum ? { albumId: selectedAlbum } : {}),
     ...(genreSlug ? { genres: genreSlug } : {}),

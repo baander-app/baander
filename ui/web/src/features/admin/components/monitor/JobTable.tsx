@@ -137,7 +137,7 @@ export function JobTable({ onJobSelect }: JobTableProps) {
   const [filters, setFilters] = useState<JobFilterType>({})
   const [cursor, setCursor] = useState<string | undefined>()
 
-  const { data, isLoading, isError, refetch, isFetching } = useJobList({
+  const { data, isPending: isLoading, isError, refetch, isFetching } = useJobList({
     ...filters,
     cursor,
   })

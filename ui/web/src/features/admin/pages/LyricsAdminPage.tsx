@@ -210,8 +210,8 @@ function Row({ label, value, muted }: { label: string; value: React.ReactNode; m
 }
 
 export function LyricsAdminPage() {
-  const { data: coverage, isLoading: coverageLoading } = useLyricsCoverage()
-  const { data: syncStatus, isLoading: syncLoading } = useLyricsSyncStatus()
+  const { data: coverage, isPending: coverageLoading } = useLyricsCoverage()
+  const { data: syncStatus, isPending: syncLoading } = useLyricsSyncStatus()
   const bulkFetch = useBulkFetchLyrics()
   const roles = useAuthStore((s) => s.user?.roles) ?? []
   const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')

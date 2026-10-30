@@ -91,7 +91,7 @@ export function StatusOverview() {
     }
   }, [])
 
-  const { data: overview, isLoading: overviewLoading, error: overviewError } = useStatusOverview()
+  const { data: overview, isPending: overviewLoading, error: overviewError } = useStatusOverview()
   const { data: analytics } = useAnalyticsSummary(from, to)
 
   if (overviewLoading) {

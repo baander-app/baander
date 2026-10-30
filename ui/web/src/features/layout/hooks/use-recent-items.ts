@@ -23,7 +23,7 @@ export function useRecentItems(options: UseRecentItemsOptions = {}): UseRecentIt
       return response.data.data.map(mapToRecentItem)
     },
   })
-  return { items: query.data ?? [], isLoading: query.isLoading }
+  return { items: query.data ?? [], isLoading: query.isPending }
 }
 
 /** Raw shape of a `/api/user/recent` response item (music + movies).

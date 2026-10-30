@@ -35,7 +35,7 @@ export function useActivityViewModel({
   limit = 50,
 }: UseActivityViewModelOptions = {}): UseActivityViewModelReturn {
   const {
-    data, isLoading, error, refetch, fetchNextPage, hasNextPage,
+    data, isPending: isLoading, error, refetch, fetchNextPage, hasNextPage,
     isFetchingNextPage, isFetchNextPageError,
   } = useInfiniteQuery({
     queryKey: [...getGetActivityHistoryQueryKey({ limit }), 'infinite'],

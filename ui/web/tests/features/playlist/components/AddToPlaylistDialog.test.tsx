@@ -49,7 +49,7 @@ describe('AddToPlaylistDialog', () => {
   it('renders dialog title and description when open', () => {
     mockUseGetPlaylistIndex.mockReturnValue({
       data: { data: [] },
-      isLoading: false,
+      isPending: false,
     })
 
     renderDialog(
@@ -71,7 +71,7 @@ describe('AddToPlaylistDialog', () => {
           { publicId: 'pl_3', name: 'Auto Mix', isSmart: true },
         ],
       },
-      isLoading: false,
+      isPending: false,
     })
 
     renderDialog(
@@ -89,7 +89,7 @@ describe('AddToPlaylistDialog', () => {
   it('shows loading skeleton while fetching playlists', () => {
     mockUseGetPlaylistIndex.mockReturnValue({
       data: undefined,
-      isLoading: true,
+      isPending: true,
     })
 
     renderDialog(
@@ -106,7 +106,7 @@ describe('AddToPlaylistDialog', () => {
   it('shows empty message when no regular playlists exist', () => {
     mockUseGetPlaylistIndex.mockReturnValue({
       data: { data: [{ publicId: 'pl_1', name: 'Smart Mix', isSmart: true }] },
-      isLoading: false,
+      isPending: false,
     })
 
     renderDialog(
@@ -121,7 +121,7 @@ describe('AddToPlaylistDialog', () => {
   it('shows create playlist form', () => {
     mockUseGetPlaylistIndex.mockReturnValue({
       data: { data: [] },
-      isLoading: false,
+      isPending: false,
     })
 
     renderDialog(
@@ -135,7 +135,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('adds the song to the created playlist using the plain resource response', async () => {
-    mockUseGetPlaylistIndex.mockReturnValue({ data: { data: [] }, isLoading: false })
+    mockUseGetPlaylistIndex.mockReturnValue({ data: { data: [] }, isPending: false })
     const create = mockMutation()
     const add = mockMutation()
     const onOpenChange = vi.fn()

@@ -19,7 +19,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const album = (title: string) => ({ data: { publicId: 'AlbumFixture1', title, label: 'Server label', year: 1969, lockedFields: [], coverImage: null } })
 
-function setup(coordinated = false) {
+function setup(coordinated = false, seeded = true) {
   const client = new OwnedQueryClient()
   client.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } })
   const detach = client.attach()
@@ -35,7 +35,7 @@ function setup(coordinated = false) {
     resourceReadFailed: () => {},
   }, catalogLiveDescriptors)
   if (coordinated) client.setCoordinator(coordinator)
-  client.setQueryData(getGetAlbumShowQueryKey('AlbumFixture1'), album('Server title'))
+  if (seeded) client.setQueryData(getGetAlbumShowQueryKey('AlbumFixture1'), album('Server title'))
   render(<QueryClientProvider client={client}><LiveCoordinatorContext.Provider value={coordinated ? coordinator : null}><ThemeProvider theme={resolveTheme('dark', 'violet')}><InfoPanel entityType="album" publicId="AlbumFixture1" /></ThemeProvider></LiveCoordinatorContext.Provider></QueryClientProvider>)
   const stop = coordinated ? coordinator.start() : () => {}
   return {
@@ -62,6 +62,16 @@ afterEach(() => {
 })
 
 describe('metadata panel server refreshes', () => {
+  it('waits for the selected entity while its initial read is deferred', async () => {
+    const { dispose } = setup(true, false)
+    try {
+      expect(screen.queryByText('Failed to load album')).toBeNull()
+      expect(request).not.toHaveBeenCalled()
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+      expect(screen.getByDisplayValue('Server title')).toBeInTheDocument()
+    } finally { dispose() }
+  })
+
   it('shows a conflict, retains text, and lets the user explicitly keep their edits', async () => {
     const { client, dispose } = setup()
     fireEvent.change(screen.getByDisplayValue('Server title'), { target: { value: 'My title' } })

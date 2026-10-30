@@ -123,7 +123,7 @@ interface ArtistDetailsPanelProps {
 
 export function ArtistDetailsPanel({ publicId }: ArtistDetailsPanelProps) {
   const navigate = useNavigate()
-  const { data, isLoading, isError, refetch } = useGetArtistShow(publicId, {
+  const { data, isPending: isLoading, isError, refetch } = useGetArtistShow(publicId, {
     query: { enabled: !!publicId },
   })
   const artist = (data as any)?.data as any

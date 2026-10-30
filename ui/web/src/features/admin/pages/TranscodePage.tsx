@@ -145,7 +145,7 @@ function stateLabel(state: SessionState): string {
 }
 
 export function TranscodePage() {
-  const { data: sessions, isLoading: sessionsLoading } = useTranscodeSessions()
+  const { data: sessions, isPending: sessionsLoading } = useTranscodeSessions()
   const list = sessions ?? []
   const activeSessions = list.filter((s) => ACTIVE_STATES.includes(s.state))
   const historySessions = list

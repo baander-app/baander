@@ -167,7 +167,7 @@ function TransportHealthSkeleton() {
 }
 
 export function TransportHealth() {
-  const { data, isLoading, error, refetch } = useTransportStatus()
+  const { data, isPending: isLoading, error, refetch } = useTransportStatus()
   const flushMutation = useFlushFailedQueue()
   const [showFlushConfirm, setShowFlushConfirm] = useState(false)
 

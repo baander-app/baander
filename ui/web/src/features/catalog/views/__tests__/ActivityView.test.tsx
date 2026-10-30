@@ -51,18 +51,20 @@ function createWrapper() {
   }
 }
 
-const now = new Date()
+const now = new Date(2026, 9, 30, 12)
 const oneHourAgo = new Date(now.getTime() - 3600_000).toISOString()
 
 describe('ActivityView', () => {
   let api: MockAdapter
   const url = '/api/activity/history?limit=50&offset=0'
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
     vi.clearAllMocks()
     api = new MockAdapter(AXIOS_INSTANCE, { onNoMatch: 'throwException' })
   })
 
-  afterEach(() => { cleanup(); api.restore() })
+  afterEach(() => { cleanup(); api.restore(); vi.useRealTimers() })
 
   it('shows loading skeleton', () => {
     api.onGet(url).reply(() => new Promise(() => {}))

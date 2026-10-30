@@ -413,6 +413,35 @@ lint warnings. Receipts are `/tmp/live-u9-mutation-isolation-green.log` and
 `/tmp/live-u9-frontend-after-mutation-isolation.log`. The remaining browser checks
 and the bounded audit of other pending-state views continue.
 
+U9 real-scan checkpoint: the console scanned the owned source directory, processed
+the new tagged WAV and skipped the already indexed source. The worker ingested
+the tagged song; scanner, ingestion and local artwork jobs finished. All 33 owned
+notifications and 99 delivery intents drained under disabled external-delivery
+preferences. Cleanup completed with zero survivors and an empty backlog. The
+receipt is `/tmp/live-u9-scan-runtime-receipts.json`. This verifies the actual
+backend chain; its mounted-browser acceptance remains open.
+
+U9 pending-view checkpoint, 2026-10-31: the audited automatic catalog, personal
+and administrative readers now retain loading states while initial reads wait.
+Recents and notification popouts forward that state to their renderers. Disabled
+History, search and duplicate-library queries keep their activation guards; the
+station search also distinguishes its placeholder from a completed empty result.
+Loaded content remains visible during background refresh.
+
+The affected selection covers 348 passing tests across 52 files after correcting
+four mocks to supply the actual query flag. The full run passed 2,894 tests; its
+only failure was an existing “one hour ago means Today” fixture at midnight.
+Pinning that fixture to local noon, with real asynchronous timers and unchanged
+assertions, passes all four ActivityView tests. Both TypeScript projects, build
+and full lint pass; lint retains eight existing warnings. Receipts are
+`/tmp/live-u9-frontend-after-pending-surfaces.log` and
+`/tmp/live-u9-activity-midnight-green.log`.
+
+The five simplification reviewers found no behavior-preserving reuse, quality,
+efficiency or test-pruning changes worth applying. Three runtime comments were
+removed; every proof test, ownership guard and cleanup safeguard was retained.
+The phase receipt is `/tmp/live-u9-simplification.json`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

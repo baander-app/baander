@@ -235,7 +235,7 @@ function buildTracks(songs: AlbumSong[], albumTitle: string): Track[] {
 
 export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
   const navigate = useNavigate()
-  const { data, isLoading, isError, refetch } = useGetAlbumShow(publicId, {
+  const { data, isPending: isLoading, isError, refetch } = useGetAlbumShow(publicId, {
     query: { enabled: !!publicId },
   })
   // GetAlbumShow200Data omits artistName (the OA schema is incomplete), but the runtime

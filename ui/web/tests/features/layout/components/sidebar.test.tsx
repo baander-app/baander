@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -8,6 +8,7 @@ import { resolveTheme } from '@/shared/theme/resolve-theme'
 import { Sidebar } from '@/features/layout/components/Sidebar'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useMediaModeStore } from '@/features/layout/stores/media-mode-store'
+import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 const testTheme = resolveTheme('dark', 'violet')
 
@@ -45,6 +46,16 @@ beforeEach(() => {
 })
 
 describe('Sidebar', () => {
+  it('forwards pending Recents to its renderer before showing an actual empty history', async () => {
+    let finish!: (value: unknown) => void
+    vi.mocked(AXIOS_INSTANCE.get).mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    renderSidebar()
+    expect(screen.queryByText('Nothing played yet')).toBeNull()
+    expect(screen.getByText('Loading recent items…')).toBeVisible()
+    await act(async () => { finish({ data: { data: [] } }) })
+    expect(await screen.findByText('Nothing played yet')).toBeVisible()
+  })
+
   it('renders the Bånder logo', () => {
     renderSidebar()
     expect(screen.getByText('Bånder')).toBeVisible()

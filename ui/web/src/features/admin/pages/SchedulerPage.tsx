@@ -134,7 +134,7 @@ export function SchedulerPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
 
-  const { data: jobs, isLoading } = useScheduledJobs()
+  const { data: jobs, isPending: isLoading } = useScheduledJobs()
 
   const activeJob = activeDialog?.job ?? null
 

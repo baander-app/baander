@@ -148,7 +148,7 @@ const LoadingStack = styled.div`
 `
 
 export function GenresPage() {
-  const { data: genres, isLoading } = useGenres()
+  const { data: genres, isPending: isLoading } = useGenres()
   const [view, setView] = useState<'list' | 'tree'>('list')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingGenre, setEditingGenre] = useState<Genre | null>(null)

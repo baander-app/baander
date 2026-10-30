@@ -161,7 +161,7 @@ const UnreadDot = styled.span`
 export function AdminNotificationBell() {
   const [open, setOpen] = useState(false)
   const popoutRef = useRef<HTMLDivElement>(null)
-  const { notifications, unreadCount, markRead, markAllRead, isMarkingAll } = useAdminNotifications()
+  const { notifications, unreadCount, isLoading, markRead, markAllRead, isMarkingAll } = useAdminNotifications()
 
   const storeUnread = useNotificationStore((s) => s.unreadCount)
   const displayCount = unreadCount > 0 ? unreadCount : storeUnread
@@ -203,7 +203,7 @@ export function AdminNotificationBell() {
 
           <PopoutBody>
             {notifications.length === 0 ? (
-              <EmptyState>No admin notifications</EmptyState>
+              isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : <EmptyState>No admin notifications</EmptyState>
             ) : (
               notifications.map((n) => (
                 <NotificationItem

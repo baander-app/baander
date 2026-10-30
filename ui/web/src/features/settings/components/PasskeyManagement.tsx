@@ -134,7 +134,7 @@ const SpinningWithMargin = styled(Loader2)`
 
 export function PasskeyManagement() {
   const { register, loading: registering, error: regError, success } = usePasskeyRegistration();
-  const { data: passkeys, isLoading: loadingList } = usePasskeyList();
+  const { data: passkeys, isPending: loadingList } = usePasskeyList();
   const deletePasskey = useDeletePasskey();
   const [deleteTarget, setDeleteTarget] = useState<{ publicId: string; name: string } | null>(null);
   const [showRegister, setShowRegister] = useState(false);

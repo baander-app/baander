@@ -99,7 +99,7 @@ export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSo
   return {
     songs,
     total: query.data?.pages.at(-1)?.meta.total ?? 0,
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
     isFetchingMore: query.isFetchingNextPage,
     hasNextPage,
     isError: query.isError,

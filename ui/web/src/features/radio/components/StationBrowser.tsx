@@ -121,10 +121,7 @@ export function StationBrowser() {
 
   const stations: RadioStation[] = stationsQuery.data ?? []
   const starredIds = new Set(starred.map((s) => s.stationId))
-  // Match original timing: skeletons show only once the debounced filter is
-  // active and a fetch is in flight (i.e. after the 300ms debounce elapses),
-  // not during the debounce window itself.
-  const loading = hasFilter && (stationsQuery.isLoading || stationsQuery.isFetching)
+  const loading = hasFilter && (stationsQuery.isPending || stationsQuery.isPlaceholderData || stationsQuery.isFetching)
 
   const handleStar = (stationId: string) => {
     starMutation.mutate(stationId)

@@ -53,7 +53,7 @@ function responseStatus(span: Span): string | null {
 }
 
 export function SpansSection() {
-  const { data: spans, isLoading, error, refetch } = useSpans(SPAN_LIMIT)
+  const { data: spans, isPending: isLoading, error, refetch } = useSpans(SPAN_LIMIT)
   const clearSpans = useClearSpans()
 
   const clearButton = (

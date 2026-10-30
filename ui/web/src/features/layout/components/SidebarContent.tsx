@@ -22,7 +22,7 @@ interface SidebarContentProps {
 export function SidebarContent({ onItemClick }: SidebarContentProps) {
   const activeMedia = useMediaModeStore((s) => s.activeMedia)
   const schema = useSidebarStore((s) => s.schemas[activeMedia])
-  const { items: recentItems } = useRecentItems({ limit: 5, mediaType: activeMedia })
+  const { items: recentItems, isLoading: recentLoading } = useRecentItems({ limit: 5, mediaType: activeMedia })
 
   return (
     <Nav>
@@ -38,7 +38,7 @@ export function SidebarContent({ onItemClick }: SidebarContentProps) {
             onItemClick={onItemClick}
           />
         ))}
-      <SidebarRecentItems items={recentItems} />
+      <SidebarRecentItems items={recentItems} isLoading={recentLoading} />
     </Nav>
   )
 }

@@ -5,7 +5,7 @@ import { SectionError, SectionSkeleton } from './SectionStates'
 import { formatCount } from './format'
 
 export function WorkerPoolsSection() {
-  const { data, isLoading, error, refetch } = useWorkerStats()
+  const { data, isPending: isLoading, error, refetch } = useWorkerStats()
 
   if (isLoading) {
     return (
