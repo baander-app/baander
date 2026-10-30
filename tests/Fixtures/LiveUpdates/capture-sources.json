@@ -1,0 +1,1724 @@
+{
+  "version": 1,
+  "families": ["catalog", "activity", "playlists", "libraries", "notifications", "account", "preferences", "devices", "sessions", "radio", "lyrics", "recommendations", "admin-users", "admin-settings", "admin-jobs", "admin-runtime", "admin-alerts", "admin-security", "admin-metadata", "admin-media", "deployment-definitions"],
+  "scope_routes": {
+    "user": {
+      "kind": "user",
+      "derivation": "OLD.user_id and NEW.user_id; omit nulls; union both for UPDATE",
+      "audience": "Only that authenticated principal."
+    },
+    "self": {
+      "kind": "user",
+      "derivation": "OLD.id and NEW.id",
+      "audience": "Only that authenticated principal; access changes force authorized resynchronization."
+    },
+    "library": {
+      "kind": "library",
+      "derivation": "OLD.library_id and NEW.library_id",
+      "audience": "Principals with current read permission; revoked recipients receive only an opaque personal access change."
+    },
+    "library-self": {
+      "kind": "library",
+      "derivation": "OLD.id and NEW.id",
+      "audience": "Principals with current read permission."
+    },
+    "album": {
+      "kind": "library",
+      "derivation": "OLD.album_id and NEW.album_id -> albums.id -> albums.library_id",
+      "audience": "Principals with current library read permission."
+    },
+    "song": {
+      "kind": "library",
+      "derivation": "OLD.song_id and NEW.song_id -> songs.id -> songs.album_id -> albums.library_id",
+      "audience": "Principals with current library read permission."
+    },
+    "movie": {
+      "kind": "library",
+      "derivation": "OLD.movie_id and NEW.movie_id -> movies.id -> movies.library_id",
+      "audience": "Principals with current library read permission."
+    },
+    "artist": {
+      "kind": "library",
+      "derivation": "OLD.id and NEW.id -> artist_album.artist_id -> albums.library_id UNION artist_song.artist_id -> songs.album_id -> albums.library_id",
+      "audience": "Principals with current library read permission; resolve all memberships before deletion."
+    },
+    "genre": {
+      "kind": "library",
+      "derivation": "OLD.id and NEW.id -> genre_album.genre_id -> albums.library_id UNION genre_song.genre_id -> songs.album_id -> albums.library_id UNION genre_movie.genre_id -> movies.library_id",
+      "audience": "Principals with current library read permission; resolve all memberships before deletion."
+    },
+    "collection": {
+      "kind": "library",
+      "derivation": "OLD.tmdb_collection_id and NEW.tmdb_collection_id -> movies.tmdb_collection_id -> movies.library_id",
+      "audience": "Principals with current library read permission; resolve children before deletion."
+    },
+    "video": {
+      "kind": "library",
+      "derivation": "OLD.id and NEW.id -> movie_video.video_id -> movies.library_id",
+      "audience": "Principals with current library read permission; resolve memberships before deletion."
+    },
+    "playlist": {
+      "kind": "playlist",
+      "derivation": "OLD.playlist_id and NEW.playlist_id",
+      "audience": "Current owner, collaborators and authorized readers; evicted collaborators receive only personal access changes."
+    },
+    "playlist-self": {
+      "kind": "playlist",
+      "derivation": "OLD.id and NEW.id; capture OLD.user_id and OLD.is_public before deletion or access changes",
+      "audience": "Current owner, collaborators and authorized readers; old audience gets opaque personal access changes."
+    },
+    "admin": {
+      "kind": "admin",
+      "derivation": "Singleton administrator scope; never include source row values",
+      "audience": "Current administrators with the matching endpoint permission."
+    },
+    "public": {
+      "kind": "global",
+      "derivation": "Singleton authenticated public scope; no personal data",
+      "audience": "All signed-in clients; only public radio catalog and public playlist discovery."
+    },
+    "recommendation": {
+      "kind": "user",
+      "derivation": "OLD.user_id and NEW.user_id when present; null denotes shared results, resolve authorized readers from source/target catalog library membership",
+      "audience": "Only the owner for personal results; shared results require current source and target read permission."
+    },
+    "token": {
+      "kind": "user",
+      "derivation": "OLD.token_id and NEW.token_id -> oauth_access_tokens.id -> oauth_access_tokens.user_id",
+      "audience": "Only the token owner; never token, network or fingerprint values."
+    },
+    "refresh-token": {
+      "kind": "user",
+      "derivation": "OLD.access_token_id and NEW.access_token_id -> oauth_access_tokens.id -> oauth_access_tokens.user_id",
+      "audience": "Only the token owner; resolve parent before cascade."
+    },
+    "image": {
+      "kind": "library",
+      "derivation": "Union OLD and NEW album_id -> albums.library_id; artist_id -> artist membership routes; playlist_id -> authorized playlist scope; include albums.cover_image_id and artists.cover_image_id reverse references",
+      "audience": "Current library or playlist readers only; route playlist images through playlist scope."
+    },
+    "transcode-owner": {
+      "kind": "user",
+      "derivation": "OLD.owner_user_id and NEW.owner_user_id",
+      "audience": "Only the job owner; admin-media is separately administrator-scoped."
+    }
+  },
+  "capture_rules": {
+    "row_images": "INSERT uses NEW; DELETE uses OLD; UPDATE unions OLD and NEW scopes and dependent audiences before relationship mutation.",
+    "no_op": "UPDATE captures only if at least one relevant column IS DISTINCT FROM its OLD value. Timestamp-only, secret-only and heartbeat-only changes do not capture.",
+    "privacy": "Inbox rows contain family and scope identifiers only. Source values, credentials, paths, network metadata, payloads and raw event bodies never enter the browser protocol. Secret-bearing structured settings may trigger safe invalidation without copying their value.",
+    "scope_routing": "Routes name the root family audience. Dependent private families require reverse lookup of affected owners, never broadcasting a user family to every library reader. Admin families always use the admin route even when another root route applies.",
+    "cascades": "Before deleting a parent, capture its own and dependent family scopes while links remain readable. Child DELETE/SET NULL capture must not depend on reading the removed parent. Keep direct OLD foreign-key scopes; parent capture covers vanished join paths.",
+    "public_playlists": "Only publicly discoverable playlists dirty the global discovery audience. Owner/collaborator changes always dirty the old and new personal audiences; loss of access sends an opaque personal reset.",
+    "expiry": "Time passing creates no SQL change; expiry and continuously varying gauges need the declared bounded active-visible sampling policy."
+  },
+  "response_caches": {
+    "authoritative-read": {
+      "policy": "No enabled ORM result-cache call or application resource response-cache decorator found for these readers; configuration alone does not enable result caching. Any later cache needs revision-aware keys or synchronous invalidation before it can satisfy live refresh.",
+      "evidence": ["config/packages/doctrine.yaml", "config/packages/cache.yaml", "src/Auth/Infrastructure/Cache/CachedAccessTokenRepository.php"],
+      "exclusions": "OAuth revocation cache, DPoP replay protection, passkey challenges, external provider tokens, compiled metadata and media segment caches are not query-resource response caches."
+    }
+  },
+  "dependency_rules": [
+    {
+      "source_tables": ["songs", "albums", "artists", "movies", "images", "artist_album", "artist_song", "library_file_index"],
+      "families": ["activity"],
+      "derivation": "Resolve media_activities.user_id for changed song/album/artist/movie and related artwork or availability before deleting relation paths.",
+      "reader": "src/Activity/Infrastructure/ActivityEnrichmentService.php"
+    },
+    {
+      "source_tables": ["songs", "albums", "artists", "artist_song", "artist_album", "images"],
+      "families": ["playlists"],
+      "derivation": "Resolve playlist_song.song_id to playlists, owners and collaborators; playlist representations embed song metadata.",
+      "reader": "src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"
+    },
+    {
+      "source_tables": ["songs", "albums", "artist_song", "genre_song"],
+      "families": ["libraries"],
+      "derivation": "Catalog mutations change counts, total size/duration and distinct artist/genre aggregates for OLD and NEW libraries.",
+      "reader": "src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php"
+    },
+    {
+      "source_tables": ["recommendations", "recommendation_jobs", "songs", "media_activities", "system_settings"],
+      "families": ["recommendations", "admin-metadata"],
+      "derivation": "Dirty personal result owners and currently authorized shared-result readers after result commits; admin coverage also reads catalog counts and effective provider settings.",
+      "reader": "src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationInsightsRepository.php"
+    },
+    {
+      "source_tables": ["users", "user_library_access", "playlists", "playlist_collaborators"],
+      "families": ["account", "libraries", "playlists", "catalog", "activity", "recommendations"],
+      "derivation": "Capture old and new principal audiences before ownership, visibility or grants change; revoked recipients receive opaque personal access invalidation and must clear inaccessible state.",
+      "reader": "src/Library/Interface/Controller/AdminUserLibraryAccessController.php"
+    }
+  ],
+  "parent_cascades": [
+    {
+      "parent": "images",
+      "child": "albums",
+      "foreign_key": "cover_image_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "libraries",
+      "child": "albums",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "albums",
+      "child": "artist_album",
+      "foreign_key": "album_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "artists",
+      "child": "artist_album",
+      "foreign_key": "artist_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "artists",
+      "child": "artist_song",
+      "foreign_key": "artist_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "songs",
+      "child": "artist_song",
+      "foreign_key": "song_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "images",
+      "child": "artists",
+      "foreign_key": "cover_image_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "audio_preferences",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "country_subscriptions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "devices",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "domain_event_outbox",
+      "child": "domain_event_outbox_receipt",
+      "foreign_key": "outbox_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "email_verification_tokens",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "eq_device_profiles",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "albums",
+      "child": "genre_album",
+      "foreign_key": "album_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "genres",
+      "child": "genre_album",
+      "foreign_key": "genre_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "genres",
+      "child": "genre_movie",
+      "foreign_key": "genre_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "movies",
+      "child": "genre_movie",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "genres",
+      "child": "genre_song",
+      "foreign_key": "genre_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "songs",
+      "child": "genre_song",
+      "foreign_key": "song_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "genres",
+      "child": "genres",
+      "foreign_key": "parent_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "albums",
+      "child": "images",
+      "foreign_key": "album_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "artists",
+      "child": "images",
+      "foreign_key": "artist_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "playlists",
+      "child": "images",
+      "foreign_key": "playlist_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "layout_preferences",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "libraries",
+      "child": "library_file_index",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "listening_sessions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "songs",
+      "child": "lyrics",
+      "foreign_key": "song_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "albums",
+      "child": "media_activities",
+      "foreign_key": "album_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "artists",
+      "child": "media_activities",
+      "foreign_key": "artist_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "movies",
+      "child": "media_activities",
+      "foreign_key": "movie_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "songs",
+      "child": "media_activities",
+      "foreign_key": "song_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "media_activities",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "movies",
+      "child": "movie_video",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "videos",
+      "child": "movie_video",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "libraries",
+      "child": "movies",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "notification_preferences",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "notifications",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_clients",
+      "child": "oauth_access_tokens",
+      "foreign_key": "client_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "oauth_access_tokens",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_clients",
+      "child": "oauth_auth_codes",
+      "foreign_key": "client_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "oauth_auth_codes",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "oauth_clients",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_clients",
+      "child": "oauth_device_codes",
+      "foreign_key": "client_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "oauth_device_codes",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_access_tokens",
+      "child": "oauth_refresh_tokens",
+      "foreign_key": "access_token_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_refresh_tokens",
+      "child": "oauth_refresh_tokens",
+      "foreign_key": "previous_refresh_token_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "oauth_access_tokens",
+      "child": "oauth_token_metadata",
+      "foreign_key": "token_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "server_instances",
+      "child": "pairing_sessions",
+      "foreign_key": "server_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "party_sessions",
+      "child": "party_events",
+      "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "party_events",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "party_sessions",
+      "child": "party_members",
+      "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "party_members",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "party_sessions",
+      "foreign_key": "host_user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "transcode_jobs",
+      "child": "party_sessions",
+      "foreign_key": "transcode_job_id",
+      "action": "SET NULL",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "videos",
+      "child": "party_sessions",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "passkeys",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "password_reset_tokens",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "player_preferences",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "playlists",
+      "child": "playlist_collaborators",
+      "foreign_key": "playlist_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "playlist_collaborators",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "playlists",
+      "child": "playlist_song",
+      "foreign_key": "playlist_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "songs",
+      "child": "playlist_song",
+      "foreign_key": "song_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "playlists",
+      "child": "playlist_statistics",
+      "foreign_key": "playlist_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "playlists",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "preference_history",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "push_subscriptions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "radio_stations",
+      "child": "radio_sessions",
+      "foreign_key": "active_station_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "radio_sessions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "recommendation_jobs",
+      "child": "recommendation_jobs",
+      "foreign_key": "original_job_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "recommendation_jobs",
+      "foreign_key": "user_id",
+      "action": "SET NULL",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "recommendations",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "albums",
+      "child": "songs",
+      "foreign_key": "album_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "radio_stations",
+      "child": "starred_stations",
+      "foreign_key": "station_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "starred_stations",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "third_party_credentials",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "videos",
+      "child": "transcode_jobs",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "transcode_jobs",
+      "child": "transcode_sessions",
+      "foreign_key": "job_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "transcode_sessions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "videos",
+      "child": "transcode_sessions",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_accent_colors",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_favorites",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "libraries",
+      "child": "user_library_access",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_library_access",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_settings",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_sidebar_configs",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "user_theme_moods",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "webhooks",
+      "child": "webhook_delivery_logs",
+      "foreign_key": "webhook_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "users",
+      "child": "transcode_jobs",
+      "foreign_key": "owner_user_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "transcode_jobs",
+      "child": "transcode_runtime_state",
+      "foreign_key": "job_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "transcode_sessions",
+      "child": "transcode_runtime_state",
+      "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "before-parent-delete"
+    },
+    {
+      "parent": "transcode_sessions",
+      "child": "transcode_control_receipts",
+      "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    }
+  ],
+  "sources": [
+    {
+      "table": "albums",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/AlbumEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "type", "mbid", "discogs_id", "spotify_id", "year", "label", "catalog_number", "barcode", "country", "language", "disambiguation", "annotation", "locked_fields", "merged_from", "cover_image_id", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["library"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php", "src/Catalog/Infrastructure/Doctrine/Repository/AlbumRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "artist_album",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/ArtistAlbumEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "artist_id", "album_id", "role"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["album"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/AlbumRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "artist_song",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/ArtistSongEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "artist_id", "song_id", "role"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["song"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "artists",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/ArtistEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["cover_image_id", "id", "public_id", "name", "country", "gender", "type", "life_span_begin", "life_span_end", "disambiguation", "sort_name", "biography", "mbid", "discogs_id", "spotify_id", "locked_fields", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["artist"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php", "src/Catalog/Infrastructure/Doctrine/Repository/ArtistRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "audio_preferences",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/AudioPreferencesEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "payload", "version", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/VersionedPreferencesWriter.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "audio_rendition_runtime",
+      "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/AudioRenditionRuntimeEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["rendition_key", "track_key", "source_signature", "source_path", "format", "bitrate", "output_directory", "state", "generation", "partial_path", "final_path", "error"],
+      "excluded_columns": ["worker_namespace", "worker_boot_id", "worker_id", "worker_launch_generation", "worker_lease_epoch", "claim_token", "lease_expires_at", "updated_at"],
+      "families": ["admin-media"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Transcode/Infrastructure/Doctrine/AudioRenditionRuntime.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "country_subscriptions",
+      "mapping": "src/Radio/Infrastructure/Doctrine/Entity/CountrySubscriptionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "source_id", "country_code", "last_synced_at", "created_at"],
+      "excluded_columns": [],
+      "families": ["radio"],
+      "scope_routes": ["user"],
+      "readers": ["src/Radio/Infrastructure/Doctrine/Repository/CountrySubscriptionDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "devices",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/DeviceEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "device_id", "name", "created_at"],
+      "excluded_columns": ["last_seen_at"],
+      "families": ["devices", "sessions"],
+      "scope_routes": ["user"],
+      "readers": ["src/Session/Infrastructure/Doctrine/Repository/DeviceDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "domain_event_outbox",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Semantic event transport; capture downstream authoritative rows, not publication bookkeeping."
+    },
+    {
+      "table": "domain_event_outbox_delivery",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Delivery retries and leases are internal; capture would amplify publication recursively."
+    },
+    {
+      "table": "domain_event_outbox_receipt",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Consumer idempotency receipts have no browser query."
+    },
+    {
+      "table": "email_verification_tokens",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/EmailVerificationTokenEntity.php",
+      "classification": "excluded",
+      "reason": "Secret challenge storage; verification outcome changes users and is captured there."
+    },
+    {
+      "table": "eq_device_profiles",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/EqDeviceProfileEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "name", "icon", "device_id", "payload", "is_default", "sort_order", "version", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/Repository/EqDeviceProfileDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "failed_messages",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "body", "headers", "queue_name", "created_at", "available_at", "delivered_at"],
+      "excluded_columns": [],
+      "families": ["admin-jobs"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Shared/Infrastructure/Messenger/FailureTransportAdministration.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "genre_album",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/GenreAlbumEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "genre_id", "album_id"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["album"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/AlbumRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "genre_movie",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/GenreMovieEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "genre_id", "movie_id"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
+      "scope_routes": ["movie"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/MovieRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "genre_song",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/GenreSongEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "genre_id", "song_id", "position"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["song"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "genres",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/GenreEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "parent_id", "name", "slug", "mbid", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["genre"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/GenreRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "images",
+      "mapping": "src/Media/Infrastructure/Doctrine/Entity/ImageEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "path", "extension", "mime_type", "blurhash", "public_id", "size", "width", "height", "imageable_type", "album_id", "artist_id", "playlist_id", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "playlists", "activity", "admin-media"],
+      "scope_routes": ["image"],
+      "readers": ["src/Media/Infrastructure/Doctrine/Repository/ImageRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "job_monitors",
+      "mapping": "src/Shared/Infrastructure/Doctrine/Entity/JobMonitorEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "job_uuid", "job_id", "name", "queue", "status", "queued_at", "started_at", "finished_at", "duration_microseconds", "attempt", "retried", "progress", "exception", "exception_class", "data", "data_truncated", "audit_log", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["admin-jobs"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Shared/Infrastructure/Messenger/JobMonitorService.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "layout_preferences",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/LayoutPreferencesEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "payload", "version", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/VersionedPreferencesWriter.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "libraries",
+      "mapping": "src/Library/Infrastructure/Doctrine/Entity/LibraryEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "name", "slug", "path", "type", "filesystem_type", "sort_order", "last_scan", "created_at", "scan_status"],
+      "excluded_columns": ["claim_id", "claim_kind", "claim_expires_at", "updated_at"],
+      "families": ["libraries", "catalog"],
+      "scope_routes": ["library-self", "admin"],
+      "readers": ["src/Library/Infrastructure/Doctrine/Repository/LibraryRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "library_file_index",
+      "mapping": "src/Library/Infrastructure/Doctrine/Entity/LibraryFileIndexEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "library_id", "path", "hash", "size", "extension", "modified_at", "available"],
+      "excluded_columns": ["discovered_at"],
+      "families": ["catalog", "libraries", "activity", "admin-media"],
+      "scope_routes": ["library"],
+      "readers": ["src/Library/Infrastructure/LibraryFileAvailability.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "listening_sessions",
+      "mapping": "src/Session/Infrastructure/Doctrine/Entity/ListeningSessionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "active_device_id", "queue", "current_track_index", "playback_state", "created_at"],
+      "excluded_columns": ["position", "last_used_at", "updated_at"],
+      "families": ["sessions"],
+      "scope_routes": ["user"],
+      "readers": ["src/Session/Infrastructure/Doctrine/Repository/ListeningSessionDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "login_blocks",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/LoginBlockEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "ip_address", "email", "field_value", "user_agent", "created_at"],
+      "excluded_columns": [],
+      "families": ["admin-security"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Auth/Interface/Controller/AdminLoginBlockController.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "lyrics",
+      "mapping": "src/Lyrics/Infrastructure/Doctrine/Entity/LyricsEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "song_id", "plain_lyrics", "synced_lyrics", "source", "source_url", "lrclib_id", "is_instrumental", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["lyrics", "catalog", "admin-metadata"],
+      "scope_routes": ["song"],
+      "readers": ["src/Lyrics/Infrastructure/Doctrine/Repository/LyricsAdminRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "media_activities",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/MediaActivityEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "activity_type", "song_id", "album_id", "artist_id", "movie_id", "play_count", "love", "last_played_at", "last_platform", "last_player", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["activity", "recommendations"],
+      "scope_routes": ["user"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/Repository/ActivityAnalyticsRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "movie_collections",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieCollectionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "tmdb_collection_id", "name", "overview", "poster_path", "backdrop_path"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
+      "scope_routes": ["collection"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/MovieRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "movie_video",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieVideoEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "movie_id", "video_id", "sort_order"],
+      "excluded_columns": [],
+      "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
+      "scope_routes": ["movie"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/MovieRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "movies",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
+      "scope_routes": ["library"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/MovieRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "notification_preferences",
+      "mapping": "src/Notification/Infrastructure/Doctrine/Entity/NotificationPreferenceEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "category", "channel", "enabled", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["notifications"],
+      "scope_routes": ["user"],
+      "readers": ["src/Notification/Infrastructure/Doctrine/Repository/NotificationPreferenceRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "notifications",
+      "mapping": "src/Notification/Infrastructure/Doctrine/Entity/NotificationEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "category", "event_type", "title", "body", "is_read", "reference_data", "parameters", "created_at"],
+      "excluded_columns": [],
+      "families": ["notifications"],
+      "scope_routes": ["user"],
+      "readers": ["src/Notification/Infrastructure/Doctrine/Repository/NotificationRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_access_tokens",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/AccessTokenEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "chain_id", "user_id", "client_id", "name", "scopes", "revoked", "expires_at", "last_refreshed_at", "created_at"],
+      "excluded_columns": ["updated_at", "token_id", "dpop_jkt"],
+      "families": ["account", "devices", "admin-security"],
+      "scope_routes": ["user", "admin"],
+      "readers": ["src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_auth_codes",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/AuthCodeEntity.php",
+      "classification": "excluded",
+      "reason": "One-time secret exchange; consent is demand-driven and grants are captured on clients and access tokens."
+    },
+    {
+      "table": "oauth_clients",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/ClientEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "name", "provider", "redirect", "personal_access_client", "password_client", "device_client", "confidential", "first_party", "revoked", "user_id", "created_at"],
+      "excluded_columns": ["secret_hash", "updated_at"],
+      "families": ["account", "admin-users"],
+      "scope_routes": ["user", "admin"],
+      "readers": ["src/Auth/Interface/Controller/AdminOAuthClientController.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_device_codes",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/DeviceCodeEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "client_id", "scopes", "expires_at", "interval", "approved", "denied", "consumed_at", "created_at"],
+      "excluded_columns": ["device_code", "user_code", "verification_uri", "verification_uri_complete", "last_polled_at", "updated_at"],
+      "families": ["account", "devices"],
+      "scope_routes": ["user"],
+      "readers": ["src/Auth/Infrastructure/Repository/OAuth/DeviceCodeRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_refresh_tokens",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/RefreshTokenEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "chain_id", "previous_refresh_token_id", "access_token_id", "revoked", "expires_at", "used_at", "created_at"],
+      "excluded_columns": ["updated_at", "token_id"],
+      "families": ["account", "devices", "admin-security"],
+      "scope_routes": ["refresh-token", "admin"],
+      "readers": ["src/Auth/Infrastructure/Repository/OAuth/RefreshTokenRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "oauth_scopes",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/ScopeEntity.php",
+      "classification": "excluded",
+      "reason": "Deployment-fixed OAuth scope definitions; revalidate after server incarnation change."
+    },
+    {
+      "table": "oauth_token_metadata",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/OAuth/TokenMetadataEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "token_id", "user_agent", "device_operating_system", "device_name", "client_fingerprint", "session_id", "ip_address", "ip_history", "ip_change_count", "country_code", "city", "created_at"],
+      "excluded_columns": ["broadcast_token", "updated_at", "last_geo_notification_at"],
+      "families": ["devices", "admin-security"],
+      "scope_routes": ["token", "admin"],
+      "readers": ["src/Auth/Infrastructure/Repository/OAuth/TokenMetadataRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "pairing_sessions",
+      "mapping": "src/Discovery/Infrastructure/Doctrine/Entity/PairingSessionEntity.php",
+      "classification": "excluded",
+      "reason": "Demand-driven pairing exchange; no mounted web query consumer in the current inventory."
+    },
+    {
+      "table": "party_events",
+      "mapping": "src/Party/Infrastructure/Doctrine/Entity/PartyEventEntity.php",
+      "classification": "excluded",
+      "reason": "Existing transient party protocol history; no current web query consumer."
+    },
+    {
+      "table": "party_members",
+      "mapping": "src/Party/Infrastructure/Doctrine/Entity/PartyMemberEntity.php",
+      "classification": "excluded",
+      "reason": "Existing transient party protocol; the current web application has no party query consumer."
+    },
+    {
+      "table": "party_sessions",
+      "mapping": "src/Party/Infrastructure/Doctrine/Entity/SyncedPartySessionEntity.php",
+      "classification": "excluded",
+      "reason": "Existing transient party protocol; the current web application has no party query consumer."
+    },
+    {
+      "table": "passkeys",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/PasskeyEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "name", "created_at"],
+      "excluded_columns": ["credential_id", "data", "counter", "last_used_at", "updated_at"],
+      "families": ["account"],
+      "scope_routes": ["user"],
+      "readers": ["src/Auth/Infrastructure/Repository/Passkey/PasskeyRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "password_reset_tokens",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/PasswordResetTokenEntity.php",
+      "classification": "excluded",
+      "reason": "Secret challenge storage; password/security outcome changes users and is captured there."
+    },
+    {
+      "table": "player_preferences",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/PlayerPreferencesEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "payload", "version", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/VersionedPreferencesWriter.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "playlist_collaborators",
+      "mapping": "src/Playlist/Infrastructure/Doctrine/Entity/PlaylistCollaboratorEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "playlist_id", "user_id", "role", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["playlists", "account"],
+      "scope_routes": ["playlist", "user"],
+      "readers": ["src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "playlist_song",
+      "mapping": "src/Playlist/Infrastructure/Doctrine/Entity/PlaylistSongEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "playlist_id", "song_id", "position", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["playlists"],
+      "scope_routes": ["playlist"],
+      "readers": ["src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "playlist_statistics",
+      "mapping": "src/Playlist/Infrastructure/Doctrine/Entity/PlaylistStatisticEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "playlist_id", "views", "plays", "shares", "favorites", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["playlists"],
+      "scope_routes": ["playlist"],
+      "readers": ["src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "playlists",
+      "mapping": "src/Playlist/Infrastructure/Doctrine/Entity/PlaylistEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "name", "description", "is_public", "is_collaborative", "is_smart", "smart_rules", "created_at"],
+      "excluded_columns": ["persistence_version", "updated_at"],
+      "families": ["playlists"],
+      "scope_routes": ["playlist-self", "public"],
+      "readers": ["src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "preference_history",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/PreferenceHistoryEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "preference_type", "version", "payload", "created_at"],
+      "excluded_columns": [],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/Repository/PreferenceHistoryDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "push_subscriptions",
+      "mapping": "src/Notification/Infrastructure/Doctrine/Entity/PushSubscriptionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "content_encoding", "user_agent", "created_at"],
+      "excluded_columns": ["endpoint", "public_key", "auth_key"],
+      "families": ["notifications"],
+      "scope_routes": ["user"],
+      "readers": ["src/Notification/Infrastructure/Push/PushSubscriptionRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "radio_sessions",
+      "mapping": "src/Radio/Infrastructure/Doctrine/Entity/RadioSessionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "active_station_id", "active_stream_url", "state", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["radio"],
+      "scope_routes": ["user"],
+      "readers": ["src/Radio/Infrastructure/Doctrine/Repository/RadioSessionDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "radio_sources",
+      "mapping": "src/Radio/Infrastructure/Doctrine/Entity/RadioSourceEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "name", "type", "sync_url", "sync_schedule", "is_active", "created_at"],
+      "excluded_columns": ["sync_config", "updated_at"],
+      "families": ["radio"],
+      "scope_routes": ["public", "admin"],
+      "readers": ["src/Radio/Infrastructure/Doctrine/Repository/RadioSourceDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "radio_stations",
+      "mapping": "src/Radio/Infrastructure/Doctrine/Entity/RadioStationEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "source_id", "external_id", "name", "country", "language", "genres", "tags", "streams", "logo", "website", "created_at"],
+      "excluded_columns": ["last_checked_at", "updated_at"],
+      "families": ["radio"],
+      "scope_routes": ["public", "admin"],
+      "readers": ["src/Radio/Infrastructure/Doctrine/Repository/RadioStationDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "recommendation_jobs",
+      "mapping": "src/Recommendation/Infrastructure/Doctrine/Entity/RecommendationJobEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "is_full", "user_id", "status", "total_songs", "completed_songs", "current_strategy", "strategy_counts", "fail_reason", "created_at", "started_at", "completed_at", "metadata", "original_job_id"],
+      "excluded_columns": ["updated_at"],
+      "families": ["recommendations", "admin-metadata"],
+      "scope_routes": ["recommendation", "admin"],
+      "readers": ["src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationInsightsRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "recommendations",
+      "mapping": "src/Recommendation/Infrastructure/Doctrine/Entity/RecommendationEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "name", "source_type", "source_id", "target_type", "target_id", "score", "position", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["recommendations", "admin-metadata"],
+      "scope_routes": ["recommendation", "admin"],
+      "readers": ["src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationInsightsRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "scheduled_jobs",
+      "mapping": "src/Scheduler/Infrastructure/Doctrine/Entity/ScheduledJobEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "revision", "evaluated_through", "recovery_after", "name", "expression", "job_type", "command", "status", "description", "parameters", "created_at", "last_run_at", "next_run_at", "last_result", "run_count", "last_failure_at", "last_error"],
+      "excluded_columns": ["updated_at"],
+      "families": ["admin-jobs"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Scheduler/Infrastructure/Doctrine/Repository/ScheduledJobRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "scheduler_occurrence_executions",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["occurrence_id", "job_id", "attempt_id", "deployment_namespace", "deployment_boot_id", "deployment_epoch", "started_at", "returned_at"],
+      "excluded_columns": [],
+      "families": ["admin-jobs"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Scheduler/Infrastructure/Doctrine/DoctrineSchedulerOccurrenceExecutionStore.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "scheduler_occurrences",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "job_id", "scheduled_for", "origin", "job_type", "command", "dispatch_after", "dispatch_token", "dispatched_at", "created_at", "public_id", "job_public_id"],
+      "excluded_columns": [],
+      "families": ["admin-jobs"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Scheduler/Infrastructure/Doctrine/DoctrineSchedulerOccurrenceStore.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "server_instances",
+      "mapping": "src/Discovery/Infrastructure/Doctrine/Entity/ServerInstanceEntity.php",
+      "classification": "excluded",
+      "reason": "Discovery registry integration has no mounted web query consumer; credentials and heartbeats stay private."
+    },
+    {
+      "table": "songs",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/SongEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "album_id", "title", "path", "size", "mime_type", "length", "lyrics", "track", "disc", "year", "comment", "hash", "bitrate", "sample_rate", "channels", "codec", "explicit", "energy", "danceability", "valence", "acousticness", "instrumentalness", "liveness", "spechiness", "loudness", "mbid", "discogs_id", "spotify_id", "locked_fields", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "playlists", "recommendations", "admin-metadata"],
+      "scope_routes": ["album"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/CatalogStatsQuery.php", "src/Catalog/Infrastructure/Doctrine/Repository/SongRepository.php", "src/Activity/Infrastructure/ActivityEnrichmentService.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "starred_stations",
+      "mapping": "src/Radio/Infrastructure/Doctrine/Entity/StarredStationEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "station_id", "starred_at"],
+      "excluded_columns": [],
+      "families": ["radio"],
+      "scope_routes": ["user"],
+      "readers": ["src/Radio/Infrastructure/Doctrine/Repository/StarredStationDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "system_settings",
+      "mapping": "src/Shared/Infrastructure/Doctrine/Entity/SystemSettingEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["key", "value"],
+      "excluded_columns": ["updated_at"],
+      "families": ["admin-settings", "admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Shared/Infrastructure/Doctrine/Repository/SystemSettingRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "third_party_credentials",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/ThirdPartyCredentialEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "provider", "expires_at", "meta", "created_at"],
+      "excluded_columns": ["updated_at", "access_token", "refresh_token"],
+      "families": ["account"],
+      "scope_routes": ["user"],
+      "readers": ["src/Auth/Infrastructure/Repository/Credential/ThirdPartyCredentialRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "transcode_control_receipts",
+      "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/TranscodeControlReceiptEntity.php",
+      "classification": "excluded",
+      "reason": "Replay protection bookkeeping; output/lifecycle changes are captured on runtime/job/session sources."
+    },
+    {
+      "table": "transcode_jobs",
+      "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/TranscodeJobEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "video_id", "owner_user_id", "quality_tier_name", "status", "reference_count", "total_segments", "completed_segments", "output_directory", "init_segment_path", "segment_map", "probe_data", "video_codec", "audio_codec", "video_bitrate", "audio_bitrate", "width", "height", "framerate", "fail_reason", "measured_loudness", "audio_track_languages", "audio_segment_map", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["admin-media"],
+      "scope_routes": ["transcode-owner", "admin"],
+      "readers": ["src/Transcode/Infrastructure/Doctrine/Repository/TranscodeJobRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "transcode_runtime_state",
+      "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/TranscodeRuntimeEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["job_id", "session_id", "request_id", "desired", "desired_revision", "observed_revision", "generation", "outcome", "output_directory", "error", "admission_deadline"],
+      "excluded_columns": ["worker_namespace", "worker_boot_id", "worker_id", "worker_launch_generation", "worker_lease_epoch", "claim_token", "lease_expires_at", "updated_at"],
+      "families": ["admin-media"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Transcode/Infrastructure/Doctrine/TranscodeRuntimeState.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "transcode_sessions",
+      "mapping": "src/Transcode/Infrastructure/Doctrine/Entity/TranscodeSessionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "video_id", "state", "priority", "audio_profile", "current_segment_index", "wall_clock_offset", "metrics", "created_at", "job_id"],
+      "excluded_columns": ["updated_at"],
+      "families": ["admin-media", "sessions"],
+      "scope_routes": ["user", "admin"],
+      "readers": ["src/Transcode/Infrastructure/Doctrine/Repository/TranscodeSessionRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_accent_colors",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/UserAccentColorEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "accent_color", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/Repository/AccentColorDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_favorites",
+      "mapping": "src/Favorites/Infrastructure/Doctrine/Entity/UserFavoriteEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "user_id", "entity_type", "entity_public_id", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["activity", "catalog"],
+      "scope_routes": ["user"],
+      "readers": ["src/Favorites/Infrastructure/Doctrine/Repository/UserFavoriteRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_library_access",
+      "mapping": "src/Library/Infrastructure/Doctrine/Entity/UserLibraryAccessEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["user_id", "library_id", "granted_at"],
+      "excluded_columns": [],
+      "families": ["account", "libraries", "catalog", "activity", "playlists", "recommendations", "admin-users"],
+      "scope_routes": ["user", "library", "admin"],
+      "readers": ["src/Library/Interface/Controller/AdminUserLibraryAccessController.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_settings",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/UserSettingEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["user_id", "key", "value"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/UserSettingRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_sidebar_configs",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/SidebarConfigEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "media_type", "items", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/Repository/SidebarConfigDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "user_theme_moods",
+      "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/UserThemeMoodEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "theme_mood", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["preferences"],
+      "scope_routes": ["user"],
+      "readers": ["src/UserPreference/Infrastructure/Doctrine/Repository/ThemeMoodDoctrineRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "users",
+      "mapping": "src/Auth/Infrastructure/Doctrine/Entity/UserEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "name", "email", "email_verified_at", "created_at", "roles", "disabled"],
+      "excluded_columns": ["password", "totp_secret", "updated_at"],
+      "families": ["account", "admin-users", "activity"],
+      "scope_routes": ["self", "admin"],
+      "readers": ["src/Auth/Infrastructure/Doctrine/UserRepository.php"],
+      "response_cache": "authoritative-read",
+      "derived_changes": [
+        {
+          "column": "totp_secret",
+          "predicate": "(OLD.totp_secret IS NULL) IS DISTINCT FROM (NEW.totp_secret IS NULL)",
+          "families": ["account"],
+          "reason": "A secret value stays private; enabling or disabling TOTP changes the visible security status."
+        }
+      ]
+    },
+    {
+      "table": "videos",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "path", "hash", "duration", "height", "width", "video_bitrate", "framerate", "probe", "created_at"],
+      "excluded_columns": ["updated_at"],
+      "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
+      "scope_routes": ["video"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/MovieRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "webhook_delivery_logs",
+      "mapping": "src/Notification/Infrastructure/Doctrine/Entity/WebhookDeliveryLogEntity.php",
+      "classification": "excluded",
+      "reason": "Internal webhook delivery audit; no current web query consumes delivery-log rows. Webhook configuration is captured separately."
+    },
+    {
+      "table": "webhooks",
+      "mapping": "src/Notification/Infrastructure/Doctrine/Entity/WebhookEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "url", "category_filter", "created_at"],
+      "excluded_columns": ["updated_at", "encrypted_secret"],
+      "families": ["admin-settings"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Notification/Infrastructure/Doctrine/Repository/WebhookRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "worker_deployment_boots",
+      "mapping": "migrations/Version20261018130000.php",
+      "classification": "excluded",
+      "reason": "Internal boot fencing; runtime dashboard reads sampled worker state."
+    },
+    {
+      "table": "worker_deployment_containers",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Internal deployment ownership; runtime dashboard reads sampled worker state."
+    },
+    {
+      "table": "worker_deployment_creations",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Internal deployment intent; runtime dashboard reads sampled worker state."
+    },
+    {
+      "table": "worker_deployment_leases",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Internal deployment fencing and heartbeat; never publish lease renewals."
+    },
+    {
+      "table": "worker_deployment_retirements",
+      "mapping": "migrations/Version20261017000000.php",
+      "classification": "excluded",
+      "reason": "Internal deployment drain coordination; no browser resource query."
+    }
+  ],
+  "sampled_sources": [
+    {
+      "families": ["admin-runtime", "admin-alerts"],
+      "reader": "src/Shared/Interface/Controller/ServerStatsControllerWithCoroutines.php",
+      "policy": "Active-visible bounded sampling; process counters, health snapshots and alert history are not PostgreSQL rows."
+    },
+    {
+      "families": ["admin-jobs"],
+      "reader": "src/Shared/Infrastructure/Messenger/RedisTransportStatus.php",
+      "policy": "Active-visible bounded sampling of Redis transport gauges; PostgreSQL failed-message transitions remain captured."
+    },
+    {
+      "families": ["admin-security"],
+      "reader": "src/Auth/Interface/Controller/AdminLoginBlockController.php",
+      "policy": "Active-visible bounded sampling for expiry transitions; persisted login-block mutations remain captured."
+    },
+    {
+      "families": ["admin-media"],
+      "reader": "src/Transcode/Interface/Controller/TranscodeJobController.php",
+      "policy": "Active-visible bounded sampling for occupancy, progress and storage; persisted lifecycle transitions remain captured."
+    },
+    {
+      "families": ["devices", "account"],
+      "reader": "src/Session/Infrastructure/Doctrine/Repository/DeviceDoctrineRepository.php",
+      "policy": "Active-visible bounded sampling of last-seen, passkey last-used and credential expiry; heartbeat-only writes do not capture."
+    }
+  ]
+}

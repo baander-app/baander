@@ -1,0 +1,263 @@
+{
+  "families": [
+    "catalog",
+    "activity",
+    "playlists",
+    "libraries",
+    "notifications",
+    "account",
+    "preferences",
+    "devices",
+    "sessions",
+    "radio",
+    "lyrics",
+    "recommendations",
+    "admin-users",
+    "admin-settings",
+    "admin-jobs",
+    "admin-runtime",
+    "admin-alerts",
+    "admin-security",
+    "admin-metadata",
+    "admin-media",
+    "deployment-definitions"
+  ],
+  "valid": [
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.changed",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "9223372036854775807",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "notifications"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.reset",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.health",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [],
+      "health": {
+        "state": "degraded",
+        "oldestPendingAgeMs": null
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "version": 2,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "session.state",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "other-user",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": 1,
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "01",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "0",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "9223372036854775808",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "user-1",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "arbitrary"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "catalog"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": -1
+      }
+    },
+    {
+      "version": 1,
+      "type": "live.ready",
+      "subscriptionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authorizationGeneration": "1",
+      "authorizationFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "families": [
+        "catalog",
+        "activity"
+      ],
+      "health": {
+        "state": "current",
+        "oldestPendingAgeMs": 0
+      },
+      "scope": "private-user"
+    }
+  ]
+}
+

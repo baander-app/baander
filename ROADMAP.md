@@ -42,6 +42,19 @@ access revocation, drafts, pagination, and capacity tests to implementation.
 No application tests ran for this documentation change; planning evidence does
 not establish working live updates.
 
+U1 delivered locally, 2026-10-30: shared PHP/TypeScript protocol validation and
+51 feature-owned policy descriptors classify 207 consuming call sites (206 unique
+classifications) across 111 files. The storage catalog covers 84 tables, including
+65 capture sources and 19 explicit exclusions, and 91 cascade relationships.
+Coverage checks link frontend table references to the backend catalog and detect
+unclassified readers. The developer guide explains the extension contract.
+Runtime capture, delivery, adoption, and behavior verification remain open.
+
+U1 verification checkpoint: the disposable backend CI runner passes 10 tests with
+1,522 assertions. All 14 frontend protocol and coverage tests, both TypeScript projects,
+scoped ESLint, scoped PHPStan, PHP formatting, prose preservation, and whitespace
+checks pass. No application subscription has been activated.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

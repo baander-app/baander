@@ -9,6 +9,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Architecture Overview](architecture.md) | DDD bounded contexts, four-layer structure, and shared kernel |
 | [Shared Kernel](shared-kernel.md) | UUID v7, cursor pagination, search, Swoole async, caching, WebSocket |
 | [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, message protocol, party sync |
+| [Live Updates](live-updates.md) | Query coverage, change sources, audiences, and freshness message contracts |
 | [API Reference](api-reference.md) | OpenAPI spec, REST patterns, and authentication flows |
 
 ## Development
