@@ -48,7 +48,7 @@ function retryableSaveError(error: unknown): boolean {
   return ['ERR_NETWORK', 'ECONNABORTED', 'ETIMEDOUT', 'ECONNRESET'].includes(error.code ?? '')
 }
 
-type PreferenceReadResult = 'applied' | 'deferred' | 'failed'
+type PreferenceReadResult = 'applied' | 'absent' | 'deferred' | 'failed'
 
 const alwaysActive = () => true
 
@@ -141,7 +141,9 @@ export function usePreferenceSync<T>({
       applyRemote(data.payload, data.version)
       acknowledgedRevision.current = revision
       return 'applied'
-    } catch {
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404 && request.current() && !signal?.aborted
+        && versionRef.current === 0 && remoteVersionRef.current === 0) return 'absent'
       return 'failed'
     } finally {
       request.finish()

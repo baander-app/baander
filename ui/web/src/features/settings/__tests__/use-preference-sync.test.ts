@@ -58,7 +58,7 @@ describe('usePreferenceSync', () => {
     expect(onRemoteUpdate).toHaveBeenCalledWith({ volume: 80, muted: true }, 3)
   })
 
-  it('returns false when server returns 404', async () => {
+  it('retains the unsaved baseline without applying a payload when server returns 404', async () => {
     mockAxios.get.mockRejectedValueOnce({ response: { status: 404 } })
 
     const { result } = createHook()
@@ -69,6 +69,9 @@ describe('usePreferenceSync', () => {
 
     expect(success!).toBe(false)
     expect(onRemoteUpdate).not.toHaveBeenCalled()
+    expect(result.current.versionRef.current).toBe(0)
+    expect(result.current.conflict).toEqual({ type: 'none', serverVersion: null })
+    expect(mockAxios.put).not.toHaveBeenCalled()
   })
 
   it('debounces push to server by 500ms', async () => {

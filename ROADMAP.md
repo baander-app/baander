@@ -336,6 +336,20 @@ from zero to one. Populated notification-list acceptance remains open: that run
 exposed an invalid fixture category. Both diagnostic fixtures were cleaned with
 zero survivors; `/tmp/live-u9-query-startup-browser.json` records those results.
 
+U9 preference-absence checkpoint: new accounts legitimately have no stored audio,
+layout or player preferences. Their initial 404 responses now finish the refresh
+without marking the connection degraded or repeatedly issuing GET requests. This
+applies only before a server version is known and while the request still belongs
+to the current owner. It supplies no synthetic payload and preserves drafts,
+pending writes, retries and conflicts; the first save still uses version zero.
+
+The new tests first reproduced the failed-read classification for all three
+endpoints. Focused checks cover first-save versioning, pending-write recovery,
+authorization errors and stale reads. The complete frontend suite now passes
+2,882 tests in 231 files (`/tmp/live-u9-frontend-after-startup.log`). Both TypeScript
+projects, the build and lint pass; lint retains eight existing warnings. Capacity,
+populated-view and recovery browser acceptance remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

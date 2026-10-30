@@ -464,3 +464,197 @@ it('keeps identical decoded sidebar snapshots referentially stable across refres
   expect(useSidebarStore.getState().schemas.music).toBe(previous)
   expect(listener).not.toHaveBeenCalled()
 })
+
+it.each(['audio', 'layout', 'player'])('acknowledges absent %s preferences without retrying and saves the first edit from version zero', async kind => {
+  const { AxiosError } = await import('axios')
+  vi.useFakeTimers({ now: Date.now() + 100_000 })
+  let saved = false
+  let reads = 0
+  const puts: unknown[] = []
+  AXIOS_INSTANCE.defaults.adapter = async config => {
+    if (config.method === 'put') {
+      puts.push(JSON.parse(String(config.data)))
+      saved = true
+    } else {
+      reads++
+      if (!saved) throw new AxiosError('No preferences found', 'ERR_BAD_REQUEST', config, undefined, {
+        ...response(config, {}), status: 404,
+      })
+    }
+    return response(config, { data: { version: 1, payload: { volume: 80 } } })
+  }
+  const { wrapper, resourceReadFailed } = setup()
+  const apply = vi.fn()
+  const hook = renderHook(() => usePreferenceSync({
+    baseUrl: `/api/user/${kind}-preferences/`, toPayload: (state: { volume: number }) => state,
+    fromPayload: payload => ({ volume: Number(payload.volume) }), onRemoteUpdate: apply,
+  }), { wrapper })
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  expect(reads).toBe(1)
+  expect(resourceReadFailed).not.toHaveBeenCalled()
+  expect(hook.result.current.versionRef.current).toBe(0)
+  expect(apply).not.toHaveBeenCalled()
+  await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
+  expect(reads).toBe(1)
+  expect(puts).toEqual([])
+  act(() => hook.result.current.pushToServer({ volume: 80 }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(1200) })
+  expect(puts).toEqual([{ payload: { volume: 80 }, version: 0 }])
+  expect(hook.result.current.versionRef.current).toBe(1)
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ volume: 80 }, 1)
+  expect(resourceReadFailed).not.toHaveBeenCalled()
+})
+
+it('retains an unsaved first preference write across absent snapshots and retries its transient failure', async () => {
+  const { AxiosError } = await import('axios')
+  vi.useFakeTimers({ now: Date.now() + 100_000 })
+  let saved = false
+  const puts: unknown[] = []
+  AXIOS_INSTANCE.defaults.adapter = async config => {
+    if (config.method === 'put') {
+      puts.push(JSON.parse(String(config.data)))
+      if (puts.length === 1) throw new AxiosError('Unavailable', 'ERR_BAD_RESPONSE', config, undefined, {
+        ...response(config, {}), status: 503,
+      })
+      saved = true
+    } else if (!saved) throw new AxiosError('No preferences found', 'ERR_BAD_REQUEST', config, undefined, {
+      ...response(config, {}), status: 404,
+    })
+    return response(config, { data: { version: 1, payload: { volume: 85 } } })
+  }
+  const { wrapper, resourceReadFailed } = setup()
+  const apply = vi.fn()
+  const hook = renderHook(() => usePreferenceSync({
+    baseUrl: '/api/user/player-preferences/', toPayload: (state: { volume: number }) => state,
+    fromPayload: payload => ({ volume: Number(payload.volume) }), onRemoteUpdate: apply,
+  }), { wrapper })
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  act(() => hook.result.current.pushToServer({ volume: 85 }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+  expect(puts).toEqual([{ payload: { volume: 85 }, version: 0 }])
+  await act(async () => { expect(await hook.result.current.fetchFromServer()).toBe(false) })
+  expect(apply).not.toHaveBeenCalled()
+  await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+  expect(puts).toEqual([
+    { payload: { volume: 85 }, version: 0 },
+    { payload: { volume: 85 }, version: 0 },
+  ])
+  expect(hook.result.current.versionRef.current).toBe(1)
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ volume: 85 }, 1)
+  expect(resourceReadFailed).not.toHaveBeenCalled()
+})
+
+it.each([401, 403, 503])('keeps preference GET %s on the failed-read recovery path', async status => {
+  const { AxiosError } = await import('axios')
+  vi.useFakeTimers({ now: Date.now() + 100_000 })
+  let reads = 0
+  let responseStatus = status
+  AXIOS_INSTANCE.defaults.adapter = async config => {
+    reads++
+    throw new AxiosError('Read unavailable', 'ERR_BAD_RESPONSE', config, undefined, {
+      ...response(config, {}), status: responseStatus,
+    })
+  }
+  const { wrapper, resourceReadFailed } = setup()
+  const apply = vi.fn()
+  renderHook(() => usePreferenceSync({
+    baseUrl: '/api/user/player-preferences/', toPayload: (state: { volume: number }) => state,
+    fromPayload: payload => ({ volume: Number(payload.volume) }), onRemoteUpdate: apply,
+  }), { wrapper })
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  expect(reads).toBe(1)
+  expect(resourceReadFailed).toHaveBeenCalledOnce()
+  await act(async () => { await vi.advanceTimersByTimeAsync(1600) })
+  expect(reads).toBe(2)
+  expect(resourceReadFailed).toHaveBeenCalledTimes(2)
+  expect(apply).not.toHaveBeenCalled()
+  if (status === 503) {
+    responseStatus = 404
+    await act(async () => { await vi.advanceTimersByTimeAsync(2300) })
+    expect(reads).toBe(3)
+    await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
+    expect(reads).toBe(3)
+    expect(resourceReadFailed).toHaveBeenCalledTimes(2)
+  }
+})
+
+it('does not let an aborted missing snapshot reset the first confirmed save', async () => {
+  const { AxiosError } = await import('axios')
+  vi.useFakeTimers({ now: Date.now() + 100_000 })
+  const missing = deferred<AxiosResponse>()
+  let initialConfig: InternalAxiosRequestConfig | undefined
+  let version = 0
+  let volume = 0
+  const puts: unknown[] = []
+  AXIOS_INSTANCE.defaults.adapter = async config => {
+    if (config.method === 'put') {
+      const body = JSON.parse(String(config.data))
+      puts.push(body)
+      volume = body.payload.volume
+      version++
+    } else if (!initialConfig) {
+      initialConfig = config
+      return missing.promise
+    }
+    return response(config, { data: { version, payload: { volume } } })
+  }
+  const { wrapper, resourceReadFailed } = setup()
+  const apply = vi.fn()
+  const hook = renderHook(() => usePreferenceSync({
+    baseUrl: '/api/user/player-preferences/', toPayload: (state: { volume: number }) => state,
+    fromPayload: payload => ({ volume: Number(payload.volume) }), onRemoteUpdate: apply,
+  }), { wrapper })
+  await act(async () => { await vi.advanceTimersByTimeAsync(200) })
+  expect(initialConfig).toBeDefined()
+  act(() => hook.result.current.pushToServer({ volume: 80 }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(1200) })
+  expect(initialConfig!.signal?.aborted).toBe(true)
+  expect(hook.result.current.versionRef.current).toBe(1)
+  await act(async () => {
+    missing.reject(new AxiosError('No preferences found', 'ERR_BAD_REQUEST', initialConfig, undefined, {
+      ...response(initialConfig!, {}), status: 404,
+    }))
+  })
+  expect(hook.result.current.versionRef.current).toBe(1)
+  act(() => hook.result.current.pushToServer({ volume: 90 }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(1200) })
+  expect(puts).toEqual([
+    { payload: { volume: 80 }, version: 0 },
+    { payload: { volume: 90 }, version: 1 },
+  ])
+  expect(resourceReadFailed).not.toHaveBeenCalled()
+})
+
+it('preserves an explicit version conflict and its local edit when a later read has no snapshot', async () => {
+  const { AxiosError } = await import('axios')
+  vi.useFakeTimers({ now: Date.now() + 100_000 })
+  let version = 1
+  let absent = false
+  let puts = 0
+  AXIOS_INSTANCE.defaults.adapter = async config => {
+    if (config.method === 'put') puts++
+    if (absent) throw new AxiosError('No preferences found', 'ERR_BAD_REQUEST', config, undefined, {
+      ...response(config, {}), status: 404,
+    })
+    return response(config, { data: { version, payload: { volume: 10 } } })
+  }
+  const { coordinator, wrapper } = setup()
+  const apply = vi.fn()
+  const hook = renderHook(() => usePreferenceSync({
+    baseUrl: '/api/user/player-preferences/', toPayload: (state: { volume: number }) => state,
+    fromPayload: payload => ({ volume: Number(payload.volume) }), onRemoteUpdate: apply,
+  }), { wrapper })
+  await act(async () => { await vi.advanceTimersByTimeAsync(200) })
+  act(() => hook.result.current.pushToServer({ volume: 80 }))
+  version = 2
+  act(() => coordinator.hint(['preferences']))
+  await act(async () => { await vi.advanceTimersByTimeAsync(400) })
+  expect(hook.result.current.conflict).toEqual({ type: 'conflict', serverVersion: 2 })
+  absent = true
+  await act(async () => { expect(await hook.result.current.fetchFromServer()).toBe(false) })
+  expect(hook.result.current.conflict).toEqual({ type: 'conflict', serverVersion: 2 })
+  expect(hook.result.current.versionRef.current).toBe(1)
+  await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
+  expect(puts).toBe(0)
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ volume: 10 }, 1)
+})
