@@ -108,36 +108,14 @@ bool in_range(int type, int v, int coarse) {
 }
 
 /* The working copy of a frame parse: the streams read so far and the
- * framing. */
-struct Frame {
-  AacMpsFrameState st;
-  int num_sets; /* coded sets */
-  int param_slot[kMaxSets];
-  int independency;
-  int smooth_mode[kMaxSets], smooth_time_idx[kMaxSets], smooth_stride_idx[kMaxSets];
-  int smg_bits[kMaxSets][kMaxPb];
-  int temp_shape_enable;
-  int stp_channel[AAC_MPS_MAX_OUTPUT_CHANNELS], ges_channel[AAC_MPS_MAX_OUTPUT_CHANNELS];
-  float env_shape[AAC_MPS_MAX_OUTPUT_CHANNELS][AAC_MPS_MAX_SLOTS];
-  int icc_diff[AAC_MPS_MAX_OTT_BOXES][kMaxSets][kMaxPb];
-  int residual_present, residual_pos, residual_end;
-};
+ * framing.  The state keeps it (it holds the whole parameter state, too
+ * much for the stack), cleared before each parse. */
+using Frame = AacMpsFrameWork;
 
-/* The working copies of a parse, off the stack (they hold the whole
- * parameter state twice). */
-struct Work {
-  Frame* frame;
-  AacMpsFrameParams* params;
-  Work()
-      : frame((Frame*)calloc(1, sizeof(Frame))),
-        params((AacMpsFrameParams*)calloc(1, sizeof(AacMpsFrameParams))) {}
-  ~Work() {
-    free(frame);
-    free(params);
-  }
-  Work(const Work&) = delete;
-  Work& operator=(const Work&) = delete;
-};
+Frame& begin_parse(AacMpsState* s) {
+  memset(&s->work, 0, sizeof(s->work));
+  return s->work;
+}
 
 /* EcData() of one parameter stream over the bands [start, stop). */
 int read_ecdata(const AacMpsState* s, Frame* f, AacBitReader* r, int stream, int type, int start,
@@ -689,9 +667,8 @@ int map_frame(AacMpsState* s, Frame* f, AacMpsFrameParams* p) {
 /* The parameters of a frame that was not read: one set at the frame's
  * end holding the last mapped values and the last smoothing. */
 void params_from_history(AacMpsState* s) {
-  Work work;
-  Frame& f = *work.frame;
-  AacMpsFrameParams& p = *work.params;
+  Frame& f = begin_parse(s);
+  AacMpsFrameParams& p = s->work_params;
   f.st = s->frame;
   f.num_sets = 1;
   f.param_slot[0] = s->slots - 1;
@@ -824,9 +801,8 @@ int aac_mps_read_frame(AacMpsState* s, AacBitReader* r) {
   }
   const AacMpsConfig& cfg = s->cfg;
   const int frame_start = r->pos;
-  Work work;
-  Frame& f = *work.frame;
-  AacMpsFrameParams& p = *work.params;
+  Frame& f = begin_parse(s);
+  AacMpsFrameParams& p = s->work_params;
   f.st = s->frame;
   f.st.num_sets_prev = s->params.num_sets;
   f.residual_pos = f.residual_end = -1;

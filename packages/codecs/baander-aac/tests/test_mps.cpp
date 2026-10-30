@@ -280,6 +280,79 @@ void test_config_low_delay() {
   }
 }
 
+/* An ELDSpecificConfig whose ELDEXT_LDSAC extension is longer than any
+ * fixed copy buffer: the low-delay configuration followed by an unknown
+ * SpatialExtensionConfig entry of `ext_bytes`, read in place to the
+ * extension's length, and the fields after it (the terminating
+ * eldExtType, the epConfig) still read as themselves. */
+void test_config_low_delay_long_extension() {
+  for (int ext_bytes : {0, 100, 300}) {
+    Options o;
+    o.tree = AAC_MPS_TREE_212;
+    o.freq_res = 3;
+    const AacMpsConfig ld = mpsenc::make_config_ld(o);
+    Bits sac(64);
+    const int sac_len = aac_mps_config_write_ld(&ld, &sac.w);
+    CHECK(sac_len > 0, "ld config writes (%d)", sac_len);
+    const std::vector<uint8_t> sac_bytes = sac.bytes();
+    const int ext_len = sac_len + (ext_bytes > 0 ? (ext_bytes < 15 ? 1 : ext_bytes < 270 ? 2 : 4) + ext_bytes : 0);
+    Bits b(1024);
+    b.put(31, 5); /* audioObjectType escape */
+    b.put(39 - 32, 6); /* AAC-ELD */
+    b.put(3, 4);  /* 48000 */
+    b.put(1, 4);  /* mono */
+    b.put(0, 1);  /* frameLengthFlag: 512 */
+    b.put(0, 3);  /* the resilience flags */
+    b.put(0, 1);  /* ldSbrPresentFlag */
+    b.put(2, 4);  /* eldExtType ELDEXT_LDSAC */
+    if (ext_len < 15) {
+      b.put((uint32_t)ext_len, 4);
+    } else if (ext_len < 15 + 255) {
+      b.put(15, 4);
+      b.put((uint32_t)(ext_len - 15), 8);
+    } else {
+      b.put(15, 4);
+      b.put(255, 8);
+      b.put((uint32_t)(ext_len - 15 - 255), 16);
+    }
+    for (int i = 0; i < sac_len; i++) {
+      b.put(sac_bytes[(size_t)i], 8);
+    }
+    if (ext_bytes > 0) {
+      b.put(3, 4); /* bsSacExtType: unknown, skipped by its length */
+      if (ext_bytes < 15) {
+        b.put((uint32_t)ext_bytes, 4);
+      } else if (ext_bytes < 270) {
+        b.put(15, 4);
+        b.put((uint32_t)(ext_bytes - 15), 8);
+      } else {
+        b.put(15, 4);
+        b.put(255, 8);
+        b.put((uint32_t)(ext_bytes - 270), 16);
+      }
+      for (int i = 0; i < ext_bytes; i++) {
+        b.put((uint32_t)(i & 0xFF), 8);
+      }
+    }
+    b.put(0, 4); /* eldExtType terminator */
+    b.put(0, 2); /* epConfig */
+    const int bits = b.bits();
+    b.align();
+    const std::vector<uint8_t> bytes = b.bytes();
+    AacBitReader r;
+    aac_bitreader_init(&r, bytes.data(), (int)bytes.size());
+    AacAsc asc;
+    CHECK(aac_asc_read(&r, &asc) == AAC_OK, "ELD config with a %d-byte extension parses", ext_bytes);
+    CHECK(r.pos == bits, "ELD config with a %d-byte extension: consumed %d of %d bits", ext_bytes, r.pos, bits);
+    CHECK(asc.aot == AAC_AOT_ER_ELD && asc.frame_length == 512 && asc.mps_present == 1, "ELD fields (%d)",
+          ext_bytes);
+    CHECK(asc.mps.low_delay == 1 && asc.mps.tree_config == AAC_MPS_TREE_212 && asc.mps.freq_res == 3,
+          "ELD surround config (%d)", ext_bytes);
+    CHECK(asc.mps.num_extensions == (ext_bytes > 0 ? 1 : 0) && (ext_bytes == 0 || asc.mps.extension_type[0] == 3),
+          "ELD surround extensions %d (%d)", asc.mps.num_extensions, ext_bytes);
+  }
+}
+
 /* ── the frame ──────────────────────────────────────────────────── */
 
 uint32_t g_seed = 12345u;
@@ -898,6 +971,7 @@ int main() {
   test_config_refusals();
   test_config_extensions();
   test_config_low_delay();
+  test_config_low_delay_long_extension();
   test_frame_round_trips();
   test_ld_frame_round_trips();
   test_ld_filterbank();

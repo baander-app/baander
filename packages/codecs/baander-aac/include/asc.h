@@ -92,9 +92,20 @@ void aac_asc_init(AacAsc* asc, int sample_rate, int channel_config);
  * alignment is relative to the config's start) or from whole bytes.
  * Returns 0, AAC_ERR_DECODE for a malformed config or AAC_ERR_UNSUPPORTED
  * for an object type outside the General Audio family, AAC-ELD and
- * USAC. */
+ * USAC.  aac_asc_read takes the config to fill the reader: the parts
+ * whose syntax does not end them (the extension loop of a
+ * SpatialSpecificConfig) run to the reader's end, and the reader is left
+ * where the config's syntax ends. */
 int aac_asc_read(AacBitReader* r, AacAsc* asc);
 int aac_asc_parse(const uint8_t* data, int size, AacAsc* asc);
+/* The config over `length_bits` from the reader's position, as a
+ * StreamMuxConfig of audioMuxVersion 1 gives it (ascLen): the reader is
+ * left after those bits, and a config that runs past them is refused.
+ * With AAC_ASC_LENGTH_UNKNOWN (audioMuxVersion 0) the config's own
+ * syntax has to end it: a SpatialSpecificConfig then ends at its byte
+ * alignment and carries no extension. */
+#define AAC_ASC_LENGTH_UNKNOWN (-1)
+int aac_asc_read_bits(AacBitReader* r, AacAsc* asc, int length_bits);
 
 /* Writes the config with the signalling `asc->signaling` names.  The byte
  * form is padded to a whole byte; returns its length in bytes, the bit

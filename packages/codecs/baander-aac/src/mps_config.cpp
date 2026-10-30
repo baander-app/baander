@@ -113,7 +113,9 @@ int read_extension_config(AacBitReader* r, AacMpsConfig* cfg, int bits_available
   return r->overread ? AAC_ERR_DECODE : AAC_OK;
 }
 
-int read_config(AacBitReader* r, AacMpsConfig* cfg, int low_delay) {
+/* The config over `length_bits` from the reader's position, or with
+ * AAC_MPS_LENGTH_UNKNOWN up to its byte alignment, without extensions. */
+int read_config(AacBitReader* r, AacMpsConfig* cfg, int low_delay, int length_bits) {
   const int anchor = r->pos;
   memset(cfg, 0, sizeof(*cfg));
   cfg->low_delay = low_delay;
@@ -229,7 +231,14 @@ int read_config(AacBitReader* r, AacMpsConfig* cfg, int low_delay) {
   }
   const int align = (8 - (r->pos - anchor) % 8) % 8;
   aac_bitreader_skip(r, align);
-  return read_extension_config(r, cfg, aac_bitreader_bits_left(r));
+  if (length_bits < 0) {
+    return r->overread ? AAC_ERR_DECODE : AAC_OK; /* no length to run the extension loop over */
+  }
+  const int remaining = length_bits - (r->pos - anchor);
+  if (remaining < 0 || remaining > aac_bitreader_bits_left(r)) {
+    return AAC_ERR_DECODE;
+  }
+  return read_extension_config(r, cfg, remaining);
 }
 
 }  // namespace
@@ -256,18 +265,25 @@ int aac_mps_tree_properties(int tree_config, int* num_ott, int* num_ttt, int* nu
   return AAC_OK;
 }
 
+int aac_mps_config_read_sized(AacBitReader* r, AacMpsConfig* cfg, int low_delay, int length_bits) {
+  if (r == NULL || cfg == NULL) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return read_config(r, cfg, low_delay ? 1 : 0, length_bits);
+}
+
 int aac_mps_config_read(AacBitReader* r, AacMpsConfig* cfg) {
   if (r == NULL || cfg == NULL) {
     return AAC_ERR_INVALID_ARG;
   }
-  return read_config(r, cfg, 0);
+  return read_config(r, cfg, 0, aac_bitreader_bits_left(r));
 }
 
 int aac_mps_config_read_ld(AacBitReader* r, AacMpsConfig* cfg) {
   if (r == NULL || cfg == NULL) {
     return AAC_ERR_INVALID_ARG;
   }
-  return read_config(r, cfg, 1);
+  return read_config(r, cfg, 1, aac_bitreader_bits_left(r));
 }
 
 int aac_mps_config_write_ld(const AacMpsConfig* cfg, AacBitWriter* w) {

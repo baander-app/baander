@@ -167,7 +167,7 @@ using AacDecoderState = struct AacDecoderState_ {
    * order L, R, C, LFE, Ls, Rs (ch[0..5]) rather than the core's. */
   struct AacDecoderMps_* mps;
   int mps_output;
-  int has_surround; /* the last frame carried a surround payload that was decoded */
+  int has_surround; /* the surround decoder built the last frame (aac_decoder_has_surround) */
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);

@@ -223,6 +223,10 @@ int aac_encoder_ld_sbr_header_count(const AacEncoderState* s);
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
 
+/* Bits an AAC-ELD frame can give an extension payload next to its
+ * channels: the frame's bit budget less what the core keeps. */
+int aac_encoder_state_extension_budget_bits(const AacEncoderState* s);
+
 /* Consumes one block of frame_size interleaved input samples (NULL for silence)
  * and writes the next ADTS frame to s->output_buf.  Returns its length in
  * bytes or a negative AacError. */

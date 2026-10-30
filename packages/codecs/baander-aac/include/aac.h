@@ -180,7 +180,12 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
  * after the channel elements and the LD-SBR data of the next frame
  * only, as ELD v2 carries its MPEG Surround payload (EXT_LDSAC_DATA).
  * `nbits` 0 clears it.  AAC_ERR_UNSUPPORTED for another object type,
- * AAC_ERR_INVALID_ARG when the payload does not fit a frame. */
+ * AAC_ERR_INVALID_ARG when the payload does not fit a frame: more than
+ * 1024 bytes, or more than the frame's bit budget (6144 bits per
+ * channel per 1024 samples, scaled to the frame length) less 512 bits
+ * per channel that the core keeps.  An accepted payload is budgeted by
+ * the rate control, so the frame that carries it is encoded within the
+ * same bounds as any other. */
 int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data, int nbits);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
@@ -222,11 +227,15 @@ int aac_decoder_channels(AacDecoderHandle ctx);
 int aac_decoder_stream_channels(AacDecoderHandle ctx);
 /* Whether the last decoded frame carried SBR and parametric stereo data. */
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps);
-/* Whether the last decoded frame carried MPEG Surround data that was
- * decoded: the output is then the surround channels (5.1 in the order
- * L, R, C, LFE, Ls, Rs, or a stereo pair for the 2-1-2 tree) built from
- * the mono or stereo core, while aac_decoder_stream_channels keeps
- * reporting the core's channels. */
+/* Whether the MPEG Surround decoder built the last decoded frame: the
+ * stream is configured for surround (by its AudioSpecificConfig or an
+ * in-band header) on a core it can take, and the output is the surround
+ * channels (5.1 in the order L, R, C, LFE, Ls, Rs, or a stereo pair for
+ * the 2-1-2 tree) built from the mono or stereo core, while
+ * aac_decoder_stream_channels keeps reporting the core's channels.  It
+ * stays set over a frame without a surround payload (one of a spatial
+ * frame spanning several core frames, or a lost one), which the surround
+ * decoder bridges with the parameters it has. */
 int aac_decoder_has_surround(AacDecoderHandle ctx);
 
 /* ── Decoder stream settings ─────────────────────────────────────── */

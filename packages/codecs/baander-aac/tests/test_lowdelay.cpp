@@ -463,6 +463,52 @@ static void concealment(AacObjectType aot, int downscale) {
 
 /* ── API ───────────────────────────────────────────────────────── */
 
+/* The extension payload of ELD v2 is bounded by the frame's bit budget:
+ * a mono 512-sample frame has 3072 bits, of which the core keeps 512, so
+ * a payload of 2560 bits is the most it carries.  One over that is
+ * refused when set, one at it is budgeted by the rate control: the
+ * frame that carries it (an EXT_FIL payload, which the decoder passes
+ * as padding) stays within the frame's bound and decodes. */
+static void test_extension_payload_budget() {
+  AacEncoderHandle enc = aac_encoder_create(48000, 1, 64000, AAC_AOT_ER_ELD, AAC_RC_CBR);
+  CHECK(enc != nullptr, "ELD mono encoder");
+  CHECK(aac_encoder_set_transport(enc, AAC_TRANSPORT_RAW) == AAC_OK, "raw access units");
+  const int budget = 6144 * 512 / 1024 - 512;
+  std::vector<uint8_t> payload(1024, 0); /* extension_type 0 (EXT_FIL), then zeros */
+  CHECK(aac_encoder_set_extension_payload(enc, payload.data(), budget + 1) == AAC_ERR_INVALID_ARG,
+        "payload of %d bits refused", budget + 1);
+  CHECK(aac_encoder_set_extension_payload(enc, payload.data(), 8 * 1024 + 8) == AAC_ERR_INVALID_ARG,
+        "payload beyond the buffer refused");
+  CHECK(aac_encoder_set_extension_payload(enc, payload.data(), budget) == AAC_OK, "payload of %d bits taken",
+        budget);
+  uint8_t asc[AAC_ASC_MAX_BYTES];
+  const int asc_len = aac_encoder_config(enc, asc, sizeof(asc));
+  AacDecoderHandle dec = aac_decoder_create(48000, 0);
+  CHECK(asc_len > 0 && aac_decoder_set_config(dec, asc, asc_len) == AAC_OK, "decoder configured");
+  const int max_bytes = aac_encoder_max_frame_bytes(enc);
+  std::vector<uint8_t> buf((size_t)max_bytes);
+  std::vector<float> block(512);
+  std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 2);
+  for (int f = 0; f < 4; f++) {
+    if (f == 2) {
+      CHECK(aac_encoder_set_extension_payload(enc, payload.data(), budget) == AAC_OK, "payload set again");
+    }
+    for (int i = 0; i < 512; i++) {
+      block[(size_t)i] = 0.5f * sinf(2.0f * 3.14159265f * 1000.0f * (float)(f * 512 + i) / 48000.0f) +
+                         0.3f * sinf(2.0f * 3.14159265f * 3700.0f * (float)(f * 512 + i) / 48000.0f);
+    }
+    const int len = aac_encoder_encode(enc, block.data(), 512, buf.data(), max_bytes);
+    CHECK(len > 0 && 8 * len <= 6144 * 512 / 1024, "frame %d: %d bytes within the frame's bound", f, len);
+    if (len <= 0) {
+      continue;
+    }
+    const int got = aac_decoder_decode(dec, buf.data(), len, out.data(), (int)out.size());
+    CHECK(got == 512, "frame %d with the payload decodes (%d)", f, got);
+  }
+  aac_decoder_destroy(dec);
+  aac_encoder_destroy(enc);
+}
+
 static void test_api() {
   AacEncoderHandle enc = aac_encoder_create(48000, 2, 128000, AAC_AOT_ER_ELD, AAC_RC_CBR);
   CHECK(enc != nullptr, "ELD encoder");
@@ -723,6 +769,7 @@ int main() {
   }
   test_asc();
   test_api();
+  test_extension_payload_budget();
   for (int fl : {512, 480}) {
     for (int sr : {48000, 32000}) {
       for (int channels : {1, 2}) {

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "asc.h"
 #include "test_util.h"
 
 namespace {
@@ -134,6 +135,7 @@ void test_against_libxaac() {
     }
     for (int c = 0; c < kChannels; c++) {
       const double snr = channel_snr_db(ref, d.pcm, kChannels, c);
+      printf("%s: %s %.1f dB against libxaac\n", streams[i], kNames[c], snr);
       CHECK(snr >= 40.0, "%s: %s %.1f dB against libxaac", streams[i], kNames[c], snr);
     }
   }
@@ -180,6 +182,7 @@ void test_asc_form() {
   }
   for (int c = 0; c < kChannels; c++) {
     const double snr = channel_snr_db(header.pcm, asc.pcm, kChannels, c);
+    printf("525 ASC form: %s %.1f dB against the header form\n", kNames[c], snr);
     CHECK(snr >= 40.0, "525 ASC form: %s %.1f dB against the header form", kNames[c], snr);
   }
 }
@@ -216,7 +219,168 @@ void test_eld_v2() {
   }
   for (int c = 0; c < 2; c++) {
     const double snr = channel_snr_db(ref, d.pcm, 2, c);
+    printf("%s: %s %.1f dB against libxaac\n", stream, kNames[c], snr);
     CHECK(snr >= 40.0, "%s: %s %.1f dB against libxaac", stream, kNames[c], snr);
+  }
+}
+
+/* A reconfiguration to a stream without surround drops the surround
+ * decoder: after the 525 stream configured by its AudioSpecificConfig,
+ * the LOAS frames of a plain stereo stream decode to the core's two
+ * channels, not to six built from the stale surround configuration. */
+void test_reconfigure_without_surround() {
+  const std::vector<uint8_t> data = read_file(data_path("mps_525_asc_q.loas"));
+  CHECK(!data.empty(), "525 ASC stream present");
+  AacDecoderHandle dec = aac_decoder_create(kRate, 0);
+  CHECK(dec != nullptr, "decoder created");
+  if (!dec || data.empty()) {
+    return;
+  }
+  CHECK(aac_decoder_feed(dec, data.data(), (int)data.size()) == (int)data.size(), "surround stream fed");
+  std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  int frames = 0;
+  for (;;) {
+    const int got = aac_decoder_decode_next(dec, out.data(), (int)out.size());
+    if (got <= 0) {
+      break;
+    }
+    frames++;
+  }
+  CHECK(frames == 96 && aac_decoder_channels(dec) == kChannels && aac_decoder_has_surround(dec) == 1,
+        "surround stream: %d frames, %d channels, surround %d", frames, aac_decoder_channels(dec),
+        aac_decoder_has_surround(dec));
+  /* the plain stereo stream, each LOAS frame with its StreamMuxConfig */
+  AacEncoderHandle enc = aac_encoder_create(kRate, 2, 128000, AAC_AOT_LC, AAC_RC_CBR);
+  CHECK(enc != nullptr, "stereo encoder");
+  if (!enc) {
+    aac_decoder_destroy(dec);
+    return;
+  }
+  CHECK(aac_encoder_set_transport(enc, AAC_TRANSPORT_LOAS) == AAC_OK, "LOAS transport");
+  const int frame = aac_encoder_frame_size(enc);
+  std::vector<float> block((size_t)frame * 2);
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) + 64);
+  int stereo_frames = 0;
+  for (int f = 0; f < 8; f++) {
+    for (int i = 0; i < frame; i++) {
+      const float v = 0.25f * sinf(2.0f * 3.14159265f * 440.0f * (float)(f * frame + i) / (float)kRate);
+      block[(size_t)(2 * i)] = v;
+      block[(size_t)(2 * i + 1)] = -v;
+    }
+    const int len = aac_encoder_encode(enc, block.data(), frame, buf.data(), (int)buf.size());
+    CHECK(len >= 0, "stereo frame %d: %d", f, len);
+    if (len <= 0) {
+      continue;
+    }
+    CHECK(aac_decoder_feed(dec, buf.data(), len) == len, "stereo frame %d fed", f);
+    const int got = aac_decoder_decode_next(dec, out.data(), (int)out.size());
+    CHECK(got == frame, "stereo frame %d: %d samples", f, got);
+    if (got > 0) {
+      stereo_frames++;
+      CHECK(aac_decoder_channels(dec) == 2 && aac_decoder_has_surround(dec) == 0,
+            "stereo frame %d: %d channels, surround %d", f, aac_decoder_channels(dec),
+            aac_decoder_has_surround(dec));
+    }
+  }
+  CHECK(stereo_frames > 0, "stereo frames decoded");
+  aac_encoder_destroy(enc);
+  aac_decoder_destroy(dec);
+}
+
+/* An AAC-ELD stream of mono frames of `frame_length` samples from the
+ * encoder, with its AudioSpecificConfig extended by a low-delay 2-1-2
+ * surround configuration of `slots` QMF slots per spatial frame; the
+ * frames carry no surround payload. */
+struct EldStream {
+  std::vector<uint8_t> asc;
+  std::vector<std::vector<uint8_t>> aus;
+};
+
+EldStream eld_stream_with_surround(int frame_length, int slots) {
+  EldStream s;
+  AacEncoderHandle enc = aac_encoder_create(kRate, 1, 64000, AAC_AOT_ER_ELD, AAC_RC_CBR);
+  CHECK(enc != nullptr, "ELD encoder");
+  if (!enc) {
+    return s;
+  }
+  CHECK(aac_encoder_set_frame_length(enc, frame_length) == AAC_OK, "ELD %d", frame_length);
+  CHECK(aac_encoder_set_transport(enc, AAC_TRANSPORT_RAW) == AAC_OK, "ELD raw access units");
+  uint8_t asc_bytes[AAC_ASC_MAX_BYTES];
+  const int asc_len = aac_encoder_config(enc, asc_bytes, sizeof(asc_bytes));
+  AacAsc asc;
+  CHECK(asc_len > 0 && aac_asc_parse(asc_bytes, asc_len, &asc) == AAC_OK, "ELD %d: config", frame_length);
+  asc.mps_present = 1;
+  asc.sac_payload_embedding = 1;
+  AacMpsConfig* m = &asc.mps;
+  memset(m, 0, sizeof(*m));
+  m->low_delay = 1;
+  m->sampling_frequency = kRate;
+  m->frame_length = slots;
+  m->freq_res = 3;
+  m->tree_config = AAC_MPS_TREE_212;
+  m->num_ott_boxes = 1;
+  m->num_input_channels = 1;
+  m->num_output_channels = 2;
+  m->ld_num_output_channels = 2;
+  m->ott_bands[0] = 12;
+  uint8_t with_surround[AAC_ASC_MAX_BYTES];
+  const int len = aac_asc_write(&asc, with_surround, sizeof(with_surround));
+  CHECK(len > 0, "ELD %d: config with surround (%d)", frame_length, len);
+  if (len > 0) {
+    s.asc.assign(with_surround, with_surround + len);
+  }
+  std::vector<float> block((size_t)frame_length);
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc));
+  for (int f = 0; f < 12; f++) {
+    for (int i = 0; i < frame_length; i++) {
+      block[(size_t)i] =
+          0.25f * sinf(2.0f * 3.14159265f * 440.0f * (float)(f * frame_length + i) / (float)kRate);
+    }
+    const int n = aac_encoder_encode(enc, block.data(), frame_length, buf.data(), (int)buf.size());
+    CHECK(n >= 0, "ELD %d: frame %d encodes (%d)", frame_length, f, n);
+    if (n > 0) {
+      s.aus.emplace_back(buf.begin(), buf.begin() + n);
+    }
+  }
+  aac_encoder_destroy(enc);
+  return s;
+}
+
+/* An AAC-ELD stream configured for low-delay surround: on 512-sample
+ * frames the surround decoder is active from the configuration on, so
+ * the output is stereo and flagged on every frame, the frames without a
+ * payload included (it bridges them with the parameters it has); on
+ * 480-sample frames, seven and a half 64-band QMF slots, it is refused
+ * and the core's mono output stays whole, frame after frame. */
+void test_eld_surround_configuration() {
+  const int lengths[2] = {512, 480};
+  const int slots[2] = {8, 7};
+  for (int i = 0; i < 2; i++) {
+    const int frame_length = lengths[i];
+    const EldStream st = eld_stream_with_surround(frame_length, slots[i]);
+    if (st.asc.empty() || st.aus.empty()) {
+      continue;
+    }
+    AacDecoderHandle dec = aac_decoder_create(kRate, 0);
+    CHECK(dec != nullptr, "ELD %d: decoder", frame_length);
+    if (!dec) {
+      continue;
+    }
+    CHECK(aac_decoder_set_config(dec, st.asc.data(), (int)st.asc.size()) == AAC_OK, "ELD %d: config applied",
+          frame_length);
+    const int expect_channels = frame_length == 512 ? 2 : 1;
+    std::vector<float> out((size_t)AAC_DECODER_MAX_OUTPUT * 2);
+    int frames = 0;
+    for (const std::vector<uint8_t>& au : st.aus) {
+      const int got = aac_decoder_decode(dec, au.data(), (int)au.size(), out.data(), (int)out.size());
+      CHECK(got == frame_length, "ELD %d: frame %d decodes %d samples", frame_length, frames, got);
+      CHECK(aac_decoder_channels(dec) == expect_channels, "ELD %d: frame %d has %d channels", frame_length,
+            frames, aac_decoder_channels(dec));
+      CHECK(aac_decoder_has_surround(dec) == (expect_channels == 2 ? 1 : 0), "ELD %d: frame %d surround %d",
+            frame_length, frames, aac_decoder_has_surround(dec));
+      frames++;
+    }
+    aac_decoder_destroy(dec);
   }
 }
 
@@ -228,5 +392,7 @@ int main() {
   test_asc_form();
   test_committed_streams_decode();
   test_eld_v2();
+  test_reconfigure_without_surround();
+  test_eld_surround_configuration();
   return test_summary("test_mps_stream");
 }

@@ -113,32 +113,21 @@ int aac_latm_read_stream_mux_config(AacBitReader* r, AacLatmConfig* cfg) {
     if (layer > 0 && aac_bitreader_read(r, 1)) {
       return AAC_ERR_UNSUPPORTED; /* useSameConfig: a layer without a config of its own */
     }
-    if (c.audio_mux_version == 0) {
-      const int ret = aac_asc_read(r, asc);
-      if (ret) {
-        return ret;
-      }
-    } else {
-      /* The config is read from a copy of its ascLen bits, so that a
-       * reader that runs to the end of the config (the surround config's
-       * extension loop) stops where the config does. */
+    /* With audioMuxVersion 1 the config's length (ascLen) bounds it: a
+     * config of any length that fits the element is taken, and its
+     * surround extension loop runs to that length.  With audioMuxVersion
+     * 0 the config's own syntax has to end it. */
+    int length_bits = AAC_ASC_LENGTH_UNKNOWN;
+    if (c.audio_mux_version == 1) {
       const uint32_t asc_len = read_latm_value(r);
-      uint8_t copy[AAC_LATM_MAX_ASC_BYTES];
-      if (asc_len > (uint32_t)aac_bitreader_bits_left(r) ||
-          asc_len > 8u * AAC_LATM_MAX_ASC_BYTES) {
+      if (asc_len > (uint32_t)aac_bitreader_bits_left(r)) {
         return AAC_ERR_DECODE;
       }
-      memset(copy, 0, sizeof(copy));
-      copy_bits(r, copy, (int)asc_len);
-      AacBitReader sub;
-      aac_bitreader_init(&sub, copy, (int)((asc_len + 7) / 8));
-      const int ret = aac_asc_read(&sub, asc);
-      if (ret) {
-        return ret;
-      }
-      if (sub.pos > (int)asc_len) {
-        return AAC_ERR_DECODE;
-      }
+      length_bits = (int)asc_len;
+    }
+    const int ret = aac_asc_read_bits(r, asc, length_bits);
+    if (ret) {
+      return ret;
     }
     if (layer > 0) {
       /* the second layer: the MPEG Surround config over the first's core */

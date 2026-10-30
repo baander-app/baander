@@ -703,6 +703,130 @@ static std::vector<std::vector<uint8_t>> split_loas(const std::vector<uint8_t>& 
   return frames;
 }
 
+/* The SpatialSpecificConfig of a 5151 tree without extensions, as a
+ * second LATM layer carries it: sampling frequency index 3, 32 slots,
+ * frequency resolution 1 (28 bands), no fixed gains or shaping, the LFE
+ * box on 2 bands, byte aligned from its own start.  `ext_bytes` of an
+ * unknown extension (bsSacExtType 3) follow when asked. */
+static int write_spatial_config(AacBitWriter* w, int ext_bytes) {
+  const int start = aac_bitwriter_bits_written(w);
+  aac_bitwriter_write(w, 3, 4);  /* bsSamplingFrequencyIndex */
+  aac_bitwriter_write(w, 31, 7); /* bsFrameLength */
+  aac_bitwriter_write(w, 1, 3);  /* bsFreqRes */
+  aac_bitwriter_write(w, 0, 4);  /* bsTreeConfig 5151 */
+  aac_bitwriter_write(w, 0, 2);  /* bsQuantMode */
+  aac_bitwriter_write(w, 0, 1);  /* bsOneIcc */
+  aac_bitwriter_write(w, 0, 1);  /* bsArbitraryDownmix */
+  aac_bitwriter_write(w, 2, 3);  /* bsFixedGainSur */
+  aac_bitwriter_write(w, 1, 3);  /* bsFixedGainLfe */
+  aac_bitwriter_write(w, 0, 3);  /* bsFixedGainDmx */
+  aac_bitwriter_write(w, 0, 1);  /* bsMatrixMode */
+  aac_bitwriter_write(w, 0, 2);  /* bsTempShapeConfig */
+  aac_bitwriter_write(w, 0, 2);  /* bsDecorrConfig */
+  aac_bitwriter_write(w, 0, 1);  /* bs3DaudioMode */
+  aac_bitwriter_write(w, 2, 5);  /* bsOttBands of the LFE box */
+  const int pad = (8 - (aac_bitwriter_bits_written(w) - start) % 8) % 8;
+  aac_bitwriter_write(w, 0, pad);
+  if (ext_bytes > 0) {
+    aac_bitwriter_write(w, 3, 4); /* bsSacExtType: unknown, skipped by its length */
+    if (ext_bytes < 15) {
+      aac_bitwriter_write(w, (uint32_t)ext_bytes, 4);
+    } else if (ext_bytes < 15 + 255) {
+      aac_bitwriter_write(w, 15, 4);
+      aac_bitwriter_write(w, (uint32_t)(ext_bytes - 15), 8);
+    } else {
+      aac_bitwriter_write(w, 15, 4);
+      aac_bitwriter_write(w, 255, 8);
+      aac_bitwriter_write(w, (uint32_t)(ext_bytes - 15 - 255), 16);
+    }
+    for (int i = 0; i < ext_bytes; i++) {
+      aac_bitwriter_write(w, (uint32_t)(i & 0xFF), 8);
+    }
+  }
+  return aac_bitwriter_bits_written(w) - start;
+}
+
+/* A StreamMuxConfig with the MPEG Surround config in a second layer: with
+ * audioMuxVersion 0 the config has no length, so it ends at its byte
+ * alignment and the fields after it (frameLengthType, latmBufferFullness,
+ * otherDataPresent, crcCheckPresent) are read as themselves; with
+ * audioMuxVersion 1 the ascLen bounds it, whatever its length within the
+ * element, and an extension inside it is read to that length. */
+static void test_stream_mux_config_surround_layer() {
+  AacAsc core;
+  aac_asc_init(&core, 48000, 2);
+  for (int version = 0; version < 2; version++) {
+    const int ext_bytes = version ? 300 : 0; /* beyond any fixed copy of the config */
+    std::vector<uint8_t> buf(1024);
+    AacBitWriter w;
+    aac_bitwriter_init(&w, buf.data(), (int)buf.size());
+    aac_bitwriter_write(&w, 1, 1); /* useSameStreamMux: a mux element's first bit */
+    aac_bitwriter_write(&w, (uint32_t)version, 1);
+    if (version) {
+      aac_bitwriter_write(&w, 0, 1);    /* audioMuxVersionA */
+      aac_bitwriter_write(&w, 0, 2);    /* taraBufferFullness: one byte */
+      aac_bitwriter_write(&w, 0xFF, 8);
+    }
+    aac_bitwriter_write(&w, 1, 1); /* allStreamsSameTimeFraming */
+    aac_bitwriter_write(&w, 0, 6); /* numSubFrames */
+    aac_bitwriter_write(&w, 0, 4); /* numProgram */
+    aac_bitwriter_write(&w, 1, 3); /* numLayer: two layers */
+    /* layer 0: the core */
+    uint8_t scratch[AAC_ASC_MAX_BYTES];
+    AacBitWriter m;
+    aac_bitwriter_init(&m, scratch, sizeof(scratch));
+    const int core_bits = aac_asc_write_bits(&core, &m);
+    if (version) {
+      aac_bitwriter_write(&w, 0, 2); /* ascLen in one byte */
+      aac_bitwriter_write(&w, (uint32_t)core_bits, 8);
+    }
+    aac_asc_write_bits(&core, &w);
+    aac_bitwriter_write(&w, 0, 3);    /* frameLengthType */
+    aac_bitwriter_write(&w, 0xFF, 8); /* latmBufferFullness */
+    /* layer 1: object type 30 with the spatial config */
+    aac_bitwriter_write(&w, 0, 1); /* useSameConfig */
+    uint8_t surround_scratch[512];
+    AacBitWriter n;
+    aac_bitwriter_init(&n, surround_scratch, sizeof(surround_scratch));
+    const int surround_bits = 5 + 4 + 4 + 1 + write_spatial_config(&n, ext_bytes);
+    if (version) {
+      aac_bitwriter_write(&w, 1, 2); /* ascLen in two bytes */
+      aac_bitwriter_write(&w, (uint32_t)surround_bits, 16);
+    }
+    aac_bitwriter_write(&w, 30, 5); /* audioObjectType */
+    aac_bitwriter_write(&w, 3, 4);  /* samplingFrequencyIndex 48000 */
+    aac_bitwriter_write(&w, 2, 4);  /* channelConfiguration */
+    aac_bitwriter_write(&w, 1, 1);  /* sacPayloadEmbedding */
+    write_spatial_config(&w, ext_bytes);
+    aac_bitwriter_write(&w, 0, 3);    /* frameLengthType */
+    aac_bitwriter_write(&w, 0xFF, 8); /* latmBufferFullness */
+    aac_bitwriter_write(&w, 0, 1);    /* otherDataPresent */
+    aac_bitwriter_write(&w, 0, 1);    /* crcCheckPresent */
+    const int bits = aac_bitwriter_bits_written(&w);
+    aac_bitwriter_write(&w, 0xAB, 8); /* the first byte of the payload */
+    CHECK(!aac_bitwriter_overflow(&w), "version %d: config written", version);
+    AacBitReader r;
+    aac_bitreader_init(&r, buf.data(), aac_bitwriter_bytes_written(&w));
+    aac_bitreader_skip(&r, 1);
+    AacLatmConfig cfg;
+    CHECK(aac_latm_read_stream_mux_config(&r, &cfg) == 0, "version %d: surround layer read", version);
+    CHECK(r.pos == bits, "version %d: consumed %d of %d bits", version, r.pos, bits);
+    CHECK(aac_bitreader_read(&r, 8) == 0xAB, "version %d: payload intact", version);
+    CHECK(cfg.valid && cfg.num_layers == 2 && cfg.frame_length_type == 0 &&
+              cfg.latm_buffer_fullness == 0xFF && !cfg.other_data_present && !cfg.crc_check_present,
+          "version %d: fields", version);
+    CHECK(cfg.asc.aot == AAC_AOT_LC && cfg.asc.channel_config == 2 && cfg.asc.mps_present == 1 &&
+              cfg.asc.sac_payload_embedding == 1,
+          "version %d: core with surround", version);
+    CHECK(cfg.asc.mps.tree_config == AAC_MPS_TREE_5151 && cfg.asc.mps.frame_length == 32 &&
+              cfg.asc.mps.fixed_gain_sur == 2 && cfg.asc.mps.ott_bands[4] == 2,
+          "version %d: spatial config", version);
+    CHECK(cfg.asc.mps.num_extensions == (version ? 1 : 0) &&
+              (!version || cfg.asc.mps.extension_type[0] == 3),
+          "version %d: %d extensions", version, cfg.asc.mps.num_extensions);
+  }
+}
+
 static void test_latm_roundtrip() {
   struct Case {
     const char* name;
@@ -847,6 +971,7 @@ int main() {
   test_asc();
   test_encoder_config();
   test_stream_mux_config();
+  test_stream_mux_config_surround_layer();
   test_latm_roundtrip();
   test_explicit_signalling();
   return test_summary("test_transport");

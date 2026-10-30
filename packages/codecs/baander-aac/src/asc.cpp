@@ -130,26 +130,27 @@ int ld_sbr_header_count(int channel_config) {
 
 constexpr int kEldExtTerm = 0;
 constexpr int kEldExtLdSac = 2; /* eldExtType of the low-delay MPEG Surround configuration */
-constexpr int kEldExtMaxBytes = 64;
+constexpr int kEldExtWriteBytes = 64; /* the writer's low-delay config never reaches this */
 
 /* The low-delay SpatialSpecificConfig of an ELDEXT_LDSAC extension:
- * `len` bytes from the reader's position, read through a copy so that
- * the configuration's extension loop is bounded to the extension and
- * its byte alignment counts from the configuration's start. */
+ * `len` bytes from the reader's position (up to the 270 + 65535 that
+ * eldExtLen can name), read in place with the configuration's extension
+ * loop bounded to the extension; its byte alignment counts from the
+ * configuration's start.  The reader is left after the extension. */
 int read_eld_ldsac(AacBitReader* r, int len, AacAsc* asc) {
-  if (len <= 0 || len > kEldExtMaxBytes || aac_bitreader_bits_left(r) < 8 * len) {
+  if (len <= 0 || aac_bitreader_bits_left(r) < 8 * len) {
     return AAC_ERR_DECODE;
   }
-  uint8_t bytes[kEldExtMaxBytes];
-  for (int i = 0; i < len; i++) {
-    bytes[i] = (uint8_t)aac_bitreader_read(r, 8);
-  }
-  AacBitReader sub;
-  aac_bitreader_init(&sub, bytes, len);
-  const int ret = aac_mps_config_read_ld(&sub, &asc->mps);
+  const int start = r->pos;
+  const int ret = aac_mps_config_read_sized(r, &asc->mps, 1, 8 * len);
   if (ret) {
     return ret;
   }
+  const int used = r->pos - start;
+  if (used > 8 * len) {
+    return AAC_ERR_DECODE;
+  }
+  aac_bitreader_skip(r, 8 * len - used);
   asc->mps_present = 1;
   asc->sac_payload_embedding = 1;
   return 0;
@@ -218,9 +219,9 @@ void write_eld_config(AacBitWriter* w, const AacAsc* asc) {
   if (asc->mps_present) {
     /* the low-delay MPEG Surround configuration as an ELDEXT_LDSAC
      * extension of its byte length */
-    uint8_t bytes[kEldExtMaxBytes];
+    uint8_t bytes[kEldExtWriteBytes];
     AacBitWriter sub;
-    aac_bitwriter_init(&sub, bytes, kEldExtMaxBytes);
+    aac_bitwriter_init(&sub, bytes, kEldExtWriteBytes);
     const int len = aac_mps_config_write_ld(&asc->mps, &sub);
     if (len > 0) {
       aac_bitwriter_write(w, kEldExtLdSac, 4);
@@ -276,7 +277,12 @@ void aac_asc_init(AacAsc* asc, int sample_rate, int channel_config) {
   asc->ps_present = -1;
 }
 
-int aac_asc_read(AacBitReader* r, AacAsc* asc) {
+namespace {
+
+/* The config from the reader's position: `length_bits` is its length
+ * when the transport gives one (AAC_ASC_LENGTH_UNKNOWN otherwise), which
+ * bounds the parts whose syntax does not end them. */
+int read_asc(AacBitReader* r, AacAsc* asc, int length_bits) {
   const int anchor = r->pos;
   aac_asc_init(asc, 0, 0);
   asc->aot = read_aot(r);
@@ -298,10 +304,12 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
   }
   if (asc->aot == AAC_AOT_MPS) {
     /* MPEG Surround: sacPayloadEmbedding and the SpatialSpecificConfig,
-     * whose byte alignment counts from its own start; the reader has to
-     * end with the config, as its extension loop runs to the end. */
+     * whose byte alignment counts from its own start and whose extension
+     * loop runs over the rest of the config's length; without a known
+     * length the config ends at its alignment, without extensions. */
     asc->sac_payload_embedding = (int)aac_bitreader_read(r, 1);
-    const int ret = aac_mps_config_read(r, &asc->mps);
+    const int mps_bits = length_bits < 0 ? AAC_MPS_LENGTH_UNKNOWN : length_bits - (r->pos - anchor);
+    const int ret = aac_mps_config_read_sized(r, &asc->mps, 0, mps_bits);
     if (ret) {
       return ret;
     }
@@ -339,7 +347,8 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
    * reads as padding.  The bits are only taken when they are the
    * extension, so that a config inside a StreamMuxConfig is not read past
    * its end. */
-  if (asc->signaling != AAC_SIGNAL_EXPLICIT_HIER && aac_bitreader_bits_left(r) >= 16 &&
+  const int remaining = length_bits < 0 ? aac_bitreader_bits_left(r) : length_bits - (r->pos - anchor);
+  if (asc->signaling != AAC_SIGNAL_EXPLICIT_HIER && remaining >= 16 &&
       aac_bitreader_peek(r, 11) == kSyncExtensionSbr) {
     aac_bitreader_skip(r, 11);
     const int ext_aot = read_aot(r);
@@ -348,7 +357,8 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
       asc->sbr_present = (int)aac_bitreader_read(r, 1);
       if (asc->sbr_present) {
         asc->ext_sample_rate = read_rate(r);
-        if (aac_bitreader_bits_left(r) >= 12 && aac_bitreader_peek(r, 11) == kSyncExtensionPs) {
+        const int left = length_bits < 0 ? aac_bitreader_bits_left(r) : length_bits - (r->pos - anchor);
+        if (left >= 12 && aac_bitreader_peek(r, 11) == kSyncExtensionPs) {
           aac_bitreader_skip(r, 11);
           asc->ps_present = (int)aac_bitreader_read(r, 1);
         }
@@ -361,6 +371,31 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
     }
   }
   return r->overread ? AAC_ERR_DECODE : 0;
+}
+
+}  // namespace
+
+int aac_asc_read(AacBitReader* r, AacAsc* asc) {
+  return read_asc(r, asc, aac_bitreader_bits_left(r));
+}
+
+int aac_asc_read_bits(AacBitReader* r, AacAsc* asc, int length_bits) {
+  if (length_bits >= 0 && length_bits > aac_bitreader_bits_left(r)) {
+    return AAC_ERR_DECODE;
+  }
+  const int start = r->pos;
+  const int ret = read_asc(r, asc, length_bits < 0 ? AAC_ASC_LENGTH_UNKNOWN : length_bits);
+  if (ret) {
+    return ret;
+  }
+  if (length_bits >= 0) {
+    const int used = r->pos - start;
+    if (used > length_bits) {
+      return AAC_ERR_DECODE;
+    }
+    aac_bitreader_skip(r, length_bits - used);
+  }
+  return AAC_OK;
 }
 
 int aac_asc_parse(const uint8_t* data, int size, AacAsc* asc) {

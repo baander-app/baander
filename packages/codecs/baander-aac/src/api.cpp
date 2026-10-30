@@ -149,8 +149,9 @@ int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data,
   if (s->aot != AAC_AOT_ER_ELD) {
     return AAC_ERR_UNSUPPORTED;
   }
-  if (nbits > 8 * AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES) {
-    return AAC_ERR_INVALID_ARG;
+  if (nbits > 8 * AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES ||
+      nbits > aac_encoder_state_extension_budget_bits(s)) {
+    return AAC_ERR_INVALID_ARG; /* the frame cannot carry it next to its channels */
   }
   if (nbits > 0) {
     memcpy(s->ext_payload, data, (size_t)((nbits + 7) / 8));

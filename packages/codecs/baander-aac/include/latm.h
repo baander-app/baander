@@ -20,13 +20,15 @@ extern "C" {
  * layer whose config is an MPEG Surround one (object type 30 with
  * sacPayloadEmbedding) merges into the first layer's AudioSpecificConfig
  * and its payload, empty when the surround data is embedded in the core's
- * access units, is dropped. */
+ * access units, is dropped.  A config of audioMuxVersion 1 is read over
+ * its ascLen, whatever its length within the element; one of
+ * audioMuxVersion 0 has no length, so a surround config in it carries
+ * no extension (its extension loop needs the length to end). */
 
 #define AAC_LOAS_SYNC 0x2B7
 #define AAC_LOAS_HEADER_BYTES 3
 #define AAC_LOAS_MAX_PAYLOAD 8191 /* 13-bit audioMuxLengthBytes */
 #define AAC_LATM_MAX_SUBFRAMES 4 /* numSubFrames + 1: four SBR blocks fill AAC_DECODER_MAX_OUTPUT */
-#define AAC_LATM_MAX_ASC_BYTES 256 /* a config of audioMuxVersion 1 is read from a copy of its ascLen bits */
 /* Bytes an AudioMuxElement adds to one access unit of `payload_bytes`:
  * the LOAS header, the StreamMuxConfig with the longest config, the
  * 255-byte length chunks and the final alignment. */

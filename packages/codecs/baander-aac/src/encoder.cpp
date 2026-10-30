@@ -999,6 +999,9 @@ int frame_overhead_bits(const AacEncoderState* s) {
     }
     bits += aac_drc_encoder_bits(&s->drc);
   }
+  if (s->aot == AAC_AOT_ER_ELD) {
+    bits += s->ext_payload_bits; /* the extension payload the next frame carries */
+  }
   return bits;
 }
 
@@ -1645,6 +1648,15 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   const float mean_pe = (float)s->avg_frame_bits;
   s->pe_min = 0.4f * mean_pe;
   s->pe_max = 0.6f * mean_pe;
+}
+
+int aac_encoder_state_extension_budget_bits(const AacEncoderState* s) {
+  /* The frame's bits are bounded per channel (6144 per 1024 samples,
+   * scaled to the frame length); the core keeps enough of each channel's
+   * share for its side information with every band released. */
+  constexpr int kCoreFloorBits = 512;
+  const int per_channel = aac_max_bits_per_channel(s->frame_length) - kCoreFloorBits;
+  return per_channel > 0 ? per_channel * s->channels : 0;
 }
 
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s) {

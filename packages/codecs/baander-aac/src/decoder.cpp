@@ -555,7 +555,6 @@ struct AacDecoderMps_ {
   int st_qmf_slots;
   uint8_t anc[kSacMaxPayload];
   int anc_len, anc_type, anc_open;
-  int frame_read; /* a spatial frame of this block was parsed */
   AacQmfAnalysis analysis[AAC_MPS_MAX_INPUT_CHANNELS];
   AacQmfSynthesis synthesis[AAC_MPS_MAX_OUTPUT_CHANNELS];
   /* the low-delay filterbanks of the ELD v2 path */
@@ -566,8 +565,17 @@ struct AacDecoderMps_ {
   float align_pcm[AAC_MPS_MAX_INPUT_CHANNELS][kInputAlignSamples]; /* the no-SBR input delay line */
   float align_qmf[AAC_MPS_MAX_INPUT_CHANNELS][kInputAlignSlots][64][2]; /* the SBR input delay line */
   int align_pos;
+  /* The residual channel elements: the frames of a box are decoded into
+   * res_ch[box] and res_pcm[box] while the spatial frame is parsed, from
+   * the overlap the last committed frame left (res_overlap,
+   * res_window_shape); they are taken over, and the box's signal handed
+   * to the surround decoder, only once the whole spatial frame parses,
+   * so that a frame that fails leaves nothing of itself behind. */
   AacDecoderChannel res_ch[kMpsBoxes];
   float res_pcm[kMpsBoxes][AAC_USAC_MAX_QMF_SLOTS * 64];
+  float res_overlap[kMpsBoxes][AAC_FRAME_SIZE_LONG];
+  int res_window_shape[kMpsBoxes];
+  int res_read[kMpsBoxes]; /* every residual frame of the box was decoded for this spatial frame */
 };
 
 namespace {
@@ -579,23 +587,46 @@ AacDecoderMps_* mps_block(AacDecoderState* s) {
   return s->mps;
 }
 
+/* Forgets the surround configuration in force (the AudioSpecificConfig's
+ * and any in-band header's) with the decoder built for it: the output is
+ * the core's again until a configuration names surround. */
+void mps_drop(AacDecoderState* s) {
+  AacDecoderMps_* m = s->mps;
+  s->mps_output = 0;
+  s->has_surround = 0;
+  if (!m) {
+    return;
+  }
+  m->cfg_valid = 0;
+  m->asc_valid = 0;
+  m->anc_open = 0;
+  m->anc_len = 0;
+  if (m->st) {
+    aac_mps_destroy(m->st);
+    m->st = nullptr;
+  }
+}
+
 /* QMF slots per core frame as the surround decoder's input arrives: the
  * 64-band analysis of the core (16 per 1024 samples), or the SBR's
- * output (32). */
+ * output (32).  mps_core_fits admits only core frames of whole slots. */
 int mps_qmf_slots(const AacDecoderState* s) {
   return core_output_length(s) / 64 * (doubled_output(s) ? 2 : 1);
 }
 
 /* Whether the surround decoder can run on this stream: a mono or stereo
  * core without parametric stereo, whose only element is the downmix of
- * the configured tree; the AAC form on the plain filterbanks (the ELD
- * and LD cores have their own), the low-delay form on an AAC-ELD core
- * at its full rate without LD-SBR (whose QMF output the low-delay path
- * does not take yet). */
+ * the configured tree, with a core frame of whole 64-band QMF slots
+ * (the 480-sample frames of AAC-ELD make seven and a half, and both
+ * filterbank pairs here take 64 samples per slot: such a stream keeps
+ * its core output rather than drift by the half slot each frame); the
+ * AAC form on the plain filterbanks (the ELD and LD cores have their
+ * own), the low-delay form on an AAC-ELD core at its full rate without
+ * LD-SBR (whose QMF output the low-delay path does not take yet). */
 bool mps_core_fits(const AacDecoderState* s) {
   const AacDecoderMps_* m = s->mps;
   if (!m || !m->cfg_valid || s->ps_output || s->ld_sbr_mode || s->layout_source == 0 ||
-      s->layout.num_elements != 1) {
+      s->layout.num_elements != 1 || core_output_length(s) % 64 != 0) {
     return false;
   }
   if (m->cfg.low_delay) {
@@ -640,12 +671,34 @@ AacMpsState* mps_state(AacDecoderState* s) {
       aac_qmf_synthesis_init(&m->synthesis[c], 64);
       aac_mps_ld_synthesis_init(&m->ld_synthesis[c]);
     }
-    for (int b = 0; b < kMpsBoxes; b++) {
-      memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
-      m->res_ch[b].prev_window_shape = 0;
-    }
+    memset(m->res_overlap, 0, sizeof(m->res_overlap));
+    memset(m->res_window_shape, 0, sizeof(m->res_window_shape));
+    memset(m->res_read, 0, sizeof(m->res_read));
   }
   return m->st;
+}
+
+/* The end of a spatial frame's parse: when it parsed, the residual
+ * channels decoded for it are taken over (their overlap carries into
+ * the next frame) and handed to the surround decoder; when it did not,
+ * they are dropped with it and the committed state stays as the last
+ * good frame left it, as the surround decoder's own concealment keeps
+ * that frame's parameters. */
+void mps_frame_done(AacDecoderState* s, bool parsed) {
+  AacDecoderMps_* m = s->mps;
+  const int frames = m->cfg.residual_frames_per_spatial_frame;
+  for (int box = 0; box < kMpsBoxes; box++) {
+    if (!m->res_read[box]) {
+      continue;
+    }
+    m->res_read[box] = 0;
+    if (!parsed) {
+      continue;
+    }
+    memcpy(m->res_overlap[box], m->res_ch[box].overlap, sizeof(m->res_overlap[box]));
+    m->res_window_shape[box] = m->res_ch[box].prev_window_shape;
+    aac_mps_set_residual(m->st, box, m->res_pcm[box], frames * s->frame_length);
+  }
 }
 
 /* extension_payload() of type EXT_LDSAC_DATA in an AAC-ELD frame: the
@@ -663,18 +716,20 @@ int decode_ldsac(AacDecoderState* s, AacBitReader* r) {
     return 0; /* a payload in segments is not an ELD v2 frame */
   }
   AacMpsState* st = mps_state(s);
-  if (st && aac_mps_read_frame(st, r) == AAC_OK) {
-    m->frame_read = 1;
+  if (st) {
+    mps_frame_done(s, aac_mps_read_frame(st, r) == AAC_OK);
   }
   return r->overread ? AAC_ERR_DECODE : 0;
 }
 
 /* ResidualData(): one AAC-LC individual_channel_stream per residual
  * frame of a box, at the residual sampling frequency index, through the
- * core decoder's syntax and filterbank; the box's time signal is handed
- * to the surround decoder once its last residual frame is in.  A
- * residual frame whose length differs from the core frame's (the short
- * window pairs of the longer spatial frames) is outside this path. */
+ * core decoder's syntax and filterbank into the box's scratch channel,
+ * which starts the first frame from the committed overlap; the box is
+ * marked for mps_frame_done, which hands its time signal to the
+ * surround decoder once the spatial frame parses.  A residual frame
+ * whose length differs from the core frame's (the short window pairs of
+ * the longer spatial frames) is outside this path. */
 int mps_residual_reader(void* ctx, AacBitReader* r, int box, int frame, int upd_qmf) {
   auto* s = static_cast<AacDecoderState*>(ctx);
   AacDecoderMps_* m = s->mps;
@@ -688,6 +743,11 @@ int mps_residual_reader(void* ctx, AacBitReader* r, int box, int frame, int upd_
     return AAC_ERR_UNSUPPORTED;
   }
   AacDecoderChannel* ch = &m->res_ch[box];
+  if (frame == 0) {
+    memcpy(ch->overlap, m->res_overlap[box], sizeof(ch->overlap));
+    ch->prev_window_shape = m->res_window_shape[box];
+    m->res_read[box] = 0;
+  }
   const int saved = s->rate_index;
   s->rate_index = cfg->residual_sample_rate_index;
   const int ret = decode_ics(s, r, &ch->cs, 0);
@@ -705,7 +765,7 @@ int mps_residual_reader(void* ctx, AacBitReader* r, int box, int frame, int upd_
   memcpy(m->res_pcm[box] + (size_t)frame * s->frame_length, ch->output,
          (size_t)s->frame_length * sizeof(float));
   if (frame == frames - 1) {
-    aac_mps_set_residual(m->st, box, m->res_pcm[box], frames * s->frame_length);
+    m->res_read[box] = 1;
   }
   return 0;
 }
@@ -747,8 +807,8 @@ void parse_sac_payload(AacDecoderState* s, AacDecoderMps_* m) {
     return;
   }
   AacMpsState* st = mps_state(s);
-  if (st && aac_mps_read_frame(st, &r) == AAC_OK) {
-    m->frame_read = 1;
+  if (st) {
+    mps_frame_done(s, aac_mps_read_frame(st, &r) == AAC_OK);
   }
 }
 
@@ -881,10 +941,15 @@ void mps_stage(AacDecoderState* s, bool active) {
     }
   }
   s->mps_output = 1;
-  s->has_surround = m->frame_read;
-  m->frame_read = 0;
+  s->has_surround = 1; /* the surround decoder is active: it built this output */
 }
 
+/* The surround decoder at a reset of the decoder state (a change of the
+ * core's format, or the caller's reset): the signal state starts over,
+ * and what an in-band header configured is forgotten with the stream
+ * it belonged to, back to the AudioSpecificConfig's configuration (which
+ * the transport reapplies after a reset) or to none; the next in-band
+ * header configures the surround decoder again. */
 void mps_reset(AacDecoderState* s) {
   AacDecoderMps_* m = s->mps;
   s->mps_output = 0;
@@ -892,9 +957,14 @@ void mps_reset(AacDecoderState* s) {
   if (!m) {
     return;
   }
+  if (m->asc_valid) {
+    m->cfg = m->asc_cfg;
+    m->cfg_valid = 1;
+  } else {
+    mps_drop(s);
+  }
   m->anc_open = 0;
   m->anc_len = 0;
-  m->frame_read = 0;
   memset(m->align_pcm, 0, sizeof(m->align_pcm));
   memset(m->align_qmf, 0, sizeof(m->align_qmf));
   m->align_pos = 0;
@@ -909,10 +979,9 @@ void mps_reset(AacDecoderState* s) {
     aac_qmf_synthesis_init(&m->synthesis[c], 64);
     aac_mps_ld_synthesis_init(&m->ld_synthesis[c]);
   }
-  for (int b = 0; b < kMpsBoxes; b++) {
-    memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
-    m->res_ch[b].prev_window_shape = 0;
-  }
+  memset(m->res_overlap, 0, sizeof(m->res_overlap));
+  memset(m->res_window_shape, 0, sizeof(m->res_window_shape));
+  memset(m->res_read, 0, sizeof(m->res_read));
 }
 
 /* ── stereo tools (4.6.8) ──────────────────────────────────────── */
@@ -2093,8 +2162,8 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->rvlc_recovered = 0;
   s->num_crc_regions = 0;
   if (s->mps) {
-    s->mps->frame_read = 0;
     s->mps->anc_open = 0;
+    memset(s->mps->res_read, 0, sizeof(s->mps->res_read));
   }
   aac_drc_frame_begin(&s->drc);
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
@@ -2282,8 +2351,15 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
 
 void aac_decoder_set_mps_config(AacDecoderState* s, const AacMpsConfig* cfg) {
   if (!cfg) {
-    if (s->mps) {
-      s->mps->asc_valid = 0;
+    /* A configuration that names no surround: when the one in force
+     * came from an AudioSpecificConfig, the stream was reconfigured
+     * without it, and the surround decoder goes with it.  When only an
+     * in-band header configured surround, the core's configuration is
+     * being repeated (every LOAS frame may carry it) and the header's
+     * configuration stays in force until a reset or a change of the
+     * core's format. */
+    if (s->mps && s->mps->asc_valid) {
+      mps_drop(s);
     }
     return;
   }

@@ -118,6 +118,26 @@ using AacMpsFrameState = struct AacMpsFrameState_ {
   int num_sets_prev;
 };
 
+/* The working copy of one frame parse: the coded history as the frame
+ * leaves it, the framing, the smoothing and temporal shaping data and
+ * the ICC differences of the residual bands.  The state keeps one so
+ * that a parse allocates nothing; the parse clears it first, as it reads
+ * only the fields the frame carries. */
+using AacMpsFrameWork = struct AacMpsFrameWork_ {
+  AacMpsFrameState st;
+  int num_sets; /* coded sets */
+  int param_slot[AAC_MPS_MAX_PARAM_SETS];
+  int independency;
+  int smooth_mode[AAC_MPS_MAX_PARAM_SETS], smooth_time_idx[AAC_MPS_MAX_PARAM_SETS],
+      smooth_stride_idx[AAC_MPS_MAX_PARAM_SETS];
+  int smg_bits[AAC_MPS_MAX_PARAM_SETS][AAC_MPS_MAX_PARAM_BANDS];
+  int temp_shape_enable;
+  int stp_channel[AAC_MPS_MAX_OUTPUT_CHANNELS], ges_channel[AAC_MPS_MAX_OUTPUT_CHANNELS];
+  float env_shape[AAC_MPS_MAX_OUTPUT_CHANNELS][AAC_MPS_MAX_SLOTS];
+  int icc_diff[AAC_MPS_MAX_OTT_BOXES][AAC_MPS_MAX_PARAM_SETS][AAC_MPS_MAX_PARAM_BANDS];
+  int residual_present, residual_pos, residual_end;
+};
+
 /* ── the decoder state ──────────────────────────────────────────── */
 
 struct AacMpsState_ {
@@ -140,6 +160,8 @@ struct AacMpsState_ {
   /* ── parameters (mps_frame.cpp) ── */
   AacMpsFrameParams params; /* the mapped parameters of the current frame */
   AacMpsFrameState frame;   /* the coded history */
+  AacMpsFrameWork work;     /* the working copies of a parse: the frame being read */
+  AacMpsFrameParams work_params; /* and its mapping, taken over once the frame parses */
   int frame_valid;          /* a frame has been read since the reset */
   int independency;         /* bsIndependencyFlag of the current frame */
   /* ResidualData(): where the residual_data() channel elements sat in
@@ -184,6 +206,18 @@ const AacMpsFrameParams* aac_mps_frame_params(const AacMpsState* s);
  * bounded to the extension's length, as aac_mps_config_read's.  Fills
  * `cfg` with low_delay set. */
 int aac_mps_config_read_ld(AacBitReader* r, AacMpsConfig* cfg);
+
+/* Either form of the SpatialSpecificConfig over a known extent:
+ * `length_bits` is the config's length from the reader's position (the
+ * ascLen of a StreamMuxConfig, the eldExtLen bytes of an ELD extension,
+ * the bsSacHeaderLen bytes of an in-band header), over whose remainder
+ * the SpatialExtensionConfig() loop runs.  AAC_MPS_LENGTH_UNKNOWN when
+ * the transport gives no length (an AudioSpecificConfig in a
+ * StreamMuxConfig of audioMuxVersion 0): the loop needs the length, so
+ * the config then ends at its byte alignment and carries no extension.
+ * The reader is left where the config ends, within the length. */
+#define AAC_MPS_LENGTH_UNKNOWN (-1)
+int aac_mps_config_read_sized(AacBitReader* r, AacMpsConfig* cfg, int low_delay, int length_bits);
 
 /* Writes the low-delay form of `cfg` (the fields aac_mps_config_read_ld
  * reads, ByteAlign() from the config's start, the residual extension
