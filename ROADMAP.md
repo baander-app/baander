@@ -23,6 +23,41 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Recessed footer material
+
+Delivered, 2026-10-30, under the reviewed
+[recessed footer material plan](docs/plans/2026-10-30-1957-feat-recessed-footer-material-plan.md).
+The selected recessed-display prototype A now supplies the music footer's shallow
+inset shading and faint lower lip. The dark mood retains true black and distinct
+near-black layers. Secondary text and the seek track receive local contrast
+adjustments against the painted surface. The design guide reserves material
+shadows for this one focal surface while it is visible; surrounding panels and
+controls remain flat.
+
+The user's later height and alignment requests reduce the rendered footer from
+115 to 97 pixels on desktop and from 171 to 145 pixels on mobile, approximately
+15%. Controls and artwork retain their sizes. Unequal top/bottom padding balances
+the footer's top border and the display's lower lip: the visible desktop gaps are
+both 7 pixels. The browser regression checks painted edges as well as element
+bounds, so geometric centering alone cannot conceal this mismatch.
+
+The additional song-list request removes artwork from `/music/songs` table rows
+while retaining the album column's artwork. Its existing availability/playback
+suite passes all 4 tests. A browser check confirms artwork is absent from idle
+and playing rows while the album column retains its cover.
+
+Verification checkpoint: all 4 focused cases pass in Chromium, Firefox and
+WebKit. Each engine covers the 32 mood/accent combinations at 1280 pixels, plus
+responsive and focus checks at 390, 768 and 1280 pixels. They check painted text
+and control contrast, compact height, vertical alignment, containment and keyboard
+focus. The 13 focused playback/layout cases also passed before the final one-pixel
+optical adjustment. Both TypeScript configurations, scoped ESLint and whitespace
+checks pass. Keyboard checks enter the seek control with Tab before testing its
+focus ring and Arrow-key seeking. WebKit ran in the Playwright 1.60.0 Noble image;
+the host lacks its required browser libraries. Design and testing guidance record
+the painted-contrast and optical-centering rules. Browser qualification does not
+establish physical OLED performance.
+
 ## Cohesive web styling
 
 Delivered, 2026-10-30, under the reviewed

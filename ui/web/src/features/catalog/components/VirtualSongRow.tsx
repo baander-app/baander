@@ -2,7 +2,6 @@ import styled, { css } from 'styled-components'
 import { memo } from 'react'
 import { Play } from 'lucide-react'
 import { formatDuration } from '@/shared/utils/format-duration'
-import { CoverArt } from '@/shared/components/cover-art'
 import type { SongEntry } from '@/features/catalog/types'
 
 const Row = styled.div<{ $isPlaying: boolean; $isFocused: boolean }>`
@@ -76,14 +75,6 @@ const HoverPlayButton = styled.button`
   &:hover {
     background-color: var(--color-highlight);
   }
-`
-
-const CoverThumbnail = styled.span`
-  width: 1.25rem;
-  height: 1.25rem;
-  flex-shrink: 0;
-  overflow: hidden;
-  border-radius: 2px;
 `
 
 const TitleCell = styled.span`
@@ -170,13 +161,6 @@ export const VirtualSongRow = memo(function VirtualSongRow({
           </HoverPlayButton>
         )}
       </HoverPlayCell>
-
-      {/* Cover art thumbnail when playing */}
-      {isPlaying && song.albumPublicId && (
-        <CoverThumbnail>
-          <CoverArt albumPublicId={song.albumPublicId} iconSize={8} />
-        </CoverThumbnail>
-      )}
 
       {/* Title */}
       <TitleCell>{song.title}{song.available === false && <span> · Unavailable</span>}</TitleCell>

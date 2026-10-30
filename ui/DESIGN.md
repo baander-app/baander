@@ -25,6 +25,14 @@ interface and current accessibility requirements. The supplied
 is supplementary Mojave-era material, not a 2014 source. Apple Music is not the
 visual reference.
 
+Baander is gradually combining restrained Aqua material cues with flat surfaces.
+The web music footer's recessed centerpiece is the first application; other
+surfaces retain their existing rules. Material supports hierarchy while content
+and controls remain dominant. Desktop, touch and TV share this visual language,
+but each needs layouts and controls suited to its input model and viewing
+conditions; visual consistency does not require the desktop footer arrangement
+on every device.
+
 ---
 
 ## Layout
@@ -40,18 +48,28 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 
 ### Footer player
 
-The music footer is one console: transport on the left, a flat central card
+The music footer is one console: transport on the left, a recessed central display
 containing artwork, title/artist and timeline, and volume on the right. On mobile,
 place the central display above one row of transport and volume controls. Keep
 long metadata within its own region so controls remain reachable. Use the shared
 Slider for seek and volume, with visible handles and keyboard access; keep elapsed
 time, duration and recovery messages in the central display.
+Keep the console compact with 6px top padding, 8px bottom padding and an 8px gap
+between mobile rows. The unequal padding balances the top border and the
+centerpiece's lower lip; these are footer-specific spacing values.
 
 For OLED screens, retain the dark mood's true-black background and distinguish
 near-black layers through existing roles: `--color-card` for the footer,
 `--color-muted` for its central display and `--color-secondary` for the play
-button. Other moods use their own values for those roles. Keep these surfaces flat,
-without gradients or shadows.
+button. Other moods use their own values for those roles. The central display has
+a shallow inset face and faint lower lip, using static shading derived from the
+existing theme colors. Keep this depth subtle, with track information and playback
+controls visually dominant and legible. The treatment has no animation or
+pointer-driven lighting. The footer and play-button surfaces remain flat.
+While the centerpiece is visible, it is the only surface on screen with material
+shading or shadows that imply depth. Keep surrounding panels and controls flat so
+the recess remains the focal surface. Focus indicators and the separation of
+transient menus and overlays retain their existing rules.
 
 ### Surfaces
 - Background: `var(--color-background)`
@@ -59,7 +77,7 @@ without gradients or shadows.
 - Sidebar: `var(--color-sidebar)`
 - Borders: `var(--color-border)` — used sparingly, not between every element
 - Surface colors follow the selected mood; dark-mode values are not universal defaults.
-- No gradients. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`).
+- No gradients except for the music footer's recessed central display described above. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`); the central display may use a shallow inset edge and faint lower lip.
 
 ### Border radius
 - Cards: 12px radius. Do not use 16px for card surfaces.
@@ -75,7 +93,7 @@ without gradients or shadows.
 - Compact mode lists: `4px` vertical padding
 - Header height: `48px`
 - Context panel width: `360px` max
-- Do not invent gap values. Use 16px, 24px, or 32px.
+- Do not invent gap values. Use 16px, 24px, or 32px, except for the footer's mobile row gap defined above.
 
 ---
 
@@ -307,8 +325,8 @@ View mode preference persists across sessions (Zustand + localStorage).
 | `setState` inside `useMemo` | Extract to `useEffect` |
 | Two-effect blob URL pattern | Use `useImageBlob` hook (single effect) |
 | `any` type | Never. Define the type. |
-| Gradients on surfaces | Flat colors only |
-| Drop shadows on cards | No shadows except overlays |
+| Gradients on surfaces | Flat colors except the music footer's recessed central display |
+| Drop shadows on cards | No shadows except overlays and the music footer's shallow inset edge and faint lower lip |
 | Bounce/spring animations | ease-out only, <120ms |
 | "..." menu buttons on items | Native right-click only |
 | Full-page reloads for navigation | React Router `<Link>` / `useNavigate()` |

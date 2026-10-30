@@ -2483,12 +2483,35 @@ The styling suite signs in through the real login flow. Deterministic catalog GE
 fixtures and a local silent WAV cover empty and populated views and an active
 player without library scans or authentication-store injection. Its DOM appearance
 matrix checks all 32 mood/accent combinations; separate Settings tests exercise
-saved preferences through the application. Only mocked command-palette searches
-disable service workers for WebKit fixture interception; login remains real and
-playback cases retain the stream service worker. Screenshots, geometry, keyboard focus,
+saved preferences through the application. Playback and mocked command-palette cases
+block service workers for deterministic fixture interception; login remains real.
+Screenshots, geometry, keyboard focus,
 reduced-motion and computed-contrast assertions cover selected routes, controls,
 overlays and viewport sizes, not every application state. See the
 [browser-test guide](../../ui/web/tests/e2e/README.md) for scope and audio precautions.
+
+The recessed music footer has a focused rendering check:
+
+```bash
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
+  tests/e2e/styling/footer-material.spec.ts
+```
+
+It checks every mood/accent combination against pixels from the painted surface,
+including the gradient, rather than treating the background as a flat color.
+Samples come from the empty right padding at the labels' and controls' vertical
+positions; artwork, glyph edges and shadow borders are excluded. This sampling
+assumes the centerpiece's background varies vertically. A future horizontal or
+localized reflection would require different sampling. The shared flat-background
+contrast helper does not certify gradients.
+
+The same spec captures desktop and narrow layouts with seek focus visible.
+Geometry checks cover the compact footer height, vertical alignment and contained
+controls. A desktop pixel check includes the lower lip when comparing the
+centerpiece's top and bottom gaps.
+Review those captures at normal size to judge the subtle recess and lower edge.
+Browser pixels establish rendered contrast, not the near-black behavior of a
+physical OLED panel; record hardware observations separately when available.
 
 The Electron app has its own Node test suite, run with Node 26:
 

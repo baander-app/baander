@@ -24,7 +24,7 @@ const TimeLabel = styled.span`
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
-  color: var(--color-muted-foreground);
+  color: var(--player-secondary-text, var(--color-muted-foreground));
 `
 
 export function ProgressBar() {

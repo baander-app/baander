@@ -29,16 +29,21 @@ const PlayerContent = styled.div`
   gap: var(--space-lg);
   max-width: 76rem;
   margin: 0 auto;
-  padding: var(--space-md) var(--space-lg);
+  padding: 6px var(--space-lg) 8px;
 
   @media (max-width: 767px) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-md);
-    padding: var(--space-md);
+    gap: var(--space-sm);
+    padding: 6px var(--space-md) 8px;
   }
 `
 
 const TrackDisplay = styled.div`
+  --recess-shade: color-mix(in srgb, var(--color-muted) 96%, black);
+  --recess-shadow: rgb(0 0 0 / 16%);
+  --recess-lip: rgb(255 255 255 / 80%);
+  --player-secondary-text: color-mix(in srgb, var(--color-muted-foreground) 85%, var(--color-foreground));
+
   display: grid;
   grid-template-columns: 3rem minmax(0, 1fr);
   align-items: center;
@@ -47,7 +52,24 @@ const TrackDisplay = styled.div`
   padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-lg);
   background-color: var(--color-muted);
+  background-image: linear-gradient(
+    to bottom,
+    var(--recess-shade),
+    var(--color-muted) 85%,
+    color-mix(in srgb, var(--color-muted) 99%, white)
+  );
+  box-shadow: inset 0 1px 2px var(--recess-shadow), 0 1px 0 var(--recess-lip);
   color: var(--color-foreground);
+
+  [data-slot='slider-track'] {
+    background-color: color-mix(in srgb, var(--color-input-boundary) 90%, var(--color-foreground));
+  }
+
+  :root[data-theme='dark'] &, :root:not([data-theme]) & {
+    --recess-shade: color-mix(in srgb, var(--color-muted) 80%, black);
+    --recess-shadow: rgb(0 0 0 / 75%);
+    --recess-lip: rgb(255 255 255 / 8%);
+  }
 
   @media (max-width: 767px) {
     grid-column: 1 / -1;
@@ -82,7 +104,7 @@ const TrackSubtitle = styled.p`
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 0.75rem;
-  color: var(--color-muted-foreground);
+  color: var(--player-secondary-text);
 `
 
 const TransportControls = styled.div`
