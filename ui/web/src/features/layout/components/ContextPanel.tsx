@@ -14,6 +14,8 @@ import { NotificationBell } from '@/features/notification/components/Notificatio
 import { NotificationPopout } from '@/features/notification/components/NotificationPopout'
 import { useNotifications } from '@/features/notification/hooks/use-notifications'
 import { DevicePicker } from '@/features/session/components/DevicePicker'
+import { usePlayerStore } from '@/features/player/stores/player-store'
+import { useRadioStore } from '@/features/radio/stores/radio-store'
 
 const ExpandedTabs = styled(Tabs)`
   display: flex;
@@ -196,6 +198,8 @@ function ResizeHandle({ width, onWidthChange }: { width: number; onWidthChange: 
 
 export function ContextPanel() {
   const closeRef = useRef<HTMLButtonElement>(null)
+  const hasCurrentTrack = usePlayerStore((s) => Boolean(s.currentTrack))
+  const hasRadioStation = useRadioStore((s) => Boolean(s.activeStation))
   const mode = useContextPanelStore((s) => s.mode)
   const activeTab = useContextPanelStore((s) => s.activeTab)
   const isOpen = useContextPanelStore((s) => s.isOpen)
@@ -302,7 +306,7 @@ export function ContextPanel() {
         </TabContentZone>
       </ExpandedTabs>
 
-      {mode !== 'compact' && (
+      {mode !== 'compact' && !hasCurrentTrack && !hasRadioStation && (
         <>
           <Separator />
           <PlayerBar />

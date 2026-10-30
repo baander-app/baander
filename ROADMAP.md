@@ -154,6 +154,23 @@ screenshots were visually reviewed across the three engines. Receipts are under
 are `/tmp/volume-review-mobile.png`, `/tmp/volume-review-desktop.png` and
 `/tmp/volume-review-engines.png`. The full suite was not rerun for this follow-up.
 
+Context-player follow-up, 2026-10-30: Chromium reproduced two Pause controls at
+1280 pixels. The context panel now hides its player and separator while a track
+or radio station is present, including paused tracks. Queue, Lyrics and Details
+remain accessible; the idle player returns when neither source exists.
+
+Six distinct Chromium checks cover playback at 390, 768 and 1280 pixels, both
+footer-volume widths, and radio start/stop. Playback assertions require one
+Pause/Seek control, one Seek control while paused, and an accessible Queue.
+The initial run passed
+four of five cases; the 1280-pixel case timed out at the login heading before
+reaching the player. Its replay and the radio case pass in
+`/tmp/context-player-final.log`. Final scoped CI-image lint and both TypeScript
+configurations pass in `/tmp/context-player-ci-final.log`. Focused review found
+no issues; mobile music, desktop music and radio screenshots were visually
+reviewed. This conditional-rendering change alters no CSS; the full suite and
+cross-browser checks were not rerun.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)

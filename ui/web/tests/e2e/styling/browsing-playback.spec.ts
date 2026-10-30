@@ -3,6 +3,37 @@ import { test, expect, catalogAlbum, catalogSong, catalogPlaylist } from './fixt
 import { setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
 
+test.describe('footer radio player', () => {
+  test.use({ serviceWorkers: 'block' })
+
+  test('hides the context player until radio stops', async ({ populatedCatalog: page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    const stream = new URL(`/api/stream/track?id=${catalogSong.publicId}`, page.url()).href
+    const station = {
+      publicId: 'stylingRadio000000001', name: 'Styling Radio', country: 'DK',
+      language: 'Danish', genres: [], tags: [], logo: null,
+      streams: [{ url: stream, format: 'wav', bitrate: 128, reliability: 1 }],
+    }
+    await page.route('**/api/radio/**', async (route) => {
+      const path = new URL(route.request().url()).pathname
+      if (path === '/api/radio/stations') return route.fulfill({ json: { data: [station] } })
+      if (path.startsWith('/api/radio/session')) return route.fulfill({ json: { data: null } })
+      return route.fulfill({ json: { data: [] } })
+    })
+    await spaNavigate(page)('/radio')
+    await page.getByRole('tab', { name: 'Stations', exact: true }).click()
+    await page.getByPlaceholder('Search stations...').fill(station.name)
+    await expect(page.getByText('Nothing playing', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Play station', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Stop radio', exact: true })).toBeVisible()
+    await expect(page.getByText('Nothing playing', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: 'Queue', exact: true })).toBeVisible()
+    await page.screenshot({ path: test.info().outputPath('radio-player-placement.png') })
+    await page.getByRole('button', { name: 'Stop radio', exact: true }).click()
+    await expect(page.getByText('Nothing playing', { exact: true })).toBeVisible()
+  })
+})
+
 test.describe('footer volume handle', () => {
   test.use({ serviceWorkers: 'block' })
 
@@ -81,6 +112,10 @@ for (const width of [390, 768, 1280]) {
     await page.getByRole('button', { name: 'Play', exact: true }).first().click()
     const pause = page.getByRole('button', { name: 'Pause', exact: true }).first()
     await expect(pause).toBeVisible()
+    await page.screenshot({ path: test.info().outputPath('player-placement.png') })
+    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('tab', { name: 'Queue', exact: true })).toBeVisible()
     const seek = page.getByRole('slider', { name: 'Seek', exact: true }).first()
     await expect(seek).toBeVisible()
     await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(0)
@@ -106,6 +141,7 @@ for (const width of [390, 768, 1280]) {
     await expect(volume).toHaveAttribute('aria-valuenow', '0')
     await pause.click()
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
     await page.keyboard.press('q')
     await page.getByRole('tab', { name: 'Queue', exact: true }).click()
     await expect(page.getByText(catalogSong.title, { exact: true }).last()).toBeVisible()
