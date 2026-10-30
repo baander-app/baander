@@ -5,15 +5,18 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 import { EQ_BANDS, type BandConfig, type VisualizerMode, useEqBandsStore } from '../stores/eq-bands-store'
 import { isEngineMode } from '@/features/visualizer/types'
 import { VisualizerHost } from '@/features/visualizer/components/VisualizerHost'
-import { registerVisualizerRenderers, getCompactMode } from '@/features/visualizer/register-visualizer-renderers'
+import { registerVisualizerRenderers } from '@/features/visualizer/register-visualizer-renderers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import { Button } from '@/shared/components/ui/button'
+import { aggregateSpectrum, frequencyToPosition, getFrequencyRange, frameSmoothing } from '@/features/visualizer/utils/spectrum'
 import styled from 'styled-components'
 
 interface DisplayData {
   leftChannel: number
   rightChannel: number
   lufs: number
+  loudnessAvailable: boolean
+  sampleRate: number | null
   peakFrequency: number
   rms: number
   frequencyBars: number[]
@@ -36,11 +39,7 @@ const SpectrumWrapper = styled.div`
   height: 100%;
   align-items: flex-end;
   gap: 1px;
-  padding: 0 0.25rem;
-
-  & > div:first-child {
-    /* bar container fills width */
-  }
+  padding: 0;
 `
 
 const SpectrumBar = styled.div`
@@ -54,17 +53,18 @@ const SpectrumBar = styled.div`
 const CurveSvg = styled.svg`
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 `
 
-function SpectrumVisualizer({ bars, bands, showCurve }: { bars: number[]; bands: BandConfig[]; showCurve: boolean }) {
-  // Map EQ bands to SVG path: X = log frequency position, Y = gain (-12 to +12)
-  const curvePoints = bands.map((band, i) => {
-    const freq = EQ_BANDS[i].frequency
-    const x = (Math.log10(freq / 20) / Math.log10(80000 / 20)) * 100
-    const y = 50 - (band.gain / 12) * 40 // map -12..+12 to 90..10
-    return { x, y }
-  })
+function SpectrumVisualizer({ bars, bands, sampleRate }: { bars: number[]; bands: BandConfig[]; sampleRate: number | null }) {
+  const range = sampleRate ? getFrequencyRange(sampleRate) : null
+  const curvePoints = sampleRate && range ? bands.flatMap((band, i) => {
+    const frequency = EQ_BANDS[i].frequency
+    if (frequency < range.min || frequency > range.max) return []
+    return [{ x: frequencyToPosition(frequency, sampleRate) * 100, y: 50 - (band.gain / 12) * 40 }]
+  }) : []
 
   let curvePath = ''
   if (curvePoints.length > 0) {
@@ -78,9 +78,9 @@ function SpectrumVisualizer({ bars, bands, showCurve }: { bars: number[]; bands:
   }
 
   return (
-    <SpectrumWrapper>
+    <SpectrumWrapper role="img" aria-label="Input spectrum with configured EQ response">
       {bars.map((height, i) => {
-        const pct = Math.max(1, height)
+        const pct = Math.max(0, Math.min(100, height))
         return (
           <SpectrumBar
             key={i}
@@ -88,7 +88,7 @@ function SpectrumVisualizer({ bars, bands, showCurve }: { bars: number[]; bands:
           />
         )
       })}
-      {showCurve && curvePath && (
+      {curvePath && (
         <CurveSvg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
@@ -134,19 +134,16 @@ const MeterTrack = styled.div`
   overflow: hidden;
 `
 
-const MeterFill = styled.div<{ $level: number }>`
+const MeterFill = styled.div`
   height: 100%;
   border-radius: 9999px;
   transition: width 100ms ease-out;
-  background-color: ${(p) => {
-    if (p.$level > 80) return 'var(--color-destructive)'
-    if (p.$level > 60) return 'color-mix(in srgb, var(--color-accent-text) 80%, transparent)'
-    return 'color-mix(in srgb, var(--color-accent-text) 50%, transparent)'
-  }};
+  background-color: var(--color-accent-text);
 `
 
 const MeterValue = styled.span`
-  width: 2rem;
+  width: 6rem;
+  font-family: var(--font-mono);
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-size: 11px;
@@ -154,13 +151,23 @@ const MeterValue = styled.span`
 `
 
 function MeterBar({ label, level }: { label: string; level: number }) {
+  const decibels = level > 0 ? 20 * Math.log10(level / 100) : -Infinity
+  const bounded = Math.max(-60, Math.min(0, decibels))
+  const value = Number.isFinite(decibels) ? decibels.toFixed(1) : '−∞'
   return (
     <MeterWrapper>
       <MeterLabel>{label}</MeterLabel>
-      <MeterTrack>
-        <MeterFill $level={level} style={{ width: `${Math.min(100, level)}%` }} />
+      <MeterTrack
+        role="meter"
+        aria-label={label === 'L' ? 'Left input RMS' : 'Right input RMS'}
+        aria-valuemin={-60}
+        aria-valuemax={0}
+        aria-valuenow={bounded}
+        aria-valuetext={`${value} dBFS RMS`}
+      >
+        <MeterFill style={{ width: `${((bounded + 60) / 60) * 100}%` }} />
       </MeterTrack>
-      <MeterValue>{Math.round(level)}</MeterValue>
+      <MeterValue>{value} dBFS</MeterValue>
     </MeterWrapper>
   )
 }
@@ -278,6 +285,7 @@ const PeakValue = styled.span`
 const Readouts = styled.div`
   margin-top: 0.75rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 1.5rem;
   font-size: 11px;
@@ -295,108 +303,77 @@ const ReadoutItem = styled.div`
 const ReadoutValue = styled.span`
   font-variant-numeric: tabular-nums;
   font-weight: 500;
-  color: var(--color-foreground)
+  color: var(--color-foreground);
 `
 
-export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled }: EqualizerAnalyzerProps) {
-  const intervalRef = useRef<number | null>(null)
-  const smoothedBarsRef = useRef(new Float32Array(64))
+const VisualizationNote = styled.p`
+  margin: 0.5rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--color-muted-foreground);
+`
 
+function emptyDisplayData(sampleRate: number | null = null): DisplayData {
+  return {
+    leftChannel: 0, rightChannel: 0, lufs: 0, loudnessAvailable: false, sampleRate,
+    peakFrequency: 0, rms: 0, frequencyBars: new Array(64).fill(0), phase: null,
+    normalizationGainDb: 0, trackId: null,
+  }
+}
+
+export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled }: EqualizerAnalyzerProps) {
+  const smoothedBarsRef = useRef(new Float32Array(64))
   const isPlaying = usePlayerStore((s) => s.isPlaying)
   const trackId = usePlayerStore((s) => s.currentTrack?.publicId ?? null)
   const albumPublicId = usePlayerStore((s) => s.currentTrack?.albumPublicId)
   const visualizerMode = useEqBandsStore((s) => s.visualizerMode)
   const setVisualizerMode = useEqBandsStore((s) => s.setVisualizerMode)
-
-  const [displayData, setDisplayData] = useState<DisplayData>({
-    leftChannel: 0,
-    rightChannel: 0,
-    lufs: -30,
-    peakFrequency: 0,
-    rms: 0,
-    frequencyBars: new Array(64).fill(0),
-    phase: null,
-    normalizationGainDb: 0,
-    trackId: null,
-  })
+  const [displayData, setDisplayData] = useState<DisplayData>(() => emptyDisplayData())
 
   useEffect(() => usePlayerStore.subscribe((state, previous) => {
-    if (!state.isPlaying || state.currentTrack?.publicId !== previous.currentTrack?.publicId) {
-      setDisplayData((data) => data.phase || data.normalizationGainDb !== 0 ? { ...data, phase: null, normalizationGainDb: 0 } : data)
+    if ((previous.isPlaying && !state.isPlaying) || state.currentTrack?.publicId !== previous.currentTrack?.publicId) {
+      setDisplayData((data) => emptyDisplayData(data.sampleRate))
     }
   }), [])
 
-  // Poll analysis data from processor
   useEffect(() => {
-    if (!isPlaying) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
+    smoothedBarsRef.current.fill(0)
+    if (!isPlaying || !trackId) return
+    let previousTime = performance.now()
+    const interval = window.setInterval(() => {
+      const processor = audioService.getProcessor()
+      const data = processor?.getAnalysisData()
+      if (!processor || !data) {
+        setDisplayData(emptyDisplayData())
+        return
       }
-      return
-    }
-
-    intervalRef.current = window.setInterval(() => {
-      try {
-        const processor = audioService.getProcessor()
-        if (!processor) {
-          setDisplayData((previous) => ({ ...previous, phase: null, normalizationGainDb: 0 }))
-          return
-        }
-
-        const data = processor.getAnalysisData()
-        if (!data) return
-
-        const bars: number[] = []
-        const barCount = 64
-        const alpha = 0.35
-        const decay = 0.92
-
-        if (data.frequencyData && data.frequencyData.length > 0) {
-          for (let i = 0; i < barCount; i++) {
-            const dataIndex = Math.floor((i / barCount) * data.frequencyData.length)
-            const target = (data.frequencyData[dataIndex] / 255) * 100
-            const prev = smoothedBarsRef.current[i] || 0
-            smoothedBarsRef.current[i] = prev * (1 - alpha) + target * alpha
-            bars.push(smoothedBarsRef.current[i])
-          }
-        } else {
-          for (let i = 0; i < barCount; i++) {
-            smoothedBarsRef.current[i] = (smoothedBarsRef.current[i] || 0) * decay
-            bars.push(smoothedBarsRef.current[i])
-          }
-        }
-
-        setDisplayData({
-          leftChannel: data.leftChannel,
-          rightChannel: data.rightChannel,
-          lufs: data.lufs,
-          peakFrequency: data.peakFrequency,
-          rms: data.rms,
-          frequencyBars: bars,
-          phase: data.phase,
-          normalizationGainDb: processor.getNormalizationGainDb(),
-          trackId,
-        })
-
-      } catch (error) {
-        console.error('[Equalizer] analysis update error:', error)
-      }
+      const now = performance.now()
+      const alpha = frameSmoothing(0.35, now - previousTime)
+      previousTime = now
+      const bars = Array.from(aggregateSpectrum(data), (peak, index) => {
+        const previous = smoothedBarsRef.current[index]
+        const next = previous + (peak * 100 - previous) * alpha
+        smoothedBarsRef.current[index] = next
+        return next
+      })
+      setDisplayData({
+        leftChannel: data.leftChannel, rightChannel: data.rightChannel,
+        lufs: data.lufs, loudnessAvailable: data.loudnessAvailable, sampleRate: data.sampleRate,
+        peakFrequency: data.peakFrequency, rms: data.rms, frequencyBars: bars,
+        phase: data.phase, normalizationGainDb: processor.getNormalizationGainDb(), trackId,
+      })
     }, 40)
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
+    return () => window.clearInterval(interval)
   }, [isPlaying, trackId])
 
-  const currentGain = normalizationEnabled && isPlaying && displayData.trackId === trackId ? displayData.normalizationGainDb : 0
+  const display = isPlaying && displayData.trackId === trackId
+    ? displayData
+    : emptyDisplayData(displayData.sampleRate)
+  const currentGain = normalizationEnabled ? display.normalizationGainDb : 0
   const totalGain = (masterGain + currentGain).toFixed(1)
-  const formattedPeakFreq = displayData.peakFrequency > 1000
-    ? `${(displayData.peakFrequency / 1000).toFixed(1)}K`
-    : `${Math.round(displayData.peakFrequency)}`
+  const formattedPeakFreq = display.peakFrequency > 1000
+    ? `${(display.peakFrequency / 1000).toFixed(1)} kHz`
+    : `${Math.round(display.peakFrequency)} Hz`
+  const upperFrequency = display.sampleRate ? getFrequencyRange(display.sampleRate).max : null
 
   // Register renderers once (idempotent)
   registerVisualizerRenderers()
@@ -412,10 +389,10 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled }: E
   ]
 
   return (
-    <Card>
+    <Card role="region" aria-label="Input analyzer">
       <CardHeader>
         <HeaderRow>
-          <CardTitle>Analyzer</CardTitle>
+          <CardTitle>Input analyzer</CardTitle>
           <ModeButtons>
             {visualizerModes.map((mode) => (
               <Button
@@ -435,36 +412,42 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled }: E
         {/* Visualizer area */}
         <VisualizerArea>
           {visualizerMode === 'spectrum' && (
-            <SpectrumVisualizer bars={displayData.frequencyBars} bands={bands} showCurve={visualizerMode === 'spectrum'} />
+            <SpectrumVisualizer bars={display.frequencyBars} bands={bands} sampleRate={display.sampleRate} />
           )}
           {visualizerMode === 'meters' && (
             <MetersContent>
-              <MeterBar label="L" level={displayData.leftChannel} />
-              <MeterBar label="R" level={displayData.rightChannel} />
+              <MeterBar label="L" level={display.leftChannel} />
+              <MeterBar label="R" level={display.rightChannel} />
               <PeakRow>
                 <PeakLabel>Peak</PeakLabel>
-                <PeakValue>{formattedPeakFreq} Hz</PeakValue>
+                <PeakValue>{display.peakFrequency > 0 ? formattedPeakFreq : '—'}</PeakValue>
               </PeakRow>
             </MetersContent>
           )}
           {visualizerMode === 'phase' && (
-            <PhaseVisualizer phase={isPlaying && displayData.trackId === trackId ? displayData.phase : null} />
+            <PhaseVisualizer phase={display.phase} />
           )}
           {isEngineMode(visualizerMode) && (
             <VisualizerHost
-              mode={getCompactMode(visualizerMode)}
+              mode={visualizerMode}
               albumPublicId={albumPublicId}
-              compact
             />
           )}
         </VisualizerArea>
 
+        <VisualizationNote>
+          Input before EQ and gain. {visualizerMode === 'spectrum' && upperFrequency
+            ? '20 Hz–' + (upperFrequency / 1000).toFixed(1) + ' kHz · spectrum −100–0 dB · configured EQ curve ±12 dB'
+            : visualizerMode === 'meters' ? 'Meters show RMS levels in dBFS.'
+              : visualizerMode === 'phase' ? 'Phase uses captured stereo samples.' : ''}
+        </VisualizationNote>
+
         {/* Readouts */}
         <Readouts>
           <ReadoutItem>
-            <span>LUFS</span>
+            <span>Momentary LUFS</span>
             <ReadoutValue>
-              {(displayData.lufs ?? -30).toFixed(1)}
+              {display.loudnessAvailable ? display.lufs.toFixed(1) : 'Unavailable'}
             </ReadoutValue>
           </ReadoutItem>
           <ReadoutItem>

@@ -200,6 +200,56 @@ Final logs are `/tmp/footer-console-accepted.log`,
 and `/tmp/footer-console-ci-final.log`; build evidence is in
 `/tmp/footer-console-ci.log`. The full frontend suite was not rerun.
 
+## Equalizer visualization calibration
+
+Delivered, 2026-10-30, under the
+[calibration plan](docs/plans/2026-10-30-calibrate-equalizer-visualizations.md).
+All seven modes now consume a documented input-spectrum contract, render the
+selected mode visibly and clear stale readings. The changes are committed
+locally; nothing has been pushed.
+
+U1 adds the periodic-Blackman, 1/N display FFT with −100 to 0 dB bytes and actual
+sample-rate/FFT metadata; the linear utility FFT remains unchanged. Spectral
+features decode into the float-input API. U2 shares logarithmic peak-band mapping
+from 20 Hz to the lower of 20 kHz and Nyquist, removes global-mean blanking, and
+repairs renderer ownership, pause clearing and elapsed-time/DPR handling. U3
+labels input analysis and RMS dBFS, marks loudness unavailable without a fresh
+measured report, and qualifies the integrated Equalizer. The pre-EQ/gain tap,
+normalization and output graph remain unchanged.
+
+The complete DSP gate passes 155 tests, exits zero and verifies reproducible
+builds and shipped-artifact parity. Native calibration passes two Chromium cases
+with 32 signals across 44.1/48 kHz and four actual worklet spectra. Native and
+WASM peak bins match; maximum level error is 0.254181 dB against a 0.4 dB bound,
+and maximum off-bin displacement is 0.4 bin. The full-scale reference follows
+the windowed magnitude convention, not 0 dBFS.
+
+All 56 audio-graph cases pass across recorded runs: 36 initially, one corrected
+neutral-analysis fixture, seventeen playback/stream cases after the harness's
+package-resolution repair, and two WebKit cases in the matching Playwright image.
+This is combined evidence, not a fresh uninterrupted aggregate. The fixture
+repairs preserve existing assertions and resolve required Axios/TanStack packages.
+
+Final CI-image verification passes 2,515 unit tests across 202 files, scoped
+ESLint, both TypeScript configurations, production build and asset verification.
+The earlier full-project lint run has zero errors and eight existing warnings.
+The final focused renderer group passes 26 tests, including the actual Particles
+StrictMode ownership race. Focused review found no remaining issues.
+
+The two Chromium UI cases pass all seven modes in four moods and the quiet
+1008 Hz, 0.001-amplitude signal in the four engine modes. All 32 screenshots
+were visually reviewed, including the small Circular response. Pause/resume and
+390/1200-pixel resizing pass without page errors. Chromium is 148.0.7778.96;
+receipts are `/tmp/visualizer-browser-complete.log` and
+`/tmp/visualizer-final-qualified.log`.
+
+The UI fixture retains real authentication and preference reads but acknowledges
+preference writes locally and blocks service workers for deterministic signal
+interception. It does not qualify preference synchronization or production
+service-worker transport. These checks establish input analysis and renderer
+behavior, not acoustic response, post-EQ measurement or audible output quality.
+Documentation prose audits and whitespace checks pass.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)

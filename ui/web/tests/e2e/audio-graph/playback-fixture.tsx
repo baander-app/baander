@@ -37,7 +37,7 @@ window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
   return element
 } as unknown as typeof Audio
 
-const tracks = ['first', 'second', 'third'].map(publicId => ({ publicId, title: publicId }))
+const tracks = ['first', 'second', 'third'].map(publicId => ({ publicId, title: publicId, available: true }))
 // Every value the playback clock publishes, as the time display and session sync read it.
 const clock: number[] = []
 subscribeToTime(() => { clock.push(getCurrentTime()) })
@@ -122,7 +122,7 @@ const fixture = {
     pending(new Error('Obsolete context resume rejected'))
   },
   playLong() {
-    const long = { publicId: 'long', title: 'long' }
+    const long = { publicId: 'long', title: 'long', available: true }
     usePlayerStore.getState().playTrack(long, [long])
   },
   clock(): number[] { return [...clock] },

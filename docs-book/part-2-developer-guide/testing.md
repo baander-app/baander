@@ -66,6 +66,28 @@ The gate rebuilds twice and checks reproducibility and shipped artifact parity.
 See [DSP qualification](../../packages/dsp/README.md) for covered contracts and
 the remaining loudness and codec qualification limits.
 
+## Spectrum and Equalizer calibration
+
+The native `native-spectrum-calibration.spec.ts` under the audio-graph suite
+compares the analyser with the shipped FFT/worklet at 44.1 and 48 kHz using
+known offline tones and silence. The authenticated UI check is separate:
+
+```bash
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
+  tests/e2e/styling/visualizer-calibration.spec.ts
+```
+
+Start or refresh the isolated preview first. The UI fixture renders all seven
+modes across four moods using a local stereo WAV with browser output muted and
+service workers blocked for fixture interception. Preference writes receive local
+acknowledgments; authentication and preference reads remain real. Keep system
+output muted too. The display measures input before EQ and gain; it does not
+establish preference synchronization, acoustic, post-EQ or production
+service-worker qualification. See the
+[audio-graph guide](../../ui/web/tests/e2e/audio-graph/README.md#spectrum-calibration-and-equalizer-display)
+and [FFT contract](../../packages/dsp/fft2048/README.md#display-spectrum) for the
+numeric scale and the two test boundaries.
+
 ## Browser authentication transport
 
 `yarn --cwd ui/web test:browser-auth` runs `ui/web/tests/e2e/browser-auth/`

@@ -134,3 +134,31 @@ the host libraries Playwright's Ubuntu images provide; on other hosts run the
 spec in `mcr.microsoft.com/playwright` at the installed Playwright version, with
 `--network none`. Playwright's Linux WebKit uses GStreamer, not Safari's media
 stack.
+
+
+## Spectrum calibration and Equalizer display
+
+`native-spectrum-calibration.spec.ts` compares the native analyser with the
+shipped FFT and worklet at 44.1 and 48 kHz. Offline signals cover amplitudes
+1, 0.1, 0.01 and 0.001, low/middle/near-Nyquist frequencies, off-bin tones and
+silence. It checks peak positions, dB agreement and worklet metadata. These
+samples never reach audio hardware.
+
+The separate `tests/e2e/styling/visualizer-calibration.spec.ts` uses the running
+application to check all seven Equalizer modes in four moods, visible signal
+marks, measured RMS meters, pause/resume, mode switching and resizing. From the
+repository root, start the isolated preview and pass its URL explicitly:
+
+```sh
+make preview-up
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
+  tests/e2e/styling/visualizer-calibration.spec.ts
+```
+
+That UI fixture uses real login and a generated local stereo WAV, blocks service
+workers for deterministic interception, and mutes browser output. Preference
+writes are acknowledged locally so shared-account conflicts cannot interrupt
+mode/theme checks; preference reads and authentication remain real. Keep system
+output muted too. Its observed analysis is input before EQ and gain; these checks
+do not qualify preference synchronization, production service-worker transport,
+acoustic response or a post-EQ measurement.
