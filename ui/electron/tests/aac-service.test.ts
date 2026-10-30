@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // The binding comes from node_modules when installed, else from the source
 // package when it has been built there (npm install in the codec directory).
-const codec = resolve(dirname(fileURLToPath(import.meta.url)), '../../../packages/codecs/baander-aac');
+const codec = resolve(dirname(fileURLToPath(import.meta.url)), '../../../packages/baander-aac');
 if (!process.env.BAANDER_AAC_NATIVE_MODULE && existsSync(join(codec, 'build/Release/baander_aac.node'))) {
   process.env.BAANDER_AAC_NATIVE_MODULE = pathToFileURL(join(codec, 'node/index.js')).href;
 }

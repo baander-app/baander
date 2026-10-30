@@ -9,7 +9,7 @@ execution: code
 
 ## Purpose and scope
 
-`packages/codecs/baander-aac` decodes and encodes AAC-LC and HE-AAC v1/v2
+`packages/baander-aac` decodes and encodes AAC-LC and HE-AAC v1/v2
 over ADTS with 1024-sample frames. This plan closes the first tier of the gap
 list against the AOSP fdk-aac upstream
 (`/mnt/project-files/aac-codec/fdk-gap-list.md`): the features that make the

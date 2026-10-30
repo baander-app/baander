@@ -228,7 +228,7 @@ lint, Vitest, build, and build-verification checks.
 
 ## Desktop native codec
 
-The Electron app ships the AAC codec from `packages/codecs/baander-aac` as a
+The Electron app ships the AAC codec from `packages/baander-aac` as a
 native Node-API module, `@baander/aac-native`, declared as a `file:`
 dependency in `ui/electron/package.json`. On `yarn install` the package's
 install script fetches the prebuilt binding for the platform from the newest
@@ -257,7 +257,7 @@ for the low-delay and xHE-AAC (`profile: 'xhe'`) profiles, whose encoder
 options add the USAC settings (`usac`), a `loudnessInfo` set written into the
 stream and `measureLoudness` for the meter inside a session. The IPC module
 validates every payload before the service runs. See the codec's
-[README](../../packages/codecs/baander-aac/docs/README.md) for the C API, the
+[README](../../packages/baander-aac/docs/README.md) for the C API, the
 command-line tool and the measured interoperability with FFmpeg.
 
 ## Component Library

@@ -1,6 +1,6 @@
 name: AAC native addon
 
-# Builds the Node-API binding of packages/codecs/baander-aac for the Electron
+# Builds the Node-API binding of packages/baander-aac for the Electron
 # version the desktop app locks, proves it loads under Node and under
 # Electron on each platform, runs the codec's CTest suites on Linux, keeps
 # one prebuild per platform as a workflow artifact and, on an
@@ -14,14 +14,14 @@ on:
         tags:
             - 'aac-native-v*'
         paths:
-            - 'packages/codecs/baander-aac/**'
+            - 'packages/baander-aac/**'
             - 'ui/electron/package.json'
             - 'ui/electron/yarn.lock'
             - '.github/workflows/aac-native.yml'
     pull_request:
         types: [ opened, synchronize, reopened ]
         paths:
-            - 'packages/codecs/baander-aac/**'
+            - 'packages/baander-aac/**'
             - 'ui/electron/package.json'
             - 'ui/electron/yarn.lock'
             - '.github/workflows/aac-native.yml'
@@ -54,7 +54,7 @@ jobs:
         defaults:
             run:
                 shell: bash
-                working-directory: packages/codecs/baander-aac
+                working-directory: packages/baander-aac
         steps:
             -   name: Checkout
                 uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,7 +62,7 @@ jobs:
             -   name: Set up Node
                 uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
                 with:
-                    node-version-file: packages/codecs/baander-aac/package.json
+                    node-version-file: packages/baander-aac/package.json
 
             -   name: Runner matches the target
                 run: |
@@ -144,7 +144,7 @@ jobs:
                 uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
                 with:
                     name: baander_aac-${{ matrix.target }}
-                    path: packages/codecs/baander-aac/prebuilds/${{ matrix.target }}/baander_aac.node
+                    path: packages/baander-aac/prebuilds/${{ matrix.target }}/baander_aac.node
                     if-no-files-found: error
                     retention-days: 30
 
@@ -162,7 +162,7 @@ jobs:
 
             -   name: Tag matches the package version
                 run: |
-                    version="$(node -p 'require("./packages/codecs/baander-aac/package.json").version')"
+                    version="$(node -p 'require("./packages/baander-aac/package.json").version')"
                     test "$GITHUB_REF_NAME" = "aac-native-v$version" \
                       || { echo "tag $GITHUB_REF_NAME does not match package version $version"; exit 1; }
                     echo "VERSION=$version" >> "$GITHUB_ENV"

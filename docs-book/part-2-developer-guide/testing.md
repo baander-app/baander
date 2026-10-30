@@ -2471,7 +2471,7 @@ import modules without extensions.
 The codec itself has CTest suites and a binding smoke test:
 
 ```bash
-cd packages/codecs/baander-aac
+cd packages/baander-aac
 mkdir -p cmake-build && cd cmake-build && cmake .. -DCMAKE_BUILD_TYPE=Release && make && ctest
 cd .. && npm install && npm test
 ```

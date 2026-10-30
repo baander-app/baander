@@ -969,7 +969,7 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 ### Native
 
 ```sh
-cd packages/codecs/baander-aac
+cd packages/baander-aac
 mkdir -p cmake-build && cd cmake-build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build .
@@ -1046,7 +1046,7 @@ The package root is this directory (`package.json`, `binding.gyp`); the
 entry is `node/index.js`, ESM only, for Node 26 and Electron. `npm install`
 or `yarn install` builds the binding with node-gyp from the same sources
 (SSE2 on x86, NEON on arm64). The Electron app depends on it as
-`file:../../packages/codecs/baander-aac` and rebuilds it for the Electron
+`file:../../packages/baander-aac` and rebuilds it for the Electron
 ABI with `yarn electron-rebuild`; electron-builder ships the entry, the
 types and the compiled binding only.
 

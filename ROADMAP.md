@@ -1377,7 +1377,7 @@ Keep these limits separate from selected work:
   coverage, display-gamut certification or Dolby Vision support. See the
   [testing guide](docs-book/part-2-developer-guide/testing.md) for the measured cases.
 - Native codec acceptance remains conditional on the selected release path.
-  [AAC reference coverage](packages/codecs/baander-aac/docs/README.md) does not
+  [AAC reference coverage](packages/baander-aac/docs/README.md) does not
   exercise the 34-band and phase decoder paths; listening tests and the HE-AAC
   IPC/bridge suites were not run in that checkpoint. The original 5% HE-AAC CBR
   target was not established by the delivered 6% acceptance gate. These limits
@@ -1504,7 +1504,7 @@ not select more outage work.
 Checkpoint, 2026-10-23, transport and robustness: the first tier of the gap
 list against the AOSP fdk-aac upstream, per the
 [plan](docs/plans/2026-10-23-002-feat-aac-codec-transport-robustness-plan.md),
-is delivered in `packages/codecs/baander-aac`. Decoder: streaming input with
+is delivered in `packages/baander-aac`. Decoder: streaming input with
 ADTS and LOAS resync, ADTS CRC verification, an AudioSpecificConfig reader
 with implicit, backward compatible and hierarchical SBR/PS signalling, LATM
 and LOAS demux, raw access units, error concealment on by default with
@@ -1518,7 +1518,7 @@ follow. Code review found eleven defects, all corrected. Verification: CTest
 in both directions (131 to 137 dB), the binding's smoke test (7 tests) and the
 Electron service suite (5 tests). Listening tests and the Electron IPC and
 bridge suites did not run in that environment. Deviations by design are
-recorded in the [codec README](packages/codecs/baander-aac/docs/README.md).
+recorded in the [codec README](packages/baander-aac/docs/README.md).
 
 Checkpoint, 2026-10-24, low delay and dynamics: the second tier, per the
 [plan](docs/plans/2026-10-23-003-feat-aac-codec-low-delay-and-drc-plan.md),
@@ -1572,7 +1572,7 @@ encoder emits none and no stream at hand uses them; stereoConfigIndex 2 is
 verified by construction only; per-platform prebuilt binaries for the
 Electron client are pending. Not run: listening tests and the ISO
 conformance suite. Figures and limits are in the
-[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
 
 Checkpoint, 2026-10-30, MPEG Surround decoder: the third tier's second
 plan, per the
@@ -1619,7 +1619,7 @@ temporal shaping in the low-delay path and ELD frame lengths other than
 client remain pending. Not run: listening tests, the ISO conformance
 suite and streams from a third-party MPEG Surround encoder, which does
 not exist as free software. Figures and limits are in the
-[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
 
 Checkpoint, 2026-10-30, xHE-AAC encoder: the third tier's third plan, per
 the
@@ -1683,7 +1683,7 @@ channels, so 6.1 and 7.1 input has no in-encoder measurement; FFmpeg
 master's LATM path refuses USAC, so its gate runs on the MP4 form; the
 prebuild workflow runs only once pushed. Not run: listening tests and the
 ISO conformance suite. Figures and limits are in the
-[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
 
 ## Roadmap maintenance
 
