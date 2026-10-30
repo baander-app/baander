@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { resolve } from 'node:path'
-import { expect, type Browser, type Page } from '@playwright/test'
+import { expect, type Browser, type Page, type Request } from '@playwright/test'
 
 export interface FixtureUser { id: string; publicId: string; email: string; password: string; admin: boolean }
 export interface FixtureResource { id: string; publicId: string; slug?: string; path?: string }
@@ -59,8 +59,11 @@ export class FixtureClient {
     child.on('exit', (code) => this.pending?.reject(new Error(`Fixture exited ${code}: ${this.stderr}`)))
   }
   static start() {
-    return new FixtureClient(spawn('php', ['scripts/dev-environment.php', 'exec', '--', 'php',
-      'tests/Fixtures/LiveUpdates/capacity-fixture.php'], {
+    const manifest = process.env.BAANDER_LIVE_CAPACITY_MANIFEST
+    const args = manifest
+      ? ['scripts/test-live-capacity-exec.php', manifest]
+      : ['scripts/dev-environment.php', 'exec', '--', 'php', 'tests/Fixtures/LiveUpdates/capacity-fixture.php']
+    return new FixtureClient(spawn('php', args, {
       cwd: resolve(import.meta.dirname, '../../../../..'), stdio: 'pipe',
     }))
   }
@@ -85,32 +88,78 @@ export class FixtureClient {
   }
 }
 
-export async function login(page: Page, user: FixtureUser) {
+/** Conservatively reserves both the initial login and its one nonce retry. */
+export class LoginAdmission {
+  readonly attempts: { epochMs: number }[] = []
+  readonly waits: { epochMs: number; milliseconds: number; reason: string }[] = []
+  constructor(readonly deadlineEpochMs: number) {}
+  recordAttempt() {
+    this.attempts.push({ epochMs: Date.now() })
+  }
+  async wait(milliseconds: number, reason: string) {
+    if (!Number.isFinite(milliseconds) || milliseconds < 0 || Date.now() + milliseconds >= this.deadlineEpochMs) {
+      throw new Error('Production login setup deadline exceeded')
+    }
+    this.waits.push({ epochMs: Date.now(), milliseconds, reason })
+    await new Promise<void>((resolveWait) => setTimeout(resolveWait, milliseconds))
+  }
+  async admit() {
+    while (true) {
+      if (Date.now() >= this.deadlineEpochMs) throw new Error('Production login setup deadline exceeded')
+      const window = this.attempts.filter((entry) => entry.epochMs > Date.now() - 300_000)
+      if (window.length + 2 <= 20) return
+      await this.wait(Math.max(1, window[0]!.epochMs + 300_100 - Date.now()), '20 login attempts per 300 seconds, including nonce retry')
+    }
+  }
+}
+
+export async function login(page: Page, user: FixtureUser, admission?: LoginAdmission) {
   await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(user.email)
   await page.getByLabel(/password/i).fill(user.password)
-  let nonceChallengeObserved = false
-  const loginResponse = page.waitForResponse(async (response) => {
-    if (new URL(response.url()).pathname !== '/api/auth/login' || response.request().method() !== 'POST') return false
-    if (!nonceChallengeObserved && response.status() === 400 && response.headers()['dpop-nonce']) {
-      const body = await response.json().catch(() => ({})) as Record<string, unknown>
-      if (body.error === 'use_dpop_nonce') {
-        nonceChallengeObserved = true
-        return false
+  const recordAttempt = (request: Request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/auth/login') admission?.recordAttempt()
+  }
+  if (admission) page.on('request', recordAttempt)
+  try {
+    while (true) {
+      await admission?.admit()
+      let nonceChallengeObserved = false
+      const loginResponse = page.waitForResponse(async (response) => {
+        if (new URL(response.url()).pathname !== '/api/auth/login' || response.request().method() !== 'POST') return false
+        if (!nonceChallengeObserved && response.status() === 400 && response.headers()['dpop-nonce']) {
+          const body = await response.json().catch(() => ({})) as Record<string, unknown>
+          if (body.error === 'use_dpop_nonce') {
+            nonceChallengeObserved = true
+            return false
+          }
+        }
+        return true
+      })
+      const [response] = await Promise.all([
+        loginResponse,
+        page.getByRole('button', { name: /log in/i }).click(),
+      ])
+      if (response.status() === 429 && admission) {
+        const retryAfter = response.headers()['retry-after']
+        const seconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) : Number.NaN
+        if (!Number.isFinite(seconds)) throw new Error('Login rate limit supplied no bounded Retry-After')
+        await admission.wait(Math.max(1, seconds) * 1000, 'server Retry-After')
+        continue
       }
+      if (response.status() >= 400) {
+        const body = await response.json().catch(() => ({})) as Record<string, unknown>
+        const failure = Object.fromEntries(Object.entries(body)
+          .filter(([key, value]) => ['code', 'error', 'message', 'title', 'detail'].includes(key)
+            && ['string', 'number'].includes(typeof value))
+          .map(([key, value]) => [key, typeof value === 'string' ? value.replaceAll(user.password, '[redacted]').slice(0, 1000) : value]))
+        await page.getByLabel(/password/i).fill('')
+        throw new Error(`Real login HTTP ${response.status()}: ${JSON.stringify(failure)}`)
+      }
+      break
     }
-    return true
-  })
-  await page.getByRole('button', { name: /log in/i }).click()
-  const response = await loginResponse
-  if (response.status() >= 400) {
-    const body = await response.json().catch(() => ({})) as Record<string, unknown>
-    const failure = Object.fromEntries(Object.entries(body)
-      .filter(([key, value]) => ['code', 'error', 'message', 'title', 'detail'].includes(key)
-        && ['string', 'number'].includes(typeof value))
-      .map(([key, value]) => [key, typeof value === 'string' ? value.replaceAll(user.password, '[redacted]').slice(0, 1000) : value]))
-    await page.getByLabel(/password/i).fill('')
-    throw new Error(`Real login HTTP ${response.status()}: ${JSON.stringify(failure)}`)
+  } finally {
+    if (admission) page.off('request', recordAttempt)
   }
   await expect(page).toHaveURL(/\/music$/)
   await expect(page.getByRole('button', { name: /\d+ unread notifications/ })).toBeVisible()

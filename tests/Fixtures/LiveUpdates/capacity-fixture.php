@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Auth\Infrastructure\Security\User\PasswordHasher;
+use App\Tests\Fixtures\Auth\SignedDpopProof;
+use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
@@ -16,6 +18,8 @@ use Symfony\Component\Yaml\Yaml;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once __DIR__ . '/ScanFixture.php';
+require_once dirname(__DIR__) . '/Auth/SignedDpopProof.php';
+require_once dirname(__DIR__) . '/WebRuntime/HttpExchange.php';
 
 /** Scoped producer for real preview qualification; importing it never opens a connection. */
 final class LiveCapacityFixture
@@ -24,6 +28,8 @@ final class LiveCapacityFixture
     private array $manifest = [];
     private bool $projectorHeld = false;
     private readonly ScanFixture $scan;
+    private ?SignedDpopProof $observerKey = null;
+    private ?string $observerAccessToken = null;
 
     public function __construct(
         private readonly Connection $connection,
@@ -52,6 +58,8 @@ final class LiveCapacityFixture
         }
         $this->manifest = json_decode((string) file_get_contents($directory . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
         return match ($op) {
+            'observer-login' => $this->observerLogin(),
+            'observer-get' => $this->observerGet((string) ($command['path'] ?? '')),
             'ordinary' => $this->produce(32, 0, (int) ($command['sequence'] ?? 1), $progress),
             'observer-notification' => $this->produce(1, 0, (int) ($command['sequence'] ?? 1), $progress, [$this->manifest['observer']]),
             'burst' => $this->produce((int) ($command['count'] ?? 10_000), (int) ($command['durationMs'] ?? 10_000), (int) ($command['sequence'] ?? 1), $progress),
@@ -65,6 +73,93 @@ final class LiveCapacityFixture
             'cleanup' => $this->cleanup((int) ($command['waitMs'] ?? 30_000)),
             default => throw new InvalidArgumentException('Unknown fixture operation.'),
         };
+    }
+
+    /** @return array<string, mixed> */
+    private function observerLogin(): array
+    {
+        $origin = $this->observerOrigin();
+        $key = new SignedDpopProof();
+        $probe = $this->observerExchange('POST', '/api/auth/refresh', [
+            'DPoP: ' . $key->create('POST', $origin . '/api/auth/refresh', 'no-access-token'),
+        ], ['refreshToken' => 'nonce-probe-' . bin2hex(random_bytes(8))]);
+        $probeBody = json_decode($probe->body, true, flags: JSON_THROW_ON_ERROR);
+        $nonce = $probe->header('DPoP-Nonce');
+        if ($probe->status() !== 400 || ($probeBody['error'] ?? null) !== 'use_dpop_nonce' || !is_string($nonce) || $nonce === '') {
+            throw new RuntimeException('Observer nonce challenge failed with HTTP ' . $probe->status());
+        }
+        $started = microtime(true) * 1000;
+        $response = $this->observerExchange('POST', '/api/auth/login', [
+            'DPoP: ' . $key->createWithNonce('POST', $origin . '/api/auth/login', $nonce),
+        ], ['email' => $this->manifest['observer']['email'], 'password' => $this->manifest['observer']['password']]);
+        $attempts = [['startEpochMs' => $started, 'endEpochMs' => microtime(true) * 1000, 'status' => $response->status()]];
+        if ($response->status() === 429) {
+            $retryAfter = $response->header('Retry-After');
+            if (!is_string($retryAfter) || !ctype_digit($retryAfter)) {
+                throw new RuntimeException('Observer login rate limit supplied no numeric Retry-After.');
+            }
+
+            return ['authenticated' => false, 'status' => 429, 'loginAttempts' => $attempts, 'retryAfterSeconds' => (int) $retryAfter];
+        }
+        if ($response->status() !== 200) {
+            throw new RuntimeException('Observer password login failed with HTTP ' . $response->status());
+        }
+        $body = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);
+        $accessToken = $body['data']['accessToken'] ?? null;
+        if (!is_string($accessToken) || $accessToken === '') {
+            throw new RuntimeException('Observer login issued no access token.');
+        }
+        $this->observerKey = $key;
+        $this->observerAccessToken = $accessToken;
+
+        return ['authenticated' => true, 'status' => 200, 'loginAttempts' => $attempts];
+    }
+
+    /** @return array<string, mixed> */
+    private function observerGet(string $path): array
+    {
+        if (!in_array($path, ['/api/debug/stats', '/api/notifications/', '/api/notifications/unread-count'], true)) {
+            throw new InvalidArgumentException('Unknown observer read path.');
+        }
+        if ($this->observerKey === null || $this->observerAccessToken === null) {
+            throw new RuntimeException('Observer must sign in before reading.');
+        }
+        $response = $this->observerExchange('GET', $path, [
+            'Authorization: DPoP ' . $this->observerAccessToken,
+            'DPoP: ' . $this->observerKey->create('GET', $this->observerOrigin() . $path, $this->observerAccessToken),
+        ]);
+        if ($response->status() !== 200) {
+            throw new RuntimeException('Observer authoritative read failed with HTTP ' . $response->status());
+        }
+        $body = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($body)) {
+            throw new RuntimeException('Observer authoritative read returned invalid JSON shape.');
+        }
+
+        return $body;
+    }
+
+    private function observerOrigin(): string
+    {
+        $origin = getenv('BAANDER_LIVE_CAPACITY_API_ORIGIN');
+        if ($origin !== 'http://127.0.0.1:9501') {
+            throw new RuntimeException('Observer HTTP requires the managed CI runtime origin.');
+        }
+
+        return $origin;
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param array<string, mixed>|null $payload
+     */
+    private function observerExchange(string $method, string $path, array $headers, ?array $payload = null): HttpExchange
+    {
+        return (new HttpExchange($this->observerOrigin() . $path, [
+            ...$headers,
+            'Accept: application/json',
+            ...($payload === null ? [] : ['Content-Type: application/json']),
+        ], $method, $payload === null ? null : json_encode($payload, JSON_THROW_ON_ERROR)))->complete(10);
     }
 
     public function close(): void

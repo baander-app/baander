@@ -75,6 +75,7 @@
         "webShutdown": 900,
         "webRuntime": 180,
         "webSecurity": 360,
+        "liveCapacity": 1800,
         "browser": 400,
         "registryQualification": 1800,
         "registryStatic": 1800,

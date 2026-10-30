@@ -484,6 +484,36 @@ still needs its rerun. The preceding failed browser result remains in
 `/tmp/live-u9-timeline-tooltip-failure-results/`; focused regression evidence is in
 `/tmp/live-u9-timeline-tooltip-red.log` and `/tmp/live-u9-timeline-tooltip-green.log`.
 
+U9 native qualification tooling checkpoint: the capacity scenario can now use the
+existing disposable web runtime with a selected CI image, production settings and
+built frontend. A private manifest binds its fixture executor to the recorded
+Docker daemon, owned container, immutable image and application layout. Runtime
+identity checks compare backend, fixture and frontend build digests. The runner
+owns its loopback TLS ingress and cleanup; it does not use the development
+instance's state or data.
+
+Production login admission preserves the real 20-attempt, 300-second limit,
+including nonce retries and observer logins. Seven focused admission tests pass.
+The tooling selection passes 39 distinct tests across its completed batches;
+full tooling PHPStan passes, and dependency, source-policy and formatting checks
+pass without suppressions. The affected native fixture passes three tests with
+122 assertions. Actual CI capacity acceptance remains open until the real workload
+completes; the preview results do not close that requirement.
+
+Managed browser lifecycle commands now have an explicit deadline and confirmed
+child-process closure before fixture access resumes. Teardown requests the PHP
+command's normal signal cleanup and waits for closure. A failed command can still
+permit owned-data cleanup after confirmed closure; an unconfirmed exit retains its
+PID and fixture manifest and prevents another executor from waiting on its lock.
+Receipts exclude raw command output. Seven child-process tests, scoped lint and
+strict TypeScript pass; the existing readiness and rendered-view assertions are
+unchanged. Verification is retained in
+`/tmp/live-u9-capacity-tooling-tests.log`,
+`/tmp/live-u9-capacity-tooling-final-tests.log`,
+`/tmp/live-u9-tooling-phpstan-final.log`,
+`/tmp/live-u9-ci-capacity-login-promise-all-green.log` and
+`/tmp/live-u9-managed-lifecycle-green.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

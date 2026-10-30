@@ -299,7 +299,9 @@ deptrac:
       - Process
       - Resources
     FixturesWeb:
+      - Configuration
       - Docker
+      - Filesystem
       - Fixtures
       - Process
       - Resources

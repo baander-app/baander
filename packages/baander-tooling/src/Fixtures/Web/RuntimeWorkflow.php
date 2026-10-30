@@ -23,15 +23,18 @@ final class RuntimeWorkflow
     private readonly ResourceLedger $resources;
     private ?string $archive = null;
     private ?string $archiveDirectory = null;
-    public function __construct(private readonly string $root, private readonly bool $security = false)
+    private ?string $capacityOrigin = null;
+    public readonly string $artifacts;
+    public function __construct(private readonly string $root, private readonly bool $security = false, private readonly bool $capacity = false)
     {
-        $this->runtime = new Runtime($root, budget: $security ? 'webSecurity' : 'webRuntime');
+        $this->runtime = new Runtime($root, budget: $capacity ? 'liveCapacity' : ($security ? 'webSecurity' : 'webRuntime'));
         $this->docker = $this->runtime->docker();
         $this->id = ($security ? 'baander-security-' : 'baander-web-') . time() . '-' . getmypid();
         $this->appDirectory = ($this->runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1'
             ? $this->runtime->layout()->root
             : '/tmp/baander-' . ($security ? 'security' : 'web') . '-runtime';
-        $this->resources = $this->runtime->resources(Runtime::artifacts($root, $this->id));
+        $this->artifacts = Runtime::artifacts($root, $this->id);
+        $this->resources = $this->runtime->resources($this->artifacts);
         $this->serveLog = '/tmp/' . ($security ? 'security' : 'web') . '-runtime-serve.log';
     }
 
@@ -99,10 +102,25 @@ final class RuntimeWorkflow
     public function app(array $arguments, ?string $input = null, bool $check = true): ProcessResult
     {
         return $this->docker(
-            ['exec', '-i', '-w', $this->appDirectory, $this->id . '-app', ...$arguments],
+            ['exec', '-i', ...$this->originEnvironment(), '-w', $this->appDirectory, $this->id . '-app', ...$arguments],
             input: $input,
             check: $check,
         );
+    }
+
+    public function capacityOrigin(): string
+    {
+        return $this->capacityOrigin ?? throw new \LogicException('Capacity ingress has not been allocated.');
+    }
+
+    /** @return list<string> */
+    private function originEnvironment(): array
+    {
+        return $this->capacityOrigin === null ? [] : [
+            '-e', 'APP_URL=' . $this->capacityOrigin,
+            '-e', 'DEFAULT_URI=' . $this->capacityOrigin,
+            '-e', 'APP_DOMAIN=' . $this->capacityOrigin,
+        ];
     }
 
     /**
@@ -197,6 +215,7 @@ final class RuntimeWorkflow
         $this->docker([
             'exec',
             '-d',
+            ...$this->originEnvironment(),
             '-w',
             $this->appDirectory,
             $this->id . '-app',
@@ -253,6 +272,11 @@ final class RuntimeWorkflow
             '--entrypoint',
             'sleep',
         ];
+        if ($this->capacity) {
+            $this->docker->assertLocalPublishedPorts();
+            array_push($arguments, '--publish', '127.0.0.1::9443');
+            $environment[] = 'TRUSTED_PROXIES=127.0.0.1';
+        }
         foreach ($environment as $variable) {
             array_push($arguments, '-e', $variable);
         }
@@ -261,6 +285,14 @@ final class RuntimeWorkflow
             $this->runtime->image('application')->id,
             'infinity',
         ]);
+        if ($this->capacity) {
+            $inspection = json_decode($this->docker(['inspect', $this->id . '-app'])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
+            $bindings = $inspection['NetworkSettings']['Ports']['9443/tcp'] ?? [];
+            Runtime::require(count($bindings) === 1 && $bindings[0]['HostIp'] === '127.0.0.1', 'Capacity ingress must publish only on loopback.');
+            $port = $bindings[0]['HostPort'] ?? '';
+            Runtime::require(is_string($port) && ctype_digit($port) && (int) $port > 0 && (int) $port <= 65535, 'Docker returned no capacity ingress port.');
+            $this->capacityOrigin = 'https://127.0.0.1:' . $port;
+        }
     }
 
     private function stageCheckout(): void
