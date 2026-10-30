@@ -468,6 +468,28 @@ synthetic cases against the standards' figures, the derived K-weighting
 against the 48 kHz table, the feed chunking, the writer's bit layout
 against hand-computed fields and the FDK encoder's own set, and the
 round trip through the decoder's parser.
+With `AAC_AOT_USAC` the same analysis, psychoacoustics, TNS, M/S decision
+and rate loop feed an xHE-AAC (ISO/IEC 23003-3) writer instead of the
+AAC-LC one: 1024-line frames of the frequency-domain core, mono as a
+single channel element and stereo as a channel pair with a common
+window and per-band M/S, every band's scale factor coded (the USAC
+rule, with the first as the global gain), the spectrum through the
+context-based arithmetic coder, and noise filling of the lines
+quantised to zero (on by default; the noise level follows the level of
+those lines, the noise offset centres the empty bands on their
+neighbours). Every frame is independent once a second (the arithmetic
+context reset, a decoder can start there) and carries the audio
+pre-roll extension with the previous access unit, so a decoder joining
+the stream at that frame hears it whole; the UsacConfig in the pre-roll
+is the stream's, extensions included. A fill element closes the frame
+when fewer than five bits follow the last arithmetic payload, which
+keeps the decoders whose range decoder reads past the frame's end in
+step. The output is LOAS/LATM by default, raw access units with the
+USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
+AAC DRC metadata are refused, as the USAC frame has no place for them;
+`aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
+frame interval and a stream identifier. The AAC-LC output is unchanged
+byte for byte.
 
 ## API
 
@@ -494,6 +516,8 @@ int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length);
 int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
+/* xHE-AAC: noise filling, pre-roll, independent frame interval, stream id */
+int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
 int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
 int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate);
 int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
@@ -677,7 +701,7 @@ sums. Neither the encoder nor the decoder allocates once it is running
 ### Command-line tool
 
 ```sh
-baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality]
+baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality] [lc|he|hev2|xhe]
 baac dec <in.aac> <out.f32le> [rate] [channels]
 baac bench [--seconds N] [--dump DIR] [--only NAME]
 ```
@@ -804,7 +828,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-eight suites, and the transform, filterbank and
+`ctest` runs thirty-nine suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -875,7 +899,15 @@ the codebooks and tables, the mixing matrices, the hybrid filterbank
 and decorrelator, the regrouped low band, and the four stereo streams
 against the FDK decodes) and MPEG-D DRC (`test_unidrc`: the parsers with
 a mutation fuzz, the gain decoder, the selection process, and the
-loudness and normalisation gain of two committed streams). The USAC
+loudness and normalisation gain of two committed streams), and the
+xHE-AAC encoder in one (`test_usac_enc`: the arithmetic coder against
+the decoder's with escapes, short windows and mixed lengths, the
+UsacConfig writer against the reader, encode and decode round trips
+through the public API against AAC-LC at the same bitrate, noise
+filling, the raw access unit bitrates at 48 to 128 kbit/s, the API's
+refusals, and the two committed streams `usac_enc_*.loas`, which a fresh
+encode reproduces byte for byte; `test_usac_enc --write-streams
+tests/data` regenerates them). The other USAC
 data under `tests/data` is the FDK xHE-AAC encoder's output
 (`usac_*.loas`, 48 access units each, mono and stereo at 12 to
 96 kbit/s), the FDK decoder's 16-bit decodes with loudness
@@ -937,7 +969,7 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool, mps-enc test stream writer for MPEG Surround
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)

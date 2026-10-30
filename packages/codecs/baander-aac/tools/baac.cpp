@@ -4,7 +4,8 @@
  *   baac dec <in.aac> <out.f32le> [rate] [channels]
  *   baac bench [--seconds N] [--dump DIR] [--only NAME]
  *
- * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream.
+ * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
+ * (a LOAS stream for the xhe profile, which ADTS cannot carry).
  * mode: cbr (default), abr, cvbr, tvbr.  The decoder follows the ADTS
  * headers, so rate and channels only set the output layout (0 keeps the
  * stream's channels).  bench encodes and decodes a synthetic stereo
@@ -52,7 +53,7 @@ static FILE* open_out(const char* path) {
 static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
-          "[quality] [lc|he|hev2]\n"
+          "[quality] [lc|he|hev2|xhe]\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n"
           "       baac bench [--seconds N] [--dump DIR] [--only NAME]\n");
   return 2;
@@ -76,7 +77,10 @@ static int encode(int argc, char** argv) {
   AacObjectType aot = AAC_AOT_LC;
   if (argc > 9) {
     const std::string profile = argv[9];
-    aot = profile == "he" ? AAC_AOT_SBR : profile == "hev2" ? AAC_AOT_PS : AAC_AOT_LC;
+    aot = profile == "he"     ? AAC_AOT_SBR
+          : profile == "hev2" ? AAC_AOT_PS
+          : profile == "xhe"  ? AAC_AOT_USAC
+                              : AAC_AOT_LC;
   }
   AacEncoderHandle enc = aac_encoder_create(sr, channels, bitrate, aot, rc);
   if (!enc) {

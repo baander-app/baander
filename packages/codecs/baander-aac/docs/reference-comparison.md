@@ -262,6 +262,44 @@ of the enhanced SBR, and stereoConfigIndex 2, are exercised by
 constructed data only: the FDK encoder emits none of them, so their
 interoperability is unverified.
 
+### xHE-AAC encoder
+
+Measured on 2026-10-30 on the two committed streams of `test_usac_enc`
+(`tests/data/usac_enc_sce_64k.loas`, mono at 64 kbit/s, and
+`usac_enc_cpe_96k.loas`, stereo at 96 kbit/s: one second of the HE-AAC
+suite's tones, noise and clicks at half level, 48 frames each, noise
+filling and the pre-roll on) and on two three-second mixes of tones and
+lowpassed noise (mono at 64 kbit/s, stereo at 96 kbit/s, noise filling
+on and off). Four decoders: FFmpeg master (through MP4, since its LATM
+path refuses the USAC configuration), the FDK decoder (16-bit output,
+loudness normalisation off), libxaac (16-bit) and ours. Every stream
+decodes in all four without an error; the FDK decoder also starts
+cleanly at the second independent frame of the three-second mono mix
+from its pre-roll (27.1 dB against the source from the second frame on,
+the same as ours).
+
+| Stream | Decoder | SNR against the source | Against our decode |
+|--------|---------|-----------------------:|-------------------:|
+| `usac_enc_sce_64k` | ours / FFmpeg / FDK / libxaac | 22.7 / 22.7 / 22.7 / 22.7 dB | - / 36.8 / 82.1 / 81.1 dB |
+| `usac_enc_cpe_96k` | ours / FFmpeg / FDK / libxaac | 20.6 / 20.6 / 20.6 / 20.6 dB | - / 33.2 / 82.1 / 80.9 dB |
+| mono mix 64 kbit/s | ours / FFmpeg / FDK / libxaac | 27.2 dB | - / 37.2 / 86.6 / 86.1 dB |
+| stereo mix 96 kbit/s | ours / FFmpeg / FDK / libxaac | 26.7 dB | - / 35.6 / 86.5 / 86.1 dB |
+| mono mix 64 kbit/s, no noise filling | ours / FFmpeg | 27.5 dB | - / 136.6 dB |
+| stereo mix 96 kbit/s, no noise filling | ours / FFmpeg | 27.3 dB | - / 136.2 dB |
+
+FDK and libxaac agree with our decoder to the limit of their 16-bit
+output. FFmpeg agrees to the same limit without noise filling and to
+33 to 37 dB with it: its noise filling draws other random signs, which
+changes the waveform of the filled lines and nothing of the SNR
+against the source. The same signals through AAC-LC at the same
+bitrates decode to within 0.5 dB of these figures on the mixes (27.1
+and 27.0 dB) and 1 to 2 dB above them on the clicks, where noise
+filling and the frames the pre-roll shares the budget with cost a
+little waveform accuracy. Raw access units of the one-second stereo
+clicks signal come to 44.6, 60.3, 92.9 and 125.6 kbit/s at 48, 64, 96
+and 128 kbit/s; LOAS adds about 5 kbit/s for the StreamMuxConfig every
+frame.
+
 ## MPEG Surround
 
 Measured on 2026-10-30 against the Ittiam libxaac decoder (AOSP

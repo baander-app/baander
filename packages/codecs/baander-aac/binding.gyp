@@ -68,7 +68,10 @@
         "src/usac_arith.cpp",
         "src/usac_stereo.cpp",
         "src/loudness.cpp",
-        "src/usac_fd.cpp"
+        "src/usac_fd.cpp",
+        "src/usac_enc_config.cpp",
+        "src/usac_arith_enc.cpp",
+        "src/usac_enc.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

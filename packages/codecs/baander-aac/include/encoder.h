@@ -61,6 +61,12 @@ static inline int aac_encoder_aot_low_delay(int aot) {
   return aot == AAC_AOT_ER_LD || aot == AAC_AOT_ER_ELD;
 }
 
+/* The window sequence of USAC that follows short windows and precedes
+ * short windows (a long window with a short slope on both sides, ISO/IEC
+ * 23003-3 7.9), which the bitstream signals as LONG_START.  The AAC
+ * object types never use it. */
+#define AAC_ENC_WIN_STOP_START 4
+
 using AacEncChannel = struct AacEncChannel_ {
   /* Three blocks of frame_length input samples at full scale 32768: the
    * frame being coded spans the first two, the third is lookahead for
@@ -185,6 +191,8 @@ using AacEncoderState = struct AacEncoderState_ {
   struct AacEncoderTransport_* transport;
   /* Dynamic range control metadata (aac_encoder_set_metadata). */
   AacDrcEncoder drc;
+  /* USAC: the frame writer's state (usac_enc.h), NULL for the AAC types. */
+  struct AacUsacEncoder_* usac;
 };
 
 /* `sr` and `ch` are the input's; HE-AAC v2 takes a stereo input only. */

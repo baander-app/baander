@@ -12,6 +12,7 @@
 #endif
 #if defined(BAAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
+#include "usac_enc.h"
 #endif
 
 namespace {
@@ -890,6 +891,15 @@ int aac_encoder_transport_asc(const AacEncoderState* s, const AacEncoderTranspor
   if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
     asc->aot = s->aot;
     asc->frame_length = s->frame_length;
+  }
+  if (s->aot == AAC_AOT_USAC) {
+    /* USAC: object type 42 with the UsacConfig of the stream; the
+     * channel configuration names the layout as the config does. */
+    asc->aot = AAC_AOT_USAC;
+    asc->frame_length = s->frame_length;
+    asc->channel_config = s->channels;
+    aac_usac_enc_config(s, &asc->usac);
+    return AAC_OK;
   }
   if (s->ld_sbr) {
     /* AAC-ELD with LD-SBR: the sampling frequency is the core's, and the

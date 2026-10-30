@@ -22,7 +22,7 @@ typedef enum AacObjectType_ {
   AAC_AOT_PS = 29,     /* HE-AAC v2 (SBR + Parametric Stereo) */
   AAC_AOT_MPS = 30,    /* MPEG Surround over a core type (configuration only) */
   AAC_AOT_ER_ELD = 39, /* AAC-ELD: the low-delay filterbank, with optional LD-SBR */
-  AAC_AOT_USAC = 42,   /* USAC / xHE-AAC (decoder only) */
+  AAC_AOT_USAC = 42,   /* USAC / xHE-AAC: the frequency-domain core, mono and stereo */
 } AacObjectType;
 
 /* Rate Control Modes */
@@ -187,6 +187,42 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
  * the rate control, so the frame that carries it is encoded within the
  * same bounds as any other. */
 int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data, int nbits);
+
+/* ── Encoder: USAC (xHE-AAC) ─────────────────────────────────────── */
+
+/* aac_encoder_create with AAC_AOT_USAC makes an xHE-AAC encoder
+ * (ISO/IEC 23003-3, the frequency-domain core with 1024-line frames,
+ * mono as a single channel element and stereo as a channel pair): it
+ * writes LOAS/LATM by default, raw access units with the USAC
+ * AudioSpecificConfig (aac_encoder_config) for MP4, and refuses ADTS,
+ * which cannot carry the object type, with AAC_ERR_UNSUPPORTED.  The
+ * delay is that of AAC-LC (aac_encoder_delay). */
+typedef struct AacUsacEncoderOptions_ {
+  /* Noise filling of the lines quantised to zero (default on). */
+  int noise_filling;
+  /* The audio pre-roll extension element at every independent frame,
+   * which lets a decoder start at that frame (default on). */
+  int preroll;
+  /* Frames from one independent frame (usacIndependencyFlag set, the
+   * arithmetic coder reset) to the next; 0 keeps the default of one
+   * second. */
+  int independent_interval_frames;
+  /* The stream identifier of the configuration (0..65535), or -1 for
+   * none (default). */
+  int stream_id;
+  /* Enhanced SBR at the 2:1 ratio (the core at half the output rate):
+   * 1 on, 0 off, -1 by bitrate (default: on below 64 kbit/s per
+   * channel). */
+  int sbr;
+  /* MPEG Surround 2-1-2 for stereo input (one core channel plus the
+   * spatial parameters, stereoConfigIndex 1): 1 on, 0 off, -1 by bitrate
+   * (default: on below 48 kbit/s for stereo). */
+  int mps212;
+} AacUsacEncoderOptions;
+/* Applies the options before the first frame (AAC_ERR_STATE after it);
+ * AAC_ERR_UNSUPPORTED for another object type.  A field outside its
+ * range takes the default. */
+int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
 

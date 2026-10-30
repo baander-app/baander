@@ -10,6 +10,7 @@
 #endif
 #if defined(BAAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
+#include "usac_enc.h"
 #endif
 
 /* Every codec object dispatches through the process-wide table of
@@ -24,7 +25,7 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
     return nullptr;
   }
   if (aot != AAC_AOT_LC && aot != AAC_AOT_SBR && aot != AAC_AOT_PS && aot != AAC_AOT_ER_LD &&
-      aot != AAC_AOT_ER_ELD) {
+      aot != AAC_AOT_ER_ELD && aot != AAC_AOT_USAC) {
     return nullptr;
   }
   if (rc_mode < AAC_RC_TVBR || rc_mode > AAC_RC_CBR) {
@@ -35,8 +36,8 @@ AacEncoderHandle aac_encoder_create(int sample_rate, int channels, int bitrate, 
       aac_encoder_state_create(sample_rate, channels, bitrate, aot, rc_mode, aac_dsp_global());
   if (s) {
     s->transport = aac_encoder_transport_create();
-    if (aac_encoder_aot_low_delay(aot)) {
-      /* ADTS cannot signal the low-delay object types. */
+    if (aac_encoder_aot_low_delay(aot) || aot == AAC_AOT_USAC) {
+      /* ADTS cannot signal the low-delay object types or USAC. */
       aac_encoder_transport_set(s->transport, AAC_TRANSPORT_LOAS);
     }
   }
@@ -126,7 +127,27 @@ int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  static_cast<AacEncoderState*>(ctx)->afterburner = enabled ? 1 : 0;
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot == AAC_AOT_USAC && enabled) {
+    return AAC_ERR_UNSUPPORTED; /* the pass re-searches the AAC codebooks, which USAC has not */
+  }
+  s->afterburner = enabled ? 1 : 0;
+  return AAC_OK;
+}
+
+int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  aac_usac_enc_set_options(s->usac, options, s->sample_rate);
+  aac_encoder_state_reset(s);
   return AAC_OK;
 }
 
@@ -169,8 +190,8 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
       prog_ref_level > 127) {
     return AAC_ERR_INVALID_ARG;
   }
-  if (aac_encoder_aot_low_delay(s->aot) && profile != AAC_DRC_NONE) {
-    return AAC_ERR_UNSUPPORTED; /* error resilient frames carry no fill elements */
+  if ((aac_encoder_aot_low_delay(s->aot) || s->aot == AAC_AOT_USAC) && profile != AAC_DRC_NONE) {
+    return AAC_ERR_UNSUPPORTED; /* error resilient and USAC frames carry no fill elements */
   }
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
@@ -211,6 +232,9 @@ int aac_encoder_set_transport(AacEncoderHandle ctx, AacTransport transport) {
   auto* s = static_cast<AacEncoderState*>(ctx);
   if (aac_encoder_aot_low_delay(s->aot) && transport == AAC_TRANSPORT_ADTS) {
     return AAC_ERR_INVALID_ARG;
+  }
+  if (s->aot == AAC_AOT_USAC && transport == AAC_TRANSPORT_ADTS) {
+    return AAC_ERR_UNSUPPORTED; /* ADTS has no profile for USAC */
   }
   return aac_encoder_transport_set(s->transport, transport);
 }

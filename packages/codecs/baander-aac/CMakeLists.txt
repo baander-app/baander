@@ -41,7 +41,7 @@ set(BAAC_AAC_SOURCES
     src/lowdelay.cpp src/eld_tables.cpp src/qmf_ld.cpp src/sbr_ld.cpp src/usac_config.cpp
     src/unidrc_parse.cpp src/unidrc_gain.cpp src/unidrc.cpp
     src/usac_arith_tables.cpp src/usac_arith.cpp src/usac_stereo.cpp src/usac_fd.cpp
-    src/loudness.cpp)
+    src/loudness.cpp src/usac_enc_config.cpp)
 set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.cpp src/limiter.cpp src/sbr_dec.cpp src/sbr_esbr.cpp src/ps_dec.cpp
     src/er_vcb11.cpp src/er_rvlc.cpp src/er_hcr.cpp
     src/usac_frame.cpp src/mps212.cpp src/mps212_tables.cpp
@@ -51,7 +51,7 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/usac_lpd.cpp src/usac_lpc.cpp src/usac_acelp.cpp src/usac_tcx.cpp src/usac_fac.cpp
     src/usac_lpd_tables.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
-    src/sbr_ld_enc.cpp)
+    src/sbr_ld_enc.cpp src/usac_arith_enc.cpp src/usac_enc.cpp)
 
 set(BAAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")

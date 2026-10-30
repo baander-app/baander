@@ -35,6 +35,7 @@ set(TEST_SOURCES
     test_usac_sbr.cpp
     test_usac_fd.cpp
     test_loudness.cpp
+    test_usac_enc.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

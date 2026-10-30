@@ -5,6 +5,7 @@
 #include "aac_tables.h"
 #include "mps_internal.h"
 #include "sbr_ld.h"
+#include "usac_enc.h"
 
 namespace {
 
@@ -408,6 +409,25 @@ int aac_asc_parse(const uint8_t* data, int size, AacAsc* asc) {
 }
 
 int aac_asc_write_bits(const AacAsc* asc, AacBitWriter* w) {
+  if (asc->aot == AAC_AOT_USAC) {
+    /* USAC: the object type, the output rate and the channel
+     * configuration, then UsacConfig() (ISO/IEC 23003-3 Table 1). */
+    if (asc->sample_rate <= 0 || asc->channel_config < 0 || asc->channel_config > 15) {
+      return AAC_ERR_INVALID_ARG;
+    }
+    const int start = aac_bitwriter_bits_written(w);
+    write_aot(w, AAC_AOT_USAC);
+    write_rate(w, asc->sample_rate);
+    aac_bitwriter_write(w, (uint32_t)asc->channel_config, 4);
+    const int ret = aac_usac_config_write(&asc->usac, w);
+    if (ret < 0) {
+      return ret;
+    }
+    if (aac_bitwriter_overflow(w)) {
+      return AAC_ERR_OVERFLOW;
+    }
+    return aac_bitwriter_bits_written(w) - start;
+  }
   const bool low_delay = is_low_delay_type(asc->aot);
   const bool length_ok = low_delay ? asc->frame_length == 512 || asc->frame_length == 480
                                    : asc->frame_length == 1024 || asc->frame_length == 960;

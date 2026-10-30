@@ -7,6 +7,7 @@
 #include "afterburner.h"
 #include "asc.h"
 #include "encoder_tools.h"
+#include "usac_enc.h"
 
 /* AAC-LC encoder.  The structure follows the Fraunhofer FDK encoder and
  * 3GPP TS 26.403: block switching with one block of lookahead, the masking
@@ -580,14 +581,17 @@ void choose_window_sequence(AacEncoderState* s, const AacEncElement* el) {
     }
   }
   const int prev = s->ch[el->ch[0]].ics.window_sequence;
+  const bool prev_short_end = prev == AAC_WIN_EIGHT_SHORT || prev == AAC_ENC_WIN_STOP_START;
   int seq = AAC_WIN_ONLY_LONG;
-  if (attack_now || (prev == AAC_WIN_EIGHT_SHORT && attack_next)) {
-    /* No window both stops and starts short blocks in AAC-LC, so a short
-     * frame between two short frames stays short. */
+  if (attack_now) {
     seq = AAC_WIN_EIGHT_SHORT;
+  } else if (prev_short_end && attack_next) {
+    /* No window both stops and starts short blocks in AAC-LC, so a short
+     * frame between two short frames stays short; USAC has one. */
+    seq = s->aot == AAC_AOT_USAC ? AAC_ENC_WIN_STOP_START : AAC_WIN_EIGHT_SHORT;
   } else if (attack_next) {
     seq = AAC_WIN_LONG_START;
-  } else if (prev == AAC_WIN_EIGHT_SHORT) {
+  } else if (prev_short_end) {
     seq = AAC_WIN_LONG_STOP;
   }
   int grouping = 0;
@@ -629,7 +633,7 @@ void window_and_mdct(AacEncoderState* s, AacEncChannel* c) {
   const int seq = ics->window_sequence;
 
   if (seq != AAC_WIN_EIGHT_SHORT) {
-    if (seq == AAC_WIN_LONG_STOP) {
+    if (seq == AAC_WIN_LONG_STOP || seq == AAC_ENC_WIN_STOP_START) {
       memset(buf, 0, (size_t)start * sizeof(float));
       for (int i = 0; i < sl; i++) {
         buf[start + i] = c->pcm[start + i] * sw_prev[i];
@@ -638,7 +642,7 @@ void window_and_mdct(AacEncoderState* s, AacEncChannel* c) {
     } else {
       s->dsp->vector_fmul(buf, c->pcm, lw_prev, fl);
     }
-    if (seq == AAC_WIN_LONG_START) {
+    if (seq == AAC_WIN_LONG_START || seq == AAC_ENC_WIN_STOP_START) {
       memcpy(buf + fl, c->pcm + fl, (size_t)start * sizeof(float));
       for (int i = 0; i < sl; i++) {
         buf[fl + start + i] = c->pcm[fl + start + i] * sw[sl - 1 - i];
@@ -901,6 +905,9 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
   if (aac_encoder_aot_low_delay(s->aot)) {
     return write_er_frame(s);
   }
+  if (s->aot == AAC_AOT_USAC) {
+    return aac_usac_enc_write_frame(s);
+  }
   AacBitWriter w;
   aac_bitwriter_init(&w, s->output_buf, sizeof(s->output_buf));
   /* The header is filled in below; it is longer than one write takes. */
@@ -976,6 +983,9 @@ int write_frame(AacEncoderState* s, int buffer_fullness) {
 /* Side-information bits of the frame apart from sections and scalefactors,
  * with each element's max_sfb of the previous quantization. */
 int frame_overhead_bits(const AacEncoderState* s) {
+  if (s->aot == AAC_AOT_USAC) {
+    return aac_usac_enc_overhead_bits(s);
+  }
   int bits = kAdtsBits + 3 + 7; /* header, END, worst-case byte alignment */
   if (s->channel_config == 0) {
     bits += pce_bits(&s->layout);
@@ -1200,6 +1210,10 @@ int quantize_frame(AacEncoderState* s) {
       max_sfb = std::max(max_sfb, channel_max_sfb(&s->ch[el->ch[k]]));
     }
     el->max_sfb = max_sfb;
+    if (s->aot == AAC_AOT_USAC) {
+      bits += aac_usac_enc_element_bits(s, el);
+      continue;
+    }
     for (int k = 0; k < el->num_ch; k++) {
       bits += finish_channel(&s->ch[el->ch[k]], max_sfb);
     }
@@ -1445,7 +1459,9 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
   const bool sbr = aac_encoder_aot_has_sbr(aot);
   const bool ps = aot == AAC_AOT_PS;
   const bool low_delay = aac_encoder_aot_low_delay(aot);
-  if ((sbr && sr % 2) || (ps && ch != 2)) {
+  const bool usac = aot == AAC_AOT_USAC;
+  /* USAC: a single channel element or a channel pair. */
+  if ((sbr && sr % 2) || (ps && ch != 2) || (usac && ch > 2)) {
     return nullptr;
   }
   const int coded_channels = ps ? 1 : ch;
@@ -1485,6 +1501,14 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
     aac_encoder_state_destroy(s);
     return nullptr;
   }
+  if (usac) {
+    s->usac = aac_usac_enc_create();
+    if (!s->usac) {
+      aac_encoder_state_destroy(s);
+      return nullptr;
+    }
+    aac_usac_enc_set_options(s->usac, nullptr, s->sample_rate);
+  }
   apply_frame_length(s);
   aac_encoder_state_configure(s);
   aac_encoder_state_reset(s);
@@ -1493,9 +1517,10 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
 
 int aac_encoder_state_set_frame_length(AacEncoderState* s, int frame_length) {
   const bool valid =
-      aac_encoder_aot_low_delay(s->aot)
-          ? aac_is_low_delay_frame(frame_length)
-          : frame_length == AAC_FRAME_SIZE_LONG || frame_length == AAC_FRAME_SIZE_LONG_960;
+      aac_encoder_aot_low_delay(s->aot) ? aac_is_low_delay_frame(frame_length)
+      : s->aot == AAC_AOT_USAC          ? frame_length == AAC_FRAME_SIZE_LONG
+                                        : frame_length == AAC_FRAME_SIZE_LONG ||
+                                            frame_length == AAC_FRAME_SIZE_LONG_960;
   if (!valid) {
     return AAC_ERR_INVALID_ARG;
   }
@@ -1611,6 +1636,17 @@ void aac_encoder_state_configure(AacEncoderState* s) {
     /* MPEG-2 AAC (ISO/IEC 13818-7) has no perceptual noise substitution. */
     s->use_pns = 0;
   }
+  if (s->aot == AAC_AOT_USAC) {
+    /* USAC has neither perceptual noise substitution nor intensity
+     * stereo (noise filling takes the place of the first), and its TNS
+     * may reach every band of the core's TNS_MAX_BANDS. */
+    s->use_pns = 0;
+    s->allow_is = 0;
+    s->tns_top_long =
+        std::min(aac_usac_enc_tns_max_bands(s->rate_index, 0), s->active_bands_long);
+    s->tns_top_short =
+        std::min(aac_usac_enc_tns_max_bands(s->rate_index, 1), s->active_bands_short);
+  }
 }
 
 void aac_encoder_state_reset(AacEncoderState* s) {
@@ -1641,6 +1677,9 @@ void aac_encoder_state_reset(AacEncoderState* s) {
   }
   memset(s->sbr_in, 0, sizeof(s->sbr_in));
   memset(s->core_in, 0, sizeof(s->core_in));
+  if (s->usac) {
+    aac_usac_enc_reset(s->usac, s->channels);
+  }
   s->reservoir = s->reservoir_max / 2;
   aac_drc_encoder_reset(&s->drc);
   s->started = 0;
@@ -1660,6 +1699,9 @@ int aac_encoder_state_extension_budget_bits(const AacEncoderState* s) {
 }
 
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s) {
+  if (s->aot == AAC_AOT_USAC) {
+    return aac_usac_enc_max_au_bytes(s) + AAC_ADTS_HEADER_SIZE;
+  }
   int bytes = (aac_max_bits_per_channel(s->frame_length) * s->channels + kAdtsBits + 7) / 8;
   for (int e = 0; e < s->num_elements; e++) {
     if (s->sbr[e]) {
@@ -1678,6 +1720,7 @@ void aac_encoder_state_destroy(AacEncoderState* s) {
   }
   destroy_sbr_encoders(s);
   destroy_ld_sbr_encoders(s);
+  aac_usac_enc_destroy(s->usac);
   delete s;
 }
 
@@ -1822,6 +1865,9 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   const bool sbr = aac_encoder_aot_has_sbr(s->aot) || s->ld_sbr;
   const int fl = s->frame_length;
   s->started = 1;
+  if (s->usac) {
+    aac_usac_enc_begin_frame(s);
+  }
   if (s->ld_sbr) {
     ld_sbr_process(s, pcm);
   } else if (sbr) {
@@ -1905,7 +1951,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       break;
   }
   const int bits = rate_control(s, target, improve);
-  if (s->afterburner) {
+  if (s->afterburner && !s->usac) {
     /* The constant-rate modes may fill the frame's budget; the quality
      * modes only redistribute the bits the frame already has. */
     const bool fixed_rate = s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR;
@@ -1920,6 +1966,9 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   if (len < 0) {
     return len;
   }
-  s->reservoir = std::clamp(s->reservoir + avg - len * 8, 0, s->reservoir_max);
+  /* The pre-roll an immediate playout frame carries repeats the previous
+   * frame and stays outside the budget of the frames. */
+  const int budgeted = s->usac ? len - s->usac->preroll_bytes : len;
+  s->reservoir = std::clamp(s->reservoir + avg - budgeted * 8, 0, s->reservoir_max);
   return len;
 }
