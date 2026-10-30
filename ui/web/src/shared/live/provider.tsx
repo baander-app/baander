@@ -62,12 +62,12 @@ export function AuthenticatedClientProvider({ children, freshnessEnabled = false
 }
 
 function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalClientProps) {
-  const [client] = useState(() => new OwnedQueryClient())
-  const [recovery] = useState(() => new LiveRecovery(authenticatedTransport, resetMirrors, undefined, freshnessEnabled))
-  const [coordinator] = useState(() => {
-    const instance = new LiveQueryCoordinator(client, recovery, LIVE_QUERY_DESCRIPTORS)
-    if (freshnessEnabled) client.setCoordinator(instance)
-    return instance
+  const [{ client, recovery, coordinator }] = useState(() => {
+    const client = new OwnedQueryClient()
+    const recovery = new LiveRecovery(authenticatedTransport, resetMirrors, undefined, freshnessEnabled)
+    const coordinator = new LiveQueryCoordinator(client, recovery, LIVE_QUERY_DESCRIPTORS)
+    if (freshnessEnabled) client.setCoordinator(coordinator)
+    return { client, recovery, coordinator }
   })
   useEffect(() => {
     resetMirrors()

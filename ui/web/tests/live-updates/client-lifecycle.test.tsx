@@ -282,6 +282,24 @@ function wire(type: string, families: string[], authorizationGeneration = '1') {
 }
 
 describe('authenticated provider lifecycle', () => {
+  it('loads mounted queries and refreshes hints after StrictMode effect replay', async () => {
+    useAuthStore.setState({ isAuthenticated: true, principalSessionId: 'strict-query-account' })
+    const read = vi.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(1)
+    function Notifications() {
+      const query = useQuery({ queryKey: ['notification-unread-count'], queryFn: read })
+      return <span>{query.data === undefined ? 'Loading notifications' : `${query.data} unread`}</span>
+    }
+    const view = render(<StrictMode><AuthenticatedClientProvider freshnessEnabled><Notifications /></AuthenticatedClientProvider></StrictMode>)
+    act(() => transportState.listeners.forEach(listener => listener.onMessage?.(wire('live.ready', ['notifications']))))
+    await screen.findByText('0 unread')
+    act(() => transportState.listeners.forEach(listener => listener.onMessage?.(wire('live.changed', ['notifications']))))
+    await screen.findByText('1 unread')
+    expect(read).toHaveBeenCalledTimes(2)
+    view.unmount()
+    expect(transportState.leases).toBe(0)
+    expect(transportState.listeners.size).toBe(0)
+  })
+
   it('retains one shared connection without a listening session under StrictMode', () => {
     useAuthStore.setState({ isAuthenticated: true, principalSessionId: 'strict-account' })
     const view = render(<StrictMode><AuthenticatedClientProvider><span>signed in</span></AuthenticatedClientProvider></StrictMode>)

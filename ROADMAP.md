@@ -322,6 +322,20 @@ now uses normal user creation's empty TOTP secret; its previous null value cause
 a separate login failure. Real logins and the integration group above verify
 that correction. Capacity targets remain unmeasured while the browser run resumes.
 
+U9 query-startup checkpoint: React StrictMode replay could attach a discarded,
+stopped coordinator to the selected query client. The provider now constructs
+the client, recovery controller and coordinator together. A regression through
+the actual provider first reproduced a mounted query that never read after
+`live.ready`; it now verifies the initial read and a later hinted refresh.
+All 40 focused lifecycle and scheduling tests pass, with scoped lint and whitespace
+checks passing. Receipts are `/tmp/live-u9-query-startup-red.log` and
+`/tmp/live-u9-query-startup-green.log`.
+
+A real browser confirms that notification reads start and the unread count changes
+from zero to one. Populated notification-list acceptance remains open: that run
+exposed an invalid fixture category. Both diagnostic fixtures were cleaned with
+zero survivors; `/tmp/live-u9-query-startup-browser.json` records those results.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
