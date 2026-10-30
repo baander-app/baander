@@ -98,7 +98,7 @@ final class LiveRuntimeTest extends TestCase
             }
             return true;
         });
-        $sender = new LiveFrameSender(new NullLogger());
+        $sender = new LiveFrameSender(new NullLogger(), new CoWrapper(new ServicePoolContainer([]), new SwooleBridge()));
         $sender->setServer($server);
         $state = new LiveConnectionState(Uuid::v7());
         $frame = $state->observe($this->snapshot('a', '1'))[0];
@@ -128,7 +128,7 @@ final class LiveRuntimeTest extends TestCase
             }
             return true;
         });
-        $sender = new LiveFrameSender(new NullLogger());
+        $sender = new LiveFrameSender(new NullLogger(), new CoWrapper(new ServicePoolContainer([]), new SwooleBridge()));
         $sender->setServer($server);
         $state = new LiveConnectionState(Uuid::v7());
         $ready = $state->observe($this->snapshot('a', '1'))[0];
@@ -190,7 +190,7 @@ final class LiveRuntimeTest extends TestCase
             self::assertFalse($pool->assigned);
             return true;
         });
-        $sender = new LiveFrameSender(new NullLogger());
+        $sender = new LiveFrameSender(new NullLogger(), $wrapper);
         $sender->setServer($server);
         $registry = WebSocketConnectionRegistry::create(32, 64);
         $principal = Uuid::v7();
@@ -203,6 +203,101 @@ final class LiveRuntimeTest extends TestCase
             $runtime->subscribe(7, $principal);
         });
         self::assertFalse($pool->assigned);
+    }
+
+    public function testQueueOverloadReleasesTheLoggerPoolAfterEverySendCoroutine(): void
+    {
+        $this->assertOverloadReleasesLoggerPool(false);
+    }
+
+    public function testBlockedPushReleasesTheLoggerPoolAfterEveryWatchdogCoroutine(): void
+    {
+        $this->assertOverloadReleasesLoggerPool(true);
+    }
+
+    private function assertOverloadReleasesLoggerPool(bool $blockedPush): void
+    {
+        $released = new \Swoole\Coroutine\Channel(1);
+        $pool = new class ($released) implements ServicePool {
+            /** @var array<int, true> */
+            private array $assigned = [];
+            /** @var list<int> */
+            public array $acquiredIds = [];
+            /** @var list<int> */
+            public array $releasedIds = [];
+
+            public function __construct(private readonly \Swoole\Coroutine\Channel $released) {}
+
+            public function get(): object
+            {
+                $id = Coroutine::getCid();
+                $this->assigned[$id] = true;
+                $this->acquiredIds[] = $id;
+                return new NullLogger();
+            }
+
+            public function releaseFromCoroutine(int $cId): void
+            {
+                if (isset($this->assigned[$cId])) {
+                    unset($this->assigned[$cId]);
+                    $this->releasedIds[] = $cId;
+                    $this->released->push(true);
+                }
+            }
+
+            public function getAssignedCount(): int
+            {
+                return count($this->assigned);
+            }
+
+            public function getFreeCount(): int
+            {
+                return 1 - $this->getAssignedCount();
+            }
+
+            public function getInstancesLimit(): int
+            {
+                return 1;
+            }
+        };
+        $wrapper = new CoWrapper(new ServicePoolContainer([[$pool]]), new SwooleBridge());
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects(self::exactly(3))->method('warning')->willReturnCallback(static function () use ($pool): void {
+            $pool->get();
+        });
+        $server = $this->createMock(Server::class);
+        $server->method('isEstablished')->willReturn(true);
+        $server->method('getClientInfo')->willReturn(['send_queued_bytes' => $blockedPush ? 0 : LiveMessage::MAX_BYTES]);
+        $waiting = 0;
+        if ($blockedPush) {
+            $server->expects(self::exactly(3))->method('push')->willReturnCallback(static function () use (&$waiting): bool {
+                $waiting = Coroutine::getCid();
+                Coroutine::suspend();
+                return false;
+            });
+        } else {
+            $server->expects(self::never())->method('push');
+        }
+        $server->expects(self::exactly(3))->method('close')->willReturnCallback(static function () use ($blockedPush, &$waiting): bool {
+            if ($blockedPush) {
+                Coroutine::resume($waiting);
+            }
+            return true;
+        });
+        $sender = new LiveFrameSender($logger, $wrapper);
+        $sender->setServer($server);
+        $frame = (new LiveConnectionState(Uuid::v7()))->observe($this->snapshot('a', '1'))[0];
+        $observed = [];
+        \Swoole\Coroutine\run(static function () use ($sender, $frame, $released, $pool, &$observed): void {
+            for ($attempt = 0; $attempt < 3; ++$attempt) {
+                $sent = $sender->send(7, $frame);
+                $observed[] = [$sent, $released->pop(1.0), $pool->getAssignedCount()];
+            }
+        });
+        self::assertSame([[true, true, 0], [true, true, 0], [true, true, 0]], $observed, 'Each overload must release the logger slot before the next send.');
+        self::assertCount(3, array_unique($pool->acquiredIds));
+        self::assertSame($pool->acquiredIds, $pool->releasedIds);
+        self::assertSame(3, $sender->diagnostics()['slow_peer_close_count']);
     }
 
     private function snapshot(string $fingerprint, string $revision): LiveSnapshot

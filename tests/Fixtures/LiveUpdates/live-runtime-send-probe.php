@@ -15,6 +15,9 @@ use Swoole\Server;
 use Swoole\Table;
 use Swoole\WebSocket\Frame;
 use Swoole\WebSocket\Server as WebSocketServer;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole as SwooleBridge;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 
 function runtimeProbeFail(string $message): never
 {
@@ -143,7 +146,7 @@ if ($child === 0) {
     exit(0);
 }
 
-$sender = new LiveFrameSender(new NullLogger());
+$sender = new LiveFrameSender(new NullLogger(), new CoWrapper(new ServicePoolContainer([]), new SwooleBridge()));
 $message = LiveMessage::fromArray([
     'version' => 1,
     'type' => 'live.health',

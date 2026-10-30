@@ -10,6 +10,7 @@ use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Timer;
 use Swoole\WebSocket\Server;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -26,7 +27,7 @@ final class LiveFrameSender implements EventSubscriberInterface, WorkerTimerInte
     /** @var array<int, int> */
     private array $watchdogs = [];
 
-    public function __construct(private readonly LoggerInterface $logger) {}
+    public function __construct(private readonly LoggerInterface $logger, private readonly CoWrapper $coWrapper) {}
 
     public static function getSubscribedEvents(): array
     {
@@ -56,6 +57,7 @@ final class LiveFrameSender implements EventSubscriberInterface, WorkerTimerInte
         $token = new \stdClass();
         $this->sending[$fd] = $token;
         $coroutine = Coroutine::create(function () use ($fd, $message, $token): void {
+            $this->coWrapper->defer();
             try {
                 $next = $message;
                 do {
@@ -133,6 +135,7 @@ final class LiveFrameSender implements EventSubscriberInterface, WorkerTimerInte
         $expired = false;
         $token = $this->sending[$fd] ?? null;
         $timer = Timer::after(100, function () use ($fd, &$expired, $token): void {
+            $this->coWrapper->defer();
             $expired = true;
             if (($this->sending[$fd] ?? null) === $token) {
                 $this->close($fd, 1013, self::OVERLOAD_REASON);

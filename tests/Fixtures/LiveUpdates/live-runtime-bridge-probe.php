@@ -154,7 +154,7 @@ final class BridgeProbeLogger extends AbstractLogger
 /**
  * A real connection assigned to timer coroutines and released by CoWrapper.
  *
- * @implements ServicePool<Connection>
+ * @implements ServicePool<object>
  */
 final class BridgeConnectionPool implements ServicePool
 {
@@ -163,7 +163,7 @@ final class BridgeConnectionPool implements ServicePool
 
     public function __construct(private Connection $connection, private Table $results, private int $worker, private string $schema) {}
 
-    public function get(): object
+    public function get(): Connection
     {
         $this->assigned[Swoole\Coroutine::getCid()] = true;
         $this->results->set('assigned-' . $this->worker, ['value' => count($this->assigned)]);
@@ -400,7 +400,7 @@ $server->on('WorkerStart', static function (Server $server) use (&$runtime, &$se
         }
     };
     $logger = new BridgeProbeLogger($applicationLog, $worker);
-    $sender = new LiveFrameSender($logger);
+    $sender = new LiveFrameSender($logger, $wrapper);
     $sender->setServer($server);
     $runtime = new LiveUpdateRuntime($reader, $projector, $registry, $sender, $logger, $wrapper, $drain, $servicePools);
     $runtime->onWorkerStarted(new WorkerStartedEvent($server, $worker));

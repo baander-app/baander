@@ -116,8 +116,9 @@ prevent concurrent passes. Worker shutdown clears timers and pending frames;
 draining workers stop starting projection and reconciliation work.
 
 Database services are released at the read or projection boundary, before socket
-delivery. Coroutine cleanup provides a second release path. Each connection has
-at most one pending frame, with family changes coalesced without losing reset
+delivery. Coroutine cleanup provides a second release path. Send and watchdog
+callbacks also register cleanup: logging can acquire pooled services too. Each
+connection has at most one pending frame, with family changes coalesced without losing reset
 information. Delivery limits the socket queue plus the outgoing frame to 64KiB;
 a 100ms watchdog closes a peer whose native send remains blocked.
 

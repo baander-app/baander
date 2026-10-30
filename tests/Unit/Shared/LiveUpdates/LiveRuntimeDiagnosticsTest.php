@@ -141,7 +141,7 @@ final class LiveRuntimeDiagnosticsTest extends TestCase
             }
             return true;
         });
-        $sender = new LiveFrameSender(new NullLogger());
+        $sender = new LiveFrameSender(new NullLogger(), new CoWrapper(new ServicePoolContainer([]), new SwooleBridge()));
         $sender->setServer($server);
         $state = new LiveConnectionState(Uuid::v7());
         $frame = $state->observe(new LiveSnapshot([LiveFamily::Catalog], str_repeat('a', 64), [], new LivePipelineHealth(null)))[0];
@@ -170,7 +170,7 @@ final class LiveRuntimeDiagnosticsTest extends TestCase
     {
         $pools = new ServicePoolContainer([]);
         $wrapper = new CoWrapper($pools, new SwooleBridge());
-        $sender = new LiveFrameSender(new NullLogger());
+        $sender = new LiveFrameSender(new NullLogger(), $wrapper);
         $server = $this->createStub(Server::class);
         $server->method('isEstablished')->willReturn(true);
         $server->method('getClientInfo')->willReturn(['send_queued_bytes' => 0]);

@@ -94,6 +94,15 @@ pass. Independent simplification retained all proof tests. Browser ownership,
 query coordination, feature adoption, and full-system qualification remain open;
 general browser subscriptions are not activated.
 
+Backend review follow-up: send and watchdog coroutines now release pooled
+logging services. Both regression cases failed before the fix as assigned slots
+accumulated across repeated closures. A new dependency-policy test proves the
+audience contracts remain unavailable to unrelated Shared adapters and domain
+code. The disposable CI runner passes 65 architecture, API, wiring, native, and
+runtime tests with 2,260 assertions; full-project CI PHPStan passes. The native
+lane has no skips. The compiled production pool's concurrent baseline remains
+part of full-system qualification.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
