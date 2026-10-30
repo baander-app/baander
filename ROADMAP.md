@@ -25,23 +25,86 @@ trees; they are not acceptance evidence for a new change.
 
 ## Cohesive web styling
 
-Requirements captured, 2026-10-30, in the
+Delivered, 2026-10-30, under the reviewed
 [styling repair plan](docs/plans/2026-10-30-1843-fix-cohesive-web-styling-plan.md).
-The confirmed scope covers shared controls and web consumers, overflow,
-theme/accent contrast, interaction states and adherence to the project design guide.
-Implementation and its acceptance checks remain open.
-The implementation plan now defines six units covering browser prerequisites,
-web token generation, shared controls, browsing/playback consumers, forms/admin
-consumers and integrated verification. Eight technical decisions establish one
-web token authority, semantic color roles and preserved native token output.
+The six units repair shared controls and web consumers, sizing, semantic color
+roles and interaction states. The required checks and final screenshot review
+are complete within the qualification scope recorded below.
+
+- **U1 — Browser entry points:** real login reaches the current music route;
+  route assertions and deterministic empty/populated catalog GET fixtures replace
+  silent skips and stale navigation assumptions. Active-player checks use a local
+  silent WAV without library scans or injected authentication-store state.
+- **U2 — Token authority:** one generated table supplies web CSS and runtime theme
+  data for all 32 mood/accent combinations. Explicit action, foreground, text,
+  focus, input-boundary and status roles replace competing definitions and obsolete
+  aliases. The existing React Native outputs are unchanged.
+- **U3 — Shared controls:** global border-box sizing and inherited control styling
+  fix the reproduced input overflow. Shared primitives use the intended radii,
+  focus and validation states, readable hover/pressed fills, and reduced motion.
+  Tooltips share the popup foreground contract; keyboard activation preserves
+  native Space behavior and modified transport shortcuts.
+- **U4 — Browsing and playback:** catalog, sidebar, queue, player and equalizer
+  consumers use the shared roles and containment rules. Artwork decoration retains
+  its identity while text receives measured contrast correction. Home navigation
+  no longer marks every nested music route active.
+- **U5 — Forms and administration:** authentication, appearance settings, account
+  dialogs, library/user forms, administrative status and notifications use the
+  shared controls and semantic roles. Appearance previews consume generated data;
+  persistence remains a separate real-settings flow with preference restoration.
+- **U6 — Integrated verification and guidance:** styling specs cover appearance,
+  containment, focus, validation, overlays, resizing and selected feature states.
+  The design and testing guides document ownership, historical HIG references,
+  reproducible preview commands and the boundary between render and persistence
+  checks. Documentation prose audits and whitespace checks pass.
+
+The CI image `baander-runner:desktop-verification`, using Node 24.22.0, passes
+66 token tests and 2,484 frontend unit tests across 196 files. Generated-output
+checks pass, including unchanged native outputs. Final-source lint, both
+TypeScript configurations, production build and asset verification pass under
+`/tmp/styling-ci-final-source.log`; lint reports zero errors and eight existing
+warnings. The React Native diff against the starting revision is empty.
+
+Chromium's initial integrated run passed 97 of 100 tests. Three command-palette
+cases failed because fixture URLs omitted the API's trailing slash; the corrected
+15-case replay passes. The initial run includes all 32 appearance combinations
+and the opacity, keyboard and resize assertions. The final 13-case replay passes:
+eight refreshed characterizations, two Home/Albums selection assertions and three
+command-palette cases with the final service-worker setting. Its receipt is
+`/tmp/styling-navigation-evidence.log`. These follow-ups are separate evidence,
+not a passing rerun of the original aggregate.
+
+Firefox passes all six selected engine checks and its final command-palette
+recheck. WebKit passed five initially and its corrected command-palette case
+passes separately, covering the same six required checks. Only that mocked search group disables service workers so WebKit
+can intercept catalog fixtures; real HTTP login remains, and playback retains
+its stream worker. Playwright is 1.60.0: Chromium 148.0.7778.96, Firefox 150.0.2
+and WebKit 26.4. Chromium and Firefox run on Linux; WebKit uses the matching
+`mcr.microsoft.com/playwright:v1.60.0-noble` image for its system libraries.
+
+All 34 final screenshots have been reviewed without remaining defects: fourteen
+browsing/form images, twelve appearance images and eight refreshed navigation
+images. Browser receipts are retained under `/tmp/styling-integrated`,
+`/tmp/styling-appearance-evidence` and their sibling run logs. Detailed
+movie-overlay and live scan-dialog states were source-inspected rather than
+browser-qualified. The selected route/state checks do not establish visual or
+accessibility coverage of every application state, native media quality or
+general playback qualification.
+
+Simplification and independent review are complete. Missing tooltips,
+opacity-aware contrast evidence and modified transport shortcuts were corrected;
+no actionable findings remain in
+`/tmp/compound-engineering-1000/ce-code-review/20261030-190250-f115f518/review.json`.
+The refreshed review is complete and ready to merge, with zero findings and no
+pending verification. Documentation prose audits and whitespace checks pass.
 
 Discovery checkpoint: Playwright reproduced 406-pixel login inputs inside
 384-pixel containers, sidebar search overflow and black labels on dark controls.
 Inspection covered login, empty music home and settings, including four theme
 palettes with the violet accent. Independent source verification confirmed the
 shared sizing and foreground omissions, accent/foreground mismatch and radius
-drift. This is defect evidence, not passing implementation acceptance; all 32
-theme/accent combinations and responsive interaction states still need verification.
+drift. This was defect evidence; all 32 theme/accent combinations and responsive
+interaction states still needed verification at that checkpoint.
 After the preview refresh completed, a follow-up login probe covered four palettes
 at 1280- and 390-pixel viewport widths. All eight observations retained the same
 22-pixel field overflow; rendered light-theme login buttons also confirmed the

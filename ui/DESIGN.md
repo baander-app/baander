@@ -18,7 +18,12 @@ with styled-components, shared UI primitives, and theme tokens as described in
 
 Content is the interface. The UI gets out of the way. Progressive disclosure: simple by default, powerful on demand. Interactions are precise and immediate. Motion communicates spatial continuity, never decoration.
 
-Reference era: Apple products 2010-2020. Clarity, restraint, spatial hierarchy. Not Apple Music.
+The reference era is Apple's 2008–2014 Human Interface Guidelines: clear hierarchy,
+restrained controls, and precise interaction, adapted to Baander's responsive web
+interface and current accessibility requirements. The supplied
+[2018 macOS HIG archive](https://martin-juul.github.io/aslice/library/apple-macos-hig-2018/index.html#470c81114d39cd61d4ec2d2af0c4aa565d70ee758c5b4b6dff3be78c84700e2c.html)
+is supplementary Mojave-era material, not a 2014 source. Apple Music is not the
+visual reference.
 
 ---
 
@@ -34,10 +39,11 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 - **Back:** Returns to previous browse view with scroll position and selection preserved.
 
 ### Surfaces
-- Background: `#000000` (`var(--color-background)`)
-- Card: `#0a0a0b` (`var(--color-card)`)
-- Sidebar: `#080809` (`var(--color-sidebar)`)
-- Borders: `#1a1a1f` (`var(--color-border)`) — used sparingly, not between every element
+- Background: `var(--color-background)`
+- Card: `var(--color-card)`
+- Sidebar: `var(--color-sidebar)`
+- Borders: `var(--color-border)` — used sparingly, not between every element
+- Surface colors follow the selected mood; dark-mode values are not universal defaults.
 - No gradients. No drop shadows except on context menus and overlays (subtle, `0 4px 24px rgba(0,0,0,0.4)`).
 
 ### Border radius
@@ -64,7 +70,7 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 - **Tracking:** `-0.01em` on headings
 - **Body:** `14px` / `0.875rem`
 - **Labels:** `11px` / `0.6875rem`, uppercase, wider tracking, medium weight
-- **Muted text:** `var(--color-muted-foreground)` (`#8b8d97`)
+- **Muted text:** `var(--color-muted-foreground)`
 - **Headings:** semibold, never bold
 - **Monospace:** JetBrains Mono for metadata values (bitrate, format, durations, IDs)
 
@@ -72,29 +78,65 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 
 ## Color
 
-### Static palette
-Use theme CSS variables emitted by `ui/web/src/shared/theme/GlobalStyles.tsx` and
-the design-token CSS imported by `ui/web/src/index.css`. Never hardcode hex values.
+### Token authority
+
+Web semantic colors are defined in
+`ui/design-tokens/tokens/web/semantic-colors.json`, together with the shared inputs
+under `ui/design-tokens/`: `tokens/base/`, `tokens/mood/moods.json`, and
+`tokens/accent/palette.json`.
+Run `yarn --cwd ui/design-tokens build` after changing those inputs. The generator
+resolves one table of 32 mood/accent combinations and emits both
+`ui/design-tokens/build/web/theme.css` and `theme.ts`. Do not edit generated files.
+The existing native theme outputs are unchanged.
+
+`ui/web/src/index.css` imports the generated CSS; the root's `data-theme` and
+`data-accent` select its colors. `resolveTheme` looks up the same generated table
+for styled-components. `GlobalStyles` supplies global element rules, not another
+set of theme-variable definitions. Use theme properties or their CSS variables;
+never hardcode palette values in components.
 
 | Token | Use |
 |-------|-----|
 | `--color-foreground` | Primary text |
 | `--color-muted-foreground` | Secondary text, labels |
-| `--color-primary` | Interactive accent (buttons, links, active states) |
-| `--color-secondary` | Subtle surfaces |
-| `--color-accent` | Hover/active backgrounds |
-| `--color-destructive` | Errors, delete actions |
+| `--color-primary` / `--color-primary-foreground` | Filled actions and their content |
+| `--color-primary-hover` / `--color-primary-pressed` | Filled-action interaction states |
+| `--color-accent-text` | Links, active text, and icons on ordinary surfaces |
+| `--color-ring` | Focus indicators |
+| `--color-input-boundary` | Visible input edges |
+| `--color-secondary` / `--color-muted` | Subtle surfaces |
+| `--color-highlight` | Hover and selection backgrounds |
+| `--color-destructive` / `--color-destructive-foreground` | Destructive actions and errors |
+| `--color-success` / `--color-success-foreground` | Success status and paired content |
+| `--color-warning` / `--color-warning-foreground` | Warning status and paired content |
+| `--color-info` / `--color-info-foreground` | Informational status and paired content |
+
+Filled actions use their paired foreground at rest, hover, and press. Text on an
+ordinary surface uses `accentText` or a suitable semantic text color; a fill's
+foreground belongs on that fill. The former `accent` and `accentForeground`
+aliases are removed. Status colors describe meaning independently of the user's
+accent choice.
 
 ### Dynamic accent (blurhash-derived)
 On album and artist detail pages, extract the dominant color from the item's `coverImage.blurhash`:
 1. Decode blurhash client-side (no image fetch)
 2. Extract the most saturated pixel from the 4×3 grid
-3. Set as CSS variable `--accent-derived` on the page container
-4. Apply as subtle tint: 2px header underline, playing indicator, active selection glow
-5. **Fallback:** Use `--color-primary` when blurhash is absent, or when extracted color has saturation < 10% or lightness < 10% or > 90%
+3. Set `--accent-derived` on the page container for decorative color, with
+   `--accent-derived-foreground` carrying its contrast-adjusted text color.
+4. Apply the decorative color as a subtle tint or 2px header underline; use the
+   foreground color for playing-state text and icons.
+5. **Fallback:** When blurhash is absent, or the extracted color has saturation
+   < 10% or lightness < 10% or > 90%, use `--color-primary` for decoration and
+   `--color-accent-text` for text and icons.
 
 ### Foreground-on-accent contrast
-When using accent-derived color for text or icons, ensure WCAG AA contrast against the background. If the derived color fails contrast, lighten or darken it by adjusting lightness to 60%.
+Measure accent-derived text against the surfaces where it appears. Keep the
+artwork color when it reaches 4.5:1; otherwise blend toward white or black until
+it reaches that ratio on every supplied surface, falling back to the theme's
+`accentText` if necessary. A fixed lightness percentage cannot establish contrast.
+Theme generation likewise checks normal text at 4.5:1 and focus/input boundaries
+at 3:1; action fills and their paired content must remain readable through hover
+and press.
 
 ---
 

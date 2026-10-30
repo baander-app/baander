@@ -2450,6 +2450,24 @@ the `baander.app` fixture rule for this application browser workflow. Scripted
 browser-auth and DSP suites retain their own disposable servers.
 See [Frontend Development](frontend-development.md) for more details.
 
+For focused styling checks against that preview, run:
+
+```bash
+E2E_BASE_URL="$(make preview-url)" yarn --cwd ui/web e2e:headless \
+  tests/e2e/styling tests/e2e/settings/preferences.spec.ts tests/e2e/layout/layout.spec.ts
+```
+
+The styling suite signs in through the real login flow. Deterministic catalog GET
+fixtures and a local silent WAV cover empty and populated views and an active
+player without library scans or authentication-store injection. Its DOM appearance
+matrix checks all 32 mood/accent combinations; separate Settings tests exercise
+saved preferences through the application. Only mocked command-palette searches
+disable service workers for WebKit fixture interception; login remains real and
+playback cases retain the stream service worker. Screenshots, geometry, keyboard focus,
+reduced-motion and computed-contrast assertions cover selected routes, controls,
+overlays and viewport sizes, not every application state. See the
+[browser-test guide](../../ui/web/tests/e2e/README.md) for scope and audio precautions.
+
 The Electron app has its own Node test suite, run with Node 26:
 
 ```bash
