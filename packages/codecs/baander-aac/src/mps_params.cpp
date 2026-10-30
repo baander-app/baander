@@ -1024,7 +1024,7 @@ int aac_mps_ec_pair_read(AacBitReader* r, int type, int (*out)[AAC_MPS_MAX_PARAM
       for (int i = 0; i < bands; i++) {
         int v = data[j][i];
         if (c.lsb) {
-          v = (v << 1) | (int)aac_bitreader_read(r, 1);
+          v = v * 2 + (int)aac_bitreader_read(r, 1);
         }
         data[j][i] = v - c.offset;
       }

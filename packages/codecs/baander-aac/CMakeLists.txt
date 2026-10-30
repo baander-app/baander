@@ -19,6 +19,7 @@ option(BAAC_AAC_BUILD_DECODER "Build AAC decoder" ON)
 option(BAAC_AAC_BUILD_TESTS   "Build test suite" ON)
 option(BAAC_AAC_BUILD_TOOLS   "Build the baac command-line tool" ON)
 option(BAAC_AAC_SHARED        "Build shared lib" OFF)
+option(BAAC_FUZZ              "Build the fuzz harnesses with libFuzzer (clang) and the sanitizers" OFF)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(BAAC_AAC_PLATFORM "ios")
@@ -73,6 +74,38 @@ add_compile_options(
     $<$<CONFIG:Release>:-O3>
     $<$<CONFIG:Release>:-ffast-math>
     $<$<CONFIG:Release>:-fno-math-errno>)
+
+# BAAC_FUZZ: the sanitizers over the whole tree and, when the compiler
+# links libFuzzer, its coverage instrumentation; the harnesses under
+# tools/fuzz then run under libFuzzer, else under their own mutation
+# driver.
+set(BAAC_FUZZ_HAVE_LIBFUZZER OFF)
+if(BAAC_FUZZ)
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_FLAGS "-fsanitize=fuzzer,address,undefined")
+    check_cxx_source_compiles("
+        #include <cstddef>
+        #include <cstdint>
+        extern \"C\" int LLVMFuzzerTestOneInput(const uint8_t*, size_t) { return 0; }"
+        BAAC_FUZZ_LIBFUZZER_LINKS)
+    set(CMAKE_REQUIRED_FLAGS "-fsanitize=address,undefined")
+    check_cxx_source_compiles("int main() { return 0; }" BAAC_FUZZ_SANITIZERS_LINK)
+    unset(CMAKE_REQUIRED_FLAGS)
+    if(NOT BAAC_FUZZ_SANITIZERS_LINK)
+        message(FATAL_ERROR "BAAC_FUZZ: this compiler cannot link ASan and UBSan "
+                            "(for clang, install its compiler-rt runtimes, or build with GCC)")
+    endif()
+    if(BAAC_FUZZ_LIBFUZZER_LINKS)
+        set(BAAC_FUZZ_HAVE_LIBFUZZER ON)
+        add_compile_options(-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+        message(STATUS "BAAC_FUZZ: libFuzzer with ASan and UBSan")
+    else()
+        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+        message(WARNING "BAAC_FUZZ: this compiler has no libFuzzer; the harnesses run their own mutation driver under ASan and UBSan")
+    endif()
+endif()
 
 include(CheckCXXCompilerFlag)
 check_cxx_compiler_flag("-msse2" HAS_SSE2)
@@ -164,6 +197,8 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     add_executable(mps-enc tools/mps-enc.cpp)
     target_include_directories(mps-enc PRIVATE src)
     target_link_libraries(mps-enc PRIVATE baander-aac)
+    # The fuzz harnesses and their seed generator (tools/fuzz/README.md).
+    add_subdirectory(tools/fuzz)
 endif()
 
 if(BAAC_AAC_BUILD_TESTS)

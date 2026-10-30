@@ -17,6 +17,7 @@ namespace {
  * extra rates of USAC; 0 marks a reserved index, 31 is the escape to a
  * 24-bit rate. */
 constexpr int kUsacSamplingFrequencyEscape = 31;
+const int kMaxUsacSampleRate = 384000;
 const int kUsacSampleRates[31] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
                                   16000, 12000, 11025, 8000,  7350,  0,     0,     57600,
                                   51200, 40000, 38400, 34150, 28800, 25600, 20000, 19200,
@@ -390,7 +391,9 @@ int aac_usac_config_read(AacBitReader* r, AacUsacConfig* c) {
   }
   c->core_sbr_frame_length_index = (int)aac_bitreader_read(r, 3);
   c->channel_config_index = (int)aac_bitreader_read(r, 5);
-  if (r->overread || c->sample_rate <= 0 ||
+  /* the escape codes 24 bits; past the highest rate a profile allows the
+   * core rate computed below would overflow */
+  if (r->overread || c->sample_rate <= 0 || c->sample_rate > kMaxUsacSampleRate ||
       c->core_sbr_frame_length_index >= kNumCoreSbrFrameLengths ||
       c->channel_config_index >= kNumChannelConfigs) {
     return AAC_ERR_DECODE;

@@ -82,7 +82,7 @@ int ec_flags(const AacMpsState* s) {
 
 void coarse_to_fine(int type, int* v, int start, int stop) {
   for (int i = start; i < stop; i++) {
-    v[i] <<= 1;
+    v[i] *= 2;
     if (type == kCld) {
       if (v[i] == -14) v[i] = -15;
       if (v[i] == 14) v[i] = 15;

@@ -55,6 +55,27 @@ foreach(test_src ${TEST_SOURCES})
     add_test(NAME ${test_name} COMMAND ${test_name})
 endforeach()
 
+# The fuzz smoke test generates the seed corpus and runs every harness
+# over it for a few seconds of mutations (in parallel; a libFuzzer build
+# runs the same through libFuzzer's options), so the harnesses stay
+# green with the codec.  It needs the harness targets of tools/fuzz.
+if(TARGET fuzz_decoder)
+    add_executable(test_fuzz_smoke test_fuzz_smoke.cpp)
+    target_link_libraries(test_fuzz_smoke PRIVATE baander-aac)
+    target_compile_definitions(test_fuzz_smoke PRIVATE
+        BAAC_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data"
+        BAAC_FUZZ_SEEDS="$<TARGET_FILE:fuzz_seeds>"
+        BAAC_FUZZ_DECODER="$<TARGET_FILE:fuzz_decoder>"
+        BAAC_FUZZ_ASC="$<TARGET_FILE:fuzz_asc>"
+        BAAC_FUZZ_ENCODER="$<TARGET_FILE:fuzz_encoder>"
+        BAAC_FUZZ_UNIDRC="$<TARGET_FILE:fuzz_unidrc>"
+        BAAC_FUZZ_MPS="$<TARGET_FILE:fuzz_mps>")
+    if(BAAC_FUZZ_HAVE_LIBFUZZER)
+        target_compile_definitions(test_fuzz_smoke PRIVATE BAAC_FUZZ_LIBFUZZER)
+    endif()
+    add_test(NAME test_fuzz_smoke COMMAND test_fuzz_smoke)
+endif()
+
 # The MPEG Surround syntax test compiles the test encoder tool in as its
 # writer, which includes the internal headers by their bare names.
 target_include_directories(test_mps PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)

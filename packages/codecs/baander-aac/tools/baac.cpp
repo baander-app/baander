@@ -3,7 +3,7 @@
  *   baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [mode] [quality] [profile] [options]
  *   baac dec <in.aac> <out.f32le> [rate] [channels]
  *   baac loudness <in.wav | in.f32le rate channels>
- *   baac bench [--seconds N] [--dump DIR] [--only NAME]
+ *   baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
  * (a LOAS stream for the xhe profile, which ADTS cannot carry).
@@ -20,11 +20,17 @@
  * decoder follows the ADTS headers, so rate and channels only set the
  * output layout (0 keeps the stream's channels).  loudness prints the
  * meter's figures of a WAV file (PCM or float) or of raw float input.
- * bench encodes and decodes a synthetic stereo signal at 48 kHz through
- * every profile and prints the times; --dump writes each stream and its
- * decode to DIR for comparisons between builds. */
+ * bench encodes and decodes a synthetic stereo signal at 48 kHz (30 s by
+ * default) through every profile and prints the times and realtime
+ * factors; --dump writes each stream and its decode to DIR for
+ * comparisons between builds; --streams decodes every .aac and .loas
+ * stream in DIR (the committed test streams) and prints the realtime
+ * factor of each and of each profile. */
+#include <dirent.h>
+
 #include <algorithm>
 #include <chrono>
+#include <map>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -74,7 +80,7 @@ static int usage() {
           "                      --rap-max-frames N  --segment-max-bytes N\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
-          "       baac bench [--seconds N] [--dump DIR] [--only NAME]\n");
+          "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n");
   return 2;
 }
 
@@ -524,16 +530,21 @@ struct BenchConfig {
   int bitrate;
   int frame_length; /* 0 keeps the object type's default */
   int afterburner;
+  int usac_sbr;    /* USAC: enhanced SBR (1 on, 0 off) */
+  int usac_mps212; /* USAC: MPS 2-1-2 (1 on, 0 off) */
 };
 
 static const BenchConfig kBenchConfigs[] = {
-    {"LC 128k", AAC_AOT_LC, 128000, 0, 0},
-    {"HE-AAC v1 64k", AAC_AOT_SBR, 64000, 0, 0},
-    {"HE-AAC v2 32k", AAC_AOT_PS, 32000, 0, 0},
-    {"LC 960 128k", AAC_AOT_LC, 128000, 960, 0},
-    {"LD 512 64k", AAC_AOT_ER_LD, 64000, 512, 0},
-    {"ELD 512 64k", AAC_AOT_ER_ELD, 64000, 512, 0},
-    {"LC 48k afterburner", AAC_AOT_LC, 48000, 0, 1},
+    {"LC 128k", AAC_AOT_LC, 128000, 0, 0, 0, 0},
+    {"HE-AAC v1 64k", AAC_AOT_SBR, 64000, 0, 0, 0, 0},
+    {"HE-AAC v2 32k", AAC_AOT_PS, 32000, 0, 0, 0, 0},
+    {"LC 960 128k", AAC_AOT_LC, 128000, 960, 0, 0, 0},
+    {"LD 512 64k", AAC_AOT_ER_LD, 64000, 512, 0, 0, 0},
+    {"ELD 512 64k", AAC_AOT_ER_ELD, 64000, 512, 0, 0, 0},
+    {"LC 48k afterburner", AAC_AOT_LC, 48000, 0, 1, 0, 0},
+    {"xHE-AAC 96k", AAC_AOT_USAC, 96000, 0, 0, 0, 0},
+    {"xHE-AAC SBR 48k", AAC_AOT_USAC, 48000, 0, 0, 1, 0},
+    {"xHE-AAC 2-1-2 32k", AAC_AOT_USAC, 32000, 0, 0, 1, 1},
 };
 
 /* A deterministic stereo test signal: harmonics of a slowly sweeping
@@ -598,6 +609,13 @@ static bool bench_encode(const BenchConfig& cfg, const std::vector<float>& pcm, 
   }
   if (cfg.afterburner) {
     aac_encoder_set_afterburner(enc, 1);
+  }
+  if (cfg.aot == AAC_AOT_USAC) {
+    AacUsacEncoderOptions opt{-1, -1, 0, -1, cfg.usac_sbr, cfg.usac_mps212};
+    if (aac_encoder_set_usac(enc, &opt) != AAC_OK) {
+      aac_encoder_destroy(enc);
+      return false;
+    }
   }
   const int frame = aac_encoder_frame_size(enc);
   const size_t block = (size_t)frame * 2;
@@ -678,10 +696,145 @@ static bool bench_decode(const BenchConfig& cfg, const std::vector<uint8_t>& str
   return errors == 0;
 }
 
+/* The profile a decoded stream belongs to, from what the decoder saw. */
+static std::string stream_profile(AacDecoderHandle dec) {
+  int sbr = 0;
+  int ps = 0;
+  aac_decoder_get_sbr_ps(dec, &sbr, &ps);
+  const int surround = aac_decoder_has_surround(dec);
+  std::string name;
+  switch (aac_decoder_object_type(dec)) {
+    case AAC_AOT_USAC:
+      name = "xHE-AAC";
+      break;
+    case AAC_AOT_ER_ELD:
+      name = "ELD";
+      break;
+    case AAC_AOT_ER_LD:
+      name = "LD";
+      break;
+    default:
+      name = ps ? "HE-AAC v2" : sbr ? "HE-AAC v1" : "LC";
+      break;
+  }
+  if (aac_decoder_object_type(dec) == AAC_AOT_USAC && sbr) {
+    name += " SBR";
+  }
+  if (surround) {
+    name += aac_decoder_channels(dec) > 2 ? " + MPS 5.1" : " + MPS 2-1-2";
+  } else {
+    /* The USAC 2-1-2 tool is not reported apart from a channel pair. */
+    name += aac_decoder_channels(dec) == 1 ? " mono" : " stereo";
+  }
+  return name;
+}
+
+/* Decodes one stream through the FIFO interface `*passes` times, as
+ * many as fill about half a second, and reports the audio seconds of
+ * one pass and the wall time of all of them. */
+static bool bench_stream(const std::vector<uint8_t>& stream, double* audio_seconds,
+                         double* wall_seconds, int* passes, std::string* profile) {
+  std::vector<float> pcm((size_t)AAC_DECODER_MAX_OUTPUT * 8);
+  *passes = 0;
+  *wall_seconds = 0.0;
+  bool ok = true;
+  while (*wall_seconds < 0.5 && *passes < 1000) {
+    AacDecoderHandle dec = aac_decoder_create(48000, 0);
+    if (!dec) {
+      return false;
+    }
+    long samples = 0;
+    int rate = 0;
+    const double t0 = now_seconds();
+    for (size_t pos = 0; pos < stream.size();) {
+      const int taken = aac_decoder_feed(dec, stream.data() + pos,
+                                         (int)std::min((size_t)4096, stream.size() - pos));
+      if (taken <= 0) {
+        ok = false;
+        break;
+      }
+      pos += (size_t)taken;
+      for (;;) {
+        const int got = aac_decoder_decode_next(dec, pcm.data(), (int)pcm.size());
+        if (got == 0) {
+          break;
+        }
+        if (got < 0) {
+          ok = false;
+          continue;
+        }
+        samples += got;
+        rate = aac_decoder_output_sample_rate(dec);
+      }
+    }
+    *wall_seconds += now_seconds() - t0;
+    (*passes)++;
+    *audio_seconds = rate > 0 ? (double)samples / (double)rate : 0.0;
+    *profile = stream_profile(dec);
+    aac_decoder_destroy(dec);
+    if (!ok || samples == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/* The decode realtime factor of every .aac and .loas stream in `dir`,
+ * then per profile over the streams of that profile. */
+static int bench_streams(const std::string& dir) {
+  DIR* d = opendir(dir.c_str());
+  if (!d) {
+    fprintf(stderr, "baac: cannot read %s\n", dir.c_str());
+    return 1;
+  }
+  std::vector<std::string> names;
+  while (dirent* e = readdir(d)) {
+    const std::string n = e->d_name;
+    const bool aac = n.size() > 4 && n.compare(n.size() - 4, 4, ".aac") == 0;
+    const bool loas = n.size() > 5 && n.compare(n.size() - 5, 5, ".loas") == 0;
+    if (aac || loas) {
+      names.push_back(n);
+    }
+  }
+  closedir(d);
+  std::sort(names.begin(), names.end());
+  struct Total {
+    double audio = 0.0, wall = 0.0;
+    int streams = 0;
+  };
+  std::map<std::string, Total> totals;
+  int failures = 0;
+  printf("\n%-32s %-22s %8s %9s\n", "stream", "profile", "audio s", "dec x");
+  for (const std::string& n : names) {
+    const std::vector<uint8_t> stream = read_all((dir + "/" + n).c_str());
+    double audio = 0.0;
+    double wall = 0.0;
+    int passes = 0;
+    std::string profile;
+    if (!bench_stream(stream, &audio, &wall, &passes, &profile)) {
+      printf("%-32s decode errors\n", n.c_str());
+      failures++;
+      continue;
+    }
+    printf("%-32s %-22s %8.2f %8.1fx\n", n.c_str(), profile.c_str(), audio,
+           audio * passes / wall);
+    Total& t = totals[profile];
+    t.audio += audio * passes;
+    t.wall += wall;
+    t.streams++;
+  }
+  printf("\n%-32s %8s %9s\n", "profile (committed streams)", "streams", "dec x");
+  for (const auto& [profile, t] : totals) {
+    printf("%-32s %8d %8.1fx\n", profile.c_str(), t.streams, t.audio / t.wall);
+  }
+  return failures ? 1 : 0;
+}
+
 static int bench(int argc, char** argv) {
-  int seconds = 60;
+  int seconds = 30;
   std::string dump;
   std::string only;
+  std::string streams;
   for (int i = 2; i < argc; i++) {
     if (strcmp(argv[i], "--seconds") == 0 && i + 1 < argc) {
       seconds = atoi(argv[++i]);
@@ -689,6 +842,8 @@ static int bench(int argc, char** argv) {
       dump = argv[++i];
     } else if (strcmp(argv[i], "--only") == 0 && i + 1 < argc) {
       only = argv[++i];
+    } else if (strcmp(argv[i], "--streams") == 0 && i + 1 < argc) {
+      streams = argv[++i];
     } else {
       return usage();
     }
@@ -730,6 +885,9 @@ static int bench(int argc, char** argv) {
       write_file(base + ".aac", stream.data(), stream.size());
       write_file(base + ".f32", out.data(), out.size() * sizeof(float));
     }
+  }
+  if (!streams.empty() && bench_streams(streams) != 0) {
+    failures++;
   }
   return failures ? 1 : 0;
 }

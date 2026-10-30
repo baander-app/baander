@@ -120,7 +120,7 @@ int make_f_master(AacSbrFreq* f) {
   }
   f->k[2] = std::min(64, f->k[2]);
   const int max_qmf_subbands = table_rate <= 32000 ? 48 : (table_rate == 44100 ? 35 : 32);
-  if (f->k[2] - f->k[0] > max_qmf_subbands || f->k[0] <= 0) {
+  if (f->k[2] - f->k[0] > max_qmf_subbands || f->k[2] <= f->k[0] || f->k[0] <= 0) {
     return AAC_ERR_DECODE;
   }
 

@@ -647,6 +647,9 @@ void adj_grid(const AacSbrChannel* ch, const AacSbrUsacChannelData* d, AdjGrid* 
     return;
   }
   g->n = ch->num_env;
+  /* a concealed frame may have no envelope: the grid then starts at 0 */
+  g->t0[0] = g->t1[0] = 0;
+  g->src[0] = 0;
   for (int e = 0; e < g->n; e++) {
     g->t0[e] = ch->t_env[e];
     g->t1[e] = ch->t_env[e + 1];

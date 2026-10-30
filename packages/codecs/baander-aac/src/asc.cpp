@@ -434,7 +434,9 @@ int aac_asc_write_bits(const AacAsc* asc, AacBitWriter* w) {
   if ((!is_ga_type(asc->aot) && asc->aot != AAC_AOT_ER_ELD) || asc->sample_rate <= 0 ||
       asc->channel_config < 0 || asc->channel_config > 15 ||
       (asc->channel_config == 0 && !asc->has_pce) || !length_ok ||
-      (asc->aot == AAC_AOT_ER_ELD && asc->channel_config == 0)) {
+      (asc->aot == AAC_AOT_ER_ELD && asc->channel_config == 0) ||
+      asc->aot == 6 || asc->aot == 20) {
+    /* The scalable types carry a layerNr this writer has no field for. */
     return AAC_ERR_INVALID_ARG;
   }
   const bool sbr = asc->sbr_present == 1 && !low_delay;

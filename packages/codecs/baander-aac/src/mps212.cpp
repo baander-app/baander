@@ -1,5 +1,6 @@
 #include "mps212.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -193,7 +194,7 @@ namespace {
 
 void coarse_to_fine(int type, int* v, int n) {
   for (int i = 0; i < n; i++) {
-    v[i] <<= 1;
+    v[i] *= 2;
     if (type == kCld) {
       if (v[i] == -14) v[i] = -15;
       if (v[i] == 14) v[i] = 15;
@@ -638,7 +639,8 @@ void set_matrices(AacMps212State* s) {
       }
       float pl = 0.0f, pr = 0.0f;
       if (s->phase_coding == 1 && s->p.phase_mode && pb < s->num_ipd_bands) {
-        const int ci = cld + 15;
+        /* a damaged or concealed frame can carry indices past +-15 */
+        const int ci = std::clamp(cld, -15, 15) + 15;
         float opd = 0.0f;
         if (!(ci == 15 && ipd == 8)) {
           opd = (float)aac_mps212_opd_q28[ipd][icc & 7][ci] / 268435456.0f;

@@ -1235,7 +1235,8 @@ float quality_factor(int quality) { return exp2f((70.0f - (float)quality) / 10.0
  * thresholds of a frame that fits).  Returns the frame's bits at the
  * chosen working point. */
 int rate_control(AacEncoderState* s, int target_bits, float base_improve, bool spend_surplus) {
-  ReleaseEntry release[2 * AAC_MAX_BANDS];
+  /* every channel's bands may be releasable */
+  ReleaseEntry release[AAC_MAX_CHANNELS * AAC_MAX_BANDS];
   const int n_release = prepare_bands(s, release);
 
   /* Largest reduction that is ever needed: it lifts every threshold to at
@@ -1269,6 +1270,13 @@ int rate_control(AacEncoderState* s, int target_bits, float base_improve, bool s
       }
     }
     set_allowances(s, 0.0f, exp2f(hi), release, 0);
+    const int spent = quantize_frame(s);
+    if (spent <= target_bits) {
+      return spent;
+    }
+    /* No point of the search fitted (its upper end is untested when the
+     * quality's own point is coarser): keep the quality's point. */
+    set_allowances(s, 0.0f, base_improve, release, 0);
     return quantize_frame(s);
   }
   float lo = 0.0f;

@@ -938,7 +938,7 @@ sums. Neither the encoder nor the decoder allocates once it is running
 baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality] [lc|he|hev2|xhe] [options]
 baac dec <in.aac> <out.f32le> [rate] [channels]
 baac loudness <in.wav> | <in.f32le> <rate> <channels>
-baac bench [--seconds N] [--dump DIR] [--only NAME]
+baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
 ```
 
 For every profile `--peak-bitrate N`, `--bandwidth HZ` and
@@ -959,11 +959,15 @@ momentary and short-term maxima) of a WAV file (integer PCM of 8 to 32
 bits or 32-bit float, up to six channels in the canonical order) or of
 raw float input with its rate and channel count.
 
-`bench` encodes and decodes a synthetic 60 s stereo signal at 48 kHz
+`bench` encodes and decodes a synthetic 30 s stereo signal at 48 kHz
 through AAC-LC (1024 and 960 frames, and with the afterburner), HE-AAC
-v1 and v2, AAC-LD and AAC-ELD and prints the times and realtime factors;
+v1 and v2, AAC-LD, AAC-ELD and xHE-AAC (the plain core, with SBR, and
+with SBR and MPS 2-1-2) and prints the times and realtime factors;
 `--dump` writes each stream and its decode, for a byte-for-byte comparison
-between builds.
+between builds, and `--streams DIR` also decodes every `.aac` and `.loas`
+stream in a directory (`tests/data` for the committed streams) and prints
+the realtime factor of each stream and of each profile. Figures are in
+[Fuzzing and benchmarks](#fuzzing-and-benchmarks).
 
 Raw PCM is interleaved 32-bit float. With ffmpeg:
 
@@ -1109,7 +1113,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-eight suites, and the transform, filterbank and
+`ctest` runs thirty-nine suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -1294,12 +1298,95 @@ Noise substitution never signals correlated noise (an M/S flag on a noise
 band): FFmpeg's decoder draws independent noise regardless of the flag,
 and its random sequence would then run ahead of a conforming decoder's.
 
+## Fuzzing and benchmarks
+
+Five fuzz harnesses under `tools/fuzz/` drive the decoder, the
+AudioSpecificConfig and StreamMuxConfig parsers, the encoder, MPEG-D
+DRC and MPEG Surround with mutated input, and
+[tools/fuzz/README.md](../tools/fuzz/README.md) documents their inputs:
+
+- `fuzz_decoder` covers ADTS, LOAS, LATM and raw access units with a
+  config, every object type, concealment on and off by an option byte,
+  and the output, DRC and loudness settings.
+- `fuzz_asc` covers the config parsers, the writer's round trip, and
+  applying a config to a decoder.
+- `fuzz_encoder` takes the profile, rate, channels, bitrate, modes,
+  transport and USAC options from the first bytes and the rest as PCM;
+  our decoder has to decode the result without an error.
+- `fuzz_unidrc` covers the `uniDrcConfig()`, `loudnessInfoSet()` and
+  `uniDrcGain()` parsers and the module's output.
+- `fuzz_mps` runs the surround streams through the public decoder.
+
+`fuzz_seeds` derives about 560 seeds from every stream under
+`tests/data` (whole, chunked, truncated, as access units with their
+config, the config alone, and the DRC payloads) and from hand-built
+inputs at the bounds a decoder has to enforce. The bounds covered are
+the Huffman escape length, the HCR lengths, the LATM `ascLen`, the PCE
+element counts, rates above 96 kHz, the ELD and surround extension
+lengths, and configs larger than any the codec writes. The reproducers
+of past findings live under `tests/data/fuzz/<harness>/` and join the
+corpus, so every run replays them. The first ten-minute runs found an
+uninitialised envelope grid in concealed USAC SBR frames, an encoder
+stack overflow at eight channels, a frame above
+`aac_encoder_max_frame_bytes` when a coarse quality spent a full
+reservoir, an MPS 2-1-2 phase table read past its end, an unbounded
+USAC sampling rate, left shifts of negative values, and an ASC writer
+accepting the scalable object types; each is fixed and its input kept.
+
+The CMake option `BAAC_FUZZ` builds the tree with ASan and UBSan.
+Under libFuzzer when the compiler links `-fsanitize=fuzzer` (clang with
+its compiler-rt runtimes), else under the mutation driver
+`fuzz_driver.cpp`, which replays the seeds, mutates them for a time or
+run budget, and writes a faulting input to an artifact directory as a
+reproducer. Without the option the harnesses build plain, and
+`test_fuzz_smoke` generates the corpus and runs each harness for a fixed
+number of mutations from a fixed seed (about 20 seconds each, side by
+side), so the same inputs run on every machine.
+
+`baac bench --streams tests/data` gives the realtime factors (audio
+seconds per wall-clock second, one thread, Release build). The figures
+below come from a shared 2.1 GHz Xeon virtual machine, where repeated
+runs vary by about a quarter, so read them as orders of magnitude.
+
+The synthetic 30 s stereo signal at 48 kHz:
+
+| Configuration | kbit/s | Encode | Decode |
+| --- | ---: | ---: | ---: |
+| LC 128k | 127.9 | 23x | 880x |
+| HE-AAC v1 64k | 64.0 | 33x | 220x |
+| HE-AAC v2 32k | 31.9 | 65x | 450x |
+| LC 960 128k | 127.9 | 24x | 370x |
+| LD 512 64k | 66.9 | 28x | 960x |
+| ELD 512 64k | 67.6 | 24x | 630x |
+| LC 48k afterburner | 47.9 | 21x | 1360x |
+| xHE-AAC 96k | 101.4 | 19x | 370x |
+| xHE-AAC SBR 48k | 54.3 | 29x | 250x |
+| xHE-AAC SBR + MPS 2-1-2 32k | 37.0 | 39x | 230x |
+
+The committed streams, decoded (the USAC streams are the FDK encoder's
+and ours; the decoder's API does not tell a USAC 2-1-2 pair from a plain
+pair, so those count as stereo):
+
+| Profile | Streams | Decode |
+| --- | ---: | ---: |
+| LC + MPEG Surround 5.1 | 9 | 72x |
+| ELD + MPS 2-1-2 | 1 | 130x |
+| ELD mono / stereo | 2 / 2 | 740x / 400x |
+| HE-AAC v1 mono / stereo | 1 / 2 | 690x / 350x |
+| HE-AAC v2 stereo | 1 | 450x |
+| xHE-AAC mono / stereo | 3 / 3 | 530x / 300x |
+| xHE-AAC SBR mono / stereo | 6 / 6 | 420x / 200x |
+
+Encoding runs at 19 to 65 times realtime and decoding at 70 to 1400
+times. MPEG Surround 5.1 is the slowest decode: it synthesises six
+channels through the hybrid QMF bank.
+
 ## Project structure
 
 ```
 include/      public aac.h and internal headers
 src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac and the 2-1-2 encoder in mps212_enc), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
-tools/        baac command-line tool, mps-enc test stream writer for MPEG Surround
+tools/        baac command-line tool (with the benchmark), mps-enc test stream writer for MPEG Surround, fuzz/ harnesses with their seed generator and mutation driver
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)
 prebuilds/    prebuilt bindings per platform-arch, fetched from a release (not committed)
