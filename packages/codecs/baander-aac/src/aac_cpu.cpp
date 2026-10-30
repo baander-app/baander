@@ -10,6 +10,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#if defined(__arm__) || defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__linux__) || defined(__ANDROID__)
+#include <sys/auxv.h>
+#elif defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
+#endif
 
 static std::atomic<int> g_cpu_flags{-1};
 static std::atomic<int> g_cpu_flags_override{-1};
@@ -136,7 +143,6 @@ static int detect_arm_flags(void) {
   int flags = 0;
 
 #if defined(__linux__) || defined(__ANDROID__)
-#include <sys/auxv.h>
 #if defined(HWCAP_NEON)
   unsigned long hwcap = getauxval(AT_HWCAP);
   if (hwcap & HWCAP_NEON) flags |= AAC_CPU_FLAG_NEON;
@@ -146,7 +152,6 @@ static int detect_arm_flags(void) {
 #endif
 
 #elif defined(__APPLE__)
-#include <sys/sysctl.h>
   int32_t value = 0;
   size_t size = sizeof(value);
   if (sysctlbyname("hw.optional.neon64", &value, &size, NULL, 0) == 0) {
