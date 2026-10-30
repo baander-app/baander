@@ -15,6 +15,11 @@ vi.mock('@/features/player/services/audio-service', () => ({
 }))
 
 const analysisData: AnalysisData = {
+  sampleRate: 48000,
+  fftSize: 2048,
+  minDecibels: -100,
+  maxDecibels: 0,
+  loudnessAvailable: false,
   phase: null,
   frequencyData: new Uint8Array(8),
   timeDomainData: new Uint8Array(8),
@@ -45,7 +50,7 @@ describe('useVisualizerLoop', () => {
       return id
     }))
     vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => frames.delete(id)))
-    getProcessor.mockReturnValue({ getAnalysisData })
+    getProcessor.mockReturnValue({ getAnalysisData, playing: true })
     getAnalysisData.mockReturnValue(analysisData)
   })
 
@@ -119,9 +124,12 @@ describe('useVisualizerLoop', () => {
       if (missing === 'canvas') options.canvasRef.current = null
       if (missing === 'renderer') options.rendererRef.current = null
       runFrame(10_000)
-      expect(options.render).toHaveBeenCalledTimes(1)
+      expect(options.render).toHaveBeenCalledTimes(missing === 'processor' || missing === 'data' ? 2 : 1)
+      if (missing === 'processor' || missing === 'data') {
+        expect(options.render.mock.lastCall?.[0].active).toBe(false)
+      }
 
-      getProcessor.mockReturnValue({ getAnalysisData })
+      getProcessor.mockReturnValue({ getAnalysisData, playing: true })
       getAnalysisData.mockReturnValue(analysisData)
       options.rendererRef.current = renderer
       options.canvasRef.current = canvas
@@ -147,6 +155,23 @@ describe('useVisualizerLoop', () => {
     expect(options.render.mock.lastCall?.[0]).toMatchObject({ deltaTime: 16, compact: true })
     unmount()
     expect(frames.size).toBe(0)
+  })
+
+  it('uses CSS geometry while scaling the drawing surface for DPR', () => {
+    const options = createOptions()
+    const canvas = options.canvasRef.current!
+    const setTransform = vi.fn()
+    const ctx = { setTransform } as unknown as CanvasRenderingContext2D
+    vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)
+    options.rendererRef.current = { ...options.rendererRef.current!, isWebGL: false }
+    canvas.style.width = '200px'
+    canvas.style.height = '100px'
+    canvas.width = 400
+    canvas.height = 200
+    renderHook(() => useVisualizerLoop(options))
+    runFrame(116)
+    expect(setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0)
+    expect(options.render.mock.lastCall?.[0]).toMatchObject({ width: 200, height: 100, active: true })
   })
 
   it('has one loop after StrictMode replay and cancels it on unmount', () => {

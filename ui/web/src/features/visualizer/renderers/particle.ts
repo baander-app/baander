@@ -1,5 +1,8 @@
 import type * as THREE from 'three'
 import type { VisualizerRenderer, RenderContext } from '../types'
+import { aggregateSpectrum } from '../utils/spectrum'
+
+const canvasOwners = new WeakMap<HTMLCanvasElement, ParticleRenderer>()
 
 /** Particle/ambient flow renderer using Three.js (lazy-loaded).
  *  Creates its own WebGL canvas appended to the host container to avoid
@@ -22,6 +25,8 @@ export class ParticleRenderer implements VisualizerRenderer {
   private ownCanvas: HTMLCanvasElement | null = null
   private hostCanvas: HTMLCanvasElement | null = null
   private initialized = false
+  private cancelled = false
+  private elapsed = 0
 
   async init(canvas: HTMLCanvasElement, context: { width: number; height: number; compact: boolean }): Promise<void> {
     this.width = context.width
@@ -30,130 +35,107 @@ export class ParticleRenderer implements VisualizerRenderer {
     this.container = canvas.parentElement
     this.hostCanvas = canvas
 
-    try {
-      const THREE = await import('three')
-      this.threeModule = THREE
+    const THREE = await import('three')
+    if (this.cancelled) return
+    this.threeModule = THREE
 
-      // Hide the host's shared canvas (2D) — we create our own WebGL canvas
-      canvas.style.display = 'none'
+    // Hide the host's shared canvas (2D) — we create our own WebGL canvas
+    canvasOwners.set(canvas, this)
+    canvas.style.display = 'none'
 
-      // Create dedicated WebGL canvas
-      this.ownCanvas = document.createElement('canvas')
-      this.ownCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
-      this.container?.appendChild(this.ownCanvas)
+    // Create dedicated WebGL canvas
+    this.ownCanvas = document.createElement('canvas')
+    this.ownCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'
+    this.ownCanvas.style.opacity = canvas.style.opacity
+    this.container?.appendChild(this.ownCanvas)
 
-      // Scene
-      this.scene = new THREE.Scene()
+    // Scene
+    this.scene = new THREE.Scene()
 
-      // Camera
-      this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.1, 1000)
-      this.camera.position.z = 50
+    // Camera
+    this.camera = new THREE.PerspectiveCamera(60, this.width / Math.max(1, this.height), 0.1, 1000)
+    this.camera.position.z = 50
 
-      // WebGL renderer
-      this.renderer = new THREE.WebGLRenderer({
-        canvas: this.ownCanvas,
-        antialias: !this.compact,
-        alpha: true,
-      })
-      this.renderer.setSize(this.width, this.height)
-      this.renderer.setPixelRatio(this.compact ? 1 : window.devicePixelRatio)
-      this.renderer.setClearColor(0x000000, 0)
+    // WebGL renderer
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.ownCanvas,
+      antialias: !this.compact,
+      alpha: true,
+    })
+    this.renderer.setPixelRatio(this.compact ? 1 : window.devicePixelRatio || 1)
+    this.renderer.setSize(this.width, this.height)
+    this.renderer.setClearColor(0x000000, 0)
 
-      // Particle system
-      const particleCount = this.compact ? 500 : 3000
-      this.geometry = new THREE.BufferGeometry()
-      const positions = new Float32Array(particleCount * 3)
-      const velocities = new Float32Array(particleCount * 3)
-      const sizes = new Float32Array(particleCount)
+    // Particle system
+    const particleCount = this.compact ? 500 : 3000
+    this.geometry = new THREE.BufferGeometry()
+    const positions = new Float32Array(particleCount * 3)
+    const velocities = new Float32Array(particleCount * 3)
+    const sizes = new Float32Array(particleCount)
 
-      for (let i = 0; i < particleCount; i++) {
-        const i3 = i * 3
-        positions[i3] = (Math.random() - 0.5) * 100
-        positions[i3 + 1] = (Math.random() - 0.5) * 100
-        positions[i3 + 2] = (Math.random() - 0.5) * 50
-        velocities[i3] = (Math.random() - 0.5) * 0.1
-        velocities[i3 + 1] = (Math.random() - 0.5) * 0.1
-        velocities[i3 + 2] = (Math.random() - 0.5) * 0.05
-        sizes[i] = Math.random() * 2 + 0.5
-      }
-
-      this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-      this.geometry.setAttribute('aVelocity', new THREE.BufferAttribute(velocities, 3))
-      this.geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1))
-
-      const material = new THREE.PointsMaterial({
-        size: this.compact ? 1 : 2,
-        transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        color: 0xffffff,
-      })
-
-      this.particles = new THREE.Points(this.geometry, material)
-      this.scene.add(this.particles)
-
-      this.initialized = true
-    } catch (error) {
-      console.error('[ParticleRenderer] Failed to initialize Three.js:', error)
-      this.threeModule = null
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3
+      positions[i3] = (Math.random() - 0.5) * 100
+      positions[i3 + 1] = (Math.random() - 0.5) * 100
+      positions[i3 + 2] = (Math.random() - 0.5) * 50
+      velocities[i3] = (Math.random() - 0.5) * 0.1
+      velocities[i3 + 1] = (Math.random() - 0.5) * 0.1
+      velocities[i3 + 2] = (Math.random() - 0.5) * 0.05
+      sizes[i] = Math.random() * 2 + 0.5
     }
+
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    this.geometry.setAttribute('aVelocity', new THREE.BufferAttribute(velocities, 3))
+    this.geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1))
+
+    const material = new THREE.PointsMaterial({
+      size: this.compact ? 1 : 2,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      color: 0x000000,
+    })
+
+    this.particles = new THREE.Points(this.geometry, material)
+    this.scene.add(this.particles)
+
+    this.initialized = true
   }
 
   render(context: RenderContext): void {
     if (!this.initialized || !this.threeModule || !this.renderer || !this.scene || !this.camera) return
 
-    const { data, palette } = context
-    const THREE = this.threeModule
+    const { data, active, colors, deltaTime } = context
+    if (!active) {
+      this.elapsed = 0
+      this.renderer.clear()
+      return
+    }
+    this.elapsed += deltaTime / 1000
+    const bands = aggregateSpectrum(data)
+    let peak = 0
+    for (const value of bands) peak = Math.max(peak, value)
 
-    const rms = data.rms
-    const spectralCentroid = data.spectralCentroid / 24000
-
-    // Attributes are populated in init() as BufferAttribute (Float32Array-backed).
-    // geometry/particles are non-null here — init() runs before the render loop starts.
     const positionAttr = this.geometry!.attributes.position as THREE.BufferAttribute
     const velocityAttr = this.geometry!.getAttribute('aVelocity') as THREE.BufferAttribute
     const positions = positionAttr.array as Float32Array
     const velocities = velocityAttr.array as Float32Array
-    const particleCount = positions.length / 3
-
-    const energyScale = 1 + rms * 5
-
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3
-
-      positions[i3] += velocities[i3] * energyScale
-      positions[i3 + 1] += velocities[i3 + 1] * energyScale
-      positions[i3 + 2] += velocities[i3 + 2] * energyScale
-
-      if (Math.abs(positions[i3]) > 50) positions[i3] *= -0.9
-      if (Math.abs(positions[i3 + 1]) > 50) positions[i3 + 1] *= -0.9
-      if (Math.abs(positions[i3 + 2]) > 25) positions[i3 + 2] *= -0.9
-
-      const angle = spectralCentroid * 0.002
-      const x = positions[i3]
-      const z = positions[i3 + 2]
-      positions[i3] = x * Math.cos(angle) - z * Math.sin(angle)
-      positions[i3 + 2] = x * Math.sin(angle) + z * Math.cos(angle)
+    const energyScale = 1 + data.rms * 5
+    const step = deltaTime / (1000 / 60)
+    for (let i = 0; i < positions.length; i++) {
+      const extent = i % 3 === 2 ? 25 : 50
+      const next = positions[i]! + velocities[i]! * energyScale * step
+      positions[i] = ((next + extent) % (2 * extent) + 2 * extent) % (2 * extent) - extent
     }
-
     positionAttr.needsUpdate = true
-
-    // Material is constructed as a PointsMaterial (see init); narrow for its props.
+    this.particles!.rotation.y = this.elapsed * data.spectralCentroid / Math.max(1, data.sampleRate / 2) * 0.12
     const material = this.particles!.material as THREE.PointsMaterial
-    if (palette && material) {
-      const primary = new THREE.Color(palette.primary)
-      const secondary = new THREE.Color(palette.secondary)
-      material.color.copy(primary).lerp(secondary, rms)
-    }
-
-    if (material) {
-      material.opacity = 0.3 + rms * 2
-      material.size = (this.compact ? 1 : 2) * (1 + rms * 3)
-    }
-
-    this.camera.position.x = Math.sin(Date.now() * 0.0003) * 3
-    this.camera.position.y = Math.cos(Date.now() * 0.0002) * 2
+    material.color.set(colors.accent)
+    material.opacity = peak
+    material.size = (this.compact ? 1 : 2) * (1 + data.rms * 3)
+    this.camera.position.x = Math.sin(this.elapsed * 0.3) * 3
+    this.camera.position.y = Math.cos(this.elapsed * 0.2) * 2
     this.camera.lookAt(0, 0, 0)
 
     this.renderer.render(this.scene, this.camera)
@@ -163,14 +145,22 @@ export class ParticleRenderer implements VisualizerRenderer {
     this.width = width
     this.height = height
 
-    if (this.renderer) this.renderer.setSize(width, height)
+    if (this.renderer) {
+      this.renderer.setPixelRatio(this.compact ? 1 : window.devicePixelRatio || 1)
+      this.renderer.setSize(width, height)
+    }
     if (this.camera) {
-      this.camera.aspect = width / height
+      this.camera.aspect = width / Math.max(1, height)
       this.camera.updateProjectionMatrix()
     }
   }
 
+  cancel(): void {
+    this.cancelled = true
+  }
+
   destroy(): void {
+    this.cancel()
     if (this.geometry) {
       this.geometry.dispose()
       this.geometry = null
@@ -188,8 +178,9 @@ export class ParticleRenderer implements VisualizerRenderer {
       this.ownCanvas = null
     }
     // Restore host canvas visibility
-    if (this.hostCanvas) {
+    if (this.hostCanvas && canvasOwners.get(this.hostCanvas) === this) {
       this.hostCanvas.style.display = ''
+      canvasOwners.delete(this.hostCanvas)
     }
     this.threeModule = null
     this.scene = null

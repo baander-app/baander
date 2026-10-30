@@ -46,9 +46,9 @@ export interface PaletteColors {
 
 /** Context provided during renderer initialization. Data is not yet available. */
 export interface InitContext {
-  /** Canvas pixel width. */
+  /** Canvas width in CSS pixels. */
   width: number
-  /** Canvas pixel height. */
+  /** Canvas height in CSS pixels. */
   height: number
   /** Smoothing alpha for EMA. */
   smoothingAlpha: number
@@ -60,17 +60,21 @@ export interface InitContext {
 export interface RenderContext {
   /** Canvas 2D rendering context (null for WebGL renderers that manage their own). */
   ctx: CanvasRenderingContext2D | null
+  /** Whether the input is currently playing; inactive frames clear live readings. */
+  active: boolean
+  /** Theme roles, resolved to concrete canvas colors. */
+  colors: { foreground: string; accent: string; background: string }
   /** Current audio analysis data. */
   data: AnalysisData
   /** Album art color palette (null if not yet extracted). */
   palette: PaletteColors | null
   /** Time since last frame in milliseconds. */
   deltaTime: number
-  /** Canvas pixel width. */
+  /** Canvas width in CSS pixels. */
   width: number
-  /** Canvas pixel height. */
+  /** Canvas height in CSS pixels. */
   height: number
-  /** Smoothing alpha for EMA (0-1). Renderers should apply: prev * (1-alpha) + target * alpha. */
+  /** Elapsed-time adjusted smoothing alpha for EMA (0-1). */
   smoothingAlpha: number
   /** Whether this is a compact/mini renderer context. */
   compact: boolean
@@ -91,6 +95,9 @@ export interface VisualizerRenderer {
 
   /** Handle canvas resize. Called on ResizeObserver trigger. */
   resize(width: number, height: number): void
+
+  /** Stop pending initialization immediately; final resource cleanup follows once initialization settles. */
+  cancel?(): void
 
   /** Clean up all resources (GPU textures, event listeners, Three.js objects). */
   destroy(): void
