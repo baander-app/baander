@@ -72,6 +72,28 @@ contract tests and scoped PHPStan pass; Deptrac reports zero violations without
 baseline changes. Formatting and whitespace checks pass. Full browser delivery
 and capacity qualification remain open.
 
+U3 delivered locally, 2026-10-30: the web runtime projects changes on worker zero
+and reconciles authorized subscriptions on each HTTP worker. Current account,
+library, and playlist authority is read with revisions in one bounded database
+snapshot. Recovery uses the normal DPoP route; reset messages identify data to
+purge without granting access. Delivery coalesces pending frames, closes blocked
+peers, and releases database services before sending. Existing server diagnostics
+now expose publication checks, reads, observed backlog, and delivery counts.
+
+U3 verification checkpoint: the disposable CI image passes 171 tests with 6,259
+assertions across ordinary, native, and PostgreSQL lanes. The two-worker probe
+covers console-origin writes, failed reads and recovery, worker reload, idle
+projection, and drain cleanup. Its real coroutine wrapper uses a test connection
+pool; full application pool baselines and capacity remain acceptance work.
+The slow-peer probe checks native send deadlines and healthy peer progress.
+All 14 frontend contract tests, both TypeScript projects, scoped CI PHPStan,
+OpenAPI generation, and Orval generation pass. Deptrac reports zero violations
+with the existing 484-entry baseline unchanged. ESLint has zero errors and eight
+pre-existing warnings. New PHP files pass formatting; prose and whitespace checks
+pass. Independent simplification retained all proof tests. Browser ownership,
+query coordination, feature adoption, and full-system qualification remain open;
+general browser subscriptions are not activated.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

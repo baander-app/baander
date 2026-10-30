@@ -17457,6 +17457,33 @@
                 }
             }
         },
+        "/api/live/recovery": {
+            "get": {
+                "tags": [
+                    "Live Updates"
+                ],
+                "summary": "Recover current live update authorization and health",
+                "operationId": "get_live_recovery",
+                "responses": {
+                    "200": {
+                        "description": "Current authorized live families",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LiveRecoveryResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "description": "Current principal unavailable"
+                    }
+                }
+            }
+        },
         "/api/monitor/rate-limiters": {
             "get": {
                 "tags": [
@@ -17697,7 +17724,7 @@
                                         "data": {
                                             "properties": {
                                                 "workers": {
-                                                    "description": "One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools",
+                                                    "description": "One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates",
                                                     "type": "array",
                                                     "items": {
                                                         "additionalProperties": true
@@ -26144,6 +26171,80 @@
                 },
                 "type": "object"
             },
+            "LiveFamily": {
+                "type": "string",
+                "enum": [
+                    "catalog",
+                    "activity",
+                    "playlists",
+                    "libraries",
+                    "notifications",
+                    "account",
+                    "preferences",
+                    "devices",
+                    "sessions",
+                    "radio",
+                    "lyrics",
+                    "recommendations",
+                    "admin-users",
+                    "admin-settings",
+                    "admin-jobs",
+                    "admin-runtime",
+                    "admin-alerts",
+                    "admin-security",
+                    "admin-metadata",
+                    "admin-media",
+                    "deployment-definitions"
+                ]
+            },
+            "LiveRecoveryResource": {
+                "required": [
+                    "version",
+                    "families",
+                    "authorizationFingerprint",
+                    "health"
+                ],
+                "properties": {
+                    "version": {
+                        "type": "integer",
+                        "enum": [
+                            1
+                        ]
+                    },
+                    "families": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LiveFamily"
+                        }
+                    },
+                    "authorizationFingerprint": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "health": {
+                        "required": [
+                            "state",
+                            "oldestPendingAgeMs"
+                        ],
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "current",
+                                    "degraded"
+                                ]
+                            },
+                            "oldestPendingAgeMs": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
             "SystemSettingResource": {
                 "required": [
                     "key",
@@ -27144,6 +27245,10 @@
         {
             "name": "Debug",
             "description": "Debug and profiling endpoints"
+        },
+        {
+            "name": "Live Updates",
+            "description": "Authenticated live update recovery endpoints"
         },
         {
             "name": "Streaming",

@@ -114,6 +114,21 @@ services:
     App\Shared\Application\LiveUpdates\LiveChangeProjector:
         alias: App\Shared\Infrastructure\LiveUpdates\DoctrineLiveChangeProjector
 
+    App\Shared\Application\LiveUpdates\LiveSnapshotReader:
+        alias: App\Shared\Infrastructure\LiveUpdates\DoctrineLiveSnapshotReader
+
+    App\Shared\Application\LiveUpdates\LiveSubscriptions:
+        alias: App\Shared\Infrastructure\LiveUpdates\LiveUpdateRuntime
+
+    App\Auth\Application\Port\CurrentUserAuthorityReader:
+        alias: App\Auth\Infrastructure\LiveUpdates\DoctrineCurrentUserAuthorityReader
+
+    App\Library\Application\Port\LibraryAudienceReader:
+        alias: App\Library\Infrastructure\LiveUpdates\DoctrineLibraryAudienceReader
+
+    App\Playlist\Application\Port\PlaylistAudienceReader:
+        alias: App\Playlist\Infrastructure\LiveUpdates\DoctrinePlaylistAudienceReader
+
     App\Shared\Interface\Controller\WebSocketController:
         tags:
             - { name: 'monolog.logger', channel: 'swoole' }

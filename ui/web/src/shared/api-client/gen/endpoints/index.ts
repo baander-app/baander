@@ -2595,6 +2595,65 @@ export interface ScheduledJobResource {
   updatedAt: string;
 }
 
+export type LiveFamily = typeof LiveFamily[keyof typeof LiveFamily];
+
+
+export const LiveFamily = {
+  catalog: 'catalog',
+  activity: 'activity',
+  playlists: 'playlists',
+  libraries: 'libraries',
+  notifications: 'notifications',
+  account: 'account',
+  preferences: 'preferences',
+  devices: 'devices',
+  sessions: 'sessions',
+  radio: 'radio',
+  lyrics: 'lyrics',
+  recommendations: 'recommendations',
+  'admin-users': 'admin-users',
+  'admin-settings': 'admin-settings',
+  'admin-jobs': 'admin-jobs',
+  'admin-runtime': 'admin-runtime',
+  'admin-alerts': 'admin-alerts',
+  'admin-security': 'admin-security',
+  'admin-metadata': 'admin-metadata',
+  'admin-media': 'admin-media',
+  'deployment-definitions': 'deployment-definitions',
+} as const;
+
+export type LiveRecoveryResourceVersion = typeof LiveRecoveryResourceVersion[keyof typeof LiveRecoveryResourceVersion];
+
+
+export const LiveRecoveryResourceVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type LiveRecoveryResourceHealthState = typeof LiveRecoveryResourceHealthState[keyof typeof LiveRecoveryResourceHealthState];
+
+
+export const LiveRecoveryResourceHealthState = {
+  current: 'current',
+  degraded: 'degraded',
+} as const;
+
+export type LiveRecoveryResourceHealth = {
+  state: LiveRecoveryResourceHealthState;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  oldestPendingAgeMs: number | null;
+};
+
+export interface LiveRecoveryResource {
+  version: LiveRecoveryResourceVersion;
+  families: LiveFamily[];
+  /** @pattern ^[0-9a-f]{64}$ */
+  authorizationFingerprint: string;
+  health: LiveRecoveryResourceHealth;
+}
+
 export interface SystemSettingResource {
   key: string;
   /** Effective value */
@@ -6908,7 +6967,7 @@ export type GetDebugStats200DataWorkerErrorsItem = {
 export type GetDebugStats200DataRedis = { [key: string]: unknown };
 
 export type GetDebugStats200Data = {
-  /** One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools */
+  /** One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates */
   workers?: GetDebugStats200DataWorkersItem[];
   /** Workers that did not answer in time */
   missing_workers?: number[];
@@ -28413,6 +28472,107 @@ export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError>,
       > => {
       return useMutation(getPostMonitorJobsCancelMutationOptions(options), queryClient);
     }
+
+export const getGetLiveRecoveryUrl = () => {
+
+
+
+
+  return `/api/live/recovery`
+}
+
+/**
+ * @summary Recover current live update authorization and health
+ */
+export const getLiveRecovery = async ( options?: RequestInit): Promise<LiveRecoveryResource> => {
+
+  return customInstance<LiveRecoveryResource>(getGetLiveRecoveryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLiveRecoveryQueryKey = () => {
+    return [
+    `/api/live/recovery`
+    ] as const;
+    }
+
+
+export const getGetLiveRecoveryQueryOptions = <TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLiveRecoveryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLiveRecovery>>> = ({ signal }) => getLiveRecovery({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLiveRecoveryQueryResult = NonNullable<Awaited<ReturnType<typeof getLiveRecovery>>>
+export type GetLiveRecoveryQueryError = ErrorType<void>
+
+
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLiveRecovery>>,
+          TError,
+          Awaited<ReturnType<typeof getLiveRecovery>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLiveRecovery>>,
+          TError,
+          Awaited<ReturnType<typeof getLiveRecovery>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Recover current live update authorization and health
+ */
+
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLiveRecoveryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetMonitorRatelimitersListUrl = () => {
 

@@ -10,4 +10,9 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class LivePipelineHealth
 {
     public function __construct(public ?int $oldestPendingAgeMs) {}
+
+    public function isDegraded(): bool
+    {
+        return ($this->oldestPendingAgeMs ?? 0) > 5000;
+    }
 }

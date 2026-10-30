@@ -30,7 +30,7 @@ final readonly class ServerStatsControllerWithCoroutines
                         new OA\Property(property: 'data', properties: [
                             new OA\Property(
                                 property: 'workers',
-                                description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools',
+                                description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates',
                                 type: 'array',
                                 items: new OA\Items(additionalProperties: true),
                             ),

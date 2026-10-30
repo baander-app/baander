@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole\Control\Operation;
 
 use App\Shared\Infrastructure\Swoole\Control\ServerControlOperation;
+use App\Shared\Infrastructure\LiveUpdates\LiveUpdateRuntime;
 use App\Shared\Infrastructure\Swoole\SwoolePoolStatsProvider;
 use Swoole\Coroutine;
 
@@ -24,8 +25,8 @@ final readonly class DebugStatsOperation implements ServerControlOperation
 
     public function __construct(
         private SwoolePoolStatsProvider $poolStats,
-    ) {
-    }
+        private LiveUpdateRuntime $liveUpdates,
+    ) {}
 
     public function name(): string
     {
@@ -65,6 +66,7 @@ final readonly class DebugStatsOperation implements ServerControlOperation
                 'coroutine_peak_num' => $coroutines['coroutine_peak_num'] ?? null,
             ],
             'pools' => $this->poolStats->getStats(),
+            'live_updates' => $this->liveUpdates->diagnostics(),
         ];
     }
 }

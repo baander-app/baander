@@ -7,7 +7,8 @@ Baander generates its OpenAPI specification from source code using Nelmio ApiDoc
 The JSON documentation route is `/api/doc.json`; the Swagger UI route at `/api/doc` is currently commented out in `config/routes/nelmio_api_doc.yaml`. The repository tracks `openapi.json`, which supplies the web Orval client. After changing an API contract, export the specification and regenerate the client:
 
 ```bash
-make exec cmd="php bin/console app:export-openapi-spec"
+make exec cmd="php bin/console app:export-openapi-spec --output=/tmp/baander-openapi.json"
+make exec cmd="cat /tmp/baander-openapi.json" > openapi.json
 ```
 
 Run `app:export-openapi-spec --check` to compare the tracked file with the current export without writing it. The web client has `yarn generate` and `yarn generate:check` scripts in `ui/web`; the latter regenerates the client and fails on a tracked diff.
@@ -15,6 +16,9 @@ Run `app:export-openapi-spec --check` to compare the tracked file with the curre
 The default export covers application `/api` routes; the generated documentation endpoint `/api/doc.json` is excluded. Operational endpoints such as `/health` and `/metrics`, WebSocket paths and `/.well-known` discovery endpoints are outside that export.
 
 See the [export command documentation](../part-1-operator-guide/commands/app-export-openapi-spec.md) for full details.
+
+The preview mounts application source read-only. The export commands above write
+to its temporary directory, then redirect the result to the host's tracked file.
 
 ## REST Conventions
 

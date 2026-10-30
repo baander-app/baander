@@ -7,13 +7,15 @@ Export Baander's OpenAPI specification, or check that an existing export matches
 Export as JSON (default):
 
 ```bash
-make exec cmd="php bin/console app:export-openapi-spec"
+make exec cmd="php bin/console app:export-openapi-spec --output=/tmp/baander-openapi.json"
+make exec cmd="cat /tmp/baander-openapi.json" > openapi.json
 ```
 
 Export as YAML to a custom path:
 
 ```bash
-make exec cmd="php bin/console app:export-openapi-spec --format yaml --output docs/api.yaml"
+make exec cmd="php bin/console app:export-openapi-spec --format yaml --output /tmp/baander-openapi.yaml"
+make exec cmd="cat /tmp/baander-openapi.yaml" > docs/api.yaml
 ```
 
 Check the tracked JSON without changing it:
@@ -31,6 +33,9 @@ make exec cmd="php bin/console app:export-openapi-spec --check"
 | `--check` | off | Compare the existing output file with a fresh export; do not write files |
 
 ## Details
+
+The preview mounts application source read-only. The examples export to a writable
+temporary directory inside the container, then redirect the file to the host.
 
 The command renders Nelmio ApiDoc's `default` area from route and OpenAPI attributes. The export covers application `/api` routes and excludes the generated documentation endpoint `/api/doc.json`. Health probes, `/metrics`, WebSocket paths and `/.well-known` endpoints are outside it. The output file is written relative to the working directory inside the container (usually `/var/www/html`).
 

@@ -28,18 +28,18 @@ deptrac:
   formatters:
     graphviz:
       groups:
-        Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
+        Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Album Sync Request Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
-        Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
+        Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
         Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
@@ -67,8 +67,18 @@ deptrac:
 
     - name: 'Shared Infrastructure'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Shared\\Infrastructure\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Shared\\Infrastructure\\LiveUpdates\\DoctrineLiveSnapshotReader$'
+
+    - name: 'Shared Live Snapshot Infrastructure'
+      collectors:
         - type: classLike
-          value: '^App\\Shared\\Infrastructure\\'
+          value: '^App\\Shared\\Infrastructure\\LiveUpdates\\DoctrineLiveSnapshotReader$'
 
     - name: 'Shared Interface'
       collectors:
@@ -146,6 +156,11 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Application\\(Port\\WebSocketTicketRedeemerInterface|DTO\\WebSocketIdentity|Exception\\WebSocketTicketUnavailableException)$'
 
+    - name: 'Auth Live Authority Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Application\\(Port\\CurrentUserAuthorityReader|DTO\\CurrentUserAuthority)$'
+
     - name: 'Auth Application'
       collectors:
         - type: bool
@@ -159,6 +174,8 @@ deptrac:
               value: '^App\\Auth\\Application\\Port\\UserIdentifierResolverInterface$'
             - type: classLike
               value: '^App\\Auth\\Application\\(Port\\WebSocketTicketRedeemerInterface|DTO\\WebSocketIdentity|Exception\\WebSocketTicketUnavailableException)$'
+            - type: classLike
+              value: '^App\\Auth\\Application\\(Port\\CurrentUserAuthorityReader|DTO\\CurrentUserAuthority)$'
 
     - name: 'Auth Infrastructure'
       collectors:
@@ -301,6 +318,11 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Application\\Port\\LibraryFileAvailabilityInterface$'
 
+    - name: 'Library Live Audience Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Port\\LibraryAudienceReader$'
+
     - name: 'Library Application'
       collectors:
         - type: bool
@@ -320,6 +342,8 @@ deptrac:
               value: '^App\\Library\\Application\\Port\\(LibraryProvisioningInterface|ProvisionedLibraryScan)$'
             - type: classLike
               value: '^App\\Library\\Application\\Port\\LibraryMediaFile[A-Za-z]*$'
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryAudienceReader$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -514,6 +538,11 @@ deptrac:
         - type: classLike
           value: '^App\\Playlist\\Application\\Port\\PlaylistDeletionPreviewPortInterface$'
 
+    - name: 'Playlist Live Audience Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Playlist\\Application\\Port\\PlaylistAudienceReader$'
+
     - name: 'Playlist Application'
       collectors:
         - type: bool
@@ -523,6 +552,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Playlist\\Application\\Port\\PlaylistDeletionPreviewPortInterface$'
+            - type: classLike
+              value: '^App\\Playlist\\Application\\Port\\PlaylistAudienceReader$'
 
     - name: 'Playlist Infrastructure'
       collectors:
@@ -964,6 +995,12 @@ deptrac:
     # =============================================
 
     # --- Shared ---
+    'Shared Live Snapshot Infrastructure':
+      - 'Auth Live Authority Contract'
+      - 'Library Live Audience Contract'
+      - 'Playlist Live Audience Contract'
+      - 'Shared Domain'
+      - 'Shared Application'
     'Shared Domain': ~
     'Shared Application':
       - 'Shared Domain'
@@ -1006,6 +1043,8 @@ deptrac:
       - 'Shared Interface'
 
     # --- Auth ---
+    'Auth Live Authority Contract':
+      - 'Shared Domain'
     'Auth WebSocket Contract': []
     'Auth Identity Contract': []
     'Auth User Identifier Contract':
@@ -1026,6 +1065,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Auth Live Authority Contract'
       - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Shared Application'
@@ -1114,6 +1154,8 @@ deptrac:
       - 'Shared Domain'
 
     # --- Library ---
+    'Library Live Audience Contract':
+      - 'Shared Domain'
     'Library File Availability Contract':
       - 'Shared Domain'
     'Library Read Scope Contract':
@@ -1141,6 +1183,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Library Live Audience Contract'
       - 'Library File Availability Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
@@ -1296,6 +1339,8 @@ deptrac:
       - 'Shared Interface'
 
     # --- Playlist ---
+    'Playlist Live Audience Contract':
+      - 'Shared Domain'
     'Playlist Deletion Preview Contract':
       - 'Shared Domain'
     'Playlist Domain':
@@ -1305,6 +1350,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Playlist Infrastructure':
+      - 'Playlist Live Audience Contract'
       - 'Auth Identity Contract'
       - 'Auth User Identifier Contract'
       - 'Catalog Song Lookup Contract'

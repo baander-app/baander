@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
 use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
+use App\Shared\Application\LiveUpdates\LiveSubscriptions;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\SyncedPartySession;
@@ -114,7 +115,32 @@ final class WebSocketControllerTest extends TestCase
             new JsonEncoder(),
             $this->listeningSessions,
             $this->identities,
+            $this->createStub(LiveSubscriptions::class),
         );
+    }
+
+    public function testLiveSubscriptionUsesTheAuthenticatedPrincipalAndClosesItsObservation(): void
+    {
+        $principal = Uuid::v7();
+        $subscriptions = $this->createMock(LiveSubscriptions::class);
+        $subscriptions->expects(self::once())->method('subscribe')->with(7, self::callback(static fn(Uuid $id): bool => $id->toString() === $principal->toString()));
+        $subscriptions->expects(self::once())->method('unsubscribe')->with(7);
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $subscriptions);
+        $controller->onOpen(7, $principal->toString(), 'token-7');
+        $controller->onMessage(7, '{"type":"live.subscribe","version":1}');
+        $controller->onClose(7);
+    }
+
+    public function testLiveSubscriptionRejectsClientSelectedAudiencesAndUnknownVersions(): void
+    {
+        $subscriptions = $this->createMock(LiveSubscriptions::class);
+        $subscriptions->expects(self::never())->method('subscribe');
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $subscriptions);
+        $controller->onOpen(7, Uuid::v7()->toString(), 'token-7');
+        $controller->onMessage(7, '{"type":"live.subscribe","version":1,"families":["admin-users"]}');
+        $controller->onMessage(7, '{"type":"live.subscribe","version":2}');
+        self::assertSame('Invalid live subscription', json_decode($this->pushedMessages[1]['data'], true)['message']);
+        self::assertSame('Invalid live subscription', json_decode($this->pushedMessages[2]['data'], true)['message']);
     }
 
     #[DataProvider('transcodePositionCommands')]
@@ -143,7 +169,7 @@ final class WebSocketControllerTest extends TestCase
                 return new Envelope($command);
             },
         );
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, $owner->toString(), 'token-1');
         $payload = ['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5, 'action' => $action, 'requestId' => $requestId];
         if ($generation !== null) {
@@ -180,7 +206,7 @@ final class WebSocketControllerTest extends TestCase
         $this->identities->method('transcodeSessionId')->willReturn(Uuid::generate());
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $controller->onMessage(1, json_encode(array_replace(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], $fields), JSON_THROW_ON_ERROR));
         self::assertSame('error', $this->lastPushedPayload()['type']);
@@ -209,7 +235,7 @@ final class WebSocketControllerTest extends TestCase
         $this->identities->method('transcodeSessionId')->willReturn(Uuid::generate());
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')->willThrowException(new \RuntimeException('Dispatch failed'));
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $controller->onMessage(1, json_encode(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], JSON_THROW_ON_ERROR));
         $this->assertLastPushMatches(1, 'error', ['message' => 'Failed to update transcode position']);
@@ -221,7 +247,7 @@ final class WebSocketControllerTest extends TestCase
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $controller->onMessage(1, json_encode(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], JSON_THROW_ON_ERROR));
         self::assertSame('error', $this->lastPushedPayload()['type']);
@@ -236,7 +262,7 @@ final class WebSocketControllerTest extends TestCase
             $identities->method('transcodeSessionId')->willThrowException(new \RuntimeException('Database unavailable'));
             $bus = $this->createMock(MessageBusInterface::class);
             $bus->expects(self::never())->method('dispatch');
-            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities);
+            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities, $this->createStub(LiveSubscriptions::class));
             $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
             $controller->onMessage(1, json_encode(['type' => $type, 'sessionId' => str_repeat('s', 21), 'action' => 'play'], JSON_THROW_ON_ERROR));
             $this->assertLastPushMatches(1, 'error', ['message' => 'Identity lookup unavailable']);
@@ -260,7 +286,7 @@ final class WebSocketControllerTest extends TestCase
             }
             $bus = $this->createMock(MessageBusInterface::class);
             $bus->expects(self::never())->method('dispatch');
-            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities);
+            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities, $this->createStub(LiveSubscriptions::class));
             $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
             $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => str_repeat('s', 21)], JSON_THROW_ON_ERROR));
             self::assertSame([
@@ -291,7 +317,7 @@ final class WebSocketControllerTest extends TestCase
             JoinPartySessionCommand::class => [$handler],
         ]))]);
 
-        return new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        return new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
     }
 
     /** @return array<string, mixed>|null */
@@ -466,6 +492,7 @@ final class WebSocketControllerTest extends TestCase
             new JsonEncoder(),
             $this->listeningSessions,
             $this->identities,
+            $this->createStub(LiveSubscriptions::class),
         );
 
         $controller->onOpen(5, 'user-uuid-2', 'token-5');
@@ -554,7 +581,7 @@ final class WebSocketControllerTest extends TestCase
     public function testRoomJoinOfAnUnknownRoomIsRefusedAndLogged(): void
     {
         $logger = new RefusalRecordingLogger();
-        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $logger);
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class), $logger);
         $controller->onOpen(1, 'user-1', 'token-1');
 
         $controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'notifications:user-1'], JSON_THROW_ON_ERROR));
@@ -722,7 +749,7 @@ final class WebSocketControllerTest extends TestCase
                 return 43.25;
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, $userId, 'token-1');
 
         $controller->onMessage(1, json_encode([
@@ -802,7 +829,7 @@ final class WebSocketControllerTest extends TestCase
                 throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException('Private party');
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
         $messageCount = count($this->pushedMessages);
 
@@ -904,7 +931,7 @@ final class WebSocketControllerTest extends TestCase
                 $events->dispatch(new MemberLeft($command->getSessionId(), $command->getUserId()));
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, $leaver, 'token-1');
         $controller->onOpen(2, $leaver, 'token-2');
         $controller->onOpen(3, $member, 'token-3');

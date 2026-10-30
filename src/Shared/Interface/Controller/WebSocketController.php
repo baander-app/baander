@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\LiveUpdates\LiveSubscription;
+use App\Shared\Application\LiveUpdates\LiveSubscriptions;
 use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
@@ -50,6 +52,7 @@ final class WebSocketController extends AbstractWebSocketController
         private readonly JsonEncoder $jsonEncoder,
         private readonly ListeningSessionInteractionInterface $listeningSessions,
         private readonly WebSocketIdentityLookupInterface $identities,
+        private readonly LiveSubscriptions $liveSubscriptions,
         private readonly ?LoggerInterface $logger = null,
     )
     {
@@ -146,6 +149,7 @@ final class WebSocketController extends AbstractWebSocketController
         $this->logger?->debug('WebSocket message', ['fd' => $fd, 'userId' => $userId, 'type' => $type]);
 
         match ($type) {
+            'live.subscribe' => $this->handleLiveSubscribe($fd, $userId, $payload),
             'ping' => $this->pusher->pushToConnection($fd, ['type' => 'pong']),
             'room.join' => $this->handleRoomJoin($fd, $userId, $payload),
             'room.leave' => $this->handleRoomLeave($fd, $payload),
@@ -188,6 +192,18 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         return $payload;
+    }
+
+    /** @param array<array-key, mixed> $payload */
+    private function handleLiveSubscribe(int $fd, string $userId, array $payload): void
+    {
+        try {
+            LiveSubscription::fromArray($payload);
+        } catch (InvalidArgumentException) {
+            $this->pusher->pushToConnection($fd, ['type' => 'error', 'message' => 'Invalid live subscription']);
+            return;
+        }
+        $this->liveSubscriptions->subscribe($fd, Uuid::fromString($userId));
     }
 
     private function checkRateLimit(int $fd): bool
@@ -699,6 +715,7 @@ final class WebSocketController extends AbstractWebSocketController
     public function onClose(int $fd): void
     {
         $userId = $this->fdUsers[$fd] ?? null;
+        $this->liveSubscriptions->unsubscribe($fd);
         $this->registry->removeConnection($fd);
         unset($this->fdUsers[$fd], $this->rateLimitWindows[$fd]);
 

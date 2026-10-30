@@ -5,9 +5,9 @@ does not schedule that work: it only determines whether the cached result is fre
 when another operation checks it. Baander's live-update contracts connect each
 reader to the changes that require another authorized read.
 
-Coverage, message validation, transactional capture, and revision projection are
-implemented. Delivery and automatic browser refresh are not enabled by these
-contracts alone.
+The backend captures committed changes, projects revisions, and delivers authorized
+hints over the existing WebSocket connection. Browser adoption is still in progress;
+the backend contract alone does not enable automatic view refresh.
 
 ## Registering a reader
 
@@ -86,6 +86,70 @@ Resource contents remain behind their normal authorized HTTP endpoints. The
 fingerprint identifies a change in authorization; it is not an access credential.
 A healthy connection alone does not prove that publication or subsequent reads
 succeeded.
+
+`live.ready` establishes the subscription's permitted families. `live.changed`
+names affected families. An authorization change sends `live.reset` with the union
+of the old and new families, including families whose access was removed. That
+union tells the browser what to purge; it is not the new permission set. The client
+must fence pending work and obtain the current recovery snapshot before scheduling
+resource reads.
+
+## Authorization and recovery
+
+`GET /api/live/recovery` uses the normal DPoP authentication path and returns a
+private, non-cacheable snapshot of permitted families, the authorization fingerprint,
+and pipeline health. Disabled or deleted accounts are denied. Database failures
+cannot produce a successful baseline.
+
+The snapshot reads the current account, library access, playlist access, revisions,
+and backlog in one read-only repeatable-read transaction. Context-owned ports
+resolve access with scalar database reads, so retained entities and token roles
+cannot preserve revoked permissions. A 500ms statement deadline and a one-second
+transaction deadline bound each snapshot. A failed rollback closes the connection.
+
+## Worker delivery
+
+HTTP worker zero checks for committed changes every 250ms, including when no
+browser is connected. Each HTTP worker reconciles its own subscriptions every
+second, rotating fairly through at most 32 principals per pass. Overlap guards
+prevent concurrent passes. Worker shutdown clears timers and pending frames;
+draining workers stop starting projection and reconciliation work.
+
+Database services are released at the read or projection boundary, before socket
+delivery. Coroutine cleanup provides a second release path. Each connection has
+at most one pending frame, with family changes coalesced without losing reset
+information. Delivery limits the socket queue plus the outgoing frame to 64KiB;
+a 100ms watchdog closes a peer whose native send remains blocked.
+
+Health messages are due every five seconds. Read or projection failure reports
+degraded health while retaining the last baseline. Recovery to current health is
+reported even when the revision vector did not change. A backlog older than five
+seconds is also degraded. Clients still need their own expiry and HTTP recovery
+policy when no message arrives.
+
+## Inspecting the runtime
+
+The existing server statistics HTTP endpoint and `app:server:stats` command expose
+`live_updates` for each worker. Reading these diagnostics does not acquire database
+services or disclose subscription identities.
+
+| Field | Meaning |
+| --- | --- |
+| `projector_enabled` | This worker started the projection timer. |
+| `last_successful_projection_check_age_ms` | Age of the last successful check, including empty or busy returns; it does not prove revisions advanced. |
+| `last_successful_reconciliation_age_ms` | Age of the last successful authorization and revision read. |
+| `max_subscription_read_age_ms` | Oldest successful read among this worker's current subscriptions. |
+| `backlog_observed` | Whether a successful snapshot has observed the inbox. |
+| `last_observed_oldest_pending_age_ms` | Backlog age at that observation; null means empty only when `backlog_observed` is true. |
+| `projection_error_count`, `read_error_count` | Failures since this worker started. |
+| `active_subscriptions` | Current subscriptions on this worker. |
+| `pending_send_count` | Pending coalesced frames, excluding a send already in progress. |
+| `slow_peer_close_count` | Connections closed for delivery overload. |
+
+Null check or read ages mean no successful operation has been recorded. The
+backlog observation is historical and does not advance with the clock. Use these
+fields together: a recent empty-or-busy projection check cannot establish that
+pending changes have been published.
 
 ## Verification
 
