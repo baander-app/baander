@@ -55,6 +55,8 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
   const _values = React.useMemo(
@@ -80,7 +82,12 @@ function Slider({
         <StyledRange data-slot="slider-range" />
       </StyledTrack>
       {Array.from({ length: _values.length }, (_, index) => (
-        <StyledThumb data-slot="slider-thumb" key={index} />
+        <StyledThumb
+          data-slot="slider-thumb"
+          key={index}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+        />
       ))}
     </StyledRoot>
   );

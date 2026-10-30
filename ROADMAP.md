@@ -135,6 +135,25 @@ in `/tmp/admin-tabs-after.log`, `/tmp/admin-tabs-firefox.log`,
 `/tmp/admin-tabs-review.png`. This focused follow-up does not rerun the earlier
 integrated suite.
 
+Footer-volume follow-up, 2026-10-30: the native range's `appearance: none`
+removed WebKit's thumb without drawing a replacement; Chromium reproduced a
+4-pixel control. The footer now uses the shared Slider with a 12-pixel handle,
+retaining the 0–100 range, step one and mute/unmute behavior. Accessible labels
+are forwarded to the actual slider thumbs.
+
+Focused checks cover four moods at 390- and 1280-pixel widths, keyboard endpoints,
+thumb movement and dragging, and unmuting. Chromium's initial run passed four of
+five cases: two new volume cases and two existing playback cases. The remaining
+768-pixel playback case timed out at the login heading before reaching the control;
+its focused replay passes. Firefox and WebKit each pass both new cases. The
+Firefox geometry assertion rounds subpixel measurements, including the observed
+11.999992-pixel handle. Final scoped CI-image ESLint and both TypeScript
+configurations pass. Focused review found no issues, and all sixteen theme
+screenshots were visually reviewed across the three engines. Receipts are under
+`/tmp/volume-{before,after,replay,firefox-final,webkit,ci-final}.log`; review images
+are `/tmp/volume-review-mobile.png`, `/tmp/volume-review-desktop.png` and
+`/tmp/volume-review-engines.png`. The full suite was not rerun for this follow-up.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)

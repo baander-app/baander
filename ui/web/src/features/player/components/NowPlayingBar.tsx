@@ -1,4 +1,5 @@
 import { Button } from '@/shared/components/ui/button'
+import { Slider } from '@/shared/components/ui/slider'
 import styled from 'styled-components'
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
@@ -115,20 +116,6 @@ const VolumeSliderWrap = styled.div`
   display: flex;
   width: 5rem;
   align-items: center;
-
-  input[type='range'] {
-    height: 0.25rem;
-    width: 100%;
-    cursor: pointer;
-    appearance: none;
-    border-radius: 9999px;
-    background: var(--color-muted);
-    accent-color: var(--color-foreground);
-
-    &::-webkit-slider-thumb {
-      appearance: none;
-    }
-  }
 `
 
 function MusicPlayerBar() {
@@ -258,13 +245,12 @@ function VolumeSlider() {
         {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
       </VolumeButton>
       <VolumeSliderWrap>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value={muted ? 0 : volume}
-          onChange={(e) => {
-            const value = Number(e.target.value)
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={[muted ? 0 : volume]}
+          onValueChange={([value]) => {
             setVolume(value)
             if (muted && value > 0) toggleMute()
           }}

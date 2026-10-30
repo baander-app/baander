@@ -3,6 +3,52 @@ import { test, expect, catalogAlbum, catalogSong, catalogPlaylist } from './fixt
 import { setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
 
+test.describe('footer volume handle', () => {
+  test.use({ serviceWorkers: 'block' })
+
+  for (const width of [390, 1280]) {
+    test(`remains visible and draggable across themes at ${width}px`, async ({ populatedCatalog: page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await spaNavigate(page)(`/music/albums/${catalogAlbum.publicId}`)
+      await page.getByRole('button', { name: 'Play', exact: true }).first().click()
+      const volume = page.getByRole('slider', { name: 'Volume', exact: true }).first()
+      await expect(volume).toBeVisible()
+      await page.screenshot({ path: test.info().outputPath('volume-initial.png') })
+      const handle = await volume.boundingBox()
+      expect(Math.round(handle!.height)).toBeGreaterThanOrEqual(12)
+      expect(Math.round(handle!.width)).toBeGreaterThanOrEqual(12)
+
+      for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
+        await setTheme(page, mood, 'violet')
+        await volume.focus()
+        await page.keyboard.press('Home')
+        await expect(volume).toHaveAttribute('aria-valuenow', '0')
+        const start = (await volume.boundingBox())!
+        await page.keyboard.press('End')
+        await expect(volume).toHaveAttribute('aria-valuenow', '100')
+        const end = (await volume.boundingBox())!
+        expect(end.x - start.x).toBeGreaterThan(40)
+        await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2)
+        await page.mouse.down()
+        await page.mouse.move((start.x + end.x + end.width) / 2, end.y + end.height / 2, { steps: 5 })
+        await page.mouse.up()
+        const value = Number(await volume.getAttribute('aria-valuenow'))
+        expect(value).toBeGreaterThan(35)
+        expect(value).toBeLessThan(65)
+        await expectNoPageOverflow(page)
+        await page.screenshot({ path: test.info().outputPath(`volume-${mood}.png`) })
+      }
+      const mute = page.getByRole('button', { name: 'Mute', exact: true }).first()
+      await mute.click()
+      await expect(volume).toHaveAttribute('aria-valuenow', '0')
+      await volume.focus()
+      await page.keyboard.press('ArrowRight')
+      await expect(volume).toHaveAttribute('aria-valuenow', '1')
+      await expect(mute).toBeVisible()
+    })
+  }
+})
+
 for (const width of [390, 768, 1280]) {
   test(`long catalog titles and sidebar controls fit at ${width}px`, async ({ populatedCatalog: page }) => {
     await page.setViewportSize({ width, height: 800 })
@@ -57,7 +103,7 @@ for (const width of [390, 768, 1280]) {
     await expect(volume).toBeVisible()
     await volume.focus()
     await page.keyboard.press('Home')
-    await expect(volume).toHaveValue('0')
+    await expect(volume).toHaveAttribute('aria-valuenow', '0')
     await pause.click()
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0)
     await page.keyboard.press('q')
