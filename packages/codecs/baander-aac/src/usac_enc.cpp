@@ -68,19 +68,6 @@ int noise_fill_start(int is_short) { return is_short ? 20 : 160; }
 
 float sf_gain(int sf) { return exp2f(0.25f * (float)(sf - 100)); }
 
-/* ── bit copying ───────────────────────────────────────────────── */
-
-void copy_bits(AacBitWriter* w, const uint8_t* src, int nbits) {
-  int i = 0;
-  for (; i + 8 <= nbits; i += 8) {
-    aac_bitwriter_write(w, src[i >> 3], 8);
-  }
-  if (i < nbits) {
-    const int rest = nbits - i;
-    aac_bitwriter_write(w, (uint32_t)(src[i >> 3] >> (8 - rest)), rest);
-  }
-}
-
 /* ── ics_info() and tns_data() ─────────────────────────────────── */
 
 /* The window_sequence field: the stop-start window travels as
@@ -446,19 +433,25 @@ int fill_element_bits(int tail_bits) { return tail_bits >= kMinTailBits ? 1 : 18
 
 /* The SBR and MPS 212 data of the element after its core (Tables 17
  * and 18): UsacSbrData() of the SBR encoder's channels, then Mps212Data()
- * when the pair is coded as its downmix. */
-void write_element_tools(AacEncoderState* s, int e, AacBitWriter* w) {
+ * when the pair is coded as its downmix.  A frame whose Mps212Data()
+ * could not be written fails here. */
+int write_element_tools(AacEncoderState* s, int e, AacBitWriter* w) {
   AacUsacEncoder* u = s->usac;
   const AacSbrEncoder* sbr = s->sbr[e];
   if (!sbr) {
-    return;
+    return AAC_OK;
   }
   aac_sbr_enc_usac_write(sbr, w);
   u->tail_bits += sbr->payload_bits;
   if (sbr->mps) {
+    const int err = aac_mps212_enc_error(&u->mps);
+    if (err) {
+      return err;
+    }
     aac_mps212_enc_write(&u->mps, w);
     u->tail_bits += aac_mps212_enc_bits(&u->mps);
   }
+  return AAC_OK;
 }
 
 int element_tool_bits(const AacEncoderState* s, int e) {
@@ -488,8 +481,7 @@ int write_element(AacEncoderState* s, int e, AacBitWriter* w) {
     if (ret) {
       return ret;
     }
-    write_element_tools(s, e, w);
-    return AAC_OK;
+    return write_element_tools(s, e, w);
   }
   const AacEncChannel* c0 = &s->ch[el->ch[0]];
   const AacEncChannel* c1 = &s->ch[el->ch[1]];
@@ -529,8 +521,7 @@ int write_element(AacEncoderState* s, int e, AacBitWriter* w) {
       return ret;
     }
   }
-  write_element_tools(s, e, w);
-  return AAC_OK;
+  return write_element_tools(s, e, w);
 }
 
 /* An access unit of silence with the stream's element list: one long
@@ -683,16 +674,20 @@ void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* op
   AacUsacEncoderOptions o;
   o.noise_filling = !opt || opt->noise_filling < 0 ? 1 : (opt->noise_filling != 0);
   o.preroll = !opt || opt->preroll < 0 ? 1 : (opt->preroll != 0);
-  /* the interval stays 0 for the default, so that a change of the core
-   * rate can turn it into frames again */
+  /* 0 stands for the default of one second, which the core rate turns
+   * into frames (aac_usac_enc_set_core_rate) */
   o.independent_interval_frames =
       opt && opt->independent_interval_frames > 0 ? opt->independent_interval_frames : 0;
   o.stream_id = opt && opt->stream_id >= 0 && opt->stream_id <= 65535 ? opt->stream_id : -1;
   o.sbr = !opt || opt->sbr < 0 ? -1 : (opt->sbr != 0);
   o.mps212 = !opt || opt->mps212 < 0 ? -1 : (opt->mps212 != 0);
   u->opt = o;
-  u->interval = std::max(1, o.independent_interval_frames > 0 ? o.independent_interval_frames
-                                                               : (sample_rate + kLong - 1) / kLong);
+  aac_usac_enc_set_core_rate(u, sample_rate);
+}
+
+void aac_usac_enc_set_core_rate(AacUsacEncoder* u, int sample_rate) {
+  const int frames = u->opt.independent_interval_frames;
+  u->interval = std::max(1, frames > 0 ? frames : (sample_rate + kLong - 1) / kLong);
 }
 
 void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int input_channels,
@@ -701,10 +696,13 @@ void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int inpu
   int want_sbr = o->sbr >= 0 ? o->sbr : bitrate < 64000 * input_channels;
   /* The 2-1-2 is never chosen by bitrate: FFmpeg's USAC decoder rejects
    * every stereoConfigIndex 1 stream, so a caller opts in knowing the
-   * players. */
-  int want_mps = input_channels == 2 && o->mps212 > 0;
+   * players.  stereoConfigIndex exists only with an SBR ratio: the
+   * 2-1-2 brings SBR with it where the bitrate rule decides, and stays
+   * off where SBR was turned off (aac_encoder_set_usac refuses that
+   * pair of options). */
+  int want_mps = input_channels == 2 && o->mps212 > 0 && o->sbr != 0;
   if (want_mps) {
-    want_sbr = 1; /* stereoConfigIndex exists only with an SBR ratio */
+    want_sbr = 1;
   }
   if (want_sbr && (input_rate % 2 || aac_asc_rate_index(input_rate / 2) < 0)) {
     want_sbr = 0;
@@ -969,7 +967,7 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
       u->preroll_bytes = len + (len < 255 ? 1 : 3);
     }
   }
-  copy_bits(&w, u->scratch, elem_bits);
+  aac_bitwriter_write_bits(&w, u->scratch, elem_bits);
   aac_bitwriter_byte_align(&w);
   if (aac_bitwriter_overflow(&w)) {
     return AAC_ERR_OVERFLOW;
@@ -991,7 +989,7 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   if (u->opt.preroll) {
     aac_bitwriter_write(&lw, 0, 1);
   }
-  copy_bits(&lw, u->scratch, elem_bits);
+  aac_bitwriter_write_bits(&lw, u->scratch, elem_bits);
   aac_bitwriter_byte_align(&lw);
   u->last_au_len[n - 1] = aac_bitwriter_overflow(&lw) ? 0 : aac_bitwriter_bytes_written(&lw);
   u->frame_index++;

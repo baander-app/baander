@@ -101,7 +101,11 @@ export interface AacUsacOptions {
   streamId?: number;
   /** Enhanced SBR at 2:1; 'auto' (default) below 64 kbit/s per channel. */
   sbr?: AacUsacTool;
-  /** MPEG Surround 2-1-2 for stereo input; 'auto' (default) leaves it off, as FFmpeg cannot decode it. */
+  /**
+   * MPEG Surround 2-1-2 for stereo input; 'auto' (default) leaves it off,
+   * as FFmpeg cannot decode it. It runs inside SBR, so 'on' brings SBR
+   * with it and is refused together with `sbr: 'off'`.
+   */
   mps212?: AacUsacTool;
 }
 
@@ -207,9 +211,17 @@ export interface AacDecodeResult {
 export interface AacEncoderSession {
   id: number;
   profile: AacProfile;
-  /** Samples per channel per frame: 1024, or 2048 for the HE-AAC profiles. */
+  /**
+   * Samples per channel per frame: 1024, or 2048 for the HE-AAC profiles
+   * and for 'xhe' while it runs SBR (by default stereo below 128 kbit/s
+   * and mono below 64 kbit/s, or as the `sbr` option says).
+   */
   frameSize: number;
-  /** Samples of lead-in before the first input sample in the decoded output. */
+  /**
+   * Samples of lead-in before the first input sample in the decoded
+   * output: 2048 for AAC-LC, 5635 for the HE-AAC profiles and for 'xhe'
+   * while it runs SBR.
+   */
   delay: number;
   /** The AudioSpecificConfig of the stream. */
   config: Uint8Array;

@@ -160,6 +160,11 @@ int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* opti
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
   }
+  /* the 2-1-2 codes the pair's downmix in the SBR encoder's QMF domain,
+   * so it cannot be asked for with SBR turned off */
+  if (options && options->mps212 > 0 && options->sbr == 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
   aac_usac_enc_set_options(s->usac, options, s->sample_rate);
   aac_encoder_state_reset(s);
   return AAC_OK;

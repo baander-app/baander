@@ -1,5 +1,5 @@
-#include <cstdlib>
 #include <cstring>
+#include <mutex>
 
 #include "mps212_enc.h"
 #include "sbr_enc.h"
@@ -19,7 +19,6 @@
 namespace {
 
 constexpr int kRingMask = AAC_SBR_ENC_RING - 1;
-constexpr int kLookaround = AAC_MPS212_ENC_LOOKAROUND;
 
 void write_sbr_info_and_header(const AacSbrEncoder* s, AacBitWriter* w) {
   /* SbrInfo(): amplitude resolution, crossover band, no pre-flattening;
@@ -34,25 +33,37 @@ int coded_channels(const AacSbrEncoder* s) { return s->mps ? 1 : s->channels; }
 
 /* The MPS 212 parameters of the frame from the left and right channel
  * rings at the frame's slots, with the analysis window's reach on either
- * side. */
+ * side; a failure stays in the MPS encoder for the frame writer. */
 void analyze_mps(AacSbrEncoder* s, int base) {
-  const int slots = s->slots;
-  const int n = slots + 2 * kLookaround;
-  auto* L = (float(*)[64][2])malloc((size_t)n * sizeof(float[64][2]));
-  auto* R = (float(*)[64][2])malloc((size_t)n * sizeof(float[64][2]));
-  if (!L || !R) {
-    free(L);
-    free(R);
-    return;
-  }
-  for (int i = 0; i < n; i++) {
-    const int idx = (base - kLookaround + i) & kRingMask;
-    memcpy(L[i], s->left[idx], sizeof(L[i]));
-    memcpy(R[i], s->ch[1].W[idx], sizeof(R[i]));
-  }
-  aac_mps212_enc_analyze(s->mps, L, R, slots, s->usac_indep);
-  free(L);
-  free(R);
+  aac_mps212_enc_analyze(s->mps, s->left, s->ch[1].W, base, kRingMask, s->slots, s->usac_indep);
+}
+
+/* The data of a silent channel: one envelope over the frame at the
+ * lowest level, the noise floor at its lowest ratio, no inverse
+ * filtering, coded along frequency as the first frame after a start
+ * must be.  The USAC form always runs 1024-line core frames, so the
+ * grid's length is fixed and the channel is built once. */
+constexpr int kUsacTimeSlots = AAC_FRAME_SIZE_LONG / 64;
+
+const AacSbrEncChannel* silent_channel(void) {
+  static AacSbrEncChannel z;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    AacSbrGrid* g = &z.grid;
+    g->frame_class = 0;
+    g->num_env = 1;
+    g->t_env[0] = 0;
+    g->t_env[1] = kUsacTimeSlots;
+    g->freq_res[0] = 0;
+    g->amp_res = 0;
+    g->num_noise = 1;
+    g->t_q[0] = 0;
+    g->t_q[1] = kUsacTimeSlots;
+    for (int j = 0; j < AAC_SBR_MAX_NOISE_BANDS; j++) {
+      z.noise_q[0][j] = 30;
+    }
+  });
+  return &z;
 }
 
 }  // namespace
@@ -136,37 +147,12 @@ void aac_sbr_enc_usac_frame(AacSbrEncoder* s, int base, const int (*prev_env)[AA
 }
 
 void aac_sbr_enc_usac_write(const AacSbrEncoder* s, AacBitWriter* w) {
-  int i = 0;
-  for (; i + 8 <= s->payload_bits; i += 8) {
-    aac_bitwriter_write(w, s->payload[i >> 3], 8);
-  }
-  if (i < s->payload_bits) {
-    const int rest = s->payload_bits - i;
-    aac_bitwriter_write(w, (uint32_t)(s->payload[i >> 3] >> (8 - rest)), rest);
-  }
+  aac_bitwriter_write_bits(w, s->payload, s->payload_bits);
 }
 
 void aac_sbr_enc_usac_write_silent(const AacSbrEncoder* s, AacBitWriter* w) {
-  /* one envelope over the frame at the lowest level, the noise floor at
-   * its lowest ratio, no inverse filtering: the data of a silent channel
-   * coded along frequency, as the first frame after a start must be */
-  auto* z = (AacSbrEncChannel*)calloc(1, sizeof(AacSbrEncChannel));
-  if (!z) {
-    return;
-  }
-  AacSbrGrid* g = &z->grid;
-  g->frame_class = 0;
-  g->num_env = 1;
-  g->t_env[0] = 0;
-  g->t_env[1] = s->time_slots;
-  g->freq_res[0] = 0;
-  g->amp_res = 0;
-  g->num_noise = 1;
-  g->t_q[0] = 0;
-  g->t_q[1] = s->time_slots;
-  for (int j = 0; j < AAC_SBR_MAX_NOISE_BANDS; j++) {
-    z->noise_q[0][j] = 30;
-  }
+  const AacSbrEncChannel* z = silent_channel();
+  const AacSbrGrid* g = &z->grid;
   const int nch = coded_channels(s);
   const int zero_env[AAC_SBR_MAX_BANDS] = {0};
   const int zero_noise[AAC_SBR_MAX_NOISE_BANDS] = {0};
@@ -191,5 +177,4 @@ void aac_sbr_enc_usac_write_silent(const AacSbrEncoder* s, AacBitWriter* w) {
   for (int c = 0; c < nch; c++) {
     aac_bitwriter_write(w, 0, 1); /* bs_add_harmonic_flag */
   }
-  free(z);
 }

@@ -363,6 +363,17 @@ void aac_bitwriter_write_bytes(AacBitWriter* w, const uint8_t* data, int len) {
   }
 }
 
+void aac_bitwriter_write_bits(AacBitWriter* w, const uint8_t* data, int nbits) {
+  int i = 0;
+  for (; i + 8 <= nbits; i += 8) {
+    aac_bitwriter_write(w, data[i >> 3], 8);
+  }
+  if (i < nbits) {
+    const int rest = nbits - i;
+    aac_bitwriter_write(w, (uint32_t)(data[i >> 3] >> (8 - rest)), rest);
+  }
+}
+
 void aac_bitwriter_byte_align(AacBitWriter* w) {
   if (w->bit_pos > 0) {
     w->byte_pos++;

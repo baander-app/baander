@@ -824,6 +824,9 @@ void aac_sbr_enc_reset(AacSbrEncoder* s) {
     memset(ch->prev_noise_q, 0, sizeof(ch->prev_noise_q));
     memset(ch->prev_invf, 0, sizeof(ch->prev_invf));
   }
+  /* the left channel's ring, which the PS and MPS 212 analyses read
+   * around the frame, holds nothing of the previous stream either */
+  memset(s->left, 0, sizeof(s->left));
   s->frames_since_header = s->header_interval; /* the first frame carries one */
   s->frame_count = 0;
   s->pos = 0;

@@ -126,10 +126,15 @@ void aac_usac_enc_destroy(AacUsacEncoder* u);
  * the element layout for them. */
 void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt,
                               int sample_rate);
+/* Turns the options' independent frame interval into frames of the core
+ * rate `sample_rate` (half the output rate with SBR); called again when
+ * the tools change the core rate. */
+void aac_usac_enc_set_core_rate(AacUsacEncoder* u, int sample_rate);
 /* The tools the options and the bitrate ask for: SBR below 64 kbit/s
- * per input channel, MPS 212 for a stereo input below 48 kbit/s (which
- * needs SBR), each overridden by its option; SBR only when the input
- * rate halves to a rate with core tables. */
+ * per input channel unless its option decides, MPS 212 for a stereo
+ * input only when its option asks for it, and then with SBR, which it
+ * needs (never with SBR turned off); SBR only when the input rate halves
+ * to a rate with core tables. */
 void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int input_channels,
                                int bitrate, int* sbr, int* mps);
 /* Keeps a configuration extension (usacConfigExtType, payload bytes)

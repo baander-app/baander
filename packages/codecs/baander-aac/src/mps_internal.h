@@ -52,6 +52,13 @@ int aac_mps_ec_pair_read(AacBitReader* r, int type, int (*out)[AAC_MPS_MAX_PARAM
                          int bands, int pair, int coarse, int time_ref, const int* history,
                          int flags);
 
+/* The PCM coding of EcDataPair() (ISO/IEC 23003-1 7.x): values of a
+ * quantiser with `levels` levels travel in groups of aac_mps_pcm_group()
+ * values, each group one word of aac_mps_pcm_bits() bits that holds the
+ * values as digits of base `levels`, the first value most significant. */
+int aac_mps_pcm_group(int levels);
+int aac_mps_pcm_bits(int levels, int group);
+
 /* The parameter band groups of a stride (bsFreqResStride): map[0..groups]
  * are the group borders; returns the number of groups. */
 int aac_mps_band_map(int bands, int stride, int* map);

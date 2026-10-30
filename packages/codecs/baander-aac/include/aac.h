@@ -196,7 +196,8 @@ int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data,
  * writes LOAS/LATM by default, raw access units with the USAC
  * AudioSpecificConfig (aac_encoder_config) for MP4, and refuses ADTS,
  * which cannot carry the object type, with AAC_ERR_UNSUPPORTED.  The
- * delay is that of AAC-LC (aac_encoder_delay). */
+ * delay (aac_encoder_delay) and frame size are AAC-LC's, or HE-AAC's
+ * when the stream runs SBR (see the sbr option below). */
 typedef struct AacUsacEncoderOptions_ {
   /* Noise filling of the lines quantised to zero (default on). */
   int noise_filling;
@@ -217,12 +218,15 @@ typedef struct AacUsacEncoderOptions_ {
   /* MPEG Surround 2-1-2 for stereo input (one core channel plus the
    * spatial parameters, stereoConfigIndex 1): 1 on, 0 or -1 off (the
    * default: the stock FFmpeg decoder cannot decode such a pair, so the
-   * tool is only ever opted into for players known to handle it). */
+   * tool is only ever opted into for players known to handle it).  The
+   * tool runs in the SBR encoder's filterbank, so with it on `sbr` must
+   * be 1 or -1 (then SBR is on whatever the bitrate). */
   int mps212;
 } AacUsacEncoderOptions;
 /* Applies the options before the first frame (AAC_ERR_STATE after it);
- * AAC_ERR_UNSUPPORTED for another object type.  A field outside its
- * range takes the default. */
+ * AAC_ERR_UNSUPPORTED for another object type, AAC_ERR_INVALID_ARG for
+ * `mps212` on with `sbr` off (the options then stay as they were).  Any
+ * other field outside its range takes the default. */
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
 
 /* ── Loudness measurement ────────────────────────────────────────── */

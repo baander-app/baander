@@ -47,7 +47,8 @@ struct Profile {
   int frame_length; /* 0 keeps the default */
   int afterburner;
   int channels;
-  int drc; /* the encoder writes DRC metadata and the decoder applies it */
+  int drc;    /* the encoder writes DRC metadata and the decoder applies it */
+  int mps212; /* xHE-AAC: the stereo pair through MPEG Surround 2-1-2 */
 };
 
 static const Profile kProfiles[] = {
@@ -63,6 +64,11 @@ static const Profile kProfiles[] = {
     {"LD 512", AAC_AOT_ER_LD, 64000, 512, 0, 2, 0},
     {"LD 480", AAC_AOT_ER_LD, 64000, 480, 0, 2, 0},
     {"ELD 512", AAC_AOT_ER_ELD, 64000, 512, 0, 2, 0},
+    /* xHE-AAC in LOAS: the plain core, enhanced SBR by the bitrate rule,
+     * and the pair coded as its downmix with the 2-1-2 parameters. */
+    {"xHE-AAC core", AAC_AOT_USAC, 128000, 0, 0, 2, 0},
+    {"xHE-AAC SBR", AAC_AOT_USAC, 48000, 0, 0, 2, 0},
+    {"xHE-AAC 2-1-2", AAC_AOT_USAC, 32000, 0, 0, 2, 0, 1},
 };
 
 static const int kSettleFrames = 8;
@@ -84,6 +90,16 @@ static void test_profile(const Profile& p) {
   if (p.drc) {
     CHECK(aac_encoder_set_metadata(enc, AAC_DRC_FILM_STANDARD, 124) == AAC_OK, "%s: metadata",
           p.name);
+  }
+  if (p.mps212) {
+    AacUsacEncoderOptions o;
+    o.noise_filling = -1;
+    o.preroll = -1;
+    o.independent_interval_frames = 0;
+    o.stream_id = -1;
+    o.sbr = -1;
+    o.mps212 = 1;
+    CHECK(aac_encoder_set_usac(enc, &o) == AAC_OK, "%s: the 2-1-2", p.name);
   }
   const int frame = aac_encoder_frame_size(enc);
   const int total_frames = kSettleFrames + kSteadyFrames;
@@ -149,7 +165,7 @@ static void test_profile(const Profile& p) {
 
   /* The one-shot decode of single ADTS frames takes the same path
    * without the FIFO. */
-  if (p.aot != AAC_AOT_ER_LD && p.aot != AAC_AOT_ER_ELD) {
+  if (p.aot != AAC_AOT_ER_LD && p.aot != AAC_AOT_ER_ELD && p.aot != AAC_AOT_USAC) {
     dec = aac_decoder_create(sr, 2);
     if (p.frame_length == 960) {
       aac_decoder_set_frame_length(dec, 960);

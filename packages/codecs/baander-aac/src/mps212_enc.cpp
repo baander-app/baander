@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "mps212.h"
+#include "mps_internal.h"
 
 /* MPS 212 encoder (ISO/IEC 23003-3 7.11, ISO/IEC 23003-1 OTT box).  The
  * parameters of a frame describe the slots the decoder applies them to:
@@ -107,76 +108,57 @@ void books_init(void) {
 
 int lav_of(int type, int cls) { return type == kCld ? 2 * cls + 3 : 2 * cls + 1; }
 
-void put_code(AacBitWriter* w, const Book* b, int sym) {
+/* Writes the code of `sym` (-1 the escape), or returns AAC_ERR_ENCODE
+ * for a symbol the book has no code for, so that the frame fails
+ * instead of carrying a payload the decoder cannot parse. */
+int put_code(AacBitWriter* w, const Book* b, int sym) {
+  if (sym > 255) {
+    return AAC_ERR_ENCODE;
+  }
   const int idx = sym < 0 ? 256 : sym;
+  if (b->len[idx] == 0) {
+    return AAC_ERR_ENCODE;
+  }
   aac_bitwriter_write(w, b->code[idx], b->len[idx]);
+  return AAC_OK;
 }
 
 /* ── EcDataPair() (ISO/IEC 23003-1 Table 7.x), one set, fine scale ── */
 
 /* PCM words of `levels` levels, grouped as the decoder reads them. */
-int pcm_group(int levels) {
-  switch (levels) {
-    case 3:
-      return 5;
-    case 7:
-      return 6;
-    case 11:
-      return 2;
-    case 13:
-    case 19:
-    case 51:
-      return 4;
-    case 25:
-      return 3;
-    default:
-      return 1;
-  }
-}
-
-int bits_for(int levels, int group) {
-  uint64_t n = 1;
-  for (int i = 0; i < group; i++) {
-    n *= (uint64_t)levels;
-  }
-  int b = 0;
-  while (((uint64_t)1 << b) < n) {
-    b++;
-  }
-  return b;
-}
-
 void write_pcm(AacBitWriter* w, const int* vals, int num, int levels) {
-  const int group = pcm_group(levels);
+  const int group = aac_mps_pcm_group(levels);
   for (int i = 0; i < num; i += group) {
     const int n = std::min(group, num - i);
     uint64_t word = 0;
     for (int k = 0; k < n; k++) {
       word = word * (uint64_t)levels + (uint64_t)vals[i + k];
     }
-    aac_bitwriter_write(w, (uint32_t)word, bits_for(levels, n));
+    aac_bitwriter_write(w, (uint32_t)word, aac_mps_pcm_bits(levels, n));
   }
 }
 
 /* One-dimensional codes of `num` differences in direction `d`, with the
  * first value of a frequency-coded set in front. */
-void write_1d(AacBitWriter* w, int type, int d, const int* first, const int* diff, int num) {
+int write_1d(AacBitWriter* w, int type, int d, const int* first, const int* diff, int num) {
+  int ret = AAC_OK;
   if (first) {
-    put_code(w, &g_books.first[type], *first);
+    ret = put_code(w, &g_books.first[type], *first);
   }
-  for (int i = 0; i < num; i++) {
+  for (int i = 0; i < num && !ret; i++) {
     const int v = diff[i];
-    put_code(w, &g_books.one[type][d], std::abs(v));
+    ret = put_code(w, &g_books.one[type][d], std::abs(v));
     if (v != 0) {
       aac_bitwriter_write(w, v < 0 ? 1u : 0u, 1);
     }
   }
+  return ret;
 }
 
 /* Two-dimensional codes of an even number of differences as frequency
  * pairs: the LAV class, the first value, each pair's code with its sign
  * and swap bits, and the pairs without a code escaped at the end. */
-void write_2d(AacBitWriter* w, int type, int d, const int* first, const int* diff, int num) {
+int write_2d(AacBitWriter* w, int type, int d, const int* first, const int* diff, int num) {
   int max_abs = 0;
   for (int i = 0; i < num; i++) {
     max_abs = std::max(max_abs, std::abs(diff[i]));
@@ -186,14 +168,14 @@ void write_2d(AacBitWriter* w, int type, int d, const int* first, const int* dif
     cls++;
   }
   const int lav = lav_of(type, cls);
-  put_code(w, &g_books.lav, cls);
-  if (first) {
-    put_code(w, &g_books.first[type], *first);
+  int ret = put_code(w, &g_books.lav, cls);
+  if (first && !ret) {
+    ret = put_code(w, &g_books.first[type], *first);
   }
   const Book* book = &g_books.two[type][cls][d];
   int esc[2 * kMaxPb];
   int num_esc = 0;
-  for (int i = 0; i + 1 < num + 1 && i < num; i += 2) {
+  for (int i = 0; i < num && !ret; i += 2) {
     const int d0 = diff[i];
     const int d1 = diff[i + 1];
     bool done = false;
@@ -252,21 +234,22 @@ void write_2d(AacBitWriter* w, int type, int d, const int* first, const int* dif
       }
     }
     if (!done) {
-      put_code(w, book, -1);
+      ret = put_code(w, book, -1);
       esc[num_esc++] = d0 + lav;
       esc[num_esc++] = d1 + lav;
     }
   }
-  if (num_esc > 0) {
+  if (num_esc > 0 && !ret) {
     write_pcm(w, esc, num_esc, 2 * lav + 1);
   }
+  return ret;
 }
 
 /* EcDataPair() of one set of `bands` quantiser indices against the
  * decoder's history, Huffman coded along frequency or, when allowed and
  * cheaper, against the history. */
-void write_ec_pair(AacBitWriter* w, int type, const int* v, int bands, int time_ref,
-                   const int* history) {
+int write_ec_pair(AacBitWriter* w, int type, const int* v, int bands, int time_ref,
+                  const int* history) {
   const int offset = type == kCld ? 15 : 0;
   aac_bitwriter_write(w, 0, 1); /* bsPcmCoding */
   int s1[kMaxPb];
@@ -302,25 +285,26 @@ void write_ec_pair(AacBitWriter* w, int type, const int* v, int bands, int time_
   const int* rest = diff1 == 0 ? d1 + 1 : d1;
   const int n = diff1 == 0 ? bands - 1 : bands;
   if (!two_d) {
-    write_1d(w, type, diff1, first, rest, n);
-  } else {
-    const int even = n & ~1;
-    write_2d(w, type, diff1, first, rest, even);
-    if (n & 1) {
-      write_1d(w, type, diff1, nullptr, rest + even, 1);
-    }
+    return write_1d(w, type, diff1, first, rest, n);
   }
+  const int even = n & ~1;
+  const int ret = write_2d(w, type, diff1, first, rest, even);
+  if (ret || !(n & 1)) {
+    return ret;
+  }
+  return write_1d(w, type, diff1, nullptr, rest + even, 1);
 }
 
 /* EcData() of one coded set (bsDataMode 3) on the fine quantiser with
  * stride 1; the history follows the decoder's. */
-void write_ecdata(AacBitWriter* w, int type, const int* v, int bands, int indep, int* history) {
+int write_ecdata(AacBitWriter* w, int type, const int* v, int bands, int indep, int* history) {
   aac_bitwriter_write(w, 3, 2); /* bsDataMode */
   aac_bitwriter_write(w, 0, 1); /* bsDataPair */
   aac_bitwriter_write(w, 0, 1); /* bsQuantCoarse */
   aac_bitwriter_write(w, 0, 2); /* bsFreqResStride */
-  write_ec_pair(w, type, v, bands, !indep, history);
+  const int ret = write_ec_pair(w, type, v, bands, !indep, history);
   memcpy(history, v, (size_t)bands * sizeof(int));
+  return ret;
 }
 
 /* ── the analysis of the split QMF bands ───────────────────────── */
@@ -354,11 +338,11 @@ int hybrid_band_of(double f) {
 }
 
 /* Adds the energies of the two channels and their cross power per
- * parameter band from the transform of QMF band `b` over the `n` slots
- * at `l` and `r`, `centre` the frame's position in the window. */
+ * parameter band from the transform of QMF band `b` over the `n` ring
+ * slots from `start` of `l` and `r`. */
 void accumulate_split_band(const AacMps212Encoder* m, const float (*l)[64][2],
-                           const float (*r)[64][2], int n, int b, double* ea, double* eb,
-                           double* pab) {
+                           const float (*r)[64][2], int start, int mask, int n, int b,
+                           double* ea, double* eb, double* pab) {
   float w[kMaxWindow];
   float tw[kMaxWindow][2];
   for (int t = 0; t < n; t++) {
@@ -370,12 +354,13 @@ void accumulate_split_band(const AacMps212Encoder* m, const float (*l)[64][2],
     float lr = 0.0f, li = 0.0f, rr = 0.0f, ri = 0.0f;
     for (int t = 0; t < n; t++) {
       const int k = (int)(((long)bin * t) % n + n) % n;
+      const int idx = (start + t) & mask;
       const float cr = w[t] * tw[k][0];
       const float ci = w[t] * tw[k][1];
-      lr += cr * l[t][b][0] - ci * l[t][b][1];
-      li += cr * l[t][b][1] + ci * l[t][b][0];
-      rr += cr * r[t][b][0] - ci * r[t][b][1];
-      ri += cr * r[t][b][1] + ci * r[t][b][0];
+      lr += cr * l[idx][b][0] - ci * l[idx][b][1];
+      li += cr * l[idx][b][1] + ci * l[idx][b][0];
+      rr += cr * r[idx][b][0] - ci * r[idx][b][1];
+      ri += cr * r[idx][b][1] + ci * r[idx][b][0];
     }
     /* the bin's frequency in band widths: the slot rate spans two
      * bands, and the band's content lies in the alias nearest its
@@ -415,8 +400,7 @@ int quantise_icc(double rho) {
 
 /* ── public ────────────────────────────────────────────────────── */
 
-void aac_mps212_enc_init(AacMps212Encoder* m, int bitrate) {
-  (void)bitrate;
+void aac_mps212_enc_init(AacMps212Encoder* m) {
   books_init();
   memset(m, 0, sizeof(*m));
   m->freq_res = kFreqRes;
@@ -443,6 +427,7 @@ void aac_mps212_enc_reset(AacMps212Encoder* m) {
   memset(m->hist_icc, 0, sizeof(m->hist_icc));
   m->have_hist = 0;
   m->payload_bits = 0;
+  m->error = 0;
 }
 
 void aac_mps212_enc_config(const AacMps212Encoder* m, AacUsacMps212Config* c) {
@@ -491,16 +476,17 @@ void aac_mps212_enc_downmix(AacMps212Encoder* m, const float (*l)[64][2], const 
   memcpy(m->gain_prev, gain, sizeof(gain));
 }
 
-void aac_mps212_enc_analyze(AacMps212Encoder* m, const float (*l)[64][2], const float (*r)[64][2],
-                            int slots, int indep) {
+int aac_mps212_enc_analyze(AacMps212Encoder* m, const float (*l)[64][2], const float (*r)[64][2],
+                           int base, int mask, int slots, int indep) {
   double ea[kMaxPb] = {};
   double eb[kMaxPb] = {};
   double pab[kMaxPb] = {};
   const int n = std::min(kMaxWindow, slots + 2 * kLookaround);
   for (int b = 0; b < kLfBands; b++) {
-    accumulate_split_band(m, l, r, n, b, ea, eb, pab);
+    accumulate_split_band(m, l, r, base - kLookaround, mask, n, b, ea, eb, pab);
   }
-  for (int t = kLookaround; t < kLookaround + slots; t++) {
+  for (int i = 0; i < slots; i++) {
+    const int t = (base + i) & mask;
     for (int b = kLfBands; b < 64; b++) {
       const int pb = m->kernel[7 + b];
       ea[pb] += (double)l[t][b][0] * l[t][b][0] + (double)l[t][b][1] * l[t][b][1];
@@ -520,23 +506,25 @@ void aac_mps212_enc_analyze(AacMps212Encoder* m, const float (*l)[64][2], const 
   if (!indep) {
     aac_bitwriter_write(&w, time_ok ? 0u : 1u, 1); /* bsIndependencyFlag */
   }
-  write_ecdata(&w, kCld, m->cld, m->num_bands, !time_ok, m->hist_cld);
-  write_ecdata(&w, kIcc, m->icc, m->num_bands, !time_ok, m->hist_icc);
+  int ret = write_ecdata(&w, kCld, m->cld, m->num_bands, !time_ok, m->hist_cld);
+  if (!ret) {
+    ret = write_ecdata(&w, kIcc, m->icc, m->num_bands, !time_ok, m->hist_icc);
+  }
+  if (!ret && aac_bitwriter_overflow(&w)) {
+    ret = AAC_ERR_OVERFLOW;
+  }
   m->have_hist = 1;
-  m->payload_bits = aac_bitwriter_bits_written(&w);
+  m->error = ret;
+  m->payload_bits = ret ? 0 : aac_bitwriter_bits_written(&w);
+  return ret;
 }
 
 int aac_mps212_enc_bits(const AacMps212Encoder* m) { return m->payload_bits; }
 
+int aac_mps212_enc_error(const AacMps212Encoder* m) { return m->error; }
+
 void aac_mps212_enc_write(const AacMps212Encoder* m, AacBitWriter* w) {
-  int i = 0;
-  for (; i + 8 <= m->payload_bits; i += 8) {
-    aac_bitwriter_write(w, m->payload[i >> 3], 8);
-  }
-  if (i < m->payload_bits) {
-    const int rest = m->payload_bits - i;
-    aac_bitwriter_write(w, (uint32_t)(m->payload[i >> 3] >> (8 - rest)), rest);
-  }
+  aac_bitwriter_write_bits(w, m->payload, m->payload_bits);
 }
 
 void aac_mps212_enc_write_silent(AacBitWriter* w) {

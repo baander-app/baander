@@ -1503,7 +1503,7 @@ void apply_usac_tools(AacEncoderState* s) {
     u->mps_active = mps;
     u->preroll_frames = sbr ? AAC_USAC_ENC_PREROLL_FRAMES_SBR : AAC_USAC_ENC_PREROLL_FRAMES;
     if (mps) {
-      aac_mps212_enc_init(&u->mps, s->bitrate);
+      aac_mps212_enc_init(&u->mps);
     }
     if (!sbr || create_usac_sbr_encoders(s) == AAC_OK) {
       break;
@@ -1512,8 +1512,7 @@ void apply_usac_tools(AacEncoderState* s) {
     sbr = 0;
     mps = 0;
   }
-  const AacUsacEncoderOptions opt = u->opt;
-  aac_usac_enc_set_options(u, &opt, s->sample_rate);
+  aac_usac_enc_set_core_rate(u, s->sample_rate);
   apply_frame_length(s);
   aac_encoder_state_configure(s);
 }

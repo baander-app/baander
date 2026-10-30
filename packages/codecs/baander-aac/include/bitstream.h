@@ -57,6 +57,8 @@ void aac_bitwriter_init(AacBitWriter* w, uint8_t* data, int capacity);
 void aac_bitwriter_write(AacBitWriter* w, uint32_t value, int nbits);
 /* Writes `len` whole bytes at the current bit position. */
 void aac_bitwriter_write_bytes(AacBitWriter* w, const uint8_t* data, int len);
+/* Writes the first `nbits` bits of `data`, most significant bit first. */
+void aac_bitwriter_write_bits(AacBitWriter* w, const uint8_t* data, int nbits);
 int aac_bitwriter_overflow(const AacBitWriter* w);
 /* Writes one spectral codeword for the dim values in v, with sign bits and
  * escape sequences.  Returns 0, or AAC_ERR_INVALID_ARG when a value does not

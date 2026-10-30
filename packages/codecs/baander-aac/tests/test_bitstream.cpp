@@ -35,6 +35,23 @@ static void test_bits() {
   CHECK(aac_bitreader_read(&r, 8) == (uint32_t)((buf[1] & 0x0F) << 4), "tail bits then zeros");
   CHECK(r.overread, "overread flagged");
 
+  /* A bit string of whole bytes and a tail, placed at an odd bit
+   * position, reads back bit for bit. */
+  const uint8_t bits[3] = {0xA5, 0x3C, 0xE0}; /* 19 bits: the last byte's top three */
+  aac_bitwriter_init(&w, buf, sizeof(buf));
+  aac_bitwriter_write(&w, 5, 3);
+  aac_bitwriter_write_bits(&w, bits, 19);
+  aac_bitwriter_write(&w, 1, 1);
+  CHECK(aac_bitwriter_bits_written(&w) == 23, "write_bits advances by the bit count");
+  aac_bitreader_init(&r, buf, sizeof(buf));
+  CHECK(aac_bitreader_read(&r, 3) == 5 && aac_bitreader_read(&r, 8) == 0xA5 &&
+            aac_bitreader_read(&r, 8) == 0x3C && aac_bitreader_read(&r, 3) == 7 &&
+            aac_bitreader_read(&r, 1) == 1,
+        "write_bits keeps the bit order across byte borders");
+  aac_bitwriter_init(&w, buf, sizeof(buf));
+  aac_bitwriter_write_bits(&w, bits, 0);
+  CHECK(aac_bitwriter_bits_written(&w) == 0, "write_bits of nothing writes nothing");
+
   /* Writing past the capacity flags the overflow. */
   aac_bitwriter_init(&w, buf, 1);
   aac_bitwriter_write(&w, 0xFF, 8);

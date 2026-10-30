@@ -615,17 +615,28 @@ int lav_of(int type, int sym) {
 
 /* ── EcDataPair(): the non-linear coding of one or two sets ─────── */
 
-struct EcReader {
-  AacBitReader* r;
-  int type;
-  int bands;  /* coded values per set */
-  int levels; /* quantiser levels */
-  int offset; /* index of the lowest level */
-  int lsb;    /* 1 when the fine quantiser's lowest bit is coded apart */
-  int err;
-};
+}  // namespace
 
-int bits_for(int levels, int group) {
+int aac_mps_pcm_group(int levels) {
+  switch (levels) {
+    case 3:
+      return 5;
+    case 7:
+      return 6;
+    case 11:
+      return 2;
+    case 13:
+    case 19:
+    case 51:
+      return 4;
+    case 25:
+      return 3;
+    default:
+      return 1;
+  }
+}
+
+int aac_mps_pcm_bits(int levels, int group) {
   uint64_t n = 1;
   for (int i = 0; i < group; i++) {
     n *= (uint64_t)levels;
@@ -637,35 +648,25 @@ int bits_for(int levels, int group) {
   return b;
 }
 
+namespace {
+
+struct EcReader {
+  AacBitReader* r;
+  int type;
+  int bands;  /* coded values per set */
+  int levels; /* quantiser levels */
+  int offset; /* index of the lowest level */
+  int lsb;    /* 1 when the fine quantiser's lowest bit is coded apart */
+  int err;
+};
+
 /* PCM coded values in groups: `num` values into out1 (and out2 when both
  * are given, alternating), minus `offset`. */
 void pcm_decode(EcReader* c, int* out1, int* out2, int offset, int num, int levels) {
-  int group;
-  switch (levels) {
-    case 3:
-      group = 5;
-      break;
-    case 7:
-      group = 6;
-      break;
-    case 11:
-      group = 2;
-      break;
-    case 13:
-    case 19:
-    case 51:
-      group = 4;
-      break;
-    case 25:
-      group = 3;
-      break;
-    default:
-      group = 1;
-      break;
-  }
+  const int group = aac_mps_pcm_group(levels);
   for (int i = 0; i < num; i += group) {
     const int n = num - i < group ? num - i : group;
-    uint32_t word = aac_bitreader_read(c->r, bits_for(levels, n));
+    uint32_t word = aac_bitreader_read(c->r, aac_mps_pcm_bits(levels, n));
     for (int j = 0; j < n; j++) {
       const int idx = i + (n - j - 1);
       const int v = (int)(word % (uint32_t)levels) - offset;

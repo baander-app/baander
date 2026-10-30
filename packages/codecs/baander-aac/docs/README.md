@@ -513,7 +513,8 @@ USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
 AAC DRC metadata are refused, as the USAC frame has no place for them;
 `aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
 frame interval, a stream identifier, and whether enhanced SBR and MPS 212
-are on, off or chosen by bitrate; `aac_encoder_set_loudness_info` adds the
+are on, off or chosen by bitrate (MPS 212 needs SBR, so asking for it
+with SBR off is refused); `aac_encoder_set_loudness_info` adds the
 loudness info set (see Loudness). The AAC-LC output is unchanged byte for
 byte.
 
@@ -616,7 +617,10 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
   silence: 2048 for AAC-LC (one block of lookahead for block switching
   plus the transform overlap; 1920 with 960-sample frames), 5635 at the
   input rate for HE-AAC (the core delay at half rate plus the QMF chains
-  of encoder and decoder; 5379 with 960-sample frames).
+  of encoder and decoder; 5379 with 960-sample frames). xHE-AAC has
+  AAC-LC's delay and frame size with the plain core and HE-AAC's while
+  it runs SBR (by default stereo below 128 kbit/s and mono below
+  64 kbit/s; `aac_encoder_frame_size` and `aac_encoder_delay` say which).
 - `aac_encoder_flush` drains the delay: with ADTS or LOAS it writes the
   remaining frames (two, or three with SBR) back to back and returns
   their total length, then 0 until the next `aac_encoder_encode`; with a

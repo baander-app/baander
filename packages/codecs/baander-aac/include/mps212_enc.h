@@ -40,11 +40,12 @@ using AacMps212Encoder = struct AacMps212Encoder_ {
   int have_hist; /* delta coding in time is possible */
   uint8_t payload[AAC_MPS212_ENC_MAX_BYTES];
   int payload_bits;
+  int error; /* the last analysed frame's Mps212Data() could not be written */
 };
 
-/* Chooses the configuration for the element's bitrate (bits per
- * second) and clears the state. */
-void aac_mps212_enc_init(AacMps212Encoder* m, int bitrate);
+/* Sets the fixed configuration (20 parameter bands, 4.5 dB of downmix
+ * headroom) and clears the state. */
+void aac_mps212_enc_init(AacMps212Encoder* m);
 void aac_mps212_enc_reset(AacMps212Encoder* m);
 
 /* Mps212Config() of the stream. */
@@ -58,16 +59,22 @@ void aac_mps212_enc_config(const AacMps212Encoder* m, AacUsacMps212Config* c);
 void aac_mps212_enc_downmix(AacMps212Encoder* m, const float (*l)[64][2], const float (*r)[64][2],
                             float (*out)[64][2], int slots);
 
-/* Estimates the parameters of one frame from `slots` QMF slots of the
- * left and right channel, with AAC_MPS212_ENC_LOOKAROUND slots of
- * history before and lookahead after them (the analysis window of the
- * split bands is centred on the frame), and writes Mps212Data() into the
- * payload; `indep` is the frame's usacIndependencyFlag. */
-void aac_mps212_enc_analyze(AacMps212Encoder* m, const float (*l)[64][2], const float (*r)[64][2],
-                            int slots, int indep);
+/* Estimates the parameters of one frame from the rings `l` and `r` of
+ * QMF slots of the left and right channel (a power of two slots long,
+ * `mask` one less than that): the frame's `slots` slots from ring
+ * position `base`, with AAC_MPS212_ENC_LOOKAROUND slots of history
+ * before and lookahead after them (the analysis window of the split
+ * bands is centred on the frame), and writes Mps212Data() into the
+ * payload; `indep` is the frame's usacIndependencyFlag.  Returns 0, or
+ * AAC_ERR_ENCODE / AAC_ERR_OVERFLOW when the data cannot be written,
+ * which aac_mps212_enc_error repeats until the next frame. */
+int aac_mps212_enc_analyze(AacMps212Encoder* m, const float (*l)[64][2], const float (*r)[64][2],
+                           int base, int mask, int slots, int indep);
 
-/* Bits of the Mps212Data() of this frame, and its writer. */
+/* Bits of the Mps212Data() of this frame (0 after a failure), the
+ * failure of its analysis, and its writer. */
 int aac_mps212_enc_bits(const AacMps212Encoder* m);
+int aac_mps212_enc_error(const AacMps212Encoder* m);
 void aac_mps212_enc_write(const AacMps212Encoder* m, AacBitWriter* w);
 
 /* Mps212Data() of an independent frame with the default parameters

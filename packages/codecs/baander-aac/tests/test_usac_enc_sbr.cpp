@@ -177,11 +177,47 @@ void test_config() {
   check_config(kRate, 2, 128000, &o, {1, 0}, "stereo 128k with SBR");
   o = options(-1, 1);
   check_config(kRate, 2, 96000, &o, {1, 1}, "stereo 96k with the 2-1-2");
-  o = options(0, 1);
-  check_config(kRate, 2, 32000, &o, {1, 1}, "stereo 32k: the 2-1-2 turns SBR on");
   /* A rate whose half the configuration cannot carry stays with the
    * plain core. */
   check_config(8000, 1, 16000, nullptr, {0, 0}, "mono 16k at 8 kHz");
+}
+
+/* stereoConfigIndex of the channel pair in the encoder's configuration,
+ * or -1 when the configuration does not parse. */
+int stereo_config_index(AacEncoderHandle enc) {
+  uint8_t asc[AAC_USAC_MAX_CONFIG_BYTES + 16];
+  const int len = aac_encoder_config(enc, asc, (int)sizeof(asc));
+  AacAsc parsed;
+  memset(&parsed, 0, sizeof(parsed));
+  if (len <= 0 || aac_asc_parse(asc, len, &parsed) != AAC_OK || parsed.usac.num_elements != 3) {
+    return -1;
+  }
+  return parsed.usac.elem[1].stereo_config_index;
+}
+
+/* The 2-1-2 with SBR turned off is refused, and the options the encoder
+ * had stay in force. */
+void test_refused_options() {
+  AacUsacEncoderOptions o = options(-1, 1);
+  AacEncoderHandle enc = make_encoder(kRate, 2, 32000, &o);
+  if (!enc) {
+    return;
+  }
+  CHECK(stereo_config_index(enc) == 1 && aac_encoder_frame_size(enc) == kFrame,
+        "the 2-1-2 with SBR by bitrate is on");
+  o = options(0, 1);
+  CHECK(aac_encoder_set_usac(enc, &o) == AAC_ERR_INVALID_ARG, "the 2-1-2 without SBR is refused");
+  CHECK(stereo_config_index(enc) == 1 && aac_encoder_frame_size(enc) == kFrame,
+        "the refused options left the accepted ones in force");
+  o = options(0, 0);
+  CHECK(aac_encoder_set_usac(enc, &o) == AAC_OK && stereo_config_index(enc) == 0 &&
+            aac_encoder_frame_size(enc) == kCore,
+        "both tools off is accepted");
+  o = options(1, 1);
+  CHECK(aac_encoder_set_usac(enc, &o) == AAC_OK && stereo_config_index(enc) == 1 &&
+            aac_encoder_frame_size(enc) == kFrame,
+        "the 2-1-2 with SBR on is accepted");
+  aac_encoder_destroy(enc);
 }
 
 /* ── encode and decode ─────────────────────────────────────────── */
@@ -548,6 +584,59 @@ void test_bitrates() {
   }
 }
 
+/* ── a flushed encoder starts over ─────────────────────────────── */
+
+/* Encodes `pcm` and flushes, on the same encoder twice; both streams
+ * must be the one a fresh encoder writes.  The MPS 212 and the
+ * parametric stereo analyses read the left channel's filterbank ring
+ * around the frame, so a ring that kept the previous stream's slots
+ * would show in the first frames after the flush. */
+void check_restart(AacEncoderHandle enc, const std::vector<float>& pcm, int channels,
+                   const char* name) {
+  if (!enc) {
+    return;
+  }
+  const int frame = aac_encoder_frame_size(enc);
+  std::vector<float> block((size_t)frame * channels);
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) * 4);
+  std::vector<uint8_t> streams[2];
+  for (int pass = 0; pass < 2; pass++) {
+    int error = 0;
+    for (size_t pos = 0; pos < pcm.size(); pos += block.size()) {
+      std::fill(block.begin(), block.end(), 0.0f);
+      const size_t n = std::min(block.size(), pcm.size() - pos);
+      memcpy(block.data(), pcm.data() + pos, n * sizeof(float));
+      const int len = aac_encoder_encode(enc, block.data(), frame, buf.data(), (int)buf.size());
+      if (len < 0) {
+        error = len;
+        break;
+      }
+      streams[pass].insert(streams[pass].end(), buf.begin(), buf.begin() + len);
+    }
+    const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+    CHECK(!error && len > 0, "%s: pass %d encodes and flushes (%d, %d)", name, pass, error, len);
+    if (len > 0) {
+      streams[pass].insert(streams[pass].end(), buf.begin(), buf.begin() + len);
+    }
+  }
+  CHECK(streams[0] == streams[1],
+        "%s: the stream after a flush is the fresh encoder's (%zu against %zu bytes)", name,
+        streams[1].size(), streams[0].size());
+  aac_encoder_destroy(enc);
+}
+
+void test_restart() {
+  const std::vector<float> pcm = gen_he_signal(2);
+  const AacUsacEncoderOptions mps = options(-1, 1);
+  check_restart(make_encoder(kRate, 2, 32000, &mps), pcm, 2, "stereo 32k with the 2-1-2");
+  const AacUsacEncoderOptions sbr = options(1, 0);
+  check_restart(make_encoder(kRate, 2, 48000, &sbr), pcm, 2, "stereo 48k with SBR");
+  /* HE-AAC v2 shares the ring with its parametric stereo analysis. */
+  AacEncoderHandle ps = aac_encoder_create(kRate, 2, 32000, AAC_AOT_PS, AAC_RC_CBR);
+  CHECK(ps != nullptr, "HE-AAC v2 encoder");
+  check_restart(ps, pcm, 2, "HE-AAC v2 at 32k");
+}
+
 /* ── the committed streams ─────────────────────────────────────── */
 
 struct Committed {
@@ -632,8 +721,10 @@ int main(int argc, char** argv) {
     return write_streams(argv[2]);
   }
   test_config();
+  test_refused_options();
   test_preroll();
   test_round_trips();
+  test_restart();
   test_bitrates();
   test_committed();
   return test_summary("test_usac_enc_sbr");
