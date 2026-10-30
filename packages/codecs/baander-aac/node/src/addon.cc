@@ -62,7 +62,11 @@ bool bytes_of(const Napi::Value& v, const uint8_t** data, size_t* size) {
 
 /* Whether the option is given (present and not undefined). */
 bool option_given(const Napi::Object& o, const char* key) {
-  return o.Has(key) && !o.Get(key).IsUndefined();
+  if (!o.Has(key)) {
+    return false;
+  }
+  const Napi::Value v = o.Get(key);
+  return !v.IsUndefined() && !v.IsNull();
 }
 
 int option_int(const Napi::Object& o, const char* key, int fallback) {

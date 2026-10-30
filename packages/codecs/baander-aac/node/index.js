@@ -1,11 +1,12 @@
 /* ESM entry of @baander/aac-native.  A Node-API addon has no ESM import
  * form, so the compiled binding is loaded through createRequire.  It is
  * looked for, in this order, at the path in BAANDER_AAC_NATIVE_BINDING when
- * that is set, in prebuilds/<platform>-<arch>/ (the release asset the
- * install script fetches; a Node-API binding is ABI-stable across Node and
- * Electron versions, so the path carries no runtime version) and in
- * build/Release and build/Debug, where node-gyp, @electron/rebuild and
- * electron-builder put a local build. */
+ * that is set, in build/Release and build/Debug, where node-gyp,
+ * @electron/rebuild and electron-builder put a local build (a deliberate
+ * local build wins over a fetched binary), and in prebuilds/<platform>-<arch>/
+ * (the release asset the install script fetches; a Node-API binding is
+ * ABI-stable across Node and Electron versions, so the path carries no
+ * runtime version). */
 import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -16,9 +17,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function candidates() {
   const paths = [
-    join(root, 'prebuilds', `${process.platform}-${process.arch}`, 'baander_aac.node'),
     join(root, 'build', 'Release', 'baander_aac.node'),
     join(root, 'build', 'Debug', 'baander_aac.node'),
+    join(root, 'prebuilds', `${process.platform}-${process.arch}`, 'baander_aac.node'),
   ];
   const override = process.env.BAANDER_AAC_NATIVE_BINDING;
   return override ? [override, ...paths] : paths;

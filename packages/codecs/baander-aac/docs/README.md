@@ -842,24 +842,29 @@ release it was compiled against, so one binary per platform and
 architecture serves Node 26 and Electron 45 alike. `node/index.js`
 resolves it in this order and lists every path it tried when none loads:
 
-1. the file named in `BAANDER_AAC_NATIVE_BINDING`, when that is set (for
-   a build elsewhere, or to make a local build win over a prebuild);
-2. `prebuilds/<process.platform>-<process.arch>/baander_aac.node`, the
+1. the file named in `BAANDER_AAC_NATIVE_BINDING`, when that is set (a
+   build elsewhere);
+2. `build/Release/baander_aac.node`, then `build/Debug/`, where node-gyp
+   and `@electron/rebuild` put a local build, so a build a developer
+   just made wins over a binary fetched earlier;
+3. `prebuilds/<process.platform>-<process.arch>/baander_aac.node`, the
    prebuilt release asset (`linux-x64`, `win32-x64`, `darwin-x64`,
-   `darwin-arm64`);
-3. `build/Release/baander_aac.node`, then `build/Debug/`, where node-gyp
-   and `@electron/rebuild` put a local build.
+   `darwin-arm64`).
 
 The package's `install` script (`node/scripts/fetch-prebuilds.mjs
 --install`) runs on every `npm install` and `yarn install`, including the
 copy the Electron app makes of this `file:` dependency. It asks the GitHub
-API of the repository in `package.json` for the newest `aac-native-v*`
-release, downloads `baander_aac-<platform>-<arch>.node` into `prebuilds/`,
-checks it against the release's `SHA256SUMS` and loads it once in a child
-process. When any of that fails (offline, a proxy, no release yet) it
-builds from source with `node-gyp rebuild` instead, so a machine with a
-toolchain never depends on the network and a machine without one needs
-only the release. An existing prebuild is kept; `npm run prebuild:download
+API of the repository in `package.json` for the release
+`aac-native-v<version>` of the package's own version, downloads
+`baander_aac-<platform>-<arch>.node` into `prebuilds/`, checks it against
+the release's `SHA256SUMS` and loads it once in a child process, which
+must report the same version. When any of that fails (offline, a proxy,
+no release yet) it builds from source with `node-gyp rebuild` instead, so
+a machine with a toolchain never depends on the network and a machine
+without one needs only the release. The script never fails the install:
+when neither route works it prints what to run later
+(`npm rebuild @baander/aac-native` or `yarn electron-rebuild`) and the
+loader reports the missing binding at first use. An existing prebuild is kept; `npm run prebuild:download
 -- --force` replaces it, and `BAANDER_AAC_NATIVE_BUILD_FROM_SOURCE=1` (or
 npm's `--build-from-source`) skips the download. `GITHUB_TOKEN` is
 optional for a public repository; `BAANDER_AAC_PREBUILD_REPO`,

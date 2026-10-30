@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /* Fetches the prebuilt binding for this platform and architecture from the
- * newest `aac-native-v*` GitHub release of the repository named in
- * package.json into prebuilds/<platform>-<arch>/baander_aac.node, checks it
- * against the release's SHA256SUMS when the release carries one, and loads
- * it once in a child process to prove it is the right binary.
+ * GitHub release `aac-native-v<version>` of this package's version in the
+ * repository named in package.json into
+ * prebuilds/<platform>-<arch>/baander_aac.node, checks it against the
+ * release's SHA256SUMS when the release carries one, and loads it once in
+ * a child process to prove it is the right binary and version.
  *
  *   node node/scripts/fetch-prebuilds.mjs [--force]
  *       Download; an existing binding is kept unless --force is given.
@@ -12,7 +13,10 @@
  *       The package's install script: the same, but when the download is
  *       not possible (offline, no release, a proxy) it builds the binding
  *       from source with node-gyp instead, so an install never depends on
- *       the network when a toolchain is present.
+ *       the network when a toolchain is present.  It always exits zero:
+ *       when neither works it says so and leaves the binding to a later
+ *       `node-gyp rebuild` or `electron-rebuild`, instead of failing the
+ *       whole install of the application that depends on this package.
  *
  * Environment: GITHUB_TOKEN or GH_TOKEN authenticates the API calls (needed
  * for a private repository and for busy CI machines, optional otherwise),
@@ -74,10 +78,12 @@ async function findRelease(repo) {
   if (pinnedTag) {
     return (await github(`${api}/tags/${encodeURIComponent(pinnedTag)}`, 'application/vnd.github+json', 20000)).json();
   }
-  /* The API lists releases newest first. */
+  /* The release of this package's version: a binary of another version
+   * may export another surface. */
+  const tag = `${tagPrefix}${pkg.version}`;
   const releases = await (await github(`${api}?per_page=100`, 'application/vnd.github+json', 20000)).json();
-  const release = releases.find((r) => !r.draft && typeof r.tag_name === 'string' && r.tag_name.startsWith(tagPrefix));
-  if (!release) throw new Error(`no ${tagPrefix}* release in ${repo}`);
+  const release = releases.find((r) => !r.draft && r.tag_name === tag);
+  if (!release) throw new Error(`no release ${tag} in ${repo}`);
   return release;
 }
 
@@ -134,6 +140,9 @@ async function download() {
   writeFileSync(partial, bytes, { mode: 0o755 });
   try {
     const version = loadedVersion(partial);
+    if (version !== pkg.version) {
+      throw new Error(`${assetName} reports version ${version}, this package is ${pkg.version}`);
+    }
     renameSync(partial, binding);
     log(`fetched ${assetName} ${version} from release ${release.tag_name} of ${repo}`);
   } catch (error) {
@@ -178,13 +187,18 @@ async function main() {
   } else {
     log('building from source with node-gyp as requested');
   }
-  return buildFromSource();
+  const status = buildFromSource();
+  if (status !== 0 && installing) {
+    log('the binding could not be fetched or built; run "npm rebuild @baander/aac-native" or "yarn electron-rebuild" before using it');
+    return 0;
+  }
+  return status;
 }
 
 main().then(
   (code) => process.exit(code),
   (error) => {
     log(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exit(installing ? 0 : 1);
   },
 );
