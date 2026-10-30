@@ -556,7 +556,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     /**
      * The service pools (entity managers among them) and the Redis connection pool.
      *
-     * @return array{services: array<int, array{active: int, free: int, limit: int}>, redis: array{active: int, idle: int, total: int}}
+     * @return array{services: array<int, array{id: int, active: int, free: int, limit: int}>, redis: array{active: int, idle: int, total: int}}
      */
     private function poolStats(): array
     {

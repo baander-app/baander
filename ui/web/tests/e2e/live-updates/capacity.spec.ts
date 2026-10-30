@@ -4,11 +4,12 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { test, expect, type BrowserContext } from '@playwright/test'
 import { FixtureClient, LoginAdmission, login, authenticatedGet, type FixtureManifest, type FixtureReceipt } from './capacity-fixtures'
 import { CapacityObserver, percentile95 } from './capacity-observers'
+import { quietPoolAssignmentViolations, type PoolStats } from './capacity-pools'
 
 interface Worker {
   worker_id: number
   process: { pid: number }
-  pools: { active: number; free: number; limit: number }[]
+  pools: PoolStats[]
   memory: { usage: number; real: number }
   coroutines: { coroutine_num: number }
   live_updates: { active_subscriptions: number; pending_send_count: number; [key: string]: unknown }
@@ -223,11 +224,9 @@ test('32 real principals converge after ordinary commits and a 10,000-capture bu
     for (const entry of after) {
       expect(entry.stats.data.workers.map((worker) => `${worker.worker_id}:${worker.process.pid}`).sort()).toEqual(identities)
       for (const worker of entry.stats.data.workers) {
-        worker.pools.forEach((pool, index) => {
-          const envelope = Math.max(...before.map((baseline) => baseline.stats.data.workers
-            .find((candidate) => candidate.worker_id === worker.worker_id)!.pools[index]!.active))
-          expect(pool.active, `worker ${worker.worker_id} pool ${index} quiet assignment`).toBeLessThanOrEqual(envelope)
-        })
+        expect(quietPoolAssignmentViolations(before.map((baseline) => baseline.stats.data.workers
+          .find((candidate) => candidate.worker_id === worker.worker_id)), worker),
+        'pool assignments returned by worker PID and pool identity').toEqual([])
         expect(worker.live_updates.pending_send_count).toBe(0)
         for (const counter of ['projection_error_count', 'read_error_count']) {
           const initial = before[0]!.stats.data.workers.find((candidate) => candidate.worker_id === worker.worker_id)!

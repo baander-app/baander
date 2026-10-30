@@ -23,6 +23,8 @@ export interface WorkerCoroutineCounts {
 }
 
 export interface ConnectionPoolStats {
+  /** Process-local identity; compare with the owning worker PID. */
+  id: number
   active: number
   free: number
   limit: number

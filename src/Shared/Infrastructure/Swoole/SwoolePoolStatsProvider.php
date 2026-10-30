@@ -10,18 +10,19 @@ final class SwoolePoolStatsProvider
 {
     public function __construct(
         private readonly ServicePoolContainer $poolContainer,
-    )
-    {
-    }
+    ) {}
 
     /**
-     * @return array<int, array{active: int, free: int, limit: int}>
+     * IDs identify retained pool objects only in this worker process; compare them with its PID.
+     *
+     * @return array<int, array{id: int, active: int, free: int, limit: int}>
      */
     public function getStats(): array
     {
         $stats = [];
-        foreach ($this->poolContainer->getPools() as $i => $pool) {
+        foreach ($this->poolContainer->getPools() as $pool) {
             $stats[] = [
+                'id' => spl_object_id($pool),
                 'active' => $pool->getAssignedCount(),
                 'free' => $pool->getFreeCount(),
                 'limit' => $pool->getInstancesLimit(),

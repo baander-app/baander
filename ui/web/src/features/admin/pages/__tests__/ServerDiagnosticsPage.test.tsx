@@ -41,7 +41,7 @@ function worker(workerId: number, pid: number): WorkerSnapshot {
     process: { pid, uid: 1000, gid: 1000, user: 'baander', uptime: 3_600 },
     swoole: { object_num: 12, resource_num: 3 },
     coroutines: { coroutine_num: 5 + workerId, coroutine_peak_num: 20 + workerId },
-    pools: [{ active: 1, free: 3, limit: 4 }],
+    pools: [{ id: 1, active: 1, free: 3, limit: 4 }],
   }
 }
 

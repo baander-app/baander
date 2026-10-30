@@ -67,7 +67,7 @@ final class SwooleDataCollector extends DataCollector
         return swoole_get_vm_status();
     }
 
-    /** @return array<int, array{active: int, free: int, limit: int}> */
+    /** @return array<int, array{id: int, active: int, free: int, limit: int}> */
     public function getPoolStats(): array
     {
         return $this->data['pool_stats'] ?? [];

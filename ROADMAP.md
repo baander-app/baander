@@ -514,6 +514,33 @@ unchanged. Verification is retained in
 `/tmp/live-u9-ci-capacity-login-promise-all-green.log` and
 `/tmp/live-u9-managed-lifecycle-green.log`.
 
+U9 pool diagnostics checkpoint: service pools are registered lazily and sorted by
+priority, so their positions and the length of the diagnostic array can change.
+The provider now reports a process-local identity. Capacity verification pairs it
+with the worker PID, requires existing pools to remain present, and requires new
+pools to have no assignments after the workload. Existing pools must return to
+their measured quiet envelopes; saturation and changed-limit checks remain.
+
+The identity regression failed before the fix and passes one PHP test with seven
+assertions. The affected frontend selection passes 16 tests; scoped lint, strict
+browser TypeScript, formatting and the full frontend build with both TypeScript
+projects pass. Five simplification lenses found one redundant comment to remove;
+all proof tests remain. The eighth capacity attempt remains a failed run because
+its positional comparison crashed, although all 320 ordinary observations
+rendered within 1,674ms. Its owned cleanup completed with zero survivors. Evidence
+is retained in `/tmp/live-u9-capacity-eighth-results/`,
+`/tmp/live-u9-pool-identity-analysis.md` and
+`/tmp/live-u9-pool-populated-build.log`. Native verification of the new diagnostic
+field and the actual CI capacity workload remain open.
+
+The latest preview rerun passes the 10,000-album Timeline and worker reload.
+Timeline used 200 successful HTTP reads for two serial walks, with no overlapping
+requests, and showed the final title. The scanner rerun failed to display the
+ingested song and could not drain owned work during cleanup. Its retained manifest
+is under investigation; the earlier scanner pass does not close this failure.
+Both passing and failing evidence is retained in
+`/tmp/live-u9-preview-final-three-results/`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
