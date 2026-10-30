@@ -350,6 +350,19 @@ authorization errors and stale reads. The complete frontend suite now passes
 projects, the build and lint pass; lint retains eight existing warnings. Capacity,
 populated-view and recovery browser acceptance remain open.
 
+U9 scan-fixture checkpoint: the owned fixture now prepares a tagged WAV and local
+lyrics sidecars for a real console scan. It records the resulting catalog rows,
+jobs, outbox events and queued deliveries. Cleanup waits for that owned work to
+finish and locks terminal rows before deleting them; incomplete or unobservable
+work retains its manifest. Metadata-provider and webhook preconditions are checked
+without changing global settings. Notification fixtures now use a valid category.
+
+The CI integration lane passes three tests with 116 assertions, including a real
+second-connection lock conflict, Redis observation errors and preservation of
+unrelated rows. Scoped PHPStan, formatting and syntax checks pass. The wrapper
+exits zero; evidence is `/tmp/live-u9-scan-integration-final.log`. The real scan,
+worker ingestion and mounted-browser refresh remain pending.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Auth\Infrastructure\Security\User\PasswordHasher;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -14,6 +15,7 @@ use Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactory;
 use Symfony\Component\Yaml\Yaml;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
+require_once __DIR__ . '/ScanFixture.php';
 
 /** Scoped producer for real preview qualification; importing it never opens a connection. */
 final class LiveCapacityFixture
@@ -21,12 +23,16 @@ final class LiveCapacityFixture
     /** @var array<string, mixed> */
     private array $manifest = [];
     private bool $projectorHeld = false;
+    private readonly ScanFixture $scan;
 
     public function __construct(
         private readonly Connection $connection,
         private readonly string $root,
         private readonly ?string $mediaRoot = null,
-    ) {}
+        ?RedisClientFactory $redis = null,
+    ) {
+        $this->scan = new ScanFixture($connection, $redis);
+    }
 
     /**
      * @param array<string, mixed> $command
@@ -53,6 +59,8 @@ final class LiveCapacityFixture
             'authority' => $this->authority($command),
             'projector' => $this->projector((bool) ($command['hold'] ?? false)),
             'sample' => $this->sample(),
+            'prepare-scan' => $this->scan->prepare($this->manifest, $this->save(...)),
+            'scan-status' => $this->scan->status($this->manifest, $this->save(...)),
             'cleanup' => $this->cleanup((int) ($command['waitMs'] ?? 30_000)),
             default => throw new InvalidArgumentException('Unknown fixture operation.'),
         };
@@ -208,7 +216,7 @@ final class LiveCapacityFixture
                     $title = 'Live ' . $this->manifest['run'] . " $sequence:$i";
                     $this->connection->insert('notifications', [
                         'id' => $notifications[$i]['id'], 'public_id' => $notifications[$i]['publicId'], 'user_id' => $user['id'],
-                        'category' => 'system', 'event_type' => 'live-qualification', 'title' => $title, 'body' => $title,
+                        'category' => 'background_jobs', 'event_type' => 'live-qualification', 'title' => $title, 'body' => $title,
                         // Monotonic timestamp per row gives deterministic newest-row ordering.
                         'created_at' => (new DateTimeImmutable())->modify('+' . $i . ' microseconds')->format('Y-m-d H:i:s.uP'),
                     ]);
@@ -350,19 +358,36 @@ final class LiveCapacityFixture
         if ($waitMs < 0 || $waitMs > 30_000) {
             throw new InvalidArgumentException('Cleanup waitMs must be between zero and 30000.');
         }
+        $deadline = microtime(true) + $waitMs / 1000;
         $this->projector(false);
+        if (isset($this->manifest['scan'])) {
+            do {
+                $scan = $this->scan->status($this->manifest, $this->save(...));
+                if ($scan['drained']) {
+                    break;
+                }
+                if (microtime(true) < $deadline) {
+                    usleep((int) (min(.25, max(0, $deadline - microtime(true))) * 1_000_000));
+                }
+            } while (microtime(true) < $deadline);
+            if (!$scan['drained']) {
+                return ['complete' => false, 'manifestRetained' => true, 'scan' => $scan];
+            }
+        }
         $ids = [...$this->userIds(), $this->manifest['observer']['id']];
         $this->manifest['accessTokenIds'] = $this->connection->fetchFirstColumn('SELECT id FROM oauth_access_tokens WHERE user_id IN (?)', [$ids], [ArrayParameterType::STRING]);
         $this->manifest['refreshTokenIds'] = $this->connection->fetchFirstColumn('SELECT r.id FROM oauth_refresh_tokens r JOIN oauth_access_tokens a ON a.id = r.access_token_id WHERE a.user_id IN (?)', [$ids], [ArrayParameterType::STRING]);
         $this->save();
         $this->connection->transactional(function () use ($ids): void {
+            if (isset($this->manifest['scan'])) {
+                $this->scan->deleteTerminalRows($this->manifest);
+            }
             $this->connection->delete('job_monitors', ['id' => $this->manifest['job']['id']]);
             $this->connection->delete('playlists', ['id' => $this->manifest['playlist']['id']]);
             $this->connection->delete('libraries', ['id' => $this->manifest['library']['id']]);
             // All user-owned auth tokens and data have explicit cascading user FKs.
             $this->connection->executeStatement('DELETE FROM users WHERE id IN (?)', [$ids], [ArrayParameterType::STRING]);
         });
-        $deadline = microtime(true) + $waitMs / 1000;
         do {
             $sample = $this->sample();
             if ((int) $sample['scopedInbox']['count'] === 0) {
@@ -378,6 +403,9 @@ final class LiveCapacityFixture
         }
         if ($survivors !== 0 || (int) $sample['scopedInbox']['count'] !== 0) {
             return ['complete' => false, 'survivors' => $survivors, 'sample' => $sample, 'manifestRetained' => true];
+        }
+        if (isset($this->manifest['scan'])) {
+            $this->scan->removeFiles($this->manifest);
         }
         if (is_file($this->manifest['song']['path'])) {
             if (!unlink($this->manifest['song']['path'])) {
@@ -462,7 +490,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     $url = $_SERVER['DATABASE_URL'] ?? $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL');
     $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql', 'postgres' => 'pdo_pgsql']))->parse((string) $url));
     $connection->executeStatement("SET TIME ZONE 'UTC'");
-    $fixture = new LiveCapacityFixture($connection, dirname(__DIR__, 3) . '/var/live-capacity', rtrim($mediaStorage, '/') . '/.live-capacity');
+    $redisUrl = $_SERVER['REDIS_URL'] ?? $_ENV['REDIS_URL'] ?? getenv('REDIS_URL');
+    $fixture = new LiveCapacityFixture($connection, dirname(__DIR__, 3) . '/var/live-capacity', rtrim($mediaStorage, '/') . '/.live-capacity', new RedisClientFactory((string) $redisUrl));
     $emit = static function (array $value): void {
         fwrite(STDOUT, json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
         fflush(STDOUT);
