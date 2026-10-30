@@ -95,8 +95,18 @@ export interface AacUsacOptions {
   noiseFilling?: boolean;
   /** The audio pre-roll at every independent frame. Default true. */
   preroll?: boolean;
-  /** Frames between independent frames; 0 keeps the default of one second. */
+  /**
+   * The distance between immediate playout frames in frames, milliseconds
+   * or output samples (samples win over milliseconds over frames); none
+   * keeps the default of one second.
+   */
   independentIntervalFrames?: number;
+  independentIntervalMs?: number;
+  independentIntervalSamples?: number;
+  /** An upper bound in frames on the distance between independent frames. */
+  independentMaxDistanceFrames?: number;
+  /** A ceiling in bytes on each segment from one immediate playout frame to the next. */
+  segmentMaxBytes?: number;
   /** The stream identifier in the configuration, 0..65535. */
   streamId?: number;
   /** Enhanced SBR at 2:1; 'auto' (default) below 64 kbit/s per channel. */
@@ -139,6 +149,18 @@ export interface AacLoudnessMeasurement {
   maxShortTermLkfs: number | null;
 }
 
+/** What a muxer needs to know about the last frame an xHE-AAC encoder session produced. */
+export interface AacEncoderFrameInfo {
+  frameIndex: number;
+  /** A decoder may start here. */
+  independent: boolean;
+  /** Bytes of the audio pre-roll; a frame with one opens a segment. */
+  prerollBytes: number;
+  bytes: number;
+  /** The frame's first decoded sample on the input's timeline (negative for the priming frames). */
+  samplePosition: number;
+}
+
 /** Options of the native AAC encoder; see @baander/aac-native. */
 export interface AacEncoderOptions {
   sampleRate?: number;
@@ -159,6 +181,12 @@ export interface AacEncoderOptions {
   ldSbr?: boolean | AacLdSbrOptions;
   /** A second quantisation pass for better quality at more CPU. */
   afterburner?: boolean;
+  /** A cap in bit/s on any single frame; 0 for none. */
+  peakBitrate?: number;
+  /** The core's lowpass in Hz (1000 or more); 0 keeps the tuning table. */
+  bandwidth?: number;
+  /** An FDK-named VBR mode, about 32/72/112/148/228 kbit/s for stereo. */
+  vbrMode?: 1 | 2 | 3 | 4 | 5;
   /** Dynamic range control metadata written into the stream ('lc', 'he' and 'hev2' only). */
   metadata?: AacMetadataOptions;
   /** 'xhe' only: the USAC encoder's options. */
@@ -271,6 +299,14 @@ export const aacBridge = {
   /** The loudness measured so far by a session opened with `measureLoudness`, or null. */
   encoderLoudness: (id: number): Promise<AacLoudnessMeasurement | null> =>
     ipcRenderer.invoke('baander:aac:encoder-loudness', id),
+
+  /** xHE-AAC only: the next frame is independent and the pre-roll follows. */
+  requestIndependentFrame: (id: number): Promise<void> =>
+    ipcRenderer.invoke('baander:aac:encoder-request-independent-frame', id),
+
+  /** xHE-AAC only: the last frame the session produced, or null. */
+  encoderLastFrame: (id: number): Promise<AacEncoderFrameInfo | null> =>
+    ipcRenderer.invoke('baander:aac:encoder-last-frame', id),
 
   closeEncoder: (id: number): Promise<boolean> => ipcRenderer.invoke('baander:aac:encoder-close', id),
 

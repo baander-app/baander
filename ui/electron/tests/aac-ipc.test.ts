@@ -9,12 +9,15 @@ mock.module('../src/main/services/aac.service.ts', { exports: { getAacService: (
 const { registerAacIpc } = await import('../src/ipc/modules/aac.ipc.ts');
 registerAacIpc();
 
-/** The validated options without the keys the validator leaves undefined. */
+/** The validated options, nested ones included, without the keys the validator leaves undefined. */
+function defined(arg: unknown): unknown {
+  return arg && typeof arg === 'object' && !Array.isArray(arg) && !ArrayBuffer.isView(arg) && !(arg instanceof ArrayBuffer)
+    ? Object.fromEntries(Object.entries(arg).filter(([, v]) => v !== undefined).map(([k, v]) => [k, defined(v)]))
+    : arg;
+}
+
 function given(call: unknown[]): unknown[] {
-  return call.map(arg =>
-    arg && typeof arg === 'object' && !ArrayBuffer.isView(arg) && !(arg instanceof ArrayBuffer)
-      ? Object.fromEntries(Object.entries(arg).filter(([, v]) => v !== undefined))
-      : arg);
+  return call.map(defined);
 }
 
 async function invoke(channel: string, ...args: unknown[]) {
@@ -55,6 +58,25 @@ test('valid requests reach the service with validated arguments', async () => {
   assert.equal(await invoke('decode', data, { loudness: false }), 'decode-result');
   assert.deepEqual(given(calls[0]), ['openDecoder', { loudness: { enabled: true, targetLufs: -16.5 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 0 }]);
   assert.deepEqual(given(calls[1]), ['decode', data, { loudness: false }]);
+  calls.length = 0;
+  const xhe = { profile: 'xhe', usac: { independentIntervalMs: 2000, independentIntervalSamples: 96000, independentMaxDistanceFrames: 100, segmentMaxBytes: 65536 } };
+  assert.equal(await invoke('encoder-open', xhe), 'openEncoder-result');
+  assert.equal(await invoke('encoder-open', { peakBitrate: 192000, bandwidth: 15000, vbrMode: 3 }), 'openEncoder-result');
+  assert.equal(await invoke('encoder-open', { peakBitrate: 0, bandwidth: 0 }), 'openEncoder-result');
+  assert.deepEqual(given(calls[0]), ['openEncoder', xhe]);
+  assert.deepEqual(given(calls[1]), ['openEncoder', { peakBitrate: 192000, bandwidth: 15000, vbrMode: 3 }]);
+  assert.deepEqual(given(calls[2]), ['openEncoder', { peakBitrate: 0, bandwidth: 0 }]);
+  calls.length = 0;
+  assert.equal(await invoke('decoder-flush', 7), 'flushDecoder-result');
+  assert.equal(await invoke('decoder-clear-history', 7), 'clearDecoderHistory-result');
+  assert.equal(await invoke('encoder-loudness', 8), 'encoderLoudness-result');
+  assert.equal(await invoke('encoder-request-independent-frame', 8), 'requestIndependentFrame-result');
+  assert.equal(await invoke('encoder-last-frame', 8), 'encoderLastFrame-result');
+  assert.equal(await invoke('measure-loudness', pcm, 48000, 1), 'measureLoudness-result');
+  assert.deepEqual(calls, [
+    ['flushDecoder', 7], ['clearDecoderHistory', 7], ['encoderLoudness', 8],
+    ['requestIndependentFrame', 8], ['encoderLastFrame', 8], ['measureLoudness', pcm, 48000, 1],
+  ]);
 });
 
 test('malformed payloads are rejected before the service is called', async () => {
@@ -90,6 +112,22 @@ test('malformed payloads are rejected before the service is called', async () =>
     ['decoder-decode', [0, new Uint8Array(1)]],
     ['encoder-encode', [1.5, pcm]],
     ['encoder-close', [-1]],
+    ['decoder-flush', [0]],
+    ['decoder-clear-history', ['7']],
+    ['encoder-request-independent-frame', [1.5]],
+    ['encoder-last-frame', [null]],
+    ['encode', [pcm, { profile: 'xhe', usac: { independentIntervalMs: -1 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { segmentMaxBytes: 1.5 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { independentMaxDistanceFrames: '4' } }]],
+    ['encode', [pcm, { profile: 'lc', usac: { independentIntervalSamples: 1024 } }]],
+    ['encode', [pcm, { peakBitrate: 100 }]],
+    ['encode', [pcm, { bandwidth: 500 }]],
+    ['encode', [pcm, { bandwidth: 96000 }]],
+    ['encode', [pcm, { vbrMode: 0 }]],
+    ['encode', [pcm, { vbrMode: 6 }]],
+    ['encode', [pcm, { vbrMode: '2' }]],
+    ['measure-loudness', [pcm, 4000, 1]],
+    ['measure-loudness', [pcm, 48000, 7]],
   ];
   for (const [channel, args] of bad) {
     calls.length = 0;

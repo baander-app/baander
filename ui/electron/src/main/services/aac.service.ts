@@ -14,6 +14,7 @@ import type {
   AacDecoder,
   AacDecoderOptions,
   AacEncoder,
+  AacEncoderFrameInfo,
   AacEncoderOptions,
   AacProfile,
   measureLoudness,
@@ -236,6 +237,25 @@ export class AacService {
    */
   async encoderLoudness(id: number): Promise<AacLoudnessMeasurement | null> {
     return this.encoder(id).loudness;
+  }
+
+  /**
+   * xHE-AAC only: makes the next frame independent, so that the immediate
+   * playout frame with the pre-roll follows it; the binding throws for
+   * the other profiles.
+   */
+  async requestIndependentFrame(id: number): Promise<void> {
+    this.encoder(id).requestIndependentFrame();
+  }
+
+  /**
+   * xHE-AAC only: the last frame the session produced (its index, whether
+   * it is independent, the pre-roll and frame sizes and its sample
+   * position), for a muxer that cuts segments; null before the first
+   * frame and for the other profiles.
+   */
+  async encoderLastFrame(id: number): Promise<AacEncoderFrameInfo | null> {
+    return this.encoder(id).lastFrame;
   }
 
   async closeEncoder(id: number): Promise<boolean> {

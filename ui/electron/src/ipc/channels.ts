@@ -34,6 +34,8 @@ export const IPC_CHANNELS = {
   AAC_ENCODER_ENCODE: 'baander:aac:encoder-encode',
   AAC_ENCODER_FLUSH: 'baander:aac:encoder-flush',
   AAC_ENCODER_LOUDNESS: 'baander:aac:encoder-loudness',
+  AAC_ENCODER_REQUEST_INDEPENDENT_FRAME: 'baander:aac:encoder-request-independent-frame',
+  AAC_ENCODER_LAST_FRAME: 'baander:aac:encoder-last-frame',
   AAC_ENCODER_CLOSE: 'baander:aac:encoder-close',
   AAC_MEASURE_LOUDNESS: 'baander:aac:measure-loudness',
 } as const;

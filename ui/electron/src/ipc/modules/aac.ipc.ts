@@ -23,6 +23,10 @@ const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2', 'ld', 'eld', 'xhe']);
 const LOW_DELAY_PROFILES = new Set<AacProfile>(['ld', 'eld']);
 const USAC_TOOLS = new Set<AacUsacTool>(['on', 'off', 'auto']);
 const MAX_STREAM_ID = 65535;
+const MAX_BITRATE = 1_000_000;
+const MIN_BANDWIDTH = 1000;
+const MAX_BANDWIDTH = 48000;
+const VBR_MODES = new Set([1, 2, 3, 4, 5]);
 const MAX_LOUDNESS_CHANNELS = 6;
 const MIN_METER_RATE = 8000;
 const MAX_METER_RATE = 384000;
@@ -119,15 +123,18 @@ function metadataOption(value: unknown): AacEncoderOptions['metadata'] {
 function usacOption(value: unknown): AacUsacOptions | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('usac');
-  const { noiseFilling, preroll, independentIntervalFrames, streamId, sbr, mps212 } = value as Record<string, unknown>;
-  if (independentIntervalFrames !== undefined && !(typeof independentIntervalFrames === 'number'
-    && Number.isInteger(independentIntervalFrames) && independentIntervalFrames >= 0)) invalid('independentIntervalFrames');
+  const { noiseFilling, preroll, streamId, sbr, mps212 } = value as Record<string, unknown>;
+  const usac = value as Record<string, unknown>;
   if (streamId !== undefined && !(typeof streamId === 'number' && Number.isInteger(streamId)
     && streamId >= 0 && streamId <= MAX_STREAM_ID)) invalid('streamId');
   return {
     noiseFilling: flag(noiseFilling, 'noiseFilling'),
     preroll: flag(preroll, 'preroll'),
-    independentIntervalFrames: independentIntervalFrames as number | undefined,
+    independentIntervalFrames: count(usac.independentIntervalFrames, 'independentIntervalFrames'),
+    independentIntervalMs: count(usac.independentIntervalMs, 'independentIntervalMs'),
+    independentIntervalSamples: count(usac.independentIntervalSamples, 'independentIntervalSamples'),
+    independentMaxDistanceFrames: count(usac.independentMaxDistanceFrames, 'independentMaxDistanceFrames'),
+    segmentMaxBytes: count(usac.segmentMaxBytes, 'segmentMaxBytes'),
     streamId: streamId as number | undefined,
     sbr: oneOf(sbr, USAC_TOOLS, 'sbr'),
     mps212: oneOf(mps212, USAC_TOOLS, 'mps212'),
@@ -148,6 +155,20 @@ function loudnessInfoOption(value: unknown): AacLoudnessInfo | undefined {
   }
   if (info.integratedLkfs === undefined || info.samplePeakDbfs === undefined) invalid('loudnessInfo');
   return info as unknown as AacLoudnessInfo;
+}
+
+/** A whole number of 0 or more, where 0 keeps the default. */
+function count(value: unknown, what: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!(typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)) invalid(what);
+  return value;
+}
+
+/** 0 (the default) or a whole number in min..max. */
+function zeroOrRange(value: unknown, min: number, max: number, what: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!(typeof value === 'number' && Number.isInteger(value) && (value === 0 || (value >= min && value <= max)))) invalid(what);
+  return value;
 }
 
 function flag(value: unknown, what: string): boolean | undefined {
@@ -223,7 +244,7 @@ function encoderOptions(value: unknown): AacEncoderOptions {
   if (sampleRate !== undefined && !(typeof sampleRate === 'number' && SAMPLE_RATES.has(sampleRate))) invalid('sampleRate');
   if (channels !== undefined && !channelCount(channels, 1)) invalid('channels');
   if (profile !== undefined && !(typeof profile === 'string' && PROFILES.has(profile as AacProfile))) invalid('profile');
-  if (bitrate !== undefined && !(typeof bitrate === 'number' && Number.isInteger(bitrate) && bitrate >= 8000 && bitrate <= 1_000_000)) invalid('bitrate');
+  if (bitrate !== undefined && !(typeof bitrate === 'number' && Number.isInteger(bitrate) && bitrate >= 8000 && bitrate <= MAX_BITRATE)) invalid('bitrate');
   if (mode !== undefined && !(typeof mode === 'string' && MODES.has(mode as AacRateControlMode))) invalid('mode');
   if (quality !== undefined && !(typeof quality === 'number' && Number.isInteger(quality) && quality >= 1 && quality <= 100)) invalid('quality');
   const lowDelay = LOW_DELAY_PROFILES.has(profile as AacProfile);
@@ -231,6 +252,7 @@ function encoderOptions(value: unknown): AacEncoderOptions {
   if ((lowDelay || usac) && transport === 'adts') invalid('transport');
   if (options.ldSbr !== undefined && profile !== 'eld') invalid('ldSbr');
   if ((options.usac !== undefined || options.loudnessInfo !== undefined) && !usac) invalid('profile');
+  if (options.vbrMode !== undefined && !(typeof options.vbrMode === 'number' && VBR_MODES.has(options.vbrMode))) invalid('vbrMode');
   return {
     sampleRate: sampleRate as number | undefined,
     channels: channels as number | undefined,
@@ -246,6 +268,9 @@ function encoderOptions(value: unknown): AacEncoderOptions {
     channelMode: oneOf(channelMode, CHANNEL_MODES, 'channelMode'),
     ldSbr: ldSbrOption(options.ldSbr),
     afterburner: flag(options.afterburner, 'afterburner'),
+    peakBitrate: zeroOrRange(options.peakBitrate, 8000, MAX_BITRATE, 'peakBitrate'),
+    bandwidth: zeroOrRange(options.bandwidth, MIN_BANDWIDTH, MAX_BANDWIDTH, 'bandwidth'),
+    vbrMode: options.vbrMode as AacEncoderOptions['vbrMode'],
     metadata: metadataOption(options.metadata),
     usac: usacOption(options.usac),
     loudnessInfo: loudnessInfoOption(options.loudnessInfo),
@@ -286,6 +311,8 @@ export function registerAacIpc(): void {
     aac.encodeChunk(sessionId(id), samples(pcm, 'pcm')));
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_FLUSH, (_event, id) => aac.flushEncoder(sessionId(id)));
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_LOUDNESS, (_event, id) => aac.encoderLoudness(sessionId(id)));
+  handleTrusted(IPC_CHANNELS.AAC_ENCODER_REQUEST_INDEPENDENT_FRAME, (_event, id) => aac.requestIndependentFrame(sessionId(id)));
+  handleTrusted(IPC_CHANNELS.AAC_ENCODER_LAST_FRAME, (_event, id) => aac.encoderLastFrame(sessionId(id)));
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_CLOSE, (_event, id) => aac.closeEncoder(sessionId(id)));
 
   handleTrusted(IPC_CHANNELS.AAC_MEASURE_LOUDNESS, (_event, pcm, sampleRate, channels) =>

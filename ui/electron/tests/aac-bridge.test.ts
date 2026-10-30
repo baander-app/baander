@@ -32,3 +32,22 @@ test('every AAC bridge method invokes its channel with the arguments as given', 
   await aacBridge.closeEncoder(4);
   assert.deepEqual(calls, expected.map(([channel, args]) => [channel, ...args]));
 });
+
+test('the playback, loudness and segmenting methods invoke their channels', async () => {
+  calls.length = 0;
+  const pcm = new Float32Array([0.25]);
+  await aacBridge.flushDecoder(5);
+  await aacBridge.clearDecoderHistory(5);
+  await aacBridge.encoderLoudness(6);
+  await aacBridge.requestIndependentFrame(6);
+  await aacBridge.encoderLastFrame(6);
+  await aacBridge.measureLoudness(pcm, 48000, 1);
+  assert.deepEqual(calls, [
+    ['baander:aac:decoder-flush', 5],
+    ['baander:aac:decoder-clear-history', 5],
+    ['baander:aac:encoder-loudness', 6],
+    ['baander:aac:encoder-request-independent-frame', 6],
+    ['baander:aac:encoder-last-frame', 6],
+    ['baander:aac:measure-loudness', pcm, 48000, 1],
+  ]);
+});

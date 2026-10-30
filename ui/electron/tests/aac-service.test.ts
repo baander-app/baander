@@ -212,6 +212,41 @@ test('decoder sessions flush their tail and clear their history for a seek', { s
   await assert.rejects(() => service.clearDecoderHistory(decoder), /does not exist/);
 });
 
+// A muxer cutting xHE-AAC segments reads each frame's info and may ask for
+// an independent frame at any point; the other profiles report none.
+test('xHE-AAC sessions report their frames and take independent frame requests', { skip: !available && 'native binding not built' }, async () => {
+  const service = new AacService();
+  const pcm = tones(48000, 48000, 2);
+  const session = await service.openEncoder({
+    sampleRate: 48000, channels: 2, bitrate: 96000, profile: 'xhe',
+    usac: { sbr: 'off', independentIntervalMs: 500, independentMaxDistanceFrames: 40, segmentMaxBytes: 20000 },
+  });
+  assert.equal(session.frameSize, 1024);
+  assert.equal(await service.encoderLastFrame(session.id), null);
+  const frames = [];
+  for (let pos = 0; pos < pcm.length; pos += 2048) {
+    if (pos === 2048 * 10) await service.requestIndependentFrame(session.id);
+    await service.encodeChunk(session.id, pcm.subarray(pos, pos + 2048));
+    const frame = await service.encoderLastFrame(session.id);
+    if (frame) frames.push(frame);
+  }
+  assert.ok(frames.length > 10);
+  const last = frames[frames.length - 1];
+  assert.equal(last.samplePosition, last.frameIndex * session.frameSize - session.delay);
+  const openers = frames.filter(f => f.prerollBytes > 0).map(f => f.frameIndex);
+  assert.ok(openers.length >= 2, `immediate playout frames at ${openers}`);
+  assert.ok(frames.every(f => f.prerollBytes === 0 || f.independent));
+  const requested = frames.find(f => f.frameIndex > frames[9].frameIndex && f.independent);
+  assert.ok(requested && requested.frameIndex <= frames[9].frameIndex + 4, 'the request is honoured within the chunk after it');
+  assert.equal(await service.closeEncoder(session.id), true);
+
+  const lc = await service.openEncoder({ sampleRate: 48000, channels: 2, vbrMode: 2, peakBitrate: 160000, bandwidth: 16000 });
+  assert.ok((await service.encodeChunk(lc.id, pcm)).length > 0);
+  assert.equal(await service.encoderLastFrame(lc.id), null);
+  await assert.rejects(() => service.requestIndependentFrame(lc.id));
+  assert.equal(await service.closeEncoder(lc.id), true);
+});
+
 test('unsupported options are rejected by the binding', { skip: !available && 'native binding not built' }, async () => {
   const service = new AacService();
   await assert.rejects(() => service.encode(new Float32Array(10), { sampleRate: 37000, channels: 2 }));
