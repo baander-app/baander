@@ -114,10 +114,12 @@ jobs:
                 run: |
                     mkdir -p electron-runtime && cd electron-runtime
                     npm install --no-save --no-package-lock --no-audit --no-fund "electron@$ELECTRON_VERSION"
-                    electron="$(node -p 'require("electron")')"
+                    # The last line of the output is the path; npm may print notices before it.
+                    electron="$(node -p 'require("electron")' | tail -n 1 | tr -d '\r')"
                     # Git Bash on Windows gets a POSIX path for the executable.
                     if command -v cygpath > /dev/null; then electron="$(cygpath -u "$electron")"; fi
-                    echo "ELECTRON_BIN=$electron" >> "$GITHUB_ENV"
+                    test -n "$electron"
+                    printf 'ELECTRON_BIN=%s\n' "$electron" >> "$GITHUB_ENV"
 
             -   name: Smoke test under Electron
                 # ELECTRON_RUN_AS_NODE runs Electron's Node without a window
