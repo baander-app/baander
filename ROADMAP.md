@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-29. This roadmap selects future work and records unresolved
+Updated: 2026-10-30. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -22,6 +22,42 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
+
+## Cohesive web styling
+
+Requirements captured, 2026-10-30, in the
+[styling repair plan](docs/plans/2026-10-30-1843-fix-cohesive-web-styling-plan.md).
+The confirmed scope covers shared controls and web consumers, overflow,
+theme/accent contrast, interaction states and adherence to the project design guide.
+Implementation and its acceptance checks remain open.
+The implementation plan now defines six units covering browser prerequisites,
+web token generation, shared controls, browsing/playback consumers, forms/admin
+consumers and integrated verification. Eight technical decisions establish one
+web token authority, semantic color roles and preserved native token output.
+
+Discovery checkpoint: Playwright reproduced 406-pixel login inputs inside
+384-pixel containers, sidebar search overflow and black labels on dark controls.
+Inspection covered login, empty music home and settings, including four theme
+palettes with the violet accent. Independent source verification confirmed the
+shared sizing and foreground omissions, accent/foreground mismatch and radius
+drift. This is defect evidence, not passing implementation acceptance; all 32
+theme/accent combinations and responsive interaction states still need verification.
+After the preview refresh completed, a follow-up login probe covered four palettes
+at 1280- and 390-pixel viewport widths. All eight observations retained the same
+22-pixel field overflow; rendered light-theme login buttons also confirmed the
+pale foreground/accent pairing.
+
+Plan verification: all nine requirements have stable identifiers; the nine cited
+repository paths exist. Completeness, consistency, scope and planning-readiness
+checks passed. Prose audits accounted for the new roadmap section and retained
+the measured dimensions as evidence rather than fixing future form widths.
+Whitespace checks passed. No application code changed at this checkpoint.
+
+Implementation-planning checkpoint: all nine requirements, three user flows and
+five acceptance examples remain intact. Coherence, feasibility, design and scope
+reviewers returned no findings. The plan names the 32-combination appearance
+matrix, responsive and interaction coverage, current browser entry points and
+repository verification gates. No application tests were run during planning.
 
 ## Cohesive operator manual
 
