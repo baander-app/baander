@@ -240,6 +240,12 @@ for real-browser and capacity qualification. Its asset audit also identified
 stable cover URLs and retained palettes that need live refresh and access-reset
 handling; those corrections remain required before completion.
 
+The adoption-phase simplification review covered reuse, code quality,
+efficiency, tests and comments. Both efficiency findings are fixed, and seven
+redundant comments were removed. Behavioral proof tests were retained. The final
+frontend results above cover the integrated changes; final code review remains
+open after U9 qualification.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

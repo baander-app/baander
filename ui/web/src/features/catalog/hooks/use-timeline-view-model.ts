@@ -147,7 +147,7 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
   })
   const decades = useMemo(() => groupAlbumsByDecadeAndYear(query.data ?? []), [query.data])
   const refetch = () => {
-    query.refetch({ cancelRefetch: false }).catch(() => { /* Query exposes read failures. */ })
+    query.refetch({ cancelRefetch: false }).catch(() => undefined)
   }
   return { decades, isLoading: query.isLoading, error: query.error, refetch }
 }

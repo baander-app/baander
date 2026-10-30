@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query'
 import { getLibraries } from '../api/library-api'
 import { libraryKeys } from '../query-keys'
 
-/** The fallback scan observer shares the authoritative library list. */
 export function useScanPolling(intervalMs = 3000) {
   const [enabled, setEnabled] = useState(false)
   const { data, refetch } = useQuery({

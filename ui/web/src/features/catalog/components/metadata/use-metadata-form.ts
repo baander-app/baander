@@ -79,7 +79,7 @@ export function useMetadataForm({
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
-      saveRef.current().catch(() => { /* The save reports current-owner failures. */ })
+      saveRef.current().catch(() => undefined)
     }, 800)
   }, [])
 
@@ -139,7 +139,7 @@ export function useMetadataForm({
   const toggleLock = useCallback((field: string) => {
     const locks = lockedFields
     updateDraftField('lockedFields', locks.includes(field) ? locks.filter(key => key !== field) : [...locks, field])
-    saveRef.current().catch(() => { /* The save reports current-owner failures. */ })
+    saveRef.current().catch(() => undefined)
   }, [lockedFields, updateDraftField])
 
   const resolveDraft = useCallback((choice: 'server' | 'local') => {
