@@ -194,9 +194,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     $localPosition = $latest->runtime->desired->position - $start * SegmentEncoder::getSegmentDuration();
                     $remainingDuration = $probe->duration - $start * SegmentEncoder::getSegmentDuration();
                     $cursorCovered = $publication?->covers($localPosition, $probe->hasAudio(), $remainingDuration) ?? false;
-                    $pauseCovered = $publication !== null && ($publication->complete
-                        || $publication->covers($localPosition + 21.0, $probe->hasAudio()));
-                    $mustPause = ($desiredPaused && $ready && $cursorCovered && $pauseCovered) || $throttled;
+                    $mustPause = ($desiredPaused && $ready && $cursorCovered) || $throttled;
                     if ($mustPause !== $paused && !$finished) {
                         if ($mustPause) {
                             $this->streamManager->pauseStream($jobId);
@@ -221,8 +219,6 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     }
                     $videoTrack = $publication?->track(MediaTrack::Video);
                     $cursorCovered = $publication?->covers($localPosition, $probe->hasAudio(), $remainingDuration) ?? false;
-                    $pauseCovered = $publication !== null && ($publication->complete
-                        || $publication->covers($localPosition + 21.0, $probe->hasAudio()));
                     $new = [];
                     foreach ($videoTrack->segments ?? [] as $segment) {
                         if (!isset($seen[$segment->ordinal])) {
@@ -244,7 +240,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         }
                     }
                     if ((!$ready || $appliedRevision !== $active->runtime->desiredRevision)
-                        && $cursorCovered && (!$desiredPaused || $pauseCovered) && $subtitleQueue === [] && $subtitleActive === []) {
+                        && $cursorCovered && $subtitleQueue === [] && $subtitleActive === []) {
                         if ($desiredPaused && !$paused && !$finished) {
                             $this->streamManager->pauseStream($jobId);
                             $paused = true;

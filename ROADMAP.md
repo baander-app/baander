@@ -76,6 +76,64 @@ Four document-review personas completed; one conflicting optional-field descript
 was corrected, with no remaining findings. Prose and whitespace checks passed.
 Implementation and runtime verification remain open.
 
+## Paused seek readiness
+
+Delivered, 2026-10-30: the user authorized the application correction after
+merging tooling into master and pushing both `origin/master` and
+`baander-github/master` at `5fc3f901`. The correction is implemented on
+`fix/paused-seek-readiness` under the reviewed
+[implementation plan](docs/plans/2026-10-30-1141-fix-paused-seek-readiness-plan.md),
+committed as `b31baff1`.
+
+The two-file application patch removes both extra 21-second paused lookahead
+gates. It retains closed paired-track cursor coverage, subtitle completion,
+execution fences and running-playback throttling. Before the fix, the cursor group
+ran two tests and 11 assertions with one failure; the running-pause control ran
+one test and two assertions with one failure. Host verification now passes 32 tests
+and 259 assertions. The initial CI backend run passes 117 tests and 5,040
+assertions under `var/test-runs/20261030-105007-4701e8e4`. The final rerun passes
+117 tests and 5,039 assertions: ordinary 102/553, native 1/4,367 and services
+14/119, with cleanup exiting zero. Its evidence is retained under
+`var/test-runs/20261030-110149-359dc578`. Three player
+test files pass 245 tests. The two changed PHP files pass CI static analysis and
+basic whitespace checks. Application Deptrac reports zero violations, errors or warnings,
+with 484 existing baseline skips, 17,169 allowed and 18,283 uncovered dependencies.
+
+Independent code review completed with zero findings under
+`/tmp/compound-engineering-1000/ce-code-review/20261030-114820-paused-seek`;
+its frozen verdict was not ready because CI, consumer, live and preview
+acceptance were pending at that snapshot, with no source findings. Caller
+verification has now closed those gates without changing the frozen review.
+Five simplification lenses found no changes. The CI image and worker image were built from verified
+bases plus exactly the two frozen source files, with hash proof. The final CI
+image is `sha256:024ebca6614343faadbd29a253181b9e71b63a81fe854fcaa91f8602d5e6c777`
+and the worker is
+`sha256:cf6eb035fd2b9d427b3691c265d7f878afec62b340820dc363e230a5414c45ce`.
+The temporary image helper now copies files without inheriting private staging
+directory modes. A real loader probe with UID zero and dropped capabilities
+reproduces permission-denied exit two before the fix and exits zero afterward;
+application source is unchanged.
+The full root-image build was intentionally cancelled while recompiling unchanged
+TSDuck; that cancellation is not application-failure evidence.
+
+The public live media runner passes with original status zero, cleanup status zero
+and removal verified under `var/test-runs/media-control-1793358242-2704041`.
+Seek readiness is 17.679436945 seconds within the unchanged 30-second limit.
+All 162 control acknowledgements pass, with maximum 0.239333687 seconds and p99
+0.22219033 seconds. The run records 1,226 heartbeats with maximum gap 0.029245592
+seconds, 778 full-occupancy samples and cancellation retirement in 0.223762875
+seconds. Byte, status and ownership checks all pass.
+
+`make preview-up` completed with exit zero after the full controller runtime and
+worker build. The preview at
+[preview-fd790a887b6899cb.baander.test](https://preview-fd790a887b6899cb.baander.test)
+is ready, with web and workers ready. Running, target and worker-snapshot identities
+all match `a9c02556`. Decoded `libraries-after.json` exactly matches
+`/tmp/baander-paused-seek-work/libraries-before.json`: Movies/Music IDs, paths,
+creation/update timestamps and null scan timestamps are retained. The local
+configuration hash is unchanged (`7803eaff`); no reset or scan ran. All acceptance
+for the tooling plan's U11 and this plan's U1 is complete.
+
 ## Cohesive project tooling
 
 Requirements checkpoint, 2026-10-29: the user confirmed the scope in the
@@ -623,7 +681,7 @@ Source policy passes; Deptrac reports 4,387 allowed and 366 external uncovered
 dependencies, with zero violations, errors or warnings. All 48 source-proof files
 match its CI image. These focused results supplement the passing full v15 suite.
 
-Live media v25 fails the 30-second worker-paused acknowledgement before byte
+Live media v25 failed the 30-second worker-paused acknowledgement before byte
 retrieval, under `var/test-runs/media-control-1793325242-2126320`. Desired revision
 five remained ahead of observed revision four. The record still carried outcome
 ready, while generation three had desired state paused and no current output.
@@ -632,15 +690,17 @@ concurrent retrieval fix is verified, but live application pause/seek acceptance
 still fails. Application readiness requires the 18-second cursor plus 21 seconds
 of lookahead, requiring seven six-second segments to cover second 39. The readiness SIGSTOP
 arrived 30.582 seconds after replacement start, beyond the unchanged 30-second
-watchdog. A scope decision on extending application work remains pending.
+watchdog. The user authorized the application correction recorded in the paused-seek
+readiness checkpoint above.
 
 The final worker image is
 `sha256:b3d2616a66ae9c3e3e0747376ccba61e92d6a3bcf373ea02a58dee03e7861dd9`;
 its inventory completed with exit zero under
 `var/tooling-audit/2026-10-29/integration/worker-final-v25-inventory`.
 Integrity verification passes for 77,048 files. Redistribution review remains not
-qualified with 5,464 gaps, a separate release classification. U11 remains open
-only for live media acceptance.
+qualified with 5,464 gaps, a separate release classification. The paused-seek
+checkpoint above records the passing media and preview follow-up that completes
+U11 acceptance.
 
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all
