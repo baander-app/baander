@@ -1,6 +1,14 @@
 # Notifications
 
-Baander supports three notification channels: browser push notifications, outgoing webhooks, and email. This page covers operator-level setup and configuration for each channel.
+When a notification appears in the app but no email or push arrives, creation has
+succeeded and a later delivery stage needs investigation. Baander stores the in-app
+notification in PostgreSQL and dispatches separate email, push and webhook messages
+to [background work](background-work.md). A stored notification or accepted message
+is not proof that an external receiver received it.
+
+Run commands on the installation host, from its checkout, with the
+[`dc` wrapper](getting-started.md). Keep the worker running after configuration;
+restarting the web service alone does not refresh a separately managed worker.
 
 ## Push Notifications (VAPID)
 
@@ -11,12 +19,12 @@ Browser push notifications use the [Web Push protocol](https://developer.mozilla
 1. **Generate a VAPID key pair:**
 
 ```bash
-make exec cmd="php bin/console app:generate-vapid-keys"
+dc exec app php bin/console app:generate-vapid-keys
 ```
 
 See the [app:generate-vapid-keys](commands/app-generate-vapid-keys.md) command reference for full details.
 
-2. **Add the keys to your `.env` file:**
+2. **Add the keys to the protected web configuration and worker credentials:**
 
 ```env
 VAPID_PUBLIC_KEY=BIj3...
@@ -25,7 +33,10 @@ VAPID_PRIVATE_KEY=MIGT...
 
 Both variables are documented in [configuration.md](configuration.md#web-push-vapid).
 
-3. **Restart the application** after setting the keys.
+3. **Apply the new environment to the web service and background worker.** Follow
+   the [configuration lifecycle](configuration.md#where-a-change-takes-effect) and
+   [Background work](background-work.md). Recreate containers when changing values
+   injected by Compose; restarting an existing container retains its environment.
 
 Users can then enable push notifications from their browser or client. If you need to rotate keys later, see the [VAPID key rotation](security.md#rotating-vapid-keys) section in the security guide.
 
@@ -61,7 +72,8 @@ Send a `POST` request with at minimum a `url` field:
 | `url` | `string` (URI) | Yes | The endpoint to deliver notifications to. Must be a valid URL. |
 | `category_filter` | `array<string>` or `null` | No | Restrict which notification categories trigger this webhook. `null` delivers all categories. |
 
-The response includes a `secret` value on creation. This is the only time the secret is returned — store it securely.
+The response includes a `secret` value on creation. Store it securely: it is shown
+once for that value. Rotation generates and returns a new value once.
 
 ```json
 {
@@ -105,9 +117,22 @@ configure the receiver with the new secret before sending subsequent notificatio
 
 ### Delivery behavior
 
-- **Retries:** Failed deliveries (server errors, timeouts) are retried up to 3 times with exponential backoff (1s, 2s, 4s). Client errors (4xx) are not retried.
-- **Timeout:** Each delivery attempt times out after 10 seconds.
-- **SSRF protection:** Webhook URLs are validated against a blocklist of private and loopback IP ranges. Deliveries to internal network addresses are silently dropped.
+- **Attempts:** Each delivery runs at most three HTTP attempts, waiting 1s and 2s
+  between them. Network failures, 5xx, 408 and 429 can retry. Other 3xx/4xx responses
+  are permanent failures; redirects are not followed.
+- **Worker retries:** A failed delivery escapes to the worker's retry policy. A
+  later message retry can resend to a receiver that already accepted an earlier
+  attempt, including another destination in the same message. Receivers must
+  deduplicate `Idempotency-Key`; see [Background work](background-work.md).
+- **Timeout:** Each HTTP attempt has a 10-second timeout and maximum duration.
+- **Destination checks:** Every DNS answer must be public or fall in an explicitly
+  permitted LAN range from `WEBHOOK_LAN_ALLOWLIST`. Loopback, link-local and metadata
+  endpoints remain blocked. The selected address is pinned for sending. Resolution
+  or validation failure is logged as a failed delivery and can retry.
+- **Observation:** Webhook delivery logs record success for a 2xx response, or
+  failure with an HTTP status when available. A 2xx proves receiver acceptance,
+  not that its downstream action completed. Worker logs use the
+  `notification.webhook` channel.
 - **User-Agent:** Requests are sent with `Baander-Webhook/1.0`.
 
 ### Notification categories
@@ -128,10 +153,10 @@ Email notifications are sent through Symfony's Mailer component. Configure the t
 
 ### Configuration
 
-Set `MAILER_DSN` in `.env`:
+Set `MAILER_DSN` in the protected configuration used by the delivery worker:
 
 ```env
-MAILER_DSN=smtp://user:pass@smtp.example.com:587
+MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 ```
 
 The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing. The default development DSN is `smtp://mailpit:1025`. See the Mail section in [configuration.md](configuration.md#mail) for full details, including the sender address.
@@ -153,17 +178,35 @@ Two [server settings](configuration.md#server-settings) switch parts of notifica
 
 ### Health alerts
 
-The web server raises health alerts. One of its HTTP workers (worker 0) runs the [health checks](monitoring.md#what-is-checked) every 60 seconds: PostgreSQL, Redis, the background worker, the Swoole server and the memory of the server's workers. `HEALTH_MONITOR_INTERVAL_SECONDS` sets the interval. The first check runs one interval after the server starts, so services that start alongside it do not alert.
+The web server creates administrator notifications when a component becomes
+unhealthy. PostgreSQL must be writable to store them, and the worker must be able
+to process the outgoing delivery messages. Alert state, timing, delayed delivery
+and the worker heartbeat belong to [Monitoring](monitoring.md#what-is-checked).
+Watch the web server from outside too: it cannot report its own outage.
 
-Each outage alerts once. A component alerts when its check reads unhealthy, and alerts again only after it has read healthy in between. A check that reads not available neither alerts nor ends an outage. Recovery is logged; no notification is sent for it.
+## Checking a missing delivery
 
-The server keeps each component's alert state for as long as it runs. A component that is already unhealthy when the server starts alerts once, at the first check. A reload of the server's workers keeps the state, so it does not repeat an alert.
+1. Check whether the in-app notification exists. If it does, investigate delivery
+   rather than recreating the event and risking duplicate messages.
+2. Check the [worker and failed work](background-work.md) and
+   [component health](monitoring.md). Queue acceptance alone does not establish
+   completion.
+3. For push, check `notifications.push_enabled`, the user's channel/category
+   preference, browser permission and a current subscription. The worker removes
+   expired subscriptions; other send failures are logged and raised for retry.
+   Push has no stored per-delivery outcome. Provider acceptance does not prove a
+   browser displayed the notification.
+4. For email, check that the user was verified when the email message was created,
+   then their channel/category preference and the configured mail transport.
+   `notification.email` errors identify failed sends; a successful transport handoff
+   does not prove inbox delivery. Check the receiving mail service separately.
+5. For webhooks, check the category filter, destination validation, signing-secret
+   decryption and receiver status. Search `notification.webhook` logs using the
+   notification ID, and confirm the receiver's deduplication and signature checks.
 
-An alert is a notification row in PostgreSQL, so it cannot be delivered while PostgreSQL is down. The server logs the alerts it owes and delivers them at the first check that can deliver them, including the alert for the PostgreSQL outage itself. An alert for an outage that ended before it could be delivered names the outage window: when the component turned unhealthy and when it recovered. A delivery that fails for another reason is logged and retried at the next check. With `notifications.admin_alerts` off, an outage is logged and no alert is sent, also when the setting is turned off during the outage.
-
-The background worker writes a heartbeat to Redis, and the web server judges it by age. An idle worker renews it about every 10 seconds and reads unhealthy after 45 seconds without a renewal. A worker that is handling a message renews it every 30 seconds and reads unhealthy after 90 seconds. A handler blocked in a single call for longer than that cannot renew it, so the worker reads unhealthy until the call returns. A heartbeat that disappears also reads unhealthy. A heartbeat that says the worker stopped reads not available for 45 seconds and unhealthy after that, so a worker that restarts itself at its memory limit has time to report in again before it would alert. Until the server has seen a heartbeat, the worker check reads not available, so a development stack without a worker does not alert. While Redis is unreachable the worker check reads not available too, and the Redis check carries the alert.
-
-Baander assumes one web server and one background worker per deployment. Two web servers would each send every alert, and two workers share one heartbeat, so a live worker hides a dead one. The web server cannot report its own outage; watch it from outside with the [health endpoints](monitoring.md#health-checks).
+Keep `APP_SECRET` with database backups: webhook secrets need the matching value.
+[Storage and data](storage-and-data.md) explains ownership, and
+[Backup and recovery](backup-and-recovery.md) covers capture and restore limits.
 
 ## Scope
 
