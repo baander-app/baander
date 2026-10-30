@@ -3,14 +3,11 @@ import type { PaletteColors } from '../types'
 /** RGB color tuple [0-255]. */
 type RGB = [number, number, number]
 
-/** Extract a color palette from an image URL using OffscreenCanvas pixel sampling. */
-export async function extractPalette(imageUrl: string): Promise<PaletteColors | null> {
+/** Extract a color palette from authenticated image bytes using OffscreenCanvas pixel sampling. */
+export async function extractPalette(blob: Blob): Promise<PaletteColors | null> {
+  let bitmap: ImageBitmap | undefined
   try {
-    const response = await fetch(imageUrl, { credentials: 'include' })
-    if (!response.ok) return null
-
-    const blob = await response.blob()
-    const bitmap = await createImageBitmap(blob)
+    bitmap = await createImageBitmap(blob)
 
     // Sample at small resolution for speed
     const sampleSize = 64
@@ -20,15 +17,14 @@ export async function extractPalette(imageUrl: string): Promise<PaletteColors | 
 
     ctx.drawImage(bitmap, 0, 0, sampleSize, sampleSize)
     const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize)
-    bitmap.close()
 
     return analyzePixels(imageData.data, sampleSize, sampleSize)
   } catch {
     return null
+  } finally {
+    bitmap?.close()
   }
 }
-
-// NOTE: extractPaletteFromBlurhash removed — dead code. Add back when blurhash fallback is wired in a future phase.
 
 /** Analyze pixel data to produce a color palette. */
 function analyzePixels(data: Uint8Array | Uint8ClampedArray, width: number, height: number): PaletteColors | null {

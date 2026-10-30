@@ -5,6 +5,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useEqProfilesStore } from '@/features/equalizer/stores/eq-profiles-store'
+import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
 import { activityService } from '@/features/player/services/activity-service'
 import { OwnedQueryClient } from './query-client'
 import { LiveRecovery } from './recovery'
@@ -14,6 +15,7 @@ import { LiveCoordinatorContext, LiveContext, useLiveCoordinator, useLiveRecover
 import { authenticatedTransport } from './transport'
 
 function resetMirrors(): void {
+  usePaletteStore.getState().clearAll()
   useNotificationStore.getState().resetForPrincipal()
   useSidebarStore.getState().resetForPrincipal()
   useEqProfilesStore.getState().resetForPrincipal()

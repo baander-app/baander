@@ -150,19 +150,30 @@ describe('metadata panel server refreshes', () => {
     dispose()
   })
 
-  it('keeps dirty text visible after a remote deletion and disables saving', async () => {
-    const { client, dispose } = setup()
+  it.each([403, 404])('settles a coordinated %s read while retaining dirty text and restoring future access', async status => {
+    const { client, coordinator, dispose } = setup(true)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     fireEvent.change(screen.getByDisplayValue('Server title'), { target: { value: 'My title' } })
-    request.mockRejectedValue(new AxiosError('Deleted', undefined, undefined, undefined, {
-      status: 404, statusText: 'Deleted', headers: {}, config: { headers: {} } as never, data: {},
-    }))
+    const failure = new AxiosError('Unavailable', undefined, undefined, undefined, {
+      status, statusText: 'Unavailable', headers: {}, config: { headers: {} } as never, data: {},
+    })
+    request.mockReset().mockRejectedValue(failure)
     await act(async () => {
-      await client.invalidateQueries({ queryKey: getGetAlbumShowQueryKey('AlbumFixture1') })
-      await vi.advanceTimersByTimeAsync(1000)
+      coordinator.hint(['catalog'])
+      await vi.advanceTimersByTimeAsync(40_000)
     })
     expect(screen.getByDisplayValue('My title')).toBeDisabled()
     expect(screen.getByRole('alert')).toHaveTextContent('unavailable')
     expect(request).toHaveBeenCalledTimes(1)
+    expect(client.getQueryState(getGetAlbumShowQueryKey('AlbumFixture1'))).toMatchObject({ data: undefined, status: 'error', error: failure })
+    request.mockResolvedValue(album('Restored title'))
+    await act(async () => {
+      coordinator.hint(['catalog'])
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(screen.getByDisplayValue('My title')).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('changed elsewhere')
     dispose()
   })
 })

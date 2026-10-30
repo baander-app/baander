@@ -1,55 +1,60 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
-import { createLogger } from '@/shared/lib/logger'
-
-const logger = createLogger('ImageBlob')
+import { captureOwnership, isCurrentOwnership, subscribeOwnership, type OwnershipStamp } from '@/shared/live/ownership'
 
 export interface UseImageBlobResult {
   src: string | null
   isLoading: boolean
 }
 
-/**
- * Fetch an image via authenticated AXIOS_INSTANCE and return a blob URL.
- * Revokes the blob URL on unmount or when imageUrl changes (fixes memory leak).
- */
-export function useImageBlob(imageUrl?: string | null): UseImageBlobResult {
+/** Authenticated bytes are shared; each renderer owns and releases its own object URL. */
+export function useAuthenticatedImage(imageUrl?: string | null) {
   const source = imageUrl || null
-  const [image, setImage] = useState(() => ({
-    source, src: null as string | null, isLoading: source !== null,
-  }))
+  const ownership = useSyncExternalStore(subscribeOwnership, captureOwnership)
+  const query = useQuery({
+    queryKey: ['catalog', 'binary-image', source, ownership.generation],
+    enabled: source !== null,
+    gcTime: 0,
+    queryFn: async ({ signal }) => {
+      if (!source) return null
+      try {
+        const response = await AXIOS_INSTANCE.get<Blob>(source, { responseType: 'blob', signal })
+        return response.data
+      } catch (error) {
+        // The image endpoints use 404 for ordinary artwork absence.
+        const status = (error as { response?: { status?: number } } | null)?.response?.status
+        if (status === 404) return null
+        throw error
+      }
+    },
+  })
+  const revoked = [query.error, query.failureReason].some(error => {
+    const status = (error as { response?: { status?: number } } | null)?.response?.status
+    return status === 401 || status === 403
+  })
+  return { blob: revoked ? null : query.data ?? null, isLoading: source !== null && query.isPending, source, ownership }
+}
 
-  // Reset during render so children never receive a cover owned by another URL.
-  // Tracking the source also distinguishes A → B → A from the earlier request.
-  if (image.source !== source) {
-    setImage({ source, src: null, isLoading: source !== null })
+function createImageSource(blob: Blob | null, source: string | null, ownership: OwnershipStamp) {
+  let src: string | null = null
+  return {
+    getSnapshot: () => isCurrentOwnership(ownership) ? src : null,
+    subscribe: (notify: () => void) => {
+      if (!blob || !source) return () => undefined
+      src = URL.createObjectURL(blob)
+      notify()
+      return () => {
+        if (src) URL.revokeObjectURL(src)
+        src = null
+      }
+    },
   }
+}
 
-  useEffect(() => {
-    if (!source) return
-    const controller = new AbortController()
-    let objectUrl: string | null = null
-
-    AXIOS_INSTANCE.get<Blob>(source, { responseType: 'blob', signal: controller.signal })
-      .then((response) => {
-        // A transport can settle after abort; cancellation alone is not ownership.
-        if (controller.signal.aborted) return
-        objectUrl = URL.createObjectURL(response.data)
-        setImage({ source, src: objectUrl, isLoading: false })
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return
-        logger.warn('Image blob fetch failed:', err)
-        setImage({ source, src: null, isLoading: false })
-      })
-
-    return () => {
-      controller.abort()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [source])
-
-  return image.source === source
-    ? { src: image.src, isLoading: image.isLoading }
-    : { src: null, isLoading: source !== null }
+export function useImageBlob(imageUrl?: string | null): UseImageBlobResult {
+  const { blob, isLoading, source, ownership } = useAuthenticatedImage(imageUrl)
+  const image = useMemo(() => createImageSource(blob, source, ownership), [blob, source, ownership])
+  const src = useSyncExternalStore(image.subscribe, image.getSnapshot)
+  return { src, isLoading }
 }

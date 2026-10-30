@@ -16,8 +16,7 @@ import { decode as decodeBlurhash } from 'blurhash'
 import { Minimize, Music, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import { VisualizerHost } from '@/features/visualizer/components/VisualizerHost'
 import { registerVisualizerRenderers } from '@/features/visualizer/register-visualizer-renderers'
-import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
-import { extractPalette } from '@/features/visualizer/utils/extract-palette'
+import { useAlbumPalette } from '@/features/visualizer/hooks/use-album-palette'
 import { useEqBandsStore } from '@/features/equalizer/stores/eq-bands-store'
 import { isEngineMode, ENGINE_MODES } from '@/features/visualizer/types'
 
@@ -332,25 +331,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
   const lyrics = extractLyrics(lyricsData)
   const hasSynced = !!lyrics?.syncedLyrics
 
-  // Extract color palette when album changes
-  useEffect(() => {
-    if (!albumPublicId) return
-    const store = usePaletteStore.getState()
-    if (store.getPalette(albumPublicId)) return // already cached
-    if (store.extracting.has(albumPublicId)) return // in progress
-
-    const coverUrl = albumData?.data?.coverImage?.url
-    if (!coverUrl) return
-
-    store.startExtraction(albumPublicId)
-    extractPalette(`/api/albums/${albumPublicId}/cover`).then((palette) => {
-      if (palette) {
-        store.setPalette(albumPublicId, palette)
-      } else {
-        store.removePalette(albumPublicId)
-      }
-    })
-  }, [albumPublicId, albumData])
+  useAlbumPalette(albumPublicId, albumData?.data?.coverImage?.url)
 
   return (
     <FullscreenOverlay

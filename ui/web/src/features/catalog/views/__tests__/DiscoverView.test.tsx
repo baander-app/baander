@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { OwnedQueryClient } from '@/shared/live/query-client'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { cleanup, render as renderUI, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
@@ -40,6 +42,18 @@ vi.mock('react-router-dom', () => ({
 }))
 
 import { DiscoverView } from '../DiscoverView'
+
+const clients: OwnedQueryClient[] = []
+afterEach(() => {
+  cleanup()
+  clients.splice(0).forEach(client => client.dispose())
+})
+
+function render(ui: React.ReactElement) {
+  const client = new OwnedQueryClient()
+  clients.push(client)
+  return renderUI(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 describe('DiscoverView', () => {
   beforeEach(() => {

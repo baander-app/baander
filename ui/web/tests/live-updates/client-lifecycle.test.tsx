@@ -7,6 +7,7 @@ import { advanceAuthorization, captureOwnership, guardMutationCallbacks, setAuth
 import { LiveRecovery } from '@/shared/live/recovery'
 import { authenticatedTransport, type SharedLiveTransport, type LiveTransportListener } from '@/shared/live/transport'
 import { AuthenticatedClientProvider } from '@/shared/live/provider'
+import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 
 vi.mock('@/shared/api-client/gen/endpoints', async importOriginal => ({
@@ -306,7 +307,11 @@ describe('authenticated provider lifecycle', () => {
     const view = render(<AuthenticatedClientProvider><Player /></AuthenticatedClientProvider>)
     const client = clients[0]
     client.setQueryData(['inactive', 'protected'], 'secret')
+    const palette = { primary: '#111111', secondary: '#222222', accent: '#333333', background: '#000000', isDark: true }
+    const token = usePaletteStore.getState().beginExtraction('album')
+    usePaletteStore.getState().finishExtraction('album', token, palette)
     act(() => useAuthStore.setState({ accessToken: 'rotated-token' }))
+    expect(usePaletteStore.getState().getPalette('album')).toEqual(palette)
     expect(mounts).toHaveBeenCalledTimes(1)
     expect(client.getQueryData(['inactive', 'protected'])).toBe('secret')
     act(() => {
@@ -314,9 +319,13 @@ describe('authenticated provider lifecycle', () => {
       transportState.listeners.forEach(listener => listener.onMessage?.(wire('live.reset', ['catalog', 'admin-users'], '2')))
     })
     expect(client.getQueryData(['inactive', 'protected'])).toBeUndefined()
+    expect(usePaletteStore.getState().getPalette('album')).toBeNull()
+    const replacementToken = usePaletteStore.getState().beginExtraction('album')
+    usePaletteStore.getState().finishExtraction('album', replacementToken, palette)
     expect(mounts).toHaveBeenCalledTimes(1)
     act(() => useAuthStore.setState({ principalSessionId: 'principal-b' }))
     expect(mounts).toHaveBeenCalledTimes(2)
+    expect(usePaletteStore.getState().getPalette('album')).toBeNull()
     expect(clients[1]).not.toBe(client)
     expect(clients[1].getQueryData(['inactive', 'protected'])).toBeUndefined()
     view.unmount()

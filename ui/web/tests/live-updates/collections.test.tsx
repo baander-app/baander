@@ -47,6 +47,7 @@ afterEach(() => {
   stops.splice(0).forEach(stop => stop())
   http.restore()
   synchronizeOwnership(null)
+  vi.useRealTimers()
 })
 
 function setup(coordinated = true) {
@@ -212,12 +213,30 @@ describe('personal collection freshness', () => {
     await screen.findByText('Shared mix')
     fireEvent.click(screen.getAllByRole('button', { name: /Share/ })[0])
     await screen.findByText('friend')
+    vi.useFakeTimers()
     denied = true
-    act(() => coordinator.hint(['playlists']))
-    await screen.findByText('This playlist is no longer available.')
+    await act(async () => {
+      coordinator.hint(['playlists'])
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(screen.getByText('This playlist is no longer available.')).toBeInTheDocument()
     expect(screen.queryByText('Shared mix')).toBeNull()
     expect(screen.queryByText('friend')).toBeNull()
-    expect(client.getQueryData(['/api/playlists/mix'])).toEqual({})
+    const key = ['/api/playlists/mix']
+    expect(client.getQueryState(key)).toMatchObject({ data: undefined, status: 'error', error: { response: { status: 403 } } })
+    const reads = http.history.get.length
+    await act(async () => { await vi.advanceTimersByTimeAsync(40_000) })
+    expect(http.history.get).toHaveLength(reads)
+    expect(screen.getByText('This playlist is no longer available.')).toBeInTheDocument()
+    denied = false
+    await act(async () => {
+      coordinator.hint(['playlists'])
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(http.history.get).toHaveLength(reads + 1)
+    expect(client.getQueryState(key)).toMatchObject({ status: 'success', error: null })
+    expect(screen.getByText('Shared mix')).toBeInTheDocument()
+    expect(screen.getByText('friend')).toBeInTheDocument()
     expect(http.history.post).toHaveLength(0)
     expect(http.history.put).toHaveLength(0)
     expect(http.history.delete).toHaveLength(0)

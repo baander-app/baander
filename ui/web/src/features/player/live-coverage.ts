@@ -6,12 +6,12 @@ export const playerLiveCoverage = [
     family: "deployment-definitions",
     policy: {
       kind: "deployment",
-      reason: "Versioned DSP binaries change with deployment and are outside persistent JSON query freshness.",
+      reason: "Deployment-owned DSP binaries change with deployment and are outside persistent JSON query freshness.",
     },
     audiences: ["global"],
     sourceTables: [],
     deploymentTables: [],
-    sources: ["versioned WASM static assets", "getWasmUrl('fft2048.wasm')", "url"],
+    sources: ["deployment-owned WASM static assets", "getWasmUrl('fft2048.wasm')", "url"],
     keyVariants: [],
     dependentFamilies: [],
     mirrors: [],
@@ -22,7 +22,7 @@ export const playerLiveCoverage = [
       "src/features/player/services/wasm-loader.ts#fetch:url",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/features/player/services/wasm-loader.test.ts", "tests/features/player/services/audio-processor-lifecycle.test.ts"], endToEnd: 'pending' },
   },
   {
     id: "player.stream-forwarding",
@@ -44,7 +44,7 @@ export const playerLiveCoverage = [
       "src/features/player/services/auth-stream-worker.ts#fetch:event.request",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/features/player/auth-stream-worker.test.ts"], endToEnd: 'pending' },
   },
   {
     id: "player.liveness",
@@ -63,14 +63,14 @@ export const playerLiveCoverage = [
     responseCaches: [],
     consumers: ["src/features/player/services/server-liveness.ts#AXIOS_INSTANCE.get:LIVE_PATH"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/features/player/services/server-liveness.test.ts"], endToEnd: 'pending' },
   },
   {
     id: "player.catalog-demand",
     family: "catalog",
     policy: {
       kind: "demand",
-      reason: "Playback, queue hydration and context-menu actions read authoritative data when invoked; refreshing must never replay an action.",
+      reason: "Restored queue availability is checked on demand before playback or resume; refreshing must never replay playback actions.",
     },
     audiences: ["library"],
     sourceTables: ["albums", "artists", "songs", "artist_album", "artist_song", "user_library_access"],
@@ -82,6 +82,6 @@ export const playerLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/player/stores/player-availability.ts#getSongIndex:generated"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["src/features/player/stores/__tests__/player-availability.test.ts"], endToEnd: 'pending' },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

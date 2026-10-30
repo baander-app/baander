@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import { CancelledError, type Query, type QueryClient, type QueryKey } from '@tanstack/react-query'
 import { expandLiveFamilies } from './descriptors'
 import { bindLiveReadContext } from './http-admission'
@@ -111,9 +112,17 @@ export class LiveQueryCoordinator {
         state.retryAt = 0
       }
       if (event.type === 'updated' && event.action.type === 'error') {
-        state.failures++
-        state.retryAt = Date.now() + Math.min(30_000, 1_000 * 2 ** Math.min(state.failures - 1, 5))
-        this.recovery.resourceReadFailed()
+        const error = query.state.error
+        if (isAxiosError(error) && [403, 404].includes(error.response?.status ?? 0)) {
+          state.acknowledged = Math.max(state.acknowledged, state.started)
+          state.failures = 0
+          state.retryAt = 0
+          if (query.state.data !== undefined) query.setState({ data: undefined, dataUpdatedAt: 0 })
+        } else {
+          state.failures++
+          state.retryAt = Date.now() + Math.min(30_000, 1_000 * 2 ** Math.min(state.failures - 1, 5))
+          this.recovery.resourceReadFailed()
+        }
       }
       if (event.type === 'updated' && state.generation > state.acknowledged && !query.state.isInvalidated) {
         query.invalidate()

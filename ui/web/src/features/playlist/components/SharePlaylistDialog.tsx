@@ -1,11 +1,10 @@
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { isAxiosError } from 'axios'
 import { useDeletePlaylistRemoveCollaborator, usePatchPlaylistUpdate, usePutPlaylistAddCollaborator } from '@/features/playlist/hooks/use-playlist-mutations'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import styled from 'styled-components'
-import { useQueryClient } from '@tanstack/react-query'
 import { Copy, Share2, X } from 'lucide-react'
-import { getGetPlaylistShowQueryKey, useGetPlaylistShow } from '@/shared/api-client/gen/endpoints'
+import { useGetPlaylistShow } from '@/shared/api-client/gen/endpoints'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { createLogger } from '@/shared/lib/logger'
 import { Button } from '@/shared/components/ui/button'
@@ -140,13 +139,9 @@ export function SharePlaylistDialog({ playlistPublicId }: SharePlaylistDialogPro
 
 /** Mounted only while the dialog is open, so every opening reads the server's state. */
 function SharePlaylistForm({ playlistPublicId }: SharePlaylistDialogProps) {
-  const queryClient = useQueryClient()
   const { data, error: readError } = useGetPlaylistShow(playlistPublicId)
   const denied = isAxiosError(readError) && [403, 404].includes(readError.response?.status ?? 0)
   const playlist = denied ? undefined : data?.data
-  useEffect(() => {
-    if (denied && playlistPublicId) queryClient.setQueryData(getGetPlaylistShowQueryKey(playlistPublicId), {})
-  }, [denied, playlistPublicId, queryClient])
   const [newCollaborator, setNewCollaborator] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<CopyState>('idle')

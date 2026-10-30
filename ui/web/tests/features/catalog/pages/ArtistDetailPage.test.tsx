@@ -1,6 +1,8 @@
+import { QueryClientProvider } from '@tanstack/react-query'
+import { OwnedQueryClient } from '@/shared/live/query-client'
 import { ThemeProvider } from '@/shared/theme'
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { cleanup, render as renderUI, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
@@ -30,6 +32,18 @@ vi.mock('@/features/layout/stores/context-panel-store', () => ({
 }))
 
 import { ArtistDetailPage } from '@/features/catalog/pages/ArtistDetailPage'
+
+const clients: OwnedQueryClient[] = []
+afterEach(() => {
+  cleanup()
+  clients.splice(0).forEach(client => client.dispose())
+})
+
+function render(ui: React.ReactElement) {
+  const client = new OwnedQueryClient()
+  clients.push(client)
+  return renderUI(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 describe('ArtistDetailPage', () => {
   it('renders artist name', () => {

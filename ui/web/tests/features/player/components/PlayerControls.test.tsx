@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { OwnedQueryClient } from '@/shared/live/query-client'
 
 const {
   mockSetIsPlaying,
@@ -56,8 +58,16 @@ vi.mock('@/features/player/stores/player-store', () => ({
 import { NowPlayingBar } from '@/features/player/components/NowPlayingBar'
 import { QueueModal } from '@/features/player/components/QueueModal'
 
+const clients: OwnedQueryClient[] = []
+afterEach(() => {
+  cleanup()
+  clients.splice(0).forEach(client => client.dispose())
+})
+
 function renderWithRouter(ui: React.ReactElement) {
-  return render(<BrowserRouter>{ui}</BrowserRouter>)
+  const client = new OwnedQueryClient()
+  clients.push(client)
+  return render(<QueryClientProvider client={client}><BrowserRouter>{ui}</BrowserRouter></QueryClientProvider>)
 }
 
 describe('NowPlayingBar', () => {

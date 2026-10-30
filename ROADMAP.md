@@ -272,6 +272,26 @@ is `/tmp/live-u9-fixture-media-integration.log`, with artifact
 `var/test-runs/20261030-213905-e7e9ecff`. Scoped PHPStan, formatting and syntax checks
 pass. Actual worker processing and browser playback remain acceptance work.
 
+U9 asset and terminal-read checkpoint, 2026-10-30: authenticated cover bytes now
+use the shared query coordinator. Stable cover URLs refresh, missing artwork is
+a successful empty result, and access resets discard image URLs and palette work.
+Each renderer releases its own object URL. Palette extraction shares those bytes
+and cannot restore results after ownership changes or unmounting.
+
+Resource-level 403 and 404 responses now clear retained server data and finish the
+attempted refresh generation. They preserve the real error without putting the
+whole connection into recovery. A later change can retry the resource; transient
+failures retain the existing retry behavior. Playlist readers no longer replace
+these errors with fabricated empty successes. Dirty metadata text remains intact.
+
+Characterization tests first reproduced stale artwork, delayed access removal,
+ordinary artwork absence, and repeated terminal reads. The final frontend suite
+passes 2,872 tests in 231 files (`/tmp/live-u9-frontend-stable.log`); the build,
+both TypeScript projects and lint pass with eight existing warnings. Browser
+capacity and recovery qualification remain open. The first capacity attempt
+stopped before fixture creation because the CLI could not resolve its configured
+media-storage path; this is a fixture setup failure, not a capacity measurement.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

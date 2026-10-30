@@ -3,7 +3,8 @@ import { firstKeyMatches, keyStartsWith, type LiveQueryDescriptor } from '@/shar
 export const catalogLiveDescriptors: readonly LiveQueryDescriptor[] = [
   {
     family: 'catalog',
-    matches: key => keyStartsWith(key, 'album-duplicates')
+    matches: key => keyStartsWith(key, 'catalog', 'binary-image')
+      || keyStartsWith(key, 'album-duplicates')
       || keyStartsWith(key, 'catalog', 'timeline')
       || firstKeyMatches(key, /^\/api\/(albums|artists|songs|movies)\/(?:[^/]+)?$/)
       || keyStartsWith(key, '/api/genres/'),

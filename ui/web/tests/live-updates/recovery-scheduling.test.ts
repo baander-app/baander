@@ -1,3 +1,4 @@
+import { AxiosError } from 'axios'
 import { QueryObserver } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OwnedQueryClient } from '@/shared/live/query-client'
@@ -226,6 +227,141 @@ describe('recovery scheduling lifecycle', () => {
     expect(recovery.getSnapshot().authorityReady).toBe(true)
     expect(client.getQueryData(['catalog', 'retained-pages'])).toBe(pages)
     expect(purge).not.toHaveBeenCalled()
+  })
+
+  it.each([403, 404])('settles an unavailable %s snapshot, preserves its error, and reads again after a hint', async status => {
+    const { bus, client, recovery } = recoveredClient()
+    const failed = vi.spyOn(recovery, 'resourceReadFailed')
+    const failure = new AxiosError('Unavailable', undefined, undefined, undefined, {
+      status, statusText: 'Unavailable', headers: {}, config: { headers: {} } as never, data: {},
+    })
+    const read = vi.fn().mockResolvedValue('initial')
+    const key = ['catalog', 'terminal']
+    const observer = new QueryObserver(client, { queryKey: key, queryFn: read, retry: false })
+    disposals.push(observer.subscribe(() => undefined))
+    bus.open()
+    bus.receive(wire('live.ready'))
+    await vi.advanceTimersByTimeAsync(200)
+    expect(observer.getCurrentResult().data).toBe('initial')
+    read.mockRejectedValue(failure)
+    bus.receive(wire('live.changed'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(client.getQueryState(key)).toMatchObject({ data: undefined, dataUpdatedAt: 0, status: 'error', fetchStatus: 'idle', error: failure })
+    expect(observer.getCurrentResult().data).toBeUndefined()
+    expect(observer.getCurrentResult().error).toBe(failure)
+    expect(recovery.getSnapshot().status).toBe('current')
+    expect(failed).not.toHaveBeenCalled()
+    const reads = read.mock.calls.length
+    for (let interval = 0; interval < 4; interval++) {
+      bus.receive(wire('live.health'))
+      await vi.advanceTimersByTimeAsync(10_000)
+    }
+    expect(read).toHaveBeenCalledTimes(reads)
+    read.mockResolvedValue('restored')
+    bus.receive(wire('live.changed'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(read).toHaveBeenCalledTimes(reads + 1)
+    expect(observer.getCurrentResult().data).toBe('restored')
+    expect(recovery.getSnapshot().status).toBe('current')
+  })
+
+  it('keeps a newer hint pending when an earlier resource read reports absence', async () => {
+    const { bus, client, recovery } = recoveredClient()
+    const earlier = deferred<string>()
+    const later = deferred<string>()
+    const failure = new AxiosError('Deleted', undefined, undefined, undefined, {
+      status: 404, statusText: 'Deleted', headers: {}, config: { headers: {} } as never, data: {},
+    })
+    const read = vi.fn().mockResolvedValueOnce('initial')
+      .mockImplementationOnce(() => earlier.promise.then(() => { throw failure }))
+      .mockImplementationOnce(() => later.promise)
+    const observer = new QueryObserver(client, { queryKey: ['catalog', 'terminal-hints'], queryFn: read, retry: false })
+    disposals.push(observer.subscribe(() => undefined))
+    bus.open()
+    bus.receive(wire('live.ready'))
+    await vi.advanceTimersByTimeAsync(200)
+    bus.receive(wire('live.changed'))
+    await vi.advanceTimersByTimeAsync(500)
+    bus.receive(wire('live.changed'))
+    earlier.resolve('ignored')
+    await flush()
+    expect(recovery.getSnapshot().status).toBe('recovering')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(read).toHaveBeenCalledTimes(3)
+    expect(observer.getCurrentResult().data).toBeUndefined()
+    expect(recovery.getSnapshot().status).toBe('recovering')
+    later.resolve('latest')
+    await vi.advanceTimersByTimeAsync(200)
+    expect(observer.getCurrentResult().data).toBe('latest')
+    expect(recovery.getSnapshot().status).toBe('current')
+  })
+
+  it('fences a terminal response from before an authorization reset until new authority and a new read settle', async () => {
+    const nextAuthority = deferred<LiveAuthority>()
+    const { bus, client, recovery } = recoveredClient(() => nextAuthority.promise)
+    const oldRead = deferred<string>()
+    const newRead = deferred<string>()
+    const read = vi.fn().mockResolvedValueOnce('initial')
+      .mockImplementationOnce(() => oldRead.promise.then(() => {
+        throw new AxiosError('Old denial', undefined, undefined, undefined, {
+          status: 403, statusText: 'Forbidden', headers: {}, config: { headers: {} } as never, data: {},
+        })
+      }))
+      .mockImplementationOnce(() => newRead.promise)
+    const key = ['catalog', 'reset-terminal']
+    const observer = new QueryObserver(client, { queryKey: key, queryFn: read, retry: false })
+    const unsubscribe = observer.subscribe(() => undefined)
+    disposals.push(unsubscribe)
+    bus.open()
+    bus.receive(wire('live.ready'))
+    await vi.advanceTimersByTimeAsync(200)
+    bus.receive(wire('live.changed'))
+    await vi.advanceTimersByTimeAsync(500)
+    const fingerprint = 'c'.repeat(64)
+    bus.receive({ ...wire('live.ready'), type: 'live.reset', authorizationGeneration: '2', authorizationFingerprint: fingerprint })
+    unsubscribe()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(recovery.getSnapshot().authorityReady).toBe(false)
+    expect(recovery.getSnapshot().status).toBe('recovering')
+    expect(read).toHaveBeenCalledTimes(2)
+    expect(client.getQueryData(key)).toBeUndefined()
+    nextAuthority.resolve({ ...authority(), authorizationFingerprint: fingerprint })
+    await flush()
+    const replacement = new QueryObserver(client, { queryKey: key, queryFn: read, retry: false })
+    disposals.push(replacement.subscribe(() => undefined))
+    await vi.advanceTimersByTimeAsync(100)
+    expect(read).toHaveBeenCalledTimes(3)
+    oldRead.resolve('obsolete')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(replacement.getCurrentResult().error).toBeNull()
+    expect(replacement.getCurrentResult().data).toBeUndefined()
+    expect(recovery.getSnapshot().status).toBe('recovering')
+    newRead.resolve('new authority snapshot')
+    await vi.advanceTimersByTimeAsync(200)
+    expect(replacement.getCurrentResult().data).toBe('new authority snapshot')
+    expect(recovery.getSnapshot().status).toBe('current')
+  })
+
+  it.each([401, 429, 503])('keeps HTTP %s failures retryable with the previous snapshot', async status => {
+    const { bus, client, recovery } = recoveredClient()
+    const failure = new AxiosError('Retryable', undefined, undefined, undefined, {
+      status, statusText: 'Retryable', headers: {}, config: { headers: {} } as never, data: {},
+    })
+    const read = vi.fn().mockResolvedValueOnce('initial').mockRejectedValueOnce(failure).mockResolvedValue('recovered')
+    const observer = new QueryObserver(client, { queryKey: ['catalog', 'retryable'], queryFn: read, retry: false })
+    disposals.push(observer.subscribe(() => undefined))
+    bus.open()
+    bus.receive(wire('live.ready'))
+    await vi.advanceTimersByTimeAsync(200)
+    bus.receive(wire('live.changed'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(observer.getCurrentResult().data).toBe('initial')
+    expect(observer.getCurrentResult().error).toBe(failure)
+    expect(recovery.getSnapshot().status).toBe('degraded')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(read).toHaveBeenCalledTimes(3)
+    expect(observer.getCurrentResult().data).toBe('recovered')
+    expect(recovery.getSnapshot().status).toBe('current')
   })
 
   it('retries a source 503 without another hint while keeping readable pages', async () => {
