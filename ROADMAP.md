@@ -292,6 +292,17 @@ capacity and recovery qualification remain open. The first capacity attempt
 stopped before fixture creation because the CLI could not resolve its configured
 media-storage path; this is a fixture setup failure, not a capacity measurement.
 
+The media failure was traced to volume ownership: configuration resolved the
+correct path, but the owned Docker volume was root-owned and unwritable by the
+application user. Development initialization now prepares that writable volume
+through its existing container routine, changing only the volume root's owner.
+Read-only, imported and external media mounts are excluded. The regression test
+first failed on the missing initialization; all 12 runtime tests now pass with
+67 assertions, and scoped formatting and PHPStan pass. Receipts are
+`/tmp/live-u9-media-volume-red.log`, `/tmp/live-u9-media-volume-green.log` and
+`/tmp/live-u9-media-volume-phpstan.log`. The failed fixture left no database rows
+or media files; its owned manifest was removed by scoped cleanup.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

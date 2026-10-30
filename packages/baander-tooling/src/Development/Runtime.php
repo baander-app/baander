@@ -535,6 +535,12 @@ class Runtime
         if ($instance['kind'] === 'preview') {
             $destinations['vendor'] = $home . '/vendor';
         }
+        foreach ($model['services']['app']['volumes'] as $mount) {
+            if ($mount['type'] === 'volume' && $mount['source'] === 'media'
+                && !($mount['read_only'] ?? false) && !($model['volumes']['media']['external'] ?? false)) {
+                $destinations['media'] = $mount['target'];
+            }
+        }
         foreach ($destinations as $key => $source) {
             $name = $model['volumes'][$key]['name'];
             $script = match ($key) {

@@ -197,6 +197,27 @@ final class DevelopmentRuntimeTest extends TestCase
         self::assertContains('type=bind,src=' . $instance['worktree'] . ',dst=/var/www/html,readonly', array_values($installs)[0]);
     }
 
+    public function testOwnedMediaVolumeIsWritableWithoutChangingImportedMedia(): void
+    {
+        $this->runtime->prepare($this->instance, $this->release);
+        $calls = file($this->root . '/runtime-resource-calls.jsonl', FILE_IGNORE_NEW_LINES)
+            |> (static fn(array $lines): array => array_map(json_decode(...), $lines));
+        $mediaSeeds = array_values(array_filter($calls, static fn(array $args): bool
+            => in_array('type=volume,src=baander-persistent-media,dst=/seed', $args, true)));
+        self::assertCount(1, $mediaSeeds);
+        self::assertSame('chown www-data:www-data /seed', $mediaSeeds[0][array_key_last($mediaSeeds[0])]);
+
+        foreach (['bind', 'volume'] as $type) {
+            file_put_contents($this->root . '/runtime-resource-calls.jsonl', '');
+            $instance = array_replace($this->instance, [
+                'state_mounts' => ['media' => ['type' => $type, 'source' => $this->root, 'target' => '/storage/media']],
+            ]);
+            $this->runtime->prepare($instance, $this->release);
+            $calls = file_get_contents($this->root . '/runtime-resource-calls.jsonl');
+            self::assertStringNotContainsString('src=baander-persistent-media,dst=', $calls);
+        }
+    }
+
     public function testPreviewMountpointSymlinkAndTraversalRefusedBeforeHelpers(): void
     {
         mkdir($this->root . '/checkout');
