@@ -363,6 +363,24 @@ unrelated rows. Scoped PHPStan, formatting and syntax checks pass. The wrapper
 exits zero; evidence is `/tmp/live-u9-scan-integration-final.log`. The real scan,
 worker ingestion and mounted-browser refresh remain pending.
 
+U9 capacity checkpoint: 32 authenticated principals passed the real HTTP,
+WebSocket and rendered-view workload in the isolated preview. Across 320 ordinary
+updates, p95 was 1,765ms and the worst principal's p95 was 2,146ms. The producer
+committed 10,000 captured changes in 10,029.28ms; all final counts and visible
+notification titles converged within a conservative 1,455.71ms after the final
+commit. All 1,344 measured source reads completed within 956.83ms in Chromium.
+Each client peaked at two concurrent GETs and four starts per second.
+
+Worker identities remained stable, pool assignments returned to their prior quiet
+envelopes, and sampled pending sends and projection/read errors remained zero.
+Owned cleanup completed with zero survivors and an empty backlog. The passing
+run is `/tmp/live-u9-capacity-sixth.log`; its timings and runtime identity are in
+`/tmp/live-u9-capacity-sixth-receipts.json`. Chromium transport timings are recorded
+separately from host callback timings after an earlier run exposed observer delay.
+This measures the native PHP/Swoole preview with development/debug/Vite overhead;
+it does not establish production-mode performance or long-duration soak behavior.
+Recovery, populated-view and scanner browser qualification remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
