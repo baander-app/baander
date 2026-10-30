@@ -86,6 +86,7 @@ using AacEncChannel = struct AacEncChannel_ {
   int active_long, active_short;  /* bands below the channel's lowpass */
   float coef[1024]; /* MDCT coefficients, [window * 128 + k] for short windows */
   float x34[1024];  /* |coef|^(3/4) */
+  float form[AAC_MAX_BANDS]; /* sum of sqrt(|coef|) per group band */
   /* Per group band, indexed group * num_swb + sfb. */
   float energy[AAC_MAX_BANDS];
   float thr[AAC_MAX_BANDS];      /* masking threshold */
@@ -172,6 +173,9 @@ using AacEncoderState = struct AacEncoderState_ {
   int avg_frame_bits; /* bits per frame at the nominal bitrate, ADTS included */
   int reservoir;      /* unspent bits available to later frames */
   int reservoir_max;
+  /* Threshold reduction the rate loop settled on in the last frame, the
+   * starting point of the next frame's search (0: none yet). */
+  float last_reduction;
   /* Tuning overrides (aac_encoder_set_peak_bitrate, aac_encoder_set_bandwidth,
    * aac_encoder_set_vbr_mode): a hard cap on any frame's bits in bits per
    * second (0: none), the lowpass asked for in Hz (0: the tuning table),

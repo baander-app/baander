@@ -46,6 +46,14 @@ const int kCodebookMaxVal[12] = {0, 1, 1, 2, 2, 4, 4, 7, 7, 12, 12, AAC_ESC_MAX_
 
 bool is_tool_book(int cb) { return cb >= AAC_CB_NOISE; }
 
+/* The AAC-LC and HE-AAC cores search scalefactors from an estimate and
+ * the threshold reduction from the last frame's; the low-delay and
+ * xHE-AAC cores keep the plain bisections, so that their committed
+ * reference streams stay bit-exact. */
+bool fast_rate_loop(const AacEncoderState* s) {
+  return s->aot != AAC_AOT_USAC && !aac_encoder_aot_low_delay(s->aot);
+}
+
 float g_sf_gain[kMaxSf + 1];    /* 2^((sf - 100) / 4) */
 float g_sf_scale34[kMaxSf + 1]; /* 2^(-(sf - 100) * 3 / 16) */
 
@@ -188,6 +196,62 @@ int find_scalefactor(AacEncChannel* c, int g, int w0, int b, int sf_min, float a
   return lo;
 }
 
+/* The same search started from an estimate: for magnitudes well above
+ * the step, rounding noise is uniform in the |x|^(3/4) domain, which puts
+ * the band's noise at (4/27) * sum(sqrt|x|) * 2^((sf - 100) * 3/8).  The
+ * search gallops from the estimate to bracket the boundary and bisects
+ * the bracket; it usually needs two to four quantizations where plain
+ * bisection over the scalefactor range needs eight. */
+int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int sf_min,
+                                   float allowed) {
+  const float form = c->form[g * c->ics.num_swb + b];
+  if (form <= 0.0f || allowed <= 0.0f) {
+    return find_scalefactor(c, g, w0, b, sf_min, allowed);
+  }
+  const int est = std::clamp(
+      100 + (int)floorf((8.0f / 3.0f) * log2f(6.75f * allowed / form)), sf_min, kMaxSf);
+  auto fits = [&](int sf) {
+    quantize_band(c, g, w0, b, sf);
+    return band_noise(c, g, w0, b, sf) <= allowed;
+  };
+  int lo, hi; /* lo fits (or is sf_min), hi does not (or is past the range) */
+  if (fits(est)) {
+    lo = est;
+    int step = 1;
+    hi = est + 1;
+    while (hi <= kMaxSf && fits(hi)) {
+      lo = hi;
+      step *= 2;
+      hi = lo + step;
+    }
+    hi = std::min(hi, kMaxSf + 1);
+  } else {
+    hi = est;
+    int step = 1;
+    lo = est - 1;
+    while (lo >= sf_min && !fits(lo)) {
+      hi = lo;
+      step *= 2;
+      lo = hi - step;
+    }
+    if (lo < sf_min) {
+      lo = sf_min;
+      if (hi == sf_min) {
+        return sf_min;
+      }
+    }
+  }
+  while (hi - lo > 1) {
+    const int mid = (lo + hi) / 2;
+    if (fits(mid)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
 int spectral_bits(const AacEncChannel* c, int g, int w0, int b, int cb) {
   const AacIcsInfo* ics = &c->ics;
   const int dim = aac_codebook_info[cb].dim;
@@ -226,6 +290,83 @@ int best_spectral_bits(const AacEncChannel* c, int g, int w0, int b) {
   return best;
 }
 
+/* Spectral bits of band b of group g with each codebook that can code
+ * its largest magnitude (cost[cb], kInfBits for the others).  The books
+ * come in pairs that index the same tuples, so each pair takes one pass
+ * over the band. */
+void band_book_bits(const AacEncChannel* c, int g, int w0, int b, int max_mag, int* cost) {
+  const AacIcsInfo* ics = &c->ics;
+  for (int cb = 0; cb <= AAC_NUM_CODEBOOKS; cb++) {
+    cost[cb] = kInfBits;
+  }
+  int b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, b7 = 0, b8 = 0, b9 = 0, b10 = 0, b11 = 0;
+  for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+    const int* q = c->quant + w * 128;
+    const int lo = ics->swb_offset[b], hi = ics->swb_offset[b + 1];
+    if (max_mag <= 1) {
+      for (int i = lo; i < hi; i += 4) {
+        const unsigned idx = 27u * (unsigned)(q[i] + 1) + 9u * (unsigned)(q[i + 1] + 1) +
+                             3u * (unsigned)(q[i + 2] + 1) + (unsigned)(q[i + 3] + 1);
+        b1 += aac_huff_cost[1][idx];
+        b2 += aac_huff_cost[2][idx];
+      }
+    }
+    if (max_mag <= 2) {
+      for (int i = lo; i < hi; i += 4) {
+        const unsigned idx = 27u * (unsigned)aac_huffman_abs_(q[i]) + 9u * (unsigned)aac_huffman_abs_(q[i + 1]) +
+                             3u * (unsigned)aac_huffman_abs_(q[i + 2]) + (unsigned)aac_huffman_abs_(q[i + 3]);
+        b3 += aac_huff_cost[3][idx];
+        b4 += aac_huff_cost[4][idx];
+      }
+    }
+    if (max_mag <= 4) {
+      for (int i = lo; i < hi; i += 2) {
+        const unsigned idx = 9u * (unsigned)(q[i] + 4) + (unsigned)(q[i + 1] + 4);
+        b5 += aac_huff_cost[5][idx];
+        b6 += aac_huff_cost[6][idx];
+      }
+    }
+    if (max_mag <= 7) {
+      for (int i = lo; i < hi; i += 2) {
+        const unsigned idx = 8u * (unsigned)aac_huffman_abs_(q[i]) + (unsigned)aac_huffman_abs_(q[i + 1]);
+        b7 += aac_huff_cost[7][idx];
+        b8 += aac_huff_cost[8][idx];
+      }
+    }
+    if (max_mag <= 12) {
+      for (int i = lo; i < hi; i += 2) {
+        const unsigned idx = 13u * (unsigned)aac_huffman_abs_(q[i]) + (unsigned)aac_huffman_abs_(q[i + 1]);
+        b9 += aac_huff_cost[9][idx];
+        b10 += aac_huff_cost[10][idx];
+      }
+    }
+    for (int i = lo; i < hi; i += 2) {
+      b11 += aac_huffman_bits(AAC_CB_ESCAPE, q + i);
+    }
+  }
+  if (max_mag <= 1) {
+    cost[1] = b1;
+    cost[2] = b2;
+  }
+  if (max_mag <= 2) {
+    cost[3] = b3;
+    cost[4] = b4;
+  }
+  if (max_mag <= 4) {
+    cost[5] = b5;
+    cost[6] = b6;
+  }
+  if (max_mag <= 7) {
+    cost[7] = b7;
+    cost[8] = b8;
+  }
+  if (max_mag <= 12) {
+    cost[9] = b9;
+    cost[10] = b10;
+  }
+  cost[11] = b11;
+}
+
 /* ── sectioning (ISO/IEC 14496-3 4.6.3, Table 4.46) ─────────────── */
 
 /* Chooses the codebook of every band of group g below max_sfb so that the
@@ -241,9 +382,13 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
   int from[AAC_MAX_SFB_LONG][kNumBooks];
   int* cb_out = c->cb + g * ics->num_swb;
 
+  int book_bits[AAC_NUM_CODEBOOKS + 1];
   for (int b = 0; b < max_sfb; b++) {
     const int tool = c->tool[g * ics->num_swb + b];
     const int max_mag = tool ? 0 : band_max_mag(c, g, w0, b);
+    if (!tool) {
+      band_book_bits(c, g, w0, b, max_mag, book_bits);
+    }
     for (int cb = 0; cb < kNumBooks; cb++) {
       cost[b][cb] = kInfBits;
       from[b][cb] = -1;
@@ -254,8 +399,7 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
       }
       /* A zero band coded with a real book also carries a scalefactor
        * (a zero difference, one bit). */
-      const int band =
-          cb == 0 || tool ? 0 : spectral_bits(c, g, w0, b, cb) + (max_mag == 0 ? 1 : 0);
+      const int band = cb == 0 || tool ? 0 : book_bits[cb] + (max_mag == 0 ? 1 : 0);
       if (b == 0) {
         cost[b][cb] = header + band;
         continue;
@@ -305,7 +449,7 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
  * band's noise stays within its allowance, smooths the scalefactors where
  * that saves bits, and quantizes.  Bands of a coding tool keep their book
  * and value. */
-void quantize_channel(AacEncChannel* c) {
+void quantize_channel(AacEncChannel* c, bool estimate) {
   const AacIcsInfo* ics = &c->ics;
   const int nswb = ics->num_swb;
   int w0 = 0;
@@ -323,7 +467,8 @@ void quantize_channel(AacEncChannel* c) {
         continue;
       }
       const int sf_min = min_scalefactor(c, g, w0, b);
-      c->sf[idx] = find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
+      c->sf[idx] = estimate ? find_scalefactor_from_estimate(c, g, w0, b, sf_min, c->allowed[idx])
+                            : find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
       c->cb[idx] = 1; /* coded; the book is chosen by sectioning */
     }
     w0 += ics->group_len[g];
@@ -1218,7 +1363,7 @@ int quantize_frame(AacEncoderState* s) {
     AacEncElement* el = &s->elem[e];
     int max_sfb = 0;
     for (int k = 0; k < el->num_ch; k++) {
-      quantize_channel(&s->ch[el->ch[k]]);
+      quantize_channel(&s->ch[el->ch[k]], fast_rate_loop(s));
       max_sfb = std::max(max_sfb, channel_max_sfb(&s->ch[el->ch[k]]));
     }
     el->max_sfb = max_sfb;
@@ -1231,6 +1376,78 @@ int quantize_frame(AacEncoderState* s) {
     }
   }
   return bits + frame_overhead_bits(s);
+}
+
+/* Smallest threshold reduction whose frame fits in target_bits, given
+ * that no reduction needs bits_at_zero > target_bits.  The search starts
+ * from the last frame's reduction, doubles until the frame fits, then
+ * interpolates the bit count linearly between the bracket ends (false
+ * position with the Illinois correction) until the frame uses all but a
+ * quarter percent of its budget.  A frame takes about five quantizations
+ * in all, where the bisection over [0, max_root] took fourteen.  Leaves the frame
+ * quantized at the result and returns its bits, or -1 when even max_root
+ * does not fit. */
+int search_reduction(AacEncoderState* s, int target_bits, int bits_at_zero, float max_root,
+                     const ReleaseEntry* release) {
+  constexpr int kMaxSteps = 12;
+  const int slack = std::max(target_bits / 400, 4);
+  float lo = 0.0f;
+  float bits_lo = (float)bits_at_zero;
+  float r = s->last_reduction > 0.0f ? std::min(s->last_reduction, max_root) : max_root / 32.0f;
+  float hi = -1.0f;
+  int bits_hi = 0;
+  int last = -1; /* 0: the frame is quantized at lo's side, 1: at hi */
+  for (;;) {
+    set_allowances(s, r, 1.0f, release, 0);
+    const int b = quantize_frame(s);
+    if (b <= target_bits) {
+      hi = r;
+      bits_hi = b;
+      last = 1;
+      break;
+    }
+    lo = r;
+    bits_lo = (float)b;
+    if (r >= max_root) {
+      return -1;
+    }
+    r = std::min(max_root, std::max(r * 2.0f, max_root / 1024.0f));
+  }
+  int side = 0; /* Illinois: which end stayed fixed last */
+  float f_lo = bits_lo - (float)target_bits, f_hi = (float)bits_hi - (float)target_bits;
+  for (int step = 0; step < kMaxSteps && bits_hi < target_bits - slack && hi - lo > max_root * 1e-4f;
+       step++) {
+    const float goal = (float)(slack / 2);
+    float t = (f_lo + goal) / std::max(f_lo - f_hi, 1.0f);
+    t = std::clamp(t, 0.05f, 0.95f);
+    r = lo + t * (hi - lo);
+    set_allowances(s, r, 1.0f, release, 0);
+    const int b = quantize_frame(s);
+    if (b <= target_bits) {
+      hi = r;
+      bits_hi = b;
+      f_hi = (float)b - (float)target_bits;
+      last = 1;
+      if (side == 1) {
+        f_lo = (f_lo + goal) * 0.5f - goal;
+      }
+      side = 1;
+    } else {
+      lo = r;
+      f_lo = (float)b - (float)target_bits;
+      last = 0;
+      if (side == -1) {
+        f_hi = (f_hi + goal) * 0.5f - goal;
+      }
+      side = -1;
+    }
+  }
+  if (last != 1) {
+    set_allowances(s, hi, 1.0f, release, 0);
+    bits_hi = quantize_frame(s);
+  }
+  s->last_reduction = hi;
+  return bits_hi;
 }
 
 /* Quality of the VBR modes as a noise-to-mask ratio: 70 sits at the
@@ -1290,11 +1507,17 @@ int rate_control(AacEncoderState* s, int target_bits, float base_improve, bool s
     set_allowances(s, 0.0f, base_improve, release, 0);
     return quantize_frame(s);
   }
+  if (fast_rate_loop(s)) {
+    const int found = search_reduction(s, target_bits, bits, max_root, release);
+    if (found >= 0) {
+      return found;
+    }
+  }
   float lo = 0.0f;
   float hi = max_root;
   set_allowances(s, hi, 1.0f, release, 0);
   bits = quantize_frame(s);
-  if (bits <= target_bits) {
+  if (bits <= target_bits && !fast_rate_loop(s)) {
     for (int it = 0; it < kSearchIterations; it++) {
       const float mid = 0.5f * (lo + hi);
       set_allowances(s, mid, 1.0f, release, 0);
@@ -1802,6 +2025,7 @@ void aac_encoder_state_reset(AacEncoderState* s) {
     aac_usac_enc_reset(s->usac, s->channels);
   }
   s->reservoir = s->reservoir_max / 2;
+  s->last_reduction = 0.0f;
   aac_drc_encoder_reset(&s->drc);
   s->started = 0;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
@@ -2129,8 +2353,23 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
     }
   }
   for (int c = 0; c < s->channels; c++) {
+    AacEncChannel* ch = &s->ch[c];
     for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
-      s->ch[c].x34[i] = powf(fabsf(s->ch[c].coef[i]), 0.75f);
+      ch->x34[i] = powf(fabsf(ch->coef[i]), 0.75f);
+    }
+    const AacIcsInfo* ics = &ch->ics;
+    int w0 = 0;
+    for (int g = 0; g < ics->num_window_groups; g++) {
+      for (int b = 0; b < ics->num_swb; b++) {
+        float form = 0.0f;
+        for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+          for (int i = w * kShort + ics->swb_offset[b]; i < w * kShort + ics->swb_offset[b + 1]; i++) {
+            form += sqrtf(fabsf(ch->coef[i]));
+          }
+        }
+        ch->form[g * ics->num_swb + b] = form;
+      }
+      w0 += ics->group_len[g];
     }
   }
 
