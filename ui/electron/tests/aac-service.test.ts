@@ -101,7 +101,8 @@ test('xHE-AAC encodes with loudness metadata and the meter reads the input', { s
   const declared = Math.round(measured.integratedLkfs * 4) / 4;
   assert.deepEqual(result.loudness, { programLoudness: declared, normalizationGain: -24 - declared });
   const gain = 10 ** (result.loudness.normalizationGain / 20);
-  assert.ok(snrDb(pcm.map(x => x * gain), result.pcm, 2048 * 2) > 15, 'the programme decodes through the normalisation gain');
+  // 48 kbit/s per channel takes SBR: the HE-AAC delay.
+  assert.ok(snrDb(pcm.map(x => x * gain), result.pcm, 5635 * 2) > 15, 'the programme decodes through the normalisation gain');
 
   const session = await service.openEncoder({ sampleRate, channels: 2, bitrate: 96000, profile: 'xhe', measureLoudness: true });
   assert.equal(session.profile, 'xhe');
@@ -165,6 +166,50 @@ test('streaming sessions match the one-shot result and are closed by id', { skip
   const total = decoded.reduce((n, d) => n + d.length, 0);
   assert.equal(total, (await service.decode(streamed, { sampleRate: 48000, channels: 1 })).pcm.length);
   assert.equal(await service.closeDecoder(decoder), true);
+});
+
+// The end of a stream drains what the limiter still holds, a seek forgets
+// the audio before, and both keep the session open.
+test('decoder sessions flush their tail and clear their history for a seek', { skip: !available && 'native binding not built' }, async () => {
+  const service = new AacService();
+  const pcm = tones(48000, 48000, 2);
+  const stream = await service.encode(pcm, { sampleRate: 48000, channels: 2, bitrate: 128000 });
+  const plain = (await service.decode(stream, { sampleRate: 48000, channels: 2 })).pcm;
+
+  const decoder = await service.openDecoder({ sampleRate: 48000, channels: 2, limiter: { attackMs: 5 } });
+  const body = await service.decodeChunk(decoder, stream);
+  assert.equal(body.delay, 240);
+  const tail = await service.flushDecoder(decoder);
+  assert.equal(tail.pcm.length, 240 * 2, 'the look-ahead is drained');
+  assert.equal(tail.sampleRate, 48000);
+  const all = new Float32Array(body.pcm.length + tail.pcm.length);
+  all.set(body.pcm, 0);
+  all.set(tail.pcm, body.pcm.length);
+  let worst = 0;
+  for (let i = 0; i < plain.length; i++) worst = Math.max(worst, Math.abs(all[i + 240 * 2] - plain[i]));
+  assert.ok(worst < 1e-6, `the limited output is the plain one delayed (${worst})`);
+  assert.equal((await service.flushDecoder(decoder)).pcm.length, 0, 'nothing is left after the flush');
+
+  // ADTS frames: the seek drops the half frame pending and the history.
+  const frames: Uint8Array[] = [];
+  for (let pos = 0; pos + 7 <= stream.length;) {
+    const length = ((stream[pos + 3] & 3) << 11) | (stream[pos + 4] << 3) | (stream[pos + 5] >> 5);
+    frames.push(stream.subarray(pos, pos + length));
+    pos += length;
+  }
+  const seeking = await service.openDecoder({ sampleRate: 48000, channels: 2 });
+  await service.decodeChunk(seeking, Buffer.concat(frames.slice(0, 10)));
+  await service.decodeChunk(seeking, frames[10].subarray(0, frames[10].length >> 1));
+  await service.clearDecoderHistory(seeking);
+  const rest = Buffer.concat(frames.slice(25));
+  const fromSeek = (await service.decodeChunk(seeking, rest)).pcm;
+  const fresh = (await service.decode(rest, { sampleRate: 48000, channels: 2 })).pcm;
+  assert.ok(fromSeek.length > 0);
+  assert.deepEqual(fromSeek, fresh, 'after the seek the session decodes as a fresh one');
+  assert.equal(await service.closeDecoder(seeking), true);
+  assert.equal(await service.closeDecoder(decoder), true);
+  await assert.rejects(() => service.flushDecoder(decoder), /does not exist/);
+  await assert.rejects(() => service.clearDecoderHistory(decoder), /does not exist/);
 });
 
 test('unsupported options are rejected by the binding', { skip: !available && 'native binding not built' }, async () => {

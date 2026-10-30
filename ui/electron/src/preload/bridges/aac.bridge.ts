@@ -192,7 +192,12 @@ export interface AacDecodeResult {
   errors: number;
   /** Frames concealed so far. */
   concealedFrames: number;
-  /** Output samples of delay added by the limiter. */
+  /**
+   * Samples per channel the decoder delays its output by beyond the
+   * encoder's priming: the limiter's look-ahead, plus the surround
+   * decoder's delay for an MPEG Surround stream. A flush returns this
+   * many samples.
+   */
   delay: number;
   hasSbr: boolean;
   hasPs: boolean;
@@ -246,6 +251,12 @@ export const aacBridge = {
 
   decodeChunk: (id: number, chunk: Uint8Array): Promise<AacDecodeResult> =>
     ipcRenderer.invoke('baander:aac:decoder-decode', id, chunk),
+
+  /** Ends the stream: the samples the decoder still held; the session starts over. */
+  flushDecoder: (id: number): Promise<AacDecodeResult> => ipcRenderer.invoke('baander:aac:decoder-flush', id),
+
+  /** Prepares a seek: forgets the audio before, keeps the configuration. */
+  clearDecoderHistory: (id: number): Promise<void> => ipcRenderer.invoke('baander:aac:decoder-clear-history', id),
 
   closeDecoder: (id: number): Promise<boolean> => ipcRenderer.invoke('baander:aac:decoder-close', id),
 

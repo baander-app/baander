@@ -376,8 +376,40 @@ void aac_decoder_destroy(AacDecoderHandle ctx);
 int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, float* pcm,
                        int pcm_size);
 
-/* Clears the filterbank history, for a seek or a new stream. */
+/* Starts over for a new stream: clears the signal history, the
+ * concealment counters and the input FIFO, drops the transport's
+ * synchronisation and re-applies the configuration. */
 int aac_decoder_reset(AacDecoderHandle ctx);
+
+/* For a seek: drops the signal history (the filterbank overlap, the SBR,
+ * parametric stereo and surround states, the dynamic range gains in
+ * force, the concealment fades) and the bytes waiting in the input FIFO,
+ * which belong to the old position, and keeps the rest: the
+ * configuration (an AudioSpecificConfig, a LOAS stream's StreamMuxConfig,
+ * a surround configuration from an in-band header), the transport in
+ * use, the settings and the counters.  The next frame decodes as the
+ * first frame of a stream does: it starts from silence through the
+ * window's rising half, with nothing of the old position's overlap, and
+ * a frame at a random access point (any frame of AAC-LC, HE-AAC and the
+ * low-delay types, an independent frame with its pre-roll of xHE-AAC,
+ * whose pre-roll is then decoded as at a stream start) gives the output
+ * a fresh decoder gives it.  The high band of HE-AAC returns with the
+ * next SBR header, as for a fresh decoder. */
+int aac_decoder_clear_history(AacDecoderHandle ctx);
+
+/* Drains the tail the decoder holds back at the end of a stream: runs
+ * the decoder on silent frames until aac_decoder_delay samples per
+ * channel have come out (the limiter's look-ahead, the surround
+ * decoder's delay), writes them to `out` interleaved with
+ * aac_decoder_channels() channels and returns their count: 0 when
+ * nothing is held back (no delay, or no frame decoded),
+ * AAC_ERR_OVERFLOW when `out_size` floats do not hold them (nothing is
+ * written then, and the decoder keeps its state).  Afterwards the
+ * decoder is reset for a new stream, as by aac_decoder_reset.  The
+ * filterbank tails of the last frame are no part of this: an encoder's
+ * flush writes the frames that carry them (aac_encoder_flush), and the
+ * stream's priming covers their delay. */
+int aac_decoder_flush(AacDecoderHandle ctx, float* out, int out_size);
 
 /* Samples per channel of one raw data block in the output: 1024, or 2048
  * while SBR is decoded. */
@@ -426,10 +458,19 @@ int aac_decoder_set_concealment(AacDecoderHandle ctx, AacConcealment mode);
 int aac_decoder_last_frame_concealed(AacDecoderHandle ctx);
 int aac_decoder_concealed_frames(AacDecoderHandle ctx);
 /* Peak limiter on the output (off by default): attack_ms of look-ahead
- * delay, release_ms of gain recovery; aac_decoder_delay reports the
- * delay in output samples, plus the delay of the surround decoder while
- * it runs. */
+ * delay, release_ms of gain recovery. */
 int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, int release_ms);
+/* The delay this decoder adds beyond the stream's own: the samples per
+ * channel, at the output rate, by which its output lags the output of
+ * the standard's decoder (FFmpeg's, which the core, SBR, parametric
+ * stereo and USAC paths match sample for sample).  The limiter's
+ * look-ahead and the surround decoder's delay while it runs; 0
+ * otherwise.  The delay of the filterbanks themselves (the transform
+ * overlap, the SBR QMF chain) is part of the stream's priming
+ * (aac_encoder_delay, an MP4 edit list) and not counted here, so a
+ * player trims the priming plus this delay at the start of a stream and
+ * drains this delay with aac_decoder_flush at its end.  It can change
+ * with the stream (the output rate, the surround decoder starting). */
 int aac_decoder_delay(AacDecoderHandle ctx);
 /* The channel mode of the stream's layout (AAC_MODE_DEFAULT for the plain
  * configurations 1..6 and 6.1). */

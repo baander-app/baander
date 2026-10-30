@@ -27,6 +27,8 @@ export const IPC_CHANNELS = {
   AAC_ENCODE: 'baander:aac:encode',
   AAC_DECODER_OPEN: 'baander:aac:decoder-open',
   AAC_DECODER_DECODE: 'baander:aac:decoder-decode',
+  AAC_DECODER_FLUSH: 'baander:aac:decoder-flush',
+  AAC_DECODER_CLEAR_HISTORY: 'baander:aac:decoder-clear-history',
   AAC_DECODER_CLOSE: 'baander:aac:decoder-close',
   AAC_ENCODER_OPEN: 'baander:aac:encoder-open',
   AAC_ENCODER_ENCODE: 'baander:aac:encoder-encode',

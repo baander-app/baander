@@ -94,7 +94,8 @@ over the attack window so that it has reached the needed value when the
 peak leaves the delay line, recovers at a constant rate in decibels over
 the release time, and passes samples that never needed a reduction
 unchanged; its delay is the attack window, reported by
-`aac_decoder_delay`.
+`aac_decoder_delay` and drained at the end of the stream by
+`aac_decoder_flush`.
 
 MPEG-4 dynamic range control (ISO/IEC 14496-3 4.5.2.7) is parsed from
 every fill element whose extension payload carries `dynamic_range_info`
@@ -277,7 +278,10 @@ reporting the core's channels. `aac_decoder_has_surround` (`hasSurround`
 in the binding) says that the last frame carried a surround payload that
 was decoded, and `aac_decoder_delay` includes the surround decoder's
 delay: 1521 samples for AAC-LC plus surround (560 of input alignment,
-384 of hybrid delay and 577 of QMF synthesis). AAC-ELD v2, an ELD core
+384 of hybrid delay and 577 of QMF synthesis), 960 behind an SBR core
+(nine QMF slots of alignment and six of hybrid delay, the SBR
+filterbanks being part of the encoder's priming), plus 64 per QMF slot
+a spatial frame gathers beyond the core frame. AAC-ELD v2, an ELD core
 of 512 samples with the low-delay 2-1-2 payload in the ELD extension
 (its configuration in the ELD-specific configuration, the frame as the
 extension payload of type 9), decodes to stereo through the low-delay
@@ -698,6 +702,8 @@ AacDecoderHandle aac_decoder_create(int sample_rate, int channels);
 int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size,
                        float* pcm, int pcm_size);
 int aac_decoder_reset(AacDecoderHandle ctx);
+int aac_decoder_clear_history(AacDecoderHandle ctx);
+int aac_decoder_flush(AacDecoderHandle ctx, float* out, int out_size);
 int aac_decoder_frame_size(AacDecoderHandle ctx);
 int aac_decoder_sample_rate(AacDecoderHandle ctx);
 int aac_decoder_output_sample_rate(AacDecoderHandle ctx);
@@ -754,8 +760,65 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
 - The ADTS header overrides the creation sample rate and channel
   configuration; `aac_decoder_sample_rate` reports the stream's rate. A
   change of rate or layout mid-stream resets the decoder state.
-  `aac_decoder_reset` clears the filterbank history, the concealment
-  state and the input FIFO for a seek and re-applies the configuration.
+  `aac_decoder_reset` starts over for a new stream: it clears the
+  history, the counters and the input FIFO and re-applies the
+  configuration set through the API.
+- `aac_decoder_clear_history` prepares a seek. It drops the input FIFO
+  and what the decoder remembers of the audio before (the filterbank
+  overlap, the SBR, parametric stereo, MPEG Surround and 2-1-2 states,
+  the DRC gains, the limiter and the concealment history) and keeps the
+  configuration, the transport state (the StreamMuxConfig of a LOAS
+  stream whose frames refer to an earlier one), the surround
+  configuration of an in-band header and the counters. A random access
+  frame fed next decodes as it would in a fresh decoder, bit for bit;
+  for xHE-AAC that is an independent frame, whose pre-roll then plays
+  as at the start of the stream. The high band of HE-AAC returns with
+  the next SBR header, as it does for a fresh decoder. AAC-ELD with
+  LD-SBR has no in-band SBR header: its envelopes are coded against the
+  previous frame's, so the first frames after a seek, as from a fresh
+  decoder, conceal until a frame codes them afresh.
+- `aac_decoder_flush` ends the stream. It drains the samples the
+  decoder still holds, `aac_decoder_delay` of them per channel, by
+  running frames of silence through the filterbanks, the SBR, surround
+  and limiter stages; returns the samples per channel written (0 when
+  it holds none); and then resets the decoder as `aac_decoder_reset`
+  does. A buffer smaller than `aac_decoder_delay` times
+  `aac_decoder_channels` gets `AAC_ERR_OVERFLOW` and the decoder is left
+  as it was. The encoder's own flush and priming cover the filterbank
+  tails, so a decode of a whole stream plus this flush holds the whole
+  input once the priming and the decoder delay are trimmed.
+- `aac_decoder_delay` is the delay the decoder adds beyond the
+  encoder's priming (`aac_encoder_delay`, which already counts the core,
+  SBR and low-delay filterbanks of a standard decoder): the limiter's
+  look-ahead (its attack window, 0 when it is off) plus the surround
+  decoder's delay while it runs. A player trims the priming plus this
+  delay from the start of the decode and appends the flush. Per
+  profile, without the limiter: AAC-LC, HE-AAC, HE-AAC v2, AAC-LD,
+  AAC-ELD, ELD with LD-SBR and xHE-AAC (with and without SBR or 2-1-2)
+  add 0; AAC-LC plus MPEG Surround adds 1521, ELD v2 256 and HE-AAC plus
+  MPEG Surround 960 (by construction: no committed stream carries that
+  combination), each plus 64 per gathered QMF slot. The suite
+  `test_playback` checks every profile's figure against the alignment
+  of its decode to the sample.
+- Rules on what applies where. MPEG-D DRC applies to USAC only: a
+  `uniDrc` extension payload in an AAC fill element is skipped. The
+  MPEG-4 DRC of `aac_decoder_set_drc` applies to AAC only: it is refused
+  with `AAC_ERR_UNSUPPORTED` once a USAC configuration is in force and
+  ignored by a USAC stream configured after it was switched on. An
+  explicit SBR configuration whose output rate is not twice the core
+  rate is refused.
+- Field tolerance. A program config element is accepted with its
+  channel elements in any order and wherever it stands in the raw data
+  block. A PCE whose layout differs from the one in force under ADTS
+  installs the new layout; the block it came in is refused (concealed
+  in the new layout when concealment is on), and the frames that follow
+  decode in it, while the ADTS header's channel configuration no
+  longer overrides it. SBR data appearing in an implicitly signalled
+  stream switches to the doubled rate, and SBR data vanishing from one
+  switches back to the core rate, each a configuration change. An SBR
+  header whose frequency tables cannot be built is a damaged header:
+  the SBR payload is discarded with it, the core decodes, and the high
+  band is concealed on the header in force.
 - `aac_decoder_feed` appends bytes to the input FIFO (64 KiB plus one
   frame) and returns how many it took; a packet transport takes a packet
   whole or not at all. `aac_decoder_decode_next` returns the samples per
@@ -888,7 +951,11 @@ between calls. The decoder options add `transport` (`detect`, `adts`,
 `limiter` (`true` or `{ attackMs, releaseMs }`), and the decoder reports
 `concealedFrames`, `channelMode`, `delay` and `hasSurround` (the last
 frame carried MPEG Surround data that was decoded, so the stream plays as
-5.1, or as stereo for ELD v2); the encoder options add
+5.1, or as stereo for ELD v2). `decoder.flush()` returns the samples the
+decoder still holds at the end of the stream (`delay` per channel, an
+empty `Float32Array` when it holds none) and starts over;
+`decoder.clearHistory()` prepares a seek as `aac_decoder_clear_history`
+does; the encoder options add
 `transport`, `signaling`, `frameLength`, `crc`, `mpeg2` and `channelMode`
 (`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`), and the encoder exposes
 `config` and the `unitSizes` of its last result, which a packetiser needs
@@ -918,7 +985,9 @@ test` runs the binding's smoke test. In the Electron app the
 main-process `AacService` wraps the binding behind the
 `window.electron.aac` bridge (one-shot `decode`, `encode` and
 `measureLoudness`, and chunked decoder/encoder sessions with
-`encoderLoudness` for a session opened with `measureLoudness`); every
+`flushDecoder` and `clearDecoderHistory` for a decoder session and
+`encoderLoudness` for an encoder session opened with
+`measureLoudness`); every
 decode result carries the `loudness` readback.
 
 ### Building for Electron and prebuilds
@@ -992,7 +1061,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-six suites, and the transform, filterbank and
+`ctest` runs thirty-seven suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -1043,7 +1112,19 @@ ELD streams within float rounding) and ELD with LD-SBR (roundtrips in
 dual and single rate at 512 and 480, delays, concealment of a
 truncated unit and of a CRC-caught payload, the configuration with its
 headers, and byte identity of plain ELD streams against committed
-references), the DSP kernels (every SIMD kernel against its scalar
+references), playback control (`test_playback`: every profile's decode
+lines up with the source at the encoder's priming plus
+`aac_decoder_delay`, to the sample; the flush drains the limiter's
+look-ahead and the surround decoder's delay exactly as the decode of
+appended silent frames would, and refuses a short buffer without
+losing the tail; a seek through `aac_decoder_clear_history` from inside
+a frame matches a fresh decoder bit for bit on every profile, on LOAS
+frames that refer to the first frame's StreamMuxConfig and on the
+surround streams; the DRC and SBR-rate rules; PCEs in unusual element
+orders and a PCE changing the layout under ADTS; SBR appearing in and
+vanishing from an implicitly signalled stream; and an SBR header that
+cannot be applied, after which the core band stays within 0.5 dB and
+the concealed high band within 6 dB), the DSP kernels (every SIMD kernel against its scalar
 version), allocation (zero heap use in the steady state of every
 profile), and the USAC decoder in six suites: the configuration
 (`test_usac_config`: the UsacConfig of every committed stream, the LATM

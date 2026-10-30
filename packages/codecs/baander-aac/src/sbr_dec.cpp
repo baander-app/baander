@@ -530,12 +530,6 @@ int read_data(AacSbrState* s, AacBitReader* r, int elem_type) {
   return 0;
 }
 
-void sbr_reset(AacSbrState* s) {
-  if (make_tables(s)) {
-    aac_sbr_turnoff(s);
-  }
-}
-
 /* ── dequantization (4.6.18.3.5) ───────────────────────────────── */
 
 float exp2i(int x) { return ldexpf(1.0f, x); }
@@ -1135,14 +1129,19 @@ int aac_sbr_decode_extension(AacSbrState* s, AacBitReader* r, int crc, int count
   s->m[0] = s->m[1];
   s->kx_and_m_pushed = 1;
   const int start_pos = local.pos;
+  int ret = 0;
   if (aac_bitreader_read(&local, 1)) {
     read_header(s, &local);
   }
   if (s->reset) {
-    sbr_reset(s);
+    /* A header whose frequency tables cannot be built (a combination
+     * the standard rules out) is a damaged header: the payload is
+     * discarded with it and the header in force stays, so that the
+     * element is concealed on its previous parameters rather than
+     * dropping to upsampling until the next header. */
+    ret = make_tables(s);
   }
-  int ret = 0;
-  if (s->start) {
+  if (ret == 0 && s->start) {
     ret = read_data(s, &local, elem_type);
   }
   num_sbr_bits += (unsigned)(local.pos - start_pos);

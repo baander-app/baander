@@ -99,6 +99,9 @@ using AacDecoderState = struct AacDecoderState_ {
   AacMdct mdct_eld;   /* AAC-ELD: the transform of the (downscaled) output frame */
   AacLayout layout;   /* element to channel assignment */
   int layout_source;  /* 0 none yet, 1 channel configuration, 2 PCE, 3 taken from the elements */
+  int config_channel_config; /* the channel configuration the transport last installed (ADTS
+                                header or AudioSpecificConfig), so that a header repeating it
+                                leaves a layout an in-band PCE replaced it with alone */
   int elem_base[AAC_MAX_ELEMENTS]; /* first channel of each layout element in ch[] */
   int elem_present[AAC_MAX_ELEMENTS];
   AacDecoderChannel ch[AAC_MAX_CHANNELS]; /* in layout element order */
@@ -109,6 +112,9 @@ using AacDecoderState = struct AacDecoderState_ {
    * core rate until a reset, every element through its own SBR state (an
    * element without SBR data is only upsampled). */
   int sbr_mode;
+  int sbr_signalled; /* the configuration announced SBR explicitly: the doubled rate stays
+                        whether or not the frames carry SBR data; with implicit signalling
+                        SBR data vanishing from the frames ends SBR mode */
   AacSbrState* sbr[AAC_MAX_ELEMENTS]; /* allocated on first use */
   /* AAC-ELD with LD-SBR: the configuration announced it and carries the
    * header of every SCE and CPE, so each layout element owns a state from
@@ -186,6 +192,14 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r);
  * known. */
 int aac_decoder_conceal_block(AacDecoderState* s);
 
+/* Produces one frame of the decoder running on after the stream's end,
+ * in ch[].output as aac_decode_raw_data_block leaves it: zero spectra,
+ * whose output is the overlap of the last frame, through the SBR and
+ * surround stages as a frame without extension data.  It is not counted
+ * as a decoded or concealed block.  Returns the number of channels of
+ * the layout, or AAC_ERR_STATE while no layout is known. */
+int aac_decoder_silent_block(AacDecoderState* s);
+
 /* Notes a lost or failed block without producing output (concealment
  * off): the SBR and PS states then clamp the delta-time coded values of
  * the next frames, which refer to the lost data, instead of refusing
@@ -247,6 +261,12 @@ int aac_decoder_set_layout(AacDecoderState* s, const AacLayout* l);
 /* Clears the filterbank overlap, window-shape history and concealment
  * state of every channel and the concealment counters. */
 void aac_decoder_reset_state(AacDecoderState* s);
+
+/* The same for a seek: the signal history goes (the overlap, the SBR, PS
+ * and surround states, the DRC gains in force, the concealment fades,
+ * the USAC frame memory so that the next independent frame decodes its
+ * pre-roll), the configuration, the layout and the counters stay. */
+void aac_decoder_clear_history_state(AacDecoderState* s);
 
 /* Mixes the decoded frame (ch[].output) into `out` with the requested
  * output channel count; returns that count. */

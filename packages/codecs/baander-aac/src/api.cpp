@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cstring>
+#include <vector>
 
 #include "aac.h"
 #include "aac_cpu.h"
@@ -490,6 +492,50 @@ int aac_decoder_decode(AacDecoderHandle ctx, const uint8_t* data, int size, floa
   }
   auto* s = static_cast<AacDecoderState*>(ctx);
   return aac_decoder_transport_decode(s, s->transport, data, size, pcm, pcm_size);
+}
+
+int aac_decoder_clear_history(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  aac_decoder_clear_history_state(s);
+  aac_decoder_transport_clear(s->transport);
+  aac_decoder_transport_reapply(s, s->transport);
+  return AAC_OK;
+}
+
+/* The tail the decoder holds back is aac_decoder_delay samples long: the
+ * decoder runs on silent frames until that many samples have come out
+ * of the limiter's and the surround decoder's delay lines. */
+int aac_decoder_flush(AacDecoderHandle ctx, float* out, int out_size) {
+  if (!ctx || (!out && out_size > 0) || out_size < 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  const int delay = aac_decoder_delay(ctx);
+  const int channels = aac_decoder_output_channels(s);
+  int written = 0;
+  if (delay > 0 && channels > 0 && s->layout_source != 0 && s->blocks_decoded > 0) {
+    if ((long long)delay * channels > out_size) {
+      return AAC_ERR_OVERFLOW;
+    }
+    std::vector<float> block((size_t)AAC_DECODER_MAX_OUTPUT * (size_t)channels);
+    while (written < delay) {
+      if (aac_decoder_silent_block(s) < 0 || aac_decoder_output_channels(s) != channels ||
+          s->frame_size <= 0) {
+        break;
+      }
+      aac_decoder_output(s, block.data());
+      aac_decoder_apply_limiter(s, block.data(), s->frame_size, channels);
+      const int take = std::min(s->frame_size, delay - written);
+      memcpy(out + (size_t)written * channels, block.data(),
+             (size_t)take * channels * sizeof(float));
+      written += take;
+    }
+  }
+  aac_decoder_reset(ctx);
+  return written;
 }
 
 int aac_decoder_set_frame_length(AacDecoderHandle ctx, int frame_length) {

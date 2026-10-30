@@ -46,7 +46,12 @@ export interface AacDecodeResult {
   errors: number;
   /** Frames concealed so far. */
   concealedFrames: number;
-  /** Output samples of delay added by the limiter. */
+  /**
+   * Samples per channel the decoder delays its output by beyond the
+   * encoder's priming: the limiter's look-ahead, plus the surround
+   * decoder's delay for an MPEG Surround stream. A flush returns this
+   * many samples.
+   */
   delay: number;
   hasSbr: boolean;
   hasPs: boolean;
@@ -170,9 +175,31 @@ export class AacService {
   }
 
   async decodeChunk(id: number, chunk: Uint8Array): Promise<AacDecodeResult> {
-    const decoder = this.decoders.get(id);
-    if (!decoder) throw new Error(`AAC decoder session ${id} does not exist`);
+    const decoder = this.decoder(id);
     return describe(decoder, decoder.decode(chunk));
+  }
+
+  /**
+   * Ends the stream: the result carries the last `delay` samples per
+   * channel the decoder still held (none without a limiter or surround),
+   * described as the stream was before the end. The session stays open
+   * for another stream, starting over.
+   */
+  async flushDecoder(id: number): Promise<AacDecodeResult> {
+    const decoder = this.decoder(id);
+    const result = describe(decoder, new Float32Array(0));
+    result.pcm = decoder.flush();
+    return result;
+  }
+
+  /**
+   * Prepares a seek: drops the pending bytes and the decoder's memory of
+   * the audio before, keeping the stream's configuration, so that the
+   * chunks from the new position decode as in a fresh session. An
+   * xHE-AAC stream resumes at an independent frame.
+   */
+  async clearDecoderHistory(id: number): Promise<void> {
+    this.decoder(id).clearHistory();
   }
 
   async closeDecoder(id: number): Promise<boolean> {
@@ -219,6 +246,12 @@ export class AacService {
   closeAll(): void {
     this.decoders.clear();
     this.encoders.clear();
+  }
+
+  private decoder(id: number): AacDecoder {
+    const decoder = this.decoders.get(id);
+    if (!decoder) throw new Error(`AAC decoder session ${id} does not exist`);
+    return decoder;
   }
 
   private encoder(id: number): AacEncoder {

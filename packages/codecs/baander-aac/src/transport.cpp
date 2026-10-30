@@ -67,6 +67,7 @@ void emit_block(AacDecoderState* s, float* pcm, int out_channels) {
 /* Explicit SBR puts the stream in SBR mode (upsampling until data
  * arrives), explicit PS makes a single channel element a stereo pair. */
 void preset_extension(AacDecoderState* s, const AacAsc* asc) {
+  s->sbr_signalled = asc->sbr_present == 1;
   if (asc->sbr_present != 1) {
     return;
   }
@@ -628,6 +629,17 @@ void aac_decoder_transport_reset(AacDecoderTransport* t) {
   t->fifo.clear();
   t->head = 0;
   t->packets.clear();
+  t->synced = 0;
+  t->discarded = 0;
+}
+
+void aac_decoder_transport_clear(AacDecoderTransport* t) {
+  t->fifo.clear();
+  t->head = 0;
+  t->packets.clear();
+  /* The next frame is taken as a stream's first: at the front of the new
+   * bytes on trust, else once a following header confirms it, and no
+   * concealed frame stands in for the bytes skipped to reach it. */
   t->synced = 0;
   t->discarded = 0;
 }

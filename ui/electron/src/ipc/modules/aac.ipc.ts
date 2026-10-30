@@ -277,6 +277,8 @@ export function registerAacIpc(): void {
   handleTrusted(IPC_CHANNELS.AAC_DECODER_OPEN, (_event, options) => aac.openDecoder(decoderOptions(options)));
   handleTrusted(IPC_CHANNELS.AAC_DECODER_DECODE, (_event, id, chunk) =>
     aac.decodeChunk(sessionId(id), bytes(chunk, 'chunk')));
+  handleTrusted(IPC_CHANNELS.AAC_DECODER_FLUSH, (_event, id) => aac.flushDecoder(sessionId(id)));
+  handleTrusted(IPC_CHANNELS.AAC_DECODER_CLEAR_HISTORY, (_event, id) => aac.clearDecoderHistory(sessionId(id)));
   handleTrusted(IPC_CHANNELS.AAC_DECODER_CLOSE, (_event, id) => aac.closeDecoder(sessionId(id)));
 
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_OPEN, (_event, options) => aac.openEncoder(encoderOptions(options)));

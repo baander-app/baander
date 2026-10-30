@@ -1397,7 +1397,9 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   aac_mdct_init(&s->mdct_long, 2 * s->frame_length);
   aac_mdct_init(&s->mdct_short, 2 * aac_short_length(s->frame_length));
   s->random_state = kRandomSeed;
+  s->config_channel_config = 0;
   s->sbr_mode = 0;
+  s->sbr_signalled = 0;
   s->ld_sbr_mode = 0;
   s->ld_sbr_dual_rate = 0;
   s->ld_sbr_crc = 0;
@@ -1489,6 +1491,27 @@ void aac_decoder_reset_state(AacDecoderState* s) {
       aac_sbr_ld_reset(s->ld_sbr[i]);
     }
   }
+}
+
+void aac_decoder_clear_history_state(AacDecoderState* s) {
+  /* The reset of the signal state, keeping what describes the session
+   * rather than the signal: the concealment and block counters, and the
+   * surround configuration an in-band header installed (the decoder's
+   * own state for it starts over). */
+  const int concealed_frames = s->concealed_frames;
+  const int blocks_decoded = s->blocks_decoded;
+  AacMpsConfig mps_cfg = {};
+  const bool mps_kept = s->mps && s->mps->cfg_valid;
+  if (mps_kept) {
+    mps_cfg = s->mps->cfg;
+  }
+  aac_decoder_reset_state(s);
+  if (mps_kept) {
+    s->mps->cfg = mps_cfg;
+    s->mps->cfg_valid = 1;
+  }
+  s->concealed_frames = concealed_frames;
+  s->blocks_decoded = blocks_decoded;
 }
 
 namespace {
@@ -1654,7 +1677,11 @@ int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config) {
   if (channel_config == 0) {
     return 0;
   }
-  if (s->layout_source == 1 && s->layout.channel_config == channel_config) {
+  /* A header or configuration repeating the configuration in force
+   * changes nothing, also when a program config element inside the
+   * stream has replaced the layout since: the configuration's layout
+   * comes back only with a different configuration. */
+  if (s->layout_source != 0 && s->config_channel_config == channel_config) {
     return 0;
   }
   AacLayout l = {};
@@ -1663,6 +1690,7 @@ int aac_decoder_set_channel_config(AacDecoderState* s, int channel_config) {
     return ret;
   }
   install_layout(s, &l, 1);
+  s->config_channel_config = channel_config;
   return 0;
 }
 
@@ -1671,6 +1699,7 @@ int aac_decoder_set_layout(AacDecoderState* s, const AacLayout* l) {
     return AAC_ERR_UNSUPPORTED;
   }
   install_layout(s, l, 2);
+  s->config_channel_config = 0;
   return 0;
 }
 
@@ -1812,9 +1841,14 @@ int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem)
       ret = decode_pce(r, &l);
       if (ret == 0 && !p->pce_seen) {
         if (p->num_sniffed > 0 || !p->sniffing) {
-          /* A PCE after channel elements, or over an ADTS configuration:
-           * the elements already decoded keep their layout. */
+          /* A PCE after channel elements keeps the layout of the
+           * elements already decoded.  A PCE over a configured layout
+           * (the ADTS header's or the AudioSpecificConfig's) that names
+           * another one is a change of configuration inside the stream:
+           * the block is refused, the decoder restarts with the PCE's
+           * layout, and the following blocks decode under it. */
           if (!p->sniffing && !same_layout(&s->layout, &l)) {
+            install_layout(s, &l, 2);
             ret = AAC_ERR_DECODE;
           }
         } else {
@@ -2256,6 +2290,22 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
     s->last_concealed = 1;
     s->concealed_frames++;
   }
+  if (s->sbr_mode && !s->sbr_signalled && !s->has_sbr && !damaged) {
+    /* SBR data vanished from an implicitly signalled stream (an AAC-LC
+     * stream following an HE-AAC one, say): a change of configuration
+     * back to the core rate, the way SBR data appearing switched to the
+     * doubled rate.  The SBR states forget their headers, so the next
+     * SBR data starts the extension afresh; the core keeps its overlap,
+     * as its samples continue.  A damaged block does not count, as its
+     * SBR data may have been lost with the damage, nor does a lost one. */
+    s->sbr_mode = 0;
+    s->ps_output = 0;
+    for (int i = 0; i < AAC_MAX_ELEMENTS; i++) {
+      if (s->sbr[i]) {
+        aac_sbr_init(s->sbr[i], s->sample_rate, s->frame_length);
+      }
+    }
+  }
   aac_drc_frame_end(&s->drc);
 
   /* Coupling channels first: independently switched ones need their time
@@ -2346,6 +2396,49 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
   s->blocks_decoded++;
   s->decoded_since_reset = 1;
   s->stream_channels = l->num_channels;
+  return l->num_channels;
+}
+
+int aac_decoder_silent_block(AacDecoderState* s) {
+  if (s->layout_source == 0 || s->rate_index < 0) {
+    return AAC_ERR_STATE;
+  }
+  s->frame_size = output_length(s);
+  if (s->aot == AAC_AOT_USAC) {
+    /* The USAC filterbank tails are part of the stream's priming: only
+     * the output stages after the frame hold samples back. */
+    for (int c = 0; c < s->layout.num_channels; c++) {
+      memset(s->ch[c].output, 0, sizeof(s->ch[c].output));
+    }
+    return s->layout.num_channels;
+  }
+  /* A frame of zero spectra: each channel's output is the overlap its
+   * last frame left, and the stages after the core (the SBR and surround
+   * filterbanks with their delay lines) run on as for a frame without
+   * extension data. */
+  memset(s->elem_present, 0, sizeof(s->elem_present));
+  for (int k = 0; k < AAC_MAX_CCE; k++) {
+    s->cce[k].present = 0;
+  }
+  if (s->mps) {
+    s->mps->anc_open = 0;
+    memset(s->mps->res_read, 0, sizeof(s->mps->res_read));
+  }
+  const AacLayout* l = &s->layout;
+  for (int i = 0; i < l->num_elements; i++) {
+    const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
+    for (int c = 0; c < nch; c++) {
+      AacDecoderChannel* ch = &s->ch[s->elem_base[i] + c];
+      memset(ch->cs.coef, 0, sizeof(ch->cs.coef));
+      ch->cs.tns_present = 0;
+      ch->cs.ics.window_sequence = AAC_WIN_ONLY_LONG;
+      ch->cs.ics.window_shape = ch->prev_window_shape;
+      imdct_and_window(s, ch);
+    }
+  }
+  const bool surround = mps_prepare(s);
+  sbr_stage(s, false, surround);
+  mps_stage(s, surround);
   return l->num_channels;
 }
 

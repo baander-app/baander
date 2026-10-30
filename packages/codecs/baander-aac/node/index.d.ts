@@ -155,6 +155,22 @@ export declare class AacDecoder {
    * concealment off.
    */
   decode(data: Uint8Array | ArrayBuffer): Float32Array;
+  /**
+   * Ends the stream: returns the last `delay` samples per channel the
+   * decoder still holds, interleaved (empty when it holds none), then
+   * starts over as `reset()` does. Bytes of an incomplete frame still
+   * pending are dropped.
+   */
+  flush(): Float32Array;
+  /**
+   * Prepares a seek: drops the pending bytes and what the decoder
+   * remembers of the audio before (overlap, SBR, parametric stereo and
+   * surround state, DRC gains, concealment history) and keeps the
+   * stream's configuration. The frames from the new position then decode
+   * as they would in a fresh decoder; for xHE-AAC, seek to an independent
+   * frame, which carries its pre-roll.
+   */
+  clearHistory(): void;
   /** Drops pending bytes and the error count and starts over, ready for a new stream. */
   reset(): void;
   /**
@@ -186,7 +202,13 @@ export declare class AacDecoder {
   readonly errors: number;
   /** Frames concealed since construction or `reset()`. */
   readonly concealedFrames: number;
-  /** Output samples of delay added by the limiter (0 without it). */
+  /**
+   * Samples per channel the decoder delays its output by beyond the
+   * encoder's priming: the limiter's look-ahead, plus the surround
+   * decoder's delay for an MPEG Surround stream. `flush()` returns this
+   * many samples. A player trims the encoder's priming plus this delay
+   * from the start of the output.
+   */
   readonly delay: number;
   /** The object type of the stream being decoded. */
   readonly objectType: AacObjectType;

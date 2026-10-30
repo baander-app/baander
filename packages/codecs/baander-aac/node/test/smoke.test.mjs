@@ -219,6 +219,67 @@ test('conceals damaged frames and limits the output', () => {
   assert.equal(limited.channelMode, 'default');
 });
 
+function adtsFrames(stream) {
+  const frames = [];
+  for (let pos = 0; pos + 7 <= stream.length;) {
+    const length = ((stream[pos + 3] & 3) << 11) | (stream[pos + 4] << 3) | (stream[pos + 5] >> 5);
+    frames.push(stream.subarray(pos, pos + length));
+    pos += length;
+  }
+  return frames;
+}
+
+function concat(parts) {
+  const out = new Float32Array(parts.reduce((n, d) => n + d.length, 0));
+  let at = 0;
+  for (const d of parts) {
+    out.set(d, at);
+    at += d.length;
+  }
+  return out;
+}
+
+test('drains the decoder delay at the end and seeks', () => {
+  const sampleRate = 44100;
+  const pcm = tones(sampleRate, sampleRate, 2);
+  const encoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000 });
+  const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+
+  const plain = new AacDecoder({ channels: 2 });
+  const plainOut = decodeAll(plain, stream, 1000);
+  assert.equal(plain.delay, 0);
+  assert.equal(plain.flush().length, 0, 'nothing held without the limiter');
+
+  const limited = new AacDecoder({ channels: 2, limiter: { attackMs: 5, releaseMs: 50 } });
+  const delay = limited.delay;
+  assert.equal(delay, Math.floor(sampleRate * 5 / 1000));
+  const body = decodeAll(limited, stream, 1000);
+  const tail = limited.flush();
+  assert.equal(tail.length, delay * 2, 'the look-ahead is drained');
+  const all = concat([body, tail]);
+  assert.equal(all.length, plainOut.length + delay * 2);
+  let worst = 0;
+  for (let i = 0; i < plainOut.length; i++) worst = Math.max(worst, Math.abs(all[i + delay * 2] - plainOut[i]));
+  assert.ok(worst < 1e-6, `the limited output is the plain one delayed (${worst})`);
+  assert.deepEqual(decodeAll(limited, stream, 1000), body, 'after flush the decoder starts over');
+
+  const surround = new AacDecoder({ channels: 0 });
+  decodeAll(surround, readFileSync(new URL('../../tests/data/mps_5151_header_q.loas', import.meta.url)), 1000);
+  assert.equal(surround.delay, 1521);
+  assert.equal(surround.flush().length, 1521 * 6, 'the surround delay is drained');
+  assert.equal(surround.flush().length, 0, 'a second flush has nothing left');
+
+  const frames = adtsFrames(stream);
+  const seeking = new AacDecoder({ channels: 2 });
+  decodeAll(seeking, Buffer.concat(frames.slice(0, 10)), 1000);
+  seeking.decode(frames[10].subarray(0, frames[10].length >> 1));
+  seeking.clearHistory();
+  const fromSeek = decodeAll(seeking, Buffer.concat(frames.slice(25)), 1000);
+  const fresh = decodeAll(new AacDecoder({ channels: 2 }), Buffer.concat(frames.slice(25)), 1000);
+  assert.ok(fromSeek.length > 0);
+  assert.deepEqual(fromSeek, fresh, 'after clearHistory the decode is a fresh decoder\'s');
+});
+
 test('names the 7.1 layout of an eight-channel stream', () => {
   const sampleRate = 48000;
   const pcm = tones(sampleRate / 2, sampleRate, 8);

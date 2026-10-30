@@ -300,8 +300,9 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
   static Napi::Function Init(Napi::Env env) {
     return DefineClass(
         env, "AacDecoder",
-        {InstanceMethod("decode", &Decoder::Decode), InstanceMethod("reset", &Decoder::Reset),
-         InstanceMethod("loudness", &Decoder::Loudness),
+        {InstanceMethod("decode", &Decoder::Decode), InstanceMethod("flush", &Decoder::Flush),
+         InstanceMethod("clearHistory", &Decoder::ClearHistory),
+         InstanceMethod("reset", &Decoder::Reset), InstanceMethod("loudness", &Decoder::Loudness),
          InstanceAccessor("sampleRate", &Decoder::SampleRate, nullptr),
          InstanceAccessor("coreSampleRate", &Decoder::CoreSampleRate, nullptr),
          InstanceAccessor("channels", &Decoder::Channels, nullptr),
@@ -513,6 +514,48 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
       memcpy(result.Data(), out.data(), out.size() * sizeof(float));
     }
     return result;
+  }
+
+  /* Drains the decoder's own delay at the end of the stream (the
+   * limiter's look-ahead, the surround decoder's delay) as interleaved
+   * samples, empty when it has none, then resets the decoder as reset()
+   * does, so that a new stream can follow. */
+  Napi::Value Flush(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    if (!handle_) {
+      return throw_error(env, "AacDecoder: not initialized");
+    }
+    const int channels = aac_decoder_channels(handle_);
+    const int delay = aac_decoder_delay(handle_);
+    std::vector<float> out(delay > 0 && channels > 0 ? static_cast<size_t>(delay) * channels : 1);
+    const int n = aac_decoder_flush(handle_, out.data(), static_cast<int>(out.size()));
+    errors_ = 0;
+    if (n < 0) {
+      return throw_error(env, std::string("AacDecoder.flush: ") + error_name(n));
+    }
+    const size_t floats = static_cast<size_t>(n) * channels;
+    Napi::Float32Array result = Napi::Float32Array::New(env, floats);
+    if (floats > 0) {
+      memcpy(result.Data(), out.data(), floats * sizeof(float));
+    }
+    return result;
+  }
+
+  /* For a seek: drops the pending bytes and what the decoder remembers
+   * of the audio before (overlap, SBR, parametric stereo and surround,
+   * DRC and concealment history), keeping the stream's configuration,
+   * so that the frames from the new position decode as they would in a
+   * fresh decoder. */
+  Napi::Value ClearHistory(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    if (!handle_) {
+      return throw_error(env, "AacDecoder: not initialized");
+    }
+    const int ret = aac_decoder_clear_history(handle_);
+    if (ret < 0) {
+      return throw_error(env, std::string("AacDecoder.clearHistory: ") + error_name(ret));
+    }
+    return env.Undefined();
   }
 
   /* Drops pending bytes and the error count and returns the decoder to
