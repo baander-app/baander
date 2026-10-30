@@ -1,28 +1,32 @@
 # Library Management
 
-Baander organizes your media into libraries. Each library points to a directory on disk and has a type that determines how files are indexed and what metadata is extracted. This page covers creating libraries, scanning them, watching for changes, and extracting cover art.
+To make files available for playback, register their directory as a library, scan it, then let background ingestion build the catalog. Optional enrichment adds information from external services after catalog records exist. A library registration alone does not import its files.
+
+The examples use the installed stack. On the installation host, run them from its checkout in the shell where the [installed `dc` wrapper](getting-started.md#command-context) is defined. Paths such as `/media/library/music` are paths inside the app and worker containers; see [Storage and Data](storage-and-data.md) for their host mounts. Console commands require trusted shell access to the installation.
 
 ## Creating Libraries
 
 Use the `app:library:create` command to register a new media library. You must provide a name, the absolute path to the media directory, and the library type.
 
 ```bash
-make exec cmd="php bin/console app:library:create 'My Music' /data/music music"
+dc exec app php bin/console app:library:create 'My Music' /media/library/music music
 ```
 
 | Argument | Description |
 |----------|-------------|
 | `name` | Human-readable library name |
 | `path` | Absolute path to the media directory on disk |
-| `type` | Library type: `music`, `podcast`, `audiobook`, `movie`, or `tv_show` |
+| `type` | Use `music` or `movie` for the supported scan and ingestion workflows |
+
+The command also accepts `podcast`, `audiobook` and `tv_show` as type values, but their scanners and catalog ingestion are not implemented. Creating one does not provide a working import workflow.
 
 The slug is auto-generated from the name (lowercased, spaces replaced with hyphens, special characters removed). Provide `--slug` to override it:
 
 ```bash
-make exec cmd="php bin/console app:library:create 'My Music' /data/music music --slug my-music-collection"
+dc exec app php bin/console app:library:create 'My Music' /media/library/music music --slug my-music-collection
 ```
 
-The library path must be accessible from inside the app container. Mount the directory as a volume in `docker-compose.yml` before creating the library.
+Mount the source directory before creating the library. The app must be able to read it for scanning and original-file streaming; the worker must see the same absolute source path for conversion. Registering a library does not copy its source files.
 
 See the [full command reference](commands/app-library-create.md) for all options including `--sort-order`.
 
@@ -31,46 +35,51 @@ See the [full command reference](commands/app-library-create.md) for all options
 After creating a library, run a scan to index its contents:
 
 ```bash
-make exec cmd="php bin/console app:library:scan my-music"
+dc exec app php bin/console app:library:scan my-music
 ```
 
-The scan performs these steps:
+The console runs discovery inline and records that job in the job monitor. Starting a scan from the administrator interface queues discovery instead: acceptance means it is waiting for background execution, not that any files have been read.
 
-1. **File discovery** -- recursively walks the library directory and collects all files with recognized media extensions
-2. **Metadata extraction** -- reads tags from audio files (title, artist, album, track number, duration) and video files (title, duration, resolution)
+Both routes then follow the same stages:
 
-Scanning is idempotent. Running it multiple times on the same library will update existing records and add new files without creating duplicates. Removed files are cleaned up on subsequent scans.
+1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion.
+2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks; movie ingestion creates movie and video records.
+3. **Optional enrichment** queues metadata or lyrics work for newly created music records when the corresponding setting is enabled.
 
-Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a web server restart dropped a queued scan or after a scan's process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
+The scan's file totals and completed library status describe discovery. They do not prove that every queued directory has reached the catalog. Check the resulting albums, tracks or movies separately, and use [Monitoring](monitoring.md) to investigate pending or failed background work. [Background Work](background-work.md) explains the delivery stages and worker requirements.
+
+Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery; it is not a request to erase and rebuild the catalog. Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
+
+Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a scan process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
 See the [command reference](commands/app-library-scan.md) for details. The other `app:library:*` commands list, show, rename and delete libraries; renaming, deleting and scanning in the admin panel need the admin role.
 
 ### What happens to new music
 
-The scan hands the files it finds to the catalog, which adds the new albums and tracks in the background. Two [server settings](configuration.md#server-settings), both off by default, add work for each new item. Baander reads them each time it adds an album or tracks, so a change applies to the next scan without a restart.
+After discovery, background ingestion adds new albums and tracks to the catalog. Two [server settings](configuration.md#server-settings), both off by default, add work for each new item. Baander reads them each time it adds an album or tracks, so a change applies to the next scan without a restart.
 
 | Setting | While it is on |
 |---------|----------------|
 | `metadata.auto_sync` | Each new album is queued for a metadata sync from the [external services](external-apis.md), right after the catalog stores it. |
 | `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. |
 
-Both act only on albums and tracks that a scan creates. A rescan of music Baander already has queues nothing. The bulk lyrics fetch, [`app:lyrics:fetch`](commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
+Both act only on albums and tracks that a scan creates. A rescan of music Baander already has does not request these automatic metadata or lyrics fetches. The bulk lyrics fetch, [`app:lyrics:fetch`](commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
 ## File Watching
 
-For continuous monitoring of a library directory, use the `app:watch-files` command. It uses Linux inotify to detect file system events in real time:
+To inspect filesystem changes, use `app:watch-files`. It prints Linux inotify events in the foreground. It does not start scans or update the catalog; run a scan separately when you want to import changes:
 
 ```bash
-make exec cmd="php bin/console app:watch-files --path /data/music"
+dc exec app php bin/console app:watch-files --path /media/library/music
 ```
 
-Watch multiple directories at once:
+Each watch covers the named directory, without recursive registration of its subdirectories. Watch multiple directories at once:
 
 ```bash
-make exec cmd="php bin/console app:watch-files --path /data/music --path /data/movies"
+dc exec app php bin/console app:watch-files --path /media/library/music --path /media/library/movies
 ```
 
-The watcher detects four event types:
+The watcher prints these event categories:
 
 | Event | Meaning |
 |-------|---------|
@@ -78,64 +87,67 @@ The watcher detects four event types:
 | `MODIFY` | An existing file was changed |
 | `DELETE` | A file or directory was removed |
 | `MOVE` | A file or directory was renamed or moved |
+| `CLOSE_WRITE` | A file opened for writing was closed |
 
 Adjust the read timeout with `--timeout` (in milliseconds, default `5000`):
 
 ```bash
-make exec cmd="php bin/console app:watch-files --path /data/music --timeout 10000"
+dc exec app php bin/console app:watch-files --path /media/library/music --timeout 10000
 ```
 
-If no `--path` is given, the command watches the current working directory.
+Always supply at least one `--path`. The current command prints a current-directory message when paths are omitted, but does not register that directory and then fails because no directories are watched.
 
 See the [command reference](commands/app-watch-files.md) for details.
 
 ## Supported Media Formats
 
-Baander detects file types by reading magic bytes from the file header, falling back to extension-based detection when headers are ambiguous.
+Library discovery selects files by extension. These lists describe what a scan discovers, not a guarantee that every codec inside a container can be decoded or played by a browser. For conversion and browser fallback, see [Transcoding](transcoding.md).
 
 ### Audio formats
 
-| Format | Extensions | Notes |
-|--------|-----------|-------|
-| MP3 | `.mp3` | MPEG-1/2 Audio Layer III, detected via ID3v2 tag or MPEG sync word |
-| FLAC | `.flac` | Free Lossless Audio Codec, detected via `fLaC` header |
-| OGG Vorbis | `.ogg`, `.oga` | Detected via `OggS` header, codec identified at offset 28 |
-| Opus | `.opus` | Detected via `OpusHead` codec identifier inside OGG container |
-| WAV | `.wav`, `.wave` | PCM audio, detected via RIFF/WAVE header |
-| AAC | `.aac`, `.m4a` | Advanced Audio Coding, detected via `ftyp` container |
-| WMA | `.wma` | Windows Media Audio |
+| Format | Extensions discovered |
+|--------|-----------------------|
+| MP3 | `.mp3` |
+| FLAC | `.flac` |
+| OGG | `.ogg` |
+| Opus | `.opus` |
+| WAV | `.wav` |
+| AAC / MPEG-4 audio | `.aac`, `.m4a` |
+| WMA | `.wma` |
+
+The scanner does not include `.oga` or `.wave`, even where a metadata reader could recognize their contents.
 
 ### Video formats
 
-| Format | Extensions | Notes |
-|--------|-----------|-------|
-| MP4 | `.mp4`, `.m4v` | MPEG-4 container, detected via `ftyp` brand at offset 8 |
-| Matroska | `.mkv` | Detected via EBML header (`\x1A\x45\xDF\xA3`) |
-| WebM | `.webm` | Matroska variant with VP8/VP9/AV1 codecs, same EBML header |
-| AVI | `.avi` | Audio Video Interleave, detected via RIFF/AVI header |
-| MOV | `.mov` | QuickTime container |
-| WMV | `.wmv` | Windows Media Video |
+| Format | Extensions discovered |
+|--------|-----------------------|
+| MP4 | `.mp4`, `.m4v` |
+| Matroska | `.mkv` |
+| WebM | `.webm` |
+| AVI | `.avi` |
+| MOV | `.mov` |
+| WMV | `.wmv` |
 
 ## Cover Art Extraction
 
 After scanning a music library, extract embedded cover art from audio files:
 
 ```bash
-make exec cmd="php bin/console app:album:extract-covers"
+dc exec app php bin/console app:album:extract-covers
 ```
 
-The command finds the albums without cover art and queues an extraction job for each one. Each job reads embedded image data (typically from ID3v2 APIC frames in MP3 files or Vorbis COMMENT blocks in FLAC/OGG files) and stores it as the album cover.
+The command runs the coverless-album batch inline and queues one extraction job per album. The independent worker reads embedded images from source audio and stores any extracted cover. A successful batch means the extraction jobs were queued; check album covers and background job outcomes to establish extraction results.
 
 Key points:
 
 - The queue workers extract the covers. The command returns once every job is queued and prints the job ID of its batch.
 - Albums are queued in batches of 500.
-- The command is safe to run repeatedly -- it only targets albums that do not already have a cover.
+- A later run selects albums that still lack a cover; it does not overwrite existing covers.
 
 See the [command reference](commands/app-album-extract-covers.md) for details.
 
 ## Next Steps
 
-- [External APIs](external-apis.md) -- configure Discogs, Last.fm, Spotify, MusicBrainz, and TasteDive for metadata enrichment
+- [External APIs](external-apis.md) -- understand optional music metadata and lyrics lookups
 - [Transcoding](transcoding.md) -- set up on-demand media conversion for streaming and quality tiers
 - [CLI Reference](commands/README.md) -- full list of available console commands
