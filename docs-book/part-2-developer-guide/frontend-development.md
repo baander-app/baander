@@ -230,13 +230,18 @@ lint, Vitest, build, and build-verification checks.
 
 The Electron app ships the AAC codec from `packages/codecs/baander-aac` as a
 native Node-API module, `@baander/aac-native`, declared as a `file:`
-dependency in `ui/electron/package.json`. `yarn install` builds it with
-node-gyp from the C++ sources; `yarn electron-rebuild` rebuilds it for the
-Electron ABI, and electron-builder (`ui/electron/electron-builder.yml`, the
-only packaging configuration) bundles only its ESM entry, types and compiled
-binding. The package is ESM-only and targets Node 26; the desktop toolchain is
-Electron 45. A Node-API module is ABI-stable, so a binding built against Node
-headers loads in Electron unchanged. The application icon is
+dependency in `ui/electron/package.json`. On `yarn install` the package's
+install script fetches the prebuilt binding for the platform from the newest
+`aac-native-v*` GitHub release (built by `.github/workflows/aac-native.yml`)
+into `prebuilds/<platform>-<arch>/`, and builds it with node-gyp from the C++
+sources when that is not possible; `yarn electron-rebuild` builds it for the
+Electron ABI into `build/Release/`, which the loader tries after `prebuilds/`
+(set `BAANDER_AAC_NATIVE_BINDING` to a file to make a local build win).
+electron-builder (`ui/electron/electron-builder.yml`, the only packaging
+configuration) bundles only its ESM entry, types and the binding, prebuilt or
+local, unpacked from the asar archive. The package is ESM-only and targets
+Node 26; the desktop toolchain is Electron 45. A Node-API module is
+ABI-stable, so one binding serves both runtimes. The application icon is
 `ui/electron/build/app-icons/icon.png`, rendered from the web app's
 `icon.svg`; electron-builder derives the platform formats from it.
 

@@ -12,3 +12,6 @@ package-lock.json
 # IDE / tool config
 .clang-format
 .idea/
+
+# Prebuilt bindings are release assets fetched by the install script
+prebuilds/*/

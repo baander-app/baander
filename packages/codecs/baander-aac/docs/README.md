@@ -687,6 +687,70 @@ wraps the binding behind the `window.electron.aac` bridge (one-shot
 `decode`/`encode` and chunked decoder/encoder sessions); every decode
 result carries the `loudness` readback.
 
+### Building for Electron and prebuilds
+
+The binding is a Node-API module: its ABI is the Node-API version it
+declares (`NAPI_VERSION=8` in `binding.gyp`), not the Node or Electron
+release it was compiled against, so one binary per platform and
+architecture serves Node 26 and Electron 45 alike. `node/index.js`
+resolves it in this order and lists every path it tried when none loads:
+
+1. the file named in `BAANDER_AAC_NATIVE_BINDING`, when that is set (for
+   a build elsewhere, or to make a local build win over a prebuild);
+2. `prebuilds/<process.platform>-<process.arch>/baander_aac.node`, the
+   prebuilt release asset (`linux-x64`, `win32-x64`, `darwin-x64`,
+   `darwin-arm64`);
+3. `build/Release/baander_aac.node`, then `build/Debug/`, where node-gyp
+   and `@electron/rebuild` put a local build.
+
+The package's `install` script (`node/scripts/fetch-prebuilds.mjs
+--install`) runs on every `npm install` and `yarn install`, including the
+copy the Electron app makes of this `file:` dependency. It asks the GitHub
+API of the repository in `package.json` for the newest `aac-native-v*`
+release, downloads `baander_aac-<platform>-<arch>.node` into `prebuilds/`,
+checks it against the release's `SHA256SUMS` and loads it once in a child
+process. When any of that fails (offline, a proxy, no release yet) it
+builds from source with `node-gyp rebuild` instead, so a machine with a
+toolchain never depends on the network and a machine without one needs
+only the release. An existing prebuild is kept; `npm run prebuild:download
+-- --force` replaces it, and `BAANDER_AAC_NATIVE_BUILD_FROM_SOURCE=1` (or
+npm's `--build-from-source`) skips the download. `GITHUB_TOKEN` is
+optional for a public repository; `BAANDER_AAC_PREBUILD_REPO`,
+`BAANDER_AAC_PREBUILD_TAG` and `BAANDER_AAC_PREBUILD_API` pin the
+repository, the release and the API host. Naming the script `install`
+(not `postinstall`) matters: npm and Yarn run an implicit `node-gyp
+rebuild` for a package with a `binding.gyp` only when it has no `install`
+script. Note that Yarn's lockfile hashes the packed contents of a `file:`
+dependency, `prebuilds/` included, so a prebuild downloaded into this
+source checkout changes `ui/electron/yarn.lock` on the next install;
+let the install script fetch it into `node_modules` instead.
+
+To produce a prebuild locally, build for the Electron the desktop app
+locks (`ui/electron/yarn.lock`) and copy the result into place; a plain
+`npx node-gyp rebuild` against the Node headers gives a binary that
+loads in Electron as well:
+
+```sh
+npx node-gyp rebuild --runtime=electron --target=45.0.0 --dist-url=https://electronjs.org/headers
+mkdir -p prebuilds/$(node -p 'process.platform + "-" + process.arch')
+cp build/Release/baander_aac.node prebuilds/$(node -p 'process.platform + "-" + process.arch')/
+```
+
+`.github/workflows/aac-native.yml` does the same on Linux x64, Windows
+x64, macOS x64 and macOS arm64 for every push to `master` and pull
+request that touches the package, the desktop app's Electron version or
+the workflow: it builds against the headers of the locked Electron, runs
+the smoke test under Node and under Electron (`ELECTRON_RUN_AS_NODE`,
+no display needed) with the binary in `prebuilds/`, runs the CTest
+suites with FFmpeg on Linux, and keeps each binary as a workflow
+artifact. Pushing a tag `aac-native-v<version>` (the version in
+`package.json`; the workflow refuses a mismatch) attaches the four
+binaries and `SHA256SUMS` to the GitHub release of that tag, creating
+the release when needed; nothing is committed. The desktop app's
+`electron-builder.yml` bundles `prebuilds/<platform>-${arch}/*.node`
+per OS block next to the `build/Release` fallback and unpacks both from
+the asar archive, which `process.dlopen` cannot read.
+
 ## Testing
 
 `ctest` runs thirty-seven suites, and the transform, filterbank and
@@ -825,7 +889,8 @@ include/      public aac.h and internal headers
 src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool, mps-enc test stream writer for MPEG Surround
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
-node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
+node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)
+prebuilds/    prebuilt bindings per platform-arch, fetched from a release (not committed)
 docs/         this file and the reference comparison
 ```
 

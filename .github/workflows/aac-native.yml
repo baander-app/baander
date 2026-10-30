@@ -1,0 +1,197 @@
+name: AAC native addon
+
+# Builds the Node-API binding of packages/codecs/baander-aac for the Electron
+# version the desktop app locks, proves it loads under Node and under
+# Electron on each platform, runs the codec's CTest suites on Linux, keeps
+# one prebuild per platform as a workflow artifact and, on an
+# `aac-native-v<version>` tag, attaches them to a GitHub release, where the
+# package's install script fetches them.  Nothing is committed.
+
+on:
+    push:
+        branches:
+            - master
+        tags:
+            - 'aac-native-v*'
+        paths:
+            - 'packages/codecs/baander-aac/**'
+            - 'ui/electron/package.json'
+            - 'ui/electron/yarn.lock'
+            - '.github/workflows/aac-native.yml'
+    pull_request:
+        types: [ opened, synchronize, reopened ]
+        paths:
+            - 'packages/codecs/baander-aac/**'
+            - 'ui/electron/package.json'
+            - 'ui/electron/yarn.lock'
+            - '.github/workflows/aac-native.yml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: aac-native-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    build:
+        name: ${{ matrix.target }}
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 45
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    -   os: ubuntu-latest
+                        target: linux-x64
+                    -   os: windows-latest
+                        target: win32-x64
+                    -   os: macos-15-intel
+                        target: darwin-x64
+                    -   os: macos-latest
+                        target: darwin-arm64
+        defaults:
+            run:
+                shell: bash
+                working-directory: packages/codecs/baander-aac
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            -   name: Set up Node
+                uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+                with:
+                    node-version-file: packages/codecs/baander-aac/package.json
+
+            -   name: Runner matches the target
+                run: |
+                    actual="$(node -p 'process.platform + "-" + process.arch')"
+                    test "$actual" = "${{ matrix.target }}" || { echo "runner is $actual, not ${{ matrix.target }}"; exit 1; }
+
+            -   name: Electron version from the desktop lockfile
+                working-directory: .
+                run: |
+                    version="$(node -e '
+                      const lock = require("node:fs").readFileSync("ui/electron/yarn.lock", "utf8");
+                      const entry = /^"electron@npm:[^"]*":\n  version: (\S+)/m.exec(lock);
+                      if (!entry) throw new Error("electron is not in ui/electron/yarn.lock");
+                      console.log(entry[1]);
+                    ')"
+                    echo "ELECTRON_VERSION=$version" >> "$GITHUB_ENV"
+                    echo "Electron $version"
+
+            -   name: Install package dependencies
+                # The install script would fetch an older prebuild; this job
+                # builds the binding itself.
+                run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+
+            -   name: Build the binding against the Electron headers
+                # A Node-API binding is ABI-stable, so a binary built against
+                # Node's headers would load in Electron too; building against
+                # Electron's headers makes the artifact the same binary
+                # `yarn electron-rebuild` produces (on Windows that links the
+                # node.lib Electron ships), and the next steps prove it loads
+                # in both runtimes.
+                run: |
+                    npx node-gyp rebuild --runtime=electron --target="$ELECTRON_VERSION" \
+                      --dist-url=https://electronjs.org/headers
+                    ls -l build/Release/baander_aac.node
+
+            -   name: Stage the prebuild
+                # The loader prefers prebuilds/<platform>-<arch>/, so the rest
+                # of the job exercises the file the release will carry.
+                run: |
+                    mkdir -p "prebuilds/${{ matrix.target }}"
+                    cp build/Release/baander_aac.node "prebuilds/${{ matrix.target }}/"
+                    rm -rf build
+
+            -   name: Smoke test under Node
+                run: npm test
+
+            -   name: Install the Electron runtime
+                working-directory: ${{ runner.temp }}
+                run: |
+                    mkdir -p electron-runtime && cd electron-runtime
+                    npm install --no-save --no-package-lock --no-audit --no-fund "electron@$ELECTRON_VERSION"
+                    electron="$(node -p 'require("electron")')"
+                    # Git Bash on Windows gets a POSIX path for the executable.
+                    if command -v cygpath > /dev/null; then electron="$(cygpath -u "$electron")"; fi
+                    echo "ELECTRON_BIN=$electron" >> "$GITHUB_ENV"
+
+            -   name: Smoke test under Electron
+                # ELECTRON_RUN_AS_NODE runs Electron's Node without a window
+                # or a display; the loader and the binding see the runtime
+                # the desktop app ships.
+                env:
+                    ELECTRON_RUN_AS_NODE: '1'
+                run: |
+                    "$ELECTRON_BIN" -p 'process.versions.electron + " / node " + process.versions.node'
+                    "$ELECTRON_BIN" --test node/test/smoke.test.mjs
+
+            -   name: CTest suites with FFmpeg interop
+                if: matrix.target == 'linux-x64'
+                run: |
+                    sudo apt-get update -q
+                    sudo apt-get install -y -q --no-install-recommends ffmpeg ninja-build
+                    cmake -S . -B cmake-build -G Ninja -DCMAKE_BUILD_TYPE=Release
+                    cmake --build cmake-build
+                    ctest --test-dir cmake-build --output-on-failure
+
+            -   name: Keep the prebuild
+                uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+                with:
+                    name: baander_aac-${{ matrix.target }}
+                    path: packages/codecs/baander-aac/prebuilds/${{ matrix.target }}/baander_aac.node
+                    if-no-files-found: error
+                    retention-days: 30
+
+    release:
+        name: Release assets
+        if: startsWith(github.ref, 'refs/tags/aac-native-v')
+        needs: build
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        permissions:
+            contents: write
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            -   name: Tag matches the package version
+                run: |
+                    version="$(node -p 'require("./packages/codecs/baander-aac/package.json").version')"
+                    test "$GITHUB_REF_NAME" = "aac-native-v$version" \
+                      || { echo "tag $GITHUB_REF_NAME does not match package version $version"; exit 1; }
+                    echo "VERSION=$version" >> "$GITHUB_ENV"
+
+            -   name: Collect the prebuilds
+                uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+                with:
+                    pattern: baander_aac-*
+                    path: prebuilds
+
+            -   name: Name the assets and write SHA256SUMS
+                # One asset per platform, named after the artifact
+                # (baander_aac-<platform>-<arch>.node), which is what the
+                # install script asks the release for.
+                run: |
+                    mkdir -p assets
+                    for dir in prebuilds/baander_aac-*; do
+                      cp "$dir/baander_aac.node" "assets/$(basename "$dir").node"
+                    done
+                    test "$(ls assets/*.node | wc -l)" -eq 4 || { echo "expected four prebuilds"; ls -l assets; exit 1; }
+                    (cd assets && sha256sum baander_aac-*.node > SHA256SUMS)
+                    cat assets/SHA256SUMS
+
+            -   name: Attach the assets to the release
+                env:
+                    GH_TOKEN: ${{ github.token }}
+                run: |
+                    if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+                      gh release upload "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+                    else
+                      gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --verify-tag \
+                        --title "@baander/aac-native $VERSION" \
+                        --notes "Prebuilt Node-API binding of @baander/aac-native $VERSION for Electron $(node -p 'require("./ui/electron/package.json").devDependencies.electron'), one asset per platform; the package's install script fetches the one for the running platform."
+                    fi
