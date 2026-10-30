@@ -84,6 +84,9 @@ using AacEncChannel = struct AacEncChannel_ {
   int prev_window_shape;
   int is_lfe;                     /* the channel of an LFE element */
   int active_long, active_short;  /* bands below the channel's lowpass */
+  int solid_long, solid_short;    /* bands below the full-precision lowpass;
+                                     the bands from there to active_* are
+                                     coded coarsely or not at all */
   float coef[1024]; /* MDCT coefficients, [window * 128 + k] for short windows */
   float x34[1024];  /* |coef|^(3/4) */
   float form[AAC_MAX_BANDS]; /* sum of sqrt(|coef|) per group band */

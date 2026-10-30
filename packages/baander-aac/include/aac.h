@@ -204,7 +204,9 @@ int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data,
  * target. */
 int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps);
 /* The lowpass of the core coder in Hz instead of the bitrate's tuning
- * table entry (0, the default): the bands above it are not coded.  The
+ * table entry (0, the default): the bands above it are not coded.  An
+ * override also turns off the sparse, coarsely coded bands that AAC-LC
+ * at 48 to 95 kbit/s per channel otherwise adds up to 20 kHz.  The
  * value is clamped to half the core rate (half the input rate with
  * SBR).  The channels of an SBR element are coded up to the element's
  * crossover whatever the override says, since the bands below the
@@ -213,7 +215,8 @@ int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps);
  * 1000 Hz. */
 int aac_encoder_set_bandwidth(AacEncoderHandle ctx, int hz);
 /* The lowpass in force, in Hz: the override, the tuning table's entry,
- * or the SBR crossover. */
+ * or the SBR crossover.  The bands up to it are coded at full
+ * precision; sparse bands coded above it are not counted. */
 int aac_encoder_bandwidth(AacEncoderHandle ctx);
 /* A VBR mode as the FDK encoder names them, 1 (lowest) to 5 (highest):
  * the mode's bitrate target for a stereo stream is 32, 72, 112, 148 or

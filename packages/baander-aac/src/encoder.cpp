@@ -34,6 +34,7 @@ constexpr int kInfBits = 1 << 28;
 constexpr float kBitsToPe = 1.18f;
 constexpr float kMinSnrFloor = 0.003f; /* -25 dB */
 constexpr float kMinSnrCeil = 0.8f;    /* -1 dB */
+constexpr float kExtensionNoise = 0.25f; /* -6 dB SNR in the bands above the lowpass */
 constexpr int kSearchIterations = 12;
 /* Noise-to-mask ratio the encoder may go down to when bits are plentiful. */
 constexpr float kImproveLimitLog2 = -8.0f;
@@ -1189,7 +1190,7 @@ float frame_pe(const AacEncoderState* s) {
   for (int c = 0; c < s->channels; c++) {
     const AacEncChannel* ch = &s->ch[c];
     const AacIcsInfo* ics = &ch->ics;
-    const int active = ics->num_windows == 8 ? ch->active_short : ch->active_long;
+    const int active = ics->num_windows == 8 ? ch->solid_short : ch->solid_long;
     for (int g = 0; g < ics->num_window_groups; g++) {
       for (int b = 0; b < active; b++) {
         const int idx = g * ics->num_swb + b;
@@ -1262,6 +1263,7 @@ int prepare_bands(AacEncoderState* s, ReleaseEntry* release) {
     const int is_short = ics->num_windows == 8;
     const int nswb = ics->num_swb;
     const int active = is_short ? ch->active_short : ch->active_long;
+    const int solid = is_short ? ch->solid_short : ch->solid_long;
     const float* table = is_short ? s->min_snr_short : s->min_snr_long;
 
     float avg = 0.0f;
@@ -1278,7 +1280,7 @@ int prepare_bands(AacEncoderState* s, ReleaseEntry* release) {
       for (int b = 0; b < nswb; b++) {
         const int idx = g * nswb + b;
         const float e = ch->energy[idx];
-        float min_snr = b < active ? table[b] : kMinSnrCeil;
+        float min_snr = b < solid ? table[b] : kMinSnrCeil;
         /* Bands far below the frame's average energy need less SNR. */
         if (e > 0.0f && avg > 10.0f * e) {
           const float db = 10.0f * log10f(avg / e);
@@ -1325,6 +1327,7 @@ void set_allowances(AacEncoderState* s, float reduction, float improve, const Re
     const AacIcsInfo* ics = &ch->ics;
     const int nswb = ics->num_swb;
     const int active = ics->num_windows == 8 ? ch->active_short : ch->active_long;
+    const int solid = ics->num_windows == 8 ? ch->solid_short : ch->solid_long;
     for (int g = 0; g < ics->num_window_groups; g++) {
       for (int b = 0; b < nswb; b++) {
         const int idx = g * nswb + b;
@@ -1338,9 +1341,12 @@ void set_allowances(AacEncoderState* s, float reduction, float improve, const Re
             const float root = sqrtf(sqrtf(thr)) + reduction;
             allowed = root * root * root * root;
             const float floor = e * ch->min_snr[idx];
-            if (allowed > floor && ch->avoid_hole[idx]) {
+            if (allowed > floor && ch->avoid_hole[idx] && b < solid) {
               allowed = fmaxf(thr, floor);
             }
+          }
+          if (b >= solid) {
+            allowed = fmaxf(allowed, e * kExtensionNoise);
           }
           if (allowed >= e) {
             allowed = -1.0f;
@@ -1909,6 +1915,22 @@ void active_bands(int rate_index, int frame_length, int sample_rate, int cutoff,
   }
 }
 
+/* Upper edge in Hz of the sparse bands an AAC-LC encoder codes above
+ * the lowpass, or 0 for none.  Apple's encoder codes such bands, at
+ * magnitudes of about 1, well above its full-precision bandwidth; on
+ * the comparison corpus coding them up to 20 kHz at 6 dB SNR measured
+ * level or better on PEAQ and 0.15 to 0.21 better on ViSQOL from 48 to
+ * 80 kbit/s per channel, but cost PEAQ at 96 kbit/s per channel. */
+int extension_cutoff(const AacEncoderState* s, int channel_bitrate) {
+  const bool lc_core = s->aot == AAC_AOT_LC && !state_has_sbr(s) && !s->ld_sbr;
+  const bool cbr_like = s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR;
+  if (!lc_core || !cbr_like || s->bandwidth_override > 0 || channel_bitrate < 48000 ||
+      channel_bitrate >= 96000) {
+    return 0;
+  }
+  return std::min(20000, s->sample_rate / 2);
+}
+
 }  // namespace
 
 void aac_encoder_state_configure(AacEncoderState* s) {
@@ -1938,6 +1960,12 @@ void aac_encoder_state_configure(AacEncoderState* s) {
   const int* so = aac_sfb_offset(fl, s->rate_index, 1);
   active_bands(s->rate_index, fl, s->sample_rate, s->bandwidth, &s->active_bands_long,
                &s->active_bands_short);
+  int solid_long = s->active_bands_long, solid_short = s->active_bands_short;
+  const int extension = extension_cutoff(s, channel_bitrate);
+  if (extension > s->bandwidth) {
+    active_bands(s->rate_index, fl, s->sample_rate, extension, &s->active_bands_long,
+                 &s->active_bands_short);
+  }
   int lfe_bands = 1;
   for (int b = 1; b < aac_num_sfb(fl, s->rate_index, 0) && lo[b] < lfe_lines(fl); b++) {
     lfe_bands = b + 1;
@@ -1945,6 +1973,8 @@ void aac_encoder_state_configure(AacEncoderState* s) {
   for (int c = 0; c < s->channels; c++) {
     s->ch[c].active_long = s->ch[c].is_lfe ? lfe_bands : s->active_bands_long;
     s->ch[c].active_short = s->ch[c].is_lfe ? 0 : s->active_bands_short;
+    s->ch[c].solid_long = s->ch[c].is_lfe ? lfe_bands : solid_long;
+    s->ch[c].solid_short = s->ch[c].is_lfe ? 0 : solid_short;
   }
   /* The channels of an SBR element are coded up to the element's
    * crossover, whatever the bitrate suggests: the generator copies the
@@ -1963,15 +1993,19 @@ void aac_encoder_state_configure(AacEncoderState* s) {
     for (int k = 0; k < el->num_ch; k++) {
       AacEncChannel* ch = &s->ch[el->ch[k]];
       active_bands(s->rate_index, fl, s->sample_rate, cutoff, &ch->active_long, &ch->active_short);
+      ch->solid_long = ch->active_long;
+      ch->solid_short = ch->active_short;
+      solid_long = std::max(solid_long, ch->active_long);
+      solid_short = std::max(solid_short, ch->active_short);
       s->active_bands_long = std::max(s->active_bands_long, ch->active_long);
       s->active_bands_short = std::max(s->active_bands_short, ch->active_short);
       s->bandwidth = std::max(s->bandwidth, cutoff);
     }
   }
   init_min_snr(s->min_snr_long, channel_bitrate, s->sample_rate, 2 * fl, 0, lo,
-               s->active_bands_long);
+               solid_long);
   init_min_snr(s->min_snr_short, channel_bitrate, s->sample_rate, 2 * aac_short_length(fl), 1, so,
-               s->active_bands_short);
+               solid_short);
   aac_enc_tools_init(s);
   if (s->mpeg2) {
     /* MPEG-2 AAC (ISO/IEC 13818-7) has no perceptual noise substitution. */
