@@ -93,9 +93,9 @@ static void test_profile(const Profile& p) {
   }
   if (p.mps212) {
     AacUsacEncoderOptions o;
+    memset(&o, 0, sizeof(o));
     o.noise_filling = -1;
     o.preroll = -1;
-    o.independent_interval_frames = 0;
     o.stream_id = -1;
     o.sbr = -1;
     o.mps212 = 1;

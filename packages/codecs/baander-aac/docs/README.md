@@ -512,11 +512,50 @@ step. The output is LOAS/LATM by default, raw access units with the
 USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
 AAC DRC metadata are refused, as the USAC frame has no place for them;
 `aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
-frame interval, a stream identifier, and whether enhanced SBR and MPS 212
-are on, off or chosen by bitrate (MPS 212 needs SBR, so asking for it
-with SBR off is refused); `aac_encoder_set_loudness_info` adds the
-loudness info set (see Loudness). The AAC-LC output is unchanged byte for
-byte.
+frame schedule and the segment size ceiling (below), a stream
+identifier, and whether enhanced SBR and MPS 212 are on, off or chosen
+by bitrate (MPS 212 needs SBR, so asking for it with SBR off is
+refused); `aac_encoder_set_loudness_info` adds the loudness info set
+(see Loudness). The AAC-LC output is unchanged byte for byte.
+
+For streaming, the immediate playout frames are where a muxer cuts
+segments (an HLS or DASH segment, an MP4 fragment) and where a player
+joins. The schedule sets the distance from one to the next in frames
+(`independent_interval_frames`), milliseconds (`_ms`) or output samples
+(`_samples`); the first one set wins in the order samples,
+milliseconds, frames, a value in samples or milliseconds is rounded up
+to whole frames of the output rate (2048 samples while SBR runs), and
+none set keeps one second. `independent_max_distance_frames` bounds the
+distance whatever the interval says. The frame before each immediate
+playout frame (two before it with SBR) is independent too, since the
+pre-roll repeats those frames and a decoder starts from the first of
+them. `aac_encoder_request_independent_frame` makes the next frame
+independent at any point of the stream, with the immediate playout
+frame following it by the pre-roll's frame count (the same frame when
+the pre-roll is off) unless one is due sooner, and restarts the
+interval from there. `segment_max_bytes` caps the bytes of the access
+units from one immediate playout frame to the next, the pre-roll
+included: the rate loop caps each frame at the segment's remaining
+budget spread over its remaining frames, never below what the frame's
+side information needs, in every rate control mode. The quality falls
+while the ceiling binds (about 3 dB of SNR on dense transients at
+128 kbit/s with the segments cut by a third), and a ceiling below what
+the side information and the pre-roll need cannot be honoured.
+`aac_encoder_last_frame_info` reports the last produced frame for the
+muxer: its index, whether it is independent, the bytes of its pre-roll
+(a frame with one opens a segment), its bytes as produced (the access
+unit of the raw transport, the transport frame of LOAS and LATM; a
+LOAS flush reports its last frame), and the position of its first
+decoded sample on the input's timeline (the frame index times the frame
+size less the encoder delay). The default schedule writes the same
+bytes as before. A stream cut at any immediate playout frame decodes
+in the FDK decoder, libxaac and our decoder with its first frame as
+close to the source as the continuous decode's, at the reported
+position. FFmpeg master decodes the cut from the MP4 form, but it does
+not run the pre-roll access units on a cold start, so its first frame
+after the cut is wrong (about 0 dB against its continuous decode) and
+the second is right; the FDK encoder's streams cut the same way behave
+alike in it.
 
 Below 64 kbit/s per channel the xHE-AAC encoder runs enhanced SBR at the
 2:1 ratio (`coreSbrFrameLengthIndex` 3): the core codes 1024 lines at
@@ -576,8 +615,12 @@ int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length);
 int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
-/* xHE-AAC: noise filling, pre-roll, independent frame interval, stream id, SBR, MPS 212 */
+/* xHE-AAC: noise filling, pre-roll, independent frame schedule, segment size ceiling,
+ * stream id, SBR, MPS 212 */
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
+/* xHE-AAC random access: an independent frame on demand, and the last frame for a muxer */
+int aac_encoder_request_independent_frame(AacEncoderHandle ctx);
+int aac_encoder_last_frame_info(AacEncoderHandle ctx, AacEncoderFrameInfo* info);
 /* xHE-AAC loudness metadata: the set of a measured programme (two-pass),
  * or a meter inside the encoder (one-pass) */
 int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* info);
@@ -797,7 +840,9 @@ With the `xhe` profile, `--loudness` measures the whole input first and
 writes the loudness info set into the stream (the figures go to stderr),
 `--sbr on|off|auto` and `--mps on|off|auto` choose enhanced SBR and
 MPS 212 (`auto`, the default, by bitrate), and `--no-noise-filling`,
-`--preroll off` and `--stream-id N` set the other USAC options; the
+`--preroll off` and `--stream-id N` set the other USAC options,
+`--rap-ms N`, `--rap-samples N` and `--rap-max-frames N` the independent
+frame schedule and `--segment-max-bytes N` the segment size ceiling; the
 options are refused with another profile. `loudness` prints the meter's
 figures (integrated loudness, loudness range, true peak, sample peak,
 momentary and short-term maxima) of a WAV file (integer PCM of 8 to 32
@@ -857,7 +902,12 @@ loudness in LUFS (`null` when the stream declares none) and the
 normalisation gain in dB after each decode call. The encoder's
 `profile: 'xhe'` writes xHE-AAC (LOAS by default, `raw` with `config` for
 MP4) and takes `usac: { noiseFilling, preroll, independentIntervalFrames,
-streamId, sbr, mps212 }` (the tools `'on'`, `'off'` or `'auto'`),
+independentIntervalMs, independentIntervalSamples,
+independentMaxDistanceFrames, segmentMaxBytes, streamId, sbr, mps212 }`
+(the tools `'on'`, `'off'` or `'auto'`); `encoder.requestIndependentFrame()`
+asks for an independent frame and `encoder.lastFrame` reports the last
+frame produced (`{ frameIndex, independent, prerollBytes, bytes,
+samplePosition }`, `null` before the first),
 `loudnessInfo` (the figures the loudness info set carries;
 `integratedLkfs` and `samplePeakDbfs` at least) and `measureLoudness:
 true`, after which `encoder.loudness` holds the figures of the input
@@ -942,7 +992,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs forty suites, and the transform, filterbank and
+`ctest` runs thirty-six suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -1028,9 +1078,18 @@ replicated-band bounds, the 2-1-2 on a panned pair and on unrelated
 channels, frequent independent frames, digital silence, the raw access
 unit bitrates at 16 to 96 kbit/s, and the committed streams
 `usac_enc_sbr_sce_32k.loas`, `usac_enc_sbr_cpe_64k.loas` and
-`usac_enc_mps_cpe_32k.loas`; a fresh encode reproduces every committed
-stream byte for byte, and `--write-streams tests/data` on either suite
-regenerates its own) and its loudness metadata in another
+`usac_enc_mps_cpe_32k.loas`; `test_usac_rap`: the independent frame
+schedule in frames, milliseconds and samples with and without SBR, its
+precedence, the distance bound and on-demand requests (in the flush
+too), the frame reports against the access units, the segment size
+ceiling on a transient-rich signal in the constant-rate and true VBR
+modes with and without the pre-roll, cuts at every immediate playout
+frame of the raw and LOAS forms decoded from cold and aligned at the
+reported position, and the committed stream
+`usac_enc_rap_cpe_64k.loas` with on-demand independent frames under a
+ceiling; a fresh encode reproduces every committed stream byte for
+byte, and `--write-streams tests/data` on each suite regenerates its
+own) and its loudness metadata in another
 (`test_encoder_loudness`: the two-pass set in the configuration as the
 writer's bytes and read back by the decoder as the declared loudness
 with its normalisation gain, the set's removal and replacement and its

@@ -50,6 +50,10 @@ constexpr int kFillByte = 0xA5;
 /* No channel codes fewer bands than this: lg stays above zero, which
  * decoders treat alike only for a coded range. */
 constexpr int kMinMaxSfb = 1;
+/* Bits a channel's lowest band costs at most when every other band is
+ * released: the arithmetic coded zeros of its lines, which the segment
+ * ceiling's floor allows on top of the side information. */
+constexpr int kMinChannelBits = 32;
 /* An empty band whose lines are quieter than this (about 150 dB below
  * full scale in the coefficient domain) is silence and gets no noise:
  * digital silence decodes to digital silence. */
@@ -652,7 +656,7 @@ AacUsacEncoder* aac_usac_enc_create(void) {
     return nullptr;
   }
   u->preroll_frames = AAC_USAC_ENC_PREROLL_FRAMES;
-  aac_usac_enc_set_options(u, nullptr, 48000);
+  aac_usac_enc_set_options(u, nullptr);
   aac_usac_enc_reset(u, AAC_MAX_CHANNELS);
   return u;
 }
@@ -669,26 +673,48 @@ void aac_usac_enc_destroy(AacUsacEncoder* u) {
   free(u);
 }
 
-void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt,
-                              int sample_rate) {
+void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt) {
   AacUsacEncoderOptions o;
   o.noise_filling = !opt || opt->noise_filling < 0 ? 1 : (opt->noise_filling != 0);
   o.preroll = !opt || opt->preroll < 0 ? 1 : (opt->preroll != 0);
-  /* 0 stands for the default of one second, which the core rate turns
-   * into frames (aac_usac_enc_set_core_rate) */
+  /* 0 in every schedule field stands for the default of one second,
+   * which aac_usac_enc_interval_frames turns into frames */
   o.independent_interval_frames =
       opt && opt->independent_interval_frames > 0 ? opt->independent_interval_frames : 0;
+  o.independent_interval_ms = opt && opt->independent_interval_ms > 0 ? opt->independent_interval_ms : 0;
+  o.independent_interval_samples =
+      opt && opt->independent_interval_samples > 0 ? opt->independent_interval_samples : 0;
+  o.independent_max_distance_frames =
+      opt && opt->independent_max_distance_frames > 0 ? opt->independent_max_distance_frames : 0;
+  o.segment_max_bytes = opt && opt->segment_max_bytes > 0 ? opt->segment_max_bytes : 0;
   o.stream_id = opt && opt->stream_id >= 0 && opt->stream_id <= 65535 ? opt->stream_id : -1;
   o.sbr = !opt || opt->sbr < 0 ? -1 : (opt->sbr != 0);
   o.mps212 = !opt || opt->mps212 < 0 ? -1 : (opt->mps212 != 0);
   u->opt = o;
-  aac_usac_enc_set_core_rate(u, sample_rate);
 }
 
-void aac_usac_enc_set_core_rate(AacUsacEncoder* u, int sample_rate) {
-  const int frames = u->opt.independent_interval_frames;
-  u->interval = std::max(1, frames > 0 ? frames : (sample_rate + kLong - 1) / kLong);
+int aac_usac_enc_interval_frames(const AacUsacEncoderOptions* o, int output_rate,
+                                 int output_frame) {
+  output_frame = std::max(1, output_frame);
+  long long frames;
+  if (o->independent_interval_samples > 0) {
+    frames = ((long long)o->independent_interval_samples + output_frame - 1) / output_frame;
+  } else if (o->independent_interval_ms > 0) {
+    /* ms * rate / 1000 samples, rounded up to whole frames */
+    const long long per_frame = 1000LL * output_frame;
+    frames = ((long long)o->independent_interval_ms * output_rate + per_frame - 1) / per_frame;
+  } else if (o->independent_interval_frames > 0) {
+    frames = o->independent_interval_frames;
+  } else {
+    frames = ((long long)output_rate + output_frame - 1) / output_frame;
+  }
+  if (o->independent_max_distance_frames > 0) {
+    frames = std::min(frames, (long long)o->independent_max_distance_frames);
+  }
+  return (int)std::clamp(frames, 1LL, (long long)INT32_MAX / 2);
 }
+
+void aac_usac_enc_request_independent(AacUsacEncoder* u) { u->requested = 1; }
 
 void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int input_channels,
                                int bitrate, int* sbr, int* mps) {
@@ -749,9 +775,14 @@ void aac_usac_enc_reset(AacUsacEncoder* u, int channels) {
   u->frame_index = 0;
   u->indep = 1;
   u->ipf = 0;
+  u->next_ipf = 0;
+  u->requested = 0;
+  u->segment_used = 0;
+  u->segment_reserved = 0;
   for (int i = 0; i < AAC_USAC_MAX_PREROLL_FRAMES; i++) {
     u->last_au_len[i] = 0;
   }
+  u->preroll_len = 0;
   u->preroll_bytes = 0;
   if (u->mps_active) {
     aac_mps212_enc_reset(&u->mps);
@@ -842,13 +873,23 @@ int aac_usac_enc_tns_max_bands(int rate_index, int is_short) {
 
 void aac_usac_enc_begin_frame(AacEncoderState* s) {
   AacUsacEncoder* u = s->usac;
-  const int k = u->frame_index % u->interval;
   const int n = u->preroll_frames;
-  u->ipf = k == 0 && u->opt.preroll;
-  /* The first pre-roll frame of an immediate playout frame is
-   * independent too, as it is the frame a decoder starts from. */
-  u->indep = k == 0 || (u->opt.preroll && k == u->interval - n);
-  if (u->frame_index == 0 && u->opt.preroll) {
+  const int k = u->frame_index;
+  /* The pre-roll of an immediate playout frame repeats the frames
+   * before it, and a decoder starts from the first of them, so that one
+   * is independent too: the independent frame leads the immediate
+   * playout frame by the pre-roll's frame count.  An on-demand request
+   * brings the next immediate playout frame to that lead from now,
+   * unless one is already due sooner. */
+  const int lead = u->opt.preroll ? n : 0;
+  if (u->requested && k + lead < u->next_ipf) {
+    u->next_ipf = k + lead;
+  }
+  u->requested = 0;
+  const int starts_segment = k == u->next_ipf;
+  u->ipf = starts_segment && u->opt.preroll;
+  u->indep = starts_segment || (u->opt.preroll && k == u->next_ipf - lead);
+  if (k == 0 && u->opt.preroll) {
     const int len = write_silent_au(s, u->last_au[0], u->last_au_cap);
     u->last_au_len[0] = len > 0 ? len : 0;
     for (int i = 1; i < n; i++) {
@@ -856,11 +897,45 @@ void aac_usac_enc_begin_frame(AacEncoderState* s) {
       u->last_au_len[i] = u->last_au_len[0];
     }
   }
+  if (starts_segment) {
+    /* a new segment: the interval counts from here, and the pre-roll
+     * this frame carries is the first charge against the ceiling */
+    u->next_ipf = k + aac_usac_enc_interval_frames(&u->opt, s->input_rate, s->frame_size);
+    u->segment_used = 0;
+    u->segment_reserved = 0;
+  }
+  u->preroll_len = 0;
+  if (u->ipf) {
+    const int len = write_preroll_payload(s, u->preroll, u->preroll_cap);
+    u->preroll_len = len > 0 ? len : 0;
+    u->segment_reserved = u->preroll_len + (u->preroll_len < 255 ? 1 : 3);
+  }
   for (int e = 0; e < s->num_elements; e++) {
     if (s->sbr[e]) {
       s->sbr[e]->usac_indep = u->indep;
     }
   }
+}
+
+int aac_usac_enc_frame_bit_ceiling(const AacEncoderState* s) {
+  const AacUsacEncoder* u = s->usac;
+  if (u->opt.segment_max_bytes <= 0) {
+    return 0;
+  }
+  /* The floor: the frame's side information with every channel coding
+   * its lowest band alone, as the rate loop reaches it when it releases
+   * every band. */
+  const int floor_bits = aac_usac_enc_overhead_bits(s) + kMinChannelBits * s->channels;
+  const int remaining_frames = std::max(1, u->next_ipf - u->frame_index);
+  const long long remaining =
+      (long long)u->opt.segment_max_bytes - u->segment_used - u->segment_reserved;
+  if (remaining <= 0) {
+    return floor_bits;
+  }
+  /* The share is in access unit bytes; the rate loop's count carries the
+   * transport estimate on top of the access unit. */
+  const long long share = remaining * 8 / remaining_frames + kTransportBits;
+  return (int)std::max((long long)floor_bits, std::min(share, (long long)kUnaffordableBits));
 }
 
 int aac_usac_enc_element_bits(AacEncoderState* s, AacEncElement* el) {
@@ -956,10 +1031,11 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   if (u->opt.preroll) {
     aac_bitwriter_write(&w, u->ipf ? 1u : 0u, 1); /* usacExtElementPresent */
     if (u->ipf) {
-      /* The payload is byte aligned in itself, not in the frame. */
-      const int len = write_preroll_payload(s, u->preroll, u->preroll_cap);
-      if (len < 0) {
-        return len;
+      /* The payload, prepared when the frame began, is byte aligned in
+       * itself, not in the frame. */
+      const int len = u->preroll_len;
+      if (len <= 0) {
+        return AAC_ERR_OVERFLOW;
       }
       aac_bitwriter_write(&w, 0, 1); /* usacExtElementUseDefaultLength */
       write_ext_payload_length(&w, len);
@@ -992,6 +1068,15 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   aac_bitwriter_write_bits(&lw, u->scratch, elem_bits);
   aac_bitwriter_byte_align(&lw);
   u->last_au_len[n - 1] = aac_bitwriter_overflow(&lw) ? 0 : aac_bitwriter_bytes_written(&lw);
+  /* The segment's bytes, and the frame for aac_encoder_last_frame_info. */
+  u->segment_used += au_len;
+  u->segment_reserved = 0;
+  u->has_last_frame = 1;
+  u->last_frame_index = u->frame_index;
+  u->last_indep = u->indep;
+  u->last_preroll_bytes = u->preroll_bytes;
+  u->last_au_bytes = au_len;
+  u->last_frame_bytes = au_len;
   u->frame_index++;
   return au_len + AAC_ADTS_HEADER_SIZE;
 }

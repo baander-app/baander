@@ -83,10 +83,29 @@ using AacUsacEncChannel = struct AacUsacEncChannel_ {
 
 using AacUsacEncoder = struct AacUsacEncoder_ {
   AacUsacEncoderOptions opt;
-  int interval;    /* frames from one independent frame to the next */
   int frame_index; /* frames since the start of the stream */
   int indep;       /* the frame being coded has usacIndependencyFlag set */
   int ipf;         /* ... and carries the audio pre-roll */
+  /* The independent frame schedule: the index of the next immediate
+   * playout frame (the next independent frame when the pre-roll is off),
+   * which opens a segment, and whether aac_encoder_request_independent_frame
+   * asked for one before the frame being coded. */
+  int next_ipf;
+  int requested;
+  /* The segment size ceiling: the bytes of the access units written
+   * since the segment's first frame, and the bytes the pre-roll of the
+   * frame being coded will add to them. */
+  int segment_used;
+  int segment_reserved;
+  /* The last written frame, for aac_encoder_last_frame_info: its index,
+   * flags and access unit bytes, and the bytes of its transport frame,
+   * which the API layer fills in after wrapping it. */
+  int has_last_frame;
+  int last_frame_index;
+  int last_indep;
+  int last_preroll_bytes;
+  int last_au_bytes;
+  int last_frame_bytes;
   /* The tools in use, resolved from the options and the bitrate by the
    * encoder state (encoder.cpp): enhanced SBR at the 2:1 ratio, and MPS
    * 212 coding a stereo input as one core channel through `mps`. */
@@ -107,6 +126,7 @@ using AacUsacEncoder = struct AacUsacEncoder_ {
   int scratch_cap;
   uint8_t* preroll; /* the AudioPreRoll() payload of the frame being written */
   int preroll_cap;
+  int preroll_len;   /* its length, prepared when the frame begins */
   int preroll_bytes; /* bytes of the pre-roll extension in the last written frame */
   /* Bits of the element stream behind its last range coder flush: the
    * sign bits of the last window and fac_data_present.  The fill element
@@ -119,17 +139,23 @@ void aac_usac_enc_destroy(AacUsacEncoder* u);
 
 /* Applies the options, with the defaults for every field outside its
  * range (noise filling on, pre-roll on, one second between independent
- * frames, no stream id, SBR and MPS 212 by bitrate); `sample_rate`, the
- * core rate, turns the default interval into frames.  Before the first
- * frame only.  The SBR and MPS 212 choices are resolved by the encoder
- * state (aac_usac_enc_choose_tools), which configures the core rate and
- * the element layout for them. */
-void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt,
-                              int sample_rate);
-/* Turns the options' independent frame interval into frames of the core
- * rate `sample_rate` (half the output rate with SBR); called again when
- * the tools change the core rate. */
-void aac_usac_enc_set_core_rate(AacUsacEncoder* u, int sample_rate);
+ * frames with no distance bound and no segment ceiling, no stream id,
+ * SBR and MPS 212 by bitrate).  Before the first frame only.  The SBR
+ * and MPS 212 choices are resolved by the encoder state
+ * (aac_usac_enc_choose_tools), which configures the core rate and the
+ * element layout for them; the schedule's interval is turned into
+ * frames from the output rate and frame size as each frame begins. */
+void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* opt);
+/* The frames between immediate playout frames the options give at an
+ * output rate and frame size: the samples, milliseconds or frames
+ * setting in that order of precedence, rounded up to whole frames, one
+ * second when none is set, and never more than the distance bound. */
+int aac_usac_enc_interval_frames(const AacUsacEncoderOptions* opt, int output_rate,
+                                 int output_frame);
+/* Asks for an independent frame on demand: the next frame begun is
+ * independent and the immediate playout frame follows it by the
+ * pre-roll's frame count, unless one is due sooner. */
+void aac_usac_enc_request_independent(AacUsacEncoder* u);
 /* The tools the options and the bitrate ask for: SBR below 64 kbit/s
  * per input channel unless its option decides, MPS 212 for a stereo
  * input only when its option asks for it, and then with SBR, which it
@@ -154,8 +180,16 @@ int aac_usac_enc_max_au_bytes(const struct AacEncoderState_* s);
 int aac_usac_enc_tns_max_bands(int rate_index, int is_short);
 
 /* Decides whether the frame about to be coded is independent and whether
- * it carries the pre-roll; called once per frame before the rate loop. */
+ * it carries the pre-roll, prepares the pre-roll payload, and opens a
+ * new segment at an immediate playout frame; called once per frame
+ * before the rate loop. */
 void aac_usac_enc_begin_frame(struct AacEncoderState_* s);
+/* The bit ceiling of the frame being coded under the segment size
+ * ceiling, as the rate loop counts bits (the transport estimate
+ * included): the segment's remaining budget spread over its remaining
+ * frames, never below what the frame's side information needs.  0 when
+ * no ceiling is set. */
+int aac_usac_enc_frame_bit_ceiling(const struct AacEncoderState_* s);
 /* The scale factors of every band (zero bands included) and the noise
  * filling parameters of the element's channels for the current
  * quantisation, with max_sfb widened to the noise filled range; returns

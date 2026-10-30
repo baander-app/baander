@@ -38,6 +38,7 @@ set(TEST_SOURCES
     test_usac_enc.cpp
     test_encoder_loudness.cpp
     test_usac_enc_sbr.cpp
+    test_usac_rap.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

@@ -614,6 +614,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     return DefineClass(
         env, "AacEncoder",
         {InstanceMethod("encode", &Encoder::Encode), InstanceMethod("flush", &Encoder::Flush),
+         InstanceMethod("requestIndependentFrame", &Encoder::RequestIndependentFrame),
+         InstanceAccessor("lastFrame", &Encoder::LastFrame, nullptr),
          InstanceAccessor("sampleRate", &Encoder::SampleRate, nullptr),
          InstanceAccessor("channels", &Encoder::Channels, nullptr),
          InstanceAccessor("frameSize", &Encoder::FrameSize, nullptr),
@@ -773,13 +775,15 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       return false;
     }
     /* The USAC options: noise filling, the pre-roll, the independent
-     * frame interval, the stream id, and SBR and MPS 212 as on, off or
-     * auto.  A field left out keeps the encoder's default. */
+     * frame schedule (in frames, milliseconds or samples, with its
+     * distance bound), the segment size ceiling, the stream id, and SBR
+     * and MPS 212 as on, off or auto.  A field left out keeps the
+     * encoder's default. */
     bool have_usac = false;
     AacUsacEncoderOptions usac_opt;
+    memset(&usac_opt, 0, sizeof(usac_opt));
     usac_opt.noise_filling = -1;
     usac_opt.preroll = -1;
-    usac_opt.independent_interval_frames = 0;
     usac_opt.stream_id = -1;
     usac_opt.sbr = -1;
     usac_opt.mps212 = -1;
@@ -803,11 +807,25 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       if (!option_number(env, u, "independentIntervalFrames",
                          "AacEncoder: usac.independentIntervalFrames",
                          &usac_opt.independent_interval_frames) ||
+          !option_number(env, u, "independentIntervalMs", "AacEncoder: usac.independentIntervalMs",
+                         &usac_opt.independent_interval_ms) ||
+          !option_number(env, u, "independentIntervalSamples",
+                         "AacEncoder: usac.independentIntervalSamples",
+                         &usac_opt.independent_interval_samples) ||
+          !option_number(env, u, "independentMaxDistanceFrames",
+                         "AacEncoder: usac.independentMaxDistanceFrames",
+                         &usac_opt.independent_max_distance_frames) ||
+          !option_number(env, u, "segmentMaxBytes", "AacEncoder: usac.segmentMaxBytes",
+                         &usac_opt.segment_max_bytes) ||
           !option_number(env, u, "streamId", "AacEncoder: usac.streamId", &usac_opt.stream_id)) {
         return false;
       }
-      if (usac_opt.independent_interval_frames < 0) {
-        throw_error(env, "AacEncoder: usac.independentIntervalFrames must be 0 or more");
+      if (usac_opt.independent_interval_frames < 0 || usac_opt.independent_interval_ms < 0 ||
+          usac_opt.independent_interval_samples < 0 ||
+          usac_opt.independent_max_distance_frames < 0 || usac_opt.segment_max_bytes < 0) {
+        throw_error(env, "AacEncoder: usac.independentIntervalFrames, independentIntervalMs, "
+                         "independentIntervalSamples, independentMaxDistanceFrames and "
+                         "segmentMaxBytes must be 0 or more");
         return false;
       }
       if (usac_opt.stream_id < -1 || usac_opt.stream_id > 65535) {
@@ -931,6 +949,36 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     return Napi::Buffer<uint8_t>::Copy(env, result.data(), result.size());
   }
 
+  /* 'xhe' only: the next frame is independent and opens the pre-roll
+   * of the immediate playout frame that follows it. */
+  Napi::Value RequestIndependentFrame(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    if (!handle_) {
+      return throw_error(env, "AacEncoder: not initialized");
+    }
+    const int ret = aac_encoder_request_independent_frame(handle_);
+    if (ret < 0) {
+      return throw_error(env, std::string("AacEncoder.requestIndependentFrame: ") + error_name(ret));
+    }
+    return env.Undefined();
+  }
+  /* 'xhe' only: the last frame produced by encode or flush, for a muxer
+   * (a flush of a stream transport reports its last frame); null before
+   * the first frame and for the other profiles. */
+  Napi::Value LastFrame(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    AacEncoderFrameInfo frame;
+    if (!handle_ || aac_encoder_last_frame_info(handle_, &frame) != AAC_OK) {
+      return env.Null();
+    }
+    Napi::Object o = Napi::Object::New(env);
+    o.Set("frameIndex", Napi::Number::New(env, frame.frame_index));
+    o.Set("independent", Napi::Boolean::New(env, frame.independent != 0));
+    o.Set("prerollBytes", Napi::Number::New(env, frame.preroll_bytes));
+    o.Set("bytes", Napi::Number::New(env, frame.bytes));
+    o.Set("samplePosition", Napi::Number::New(env, static_cast<double>(frame.sample_position)));
+    return o;
+  }
   Napi::Value SampleRate(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), sample_rate_);
   }

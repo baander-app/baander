@@ -67,7 +67,11 @@ static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int 
   if (frame_len < 0) {
     return frame_len;
   }
-  return aac_encoder_transport_wrap(s, s->transport, frame_len, out, out_size);
+  const int len = aac_encoder_transport_wrap(s, s->transport, frame_len, out, out_size);
+  if (len > 0 && s->usac) {
+    s->usac->last_frame_bytes = len; /* the frame as the caller receives it */
+  }
+  return len;
 }
 
 int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, uint8_t* out,
@@ -165,8 +169,40 @@ int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* opti
   if (options && options->mps212 > 0 && options->sbr == 0) {
     return AAC_ERR_INVALID_ARG;
   }
-  aac_usac_enc_set_options(s->usac, options, s->sample_rate);
+  aac_usac_enc_set_options(s->usac, options);
   aac_encoder_state_reset(s);
+  return AAC_OK;
+}
+
+int aac_encoder_request_independent_frame(AacEncoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  aac_usac_enc_request_independent(s->usac);
+  return AAC_OK;
+}
+
+int aac_encoder_last_frame_info(AacEncoderHandle ctx, AacEncoderFrameInfo* info) {
+  if (!ctx || !info) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  const AacUsacEncoder* u = s->usac;
+  if (!u->has_last_frame) {
+    return AAC_ERR_STATE;
+  }
+  info->frame_index = u->last_frame_index;
+  info->independent = u->last_indep;
+  info->preroll_bytes = u->last_preroll_bytes;
+  info->bytes = u->last_frame_bytes;
+  info->sample_position = (int64_t)u->last_frame_index * s->frame_size - s->delay;
   return AAC_OK;
 }
 

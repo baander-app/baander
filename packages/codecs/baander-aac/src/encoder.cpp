@@ -1513,7 +1513,6 @@ void apply_usac_tools(AacEncoderState* s) {
     sbr = 0;
     mps = 0;
   }
-  aac_usac_enc_set_core_rate(u, s->sample_rate);
   apply_frame_length(s);
   aac_encoder_state_configure(s);
 }
@@ -1575,7 +1574,7 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
       aac_encoder_state_destroy(s);
       return nullptr;
     }
-    aac_usac_enc_set_options(s->usac, nullptr, s->sample_rate);
+    aac_usac_enc_set_options(s->usac, nullptr);
   }
   apply_frame_length(s);
   aac_encoder_state_configure(s);
@@ -2025,6 +2024,15 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
     default:
       improve = quality_factor(s->quality);
       break;
+  }
+  if (s->usac) {
+    /* xHE-AAC under a segment size ceiling: the frame's share of what
+     * the segment has left caps the budget in every mode. */
+    const int ceiling = aac_usac_enc_frame_bit_ceiling(s);
+    if (ceiling > 0) {
+      max_bits = std::min(max_bits, ceiling);
+      target = std::min(target, max_bits);
+    }
   }
   const int bits = rate_control(s, target, improve);
   if (s->afterburner && !s->usac) {

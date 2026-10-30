@@ -204,10 +204,30 @@ typedef struct AacUsacEncoderOptions_ {
   /* The audio pre-roll extension element at every independent frame,
    * which lets a decoder start at that frame (default on). */
   int preroll;
-  /* Frames from one independent frame (usacIndependencyFlag set, the
-   * arithmetic coder reset) to the next; 0 keeps the default of one
-   * second. */
+  /* The independent frame schedule: the distance from one immediate
+   * playout frame (usacIndependencyFlag set, the arithmetic coder reset,
+   * the audio pre-roll carried) to the next, as a count of frames, of
+   * milliseconds or of output samples.  The first one set wins in the
+   * order samples, milliseconds, frames; a value in samples or
+   * milliseconds is rounded up to whole frames of the output rate (2048
+   * samples per frame while SBR runs).  All 0 keeps the default of one
+   * second.  The frame before each immediate playout frame (two before
+   * it with SBR) is independent as well: it opens the pre-roll. */
   int independent_interval_frames;
+  int independent_interval_ms;
+  int independent_interval_samples;
+  /* An upper bound in frames on the distance between independent
+   * frames, whatever the interval and the on-demand requests say; 0 for
+   * none (default). */
+  int independent_max_distance_frames;
+  /* A ceiling in bytes on each segment of access units from one
+   * immediate playout frame to the next (the pre-roll included), for a
+   * muxer that cuts the stream there; 0 for none (default).  The rate
+   * loop caps every frame at the segment's remaining budget spread over
+   * its remaining frames, so the quality falls while the ceiling binds;
+   * a ceiling below what the frames' side information and the pre-roll
+   * need cannot be honoured. */
+  int segment_max_bytes;
   /* The stream identifier of the configuration (0..65535), or -1 for
    * none (default). */
   int stream_id;
@@ -226,8 +246,38 @@ typedef struct AacUsacEncoderOptions_ {
 /* Applies the options before the first frame (AAC_ERR_STATE after it);
  * AAC_ERR_UNSUPPORTED for another object type, AAC_ERR_INVALID_ARG for
  * `mps212` on with `sbr` off (the options then stay as they were).  Any
- * other field outside its range takes the default. */
+ * other field outside its range takes the default; the schedule and
+ * segment fields take 0 for none. */
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
+
+/* Asks for an independent frame on demand, at any point of the stream:
+ * the next encoded frame is independent and opens the pre-roll of the
+ * immediate playout frame that follows it (one frame later for the
+ * plain core, two with SBR; the same frame when the pre-roll is off),
+ * unless one is already due sooner.  The interval count restarts from
+ * that immediate playout frame.  AAC_ERR_UNSUPPORTED for another object
+ * type. */
+int aac_encoder_request_independent_frame(AacEncoderHandle ctx);
+
+/* What a muxer needs to know about the last frame aac_encoder_encode or
+ * aac_encoder_flush produced. */
+typedef struct AacEncoderFrameInfo_ {
+  int frame_index;     /* frames since the stream's start, from 0 */
+  int independent;     /* usacIndependencyFlag: a decoder may start here */
+  int preroll_bytes;   /* bytes of the audio pre-roll extension, 0 without one */
+  int bytes;           /* bytes of the frame as produced: the access unit or the transport frame */
+  /* The position of the frame's first decoded sample on the input's
+   * timeline, in output samples: the frame index times the frame size
+   * less the encoder delay, so the first frames are negative (they
+   * decode to the delay's priming). */
+  int64_t sample_position;
+} AacEncoderFrameInfo;
+/* AAC_ERR_STATE before the first frame; the last frame of a flushed
+ * stream stays readable until the next stream's first frame.  A frame
+ * with the pre-roll is where a segment starts (every independent frame
+ * when the pre-roll is off).  AAC_ERR_UNSUPPORTED for an object type
+ * other than AAC_AOT_USAC. */
+int aac_encoder_last_frame_info(AacEncoderHandle ctx, AacEncoderFrameInfo* info);
 
 /* ── Loudness measurement ────────────────────────────────────────── */
 

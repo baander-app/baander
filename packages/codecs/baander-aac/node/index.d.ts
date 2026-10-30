@@ -217,8 +217,30 @@ export interface AacUsacOptions {
    * a decoder start there. Default true.
    */
   preroll?: boolean;
-  /** Frames between independent frames; 0 keeps the default of one second. */
+  /**
+   * The independent frame schedule: the distance from one immediate
+   * playout frame (independent, with the audio pre-roll) to the next, in
+   * frames, milliseconds or output samples. The first one given wins in
+   * the order samples, milliseconds, frames; samples and milliseconds
+   * are rounded up to whole frames (2048 samples while SBR runs). None
+   * keeps the default of one second. The frame before each (two before
+   * it with SBR) is independent too and opens the pre-roll.
+   */
   independentIntervalFrames?: number;
+  independentIntervalMs?: number;
+  independentIntervalSamples?: number;
+  /**
+   * An upper bound in frames on the distance between independent frames,
+   * whatever the interval and `requestIndependentFrame()` say. Default none.
+   */
+  independentMaxDistanceFrames?: number;
+  /**
+   * A ceiling in bytes on each segment of access units from one immediate
+   * playout frame to the next, the pre-roll included, for a muxer that
+   * cuts there; the rate loop caps every frame at the segment's remaining
+   * budget, so the quality falls while the ceiling binds. Default none.
+   */
+  segmentMaxBytes?: number;
   /** The stream identifier written into the configuration, 0..65535. Default none. */
   streamId?: number;
   /** Enhanced SBR at 2:1; 'auto' (default) uses it below 64 kbit/s per channel. */
@@ -264,6 +286,25 @@ export interface AacLoudnessMeasurement {
   rangeLu: number | null;
   maxMomentaryLkfs: number | null;
   maxShortTermLkfs: number | null;
+}
+
+/** What a muxer needs to know about the last frame an xHE-AAC encoder produced. */
+export interface AacEncoderFrameInfo {
+  /** Frames since the stream's start, from 0. */
+  frameIndex: number;
+  /** usacIndependencyFlag: a decoder may start here. */
+  independent: boolean;
+  /** Bytes of the audio pre-roll extension; a frame with one opens a segment. */
+  prerollBytes: number;
+  /** Bytes of the frame as produced: the access unit, or the transport frame. */
+  bytes: number;
+  /**
+   * The position of the frame's first decoded sample on the input's
+   * timeline, in output samples: the frame index times `frameSize` less
+   * `delay`, so the first frames are negative (they decode to the
+   * delay's priming).
+   */
+  samplePosition: number;
 }
 
 export interface AacLdSbrOptions {
@@ -343,6 +384,23 @@ export declare class AacEncoder {
    * returns the final frames. The encoder can then start a new stream.
    */
   flush(): Buffer;
+  /**
+   * 'xhe' only: asks for an independent frame on demand, at any point of
+   * the stream. The next frame is independent and opens the pre-roll of
+   * the immediate playout frame that follows it (one frame later for the
+   * plain core, two with SBR; the same frame without the pre-roll),
+   * unless one is already due sooner; the interval counts from there.
+   * Throws for the other profiles.
+   */
+  requestIndependentFrame(): void;
+  /**
+   * 'xhe' only: the last frame `encode` or `flush` produced, for a muxer
+   * that cuts segments at the frames with a pre-roll (a `flush` of a
+   * stream transport reports its last frame). Null before the first
+   * frame and for the other profiles; the last frame of a flushed stream
+   * stays until the next stream begins.
+   */
+  readonly lastFrame: AacEncoderFrameInfo | null;
   /** The AudioSpecificConfig, for an MP4 esds box or an out-of-band StreamMuxConfig. */
   readonly config: Buffer;
   /**

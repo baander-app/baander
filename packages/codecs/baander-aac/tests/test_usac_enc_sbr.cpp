@@ -44,6 +44,7 @@ constexpr int kFrame = 2 * kCore; /* output samples per frame with SBR */
  * bitrate rule. */
 AacUsacEncoderOptions options(int sbr, int mps) {
   AacUsacEncoderOptions o;
+  memset(&o, 0, sizeof(o));
   o.noise_filling = 1;
   o.preroll = 1;
   o.independent_interval_frames = 0;

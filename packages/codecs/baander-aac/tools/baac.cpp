@@ -10,7 +10,9 @@
  * mode: cbr (default), abr, cvbr, tvbr.  The xhe options: --loudness
  * measures the whole input first and writes the loudness info set into
  * the stream; --sbr and --mps (on, off, auto), --no-noise-filling,
- * --preroll off and --stream-id N set the USAC encoder options.  The
+ * --preroll off and --stream-id N set the USAC encoder options;
+ * --rap-ms N, --rap-samples N and --rap-max-frames N set the independent
+ * frame schedule and --segment-max-bytes N the segment size ceiling.  The
  * decoder follows the ADTS headers, so rate and channels only set the
  * output layout (0 keeps the stream's channels).  loudness prints the
  * meter's figures of a WAV file (PCM or float) or of raw float input.
@@ -63,6 +65,8 @@ static int usage() {
           "info set)\n"
           "                      --sbr on|off|auto  --mps on|off|auto  --no-noise-filling\n"
           "                      --preroll off  --stream-id N\n"
+          "                      --rap-ms N | --rap-samples N  (the independent frame interval)\n"
+          "                      --rap-max-frames N  --segment-max-bytes N\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
           "       baac bench [--seconds N] [--dump DIR] [--only NAME]\n");
@@ -234,8 +238,19 @@ static int loudness(int argc, char** argv) {
 struct EncodeOptions {
   bool loudness = false;
   bool usac = false; /* any USAC option given */
-  AacUsacEncoderOptions opt{-1, -1, 0, -1, -1, -1};
+  AacUsacEncoderOptions opt{-1, -1, 0, 0, 0, 0, 0, -1, -1, -1};
 };
+
+/* A positive integer option value; false with a message otherwise. */
+static bool positive_option(const char* name, const char* value, int* out) {
+  const long v = atol(value);
+  if (v <= 0 || v > 1000000000L) {
+    fprintf(stderr, "baac: %s takes a positive count\n", name);
+    return false;
+  }
+  *out = (int)v;
+  return true;
+}
 
 static bool on_off_auto(const char* value, int* out) {
   const std::string v = value;
@@ -270,6 +285,31 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     } else if (arg == "--preroll" && has_value && strcmp(argv[i + 1], "off") == 0) {
       o->usac = true;
       o->opt.preroll = 0;
+      i++;
+    } else if (arg == "--rap-ms" && has_value) {
+      if (!positive_option("--rap-ms", argv[i + 1], &o->opt.independent_interval_ms)) {
+        return false;
+      }
+      o->usac = true;
+      i++;
+    } else if (arg == "--rap-samples" && has_value) {
+      if (!positive_option("--rap-samples", argv[i + 1], &o->opt.independent_interval_samples)) {
+        return false;
+      }
+      o->usac = true;
+      i++;
+    } else if (arg == "--rap-max-frames" && has_value) {
+      if (!positive_option("--rap-max-frames", argv[i + 1],
+                           &o->opt.independent_max_distance_frames)) {
+        return false;
+      }
+      o->usac = true;
+      i++;
+    } else if (arg == "--segment-max-bytes" && has_value) {
+      if (!positive_option("--segment-max-bytes", argv[i + 1], &o->opt.segment_max_bytes)) {
+        return false;
+      }
+      o->usac = true;
       i++;
     } else if (arg == "--stream-id" && has_value) {
       const int id = atoi(argv[i + 1]);
