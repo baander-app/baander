@@ -1,3 +1,5 @@
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback, useEffect, useState } from 'react'
 import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqProfilesStore, type EqProfile, type EqProfileIcon } from '../stores/eq-profiles-store'
@@ -22,8 +24,8 @@ const ICON_LABEL: Record<EqProfileIcon, string> = {
   custom: '...',
 }
 
-async function apiListProfiles() {
-  const res = await AXIOS_INSTANCE.get('/api/user/eq-profiles/')
+async function apiListProfiles(signal?: AbortSignal) {
+  const res = await AXIOS_INSTANCE.get('/api/user/eq-profiles/', { signal })
   return (res.data?.data?.profiles ?? res.data?.profiles ?? []) as EqProfile[]
 }
 
@@ -167,7 +169,7 @@ const DefaultLabel = styled.span`
 export function ProfileSelector() {
   const profiles = useEqProfilesStore((s) => s.profiles)
   const activeProfileId = useEqProfilesStore((s) => s.activeProfileId)
-  const loaded = useEqProfilesStore((s) => s.loaded)
+  const coordinator = useLiveCoordinator()
   const setProfiles = useEqProfilesStore((s) => s.setProfiles)
   const addProfile = useEqProfilesStore((s) => s.addProfile)
   const removeProfile = useEqProfilesStore((s) => s.removeProfile)
@@ -179,37 +181,48 @@ export function ProfileSelector() {
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState<EqProfileIcon>('custom')
 
-  // Load profiles on mount
   useEffect(() => {
-    if (loaded) return
-    let cancelled = false
-    apiListProfiles()
-      .then((list) => {
-        if (cancelled) return
+    const controller = new AbortController()
+    const read = async (signal: AbortSignal) => {
+      const owner = captureOwnership()
+      try {
+        const list = await apiListProfiles(signal)
+        if (signal.aborted || controller.signal.aborted || !isCurrentOwnership(owner)) return
+        const firstLoad = !useEqProfilesStore.getState().loaded
         setProfiles(list)
-        // Auto-activate default
-        const def = list.find((p) => p.isDefault)
-        if (def) setActiveProfileId(def.publicId)
-      })
-      .catch((err) => {
-        if (cancelled) return
-        logger.warn('Failed to load EQ profiles:', err)
+        if (firstLoad && !useEqProfilesStore.getState().activeProfileId) {
+          const def = list.find(profile => profile.isDefault)
+          if (def) setActiveProfileId(def.publicId)
+        }
+      } catch (error) {
+        if (signal.aborted || controller.signal.aborted || !isCurrentOwnership(owner)) return
+        logger.warn('Failed to load EQ profiles:', error)
         setLoaded(true)
-      })
-    return () => { cancelled = true }
-  }, [loaded, setProfiles, setActiveProfileId, setLoaded])
+        if (coordinator) throw error
+      }
+    }
+    const unregister = coordinator?.registerAdapter({
+      id: 'eq-profiles', family: 'preferences', isActive: () => true, read,
+    })
+    if (!coordinator) read(controller.signal).catch(() => undefined)
+    return () => { controller.abort(); unregister?.() }
+  }, [coordinator, setProfiles, setActiveProfileId, setLoaded])
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       const profile = await apiCreateProfile({
         name: newName.trim(),
         icon: newIcon,
       })
+      if (!isCurrentOwnership(owner)) return
       addProfile(profile)
       setShowCreate(false)
       setNewName('')
     } catch {
+      if (!isCurrentOwnership(owner)) return
       // Offline fallback: create locally
       toast.warning('Could not reach server — profile saved locally.')
       const local: EqProfile = {
@@ -224,19 +237,27 @@ export function ProfileSelector() {
       addProfile(local)
       setShowCreate(false)
       setNewName('')
+    } finally {
+      release?.()
     }
-  }, [newName, newIcon, profiles.length, addProfile])
+  }, [newName, newIcon, profiles.length, addProfile, coordinator])
 
   const handleSave = useCallback(async (id: string) => {
     const payload = captureCurrentPayload()
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       const updated = await apiUpdateProfile(id, { payload })
+      if (!isCurrentOwnership(owner)) return
       updateProfile(id, { payload: updated.payload, version: updated.version })
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.warning('Could not reach server — profile saved locally.')
       updateProfile(id, { payload })
+    } finally {
+      release?.()
     }
-  }, [updateProfile])
+  }, [updateProfile, coordinator])
 
   const handleActivate = useCallback(async (id: string) => {
     setActiveProfileId(id)
@@ -244,22 +265,33 @@ export function ProfileSelector() {
     if (profile?.payload && Object.keys(profile.payload).length > 0) {
       applyProfilePayload(profile.payload)
     }
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       await apiActivateProfile(id)
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.warning('Could not reach server — profile activated locally only.')
+    } finally {
+      release?.()
     }
-  }, [setActiveProfileId])
+  }, [setActiveProfileId, coordinator])
 
   const handleDelete = useCallback(async (id: string) => {
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       await apiDeleteProfile(id)
+      if (!isCurrentOwnership(owner)) return
       removeProfile(id)
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.warning('Could not reach server — profile removed locally only.')
       removeProfile(id)
+    } finally {
+      release?.()
     }
-  }, [removeProfile])
+  }, [removeProfile, coordinator])
 
   return (
     <Card>

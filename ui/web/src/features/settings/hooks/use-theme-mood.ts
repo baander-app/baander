@@ -1,3 +1,5 @@
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback, useSyncExternalStore } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
@@ -39,6 +41,7 @@ function getServerSnapshot(): ThemeMood {
 }
 
 export function useThemeMood() {
+  const coordinator = useLiveCoordinator()
   const mood = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const setMood = useCallback(async (newMood: ThemeMood) => {
@@ -49,11 +52,16 @@ export function useThemeMood() {
     window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }))
 
     // Persist to backend (fire-and-forget, non-blocking)
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       await AXIOS_INSTANCE.put('/api/user/theme-mood/', { mood: newMood })
     } catch {
-      // Non-critical — local state is already applied
+      // The local choice remains available offline.
+    } finally {
+      release?.()
     }
+    if (!isCurrentOwnership(owner)) return
 
     // Persist to Electron config-store (if running in Electron)
     try {
@@ -62,7 +70,7 @@ export function useThemeMood() {
     } catch {
       // Non-critical — web-only environment
     }
-  }, [])
+  }, [coordinator])
 
   const applyOnMount = useCallback(() => {
     applyMood(mood)

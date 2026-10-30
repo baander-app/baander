@@ -32,6 +32,6 @@ export const playlistLiveCoverage = [
       "src/features/playlist/pages/PlaylistsPage.tsx#useGetPlaylistIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

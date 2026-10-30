@@ -1,8 +1,11 @@
+import { useLiveCoordinator } from '@/shared/live/context'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   getGetUserSettingsIndexQueryKey,
+  deleteUserSettingsReset,
   useDeleteUserSettingsReset,
   useGetUserSettingsIndex,
+  putUserSettingsSet,
   usePutUserSettingsSet,
   type GetUserSettingsIndex200,
   type UserSettingResource,
@@ -22,6 +25,7 @@ export function useUserSetting(key: string) {
 /** Stores the setting the server answered with, then refetches the user's settings. */
 function useStoreUserSetting() {
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
   const queryKey = getGetUserSettingsIndexQueryKey()
 
   return (saved: UserSettingResource | undefined) => {
@@ -32,6 +36,7 @@ function useStoreUserSetting() {
       })
     }
 
+    if (coordinator) return
     return queryClient.invalidateQueries({ queryKey })
   }
 }
@@ -39,9 +44,15 @@ function useStoreUserSetting() {
 /** Saves the user's explicit choice for one setting. */
 export function useSetUserSetting() {
   const store = useStoreUserSetting()
+  const coordinator = useLiveCoordinator()
 
   return usePutUserSettingsSet({
     mutation: {
+      mutationFn: async ({ key, data }) => {
+        const release = coordinator?.beginMutation(['preferences'])
+        try { return await putUserSettingsSet(key, data) }
+        finally { release?.() }
+      },
       onSuccess: (response) => store(response.data),
     },
   })
@@ -50,9 +61,15 @@ export function useSetUserSetting() {
 /** Removes the user's choice for one setting so its default applies again. */
 export function useResetUserSetting() {
   const store = useStoreUserSetting()
+  const coordinator = useLiveCoordinator()
 
   return useDeleteUserSettingsReset({
     mutation: {
+      mutationFn: async ({ key }) => {
+        const release = coordinator?.beginMutation(['preferences'])
+        try { return await deleteUserSettingsReset(key) }
+        finally { release?.() }
+      },
       onSuccess: (response) => store(response.data),
     },
   })

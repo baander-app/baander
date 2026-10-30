@@ -1,3 +1,5 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { usePostPlaylistAddSong, usePostPlaylistStore } from '@/features/playlist/hooks/use-playlist-mutations'
 import { useState } from 'react'
 import styled from 'styled-components'
 import {
@@ -11,8 +13,8 @@ import {
 import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { useGetPlaylistIndex, usePostPlaylistAddSong } from '@/shared/api-client/gen/endpoints'
-import { usePostPlaylistStore } from '@/shared/api-client/gen/endpoints'
+import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 
@@ -94,17 +96,21 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
   const regularPlaylists = filtered.filter((p) => !p.isSmart)
 
   const handleAdd = async (playlistPublicId: string) => {
+    const owner = captureOwnership()
     try {
       await addSong.mutateAsync({ publicId: playlistPublicId, data: { songId } })
+      if (!isCurrentOwnership(owner)) return
       toast.success('Added to playlist')
       onOpenChange(false)
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.error('Failed to add song to playlist')
     }
   }
 
   const handleCreateAndAdd = async () => {
     if (!newName.trim()) return
+    const owner = captureOwnership()
     setCreating(true)
     try {
       const result = await createPlaylist.mutateAsync({
@@ -116,17 +122,20 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
           smartRules: [],
         },
       })
+      if (!isCurrentOwnership(owner)) return
       const newPlaylistId = result.publicId
       if (newPlaylistId) {
         await addSong.mutateAsync({ publicId: newPlaylistId, data: { songId } })
+        if (!isCurrentOwnership(owner)) return
         toast.success(`Created "${newName.trim()}" and added song`)
       }
       setNewName('')
       onOpenChange(false)
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.error('Failed to create playlist')
     } finally {
-      setCreating(false)
+      if (isCurrentOwnership(owner)) setCreating(false)
     }
   }
 

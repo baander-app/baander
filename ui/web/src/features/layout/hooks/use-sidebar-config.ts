@@ -1,72 +1,53 @@
-import { useEffect, useRef } from 'react'
+import { replaceEqualDeep } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
+import { useEffect } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useSidebarStore } from '../stores/sidebar-store'
 import { useMediaModeStore } from '../stores/media-mode-store'
 import { ALL_SCHEMAS } from '../schemas'
 import type { MediaSidebarSchema } from '../schemas/types'
 
-/**
- * Fetches per-media-type sidebar config from the API.
- *
- * Loading strategy:
- * - If the schema for the active media is already cached (non-empty sections),
- *   render immediately without showing skeletons — the API fetch runs in the
- *   background and silently updates when it returns.
- * - If no cached data exists (first load of a media type), show skeletons
- *   until the fetch completes or falls back to static defaults.
- */
 export function useSidebarConfig() {
-  const setLoading = useSidebarStore((s) => s.setLoading)
-  const setError = useSidebarStore((s) => s.setError)
-  const setSchema = useSidebarStore((s) => s.setSchema)
-  const schemas = useSidebarStore((s) => s.schemas)
-  const activeMedia = useMediaModeStore((s) => s.activeMedia)
-
-  // Track which media types have been fetched at least once
-  const fetchedMedia = useRef<Set<string>>(new Set())
-
-  // Determine if we have cached content for the active media
-  const activeSchema = schemas[activeMedia]
-  const hasCachedContent = activeSchema.sections.length > 0
-
-  // Show loading state only when we have nothing cached
-  const isLoading = useSidebarStore((s) => s.isLoading)
-  const shouldShowLoading = isLoading && !hasCachedContent
+  const coordinator = useLiveCoordinator()
+  const activeMedia = useMediaModeStore(s => s.activeMedia)
+  const hasCachedContent = useSidebarStore(s => s.schemas[activeMedia].sections.length > 0)
+  const isLoading = useSidebarStore(s => s.isLoading)
 
   useEffect(() => {
-    let cancelled = false
-
-    async function fetchConfig() {
-      // If schema is already cached, skip the loading skeleton — fetch in background
-      if (hasCachedContent) {
-        setLoading(false)
-      } else {
-        setLoading(true)
-      }
-      setError(null)
-
+    const controller = new AbortController()
+    const read = async (signal: AbortSignal) => {
+      const owner = captureOwnership()
+      const current = () => !signal.aborted && !controller.signal.aborted && isCurrentOwnership(owner)
+      const store = useSidebarStore.getState()
+      store.setLoading(store.schemas[activeMedia].sections.length === 0)
       try {
-        const res = await AXIOS_INSTANCE.get(`/api/user/sidebar-config/${activeMedia}`)
-        if (!cancelled && res.data?.sections?.length > 0) {
-          setSchema(activeMedia, res.data as MediaSidebarSchema)
-        } else if (!cancelled) {
-          setSchema(activeMedia, ALL_SCHEMAS[activeMedia])
+        const res = await AXIOS_INSTANCE.get(`/api/user/sidebar-config/${activeMedia}`, { signal })
+        if (!current()) return
+        store.setError(null)
+        const next = res.data?.sections?.length > 0 ? res.data as MediaSidebarSchema : ALL_SCHEMAS[activeMedia]
+        const currentSchema = useSidebarStore.getState().schemas[activeMedia]
+        const shared = replaceEqualDeep(currentSchema, next)
+        if (shared !== currentSchema) store.setSchema(activeMedia, shared)
+      } catch (error) {
+        if (!current()) return
+        if (isAxiosError(error) && [403, 404].includes(error.response?.status ?? 0)) {
+          store.setError('Sidebar access unavailable')
+          store.setSchema(activeMedia, ALL_SCHEMAS[activeMedia])
         }
-      } catch {
-        if (!cancelled) {
-          setSchema(activeMedia, ALL_SCHEMAS[activeMedia])
-        }
+        if (!store.schemas[activeMedia].sections.length) store.setSchema(activeMedia, ALL_SCHEMAS[activeMedia])
+        if (coordinator) throw error
       } finally {
-        if (!cancelled) {
-          fetchedMedia.current.add(activeMedia)
-          setLoading(false)
-        }
+        if (current()) store.setLoading(false)
       }
     }
+    const unregister = coordinator?.registerAdapter({
+      id: `sidebar:${activeMedia}`, family: 'preferences', isActive: () => true, read,
+    })
+    if (!coordinator) read(controller.signal).catch(() => undefined)
+    return () => { controller.abort(); unregister?.() }
+  }, [activeMedia, coordinator])
 
-    fetchConfig()
-    return () => { cancelled = true }
-  }, [activeMedia, hasCachedContent, setSchema, setLoading, setError])
-
-  return { isLoading: shouldShowLoading }
+  return { isLoading: isLoading && !hasCachedContent }
 }

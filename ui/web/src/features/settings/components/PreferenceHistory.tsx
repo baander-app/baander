@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import styled from 'styled-components'
 import { Button } from '@/shared/components/ui/button'
@@ -68,7 +69,7 @@ const SmallSpinner = styled(Loader2)`
 `
 
 interface PreferenceHistoryProps {
-  fetchHistory: () => Promise<PreferenceVersion[]>
+  fetchHistory: (signal?: AbortSignal) => Promise<PreferenceVersion[]>
   onRollback: (version: number) => Promise<boolean>
   currentVersion: number
   label: string
@@ -80,14 +81,15 @@ export function PreferenceHistory({
   currentVersion,
   label,
 }: PreferenceHistoryProps) {
+  const [opened, setOpened] = useState(false)
   const {
     data: history = [],
     isLoading,
     refetch,
   } = useQuery({
     queryKey: ['preference-history', label],
-    queryFn: fetchHistory,
-    enabled: false,
+    queryFn: ({ signal }) => fetchHistory(signal),
+    enabled: opened,
   })
 
   if (history.length === 0) {
@@ -95,7 +97,7 @@ export function PreferenceHistory({
       <Button
         size="sm"
         variant="ghost"
-        onClick={() => refetch()}
+        onClick={() => { if (!opened) setOpened(true); else refetch().catch(() => undefined) }}
         disabled={isLoading}
       >
         {isLoading ? (

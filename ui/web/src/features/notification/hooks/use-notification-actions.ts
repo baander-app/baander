@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { notificationApi, type NotificationListResponse } from '../api/notification-api'
 import { useNotificationStore } from '../stores/notification-store'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { notificationsKey, unreadCountKey } from './use-notifications'
 
 export function useNotificationActions() {
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
 
   const cancelReads = () => Promise.all([
     queryClient.cancelQueries({ queryKey: notificationsKey }),
@@ -25,29 +28,36 @@ export function useNotificationActions() {
     store.setUnreadCount(count)
   }
   const invalidate = () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: notificationsKey }),
-    queryClient.invalidateQueries({ queryKey: unreadCountKey }),
-    queryClient.invalidateQueries({ queryKey: ['admin-notifications'] }),
-    queryClient.invalidateQueries({ queryKey: ['admin-alerts'] }),
-  ])
+      queryClient.invalidateQueries({ queryKey: notificationsKey }),
+      queryClient.invalidateQueries({ queryKey: unreadCountKey }),
+      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-alerts'] }),
+    ])
 
-  const markRead = useMutation({
-    mutationFn: (publicId: string) => notificationApi.markRead(publicId),
-    onMutate: cancelReads,
-    onSuccess: async (_, publicId) => {
+  const performRead = async (publicId?: string) => {
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['notifications', 'admin-alerts'])
+    try {
       await cancelReads()
-      updateRead(publicId)
-    },
-    onSettled: invalidate,
+      if (!isCurrentOwnership(owner)) return
+      const response = publicId === undefined
+        ? await notificationApi.markAllRead()
+        : await notificationApi.markRead(publicId)
+      if (!isCurrentOwnership(owner)) return response
+      await cancelReads()
+      if (isCurrentOwnership(owner)) updateRead(publicId)
+      return response
+    } finally {
+      release?.()
+    }
+  }
+  const markRead = useMutation({
+    mutationFn: (publicId: string) => performRead(publicId),
+    onSettled: () => { if (!coordinator) return invalidate() },
   })
   const markAllRead = useMutation({
-    mutationFn: () => notificationApi.markAllRead(),
-    onMutate: cancelReads,
-    onSuccess: async () => {
-      await cancelReads()
-      updateRead()
-    },
-    onSettled: invalidate,
+    mutationFn: () => performRead(),
+    onSettled: () => { if (!coordinator) return invalidate() },
   })
   return { markRead, markAllRead }
 }

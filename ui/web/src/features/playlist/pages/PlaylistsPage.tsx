@@ -1,12 +1,10 @@
-import { useState } from 'react'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { usePostPlaylistStore, useDeletePlaylistDestroy } from '@/features/playlist/hooks/use-playlist-mutations'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { interactiveTransition } from '@/shared/theme'
-import {
-  useGetPlaylistIndex,
-  usePostPlaylistStore,
-  useDeletePlaylistDestroy,
-} from '@/shared/api-client/gen/endpoints'
+import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
 import { SmartPlaylistEditor, type SmartRule } from '../components/SmartPlaylistEditor'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -197,7 +195,8 @@ export function PlaylistsPage() {
   const [newDescription, setNewDescription] = useState('')
   const [isSmart, setIsSmart] = useState(false)
   const [smartRules, setSmartRules] = useState<SmartRule[]>([])
-  const { data, isLoading, refetch } = useGetPlaylistIndex()
+  const draftRevision = useRef(0)
+  const { data, isLoading } = useGetPlaylistIndex()
   const createPlaylist = usePostPlaylistStore()
   const deletePlaylist = useDeletePlaylistDestroy()
 
@@ -207,6 +206,8 @@ export function PlaylistsPage() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return
+    const submittedRevision = draftRevision.current
+    const owner = captureOwnership()
     try {
       await createPlaylist.mutateAsync({
         data: {
@@ -220,24 +221,28 @@ export function PlaylistsPage() {
             : [],
         },
       })
+      if (!isCurrentOwnership(owner)) return
       toast.success(isSmart ? 'Smart playlist created' : 'Playlist created')
+      if (draftRevision.current !== submittedRevision) return
       setShowCreate(false)
       setNewName('')
       setNewDescription('')
       setIsSmart(false)
       setSmartRules([])
-      refetch()
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.error('Failed to create playlist')
     }
   }
 
   const handleDelete = async (publicId: string) => {
+    const owner = captureOwnership()
     try {
       await deletePlaylist.mutateAsync({ publicId })
+      if (!isCurrentOwnership(owner)) return
       toast.success('Playlist deleted')
-      refetch()
     } catch {
+      if (!isCurrentOwnership(owner)) return
       toast.error('Failed to delete playlist')
     }
   }
@@ -250,7 +255,10 @@ export function PlaylistsPage() {
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => {
+              draftRevision.current++
+              setShowCreate(!showCreate)
+            }}
             aria-label="Create playlist"
           >
             <Plus size={14} />
@@ -263,34 +271,47 @@ export function PlaylistsPage() {
               <SmallInput
                 placeholder="Playlist name"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={(e) => {
+                  draftRevision.current++
+                  setNewName(e.target.value)
+                }}
                 autoFocus
               />
               <SmallInput
                 placeholder="Description (optional)"
                 value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)}
+                onChange={(e) => {
+                  draftRevision.current++
+                  setNewDescription(e.target.value)
+                }}
               />
               <SmartToggleRow>
                 <SmartToggle
                   type="button"
                   $active={isSmart}
-                  onClick={() => setIsSmart(!isSmart)}
+                  onClick={() => {
+                    draftRevision.current++
+                    setIsSmart(!isSmart)
+                  }}
                 >
                   Smart playlist
                 </SmartToggle>
               </SmartToggleRow>
               {isSmart && (
-                <SmartPlaylistEditor rules={smartRules} onChange={setSmartRules} />
+                <SmartPlaylistEditor rules={smartRules} onChange={(rules) => {
+                  draftRevision.current++
+                  setSmartRules(rules)
+                }} />
               )}
               <ActionRow>
-                <Button size="xs" onClick={handleCreate} disabled={!newName.trim()}>
+                <Button size="xs" onClick={handleCreate} disabled={!newName.trim() || createPlaylist.isPending}>
                   Create
                 </Button>
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => {
+                    draftRevision.current++
                     setShowCreate(false)
                     setNewName('')
                     setNewDescription('')

@@ -1,13 +1,11 @@
+import { getGetPlaylistShowQueryKey } from '@/shared/api-client/gen/endpoints'
+import { isAxiosError } from 'axios'
+import { useDeletePlaylistRemoveCollaborator } from '@/features/playlist/hooks/use-playlist-mutations'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  useDeletePlaylistRemoveCollaborator,
-  useGetPlaylistShow,
-  type GetPlaylistShow200DataSongsItem,
-} from '@/shared/api-client/gen/endpoints'
-import { forgetPlaylistQueries } from '../lib/playlist-queries'
+import { useGetPlaylistShow, type GetPlaylistShow200DataSongsItem } from '@/shared/api-client/gen/endpoints'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
@@ -15,7 +13,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Badge } from '@/shared/components/ui/badge'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { ArrowLeft, LogOut, Play } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { formatDuration } from '@/shared/utils/format-duration'
 import { SharePlaylistDialog } from '../components/SharePlaylistDialog'
@@ -152,7 +150,7 @@ export function PlaylistDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data, isLoading } = useGetPlaylistShow(
+  const { data, isLoading, error } = useGetPlaylistShow(
     publicId!,
     { query: { enabled: !!publicId } }
   )
@@ -161,18 +159,18 @@ export function PlaylistDetailPage() {
   const viewerPublicId = useAuthStore((s) => s.user?.publicId)
   const leave = useDeletePlaylistRemoveCollaborator({
     mutation: {
-      onSuccess: async () => {
-        // The viewer can no longer read this playlist, so the show query is dropped, not refetched.
-        await forgetPlaylistQueries(queryClient, publicId!)
-        navigate('/music/playlists')
-      },
+      onSuccess: () => navigate('/music/playlists'),
       onError: (failure: unknown) => {
         toast.error(parseApiError(failure, 'You could not leave the playlist.').message)
       },
     },
   })
 
-  const playlist = data?.data
+  const denied = isAxiosError(error) && [403, 404].includes(error.response?.status ?? 0)
+  const playlist = denied ? undefined : data?.data
+  useEffect(() => {
+    if (denied && publicId) queryClient.setQueryData(getGetPlaylistShowQueryKey(publicId), {})
+  }, [denied, publicId, queryClient])
   const songs = playlist?.songs ?? EMPTY_SONGS
 
   const tracks: Track[] = useMemo(() =>

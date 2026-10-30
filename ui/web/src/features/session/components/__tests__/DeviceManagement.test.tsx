@@ -93,4 +93,43 @@ describe('DeviceManagement', () => {
     await waitFor(() => expect(mock.history.delete).toHaveLength(1))
     expect(mock.history.delete[0].url).toBe(`/api/devices/${publicId}`)
   })
+  it('retains a dirty name and exposes conflict or deletion from fresh server snapshots', async () => {
+    const user = userEvent.setup()
+    renderDevices({ data: [{ publicId: 'device', name: 'Office' }] })
+    await user.click(await screen.findByRole('button', { name: 'Rename Office' }))
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), 'My name')
+    client.setQueryData(getGetDeviceListQueryKey(), { data: [{ publicId: 'device', name: 'Remote' }] })
+    expect(await screen.findByText('This device changed elsewhere.')).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('My name')
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Keep my name' }))
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeEnabled()
+    client.setQueryData(getGetDeviceListQueryKey(), { data: [] })
+    expect(await screen.findByText(/This device is no longer available/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox')).toHaveValue('My name')
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeDisabled()
+  })
+
+  it('keeps newer input when a pending rename succeeds', async () => {
+    const user = userEvent.setup()
+    let finish: ((value: [number, unknown]) => void) | undefined
+    let savedName = 'Office'
+    mock.onGet('/api/devices').reply(() => [200, { data: [{ publicId: 'device', name: savedName }] }])
+    mock.onPut('/api/devices/device').reply(() => new Promise(resolve => { finish = resolve }))
+    render(<QueryClientProvider client={client}><DeviceManagement /></QueryClientProvider>)
+    await user.click(await screen.findByRole('button', { name: 'Rename Office' }))
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), 'Submitted')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+    await waitFor(() => expect(finish).toBeDefined())
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), 'Newer edit')
+    savedName = 'Submitted'
+    finish?.([200, { data: { message: 'Device renamed.' } }])
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Rename' })).toBeEnabled())
+    expect(screen.getByRole('textbox')).toHaveValue('Newer edit')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
 })

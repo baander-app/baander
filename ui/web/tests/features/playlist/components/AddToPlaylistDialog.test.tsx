@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
@@ -32,6 +34,11 @@ function mockMutation(overrides = {}) {
   }
 }
 
+function renderDialog(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
+
 describe('AddToPlaylistDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -45,7 +52,7 @@ describe('AddToPlaylistDialog', () => {
       isLoading: false,
     })
 
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open={true} onOpenChange={vi.fn()} songId="song_1" />
       </SCTypedThemeProvider>,
@@ -67,7 +74,7 @@ describe('AddToPlaylistDialog', () => {
       isLoading: false,
     })
 
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open={true} onOpenChange={vi.fn()} songId="song_1" />
       </SCTypedThemeProvider>,
@@ -85,7 +92,7 @@ describe('AddToPlaylistDialog', () => {
       isLoading: true,
     })
 
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open={true} onOpenChange={vi.fn()} songId="song_1" />
       </SCTypedThemeProvider>,
@@ -102,7 +109,7 @@ describe('AddToPlaylistDialog', () => {
       isLoading: false,
     })
 
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open={true} onOpenChange={vi.fn()} songId="song_1" />
       </SCTypedThemeProvider>,
@@ -117,7 +124,7 @@ describe('AddToPlaylistDialog', () => {
       isLoading: false,
     })
 
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open={true} onOpenChange={vi.fn()} songId="song_1" />
       </SCTypedThemeProvider>,
@@ -134,7 +141,7 @@ describe('AddToPlaylistDialog', () => {
     const onOpenChange = vi.fn()
     mockUsePostPlaylistStore.mockReturnValue(create)
     mockUsePostPlaylistAddSong.mockReturnValue(add)
-    render(
+    renderDialog(
       <SCTypedThemeProvider theme={testTheme}>
         <AddToPlaylistDialog open onOpenChange={onOpenChange} songId="song_1" />
       </SCTypedThemeProvider>,

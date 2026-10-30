@@ -1,3 +1,5 @@
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback, useSyncExternalStore } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
@@ -27,6 +29,7 @@ function getServerSnapshot(): AccentColor {
 }
 
 export function useAccentColor() {
+  const coordinator = useLiveCoordinator()
   const color = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const setColor = useCallback(async (newColor: AccentColor) => {
@@ -35,12 +38,17 @@ export function useAccentColor() {
 
     window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }))
 
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['preferences'])
     try {
       await AXIOS_INSTANCE.put('/api/user/accent-color/', { color: newColor })
     } catch {
-      // Non-critical
+      return
+    } finally {
+      release?.()
     }
-  }, [])
+    if (!isCurrentOwnership(owner)) return
+  }, [coordinator])
 
   const applyOnMount = useCallback(() => {
     applyColor(color)

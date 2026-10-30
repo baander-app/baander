@@ -29,6 +29,9 @@ export const equalizerLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/equalizer/components/ProfileSelector.tsx#AXIOS_INSTANCE.get:'/api/user/eq-profiles/'"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: ["tests/live-updates/preferences-consumers.test.tsx"],
+      endToEnd: 'pending',
+    },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

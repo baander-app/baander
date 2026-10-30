@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getGetDeviceListQueryKey, type GetDeviceList200 } from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { getCurrentTime, subscribe as subscribeToTime } from '@/features/player/stores/player-time-tracker'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
@@ -8,23 +9,13 @@ import { PLAYER_ACTIONS } from '@/features/player/player-actions'
 import { getDeviceId, getDeviceName } from '../utils/device-id'
 import { SessionSyncBus } from '../services/SessionSyncBus'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { useLiveCoordinator } from '@/shared/live/context'
 import { authenticatedTransport } from '@/shared/live/transport'
-import { captureOwnership, isCurrentOwnership, assertCurrentOwnership } from '@/shared/live/ownership'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { getSessionQueueSongs, useSessionClaim } from './use-session-claim'
 import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('Session')
-
-async function getSessionQueueSongs(publicIds: string[]): Promise<Record<string, unknown>[]> {
-  const ownership = captureOwnership()
-  const ids = [...new Set(publicIds)]
-  const batches: string[][] = []
-  for (let offset = 0; offset < ids.length; offset += 100) batches.push(ids.slice(offset, offset + 100))
-  const responses = await Promise.all(batches.map((batch) => AXIOS_INSTANCE.get<{ data: Record<string, unknown>[] }>('/api/songs/', {
-    params: { publicIds: batch.join(','), limit: batch.length },
-  })))
-  assertCurrentOwnership(ownership)
-  return responses.flatMap((response) => response.data.data ?? [])
-}
 
 export interface SessionData {
   publicId: string
@@ -44,10 +35,12 @@ const SYNC_DEBOUNCE_MS = 2000
 
 export function useSession() {
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
   const deviceId = getDeviceId()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sessionSyncBus = useRef<SessionSyncBus | null>(null)
   const deviceRegistered = useRef(false)
+  const restoredPrincipal = useRef<string | null | undefined>(undefined)
 
   const [dismissedTransfer, setDismissedTransfer] = useState<{ sessionId: string; deviceId: string } | null>(null)
   // Clearing credentials closes the socket; a later login obtains a fresh connection ticket.
@@ -55,9 +48,9 @@ export function useSession() {
 
   const query = useQuery({
     queryKey: SESSION_KEY,
-    queryFn: async (): Promise<SessionData | null> => {
+    queryFn: async ({ signal }): Promise<SessionData | null> => {
       try {
-        const res = await AXIOS_INSTANCE.get('/api/session')
+        const res = await AXIOS_INSTANCE.get('/api/session', { signal })
         return res.data?.data ?? res.data ?? null
       } catch (err) {
         // 404 means no session exists yet (first-time user) — treat as null, not an error.
@@ -70,12 +63,13 @@ export function useSession() {
     staleTime: 30_000,
   })
 
-  const { data: devices = [] } = useQuery({
-    queryKey: ['devices'],
-    queryFn: async (): Promise<Array<{ publicId: string; deviceId: string }>> => {
-      const res = await AXIOS_INSTANCE.get('/api/devices')
-      return res.data?.data ?? []
+  const { data: devices = [], isSuccess: devicesReady } = useQuery({
+    queryKey: getGetDeviceListQueryKey(),
+    queryFn: async ({ signal }): Promise<GetDeviceList200> => {
+      const response = await AXIOS_INSTANCE.get<GetDeviceList200>('/api/devices', { signal })
+      return response.data
     },
+    select: response => response.data ?? [],
   })
   const devicePublicId = devices.find(device => device.deviceId === deviceId)?.publicId ?? null
 
@@ -88,14 +82,16 @@ export function useSession() {
     if (deviceRegistered.current || !isAuthenticated) return
     const ownership = captureOwnership()
     deviceRegistered.current = true
+    const release = coordinator?.beginMutation(['devices'])
     AXIOS_INSTANCE.post('/api/devices', {
       deviceId,
       name: getDeviceName(),
     }).then(() => {
-      if (isCurrentOwnership(ownership)) return queryClient.invalidateQueries({ queryKey: ['devices'] })
+      if (isCurrentOwnership(ownership) && !coordinator) return queryClient.invalidateQueries({ queryKey: getGetDeviceListQueryKey() })
     })
       .catch((err) => { logger.warn('Device registration failed:', err) })
-  }, [deviceId, queryClient, isAuthenticated])
+      .finally(() => release?.())
+  }, [coordinator, deviceId, queryClient, isAuthenticated])
 
   // Auto-create session when playback starts and no session exists
   const [sessionCreated, setSessionCreated] = useState(false)
@@ -132,8 +128,12 @@ export function useSession() {
     const session = query.data
     const ownership = captureOwnership()
     let disposed = false
-    if (!session) return
-    if (session.activeDeviceId && session.activeDeviceId !== devicePublicId) return
+    if (!query.isSuccess || !devicesReady) return
+    if (restoredPrincipal.current === ownership.principal) return
+    if (!session || (session.activeDeviceId && session.activeDeviceId !== devicePublicId)) {
+      restoredPrincipal.current = ownership.principal
+      return
+    }
 
     // This device is active — hydrate server queue into player store if empty
     const localQueue = usePlayerStore.getState().queue
@@ -160,6 +160,7 @@ export function useSession() {
           })
           .filter(Boolean) as Track[]
 
+        restoredPrincipal.current = ownership.principal
         if (tracks.length > 0) {
           mediator.dispatch(PLAYER_ACTIONS.STATE_RESTORE, {
             queue: tracks,
@@ -168,9 +169,11 @@ export function useSession() {
           }, 'session')
         }
       }).catch((err) => { logger.warn('Queue hydration failed:', err) })
+    } else {
+      restoredPrincipal.current = ownership.principal
     }
     return () => { disposed = true }
-  }, [query.data, devicePublicId, queryClient])
+  }, [query.data, query.isSuccess, devicesReady, devicePublicId, queryClient])
 
   // Initialize SessionSyncBus when the session id changes. Keying on the stable id (not the
   // whole query.data object) avoids disconnecting/reconnecting the socket — and resetting the
@@ -273,58 +276,7 @@ export function useSession() {
     }
   }, [sessionId, isAuthenticated, deviceId, devicePublicId, queryClient])
 
-  const claimMutation = useMutation({
-    mutationFn: async (): Promise<SessionData> => {
-      const res = await AXIOS_INSTANCE.post('/api/session/claim', { deviceId })
-      return res.data?.data ?? res.data
-    },
-    // NOTE: onSuccess is async but React Query does not await it — the batch lookup
-    // fires and forgets. The try/catch ensures the player store always gets a
-    // STATE_RESTORE dispatch even if hydration fails.
-    onSuccess: async (data) => {
-      const ownership = captureOwnership()
-      queryClient.setQueryData(SESSION_KEY, data)
-      setDismissedTransfer(null)
-
-      if (data.queue.length > 0) {
-        // Hydrate server queue (publicIds) into Track[] via batch lookup
-        try {
-          const songs = await getSessionQueueSongs(data.queue)
-          if (!isCurrentOwnership(ownership)) return
-          const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
-          const tracks: Track[] = data.queue
-            .filter(Boolean)
-            .map((id: string) => {
-              const s = songMap.get(id)
-              if (!s) return null
-              return {
-                publicId: s.publicId as string,
-                available: s.available === true,
-                title: s.title as string,
-                artistName: (s.artistName as string) ?? undefined,
-                albumName: (s.albumName as string) ?? undefined,
-                albumPublicId: (s.albumId as string) ?? undefined,
-                duration: (s.length as number) ?? undefined,
-              }
-            })
-            .filter(Boolean) as Track[]
-
-          mediator.dispatch(PLAYER_ACTIONS.STATE_RESTORE, {
-            queue: tracks,
-            currentIndex: data.currentTrackIndex,
-            currentTime: data.position,
-          }, 'session')
-        } catch {
-          if (!isCurrentOwnership(ownership)) return
-          mediator.dispatch(PLAYER_ACTIONS.STATE_RESTORE, {
-            queue: [],
-            currentIndex: 0,
-            currentTime: 0,
-          }, 'session')
-        }
-      }
-    },
-  })
+  const claimMutation = useSessionClaim(() => setDismissedTransfer(null))
 
   // "Bring local queue" option in claim flow
   const claimWithQueueMutation = useMutation({

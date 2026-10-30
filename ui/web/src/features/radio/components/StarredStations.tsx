@@ -1,7 +1,5 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useStarredStations, useStations } from '../hooks/use-radio-stations'
+import { useStarredStations, useStations, useUnstarStation } from '../hooks/use-radio-stations'
 import styled from 'styled-components'
-import { unstarStation, type StarredStation } from '@/features/radio/api/radio-api'
 import { StationCard } from './StationCard'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 
@@ -25,7 +23,6 @@ const EmptyMessage = styled.p`
 `
 
 export function StarredStations() {
-  const queryClient = useQueryClient()
   const starredQuery = useStarredStations()
   const starred = starredQuery.data ?? []
   const stationsQuery = useStations('', '', starred.length > 0)
@@ -36,15 +33,7 @@ export function StarredStations() {
   const loading = starredQuery.isPending || (
     starred.length > 0 && stationsQuery.isFetching && stationsQuery.isPlaceholderData
   )
-  const unstar = useMutation({
-    mutationFn: unstarStation,
-    onSuccess: (_result, stationId) => {
-      queryClient.setQueryData<StarredStation[]>(
-        ['radio', 'starred'],
-        (previous = []) => previous.filter((item) => item.stationId !== stationId),
-      )
-    },
-  })
+  const unstar = useUnstarStation()
 
   if (loading) {
     return (

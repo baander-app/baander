@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback } from 'react'
 import { getAlbumShow, type SongResource } from '@/shared/api-client/gen/endpoints'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
@@ -35,8 +36,10 @@ export function usePlayAlbum() {
 
   const playAlbum = useCallback(
     async (albumPublicId: string, albumTitle: string) => {
+      const owner = captureOwnership()
       try {
         const response = await getAlbumShow(albumPublicId)
+        if (!isCurrentOwnership(owner)) return
         const songs = response.data?.songs
         if (!songs || songs.length === 0) {
           logger.warn('No songs found for album', albumPublicId)

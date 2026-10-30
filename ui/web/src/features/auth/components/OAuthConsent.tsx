@@ -10,6 +10,7 @@ import {
   decideAuthorization,
   lookupAuthorization,
 } from '../api/oauth-authorize-api'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useRetryCountdown } from '../hooks/use-retry-countdown'
 import { leaveAppFor } from '../lib/browser-navigation'
 import { checkedClientRedirect } from '../lib/client-redirect'
@@ -75,11 +76,12 @@ export function OAuthConsent({ query }: OAuthConsentProps) {
   const lookup = useQuery({
     queryKey: ['oauth-authorize', query],
     queryFn: async ({ signal }) => {
+      const owner = captureOwnership()
       try {
         return await lookupAuthorization(query, signal)
       } catch (err: unknown) {
         const wait = retryAfterSeconds(err)
-        if (wait !== null) startCountdown(wait)
+        if (wait !== null && isCurrentOwnership(owner)) startCountdown(wait)
         throw err
       }
     },

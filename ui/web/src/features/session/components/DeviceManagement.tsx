@@ -10,12 +10,17 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog'
 import { Monitor, Trash2, Loader2, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { guardMutationCallbacks, subscribeOwnership } from '@/shared/live/ownership'
 import {
   useGetDeviceList,
   usePutDeviceRename,
   useDeleteDeviceForget,
   getGetDeviceListQueryKey,
+  putDeviceRename,
+  deleteDeviceForget,
 } from '@/shared/api-client/gen/endpoints'
 import styled, { keyframes } from 'styled-components'
 
@@ -151,41 +156,78 @@ const DialogSpinnerIcon = styled(Loader2)`
 
 export function DeviceManagement() {
   const queryClient = useQueryClient()
-  const { data: devices = [], isLoading } = useGetDeviceList({
+  const coordinator = useLiveCoordinator()
+  const { data: devices = [], isLoading, isSuccess, error } = useGetDeviceList({
     query: {
       select: (res): Device[] => res.data ?? [],
     },
   })
 
-  const renameDevice = usePutDeviceRename({
-    mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetDeviceListQueryKey() }),
+  const refresh = () => coordinator
+    ? coordinator.hint(['devices'])
+    : queryClient.invalidateQueries({ queryKey: getGetDeviceListQueryKey() })
+  const renameDevice = usePutDeviceRename({ mutation: {
+    mutationFn: async ({ deviceId, data }) => {
+      const release = coordinator?.beginMutation(['devices'])
+      try { return await putDeviceRename(deviceId, data) }
+      finally {
+        release?.()
+      }
     },
-  })
-  const forgetDevice = useDeleteDeviceForget({
-    mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetDeviceListQueryKey() }),
+    onSettled: () => { if (!coordinator) return refresh() },
+  } })
+  const forgetDevice = useDeleteDeviceForget({ mutation: {
+    mutationFn: async ({ deviceId }) => {
+      const release = coordinator?.beginMutation(['devices'])
+      try { return await deleteDeviceForget(deviceId) }
+      finally {
+        release?.()
+      }
     },
-  })
+    onSettled: () => { if (!coordinator) return refresh() },
+  } })
 
   const [editTarget, setEditTarget] = useState<Device | null>(null)
-  const [editName, setEditName] = useState('')
   const [forgetTarget, setForgetTarget] = useState<Device | null>(null)
+  const draft = useDraft({ identity: editTarget?.publicId ?? '', initialData: { name: editTarget?.name ?? '' } })
+  const currentDraft = useRef(draft)
+  useEffect(() => { currentDraft.current = draft }, [draft])
+  const targetIdentity = useRef(editTarget?.publicId)
+  useEffect(() => { targetIdentity.current = editTarget?.publicId }, [editTarget?.publicId])
+  const { receive, revokeAccess } = draft
+  useEffect(() => subscribeOwnership(revokeAccess), [revokeAccess])
+  useEffect(() => {
+    const status = (error as { response?: { status?: number } } | null)?.response?.status
+    if (status === 401 || status === 403) revokeAccess()
+  }, [error, revokeAccess])
+  useEffect(() => {
+    if (!editTarget || !isSuccess) return
+    const current = devices.find(device => device.publicId === editTarget.publicId)
+    receive(current ? { name: current.name ?? '' } : null)
+  }, [devices, editTarget, isSuccess, receive])
 
   function handleRename() {
-    if (!editTarget?.publicId) return
-    const name = editName.trim()
-    if (!name) return
-    renameDevice.mutate({ deviceId: editTarget.publicId, data: { name } }, {
-      onSuccess: () => setEditTarget(null),
-    })
+    if (!editTarget?.publicId || !draft.canSave || !draft.values.name.trim()) return
+    const trimmed = draft.values.name.trim()
+    if (trimmed !== draft.values.name) draft.updateField('name', trimmed)
+    const submission = draft.beginSave()
+    if (!submission) return
+    const identity = editTarget.publicId
+    renameDevice.mutate({ deviceId: identity, data: { name: submission.values.name.trim() } }, guardMutationCallbacks({
+      onSuccess: () => {
+        draft.completeSave(submission)
+        if (targetIdentity.current === identity && currentDraft.current.values.name === submission.values.name) setEditTarget(null)
+      },
+      onError: () => draft.failSave(submission),
+    }))
   }
 
   function handleForget() {
-    if (!forgetTarget?.publicId) return
-    forgetDevice.mutate({ deviceId: forgetTarget.publicId }, {
-      onSuccess: () => setForgetTarget(null),
-    })
+    if (!forgetTarget?.publicId || !devices.some(device => device.publicId === forgetTarget.publicId)) return
+    const identity = forgetTarget.publicId
+    forgetDevice.mutate({ deviceId: identity }, guardMutationCallbacks({
+      onSuccess: () => setForgetTarget(current => current?.publicId === identity ? null : current),
+    }))
   }
 
   return (
@@ -224,7 +266,7 @@ export function DeviceManagement() {
               <DeviceActions>
                 <SmallButton
                   aria-label={`Rename ${device.name || 'device'}`}
-                  onClick={() => { setEditTarget(device); setEditName(device.name ?? '') }}
+                  onClick={() => { setEditTarget(device) }}
                 >
                   <IconMuted><Pencil size={14} /></IconMuted>
                 </SmallButton>
@@ -249,14 +291,20 @@ export function DeviceManagement() {
             <DialogDescription>Give this device a recognizable name.</DialogDescription>
           </DialogHeader>
           <Input
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
+            value={draft.values.name ?? ''}
+            onChange={(e) => draft.updateField('name', e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleRename()}
             autoFocus
           />
+          {draft.status === 'conflict' && <div role="alert">
+            This device changed elsewhere.
+            <Button onClick={() => draft.resolveConflict('server')}>Use server name</Button>
+            <Button onClick={() => draft.resolveConflict('local')}>Keep my name</Button>
+          </div>}
+          {draft.status === 'unavailable' && <p role="alert">This device is no longer available. Your name is retained for recovery.</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
-            <Button onClick={handleRename} disabled={renameDevice.isPending || !editName.trim()}>
+            <Button onClick={handleRename} disabled={renameDevice.isPending || !draft.canSave || !draft.values.name?.trim()}>
               {renameDevice.isPending ? <DialogSpinnerIcon size={14} /> : null}
               Rename
             </Button>
@@ -276,7 +324,7 @@ export function DeviceManagement() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setForgetTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleForget} disabled={forgetDevice.isPending}>
+            <Button variant="destructive" onClick={handleForget} disabled={forgetDevice.isPending || !devices.some(device => device.publicId === forgetTarget?.publicId)}>
               {forgetDevice.isPending ? <DialogSpinnerIcon size={14} /> : null}
               Forget
             </Button>

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSubscriptions } from '../hooks/use-radio-stations'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { useSubscriptions, useRadioOperation } from '../hooks/use-radio-stations'
 import styled, { css } from 'styled-components'
 import { Globe, Check } from 'lucide-react'
-import { getAvailableCountries, subscribeCountry, unsubscribeCountry, type CountrySubscription } from '@/features/radio/api/radio-api'
+import { getAvailableCountries, subscribeCountry, unsubscribeCountry } from '@/features/radio/api/radio-api'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { toast } from 'sonner'
@@ -92,10 +92,10 @@ const EmptyMessage = styled.p`
 `
 
 export function CountryPicker() {
-  const queryClient = useQueryClient()
+  const run = useRadioOperation()
   const countriesQuery = useQuery({
     queryKey: ['radio', 'countries'],
-    queryFn: getAvailableCountries,
+    queryFn: ({ signal }) => getAvailableCountries(signal),
     retry: false,
   })
   const subscriptionsQuery = useSubscriptions()
@@ -108,33 +108,13 @@ export function CountryPicker() {
   )
 
   const toggle = useMutation({
-    mutationFn: async (code: string) => {
+    mutationFn: (code: string) => run(async () => {
       const sub = subscriptions.find(
         (item) => item.countryCode.toUpperCase() === code.toUpperCase(),
       )
-      if (sub) {
-        await unsubscribeCountry(sub.sourceId, code)
-        return {
-          code,
-          subscription: null,
-        }
-      }
-      return {
-        code,
-        subscription: await subscribeCountry(null, code),
-      }
-    },
-    onSuccess: ({ code, subscription }) => {
-      queryClient.setQueryData<CountrySubscription[]>(
-        ['radio', 'subscriptions'],
-        (previous = []) => {
-          const remaining = previous.filter(
-            (item) => item.countryCode.toUpperCase() !== code.toUpperCase(),
-          )
-          return subscription ? [...remaining, subscription] : remaining
-        },
-      )
-    },
+      if (sub) await unsubscribeCountry(sub.sourceId, code)
+      else await subscribeCountry(null, code)
+    }),
     onError: () => toast.error('Failed to update subscription'),
   })
 

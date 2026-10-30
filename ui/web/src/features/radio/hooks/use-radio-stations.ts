@@ -1,5 +1,8 @@
+import { useLiveCoordinator } from '@/shared/live/context'
+import { assertCurrentOwnership, captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  type RadioStation,
   getStations,
   getSubscriptions,
   getStarredStations,
@@ -12,11 +15,11 @@ const SUBSCRIPTIONS_KEY = ['radio', 'subscriptions'] as const
 const STARRED_KEY = ['radio', 'starred'] as const
 
 export function useStations(country: string, query: string, enabled: boolean) {
-  return useQuery({
+  return useQuery<RadioStation[]>({
     queryKey: [...STATIONS_KEY, { country, query }],
-    queryFn: () => getStations(country || undefined, query || undefined),
+    queryFn: ({ signal }) => getStations(country || undefined, query || undefined, signal),
     enabled,
-    placeholderData: () => [],
+    placeholderData: [],
     retry: false,
   })
 }
@@ -24,7 +27,7 @@ export function useStations(country: string, query: string, enabled: boolean) {
 export function useSubscriptions() {
   return useQuery({
     queryKey: [...SUBSCRIPTIONS_KEY],
-    queryFn: getSubscriptions,
+    queryFn: ({ signal }) => getSubscriptions(signal),
     retry: false,
   })
 }
@@ -32,23 +35,40 @@ export function useSubscriptions() {
 export function useStarredStations() {
   return useQuery({
     queryKey: [...STARRED_KEY],
-    queryFn: getStarredStations,
+    queryFn: ({ signal }) => getStarredStations(signal),
     retry: false,
   })
 }
 
-export function useStarStation() {
+/** Holds snapshots until a local command settles, including when the socket is down. */
+export function useRadioOperation() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (stationId: string) => starStation(stationId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [...STARRED_KEY] }),
-  })
+  const coordinator = useLiveCoordinator()
+  return async <T,>(operation: () => Promise<T>): Promise<T> => {
+    const owner = captureOwnership()
+    const release = coordinator?.beginMutation(['radio'])
+    try {
+      const result = await operation()
+      assertCurrentOwnership(owner)
+      return result
+    } finally {
+      release?.()
+      if (!coordinator && isCurrentOwnership(owner)) {
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ['radio'] }),
+          qc.invalidateQueries({ queryKey: ['catalog', 'starred-stations'] }),
+        ])
+      }
+    }
+  }
+}
+
+export function useStarStation() {
+  const run = useRadioOperation()
+  return useMutation({ mutationFn: (stationId: string) => run(() => starStation(stationId)) })
 }
 
 export function useUnstarStation() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (stationId: string) => unstarStation(stationId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [...STARRED_KEY] }),
-  })
+  const run = useRadioOperation()
+  return useMutation({ mutationFn: (stationId: string) => run(() => unstarStation(stationId)) })
 }

@@ -190,4 +190,12 @@ describe('usePreferenceSync', () => {
     }, { signal: expect.any(AbortSignal) })
     expect(onRemoteUpdate).toHaveBeenCalledWith({ volume: 50, muted: false }, 1)
   })
+  it('does not apply a GET started after a local edit before debounce', async () => {
+    mockAxios.get.mockResolvedValueOnce({ data: { data: { payload: { volume: 0.1, muted: false }, version: 2 } } })
+    const { result } = createHook()
+    act(() => result.current.pushToServer({ volume: 80, muted: false }))
+    await act(async () => { await result.current.fetchFromServer() })
+    expect(onRemoteUpdate).not.toHaveBeenCalled()
+  })
+
 })

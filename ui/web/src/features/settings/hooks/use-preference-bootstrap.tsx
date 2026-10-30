@@ -1,3 +1,5 @@
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback, useEffect, useRef } from 'react'
 import { useEqBandsStore } from '@/features/equalizer/stores/eq-bands-store'
 import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store'
@@ -34,6 +36,7 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
 }
 
 function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
+  const coordinator = useLiveCoordinator()
   const isActive = useCallback(() => {
     const auth = useAuthStore.getState()
     return auth.isAuthenticated && auth.user?.publicId === userPublicId
@@ -75,33 +78,50 @@ function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
     const controller = new AbortController()
     const canApply = () => !controller.signal.aborted && isActive()
 
-    void audioFetchRef.current()
-    void playerFetchRef.current()
-    void layoutFetchRef.current()
-
-    void (async () => {
-      try {
-        const moodRes = await AXIOS_INSTANCE.get('/api/user/theme-mood/', { signal: controller.signal })
-        const serverMood = moodRes.data?.mood ?? moodRes.data?.data?.mood
-        if (canApply() && serverMood && (VALID_MOODS as readonly string[]).includes(serverMood)) {
-          localStorage.setItem('baander-theme-mood', serverMood)
-          document.documentElement.setAttribute('data-theme', serverMood)
+    if (!coordinator) {
+      Promise.resolve(audioFetchRef.current()).catch(() => undefined)
+      Promise.resolve(playerFetchRef.current()).catch(() => undefined)
+      Promise.resolve(layoutFetchRef.current()).catch(() => undefined)
+    }
+    const readTheme = async (signal: AbortSignal) => {
+      const owner = captureOwnership()
+      const [moodResult, colorResult] = await Promise.allSettled([
+        AXIOS_INSTANCE.get('/api/user/theme-mood/', { signal }),
+        AXIOS_INSTANCE.get('/api/user/accent-color/', { signal }),
+      ])
+      if (signal.aborted || !canApply() || !isCurrentOwnership(owner)) return
+      const mood = moodResult.status === 'fulfilled'
+        ? moodResult.value.data?.mood ?? moodResult.value.data?.data?.mood : undefined
+      const color = colorResult.status === 'fulfilled'
+        ? colorResult.value.data?.color ?? colorResult.value.data?.data?.color : undefined
+      let storedSnapshotChanged = false
+      if ((VALID_MOODS as readonly unknown[]).includes(mood)) {
+        if (localStorage.getItem('baander-theme-mood') !== mood) {
+          localStorage.setItem('baander-theme-mood', mood)
+          storedSnapshotChanged = true
         }
-      } catch { /* first-time user, use local/OS default */ }
-
-      if (!canApply()) return
-      try {
-        const colorRes = await AXIOS_INSTANCE.get('/api/user/accent-color/', { signal: controller.signal })
-        const serverColor = colorRes.data?.color ?? colorRes.data?.data?.color
-        if (canApply() && serverColor && (VALID_COLORS as readonly string[]).includes(serverColor)) {
-          localStorage.setItem('baander-accent-color', serverColor)
-          document.documentElement.setAttribute('data-accent', serverColor)
+        if (document.documentElement.getAttribute('data-theme') !== mood) {
+          document.documentElement.setAttribute('data-theme', mood)
         }
-      } catch { /* first-time user, use local default */ }
-    })()
-
-    return () => controller.abort()
-  }, [isActive])
+      }
+      if ((VALID_COLORS as readonly unknown[]).includes(color)) {
+        if (localStorage.getItem('baander-accent-color') !== color) {
+          localStorage.setItem('baander-accent-color', color)
+          storedSnapshotChanged = true
+        }
+        if (document.documentElement.getAttribute('data-accent') !== color) {
+          document.documentElement.setAttribute('data-accent', color)
+        }
+      }
+      if (storedSnapshotChanged) window.dispatchEvent(new StorageEvent('storage'))
+      if (moodResult.status === 'rejected' || colorResult.status === 'rejected') throw new Error('Theme snapshot incomplete')
+    }
+    const unregister = coordinator?.registerAdapter({
+      id: 'preference:theme', family: 'preferences', isActive, read: readTheme,
+    })
+    if (!coordinator) readTheme(controller.signal).catch(() => undefined)
+    return () => { controller.abort(); unregister?.() }
+  }, [isActive, coordinator])
 
   // Subscribe to store changes and push to server
   useEffect(() => {
@@ -172,7 +192,7 @@ function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
         : null
 
   function handleConflictResolve(resolution: 'mine' | 'theirs') {
-    void activeConflict?.resolve(resolution)
+    activeConflict?.resolve(resolution).catch(() => undefined)
   }
 
   return (

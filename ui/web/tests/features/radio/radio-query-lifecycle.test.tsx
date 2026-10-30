@@ -72,7 +72,10 @@ it('shares subscription query ownership across StrictMode and updates cached sub
     lastSyncedAt: null,
     createdAt: '',
   }
-  vi.mocked(subscribeCountry).mockResolvedValue(subscription)
+  vi.mocked(subscribeCountry).mockImplementation(async () => {
+    vi.mocked(getSubscriptions).mockResolvedValue([subscription])
+    return subscription
+  })
   const view = render(<CountryPicker />, {
     wrapper: queryWrapper(client),
     reactStrictMode: true,
@@ -80,13 +83,18 @@ it('shares subscription query ownership across StrictMode and updates cached sub
 
   await screen.findByText('Denmark')
 
-  expect(getSubscriptions).toHaveBeenCalledOnce()
+  expect(getSubscriptions).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(getSubscriptions).mock.calls[0][0]?.aborted).toBe(true)
+  expect(vi.mocked(getSubscriptions).mock.calls[1][0]?.aborted).toBe(false)
 
   fireEvent.click(screen.getByRole('button', { name: /Denmark/ }))
 
   await waitFor(() => {
     expect(client.getQueryData(['radio', 'subscriptions'])).toEqual([subscription])
+    expect(client.isFetching({ queryKey: ['radio', 'subscriptions'] })).toBe(0)
   })
+
+  expect(getSubscriptions).toHaveBeenCalledTimes(3)
 
   view.unmount()
   client.clear()
@@ -107,17 +115,25 @@ it('loads starred stations through shared query keys and keeps unstarred results
   vi.mocked(getStations).mockResolvedValue([
     { publicId: 'station', name: 'Favorite station' } as RadioStation,
   ])
-  vi.mocked(unstarStation).mockResolvedValue(undefined)
+  vi.mocked(unstarStation).mockImplementation(async () => {
+    vi.mocked(getStarredStations).mockResolvedValue([])
+  })
   render(<StarredStations />, {
     wrapper: queryWrapper(client),
     reactStrictMode: true,
   })
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Favorite station' }))
+  const stationButton = await screen.findByRole('button', { name: 'Favorite station' })
+  expect(getStarredStations).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(getStarredStations).mock.calls[0][0]?.aborted).toBe(true)
+  expect(vi.mocked(getStarredStations).mock.calls[1][0]?.aborted).toBe(false)
+  fireEvent.click(stationButton)
 
   await screen.findByText(/No starred stations yet/)
   expect(client.getQueryData(['radio', 'starred'])).toEqual([])
-  expect(getStarredStations).toHaveBeenCalledOnce()
+  expect(getStarredStations).toHaveBeenCalledTimes(3)
+  expect(unstarStation).toHaveBeenCalledExactlyOnceWith('station')
+  expect(client.isFetching({ queryKey: ['radio', 'starred'] })).toBe(0)
 
   client.clear()
 })

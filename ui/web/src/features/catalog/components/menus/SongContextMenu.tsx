@@ -1,3 +1,5 @@
+import { guardMutationCallbacks } from '@/shared/live/ownership'
+import { usePostPlaylistAddSong } from '@/features/playlist/hooks/use-playlist-mutations'
 import { useState } from 'react'
 import {
   ContextMenu,
@@ -14,8 +16,7 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 import { mediator } from '@/shared/lib/mediator/bus'
 import { PLAYER_ACTIONS } from '@/features/player/player-actions'
 import { useContextActions, type SongContextMenuData } from '../../hooks/use-context-actions'
-import { useGetPlaylistIndex, usePostPlaylistAddSong } from '@/shared/api-client/gen/endpoints'
-import { useQueryClient } from '@tanstack/react-query'
+import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
 import { toast } from 'sonner'
 import { LyricsDialog } from '../LyricsDialog'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
@@ -32,8 +33,7 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
   const lyricsKeys = useShortcutDisplay('panel.lyrics')
   const infoKeys = useShortcutDisplay('panel.info')
   const { data: playlistsData } = useGetPlaylistIndex()
-  const { mutateAsync: addSongToPlaylist } = usePostPlaylistAddSong()
-  const queryClient = useQueryClient()
+  const { mutate: addSongToPlaylist } = usePostPlaylistAddSong()
   const playlists = (playlistsData as Record<string, unknown> | undefined)?.data as Array<{ publicId: string; name: string }> ?? []
   const insertAfterCurrent = usePlayerStore((s) => s.insertAfterCurrent)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
@@ -97,10 +97,9 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
                     addSongToPlaylist({
                       publicId: playlist.publicId,
                       data: { songId: song.publicId }
-                    }, {
-                      onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playlists'] }),
+                    }, guardMutationCallbacks({
                       onError: () => toast.error('Failed to add song to playlist'),
-                    })
+                    }))
                   }}
                 >
                   {playlist.name}

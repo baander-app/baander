@@ -90,6 +90,7 @@ export const catalogLiveCoverage = [
     behaviorVerification: {
       unitProofs: [
         "tests/live-updates/catalog-consumers.test.tsx",
+        "tests/live-updates/collections.test.tsx",
         "src/features/catalog/components/metadata/__tests__/InfoPanel.test.tsx",
         "src/features/catalog/components/metadata/__tests__/use-metadata-form.test.tsx",
         "src/shared/drafts/__tests__/use-draft.test.tsx",
@@ -133,7 +134,7 @@ export const catalogLiveCoverage = [
     responseCaches: [],
     consumers: ["src/features/catalog/components/LyricsDialog.tsx#useGetLyricsSearch:generated"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.catalog-demand",
@@ -158,7 +159,7 @@ export const catalogLiveCoverage = [
       "src/features/catalog/pages/ArtistDetailPage.tsx#AXIOS_INSTANCE.get:'/api/songs'",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.playlists",
@@ -189,7 +190,7 @@ export const catalogLiveCoverage = [
       "src/features/catalog/pages/HomePage.tsx#useGetPlaylistIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.activity",
@@ -274,7 +275,7 @@ export const catalogLiveCoverage = [
       "src/features/catalog/hooks/use-starred-stations.ts#AXIOS_INSTANCE.get:'/api/radio/starred'",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.radio-global",
@@ -293,7 +294,7 @@ export const catalogLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/catalog/hooks/use-starred-stations.ts#AXIOS_INSTANCE.get:'/api/radio/stations'"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.catalog-timeline",

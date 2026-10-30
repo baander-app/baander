@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useCallback } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
@@ -14,10 +15,12 @@ export function usePlayArtist() {
 
   const playArtist = useCallback(
     async (artistPublicId: string, artistName: string) => {
+      const owner = captureOwnership()
       try {
         const res = await AXIOS_INSTANCE.get('/api/songs', {
           params: { artistId: artistPublicId, limit: 1000 },
         })
+        if (!isCurrentOwnership(owner)) return
         const body = res.data as Record<string, unknown>
         const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
         if (items.length === 0) {

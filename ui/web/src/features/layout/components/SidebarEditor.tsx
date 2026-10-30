@@ -1,3 +1,6 @@
+import { useDraft } from '@/shared/drafts/use-draft'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useShallow } from 'zustand/react/shallow'
 import styled from 'styled-components'
 import { useState, useEffect, useRef } from 'react'
@@ -287,7 +290,21 @@ export function SidebarEditor() {
 
 function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaType; initialSchema: MediaSidebarSchema }) {
   const { isLoading, setEditorOpen, setSchema } = useSidebarStore(useShallow((state) => ({ isLoading: state.isLoading, setEditorOpen: state.setEditorOpen, setSchema: state.setSchema })))
-  const [editingSections, setEditingSections] = useState<SidebarSection[]>(() => initialSchema.sections.map((section) => ({ ...section, items: [...section.items] })))
+  const coordinator = useLiveCoordinator()
+  const unavailable = useSidebarStore(state => state.error === 'Sidebar access unavailable')
+  const draft = useDraft({ identity: `sidebar:${activeMedia}`, initialData: { sections: initialSchema.sections } })
+  const editingSections = draft.values.sections ?? []
+  const editRevision = useRef(0)
+  const setEditingSections = (update: SidebarSection[] | ((sections: SidebarSection[]) => SidebarSection[])) => {
+    editRevision.current++
+    draft.updateField('sections', typeof update === 'function' ? update(editingSections) : update)
+  }
+  const receive = draft.receive
+  const revokeAccess = draft.revokeAccess
+  useEffect(() => {
+    if (unavailable) revokeAccess()
+    else receive({ sections: initialSchema.sections })
+  }, [initialSchema.sections, receive, revokeAccess, unavailable])
   const mounted = useRef(false)
   useEffect(() => {
     mounted.current = true
@@ -355,7 +372,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
     if (newType === 'panel_action') config.tab = 'queue'
 
     const item: SidebarItemData = {
-      id: `${newType}-${Date.now()}`,
+      id: `${newType}-${crypto.randomUUID()}`,
       type: newType as SidebarItemData['type'],
       label: newLabel.trim(),
       icon: newIcon,
@@ -377,34 +394,45 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
   }
 
   const handleSave = async () => {
+    const submission = draft.beginSave()
+    if (!submission) return
+    const owner = captureOwnership()
+    const revision = editRevision.current
+    const release = coordinator?.beginMutation(['preferences'])
     setIsSaving(true)
     try {
-      const res = await AXIOS_INSTANCE.put(`/api/user/sidebar-config/${activeMedia}`, {
-        sections: editingSections,
-      })
-      if (res.data?.mediaType) {
-        setSchema(activeMedia, res.data)
-      }
-      if (mounted.current) setEditorOpen(false)
+      const res = await AXIOS_INSTANCE.put(`/api/user/sidebar-config/${activeMedia}`, submission.values)
+      if (!mounted.current || !isCurrentOwnership(owner)) return
+      draft.completeSave(submission)
+      if (res.data?.mediaType) setSchema(activeMedia, res.data)
+      if (revision === editRevision.current) setEditorOpen(false)
     } catch {
-      // Error handled silently — user can retry
+      if (!mounted.current || !isCurrentOwnership(owner)) return
+      draft.failSave(submission)
     } finally {
-      if (mounted.current) setIsSaving(false)
+      release?.()
+      if (mounted.current && isCurrentOwnership(owner)) setIsSaving(false)
     }
   }
 
   const handleReset = async () => {
+    const owner = captureOwnership()
+    const revision = editRevision.current
+    const release = coordinator?.beginMutation(['preferences'])
     setIsSaving(true)
     try {
       const res = await AXIOS_INSTANCE.delete(`/api/user/sidebar-config/${activeMedia}`)
-      if (res.data?.mediaType) {
-        setSchema(activeMedia, res.data)
+      if (!mounted.current || !isCurrentOwnership(owner)) return
+      if (res.data?.mediaType) setSchema(activeMedia, res.data)
+      if (revision === editRevision.current) {
+        draft.receive({ sections: res.data?.sections ?? [] })
+        draft.resolveConflict('server')
       }
-      if (mounted.current) setEditingSections(res.data?.sections ?? [])
     } catch {
-      // Error handled silently
+      return
     } finally {
-      if (mounted.current) setIsSaving(false)
+      release?.()
+      if (mounted.current && isCurrentOwnership(owner)) setIsSaving(false)
     }
   }
 
@@ -429,6 +457,12 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
           </CloseButton>
         </SheetHeader>
 
+        {draft.status === 'conflict' && <div role="alert">
+          The sidebar changed elsewhere. Choose which version to keep.
+          <Button onClick={() => draft.resolveConflict('local')}>Keep my edits</Button>
+          <Button onClick={() => draft.resolveConflict('server')}>Use server version</Button>
+        </div>}
+        {draft.status === 'unavailable' && <div role="alert">This sidebar is unavailable. Your edits are preserved.</div>}
         {/* Content */}
         <SheetContent>
           {isLoading ? (
@@ -559,10 +593,10 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
 
         {/* Footer */}
         <SheetFooter>
-          <MutedButton size="sm" variant="ghost" onClick={handleReset} disabled={isSaving}>
+          <MutedButton size="sm" variant="ghost" onClick={handleReset} disabled={isSaving || draft.status === 'unavailable'}>
             Reset
           </MutedButton>
-          <StretchButton size="sm" onClick={handleSave} disabled={isSaving}>
+          <StretchButton size="sm" onClick={handleSave} disabled={isSaving || !draft.canSave}>
             {isSaving ? 'Saving...' : 'Save changes'}
           </StretchButton>
         </SheetFooter>

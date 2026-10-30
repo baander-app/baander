@@ -194,7 +194,7 @@ describe('useSession', () => {
 
     await waitFor(() => expect(result.current.session).toBeDefined())
 
-    expect(mockAxios.get).toHaveBeenCalledWith('/api/session')
+    expect(mockAxios.get).toHaveBeenCalledWith('/api/session', { signal: expect.any(AbortSignal) })
     expect(result.current.session?.publicId).toBe('session-1')
   })
 

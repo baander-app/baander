@@ -70,22 +70,22 @@ export interface RadioSession {
 
 // --- Sources ---
 
-export async function getRadioSources(): Promise<RadioSource[]> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/sources')
+export async function getRadioSources(signal?: AbortSignal): Promise<RadioSource[]> {
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/sources', { signal })
   return data.data ?? []
 }
 
 // --- Countries ---
 
-export async function getAvailableCountries(): Promise<CountryInfo[]> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/countries')
+export async function getAvailableCountries(signal?: AbortSignal): Promise<CountryInfo[]> {
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/countries', { signal })
   return data.data ?? []
 }
 
 // --- Subscriptions ---
 
-export async function getSubscriptions(): Promise<CountrySubscription[]> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/subscriptions')
+export async function getSubscriptions(signal?: AbortSignal): Promise<CountrySubscription[]> {
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/subscriptions', { signal })
   return data.data ?? []
 }
 
@@ -108,18 +108,18 @@ export async function refreshCountry(countryCode: string): Promise<{ synced: num
 
 // --- Stations ---
 
-export async function getStations(country?: string, query?: string): Promise<RadioStation[]> {
+export async function getStations(country?: string, query?: string, signal?: AbortSignal): Promise<RadioStation[]> {
   const params: Record<string, string> = {}
   if (country) params.country = country
   if (query) params.q = query
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/stations', { params })
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/stations', { params, signal })
   return data.data ?? []
 }
 
 // --- Starred ---
 
-export async function getStarredStations(): Promise<StarredStation[]> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/starred')
+export async function getStarredStations(signal?: AbortSignal): Promise<StarredStation[]> {
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/starred', { signal })
   return data.data ?? []
 }
 
@@ -134,8 +134,8 @@ export async function unstarStation(stationId: string): Promise<void> {
 
 // --- Session ---
 
-export async function getRadioSession(): Promise<RadioSession | null> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/session')
+export async function getRadioSession(signal?: AbortSignal): Promise<RadioSession | null> {
+  const { data } = await AXIOS_INSTANCE.get('/api/radio/session', { signal })
   return data.data
 }
 

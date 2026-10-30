@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -28,10 +29,12 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
   const setActiveTab = useContextPanelStore((s) => s.setActiveTab)
 
   const handleShuffleAll = async () => {
+    const owner = captureOwnership()
     try {
       const res = await AXIOS_INSTANCE.get('/api/songs', {
         params: { artistId: artist.publicId, limit: 1000 },
       })
+      if (!isCurrentOwnership(owner)) return
       const body = res.data as Record<string, unknown>
       const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
       if (items.length === 0) return
@@ -54,10 +57,12 @@ export function ArtistContextMenu({ artist, children }: ArtistContextMenuProps) 
   }
 
   const handlePlayAll = async () => {
+    const owner = captureOwnership()
     try {
       const res = await AXIOS_INSTANCE.get('/api/songs', {
         params: { artistId: artist.publicId, limit: 1000 },
       })
+      if (!isCurrentOwnership(owner)) return
       const body = res.data as Record<string, unknown>
       const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
       if (items.length === 0) return

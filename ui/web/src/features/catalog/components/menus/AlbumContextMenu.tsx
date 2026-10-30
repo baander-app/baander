@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -48,12 +49,16 @@ export function AlbumContextMenu({ album, tracks, children }: AlbumContextMenuPr
   }
 
   const handlePlayAll = async () => {
+    const owner = captureOwnership()
     const fetched = (await handleFetchTracks()).filter((track) => track.available === true)
+    if (!isCurrentOwnership(owner)) return
     if (fetched.length > 0) playTrack(fetched[0], fetched)
   }
 
   const handleShuffleAll = async () => {
+    const owner = captureOwnership()
     const fetched = (await handleFetchTracks()).filter((track) => track.available === true)
+    if (!isCurrentOwnership(owner)) return
     if (fetched.length > 0) {
       const shuffled = [...fetched].sort(() => Math.random() - 0.5)
       playTrack(shuffled[0], shuffled)
@@ -61,19 +66,25 @@ export function AlbumContextMenu({ album, tracks, children }: AlbumContextMenuPr
   }
 
   const handlePlayNext = async () => {
+    const owner = captureOwnership()
     const fetched = await handleFetchTracks()
+    if (!isCurrentOwnership(owner)) return
     if (fetched.length > 0) insertAfterCurrent(fetched)
   }
 
   const handlePlayLast = async () => {
+    const owner = captureOwnership()
     const fetched = await handleFetchTracks()
+    if (!isCurrentOwnership(owner)) return
     if (fetched.length > 0) {
       for (const t of fetched) addToQueue(t)
     }
   }
 
   const handleAddToPlaylist = async () => {
+    const owner = captureOwnership()
     const fetched = await handleFetchTracks()
+    if (!isCurrentOwnership(owner)) return
     if (fetched.length > 0) actions.addToPlaylist(fetched.map((t) => t.publicId))
   }
 

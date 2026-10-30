@@ -153,8 +153,7 @@ describe('SharePlaylistDialog', () => {
     await waitFor(() => expect(within(dialog).getByRole('switch', { name: 'Let collaborators edit' })).toBeChecked())
     const [update] = requestsTo('PATCH', PLAYLIST_URL)
     expect(JSON.parse(String(update[1].body))).toEqual({ isCollaborative: true })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['/api/playlists/'] })
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) })
     expect(requestsTo('GET', PLAYLIST_URL).length).toBeGreaterThanOrEqual(2)
   })
 

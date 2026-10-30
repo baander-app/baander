@@ -185,6 +185,33 @@ activation remains disabled. U7–U8 adoption remains open, including
 draft protection in `EditLibraryDialog`; U9 still owns full producer, browser and
 capacity acceptance.
 
+U7 implementation checkpoint, 2026-10-30: personal collections, notifications,
+preferences, sidebar configuration, EQ profiles and devices now use the shared
+refresh lifecycle. Device registration and session claiming remain explicit
+commands; refreshing a session does not replay its queue. Remote preferences
+retain local edits and expose version conflicts. Transient autosave failures
+retry the latest unsaved state with one bounded timer, while successful reads
+held for a draft acknowledge freshness without repeatedly fetching it.
+Unchanged sidebar and theme snapshots avoid redundant store and DOM updates.
+
+U7 focused verification: the final preference group passes 424 tests across
+14 files. Collections and radio pass 54 tests across eight files; personal,
+account and device consumers pass 63 tests across eleven files. Session checks
+pass 27 tests across four files, including explicit claiming and one-time
+hydration. These focused groups overlap and are not summed. The failed autosave
+regression fails before its fix and passes afterward in
+`/tmp/u7-preference-retry-red.log` and `/tmp/u7-preference-retry-green.log`.
+Scoped ESLint and whitespace checks pass. Full producer and browser acceptance
+remains assigned to U9.
+
+Integrated radio checks exposed a starred-stations action that still bypassed
+the shared mutation hook. The action now refreshes the authoritative radio and
+catalog families. Its regression fails against the old action and passes after
+the change; the final radio group passes thirteen tests across two files.
+StrictMode checks distinguish a canceled initial read from the successful read,
+and the mutation executes once. The playlist dialog's six tests pass with the
+required query provider added to its fixture; their behavior assertions remain.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

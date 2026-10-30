@@ -1,3 +1,7 @@
+import { catalogLiveDescriptors } from '../live-descriptors'
+import { playlistLiveDescriptors } from '@/features/playlist/live-descriptors'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, assertCurrentOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import styled from 'styled-components'
 import { useMergeStore } from '../stores/merge-store'
 import {
@@ -86,20 +90,30 @@ export function MergeAlbumsDialog() {
   )
 
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
 
   const mergeMutation = useMutation({
-    mutationFn: ({ sourcePublicId, targetPublicId }: { sourcePublicId: string; targetPublicId: string }) =>
-      AXIOS_INSTANCE.post('/api/albums/merge', {
-        targetPublicId,
-        sourcePublicId,
-      }),
-    onSuccess: () => {
+    mutationFn: async ({ sourcePublicId, targetPublicId }: { sourcePublicId: string; targetPublicId: string }) => {
+      const owner = captureOwnership()
+      const release = coordinator?.beginMutation(['catalog', 'playlists'])
+      try {
+        const result = await AXIOS_INSTANCE.post('/api/albums/merge', { targetPublicId, sourcePublicId })
+        assertCurrentOwnership(owner)
+        return result
+      } finally {
+        release?.()
+        if (!coordinator && isCurrentOwnership(owner)) {
+          await queryClient.invalidateQueries({
+            predicate: query => [...catalogLiveDescriptors, ...playlistLiveDescriptors]
+              .some(descriptor => descriptor.refreshPolicy !== 'demand' && descriptor.matches(query.queryKey)),
+          })
+        }
+      }
+    },
+    onSuccess: (_result, submitted) => {
       toast.success('Albums merged successfully')
-      // A merge restructures album data across index/show/duplicates views with
-      // inconsistent query-key shapes, so invalidate all and let active queries refetch
-      // rather than destroying SPA state with a full reload.
-      queryClient.invalidateQueries()
-      closeMerge()
+      const current = useMergeStore.getState()
+      if (current.sourcePublicId === submitted.sourcePublicId && current.targetPublicId === submitted.targetPublicId) closeMerge()
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : 'Failed to merge albums')

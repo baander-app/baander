@@ -1,19 +1,17 @@
 import type { QueryClient } from '@tanstack/react-query'
-import {
-  getGetPlaylistIndexQueryKey,
-  getGetPlaylistShowQueryKey,
-} from '@/shared/api-client/gen/endpoints'
+import type { LiveQueryCoordinator } from '@/shared/live/query-coordinator'
 
-/** Refetches the list and the one playlist after a change to either. */
-export async function invalidatePlaylistQueries(queryClient: QueryClient, publicId: string): Promise<void> {
-  await Promise.all([
-    queryClient.invalidateQueries({ queryKey: getGetPlaylistShowQueryKey(publicId) }),
-    queryClient.invalidateQueries({ queryKey: getGetPlaylistIndexQueryKey() }),
-  ])
-}
-
-/** Forgets one playlist the viewer can no longer read, and refetches the list. */
-export async function forgetPlaylistQueries(queryClient: QueryClient, publicId: string): Promise<void> {
-  queryClient.removeQueries({ queryKey: getGetPlaylistShowQueryKey(publicId) })
-  await queryClient.invalidateQueries({ queryKey: getGetPlaylistIndexQueryKey() })
+/** Refresh every list, filter and detail variant through the same family. */
+export async function invalidatePlaylistQueries(
+  queryClient: QueryClient,
+  coordinator?: LiveQueryCoordinator | null,
+): Promise<void> {
+  if (coordinator) {
+    coordinator.hint(['playlists'])
+    return
+  }
+  await queryClient.invalidateQueries({
+    predicate: query => typeof query.queryKey[0] === 'string'
+      && /^\/api\/playlists\/(?:[^/]+)?$/.test(query.queryKey[0]),
+  })
 }

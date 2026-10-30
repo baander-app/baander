@@ -131,7 +131,7 @@ describe('PlaylistDetailPage sharing controls', () => {
     const deletes = mockRequest.mock.calls.filter(([, options]) => options.method === 'DELETE')
     expect(deletes).toHaveLength(1)
     expect(deletes[0][0]).toBe(`${PLAYLIST_URL}/collaborators/${COLLABORATOR}`)
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['/api/playlists/'] })
+    expect(invalidate).toHaveBeenCalledWith({ predicate: expect.any(Function) })
     expect(remove).toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
     expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()

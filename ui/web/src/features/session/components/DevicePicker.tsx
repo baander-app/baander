@@ -1,20 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
+import { useGetDeviceList } from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Monitor, Smartphone } from 'lucide-react'
+import { useSessionClaim } from '../hooks/use-session-claim'
 import { getDeviceId } from '../utils/device-id'
 import styled from 'styled-components'
 import { interactiveTransition } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
 
-const DEVICES_KEY = ['devices']
 const SESSION_KEY = ['session', 'current']
-
-interface Device {
-  publicId: string
-  deviceId: string
-  name: string | null
-  lastUsedAt: string | null
-}
 
 const ActiveDeviceWrapper = styled.div`
   display: flex;
@@ -69,38 +63,27 @@ const TransferLabel = styled.span`
 `;
 
 export function DevicePicker() {
-  const queryClient = useQueryClient()
   const myDeviceId = getDeviceId()
 
-  const { data: devices = [] } = useQuery({
-    queryKey: DEVICES_KEY,
-    queryFn: async (): Promise<Device[]> => {
-      const res = await AXIOS_INSTANCE.get('/api/devices')
-      return res.data?.data ?? []
-    },
+  const { data: devices = [] } = useGetDeviceList({
+    query: { select: response => response.data ?? [] },
   })
 
   const { data: session } = useQuery({
     queryKey: SESSION_KEY,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
-        const res = await AXIOS_INSTANCE.get('/api/session')
+        const res = await AXIOS_INSTANCE.get('/api/session', { signal })
         return res.data?.data ?? res.data ?? null
-      } catch {
-        return null
+      } catch (error) {
+        if ((error as { response?: { status?: number } }).response?.status === 404) return null
+        throw error
       }
     },
     staleTime: 30_000,
   })
 
-  const claimMutation = useMutation({
-    mutationFn: async () => {
-      await AXIOS_INSTANCE.post('/api/session/claim', { deviceId: myDeviceId })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SESSION_KEY })
-    },
-  })
+  const claimMutation = useSessionClaim()
 
   const activeDeviceId = session?.activeDeviceId ?? null
   const isActive = activeDeviceId === devices.find(d => d.deviceId === myDeviceId)?.publicId

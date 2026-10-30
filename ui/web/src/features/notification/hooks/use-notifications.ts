@@ -49,7 +49,7 @@ export function useNotifications() {
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
     loadMore: () => {
-      if (query.hasNextPage && !query.isFetching) void query.fetchNextPage()
+      if (query.hasNextPage && !query.isFetching) query.fetchNextPage().catch(() => {})
     },
     refetch: query.refetch,
   }

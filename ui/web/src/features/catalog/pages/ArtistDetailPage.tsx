@@ -1,3 +1,4 @@
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Play, Shuffle } from 'lucide-react'
@@ -167,8 +168,10 @@ export function ArtistDetailPage() {
   }
 
   const handlePlay = async () => {
+    const owner = captureOwnership()
     try {
       const tracks = await fetchArtistSongs()
+      if (!isCurrentOwnership(owner)) return
       if (tracks.length > 0) playTrack(tracks[0], tracks)
     } catch {
       // Silently fail
@@ -176,8 +179,10 @@ export function ArtistDetailPage() {
   }
 
   const handleShuffle = async () => {
+    const owner = captureOwnership()
     try {
       const tracks = await fetchArtistSongs()
+      if (!isCurrentOwnership(owner)) return
       if (tracks.length === 0) return
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
       if (shuffled.length > 0) playTrack(shuffled[0], shuffled)

@@ -3,7 +3,7 @@ import { keyStartsWith, type LiveQueryDescriptor } from '@/shared/live/descripto
 export const sessionLiveDescriptors: readonly LiveQueryDescriptor[] = [
   {
     family: 'devices',
-    matches: key => keyStartsWith(key, 'devices') || keyStartsWith(key, '/api/devices'),
+    matches: key => keyStartsWith(key, '/api/devices'),
   },
   {
     family: 'sessions',

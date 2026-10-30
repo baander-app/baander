@@ -23,6 +23,6 @@ export const notificationLiveCoverage = [
       "src/features/notification/hooks/use-notifications.ts#useQuery:unreadCountKey=['notification-unread-count']asconst",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/notification/hooks/__tests__/use-notifications.test.tsx"], endToEnd: "pending" },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

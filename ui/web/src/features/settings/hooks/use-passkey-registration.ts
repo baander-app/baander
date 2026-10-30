@@ -1,3 +1,5 @@
+import { useLiveCoordinator } from '@/shared/live/context';
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { postPasskeyOptions, postPasskeyRegister } from '@/shared/api-client/gen/endpoints';
@@ -23,18 +25,24 @@ export function usePasskeyRegistration() {
   });
   const mountedRef = useRef(true);
   const queryClient = useQueryClient();
+  const coordinator = useLiveCoordinator();
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
   const register = useCallback(async (name = 'Passkey') => {
+    const owner = captureOwnership();
+    const current = () => mountedRef.current && isCurrentOwnership(owner);
+    const release = coordinator?.beginMutation(['account']);
     setState({ loading: true, error: null, success: false });
 
     try {
       const result = await postPasskeyOptions({ method: 'POST' }) as unknown as { data: PasskeyOptionsResponse };
+      if (!current()) return;
       const { challengeKey, options } = result.data;
 
       const credential = await navigator.credentials.create({
@@ -53,8 +61,9 @@ export function usePasskeyRegistration() {
         } as PublicKeyCredentialCreationOptions,
       });
 
+      if (!current()) return;
       if (!credential) {
-        if (mountedRef.current) {
+        if (current()) {
           setState({ loading: false, error: 'Passkey creation was cancelled. Please try again.', success: false });
         }
         return;
@@ -67,12 +76,12 @@ export function usePasskeyRegistration() {
         name,
       });
 
-      if (mountedRef.current) {
+      if (current()) {
         setState({ loading: false, error: null, success: true });
-        queryClient.invalidateQueries({ queryKey: PASSKEYS_QUERY_KEY });
+        if (!coordinator) queryClient.invalidateQueries({ queryKey: PASSKEYS_QUERY_KEY });
       }
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!current()) return;
 
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
         // User cancelled the WebAuthn dialog — not an error
@@ -83,8 +92,10 @@ export function usePasskeyRegistration() {
       const message =
         err instanceof Error ? err.message : 'Failed to register passkey';
       setState({ loading: false, error: message, success: false });
+    } finally {
+      release?.();
     }
-  }, [queryClient]);
+  }, [queryClient, coordinator]);
 
   return {
     register,

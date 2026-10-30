@@ -1,14 +1,11 @@
-import { useState } from 'react'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { isAxiosError } from 'axios'
+import { useDeletePlaylistRemoveCollaborator, usePatchPlaylistUpdate, usePutPlaylistAddCollaborator } from '@/features/playlist/hooks/use-playlist-mutations'
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
 import { Copy, Share2, X } from 'lucide-react'
-import {
-  useDeletePlaylistRemoveCollaborator,
-  useGetPlaylistShow,
-  usePatchPlaylistUpdate,
-  usePutPlaylistAddCollaborator,
-} from '@/shared/api-client/gen/endpoints'
-import { invalidatePlaylistQueries } from '../lib/playlist-queries'
+import { getGetPlaylistShowQueryKey, useGetPlaylistShow } from '@/shared/api-client/gen/endpoints'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { createLogger } from '@/shared/lib/logger'
 import { Button } from '@/shared/components/ui/button'
@@ -144,17 +141,19 @@ export function SharePlaylistDialog({ playlistPublicId }: SharePlaylistDialogPro
 /** Mounted only while the dialog is open, so every opening reads the server's state. */
 function SharePlaylistForm({ playlistPublicId }: SharePlaylistDialogProps) {
   const queryClient = useQueryClient()
-  const { data } = useGetPlaylistShow(playlistPublicId)
-  const playlist = data?.data
+  const { data, error: readError } = useGetPlaylistShow(playlistPublicId)
+  const denied = isAxiosError(readError) && [403, 404].includes(readError.response?.status ?? 0)
+  const playlist = denied ? undefined : data?.data
+  useEffect(() => {
+    if (denied && playlistPublicId) queryClient.setQueryData(getGetPlaylistShowQueryKey(playlistPublicId), {})
+  }, [denied, playlistPublicId, queryClient])
   const [newCollaborator, setNewCollaborator] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<CopyState>('idle')
 
-  const refresh = () => invalidatePlaylistQueries(queryClient, playlistPublicId)
   const mutationOptions = (fallback: string) => ({
     mutation: {
       onMutate: () => setError(null),
-      onSuccess: refresh,
       onError: (failure: unknown) => setError(parseApiError(failure, fallback).message),
     },
   })
@@ -163,14 +162,14 @@ function SharePlaylistForm({ playlistPublicId }: SharePlaylistDialogProps) {
   const addCollaborator = usePutPlaylistAddCollaborator({
     mutation: {
       ...mutationOptions('The collaborator could not be added.').mutation,
-      onSuccess: async () => {
-        setNewCollaborator('')
-        await refresh()
+      onSuccess: (_data: unknown, variables: { userPublicId: string }) => {
+        setNewCollaborator(current => current.trim() === variables.userPublicId ? '' : current)
       },
     },
   })
   const removeCollaborator = useDeletePlaylistRemoveCollaborator(mutationOptions('The collaborator could not be removed.'))
 
+  if (denied || (data !== undefined && !playlist)) return <p>This playlist is no longer available.</p>
   if (!playlist) return null
 
   const collaborators = playlist.collaboratorPublicIds ?? []
@@ -184,14 +183,15 @@ function SharePlaylistForm({ playlistPublicId }: SharePlaylistDialogProps) {
   }
 
   const copyOwnPublicId = async () => {
+    const owner = captureOwnership()
     const ownerPublicId = playlist.ownerPublicId ?? ''
     try {
       if (!navigator.clipboard) throw new Error('The clipboard is unavailable')
       await navigator.clipboard.writeText(ownerPublicId)
-      setCopyState('copied')
+      if (isCurrentOwnership(owner)) setCopyState('copied')
     } catch (failure: unknown) {
       logger.warn('Could not copy the public id:', failure)
-      setCopyState('failed')
+      if (isCurrentOwnership(owner)) setCopyState('failed')
     }
   }
 

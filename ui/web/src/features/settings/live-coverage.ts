@@ -48,7 +48,14 @@ export const settingsLiveCoverage = [
       "src/features/settings/hooks/use-user-settings.ts#useGetUserSettingsIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/preferences-consumers.test.tsx",
+        "src/features/settings/__tests__/preference-conflict-lifecycle.test.ts",
+        "src/features/settings/__tests__/use-preference-bootstrap.test.tsx",
+      ],
+      endToEnd: 'pending',
+    },
   },
   {
     id: "settings.account",
@@ -70,6 +77,12 @@ export const settingsLiveCoverage = [
       "src/features/settings/hooks/use-passkey-list.ts#useQuery:PASSKEYS_QUERY_KEY=['passkeys']asconst",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/preferences-consumers.test.tsx",
+        "src/features/settings/hooks/__tests__/use-passkey-registration.test.ts",
+      ],
+      endToEnd: 'pending',
+    },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]
