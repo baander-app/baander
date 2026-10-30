@@ -30,6 +30,12 @@
                   <Item>
                     <option name="path" value="composer.json" />
                   </Item>
+                  <Item>
+                    <option name="path" value="packages/baander-tooling/composer.json" />
+                  </Item>
+                  <Item>
+                    <option name="path" value="relay/composer.json" />
+                  </Item>
                 </list>
               </option>
             </SchemaInfo>
