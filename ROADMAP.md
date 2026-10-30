@@ -23,6 +23,25 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Cohesive live updates
+
+Implementation plan delivered, 2026-10-30, in the
+[live update architecture plan](docs/plans/2026-10-30-2030-feat-cohesive-live-updates-plan.md).
+The confirmed scope covers all React Query server state and related readers such
+as sidebar Recents. Nine units in three dependent review groups cover transactional
+change capture, scoped revisions, shared WebSocket delivery, targeted query
+refresh, recovery, and authorization. Unsaved edits and active playback remain
+protected. Runtime implementation and acceptance are still open.
+
+Verification checkpoint: an independent source check confirmed six grounding
+claims with their scope limits. Repository, PostgreSQL, framework, and flow
+research grounds the implementation decisions. All seven document-review lenses
+returned without findings; the confidence, contract-preservation, prose, and
+whitespace checks pass. The plan assigns transaction races, multi-worker delivery,
+access revocation, drafts, pagination, and capacity tests to implementation.
+No application tests ran for this documentation change; planning evidence does
+not establish working live updates.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

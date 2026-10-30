@@ -312,6 +312,15 @@ functional/integration lane owns a disposable Compose project with separate
 PostgreSQL, Redis and application containers. Together, the lane manifests must
 contain every discovered test file exactly once.
 
+## Live updates
+
+### Scope revision
+
+The live-update design's durable freshness marker for a query topic and audience.
+It advances when committed source changes are projected, and several changes may
+share one advance. It identifies a need to refetch current data, not an entity
+version, a business-operation count, or a position in replayable event history.
+
 ## Store debugging
 
 ### Recorder instance
