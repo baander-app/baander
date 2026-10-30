@@ -46,6 +46,8 @@ extern "C" {
   (AAC_ENCODER_ELD_DELAY(frame_length) + AAC_CLDFB_DELAY + 1)
 /* One raw_data_block of up to 6144 bits per channel plus the ADTS header. */
 #define AAC_ENCODER_MAX_FRAME_BYTES (AAC_MAX_CHANNELS * 6144 / 8 + AAC_ADTS_HEADER_SIZE)
+/* The extension_payload() an AAC-ELD frame carries (ELD v2's spatial frame). */
+#define AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES 1024
 
 #define AAC_ENC_TNS_MAX_ORDER 12
 #define AAC_ENC_TNS_MAX_FILTERS 2
@@ -166,6 +168,10 @@ using AacEncoderState = struct AacEncoderState_ {
   int ld_sbr_dual_rate;
   int ld_sbr_crc; /* a 10-bit CRC in front of every element's sbr_data() */
   AacSbrLdEncoder* ld_sbr_enc[AAC_MAX_ELEMENTS];
+  /* AAC-ELD: the extension_payload() of the next frame (ELD v2's
+   * MPEG Surround payload), written once after the elements */
+  uint8_t ext_payload[AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES];
+  int ext_payload_bits;
   float sbr_in[AAC_MAX_CHANNELS][2 * AAC_FRAME_SIZE_LONG]; /* full-rate input */
   float core_in[AAC_MAX_CHANNELS][AAC_FRAME_SIZE_LONG];    /* half-rate core signal */
   AacMdct mdct_long, mdct_short;

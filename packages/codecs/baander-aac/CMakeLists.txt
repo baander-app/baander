@@ -46,6 +46,7 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/usac_frame.cpp src/mps212.cpp src/mps212_tables.cpp
     src/mps_tables.cpp src/mps_tree.cpp src/mps_dec.cpp
     src/mps_params.cpp src/mps_config.cpp src/mps_frame.cpp src/mps_glue.cpp
+    src/mps_ld.cpp src/mps_ld_tables.cpp
     src/usac_lpd.cpp src/usac_lpc.cpp src/usac_acelp.cpp src/usac_tcx.cpp src/usac_fac.cpp
     src/usac_lpd_tables.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp

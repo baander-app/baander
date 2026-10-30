@@ -3,6 +3,7 @@
 #include "asc.h"
 #include "channel_map.h"
 #include "er.h"
+#include "mps_ld.h"
 
 #include <algorithm>
 #include <cmath>
@@ -524,6 +525,7 @@ void imdct_and_window(AacDecoderState* s, AacDecoderChannel* ch) {
 /* ── MPEG Surround (ISO/IEC 23003-1) ───────────────────────────── */
 
 constexpr int kExtSacData = 12;      /* extension_type of the surround payload (Table 4.56) */
+constexpr int kExtLdSacData = 9;     /* extension_type of the low-delay surround payload of ELD v2 */
 constexpr int kSacMaxPayload = 4096; /* bytes of payload gathered across the fill elements of a block */
 constexpr int kMpsBoxes = AAC_MPS_MAX_OTT_BOXES + AAC_MPS_MAX_TTT_BOXES;
 constexpr int kQmfPairDelay = 577;   /* samples the 64-band analysis and synthesis pair delays by */
@@ -556,6 +558,9 @@ struct AacDecoderMps_ {
   int frame_read; /* a spatial frame of this block was parsed */
   AacQmfAnalysis analysis[AAC_MPS_MAX_INPUT_CHANNELS];
   AacQmfSynthesis synthesis[AAC_MPS_MAX_OUTPUT_CHANNELS];
+  /* the low-delay filterbanks of the ELD v2 path */
+  AacMpsLdAnalysis ld_analysis[AAC_MPS_MAX_INPUT_CHANNELS];
+  AacMpsLdSynthesis ld_synthesis[AAC_MPS_MAX_OUTPUT_CHANNELS];
   AacUsacQmfFrame in[AAC_MPS_MAX_INPUT_CHANNELS];
   AacUsacQmfFrame out[AAC_MPS_MAX_OUTPUT_CHANNELS];
   float align_pcm[AAC_MPS_MAX_INPUT_CHANNELS][kInputAlignSamples]; /* the no-SBR input delay line */
@@ -582,13 +587,22 @@ int mps_qmf_slots(const AacDecoderState* s) {
 }
 
 /* Whether the surround decoder can run on this stream: a mono or stereo
- * core of the plain filterbanks (the ELD and LD cores have their own
- * low-delay filterbanks) without parametric stereo, whose only element
- * is the downmix of the configured tree. */
+ * core without parametric stereo, whose only element is the downmix of
+ * the configured tree; the AAC form on the plain filterbanks (the ELD
+ * and LD cores have their own), the low-delay form on an AAC-ELD core
+ * at its full rate without LD-SBR (whose QMF output the low-delay path
+ * does not take yet). */
 bool mps_core_fits(const AacDecoderState* s) {
   const AacDecoderMps_* m = s->mps;
-  if (!m || !m->cfg_valid || s->ps_output || s->ld_sbr_mode || s->aot == AAC_AOT_ER_LD ||
-      s->aot == AAC_AOT_ER_ELD || s->layout_source == 0 || s->layout.num_elements != 1) {
+  if (!m || !m->cfg_valid || s->ps_output || s->ld_sbr_mode || s->layout_source == 0 ||
+      s->layout.num_elements != 1) {
+    return false;
+  }
+  if (m->cfg.low_delay) {
+    if (s->aot != AAC_AOT_ER_ELD || s->eld_downscale != 1) {
+      return false;
+    }
+  } else if (s->aot == AAC_AOT_ER_LD || s->aot == AAC_AOT_ER_ELD) {
     return false;
   }
   const int type = s->layout.elems[0].type;
@@ -620,9 +634,11 @@ AacMpsState* mps_state(AacDecoderState* s) {
     aac_mps_set_residual_reader(m->st, mps_residual_reader, s);
     for (int c = 0; c < AAC_MPS_MAX_INPUT_CHANNELS; c++) {
       aac_qmf_analysis_init(&m->analysis[c], 64);
+      aac_mps_ld_analysis_init(&m->ld_analysis[c]);
     }
     for (int c = 0; c < AAC_MPS_MAX_OUTPUT_CHANNELS; c++) {
       aac_qmf_synthesis_init(&m->synthesis[c], 64);
+      aac_mps_ld_synthesis_init(&m->ld_synthesis[c]);
     }
     for (int b = 0; b < kMpsBoxes; b++) {
       memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
@@ -630,6 +646,27 @@ AacMpsState* mps_state(AacDecoderState* s) {
     }
   }
   return m->st;
+}
+
+/* extension_payload() of type EXT_LDSAC_DATA in an AAC-ELD frame: the
+ * ancType, ancStart and ancStop bits of the AAC form, then the spatial
+ * frame of the low-delay form, which runs to the end of the frame.  The
+ * reader is left after the frame; the padding that follows is
+ * nothing more of the block. */
+int decode_ldsac(AacDecoderState* s, AacBitReader* r) {
+  aac_bitreader_skip(r, 4); /* extension_type */
+  aac_bitreader_skip(r, 2); /* ancType */
+  const int anc_start = (int)aac_bitreader_read(r, 1);
+  const int anc_stop = (int)aac_bitreader_read(r, 1);
+  AacDecoderMps_* m = s->mps;
+  if (!m || !m->cfg_valid || !m->cfg.low_delay || !anc_start || !anc_stop) {
+    return 0; /* a payload in segments is not an ELD v2 frame */
+  }
+  AacMpsState* st = mps_state(s);
+  if (st && aac_mps_read_frame(st, r) == AAC_OK) {
+    m->frame_read = 1;
+  }
+  return r->overread ? AAC_ERR_DECODE : 0;
 }
 
 /* ResidualData(): one AAC-LC individual_channel_stream per residual
@@ -775,7 +812,20 @@ void mps_stage(AacDecoderState* s, bool active) {
   const int nout = m->cfg.num_output_channels;
   const int q = m->st_qmf_slots;
   AacDecoderChannel* chans = &s->ch[s->elem_base[0]];
-  if (!s->sbr_mode) {
+  if (m->cfg.low_delay) {
+    /* The ELD v2 path: the core output through the low-delay filterbank
+     * as it comes, the parameters of the frame on the frame's own slots. */
+    for (int c = 0; c < nin; c++) {
+      for (int n = 0; n < q; n++) {
+        float in[64];
+        for (int i = 0; i < 64; i++) {
+          in[i] = chans[c].output[64 * n + i] * 32768.0f;
+        }
+        aac_mps_ld_analyze(&m->ld_analysis[c], in, m->in[c].x[n]);
+      }
+      m->in[c].slots = q;
+    }
+  } else if (!s->sbr_mode) {
     /* The core output passes a delay line before the analysis so that the
      * spatial parameters meet the audio where the reference decoder
      * applies them. */
@@ -820,7 +870,11 @@ void mps_stage(AacDecoderState* s, bool active) {
   for (int c = 0; c < nout; c++) {
     float* pcm = s->ch[c].output;
     for (int n = 0; n < q; n++) {
-      aac_qmf_synthesize(&m->synthesis[c], m->out[c].x[n], pcm + 64 * n);
+      if (m->cfg.low_delay) {
+        aac_mps_ld_synthesize(&m->ld_synthesis[c], m->out[c].x[n], pcm + 64 * n);
+      } else {
+        aac_qmf_synthesize(&m->synthesis[c], m->out[c].x[n], pcm + 64 * n);
+      }
     }
     for (int i = 0; i < 64 * q; i++) {
       pcm[i] *= 1.0f / 32768.0f;
@@ -849,9 +903,11 @@ void mps_reset(AacDecoderState* s) {
   }
   for (int c = 0; c < AAC_MPS_MAX_INPUT_CHANNELS; c++) {
     aac_qmf_analysis_init(&m->analysis[c], 64);
+    aac_mps_ld_analysis_init(&m->ld_analysis[c]);
   }
   for (int c = 0; c < AAC_MPS_MAX_OUTPUT_CHANNELS; c++) {
     aac_qmf_synthesis_init(&m->synthesis[c], 64);
+    aac_mps_ld_synthesis_init(&m->ld_synthesis[c]);
   }
   for (int b = 0; b < kMpsBoxes; b++) {
     memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
@@ -2059,7 +2115,11 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
       return AAC_ERR_UNSUPPORTED;
     }
     p.sniffing = false;
-    const int ret = decode_er_elements(s, r);
+    int ret = decode_er_elements(s, r);
+    if (ret == 0 && s->aot == AAC_AOT_ER_ELD && aac_bitreader_bits_left(r) >= 8 &&
+        aac_bitreader_peek(r, 4) == (uint32_t)kExtLdSacData) {
+      ret = decode_ldsac(s, r);
+    }
     if (ret) {
       if (!conceal) {
         aac_decoder_note_lost_block(s);
@@ -2250,6 +2310,11 @@ int aac_decoder_mps_delay(const AacDecoderState* s) {
    * back the frames being gathered. */
   const int slots = aac_mps_config(s->mps->st)->frame_length;
   const int gathered = slots > s->mps->st_qmf_slots ? slots - s->mps->st_qmf_slots : 0;
+  if (s->mps->cfg.low_delay) {
+    /* the low-delay filterbank pair alone: no hybrid filterbank, no
+     * input alignment */
+    return AAC_MPS_LD_DELAY + gathered * 64;
+  }
   if (s->sbr_mode) {
     return (kInputAlignSlots + 6 + gathered) * 64;
   }

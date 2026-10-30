@@ -883,6 +883,13 @@ int write_er_frame(AacEncoderState* s) {
       aac_sbr_ld_enc_write(sbr, &w);
     }
   }
+  if (eld && s->ext_payload_bits > 0) {
+    /* the extension_payload() of ELD v2, once, as the caller gave it */
+    for (int i = 0; i < s->ext_payload_bits; i++) {
+      aac_bitwriter_write(&w, (s->ext_payload[i / 8] >> (7 - i % 8)) & 1u, 1);
+    }
+    s->ext_payload_bits = 0;
+  }
   aac_bitwriter_byte_align(&w);
   if (aac_bitwriter_overflow(&w)) {
     return AAC_ERR_OVERFLOW;

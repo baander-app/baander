@@ -185,6 +185,15 @@ const AacMpsFrameParams* aac_mps_frame_params(const AacMpsState* s);
  * `cfg` with low_delay set. */
 int aac_mps_config_read_ld(AacBitReader* r, AacMpsConfig* cfg);
 
+/* Writes the low-delay form of `cfg` (the fields aac_mps_config_read_ld
+ * reads, ByteAlign() from the config's start, the residual extension
+ * when cfg->residual_coding is set, no other extension), so that the
+ * written bytes read back as the same configuration.  Returns the
+ * number of bytes written, or AAC_ERR_INVALID_ARG for a configuration
+ * the form cannot express (an unsupported tree, bs3DaudioMode, a frame
+ * length above 32 slots). */
+int aac_mps_config_write_ld(const AacMpsConfig* cfg, AacBitWriter* w);
+
 /* The parameter bands of a bsFreqRes value in the low-delay form (no
  * hybrid bands: 23, 15, 12, 9, 7, 5, 4). */
 int aac_mps_param_bands_ld(int freq_res);

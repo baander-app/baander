@@ -141,6 +141,24 @@ int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length) {
   return aac_encoder_state_set_frame_length(s, frame_length);
 }
 
+int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data, int nbits) {
+  if (!ctx || nbits < 0 || (nbits > 0 && !data)) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_ER_ELD) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (nbits > 8 * AAC_ENCODER_MAX_EXT_PAYLOAD_BYTES) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (nbits > 0) {
+    memcpy(s->ext_payload, data, (size_t)((nbits + 7) / 8));
+  }
+  s->ext_payload_bits = nbits;
+  return 0;
+}
+
 int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;

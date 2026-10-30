@@ -196,6 +196,30 @@ void test_committed_streams_decode() {
   }
 }
 
+/* AAC-ELD v2: the ELD core with the low-delay 2-1-2 payload decodes
+ * to stereo and matches libxaac's decode per channel; both carry the
+ * low-delay filterbank pair's delay over the core. */
+void test_eld_v2() {
+  const char* stream = "mps_212_eld.loas";
+  const Decoded d = decode_stream(stream, 0);
+  CHECK(d.errors == 0, "%s: %d errors", stream, d.errors);
+  CHECK(d.frames == 190, "%s: %d frames", stream, d.frames);
+  CHECK(d.channels == 2, "%s: %d channels", stream, d.channels);
+  CHECK(d.has_surround == 1, "%s: surround flagged", stream);
+  CHECK(d.object_type == AAC_AOT_ER_ELD, "%s: core object type %d", stream, d.object_type);
+  CHECK(d.delay == 256, "%s: delay %d", stream, d.delay);
+  int wav_channels = 0;
+  const std::vector<float> ref = read_wav16("mps_212_eld_xaac.wav", &wav_channels);
+  CHECK(wav_channels == 2, "eld xaac wav: %d channels", wav_channels);
+  if (d.channels != 2 || wav_channels != 2) {
+    return;
+  }
+  for (int c = 0; c < 2; c++) {
+    const double snr = channel_snr_db(ref, d.pcm, 2, c);
+    CHECK(snr >= 40.0, "%s: %s %.1f dB against libxaac", stream, kNames[c], snr);
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -203,5 +227,6 @@ int main() {
   test_stereo_request();
   test_asc_form();
   test_committed_streams_decode();
+  test_eld_v2();
   return test_summary("test_mps_stream");
 }

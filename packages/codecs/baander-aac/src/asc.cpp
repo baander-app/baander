@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "aac_tables.h"
+#include "mps_internal.h"
 #include "sbr_ld.h"
 
 namespace {
@@ -128,10 +129,36 @@ int ld_sbr_header_count(int channel_config) {
 }
 
 constexpr int kEldExtTerm = 0;
+constexpr int kEldExtLdSac = 2; /* eldExtType of the low-delay MPEG Surround configuration */
+constexpr int kEldExtMaxBytes = 64;
+
+/* The low-delay SpatialSpecificConfig of an ELDEXT_LDSAC extension:
+ * `len` bytes from the reader's position, read through a copy so that
+ * the configuration's extension loop is bounded to the extension and
+ * its byte alignment counts from the configuration's start. */
+int read_eld_ldsac(AacBitReader* r, int len, AacAsc* asc) {
+  if (len <= 0 || len > kEldExtMaxBytes || aac_bitreader_bits_left(r) < 8 * len) {
+    return AAC_ERR_DECODE;
+  }
+  uint8_t bytes[kEldExtMaxBytes];
+  for (int i = 0; i < len; i++) {
+    bytes[i] = (uint8_t)aac_bitreader_read(r, 8);
+  }
+  AacBitReader sub;
+  aac_bitreader_init(&sub, bytes, len);
+  const int ret = aac_mps_config_read_ld(&sub, &asc->mps);
+  if (ret) {
+    return ret;
+  }
+  asc->mps_present = 1;
+  asc->sac_payload_embedding = 1;
+  return 0;
+}
 
 /* ELDSpecificConfig() (Table 4.180): the frame length, the resilience
- * flags, the low-delay SBR signalling with its headers, and extensions
- * (such as the SAOC and LD MPEG Surround payloads) that are skipped. */
+ * flags, the low-delay SBR signalling with its headers, and extensions:
+ * the low-delay MPEG Surround configuration of ELD v2 is read, the
+ * others (such as SAOC) are skipped. */
 int read_eld_config(AacBitReader* r, AacAsc* asc) {
   asc->frame_length = aac_bitreader_read(r, 1) ? 480 : 512;
   asc->section_resilience = (int)aac_bitreader_read(r, 1);
@@ -162,6 +189,13 @@ int read_eld_config(AacBitReader* r, AacAsc* asc) {
     if (aac_bitreader_bits_left(r) < 8 * len) {
       return AAC_ERR_DECODE;
     }
+    if (ext_type == kEldExtLdSac && !asc->mps_present) {
+      const int ret = read_eld_ldsac(r, len, asc);
+      if (ret) {
+        return ret;
+      }
+      continue;
+    }
     aac_bitreader_skip(r, 8 * len);
   }
   return r->overread ? AAC_ERR_DECODE : 0;
@@ -179,6 +213,26 @@ void write_eld_config(AacBitWriter* w, const AacAsc* asc) {
     const int n = ld_sbr_header_count(asc->channel_config);
     for (int i = 0; i < n; i++) {
       aac_sbr_ld_header_write(&asc->ld_sbr_header[i], w);
+    }
+  }
+  if (asc->mps_present) {
+    /* the low-delay MPEG Surround configuration as an ELDEXT_LDSAC
+     * extension of its byte length */
+    uint8_t bytes[kEldExtMaxBytes];
+    AacBitWriter sub;
+    aac_bitwriter_init(&sub, bytes, kEldExtMaxBytes);
+    const int len = aac_mps_config_write_ld(&asc->mps, &sub);
+    if (len > 0) {
+      aac_bitwriter_write(w, kEldExtLdSac, 4);
+      if (len < 15) {
+        aac_bitwriter_write(w, (uint32_t)len, 4);
+      } else {
+        aac_bitwriter_write(w, 15, 4);
+        aac_bitwriter_write(w, (uint32_t)(len - 15), 8);
+      }
+      for (int i = 0; i < len; i++) {
+        aac_bitwriter_write(w, bytes[i], 8);
+      }
     }
   }
   aac_bitwriter_write(w, kEldExtTerm, 4);

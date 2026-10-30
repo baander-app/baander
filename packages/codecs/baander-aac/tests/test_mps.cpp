@@ -250,6 +250,34 @@ void test_config_low_delay() {
   CHECK(aac_mps_config_read_ld(&r, &cfg) == AAC_OK, "low-delay 5151 parses");
   CHECK(cfg.one_icc == 1 && cfg.fixed_gain_sur == 2 && cfg.fixed_gain_lfe == 1, "ld 5151 gains");
   CHECK(cfg.ott_bands[4] == 2, "ld lfe bands");
+  /* the library's writer of the low-delay form against its reader */
+  for (int variant = 0; variant < 3; variant++) {
+    Options o;
+    o.tree = AAC_MPS_TREE_212;
+    o.freq_res = 1 + variant * 2;
+    o.arbdmx = variant == 2;
+    o.gain_dmx = 3 + variant;
+    o.temp_shape = variant;
+    o.quant_mode = variant;
+    const AacMpsConfig written = mpsenc::make_config_ld(o);
+    Bits b(64);
+    const int len = aac_mps_config_write_ld(&written, &b.w);
+    CHECK(len > 0, "ld variant %d writes (%d)", variant, len);
+    const std::vector<uint8_t> wbytes = b.bytes();
+    CHECK((int)wbytes.size() == len, "ld variant %d: %d bytes", variant, len);
+    aac_bitreader_init(&r, wbytes.data(), (int)wbytes.size());
+    CHECK(aac_mps_config_read_ld(&r, &cfg) == AAC_OK, "ld variant %d parses", variant);
+    CHECK(cfg.low_delay == 1 && cfg.sampling_frequency == 48000, "ld variant %d rate", variant);
+    CHECK(cfg.frame_length == mpsenc::kLdSlots && cfg.tree_config == AAC_MPS_TREE_212, "ld variant %d frame",
+          variant);
+    CHECK(cfg.freq_res == o.freq_res && cfg.ott_bands[0] == aac_mps_param_bands_ld(o.freq_res),
+          "ld variant %d bands %d", variant, cfg.ott_bands[0]);
+    CHECK(cfg.quant_mode == o.quant_mode && cfg.arbitrary_downmix == (o.arbdmx ? 1 : 0) &&
+              cfg.fixed_gain_dmx == o.gain_dmx && cfg.temp_shape_config == o.temp_shape,
+          "ld variant %d fields", variant);
+    CHECK(cfg.decorr_config == 0 && cfg.num_input_channels == 1 && cfg.num_output_channels == 2,
+          "ld variant %d layout", variant);
+  }
 }
 
 /* ── the frame ──────────────────────────────────────────────────── */
@@ -368,6 +396,110 @@ int compare(const AacMpsState* st, const Config& c, const FrameParams& p) {
     }
   }
   return bad;
+}
+
+/* The low-delay frame: the tool's writer of the low-delay SpatialFrame
+ * against the reader, with one or two parameter sets, both framing
+ * types, PCM and Huffman coding, smoothing and the arbitrary downmix. */
+void test_ld_frame_round_trips() {
+  using mpsenc::kLdSlots;
+  const Books books;
+  for (int variant = 0; variant < 6; variant++) {
+    Options o;
+    o.tree = AAC_MPS_TREE_212;
+    o.freq_res = 1 + (variant % 3) * 2;
+    o.arbdmx = variant == 5;
+    o.smooth = variant == 4;
+    o.temp_shape = variant == 3 ? 1 : 0;
+    const int sets = 1 + variant % 2;
+    const int framing = variant >= 3 ? 1 : 0;
+    const AacMpsConfig mps = mpsenc::make_config_ld(o);
+    Config c;
+    memset(&c, 0, sizeof(c));
+    c.tree = AAC_MPS_TREE_212;
+    c.freq_res = o.freq_res;
+    c.bands = mps.ott_bands[0];
+    c.num_ott = 1;
+    c.num_in = 1;
+    c.ott_bands[0] = c.bands;
+    c.gain_dmx = o.gain_dmx;
+    c.smooth = o.smooth;
+    c.temp_shape = o.temp_shape;
+    c.arbdmx = o.arbdmx;
+    AacMpsState* st = aac_mps_create(&mps, mpsenc::kLdFrame, kLdSlots, 48000);
+    CHECK(st != NULL, "ld variant %d: state", variant);
+    if (!st) continue;
+    EcOpts ec;
+    ec.huffman = variant % 2 == 1;
+    ec.pairs = false;
+    ec.two_d = ec.huffman;
+    ec.aac_form = false;
+    History h;
+    init_history(c, h);
+    int bad = 0;
+    for (int frame = 0; frame < 12; frame++) {
+      FrameParams p;
+      random_params(c, sets, framing, p);
+      for (int i = 0; i < sets; i++) {
+        p.slot[i] = framing ? (kLdSlots * (2 * i + 1)) / (2 * sets) : (kLdSlots * (i + 1)) / sets - 1;
+      }
+      p.indep = frame % 5 == 0;
+      Bits fb;
+      mpsenc::write_frame_ld(fb, books, c, p, h, framing, ec, kLdSlots);
+      const std::vector<uint8_t> bytes = fb.bytes();
+      AacBitReader r;
+      aac_bitreader_init(&r, bytes.data(), (int)bytes.size());
+      const int ret = aac_mps_read_frame(st, &r);
+      CHECK(ret == AAC_OK, "ld variant %d: frame %d parses (%d)", variant, frame, ret);
+      CHECK(aac_bitreader_bits_left(&r) == 0 && !r.overread, "ld variant %d: frame %d ends on the frame",
+            variant, frame);
+      const AacMpsFrameParams* q = aac_mps_frame_params(st);
+      const int extend = p.slot[sets - 1] != kLdSlots - 1 ? 1 : 0;
+      if (q->num_sets != sets + extend || st->independency != p.indep) bad++;
+      if (extend && q->param_slot[sets] != kLdSlots - 1) bad++;
+      for (int s = 0; s < sets; s++) {
+        if (q->param_slot[s] != p.slot[s]) bad++;
+        for (int pb = 0; pb < c.bands; pb++) {
+          if (q->ott_cld[0][s][pb] != p.ott_cld[0][s][pb]) bad++;
+          if (q->ott_icc[0][s][pb] != p.ott_icc[0][s][pb]) bad++;
+          if (c.arbdmx && q->arbdmx_gain[0][s][pb] != p.arb[0][s][pb]) bad++;
+        }
+      }
+      CHECK(q->temp_shape_enable == 0, "ld variant %d: no temporal shaping", variant);
+      if (c.smooth) {
+        CHECK(q->smooth_time[0] == 128 && q->smoothing[0][0] == 1, "ld variant %d: smoothing", variant);
+      }
+    }
+    CHECK(bad == 0, "ld variant %d: %d parameters differ after the round trip", variant, bad);
+    aac_mps_destroy(st);
+  }
+}
+
+/* The low-delay filterbank pair reconstructs its input at the documented
+ * delay with unit gain. */
+void test_ld_filterbank() {
+  constexpr int kLdTestSlots = 64;
+  AacMpsLdAnalysis ana;
+  AacMpsLdSynthesis syn;
+  aac_mps_ld_analysis_init(&ana);
+  aac_mps_ld_synthesis_init(&syn);
+  std::vector<float> in((size_t)kLdTestSlots * AAC_MPS_LD_BANDS), out(in.size());
+  for (size_t i = 0; i < in.size(); i++) {
+    in[i] = (float)(rnd(-10000, 10000) / 10000.0) * 0.5f + 0.3f * sinf(0.013f * (float)i);
+  }
+  for (int t = 0; t < kLdTestSlots; t++) {
+    float W[AAC_MPS_LD_BANDS][2];
+    aac_mps_ld_analyze(&ana, &in[(size_t)t * AAC_MPS_LD_BANDS], W);
+    aac_mps_ld_synthesize(&syn, W, &out[(size_t)t * AAC_MPS_LD_BANDS]);
+  }
+  double sig = 0.0, err = 0.0;
+  for (size_t i = AAC_MPS_LD_DELAY; i < out.size(); i++) {
+    const double r = in[i - AAC_MPS_LD_DELAY];
+    sig += r * r;
+    err += (r - out[i]) * (r - out[i]);
+  }
+  const double snr = err > 0.0 ? 10.0 * log10(sig / err) : 200.0;
+  CHECK(snr >= 60.0, "ld filterbank: %.1f dB at delay %d", snr, AAC_MPS_LD_DELAY);
 }
 
 struct FrameCase {
@@ -767,6 +899,8 @@ int main() {
   test_config_extensions();
   test_config_low_delay();
   test_frame_round_trips();
+  test_ld_frame_round_trips();
+  test_ld_filterbank();
   test_quant_mode();
   test_conceal_and_reset();
   test_residual_positions();

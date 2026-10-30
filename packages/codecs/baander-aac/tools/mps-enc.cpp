@@ -8,6 +8,12 @@
  *
  *   mps-enc <in.wav|in.f32> <out.loas> [options]
  *     --tree 5151|5152|525|212 the spatial tree (default 525; 212 codes the front pair alone)
+ *     --core lc|eld            the core: AAC-LC with the payload in fill
+ *                              elements (default), or AAC-ELD v2 (tree 212
+ *                              only): the low-delay form of the configuration
+ *                              in the ELD configuration and of the frame in
+ *                              the ELD extension payload, on a stereo (or
+ *                              5.1, front pair) input downmixed to mono
  *     --form header|asc        the in-band bsSacHeader in the fill element
  *                              (default) or the object type 30 config in a
  *                              second LATM layer with sacPayloadEmbedding
@@ -58,6 +64,7 @@
 #include "mps.h"
 #include "mps212.h"
 #include "mps_internal.h"
+#include "mps_ld.h"
 #include "qmf.h"
 
 namespace mpsenc {
@@ -76,6 +83,7 @@ constexpr int kDownmixDelay = 577 + 6 * 64;
 struct Options {
   std::string in, out;
   int tree = AAC_MPS_TREE_525;
+  bool eld = false; /* --core eld: the ELD v2 path */
   bool asc_form = false;
   bool huffman = false;
   bool pairs = false;
@@ -1194,6 +1202,7 @@ std::vector<uint8_t> loas_frame(const std::vector<uint8_t>& au, const AacAsc& co
 struct Verifier {
   AacMpsState* st = nullptr;
   int frames = 0, mismatches = 0;
+  int slots = kSlots;
   void init(const std::vector<uint8_t>& ssc) {
     AacBitReader r;
     aac_bitreader_init(&r, ssc.data(), (int)ssc.size());
@@ -1204,6 +1213,23 @@ struct Verifier {
       exit(1);
     }
     st = aac_mps_create(&cfg, kFrame, kSlots, kRate);
+    if (!st) {
+      fprintf(stderr, "mps-enc: verify: aac_mps_create failed\n");
+      exit(1);
+    }
+  }
+  /* The low-delay form: the config as the ELD extension carries it. */
+  void init_ld(const std::vector<uint8_t>& ssc, int core_frame, int core_slots) {
+    AacBitReader r;
+    aac_bitreader_init(&r, ssc.data(), (int)ssc.size());
+    AacMpsConfig cfg;
+    const int ret = aac_mps_config_read_ld(&r, &cfg);
+    if (ret != AAC_OK) {
+      fprintf(stderr, "mps-enc: verify: the low-delay config does not parse (%d)\n", ret);
+      exit(1);
+    }
+    slots = cfg.frame_length;
+    st = aac_mps_create(&cfg, core_frame, core_slots, kRate);
     if (!st) {
       fprintf(stderr, "mps-enc: verify: aac_mps_create failed\n");
       exit(1);
@@ -1223,7 +1249,7 @@ struct Verifier {
     int bad = 0;
     /* the parser appends the frame-end set when the last coded set
      * sits before the frame's last slot */
-    const int extend = p.slot[p.num_sets - 1] != kSlots - 1 ? 1 : 0;
+    const int extend = p.slot[p.num_sets - 1] != slots - 1 ? 1 : 0;
     if (q->num_sets != p.num_sets + extend || st->independency != p.indep) {
       bad++;
     }
@@ -1314,9 +1340,333 @@ struct Verifier {
   ~Verifier() { aac_mps_destroy(st); }
 };
 
+/* ── the ELD v2 path ────────────────────────────────────────────── */
+
+/* The low-delay form of ISO/IEC 23003-1 as AAC-ELD v2 carries it: the
+ * 2-1-2 tree over the core's 64-band low-delay filterbank (no hybrid
+ * filterbank, at most 23 parameter bands), one spatial frame per core
+ * frame of 512 samples (eight slots), the configuration as an extension
+ * of the ELD configuration and the frame as an extension payload of
+ * type EXT_LDSAC_DATA after the channel element.  The downmix is coded
+ * by the codec's ELD encoder; its delay of one and a half frames plus
+ * the filterbank pair's 256 samples is two frames, so the parameters of
+ * frame f ride in access unit f + 2 and the parameter analysis needs no
+ * delay line of its own. */
+
+constexpr int kLdFrame = 512;
+constexpr int kLdSlots = kLdFrame / 64;
+constexpr int kExtLdSacData = 9;
+
+/* The low-delay configuration of the options: the 2-1-2 tree alone. */
+AacMpsConfig make_config_ld(const Options& o) {
+  AacMpsConfig c;
+  memset(&c, 0, sizeof(c));
+  c.low_delay = 1;
+  c.sampling_frequency = kRate;
+  c.frame_length = kLdSlots;
+  c.freq_res = o.freq_res;
+  c.tree_config = AAC_MPS_TREE_212;
+  c.quant_mode = o.quant_mode;
+  c.arbitrary_downmix = o.arbdmx ? 1 : 0;
+  c.fixed_gain_dmx = o.gain_dmx;
+  c.temp_shape_config = o.temp_shape;
+  c.decorr_config = 0;
+  c.num_ott_boxes = 1;
+  c.num_input_channels = 1;
+  c.num_output_channels = 2;
+  c.ld_num_output_channels = 2;
+  c.ott_bands[0] = aac_mps_param_bands_ld(o.freq_res);
+  return c;
+}
+
+/* Writes one SpatialFrame() of the low-delay form (byte aligned at its
+ * end, no extensions): bsNumParamSets of one bit, bsParamSlot in
+ * ceil(log2(slots)) bits each, the EcData without time pairs or pilot
+ * coding, the OTT box of the 2-1-2 tree. */
+void write_frame_ld(Bits& b, const Books& books, const Config& c, const FrameParams& p, History& h,
+                    int framing, const EcOpts& o, int slots) {
+  const int start = b.bits();
+  b.put((uint32_t)framing, 1);
+  b.put((uint32_t)(p.num_sets - 1), 1);
+  if (framing) {
+    for (int i = 0; i < p.num_sets; i++) {
+      b.put((uint32_t)p.slot[i], ceil_log2(slots));
+    }
+  }
+  b.put(p.indep ? 1u : 0u, 1);
+  write_ecdata(b, books, AAC_MPS_PARAM_CLD, p.ott_cld[0], p.num_sets, c.ott_bands[0], p.indep,
+               h.ott_cld[0], o);
+  write_ecdata(b, books, AAC_MPS_PARAM_ICC, p.ott_icc[0], p.num_sets, c.ott_bands[0], p.indep,
+               h.ott_icc[0], o);
+  for (int s = 0; s < p.num_sets; s++) {
+    if (c.smooth) {
+      b.put(2, 2); /* bsSmoothMode */
+      b.put(1, 2); /* bsSmoothTime: 128 slots */
+    } else {
+      b.put(0, 2);
+    }
+  }
+  if (c.temp_shape != 0) {
+    b.put(0, 1); /* bsTempShapeEnable */
+  }
+  if (c.arbdmx) {
+    write_ecdata(b, books, AAC_MPS_PARAM_CLD, p.arb[0], p.num_sets, c.bands, p.indep, h.arb[0], o);
+  }
+  const int pad = (8 - (b.bits() - start) % 8) % 8;
+  b.put(0, pad);
+}
+
+/* The analysis of one channel through the low-delay filterbank: 64
+ * bands in the lowest entries of the 71-band form the boxes work on,
+ * the rest zero. */
+struct LdAnalyser {
+  AacMpsLdAnalysis bank;
+  LdAnalyser() { aac_mps_ld_analysis_init(&bank); }
+  void push(const float* in, Hyb out) {
+    float W[64][2];
+    aac_mps_ld_analyze(&bank, in, W);
+    memset(out, 0, sizeof(Hyb));
+    memcpy(out, W, sizeof(W));
+  }
+};
+
+int run_eld(const Options& o) {
+  if (o.tree != AAC_MPS_TREE_212) {
+    fprintf(stderr, "mps-enc: the ELD core carries the 2-1-2 tree alone\n");
+    return 1;
+  }
+  int channels = 0, rate = 0;
+  std::vector<float> pcm = read_input(o.in, &channels, &rate);
+  if ((channels != 2 && channels != kInChannels) || rate != kRate) {
+    fprintf(stderr, "mps-enc: the input must be 48 kHz with two or six channels (got %d Hz, %d)\n",
+            rate, channels);
+    return 1;
+  }
+  size_t frames_in = pcm.size() / channels;
+  if (o.seconds > 0.0) {
+    frames_in = std::min(frames_in, (size_t)(o.seconds * kRate));
+  }
+  const int num_frames = (int)((frames_in + kLdFrame - 1) / kLdFrame);
+  pcm.resize((size_t)num_frames * kLdFrame * channels, 0.0f);
+
+  /* the configuration: the library's writer of the low-delay form, and
+   * the tool's view of it for the frame writer */
+  const AacMpsConfig mps = make_config_ld(o);
+  Config cfg;
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.tree = AAC_MPS_TREE_212;
+  cfg.freq_res = o.freq_res;
+  cfg.bands = mps.ott_bands[0];
+  cfg.num_ott = 1;
+  cfg.num_in = 1;
+  cfg.ott_bands[0] = cfg.bands;
+  cfg.gain_dmx = o.gain_dmx;
+  cfg.quant_mode = o.quant_mode;
+  cfg.smooth = o.smooth;
+  cfg.temp_shape = o.temp_shape;
+  cfg.arbdmx = o.arbdmx;
+  const uint8_t* kernel64 = aac_mps_ld_kernel(cfg.bands);
+  if (!kernel64) {
+    fprintf(stderr, "mps-enc: no low-delay band table for %d bands\n", cfg.bands);
+    return 1;
+  }
+  uint8_t kernel[kHyb];
+  for (int k = 0; k < kHyb; k++) {
+    kernel[k] = k < 64 ? kernel64[k] : kernel64[63];
+  }
+  Bits cb(64);
+  const int ssc_len = aac_mps_config_write_ld(&mps, &cb.w);
+  if (ssc_len <= 0) {
+    fprintf(stderr, "mps-enc: cannot write the low-delay config (%d)\n", ssc_len);
+    return 1;
+  }
+  const std::vector<uint8_t> ssc = cb.bytes();
+  const Books books;
+  EcOpts ec;
+  ec.huffman = o.huffman;
+  ec.pairs = o.pairs;
+  ec.two_d = o.huffman;
+  ec.aac_form = false;
+
+  /* the core encoder on the downmix, and its configuration with the
+   * spatial configuration as the ELD extension */
+  AacEncoderHandle enc = aac_encoder_create(kRate, 1, o.bitrate, AAC_AOT_ER_ELD, AAC_RC_CBR);
+  if (!enc) {
+    fprintf(stderr, "mps-enc: cannot create the ELD encoder\n");
+    return 1;
+  }
+  aac_encoder_set_transport(enc, AAC_TRANSPORT_RAW);
+  if (aac_encoder_frame_size(enc) != kLdFrame) {
+    fprintf(stderr, "mps-enc: the ELD encoder frame is %d samples\n", aac_encoder_frame_size(enc));
+    return 1;
+  }
+  uint8_t asc_bytes[AAC_ASC_MAX_BYTES];
+  const int asc_len = aac_encoder_config(enc, asc_bytes, sizeof(asc_bytes));
+  AacAsc core_asc;
+  if (asc_len <= 0 || aac_asc_parse(asc_bytes, asc_len, &core_asc) != AAC_OK) {
+    fprintf(stderr, "mps-enc: cannot read the ELD encoder's configuration\n");
+    return 1;
+  }
+  core_asc.mps_present = 1;
+  core_asc.sac_payload_embedding = 1;
+  core_asc.mps = mps;
+  const int frame_offset = o.frame_offset;
+  const int param_delay = o.param_shift;
+
+  std::vector<LdAnalyser> ana_dmx(2), ana_par(2);
+  OttBox box_dmx, box_par;
+  std::vector<FrameParams> params(num_frames);
+  const float g_dmx = aac_mps212_fixed_gain[cfg.gain_dmx];
+  AacMpsLdSynthesis syn;
+  aac_mps_ld_synthesis_init(&syn);
+  std::vector<std::vector<uint8_t>> aus;
+  std::vector<uint8_t> aubuf(1 << 16);
+  static Hyb hyb_dmx[2][kLdSlots], hyb_par[2][kLdSlots], dmx[kLdSlots];
+  int slot[kMaxSets];
+  const int num_sets = std::max(1, std::min(2, o.sets));
+  for (int i = 0; i < num_sets; i++) {
+    slot[i] = o.framing ? (kLdSlots * (2 * i + 1)) / (2 * num_sets)
+                        : (kLdSlots * (i + 1) + num_sets - 1) / num_sets - 1;
+  }
+  if (o.framing) {
+    for (int i = 1; i < num_sets; i++) {
+      slot[i] = std::max(slot[i], slot[i - 1] + 1);
+    }
+  }
+  auto sample = [&](int frame_idx, int ch, int i, int delay) -> float {
+    const long n = (long)frame_idx * kLdFrame + i - delay;
+    if (n < 0 || n >= (long)frames_in) {
+      return 0.0f;
+    }
+    return pcm[(size_t)n * channels + ch];
+  };
+  History hist;
+  memset(&hist, 0, sizeof(hist));
+  Verifier verifier;
+  if (o.verify || o.dump) {
+    verifier.init_ld(ssc, kLdFrame, kLdSlots);
+  }
+  size_t payload_bytes = 0;
+  int au_index = 0;
+  /* the spatial frame of access unit `j` as the extension payload of
+   * the encoder's next frame */
+  auto attach = [&](int j) {
+    const int pf = std::max(0, std::min(num_frames - 1, j - frame_offset));
+    FrameParams p = params[pf];
+    if (j == 0) {
+      p.indep = 1;
+    }
+    Bits fb;
+    write_frame_ld(fb, books, cfg, p, hist, o.framing, ec, kLdSlots);
+    const std::vector<uint8_t> frame = fb.bytes();
+    if (o.verify || o.dump) {
+      verifier.check(frame, cfg, p);
+    }
+    if (o.dump) {
+      verifier.dump(cfg);
+    }
+    Bits ext(frame.size() + 8);
+    ext.put(kExtLdSacData, 4);
+    ext.put(0, 2); /* ancType */
+    ext.put(1, 1); /* ancStart */
+    ext.put(1, 1); /* ancStop */
+    for (uint8_t v : frame) {
+      ext.put(v, 8);
+    }
+    payload_bytes += frame.size() + 1;
+    const std::vector<uint8_t> bytes = ext.bytes();
+    if (!o.core_only) {
+      const int ret = aac_encoder_set_extension_payload(enc, bytes.data(), ext.bits());
+      if (ret) {
+        fprintf(stderr, "mps-enc: cannot attach the payload (%d)\n", ret);
+        exit(1);
+      }
+    }
+  };
+  std::vector<float> core_in((size_t)kLdFrame);
+  for (int f = 0; f < num_frames; f++) {
+    float in[2][64];
+    for (int t = 0; t < kLdSlots; t++) {
+      for (int ch = 0; ch < 2; ch++) {
+        for (int i = 0; i < 64; i++) {
+          in[ch][i] = sample(f, ch, t * 64 + i, 0);
+        }
+        ana_dmx[ch].push(in[ch], hyb_dmx[ch][t]);
+        for (int i = 0; i < 64; i++) {
+          in[ch][i] = sample(f, ch, t * 64 + i, param_delay);
+        }
+        ana_par[ch].push(in[ch], hyb_par[ch][t]);
+      }
+    }
+    FrameParams scratch;
+    memset(&scratch, 0, sizeof(scratch));
+    FrameParams& p = params[f];
+    memset(&p, 0, sizeof(p));
+    p.num_sets = num_sets;
+    memcpy(p.slot, slot, sizeof(slot));
+    p.indep = o.indep_every > 0 && f % o.indep_every == 0;
+    box_par.run(hyb_par[0], hyb_par[1], slot, num_sets, kernel, cfg.bands, false, 0, dmx,
+                p.ott_cld[0], p.ott_icc[0]);
+    /* the parameter path's downmix is not used: the downmix path's is
+     * synthesised to the core, with the clip protection gain */
+    box_dmx.run(hyb_dmx[0], hyb_dmx[1], slot, num_sets, kernel, cfg.bands, false, 0, dmx,
+                scratch.ott_cld[0], scratch.ott_icc[0]);
+    for (int t = 0; t < kLdSlots; t++) {
+      float out[64];
+      aac_mps_ld_synthesize(&syn, dmx[t], out);
+      for (int i = 0; i < 64; i++) {
+        core_in[(size_t)(t * 64 + i)] = out[i] / g_dmx;
+      }
+    }
+    attach(au_index);
+    const int n = aac_encoder_encode(enc, core_in.data(), kLdFrame, aubuf.data(), (int)aubuf.size());
+    if (n < 0) {
+      fprintf(stderr, "mps-enc: core encoder error %d\n", n);
+      return 1;
+    }
+    if (n > 0) {
+      aus.emplace_back(aubuf.begin(), aubuf.begin() + n);
+      au_index++;
+    }
+  }
+  for (;;) {
+    attach(au_index);
+    const int n = aac_encoder_flush(enc, aubuf.data(), (int)aubuf.size());
+    if (n <= 0) {
+      break;
+    }
+    aus.emplace_back(aubuf.begin(), aubuf.begin() + n);
+    au_index++;
+  }
+  aac_encoder_destroy(enc);
+
+  FILE* out = fopen(o.out.c_str(), "wb");
+  if (!out) {
+    fprintf(stderr, "mps-enc: cannot create %s\n", o.out.c_str());
+    return 1;
+  }
+  for (const std::vector<uint8_t>& au : aus) {
+    const std::vector<uint8_t> loas = loas_frame(au, core_asc, nullptr, 0);
+    fwrite(loas.data(), 1, loas.size(), out);
+  }
+  fclose(out);
+  fprintf(stderr, "mps-enc: ELD v2: %zu access units, %d spatial frames, %zu bytes of spatial payload (%.1f kbit/s)\n",
+          aus.size(), num_frames, payload_bytes,
+          8.0 * (double)payload_bytes * kRate / (double)(aus.size() * kLdFrame) / 1000.0);
+  if (o.verify) {
+    fprintf(stderr, "mps-enc: round trip: %d frames, %d with differences\n", verifier.frames,
+            verifier.mismatches);
+    return verifier.mismatches ? 1 : 0;
+  }
+  return 0;
+}
+
 /* ── the encoder ────────────────────────────────────────────────── */
 
 int run(const Options& o) {
+  if (o.eld) {
+    return run_eld(o);
+  }
   int channels = 0, rate = 0;
   std::vector<float> pcm = read_input(o.in, &channels, &rate);
   if (channels != kInChannels || rate != kRate) {
@@ -1545,7 +1895,7 @@ int run(const Options& o) {
 }
 
 int usage() {
-  fprintf(stderr, "usage: mps-enc <in.wav|in.f32> <out.loas> [--tree 5151|5152|525|212] [--form header|asc]\n"
+  fprintf(stderr, "usage: mps-enc <in.wav|in.f32> <out.loas> [--tree 5151|5152|525|212] [--core lc|eld] [--form header|asc]\n"
                   "       [--huffman] [--pairs] [--sets N] [--framing 0|1] [--freq-res R] [--ttt-mode M]\n"
                   "       [--dual-mode B] [--gain-sur I] [--gain-lfe I] [--gain-dmx I] [--one-icc] [--quant-mode M]\n"
                   "       [--smooth]\n"
@@ -1573,6 +1923,12 @@ int parse_args(int argc, char** argv, Options& o) {
       const std::string t = value();
       o.tree = t == "5151" ? AAC_MPS_TREE_5151 : t == "5152" ? AAC_MPS_TREE_5152
              : t == "212" ? AAC_MPS_TREE_212 : AAC_MPS_TREE_525;
+    } else if (a == "--core") {
+      const std::string c = value();
+      if (c != "lc" && c != "eld") {
+        return usage();
+      }
+      o.eld = c == "eld";
     } else if (a == "--form") {
       o.asc_form = std::string(value()) == "asc";
     } else if (a == "--huffman") {

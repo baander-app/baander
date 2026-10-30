@@ -175,6 +175,13 @@ int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
  * for a profile on the low-delay object types (AAC_AOT_ER_LD,
  * AAC_AOT_ER_ELD): their frames carry no fill elements. */
 int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level);
+/* AAC-ELD only: an extension_payload() (its extension_type nibble
+ * first, `nbits` bits of `data` from the most significant bit) written
+ * after the channel elements and the LD-SBR data of the next frame
+ * only, as ELD v2 carries its MPEG Surround payload (EXT_LDSAC_DATA).
+ * `nbits` 0 clears it.  AAC_ERR_UNSUPPORTED for another object type,
+ * AAC_ERR_INVALID_ARG when the payload does not fit a frame. */
+int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data, int nbits);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
 

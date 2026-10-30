@@ -269,3 +269,87 @@ int aac_mps_config_read_ld(AacBitReader* r, AacMpsConfig* cfg) {
   }
   return read_config(r, cfg, 1);
 }
+
+int aac_mps_config_write_ld(const AacMpsConfig* cfg, AacBitWriter* w) {
+  if (cfg == NULL || w == NULL || !tree_supported(cfg->tree_config) || cfg->audio_3d_mode ||
+      cfg->frame_length < 1 || cfg->frame_length > 32 || cfg->freq_res < 1 || cfg->freq_res > 7) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  const int start = aac_bitwriter_bits_written(w);
+  int sfi = -1;
+  for (int i = 0; i < 13; i++) {
+    if (kSampleRates[i] == cfg->sampling_frequency) {
+      sfi = i;
+    }
+  }
+  aac_bitwriter_write(w, sfi < 0 ? 15u : (uint32_t)sfi, 4);
+  if (sfi < 0) {
+    aac_bitwriter_write(w, (uint32_t)cfg->sampling_frequency, 24);
+  }
+  aac_bitwriter_write(w, (uint32_t)(cfg->frame_length - 1), 5);
+  aac_bitwriter_write(w, (uint32_t)cfg->freq_res, 3);
+  aac_bitwriter_write(w, (uint32_t)cfg->tree_config, 4);
+  const Tree& tree = kTrees[cfg->tree_config];
+  const bool full = cfg->tree_config != AAC_MPS_TREE_212;
+  aac_bitwriter_write(w, (uint32_t)cfg->quant_mode, 2);
+  if (full) {
+    aac_bitwriter_write(w, cfg->one_icc ? 1u : 0u, 1);
+  }
+  aac_bitwriter_write(w, cfg->arbitrary_downmix ? 1u : 0u, 1);
+  if (full) {
+    aac_bitwriter_write(w, (uint32_t)cfg->fixed_gain_sur, 3);
+    aac_bitwriter_write(w, (uint32_t)cfg->fixed_gain_lfe, 3);
+  }
+  aac_bitwriter_write(w, (uint32_t)cfg->fixed_gain_dmx, 3);
+  if (full) {
+    aac_bitwriter_write(w, cfg->matrix_mode ? 1u : 0u, 1);
+  }
+  aac_bitwriter_write(w, (uint32_t)cfg->temp_shape_config, 2);
+  aac_bitwriter_write(w, (uint32_t)cfg->decorr_config, 2);
+  if (full) {
+    aac_bitwriter_write(w, 0, 1); /* bs3DaudioMode */
+  }
+  for (int i = 0; i < tree.num_ott; i++) {
+    if (tree.lfe[i]) {
+      aac_bitwriter_write(w, (uint32_t)cfg->ott_bands[i], 5);
+    }
+  }
+  for (int i = 0; i < tree.num_ttt; i++) {
+    aac_bitwriter_write(w, cfg->ttt_dual_mode[i] ? 1u : 0u, 1);
+    aac_bitwriter_write(w, (uint32_t)cfg->ttt_mode_low[i], 3);
+    if (cfg->ttt_dual_mode[i]) {
+      aac_bitwriter_write(w, (uint32_t)cfg->ttt_mode_high[i], 3);
+      aac_bitwriter_write(w, (uint32_t)cfg->ttt_bands_low[i], 5);
+    }
+  }
+  if (cfg->temp_shape_config == 2) {
+    aac_bitwriter_write(w, cfg->env_quant_mode ? 1u : 0u, 1);
+  }
+  const int pad = (8 - (aac_bitwriter_bits_written(w) - start) % 8) % 8;
+  aac_bitwriter_write(w, 0, pad);
+  if (cfg->residual_coding) {
+    /* ResidualConfig: its length in bytes covers the fields and their
+     * padding */
+    const int boxes = tree.num_ott + tree.num_ttt;
+    int bits = 6;
+    for (int i = 0; i < boxes; i++) {
+      bits += cfg->residual_present[i] ? 6 : 1;
+    }
+    const int len = (bits + 7) / 8;
+    aac_bitwriter_write(w, 0, 4); /* bsSacExtType: residual coding */
+    aac_bitwriter_write(w, (uint32_t)len, 4);
+    aac_bitwriter_write(w, (uint32_t)cfg->residual_sample_rate_index, 4);
+    aac_bitwriter_write(w, (uint32_t)(cfg->residual_frames_per_spatial_frame - 1), 2);
+    for (int i = 0; i < boxes; i++) {
+      aac_bitwriter_write(w, cfg->residual_present[i] ? 1u : 0u, 1);
+      if (cfg->residual_present[i]) {
+        aac_bitwriter_write(w, (uint32_t)cfg->residual_bands[i], 5);
+      }
+    }
+    aac_bitwriter_write(w, 0, 8 * len - bits);
+  }
+  if (aac_bitwriter_overflow(w)) {
+    return AAC_ERR_OVERFLOW;
+  }
+  return (aac_bitwriter_bits_written(w) - start) / 8;
+}
