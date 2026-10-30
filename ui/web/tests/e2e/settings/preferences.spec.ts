@@ -29,15 +29,21 @@ test.describe('Settings page', () => {
     const toggle = main(page).getByRole('switch', { name: 'Volume normalization' })
     const enabled = await toggle.getAttribute('aria-checked') === 'true'
     if (!enabled) await toggle.click()
-    const select = main(page).getByRole('combobox').filter({ hasText: /LUFS/ })
+    const select = main(page).getByRole('combobox', { name: 'Loudness target' })
     const original = await select.innerText()
+    const custom = main(page).getByRole('textbox', { name: 'Custom target (LUFS)' })
+    const originalCustom = await custom.isVisible() ? await custom.inputValue() : null
     try {
       await select.click()
-      await page.getByRole('option', { name: '-16 LUFS (Apple Music)', exact: true }).click()
-      await expect(select).toHaveText('-16 LUFS (Apple Music)')
+      await page.getByRole('option', { name: 'Balanced (−16 LUFS)', exact: true }).click()
+      await expect(select).toHaveText('Balanced (−16 LUFS)')
     } finally {
       await select.click()
       await page.getByRole('option', { name: original, exact: true }).click()
+      if (originalCustom !== null) {
+        await custom.fill(originalCustom)
+        await custom.press('Enter')
+      }
       if (!enabled) await toggle.click()
     }
   })

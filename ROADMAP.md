@@ -23,6 +23,30 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Baander loudness levels
+
+Delivered, 2026-10-30, under the reviewed
+[loudness target plan](docs/plans/2026-10-30-2007-feat-loudness-target-levels-plan.md).
+Settings and Equalizer share Quiet (−23), Relaxed (−18), Balanced (−16) and
+Louder (−14 LUFS), plus a custom numeric target. Fractional targets survive save,
+fetch, local restoration and version rollback. Invalid input retains the last
+valid target and shows a linked error message. The default remains −14 LUFS with
+normalization off; the measurement algorithm and gain limits are unchanged.
+
+Verification checkpoint: the controller suite passes 179 tests with 1,988
+assertions in the CI image. Scoped PHPStan and PHP syntax checks pass. The
+frontend passes 304 store/preference tests and 23 control/settings tests, both
+TypeScript configurations and scoped ESLint. OpenAPI export and Orval drift
+checks pass; regeneration also aligns the existing TOTP example with its current
+source. The review's error-color finding is fixed and verified.
+
+The real preview accepts −20.5 LUFS, shows it in Equalizer and restores it after
+reload. Invalid input leaves the saved target unchanged, and choosing Balanced
+saves −16. This browser check and 2 existing settings checks pass, including
+narrow input containment, keyboard use and error contrast in all four moods.
+The preview's original audio settings were restored. Prose and whitespace checks
+pass. All planned units and the independent review's follow-up checks are closed.
+
 ## Recessed footer material
 
 Delivered, 2026-10-30, under the reviewed

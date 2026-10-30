@@ -157,6 +157,15 @@ when its content is unchanged. This observation does not diagnose a failed mount
 or guarantee that the file is still reachable at playback time. A catalog track
 without an index observation is unavailable until a scan confirms its source.
 
+## Audio playback
+
+### Loudness target
+
+The loudness, measured in LUFS, that playback normalization aims to reach. Baander
+offers Quiet (−23), Relaxed (−18), Balanced (−16) and Louder (−14), or a custom
+numeric target. The target controls playback gain within the existing gain limits;
+it does not change the source recording or select a transcoding standard.
+
 ## Media execution
 
 ### Transcode execution generation

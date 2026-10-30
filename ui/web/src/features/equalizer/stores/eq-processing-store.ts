@@ -4,8 +4,9 @@ import { withStoreDebug } from '@/shared/stores/debug'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { audioService } from '@/features/player/services/audio-service'
+import { isLoudnessTarget } from '../loudness-targets'
 
-export type LufsTarget = -14 | -16 | -18 | -23
+export type LufsTarget = number
 export type ProcessingModule = 'eq' | 'compressor' | 'stereo' | 'crossfeed' | 'loudness' | 'masterGain'
 
 export const DEFAULT_CHAIN_ORDER: ProcessingModule[] = [
@@ -122,6 +123,7 @@ export const useEqProcessingStore = create<EqProcessingState>()(
       chainOrder: [...DEFAULT_CHAIN_ORDER],
 
       applySettings: (settings) => {
+        if ('targetLufs' in settings && !isLoudnessTarget(settings.targetLufs)) return
         const state = get()
         const next = { ...settings }
         if (next.chainOrder && next.chainOrder.length === state.chainOrder.length && next.chainOrder.every((value, index) => value === state.chainOrder[index])) next.chainOrder = state.chainOrder
@@ -179,7 +181,7 @@ export const useEqProcessingStore = create<EqProcessingState>()(
       },
 
       setTargetLufs: (target) => {
-        if (get().targetLufs === target) return
+        if (!isLoudnessTarget(target) || get().targetLufs === target) return
         set({ targetLufs: target })
         audioService.getProcessor()?.setNormalization(useEqProcessingStore.getState().normalizationEnabled, target)
       },
@@ -242,6 +244,14 @@ export const useEqProcessingStore = create<EqProcessingState>()(
       name: 'baander-eq-processing',
       storage: createSelectiveJSONStorage(),
       version: 1,
+      merge: (persistedState, currentState) => {
+        const restored = persistedState as Partial<EqProcessingSettings> | null
+        return {
+          ...currentState,
+          ...restored,
+          targetLufs: isLoudnessTarget(restored?.targetLufs) ? restored.targetLufs : currentState.targetLufs,
+        }
+      },
       partialize: (state) => ({
         compressionEnabled: state.compressionEnabled,
         compressorThreshold: state.compressorThreshold,

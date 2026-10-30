@@ -115,7 +115,7 @@ test('settings switch and select retain keyboard access in a short viewport', as
   await page.route('**/api/user/audio-preferences/', async (route) => route.fulfill({ status: 503, json: { error: { message: 'Fixture unavailable' } } }))
   try {
     if (original === 'true') await toggle.click()
-    const select = page.getByRole('combobox').filter({ hasText: /LUFS/ })
+    const select = page.getByRole('combobox', { name: 'Loudness target' })
     await expect(select).toBeDisabled()
     await toggle.focus()
     await page.keyboard.press('Space')

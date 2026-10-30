@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { LoudnessTargetControl } from './LoudnessTargetControl'
 import { Button } from '@/shared/components/ui/button'
 import { useEqProcessingStore, type ProcessingModule, DEFAULT_CHAIN_ORDER } from '../stores/eq-processing-store'
 import styled, { css } from 'styled-components'
@@ -177,31 +178,6 @@ const NormalizeRow = styled.div`
   align-items: center;
   gap: 0.5rem;
   padding: 0.125rem 0;
-`
-
-const TargetRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-`
-
-const TargetButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-md);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  border: none;
-  cursor: pointer;
-  transition: none;
-
-  ${(p) => p.$active
-    ? css`
-      background-color: var(--color-highlight);
-      color: var(--color-highlight-foreground);
-      &:hover { background-color: var(--color-highlight); color: var(--color-highlight-foreground); }
-    `
-    : css`color: var(--color-muted-foreground); &:hover { color: var(--color-foreground); }`
-  }
 `
 
 const ChainList = styled.div`
@@ -486,20 +462,12 @@ function MasterGainControls() {
         >
           Normalize
         </ModeButton>
-        {normalizationEnabled && (
-          <TargetRow>
-            {([-14, -16, -18, -23] as const).map((val) => (
-              <TargetButton
-                key={val}
-                $active={targetLufs === val}
-                onClick={() => setTargetLufs(val)}
-              >
-                {val}
-              </TargetButton>
-            ))}
-          </TargetRow>
-        )}
       </NormalizeRow>
+      <LoudnessTargetControl
+        value={targetLufs}
+        onChange={setTargetLufs}
+        disabled={!normalizationEnabled}
+      />
     </ControlsCol>
   )
 }

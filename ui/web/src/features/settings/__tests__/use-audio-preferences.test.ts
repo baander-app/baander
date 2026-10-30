@@ -33,6 +33,17 @@ describe('useAudioPreferences store snapshots', () => {
     }, expect.anything())
   })
 
+  it('saves the custom target captured when the push is requested', async () => {
+    const { result } = renderHook(() => useAudioPreferences())
+    useEqProcessingStore.getState().setTargetLufs(-20.5)
+    act(() => result.current.pushToServer())
+    useEqProcessingStore.getState().setTargetLufs(-16)
+    await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+    expect(http.put).toHaveBeenCalledWith('/api/user/audio-preferences/', {
+      version: 0, payload: expect.objectContaining({ targetLufs: -20.5 }),
+    }, expect.anything())
+  })
+
   it('captures copies of bands and chain at push time', async () => {
     const { result } = renderHook(() => useAudioPreferences())
     const beforeBands = useEqBandsStore.getState().bands.map((band) => ({ ...band }))

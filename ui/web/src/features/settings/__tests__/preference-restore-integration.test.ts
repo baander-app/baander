@@ -81,7 +81,7 @@ describe('remote preference restores through hooks and mediator handlers', () =>
   for (const field of Object.keys(audioPayload)) {
     invalidPayloads.push([`${field} missing`, Object.fromEntries(Object.entries(audioPayload).filter(([key]) => key !== field))])
   }
-  for (const [field, value] of [['targetLufs', -20], ['targetLufs', '-18'], ['stereoMode', 'mono'], ['crossfeedPreset', 'custom']]) {
+  for (const [field, value] of [['targetLufs', '-18'], ['targetLufs', null], ['targetLufs', NaN], ['targetLufs', Infinity], ['targetLufs', -Infinity], ['stereoMode', 'mono'], ['crossfeedPreset', 'custom']] as const) {
     invalidPayloads.push([`${field} unknown`, { ...audioPayload, [field]: value }])
   }
   for (const band of [null, [], { gain: 0 }, { q: 1 }, { gain: 13, q: 1 }, { gain: -13, q: 1 }, { gain: 0, q: 10.1 }, { gain: Infinity, q: 1 }, { gain: 0, q: NaN }]) {
@@ -120,6 +120,21 @@ describe('remote preference restores through hooks and mediator handlers', () =>
     await act(async () => { expect(await result.current.fetchFromServer()).toBe(true) })
     expect(useEqBandsStore.getState().bands).toEqual(payload.bands)
     expect(useEqProcessingStore.getState().compressorAttack).toBe(payload.compressorAttack)
+  })
+
+  describe.each(['fetch', 'rollback'] as const)('%s custom loudness target', (operation) => {
+    it.each([-20, -20.5, 100, -100])('restores finite target %s', async (targetLufs) => {
+      const payload = { ...audioPayload, targetLufs }
+      const response = { data: { data: { payload, version: 8 } } }
+      if (operation === 'fetch') vi.mocked(AXIOS_INSTANCE.get).mockResolvedValueOnce(response)
+      else vi.mocked(AXIOS_INSTANCE.post).mockResolvedValueOnce(response)
+      const { result } = renderHook(() => useAudioPreferences())
+      await act(async () => {
+        expect(await (operation === 'fetch' ? result.current.fetchFromServer() : result.current.rollback(2))).toBe(true)
+      })
+      expect(useEqProcessingStore.getState().targetLufs).toBe(targetLufs)
+      expect(result.current.versionRef.current).toBe(8)
+    })
   })
 
   describe.each(['fetch', 'rollback'] as const)('%s validation', (operation) => {

@@ -2868,16 +2868,6 @@ export const SaveAudioPreferencesRequestPayloadPreset = {
   LOUDNESS: 'LOUDNESS',
 } as const;
 
-export type SaveAudioPreferencesRequestPayloadTargetLufs = typeof SaveAudioPreferencesRequestPayloadTargetLufs[keyof typeof SaveAudioPreferencesRequestPayloadTargetLufs];
-
-
-export const SaveAudioPreferencesRequestPayloadTargetLufs = {
-  NUMBER_MINUS_14: -14,
-  NUMBER_MINUS_16: -16,
-  NUMBER_MINUS_18: -18,
-  NUMBER_MINUS_23: -23,
-} as const;
-
 export type SaveAudioPreferencesRequestPayloadVisualizerMode = typeof SaveAudioPreferencesRequestPayloadVisualizerMode[keyof typeof SaveAudioPreferencesRequestPayloadVisualizerMode];
 
 
@@ -2961,7 +2951,7 @@ export type SaveAudioPreferencesRequestPayload = {
      */
   masterGain: number;
   normalizationEnabled: boolean;
-  targetLufs: SaveAudioPreferencesRequestPayloadTargetLufs;
+  targetLufs: number;
   visualizerMode: SaveAudioPreferencesRequestPayloadVisualizerMode;
   stereoEnabled: boolean;
   /**

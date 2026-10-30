@@ -339,3 +339,49 @@ describe('useEqProcessingStore — persist partialize', () => {
     expect(useEqProcessingStore.persist.getOptions().name).toBe('baander-eq-processing')
   })
 })
+
+
+describe('custom loudness targets', () => {
+  it('applies fractional targets without changing normalization defaults', () => {
+    useEqProcessingStore.getState().setTargetLufs(-20.5)
+    expect(useEqProcessingStore.getState().targetLufs).toBe(-20.5)
+    expect(useEqProcessingStore.getState().normalizationEnabled).toBe(false)
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(false, -20.5)
+  })
+
+  it.each([NaN, Infinity, -Infinity, null, '-20.5', undefined])('ignores invalid direct target %s', (target) => {
+    const before = useEqProcessingStore.getState()
+    const storageWrite = vi.spyOn(Storage.prototype, 'setItem')
+    useEqProcessingStore.getState().setTargetLufs(target as number)
+    expect(useEqProcessingStore.getState()).toBe(before)
+    expect(mockProcessor.setNormalization).not.toHaveBeenCalled()
+    expect(storageWrite).not.toHaveBeenCalled()
+    storageWrite.mockRestore()
+  })
+
+  it.each([NaN, Infinity, -Infinity, null, '-20.5', undefined])('rejects invalid settings target %s atomically', (target) => {
+    const before = useEqProcessingStore.getState()
+    useEqProcessingStore.getState().applySettings({ targetLufs: target as number, normalizationEnabled: true })
+    expect(useEqProcessingStore.getState()).toBe(before)
+    expect(mockProcessor.setNormalization).not.toHaveBeenCalled()
+  })
+
+  it('applies a fractional target from a settings update', () => {
+    useEqProcessingStore.getState().applySettings({ targetLufs: -20.5, normalizationEnabled: true })
+    expect(useEqProcessingStore.getState()).toMatchObject({ targetLufs: -20.5, normalizationEnabled: true })
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(true, -20.5)
+  })
+
+  it('restores a locally persisted custom target', async () => {
+    localStorage.setItem('baander-eq-processing', JSON.stringify({ state: { targetLufs: -20.5 }, version: 1 }))
+    await useEqProcessingStore.persist.rehydrate()
+    expect(useEqProcessingStore.getState().targetLufs).toBe(-20.5)
+  })
+
+  it.each(['null', '"-20.5"', '1e400', '-1e400'])('keeps the current target when local storage contains %s', async (target) => {
+    useEqProcessingStore.getState().setTargetLufs(-20.5)
+    localStorage.setItem('baander-eq-processing', `{"state":{"targetLufs":${target}},"version":1}`)
+    await useEqProcessingStore.persist.rehydrate()
+    expect(useEqProcessingStore.getState().targetLufs).toBe(-20.5)
+  })
+})

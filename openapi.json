@@ -3130,7 +3130,7 @@
                                                 },
                                                 "provisioningUri": {
                                                     "type": "string",
-                                                    "example": "otpauth://totp/Baander:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Baander"
+                                                    "example": "otpauth://totp/B%C3%A5nder:alice%40baander.app?secret=JBSWY3DPEHPK3PXP&issuer=B%C3%A5nder"
                                                 }
                                             },
                                             "type": "object"
@@ -26625,13 +26625,7 @@
                                 "type": "boolean"
                             },
                             "targetLufs": {
-                                "type": "number",
-                                "enum": [
-                                    -14,
-                                    -16,
-                                    -18,
-                                    -23
-                                ]
+                                "type": "number"
                             },
                             "visualizerMode": {
                                 "type": "string",

@@ -192,10 +192,12 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testRollbackRestoresPreviousVersionPayload(): void
     {
         $user = $this->createTestUser();
-        $firstPayload = AudioPreferencePayload::valid();
+        $firstPayload = AudioPreferencePayload::valid(['targetLufs' => -20.5]);
         $secondPayload = AudioPreferencePayload::valid(['preset' => 'BASS']);
 
-        $this->savePreferences($user, $firstPayload, 0);   // version 1
+        $saved = $this->assertJsonResponse($this->savePreferences($user, $firstPayload, 0), 200, 'data');
+        $this->assertSame(-20.5, $saved['data']['payload']['targetLufs']);
+        $this->assertSame(-20.5, $this->readAudioState($user)['saved']['payload']['targetLufs']);
         $this->savePreferences($user, $secondPayload, 1);  // version 2
 
         $data = $this->assertJsonResponse(
@@ -205,6 +207,7 @@ final class AudioPreferencesControllerTest extends TestCase
         );
 
         $this->assertEquals($firstPayload, $data['data']['payload'], 'Rollback must restore the version-1 payload.');
+        $this->assertSame(-20.5, $this->readAudioState($user)['saved']['payload']['targetLufs']);
         $this->assertSame(3, $data['data']['version']);
     }
 
@@ -244,6 +247,9 @@ final class AudioPreferencesControllerTest extends TestCase
     /** @return iterable<string, array{array<string, mixed>}> */
     public static function validPayloads(): iterable
     {
+        foreach ([-20.5, -15, 0, 3.5, -1.0e100, 1.0e100] as $target) {
+            yield 'custom-target-' . $target => [AudioPreferencePayload::valid(['targetLufs' => $target])];
+        }
         foreach (['lower' => ['gain' => -12, 'q' => 0.1, 'compressorThreshold' => -50, 'compressorRatio' => 1, 'compressorKnee' => 0, 'compressorAttack' => 0.1, 'compressorRelease' => 10, 'masterGain' => -12, 'stereoWidth' => 0], 'upper' => ['gain' => 12, 'q' => 10, 'compressorThreshold' => 0, 'compressorRatio' => 20, 'compressorKnee' => 40, 'compressorAttack' => 100, 'compressorRelease' => 1000, 'masterGain' => 12, 'stereoWidth' => 2]] as $case => $values) {
             $band = ['gain' => $values['gain'], 'q' => $values['q']];
             unset($values['gain'], $values['q']);
@@ -303,10 +309,12 @@ final class AudioPreferencesControllerTest extends TestCase
                 yield "$field-$case" => [array_replace($valid, [$field => $invalid])];
             }
         }
-        foreach (['preset' => 'CUSTOM', 'visualizerMode' => 'waveform', 'stereoMode' => 'mono', 'crossfeedPreset' => 'custom', 'targetLufs' => -15] as $field => $value) {
+        foreach (['preset' => 'CUSTOM', 'visualizerMode' => 'waveform', 'stereoMode' => 'mono', 'crossfeedPreset' => 'custom'] as $field => $value) {
             yield 'enum-' . $field => [array_replace($valid, [$field => $value])];
         }
         yield 'lufs-string' => [array_replace($valid, ['targetLufs' => '-14'])];
+        yield 'lufs-boolean' => [array_replace($valid, ['targetLufs' => false])];
+        yield 'lufs-list' => [array_replace($valid, ['targetLufs' => []])];
         foreach (['nine' => array_slice($valid['bands'], 0, 9), 'eleven' => [...$valid['bands'], $valid['bands'][0]], 'legacy-gains' => array_fill(0, 10, 0), 'object' => ['band' => $valid['bands'][0]], 'numeric-object' => (object) $valid['bands']] as $case => $bands) {
             yield 'bands-' . $case => [array_replace($valid, ['bands' => $bands])];
         }
@@ -318,6 +326,31 @@ final class AudioPreferencesControllerTest extends TestCase
         foreach (['missing' => array_slice($valid['chainOrder'], 0, 5), 'duplicate' => ['eq', 'eq', 'stereo', 'crossfeed', 'loudness', 'masterGain'], 'unknown' => ['eq', 'compressor', 'stereo', 'crossfeed', 'loudness', 'unknown'], 'extra' => [...$valid['chainOrder'], 'eq'], 'object' => array_combine($valid['chainOrder'], $valid['chainOrder']), 'numeric-object' => (object) $valid['chainOrder'], 'string' => 'eq'] as $case => $order) {
             yield 'chain-' . $case => [array_replace($valid, ['chainOrder' => $order])];
         }
+    }
+
+    #[DataProvider('overflowingTargets')]
+    public function testOverflowingTargetPreservesSavedPreferencesAndHistory(string $target): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 0), 200);
+        $before = $this->readAudioState($user);
+        $payload = json_encode(AudioPreferencePayload::valid(), JSON_THROW_ON_ERROR);
+        $payload = str_replace('"targetLufs":-14', '"targetLufs":' . $target, $payload);
+
+        $this->client->request('PUT', '/api/user/audio-preferences/', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_BAANDER_TEST_USER_ID' => $user->getId()->toString(),
+        ], '{"payload":' . $payload . ',"version":1}');
+
+        $this->assertJsonResponse($this->client->getResponse(), 422, 'error');
+        $this->assertSame($before, $this->readAudioState($user));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function overflowingTargets(): iterable
+    {
+        yield 'positive' => ['1e999'];
+        yield 'negative' => ['-1e999'];
     }
 
     /** @return array<string, mixed> */

@@ -10,8 +10,8 @@ const testTheme = resolveTheme('dark', 'violet')
 const mockSetNormalizationEnabled = vi.fn()
 const mockSetTargetLufs = vi.fn()
 
-vi.mock('@/features/equalizer/stores/eq-store', () => ({
-  useEqStore: (selector: (s: unknown) => unknown) =>
+vi.mock('@/features/equalizer/stores/eq-processing-store', () => ({
+  useEqProcessingStore: (selector: (s: unknown) => unknown) =>
     selector({
       normalizationEnabled: false,
       targetLufs: -14,
@@ -82,8 +82,8 @@ describe('SettingsPage', () => {
   it('renders LUFS target selector', () => {
     renderWithProviders(<SettingsPage />)
 
-    expect(screen.getByText('LUFS Target')).toBeInTheDocument()
-    expect(screen.getByText('-14 LUFS (Spotify)')).toBeInTheDocument()
+    expect(screen.getByText('Loudness target')).toBeInTheDocument()
+    expect(screen.getByText('Louder (−14 LUFS)')).toBeInTheDocument()
   })
 
   it('renders equalizer link', () => {

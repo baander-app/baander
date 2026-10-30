@@ -1,3 +1,4 @@
+import { isLoudnessTarget } from '@/features/equalizer/loudness-targets'
 import { EQ_PRESETS, type EqPresetName } from '@/features/equalizer/stores/eq-bands-store'
 import { DEFAULT_CHAIN_ORDER, type ProcessingModule } from '@/features/equalizer/stores/eq-processing-store'
 import { ENGINE_MODES, LEGACY_MODES } from '@/features/visualizer/types'
@@ -68,6 +69,7 @@ function chain(value: unknown): ProcessingModule[] {
 export function validateAudioPreferencePayload(value: unknown): SettingsApplyEqPayload {
   const p = record(value)
   exactFields(p, FIELDS)
+  if (!isLoudnessTarget(p.targetLufs)) throw new Error('Invalid loudness target')
   return {
     enabled: boolean(p.enabled), bands: bands(p.bands),
     preset: choice(p.preset, Object.keys(EQ_PRESETS).filter(isPreset)),
@@ -80,7 +82,7 @@ export function validateAudioPreferencePayload(value: unknown): SettingsApplyEqP
     compressorRelease: number(p.compressorRelease, 10, 1000),
     masterGain: number(p.masterGain, -12, 12),
     normalizationEnabled: boolean(p.normalizationEnabled),
-    targetLufs: choice(p.targetLufs, [-14, -16, -18, -23]),
+    targetLufs: p.targetLufs,
     stereoEnabled: boolean(p.stereoEnabled), stereoWidth: number(p.stereoWidth, 0, 2),
     stereoMode: choice(p.stereoMode, ['normal', 'mid', 'side']),
     crossfeedEnabled: boolean(p.crossfeedEnabled),

@@ -97,12 +97,10 @@ describe('SettingsPage', () => {
     expect(mockSetNormalizationEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('renders the LUFS target select with all options', () => {
+  it('renders the Baander target and preserves the default', () => {
     renderWithTheme(<SettingsPage />);
-    // The LUFS target uses a Radix Select with these options
-    expect(screen.getByText('LUFS Target')).toBeInTheDocument();
-    // Verify the select trigger exists (the default value is shown)
-    expect(screen.getByText('-14 LUFS (Spotify)')).toBeInTheDocument();
+    expect(screen.getByText('Loudness target')).toBeInTheDocument();
+    expect(screen.getByText('Louder (−14 LUFS)')).toBeInTheDocument();
   });
 
   it('disables LUFS select when normalization is off', () => {

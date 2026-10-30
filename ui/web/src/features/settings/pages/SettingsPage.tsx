@@ -1,9 +1,9 @@
 import { Switch } from '@/shared/components/ui/switch';
-import { type LufsTarget, useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store';
+import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store';
 import styled from 'styled-components';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { LoudnessTargetControl } from '@/features/equalizer/components/LoudnessTargetControl';
 import { Link } from 'react-router-dom';
 import { PasskeyManagement } from '../components/PasskeyManagement';
 import { AccountManagement } from '../components/AccountManagement';
@@ -11,8 +11,6 @@ import { AppearanceSection } from '../components/AppearanceSection';
 import { EmailLanguageSetting } from '../components/EmailLanguageSetting';
 import { DeviceManagement } from '@/features/session/components/DeviceManagement';
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check';
-
-const VALID_LUFS_TARGETS = [-14, -16, -18, -23] as const;
 
 const PageContainer = styled.div`
   display: flex;
@@ -83,11 +81,6 @@ const FieldDescription = styled.p`
   color: var(--color-muted-foreground);
 `
 
-const FieldLabel = styled.label`
-  font-size: 0.875rem;
-  font-weight: 500;
-`
-
 const CardStackSmall = styled(CardContent)`
   display: flex;
   flex-direction: column;
@@ -100,13 +93,6 @@ export function SettingsPage() {
   const setNormalizationEnabled = useEqProcessingStore((s) => s.setNormalizationEnabled);
   const setTargetLufs = useEqProcessingStore((s) => s.setTargetLufs);
   const { isAdmin } = useAdminCheck();
-
-  const handleLufsChange = (value: string) => {
-    const parsed = parseFloat(value);
-    if ((VALID_LUFS_TARGETS as readonly number[]).includes(parsed)) {
-      setTargetLufs(parsed as LufsTarget);
-    }
-  };
 
   return (
     <PageContainer>
@@ -140,25 +126,11 @@ export function SettingsPage() {
 
             <Card size="sm">
               <CardStack>
-                <FieldLabel>LUFS Target</FieldLabel>
-                <FieldDescription>
-                  Target loudness for volume normalization
-                </FieldDescription>
-                <Select
-                  value={String(targetLufs)}
-                  onValueChange={handleLufsChange}
+                <LoudnessTargetControl
+                  value={targetLufs}
+                  onChange={setTargetLufs}
                   disabled={!normalizationEnabled}
-                >
-                  <SelectTrigger style={{ width: '100%', maxWidth: '20rem' }}>
-                    <SelectValue/>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="-14">-14 LUFS (Spotify)</SelectItem>
-                    <SelectItem value="-16">-16 LUFS (Apple Music)</SelectItem>
-                    <SelectItem value="-18">-18 LUFS (YouTube)</SelectItem>
-                    <SelectItem value="-23">-23 LUFS (Broadcast)</SelectItem>
-                  </SelectContent>
-                </Select>
+                />
               </CardStack>
             </Card>
 
