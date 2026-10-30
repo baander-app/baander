@@ -178,16 +178,17 @@ The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party c
 
 ## External APIs
 
-All API keys are optional — Baander works without them, but metadata enrichment will be limited to what's available locally.
+API keys are optional. MusicBrainz and LRCLIB lookups work without them; other
+providers need credentials in the process that makes the request.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DISCOGS_TOKEN` | — | Discogs API personal access token. Get one from your [Discogs settings](https://www.discogs.com/settings/developers). |
-| `LASTFM_API_KEY` | — | Last.fm API key for artist/track metadata lookup. |
+| `DISCOGS_TOKEN` | — | Discogs API personal access token. The admitted worker recipe cannot currently provision it for queued enrichment; see [External APIs](external-apis.md#configuration). |
+| `LASTFM_API_KEY` | — | Last.fm API key for web artist search and browse information; stored metadata sync does not use it. |
 | `LASTFM_API_SECRET` | — | Listed in `.env.example`, but not consumed by the current Last.fm adapter. |
-| `SPOTIFY_CLIENT_ID` | — | Spotify API client ID for album art and metadata. |
-| `SPOTIFY_CLIENT_SECRET` | — | Spotify API client secret. |
-| `TASTE_DIVE_API_KEY` | — | TasteDive API key for music recommendations. |
+| `SPOTIFY_CLIENT_ID` | — | Adapter credential; no current application workflow calls Spotify. |
+| `SPOTIFY_CLIENT_SECRET` | — | Companion adapter secret; it does not enable a current workflow. |
+| `TASTE_DIVE_API_KEY` | — | Adapter credential; no current application workflow calls TasteDive. |
 | `MUSICBRAINZ_VERSION` | `1.0.0` | Listed in `.env.example`, but not consumed by the current MusicBrainz adapter. |
 | `MUSICBRAINZ_CONTACT` | `noreply@localhost` | Listed in `.env.example`, but not consumed by the current MusicBrainz adapter. |
 

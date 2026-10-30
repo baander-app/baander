@@ -118,21 +118,21 @@ Events are dispatched via Symfony's `EventDispatcherInterface` inside handlers. 
 
 ## Job Monitoring
 
-Every dispatched message gets a `JobIdStamp` from `JobMonitoringMiddleware` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` and `SwooleTaskJobMonitorDecorator` record each attempt with `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../part-1-operator-guide/monitoring.md) for details.
+Every dispatched message gets a `JobIdStamp` from `JobMonitoringMiddleware` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` records received delivery attempts. `JobMonitorAdministration::runInline()` records monitored work executed in the calling process. Both use `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../part-1-operator-guide/monitoring.md) for details.
 
 A long-running handler lets an operator cancel its job. It calls `JobCancellationCheckpointInterface::check()` (a Shared Application port) between items of its work, outside any `catch` that would swallow the exception. `check()` throws `JobCancelledException` when the job monitor's Cancel action, or `app:monitor:job:cancel`, has set the job's cancellation flag; outside a job run it does nothing. Each check costs a Redis `EXISTS`, so place checkpoints per item of real work (an album, a directory, a page), not inside a tight loop.
 
-`JobCancellationMiddleware` runs each received job as the current job of its coroutine, so the checkpoint finds the job ID without the handler passing it, on Messenger workers, Swoole task workers and inline runs alike. When the handler stops at a checkpoint, the middleware marks the row `cancelled` and returns the envelope with a `JobCancelledStamp`, so the transport acknowledges the delivery: it is not retried and does not reach the failure transport. An inline run (`JobMonitorAdministrationInterface::runInline()`) rethrows `JobCancelledException` to its console command.
+`JobCancellationMiddleware` runs each received job as the current job of its coroutine, so the checkpoint finds the job ID without the handler passing it, on Messenger workers and inline runs alike. When the handler stops at a checkpoint, the middleware marks the row `cancelled` and returns the envelope with a `JobCancelledStamp`, so the transport acknowledges the delivery: it is not retried and does not reach the failure transport. An inline run (`JobMonitorAdministrationInterface::runInline()`) rethrows `JobCancelledException` to its console command.
 
 ## Async Processing
 
 The admitted worker deployment owns the Redis `async` (`MESSENGER_TRANSPORT_DSN`)
-and `scheduler` consumers, outbox relay, scheduler and media execution. The web container runs `app:serve`
-without task workers or a CPU pool. Follow [Worker deployment](../part-1-operator-guide/commands/README.md#worker-deployment)
-for manifests, shared named volumes and the immutable boot lifecycle. Consumer
-names include the deployment and boot identity. A child failure, lease loss or
-termination signal drains the deployment; replacement requires explicit host
-recovery. Automatic worker restart and a second child supervisor are unsupported.
+and `scheduler` consumers, outbox relay, scheduler and media execution. The web
+container runs `app:serve` without task workers or a CPU pool. Consumer names
+include the deployment and boot identity. [Background Work](../part-1-operator-guide/background-work.md)
+owns the operator explanation of admission, observation, lifecycle and uncertain
+outcomes; [Worker deployment](../part-1-operator-guide/commands/README.md#worker-deployment)
+provides the manifest and host-command reference.
 
 ### Message contract and retries
 
@@ -190,3 +190,4 @@ a complete audit of all event producers.
 - [Coding Conventions](coding-conventions.md) — CQRS rules and common mistakes
 - [Real-Time Patterns](real-time-patterns.md) — how events feed into WebSocket pushes
 - [Testing](testing.md) — how to test handlers
+- [Background Work](../part-1-operator-guide/background-work.md) — operate consumers, scheduling, outbox relay and native execution

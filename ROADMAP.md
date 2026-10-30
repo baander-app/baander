@@ -25,6 +25,50 @@ trees; they are not acceptance evidence for a new change.
 
 ## Cohesive operator manual
 
+Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)
+now connects component responsibilities, storage, setup, daily tasks, monitoring
+and recovery. Five new explanatory chapters join the twelve existing narrative
+chapters. Task, symptom and component indexes provide direct entry; 41 command
+reference pages, including their index, preserve the installed/development
+execution distinction. Adjacent developer and registry documentation links back
+to the manual. The change covers 66 documentation files and changes no runtime code.
+
+Unit checkpoints: U1 explains components and data ownership; U2 updates the source
+build recipe and connects queues, outbox, scheduling and worker lifecycle; U3
+separates discovery, ingestion, enrichment and playback; U4 corrects credential
+revocation and notification delivery; U5 connects diagnostics, upgrades, backups
+and the independent registry; U6 reconciles command references; U7 integrates
+navigation and reader acceptance. Source checks corrected unsupported ingestion
+and watcher claims, stale storage descriptions and misleading health/recovery
+advice. Existing useful procedure details and command family headings remain.
+
+Verification: the public backend runner provisioned the current documentation
+into the CI image and passed command coverage with 4 tests, 4 assertions and zero
+skips. Source discovery matched 146 command declarations to index entries and
+pages. All 66 documentation files received prose audits with intentional factual
+and structural changes accounted for. Shell syntax checks passed for 166 fenced
+examples; 805 local destinations and fragments passed, including 43 inbound links
+from untouched documentation. Whitespace checks passed. The simplification preflight
+found no executable code in scope.
+
+Independent reader walkthroughs covered all five acceptance examples from the
+index and direct task/symptom entries. They found and resolved an omitted frontend
+upgrade build and a diagnostic that pointed at the web image instead of the worker
+image. The focused code review, including an independent local adversarial read,
+found two further corrections: disclose the unsupported worker provider-secret
+handoff and keep installed media paths consistent in command references. Both
+fixes were verified with no remaining findings. Cross-model review was disabled
+by checkout configuration.
+
+Qualification limits remain explicit: these checks did not deploy a new instance,
+scan user media, rotate secrets, replace workers or restore data. The current
+worker credentials contract cannot provision private Discogs tokens for queued
+enrichment; documentation now identifies that runtime gap. Coordinated application
+restore, actual registry destination/RPO/RTO and whole-host capacity remain
+unqualified. The revised source-build procedure is source-verified, without a new
+bootstrap run. Work is committed locally on `docs/cohesive-operator-manual`;
+publishing remains separate.
+
 Requirements checkpoint, 2026-10-30: the user confirmed an easy-to-follow manual
 built from the existing operator book, covering understanding Baander, setup,
 daily operation, maintenance and recovery. The

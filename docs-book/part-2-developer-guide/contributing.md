@@ -62,7 +62,11 @@ Reviewers check for:
 
 ## Documentation Maintenance
 
-When you change code, update the corresponding documentation:
+When you change code, update the corresponding documentation. The
+[operator manual](../part-1-operator-guide/README.md) explains installation,
+routine operation, monitoring and recovery. Update the affected
+chapter when a change alters those tasks; keep argument and option detail in the
+CLI reference.
 
 | Code Change | Documentation to Update |
 |-------------|------------------------|

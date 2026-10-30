@@ -110,19 +110,22 @@ those of the web process alone.
 
 Health endpoints, background-job monitoring and console commands help operators
 inspect scans, failures and worker availability. The [operator guide](docs-book/part-1-operator-guide/README.md)
-is the reference for configuration, monitoring, upgrades and troubleshooting.
+connects the system explanation to configuration, monitoring, upgrades and recovery.
 
 ## Getting started
 
-Start with the **[source-installation guide](docs-book/part-1-operator-guide/getting-started.md)**.
-It walks through configuration and TLS, shared storage, image builds, database
+Start with the **[operator manual](docs-book/part-1-operator-guide/README.md)**.
+Its reading path explains the components and data stores before installation,
+then connects routine tasks to monitoring, maintenance and recovery. If you are
+ready to install, the [source-installation guide](docs-book/part-1-operator-guide/getting-started.md)
+walks through configuration and TLS, shared storage, image builds, database
 initialization, OAuth keys, the first administrator account, the frontend build,
 worker deployment and a first library scan.
 
 Bånder is a pre-release project. The current setup builds from source and uses a
 development-oriented Docker Compose stack. Starting Compose alone does not provide
 a complete instance: background processing requires the separately admitted worker
-pair described in [Worker deployment](docs-book/part-1-operator-guide/commands/README.md#worker-deployment).
+pair explained in [Background Work](docs-book/part-1-operator-guide/background-work.md).
 
 A disposable source-installation check verified frontend loading, administrator
 login, worker startup and a sample music scan through ingestion and browser

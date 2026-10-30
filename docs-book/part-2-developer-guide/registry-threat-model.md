@@ -7,7 +7,9 @@ persistence and do not call this service; their boundaries belong to the
 [application threat model](application-threat-model.md).
 
 This model describes source controls and the cases exercised by the local native
-contracts. The [Registry guide](../../relay/README.md) describes the runners,
+contracts. Operators should start with the [Registry chapter](../part-1-operator-guide/registry.md)
+for applicability, health, credentials and recovery boundaries. The
+[service reference](../../relay/README.md) describes the runners,
 artifact locations and release acceptance limits. Execution results apply to the
 checkout and toolchain recorded by each run; test descriptions below do not claim
 a current passing run. Container startup qualification is prior evidence unless
