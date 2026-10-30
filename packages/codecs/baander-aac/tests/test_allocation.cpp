@@ -93,6 +93,7 @@ static void test_profile(const Profile& p) {
   }
   if (p.mps212) {
     AacUsacEncoderOptions o;
+    aac_usac_encoder_options_init(&o);
     memset(&o, 0, sizeof(o));
     o.noise_filling = -1;
     o.preroll = -1;

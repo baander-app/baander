@@ -73,7 +73,8 @@
         "src/usac_arith_enc.cpp",
         "src/usac_enc.cpp",
         "src/sbr_enc_usac.cpp",
-        "src/mps212_enc.cpp"
+        "src/mps212_enc.cpp",
+        "src/drc_gen.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

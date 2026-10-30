@@ -5,6 +5,7 @@
 
 #include "aac.h"
 #include "bitstream.h"
+#include "drc_gen.h"
 #include "ics.h"
 #include "mps212_enc.h"
 #include "usac.h"
@@ -20,9 +21,10 @@ extern "C" {
  * turns the AAC-LC encoder's analysis and quantisation of a frame into
  * UsacFrame() with the frequency-domain core, followed in each element
  * by the enhanced SBR data of the SBR encoder (sbr_enc_usac.cpp) and
- * the MPS 212 data of a parametric stereo pair (mps212_enc.cpp).  The
- * encoder state of encoder.h owns one AacUsacEncoder when its object
- * type is USAC. */
+ * the MPS 212 data of a parametric stereo pair (mps212_enc.cpp), and
+ * with the drc option the MPEG-D DRC gains of the generator in
+ * drc_gen.cpp in the UNI_DRC extension element.  The encoder state of
+ * encoder.h owns one AacUsacEncoder when its object type is USAC. */
 
 /* ── UsacConfig() (usac_enc_config.cpp) ───────────────────────── */
 
@@ -60,11 +62,15 @@ struct AacEncElement_;
  * envelope history have to be warm too. */
 #define AAC_USAC_ENC_PREROLL_FRAMES 1
 #define AAC_USAC_ENC_PREROLL_FRAMES_SBR 2
+/* The UNI_DRC extension element of a frame: the uniDrcGain() payload
+ * and the element's flags and length. */
+#define AAC_USAC_ENC_MAX_DRC_BYTES (AAC_DRC_GEN_MAX_PAYLOAD_BYTES + 4)
 /* The largest access unit of a stream without its pre-roll: the bit
  * budget of the core channels, the SBR data of up to `channels` SBR
- * channels and the MPS 212 data. */
+ * channels, the MPS 212 data and the DRC gains. */
 #define AAC_USAC_ENC_MAX_AU_BYTES(channels) \
-  ((6144 / 8) * (channels) + AAC_SBR_ENC_MAX_BYTES * (channels) + AAC_MPS212_ENC_MAX_BYTES)
+  ((6144 / 8) * (channels) + AAC_SBR_ENC_MAX_BYTES * (channels) + AAC_MPS212_ENC_MAX_BYTES + \
+   AAC_USAC_ENC_MAX_DRC_BYTES)
 /* ... and with the pre-roll of an immediate playout frame: the embedded
  * configuration and the previous access units. */
 #define AAC_USAC_ENC_MAX_IPF_BYTES(channels) \
@@ -132,6 +138,21 @@ using AacUsacEncoder = struct AacUsacEncoder_ {
    * sign bits of the last window and fac_data_present.  The fill element
    * pads a short tail so that a decoder's look-ahead stays in the frame. */
   int tail_bits;
+  /* MPEG-D DRC (the drc option): the gain generator of the stream, made
+   * at its first frame and kept until the next stream's first frame so
+   * that its meters stay readable; the uniDrcGain() payload of the frame
+   * being coded, and the frame it belongs to (frame_index + 1, 0 none). */
+  AacDrcGen* drc;
+  uint8_t drc_payload[AAC_DRC_GEN_MAX_PAYLOAD_BYTES];
+  int drc_payload_len;
+  int drc_payload_frame;
+  /* The programme's loudness figures of aac_encoder_set_loudness_info,
+   * which anchor the gain generator, and the figures of each DRC set's
+   * output (drcSetId 1 and 2) given by the caller. */
+  int has_program_loudness;
+  AacLoudnessInfo program_loudness;
+  int has_set_loudness[AAC_DRC_GEN_SETS];
+  AacLoudnessInfo set_loudness[AAC_DRC_GEN_SETS];
 };
 
 AacUsacEncoder* aac_usac_enc_create(void);
@@ -170,6 +191,33 @@ void aac_usac_enc_choose_tools(const AacUsacEncoder* u, int input_rate, int inpu
 int aac_usac_enc_set_config_ext(AacUsacEncoder* u, int type, const uint8_t* data, int len);
 /* Forgets every frame: the next frame is the first of a stream. */
 void aac_usac_enc_reset(AacUsacEncoder* u, int channels);
+
+/* ── MPEG-D DRC ────────────────────────────────────────────────── */
+
+/* Feeds one frame of input (interleaved at full scale 1.0, NULL for the
+ * silence of a flush) to the DRC gain generator before the frame is
+ * coded, and prepares the frame's uniDrcGain() payload; at a stream's
+ * first frame the generator starts over (with meters when the encoder
+ * measures loudness).  Nothing without the drc option.  A frame begun
+ * without it is given the gains of silence. */
+int aac_usac_enc_drc_input(struct AacEncoderState_* s, const float* pcm);
+/* The programme's figures (NULL forgets them): the anchor of the gain
+ * generator and the drcSetId 0 entry of the loudness info set. */
+void aac_usac_enc_set_program_loudness(AacUsacEncoder* u, const AacLoudnessInfo* info);
+/* The figures of a DRC set's output (drcSetId 1 or 2; NULL forgets
+ * them), written into the loudness info set in place of the estimate.
+ * AAC_ERR_INVALID_ARG for another set. */
+int aac_usac_enc_set_drc_loudness(AacUsacEncoder* u, int drc_set_id, const AacLoudnessInfo* info);
+/* The loudness the generator's meter measured for a DRC set's output;
+ * AAC_ERR_STATE without the meters or before 400 ms. */
+int aac_usac_enc_drc_loudness(const AacUsacEncoder* u, int drc_set_id, AacLoudnessInfo* out);
+/* The figures the loudness info set declares for a DRC set (drcSetId 1
+ * or 2), the program loudness and the peaks: the caller's, or without
+ * them the estimate from the programme's (its integrated loudness,
+ * which the curve roughly keeps, and bounds on the peaks: the general
+ * set's the programme's peak or -1 dBTP, the night set's its limiter's
+ * ceiling).  0 when the set gets no entry (no figures at all). */
+int aac_usac_enc_drc_set_figures(const AacUsacEncoder* u, int drc_set_id, AacLoudnessInfo* out);
 
 /* The UsacConfig() of the encoder's stream. */
 void aac_usac_enc_config(const struct AacEncoderState_* s, AacUsacConfig* c);

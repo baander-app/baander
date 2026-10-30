@@ -53,7 +53,7 @@ set(BAAC_AAC_DECODER_SOURCES src/decoder.cpp src/conceal.cpp src/decoder_output.
     src/usac_lpd_tables.cpp)
 set(BAAC_AAC_ENCODER_SOURCES src/psycho.cpp src/encoder_tools.cpp src/afterburner.cpp src/encoder.cpp src/sbr_enc.cpp src/ps_enc.cpp
     src/sbr_ld_enc.cpp src/usac_arith_enc.cpp src/usac_enc.cpp src/sbr_enc_usac.cpp
-    src/mps212_enc.cpp)
+    src/mps212_enc.cpp src/drc_gen.cpp)
 
 set(BAAC_AAC_SIMD_SOURCES)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64|i686|i386")

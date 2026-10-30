@@ -41,6 +41,7 @@ set(TEST_SOURCES
     test_usac_rap.cpp
     test_playback.cpp
     test_encoder_tuning.cpp
+    test_drc_gen.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

@@ -540,10 +540,13 @@ USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
 AAC DRC metadata are refused, as the USAC frame has no place for them;
 `aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
 frame schedule and the segment size ceiling (below), a stream
-identifier, and whether enhanced SBR and MPS 212 are on, off or chosen
+identifier, whether enhanced SBR and MPS 212 are on, off or chosen
 by bitrate (MPS 212 needs SBR, so asking for it with SBR off is
-refused); `aac_encoder_set_loudness_info` adds the loudness info set
-(see Loudness). The AAC-LC output is unchanged byte for byte.
+refused), and the MPEG-D DRC gain sets (below). Fill the structure
+with `aac_usac_encoder_options_init` first and set only the fields that
+change, so the call stays correct when the structure gains a field;
+`aac_encoder_set_loudness_info` adds the loudness info set (see
+Loudness). The AAC-LC output is unchanged byte for byte.
 
 For streaming, the immediate playout frames are where a muxer cuts
 segments (an HLS or DASH segment, an MP4 fragment) and where a player
@@ -617,6 +620,48 @@ caller who knows the players sets `mps212` to 1 for a stereo pair at
 24 or 32 kbit/s, where it buys 1.5 to 2 kHz of bandwidth over the SBR
 pair.
 
+With `drc` on (off by default), the encoder writes MPEG-D DRC gain sets
+(ISO/IEC 23003-4) for a quieter listening mode. The UsacConfig gains an
+`ID_EXT_ELE_UNI_DRC` element after the pre-roll element, whose
+configuration is a `uniDrcConfig()` with one channel layout, one
+coefficients block of two single-band gain sets (the regular gain
+coding profile, linear interpolation, the default `deltaTmin` and DRC
+frame) and two DRC sets in the version 1 syntax of the configuration
+extension, which the FDK decoder applies and the version 0 form does
+not: drcSetId 1 with the effect "general compression" and drcSetId 2
+with "night". Every access unit carries that frame's `uniDrcGain()`
+(a few bytes), the pre-roll's configuration included. The gains come
+from the input: the K-weighted loudness over 400 ms, mapped through a
+static curve around the programme's integrated loudness (a dead band of
+half the target loudness range, then a ratio that brings the
+programme's range to the target, `drc_target_range_lu`, 6 to 16 LU,
+default 10; up to 12 dB of boost and 24 dB of cut, no boost for
+passages 30 to 40 LU below the anchor and quieter), smoothed with a
+50 ms attack and a 1.5 s release. The general set is that compressor,
+its boost bounded so that the true peak stays at or below -1 dBTP; the
+night set adds a limiter that holds the true peak (4 times oversampled)
+at -1 dBTP after the programme is normalised to -16 LUFS, which its
+`limiterPeakTarget` declares. The decoders apply the gains of a frame to
+the next frame's output, so the generator uses what the codec delay
+leaves beyond one frame as its lookahead. With
+`aac_encoder_set_loudness_info` the programme's figures anchor the curve
+and size the ratio (two-pass); without them the anchor is the
+integrated loudness of the input so far and the range is assumed to be
+16 LU (one-pass). The loudness info set then carries an entry per DRC
+set besides the programme's (an empty set without any figures, which
+libxaac needs before it applies a set): estimated from the programme's
+figures (its integrated loudness and bounds on the peaks), or measured
+on the set's output, which the encoder meters with loudness
+measurement on (`aac_encoder_drc_loudness`) and takes with
+`aac_encoder_set_drc_loudness_info`; `baac --drc --loudness` runs that
+three-pass flow. On a music test signal with a 16 LU loudness range,
+the target of 10 LU brings the decoded range to 10.2 LU one-pass and
+10.7 LU two-pass, and FDK, libxaac and our decoder apply the gains (see
+`docs/reference-comparison.md`). The gains cost about 0.7 kbit/s; the
+configuration grows by 34 bytes (and the loudness entries by up to
+33), which a LOAS stream pays in every frame, since its
+StreamMuxConfig repeats in every frame.
+
 ## API
 
 All functions are declared in `include/aac.h` with C linkage.
@@ -643,7 +688,8 @@ int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
 /* xHE-AAC: noise filling, pre-roll, independent frame schedule, segment size ceiling,
- * stream id, SBR, MPS 212 */
+ * stream id, SBR, MPS 212, DRC gain sets; init fills the defaults */
+void aac_usac_encoder_options_init(AacUsacEncoderOptions* options);
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
 /* xHE-AAC random access: an independent frame on demand, and the last frame for a muxer */
 int aac_encoder_request_independent_frame(AacEncoderHandle ctx);
@@ -952,8 +998,11 @@ writes the loudness info set into the stream (the figures go to stderr),
 MPS 212 (`auto`, the default, by bitrate), and `--no-noise-filling`,
 `--preroll off` and `--stream-id N` set the other USAC options,
 `--rap-ms N`, `--rap-samples N` and `--rap-max-frames N` the independent
-frame schedule and `--segment-max-bytes N` the segment size ceiling; the
-options are refused with another profile. `loudness` prints the meter's
+frame schedule, `--segment-max-bytes N` the segment size ceiling and
+`--drc` with `--drc-range LU` the MPEG-D DRC gain sets (with
+`--loudness`, a further pass measures each set's output for its entry
+in the loudness info set); the options are refused with another
+profile. `loudness` prints the meter's
 figures (integrated loudness, loudness range, true peak, sample peak,
 momentary and short-term maxima) of a WAV file (integer PCM of 8 to 32
 bits or 32-bit float, up to six channels in the canonical order) or of
@@ -1022,8 +1071,9 @@ normalisation gain in dB after each decode call. The encoder's
 `profile: 'xhe'` writes xHE-AAC (LOAS by default, `raw` with `config` for
 MP4) and takes `usac: { noiseFilling, preroll, independentIntervalFrames,
 independentIntervalMs, independentIntervalSamples,
-independentMaxDistanceFrames, segmentMaxBytes, streamId, sbr, mps212 }`
-(the tools `'on'`, `'off'` or `'auto'`); `encoder.requestIndependentFrame()`
+independentMaxDistanceFrames, segmentMaxBytes, streamId, sbr, mps212,
+drc, drcTargetRangeLu }` (the tools `'on'`, `'off'` or `'auto'`, `drc` a
+boolean); `encoder.requestIndependentFrame()`
 asks for an independent frame and `encoder.lastFrame` reports the last
 frame produced (`{ frameIndex, independent, prerollBytes, bytes,
 samplePosition }`, `null` before the first),
@@ -1113,7 +1163,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-nine suites, and the transform, filterbank and
+`ctest` runs forty suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -1197,7 +1247,7 @@ and decorrelator, the regrouped low band, and the four stereo streams
 against the FDK decodes) and MPEG-D DRC (`test_unidrc`: the parsers with
 a mutation fuzz, the gain decoder, the selection process, and the
 loudness and normalisation gain of two committed streams), and the
-xHE-AAC encoder in three (`test_usac_enc`: the arithmetic coder against
+xHE-AAC encoder in four (`test_usac_enc`: the arithmetic coder against
 the decoder's with escapes, short windows and mixed lengths, the
 UsacConfig writer against the reader, encode and decode round trips
 of the plain core through the public API against AAC-LC at the same
@@ -1220,7 +1270,13 @@ modes with and without the pre-roll, cuts at every immediate playout
 frame of the raw and LOAS forms decoded from cold and aligned at the
 reported position, and the committed stream
 `usac_enc_rap_cpe_64k.loas` with on-demand independent frames under a
-ceiling; a fresh encode reproduces every committed stream byte for
+ceiling; `test_drc_gen`: the `uniDrcConfig()`, `uniDrcGain()` and
+loudness info set writers against the parsers, the gain generator on a
+signal of loud, medium and quiet passages (the direction and bounds of
+the gains, attack and release, the peak bounds, the loudness range of
+each set's output, one- and two-pass), streams with the gain sets on
+and off through our decoder's DRC requests, and the committed stream
+`usac_enc_drc_cpe_64k.loas`; a fresh encode reproduces every committed stream byte for
 byte, and `--write-streams tests/data` on each suite regenerates its
 own) and its loudness metadata in another
 (`test_encoder_loudness`: the two-pass set in the configuration as the
@@ -1385,7 +1441,7 @@ channels through the hybrid QMF bank.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac and the 2-1-2 encoder in mps212_enc), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac, the 2-1-2 encoder in mps212_enc and the MPEG-D DRC gain generator in drc_gen), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool (with the benchmark), mps-enc test stream writer for MPEG Surround, fuzz/ harnesses with their seed generator and mutation driver
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)

@@ -282,7 +282,30 @@ typedef struct AacUsacEncoderOptions_ {
    * tool runs in the SBR encoder's filterbank, so with it on `sbr` must
    * be 1 or -1 (then SBR is on whatever the bitrate). */
   int mps212;
+  /* MPEG-D DRC gain sets (ISO/IEC 23003-4) for a quieter listening mode:
+   * 1 on, 0 or any other value off (default).  The stream then carries a
+   * uniDrcConfig() with two DRC sets on its own layout, drcSetId 1
+   * "general compression" (a compressor that boosts the quiet passages
+   * and cuts the loud ones around the programme's integrated loudness,
+   * the boost bounded at -1 dBTP) and drcSetId 2 "night" (the same
+   * compressor with a limiter that
+   * holds the true peak at -1 dBTP after normalisation to -16 LUFS),
+   * and every frame the gains in the UNI_DRC extension element.  A
+   * player applying MPEG-D DRC selects a set by the effect it asks for;
+   * every other decoder ignores the element.  The programme's figures of
+   * aac_encoder_set_loudness_info anchor the compressor (two-pass);
+   * without them it follows the integrated loudness of the input so far
+   * (one-pass). */
+  int drc;
+  /* The loudness range in LU the DRC sets bring the programme towards,
+   * 6 to 16 (default 10; any other value takes the default).  The ratio
+   * follows from the programme's loudness range when its figures carry
+   * one, from an assumed 16 LU otherwise. */
+  int drc_target_range_lu;
 } AacUsacEncoderOptions;
+/* Fills every field with its default, so that a caller sets only what it
+ * changes and stays correct when the structure grows. */
+void aac_usac_encoder_options_init(AacUsacEncoderOptions* options);
 /* Applies the options before the first frame (AAC_ERR_STATE after it);
  * AAC_ERR_UNSUPPORTED for another object type, AAC_ERR_INVALID_ARG for
  * `mps212` on with `sbr` off (the options then stay as they were).  Any
@@ -393,6 +416,28 @@ int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* i
  * than six channels, the layouts the meter has no weights for. */
 int aac_encoder_set_loudness_measurement(AacEncoderHandle ctx, int enabled);
 int aac_encoder_loudness(AacEncoderHandle ctx, AacLoudnessInfo* out);
+
+/* The DRC sets of the drc option of aac_encoder_set_usac, by drcSetId. */
+#define AAC_USAC_DRC_SET_GENERAL 1
+#define AAC_USAC_DRC_SET_NIGHT 2
+/* With DRC sets the loudness info set carries an entry for each set
+ * besides the programme's, so that a player's loudness normalisation
+ * matches the set it selects.  By default the entry is estimated from
+ * the programme's figures (the integrated loudness, which the
+ * compressor roughly keeps, and bounds on the peaks: the general set's
+ * the programme's peak or -1 dBTP, the night set's its ceiling); this
+ * call gives the figures measured on the set's output
+ * instead (NULL returns to the estimate).  Before the first frame
+ * (AAC_ERR_STATE after it); AAC_ERR_INVALID_ARG for another drcSetId,
+ * AAC_ERR_UNSUPPORTED for an object type other than AAC_AOT_USAC. */
+int aac_encoder_set_drc_loudness_info(AacEncoderHandle ctx, int drc_set_id,
+                                      const AacLoudnessInfo* info);
+/* With the drc option and loudness measurement on, the encoder also
+ * meters each DRC set's output (the input times the gains as a decoder
+ * applies them); this reads a set's figures, for the second pass of a
+ * measured encode.  AAC_ERR_STATE without the meters or before 400 ms
+ * of output. */
+int aac_encoder_drc_loudness(AacEncoderHandle ctx, int drc_set_id, AacLoudnessInfo* out);
 
 /* ── Decoder API ─────────────────────────────────────────────────── */
 

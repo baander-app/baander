@@ -59,7 +59,7 @@ test('valid requests reach the service with validated arguments', async () => {
   assert.deepEqual(given(calls[0]), ['openDecoder', { loudness: { enabled: true, targetLufs: -16.5 }, drcEffect: 'night', albumMode: true, drcBoost: 50, drcCut: 0 }]);
   assert.deepEqual(given(calls[1]), ['decode', data, { loudness: false }]);
   calls.length = 0;
-  const xhe = { profile: 'xhe', usac: { independentIntervalMs: 2000, independentIntervalSamples: 96000, independentMaxDistanceFrames: 100, segmentMaxBytes: 65536 } };
+  const xhe = { profile: 'xhe', usac: { independentIntervalMs: 2000, independentIntervalSamples: 96000, independentMaxDistanceFrames: 100, segmentMaxBytes: 65536, drc: true, drcTargetRangeLu: 8 } };
   assert.equal(await invoke('encoder-open', xhe), 'openEncoder-result');
   assert.equal(await invoke('encoder-open', { peakBitrate: 192000, bandwidth: 15000, vbrMode: 3 }), 'openEncoder-result');
   assert.equal(await invoke('encoder-open', { peakBitrate: 0, bandwidth: 0 }), 'openEncoder-result');
@@ -120,6 +120,9 @@ test('malformed payloads are rejected before the service is called', async () =>
     ['encode', [pcm, { profile: 'xhe', usac: { segmentMaxBytes: 1.5 } }]],
     ['encode', [pcm, { profile: 'xhe', usac: { independentMaxDistanceFrames: '4' } }]],
     ['encode', [pcm, { profile: 'lc', usac: { independentIntervalSamples: 1024 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { drc: 1 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { drcTargetRangeLu: 20 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { drcTargetRangeLu: 8.5 } }]],
     ['encode', [pcm, { peakBitrate: 100 }]],
     ['encode', [pcm, { bandwidth: 500 }]],
     ['encode', [pcm, { bandwidth: 96000 }]],

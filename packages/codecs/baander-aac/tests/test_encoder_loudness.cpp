@@ -85,6 +85,7 @@ AacEncoderHandle create_plain(int channels, int bitrate, AacObjectType aot) {
   AacEncoderHandle enc = aac_encoder_create(kRate, channels, bitrate, aot, AAC_RC_CBR);
   if (enc && aot == AAC_AOT_USAC) {
     AacUsacEncoderOptions o;
+    aac_usac_encoder_options_init(&o);
     memset(&o, 0, sizeof(o));
     o.noise_filling = -1;
     o.preroll = -1;
@@ -253,6 +254,7 @@ void test_two_pass() {
   enc = create_plain(1, 64000, AAC_AOT_USAC);
   if (enc) {
     AacUsacEncoderOptions opt;
+    aac_usac_encoder_options_init(&opt);
     memset(&opt, -1, sizeof(opt));
     opt.stream_id = 42;
     CHECK(aac_encoder_set_usac(enc, &opt) == AAC_OK && aac_encoder_set_loudness_info(enc, &info) == AAC_OK,
@@ -425,6 +427,7 @@ void test_bytes_unchanged() {
   AacEncoderHandle with_set = create_plain(2, 96000, AAC_AOT_USAC);
   if (plain && with_set) {
     AacUsacEncoderOptions opt;
+    aac_usac_encoder_options_init(&opt);
     memset(&opt, -1, sizeof(opt));
     opt.preroll = 0;
     opt.independent_interval_frames = 0;

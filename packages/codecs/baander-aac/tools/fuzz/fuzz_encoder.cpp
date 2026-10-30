@@ -101,6 +101,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     static const int kSbr[4] = {-1, 0, 1, 2};
     static const int kInterval[4] = {0, 1, 4, 37};
     AacUsacEncoderOptions o;
+    aac_usac_encoder_options_init(&o);
     o.noise_filling = usac & 1;
     o.preroll = usac >> 1 & 1;
     o.sbr = kSbr[usac >> 2 & 3];

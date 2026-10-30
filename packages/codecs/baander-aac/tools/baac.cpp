@@ -16,7 +16,11 @@
  * the stream; --sbr and --mps (on, off, auto), --no-noise-filling,
  * --preroll off and --stream-id N set the USAC encoder options;
  * --rap-ms N, --rap-samples N and --rap-max-frames N set the independent
- * frame schedule and --segment-max-bytes N the segment size ceiling.  The
+ * frame schedule and --segment-max-bytes N the segment size ceiling;
+ * --drc writes the MPEG-D DRC gain sets (general compression and night)
+ * aiming at the loudness range of --drc-range LU (6 to 16, default 10),
+ * and with --loudness a further pass measures each set's output for the
+ * loudness info set.  The
  * decoder follows the ADTS headers, so rate and channels only set the
  * output layout (0 keeps the stream's channels).  loudness prints the
  * meter's figures of a WAV file (PCM or float) or of raw float input.
@@ -78,6 +82,7 @@ static int usage() {
           "                      --preroll off  --stream-id N\n"
           "                      --rap-ms N | --rap-samples N  (the independent frame interval)\n"
           "                      --rap-max-frames N  --segment-max-bytes N\n"
+          "                      --drc  --drc-range LU  (MPEG-D DRC gain sets, 6 to 16 LU)\n"
           "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
           "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n");
@@ -244,6 +249,12 @@ static int loudness(int argc, char** argv) {
 
 /* ── encode ────────────────────────────────────────────────────── */
 
+static AacUsacEncoderOptions default_usac_options() {
+  AacUsacEncoderOptions o;
+  aac_usac_encoder_options_init(&o);
+  return o;
+}
+
 /* The --options of `baac enc`, taken out of argv before the positional
  * arguments are read. */
 struct EncodeOptions {
@@ -252,7 +263,7 @@ struct EncodeOptions {
   int peak_bitrate = 0;
   int bandwidth = 0;
   int vbr_mode = 0;
-  AacUsacEncoderOptions opt{-1, -1, 0, 0, 0, 0, 0, -1, -1, -1};
+  AacUsacEncoderOptions opt = default_usac_options();
 };
 
 /* A positive integer option value; false with a message otherwise. */
@@ -335,6 +346,18 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
       }
       o->usac = true;
       i++;
+    } else if (arg == "--drc") {
+      o->usac = true;
+      o->opt.drc = 1;
+    } else if (arg == "--drc-range" && has_value) {
+      const int lu = atoi(argv[i + 1]);
+      if (lu < 6 || lu > 16) {
+        fprintf(stderr, "baac: --drc-range takes 6 to 16 LU\n");
+        return false;
+      }
+      o->usac = true;
+      o->opt.drc_target_range_lu = lu;
+      i++;
     } else if (arg == "--stream-id" && has_value) {
       const int id = atoi(argv[i + 1]);
       if (id < 0 || id > 65535) {
@@ -353,6 +376,74 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
   }
   *argc = kept;
   return true;
+}
+
+/* Encodes the whole input through `enc` and its flush, writing the
+ * stream to `out` (nothing when NULL); false on an encode error. */
+static bool encode_all(AacEncoderHandle enc, const std::vector<uint8_t>& in, int channels,
+                       FILE* out, long* bytes, int* frames) {
+  const int frame = aac_encoder_frame_size(enc);
+  const size_t block = (size_t)frame * channels;
+  const size_t total = in.size() / sizeof(float);
+  std::vector<float> pcm(block);
+  std::vector<uint8_t> buf(16384);
+  *bytes = 0;
+  *frames = 0;
+  for (size_t pos = 0; pos < total; pos += block) {
+    std::fill(pcm.begin(), pcm.end(), 0.0f);
+    const size_t n = std::min(block, total - pos);
+    memcpy(pcm.data(), in.data() + pos * sizeof(float), n * sizeof(float));
+    const int len = aac_encoder_encode(enc, pcm.data(), frame, buf.data(), (int)buf.size());
+    if (len < 0) {
+      fprintf(stderr, "baac: encode error %d at frame %d\n", len, *frames);
+      return false;
+    }
+    if (out) {
+      fwrite(buf.data(), 1, (size_t)len, out);
+    }
+    *bytes += len;
+    (*frames)++;
+  }
+  const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+  if (len > 0) {
+    if (out) {
+      fwrite(buf.data(), 1, (size_t)len, out);
+    }
+    *bytes += len;
+  }
+  return true;
+}
+
+/* The pass that measures the DRC sets' output: an encode with the
+ * programme's figures and the encoder's meters on, whose stream is
+ * dropped, and the figures of each set into the encoder `enc`. */
+static bool measure_drc_sets(int sr, int channels, int bitrate, AacRateControl rc,
+                             const EncodeOptions& options, const AacLoudnessInfo& program,
+                             const std::vector<uint8_t>& in, AacEncoderHandle enc) {
+  AacEncoderHandle probe = aac_encoder_create(sr, channels, bitrate, AAC_AOT_USAC, rc);
+  if (!probe || aac_encoder_set_usac(probe, &options.opt) != AAC_OK ||
+      aac_encoder_set_loudness_info(probe, &program) != AAC_OK ||
+      aac_encoder_set_loudness_measurement(probe, 1) != AAC_OK) {
+    fprintf(stderr, "baac: the DRC measurement pass could not start\n");
+    aac_encoder_destroy(probe);
+    return false;
+  }
+  long bytes;
+  int frames;
+  bool ok = encode_all(probe, in, channels, nullptr, &bytes, &frames);
+  for (int id = AAC_USAC_DRC_SET_GENERAL; ok && id <= AAC_USAC_DRC_SET_NIGHT; id++) {
+    AacLoudnessInfo set;
+    if (aac_encoder_drc_loudness(probe, id, &set) != AAC_OK ||
+        aac_encoder_set_drc_loudness_info(enc, id, &set) != AAC_OK) {
+      fprintf(stderr, "baac: DRC set %d could not be measured\n", id);
+      ok = false;
+      break;
+    }
+    fprintf(stderr, "DRC set %d: ", id);
+    print_loudness(stderr, set);
+  }
+  aac_encoder_destroy(probe);
+  return ok;
 }
 
 static int encode(int argc, char** argv) {
@@ -429,32 +520,17 @@ static int encode(int argc, char** argv) {
       return 1;
     }
     print_loudness(stderr, info);
-  }
-  FILE* out = open_out(argv[3]);
-  const int frame = aac_encoder_frame_size(enc);
-  const size_t block = (size_t)frame * channels;
-  const size_t total = in.size() / sizeof(float);
-  std::vector<float> pcm(block);
-  std::vector<uint8_t> buf(16384);
-  long bytes = 0;
-  int frames = 0;
-  for (size_t pos = 0; pos < total; pos += block) {
-    std::fill(pcm.begin(), pcm.end(), 0.0f);
-    const size_t n = std::min(block, total - pos);
-    memcpy(pcm.data(), in.data() + pos * sizeof(float), n * sizeof(float));
-    const int len = aac_encoder_encode(enc, pcm.data(), frame, buf.data(), (int)buf.size());
-    if (len < 0) {
-      fprintf(stderr, "baac: encode error %d at frame %d\n", len, frames);
+    if (options.opt.drc == 1 &&
+        !measure_drc_sets(sr, channels, bitrate, rc, options, info, in, enc)) {
       return 1;
     }
-    fwrite(buf.data(), 1, (size_t)len, out);
-    bytes += len;
-    frames++;
   }
-  const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
-  if (len > 0) {
-    fwrite(buf.data(), 1, (size_t)len, out);
-    bytes += len;
+  FILE* out = open_out(argv[3]);
+  const size_t total = in.size() / sizeof(float);
+  long bytes = 0;
+  int frames = 0;
+  if (!encode_all(enc, in, channels, out, &bytes, &frames)) {
+    return 1;
   }
   if (out != stdout) {
     fclose(out);
@@ -611,7 +687,10 @@ static bool bench_encode(const BenchConfig& cfg, const std::vector<float>& pcm, 
     aac_encoder_set_afterburner(enc, 1);
   }
   if (cfg.aot == AAC_AOT_USAC) {
-    AacUsacEncoderOptions opt{-1, -1, 0, -1, cfg.usac_sbr, cfg.usac_mps212};
+    AacUsacEncoderOptions opt;
+    aac_usac_encoder_options_init(&opt);
+    opt.sbr = cfg.usac_sbr;
+    opt.mps212 = cfg.usac_mps212;
     if (aac_encoder_set_usac(enc, &opt) != AAC_OK) {
       aac_encoder_destroy(enc);
       return false;

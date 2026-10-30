@@ -65,6 +65,12 @@ static int encode_block(AacEncoderState* s, const float* pcm, uint8_t* out, int 
   if (out_size < aac_encoder_transport_max_bytes(s, s->transport)) {
     return AAC_ERR_OVERFLOW;
   }
+  if (s->usac) {
+    const int err = aac_usac_enc_drc_input(s, pcm);
+    if (err) {
+      return err;
+    }
+  }
   const int frame_len = aac_encode_frame_internal(s, pcm);
   if (frame_len < 0) {
     return frame_len;
@@ -155,6 +161,18 @@ int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled) {
   return AAC_OK;
 }
 
+void aac_usac_encoder_options_init(AacUsacEncoderOptions* options) {
+  if (!options) {
+    return;
+  }
+  *options = {};
+  options->noise_filling = -1;
+  options->preroll = -1;
+  options->stream_id = -1;
+  options->sbr = -1;
+  options->mps212 = -1;
+}
+
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
@@ -234,6 +252,7 @@ int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* i
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
   }
+  aac_usac_enc_set_program_loudness(s->usac, info);
   if (!info) {
     usac_remove_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO);
     return AAC_OK;
@@ -250,6 +269,42 @@ int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* i
   }
   return aac_usac_enc_set_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO, payload,
                                      (bits + 7) / 8);
+}
+
+int aac_encoder_set_drc_loudness_info(AacEncoderHandle ctx, int drc_set_id,
+                                      const AacLoudnessInfo* info) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  if (info) {
+    /* the figures must be codable, as for the programme's set */
+    uint8_t probe[AAC_USAC_MAX_CONFIG_EXT_BYTES];
+    AacBitWriter w;
+    aac_bitwriter_init(&w, probe, (int)sizeof(probe));
+    const int bits = aac_loudness_info_write(&w, info);
+    if (bits < 0) {
+      return bits;
+    }
+  }
+  return aac_usac_enc_set_drc_loudness(s->usac, drc_set_id, info);
+}
+
+int aac_encoder_drc_loudness(AacEncoderHandle ctx, int drc_set_id, AacLoudnessInfo* out) {
+  if (!ctx || !out) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  return aac_usac_enc_drc_loudness(s->usac, drc_set_id, out);
 }
 
 int aac_encoder_set_loudness_measurement(AacEncoderHandle ctx, int enabled) {

@@ -117,6 +117,13 @@ export interface AacUsacOptions {
    * with it and is refused together with `sbr: 'off'`.
    */
   mps212?: AacUsacTool;
+  /**
+   * MPEG-D DRC gain sets ("general compression" and "night") that a
+   * player applying MPEG-D DRC selects by effect. Default false.
+   */
+  drc?: boolean;
+  /** The loudness range in LU the DRC sets aim for, 6 to 16. Default 10. */
+  drcTargetRangeLu?: number;
 }
 
 /**

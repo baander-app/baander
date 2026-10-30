@@ -504,6 +504,57 @@ of the band to replication; the 2-1-2 points carry the sum of the
 channels 3 dB better than the FDK encoder's and the channels themselves
 worse, for want of phase coding.
 
+#### DRC gain sets
+
+Measured on 2026-10-30 on a 24-second stereo music excerpt at 48 kHz
+whose 4-second passages sit at 0, -16, -4, -20, 0 and -12 dB (-16.1
+LUFS, a loudness range of 16.1 LU, -3.1 dBTP), encoded with the MPEG-D
+DRC gain sets on: at 64 kbit/s (2:1 SBR) one-pass and two-pass (the
+programme's figures from `--loudness`, each set's loudness measured on
+its output), and at 128 kbit/s (plain core) one-pass with a 6 LU
+target. Four decoders: ours, the FDK decoder (16-bit, loudness
+normalisation off, `BAANDER_FDK_DRC_EFFECT` 1 for night and 6 for
+general compression), libxaac (16-bit, `-effect:1` and `-effect:6`) and
+FFmpeg master through MP4. Loudness, loudness range (EBU Tech 3342) and
+true peak are FFmpeg's `ebur128` on each decode.
+
+| Stream | kbit/s (LOAS / config once) | SNR against the source, all four | Night: ours / FDK / libxaac | General: ours / FDK / libxaac |
+|--------|----------------------------:|---------------------------------:|-----------------------------|-------------------------------|
+| 64 kbit/s, one-pass, 10 LU | 78.6 / 69.5 | 23.3 dB | -17.1 LUFS, 10.2 LU, -2.1 dBTP / -17.0, 10.3, -1.0 / -17.0, 10.3, -0.8 | -17.1, 10.1, -2.0 / -17.0, 10.2, -1.0 / -17.0, 10.2, -0.8 |
+| 64 kbit/s, two-pass, 10 LU | 85.0 / 69.7 | 23.3 dB | -17.6, 10.6, -2.2 / -17.5, 10.7, -1.0 / -17.5, 10.7, -0.9 | -17.5, 10.6, -2.0 / -17.4, 10.7, -1.0 / -17.4, 10.7, -0.7 |
+| 128 kbit/s, one-pass, 6 LU | 144.7 / 127.8 | 27.7 dB | -17.0, 8.7, -0.9 / -16.9, 8.7, -1.0 / -16.9, 8.7, -0.8 | -16.9, 8.7, -0.8 / -16.9, 8.7, -1.0 / -16.8, 8.7, -0.6 |
+
+Without a DRC request every decoder plays the stream as before: the
+same SNR against the source as the stream without gain sets, FFmpeg
+(which ignores the extension element) at 36.2 dB against our decode at
+64 kbit/s, as without the gains (36.4 dB). The loudness range falls from
+16.1 LU to 10.2 to 10.7 LU at the 10 LU target and to 8.7 LU at 6 LU,
+where the ratio reaches its ceiling of 8. The two-pass stream declares
+-17.39 LUFS for the general set and -17.44 LUFS for the night set,
+measured on the encoder's model of the decode; FDK and libxaac land at
+-17.4 and -17.5 LUFS. The night set's ceiling after normalisation is
+-1.1 dBTP on these streams; FDK holds -1.0 dBTP and libxaac -0.8 to
+-0.9 dBTP, the rest being the codec's own overshoot on the peaks.
+
+The FDK decoder and libxaac apply the same gains at the same time. The
+gain curve, the ratio of the DRC decode to the plain one in 32-sample
+blocks, agrees between them within 0.07 dB rms (p99 0.13 dB) at
+64 kbit/s and 0.02 dB rms at 128 kbit/s. Both apply the gains a frame
+carries to the next frame's output, and the encoder places them
+accordingly. Our decoder applies them to the frame that carries them,
+one frame early: its curve agrees with FDK's within 0.07 dB rms once
+shifted by one frame (2048 samples with SBR, 1024 without), against
+0.2 to 0.28 dB rms (p99 up to 1.06 dB) as it stands, which moves its
+night set's peaks and its loudness by about 0.1 LU. The FDK decoder
+fails frames of LOAS streams that repeat a large StreamMuxConfig in
+every frame, with or without the gain sets (10 and 19 failed frames on
+the two 64 kbit/s streams, 16 and 31 on plain streams at 96 and
+128 kbit/s, none at 128 kbit/s with the gain sets); the same streams
+with the configuration sent once decode without a failure, and the
+figures above are from that form. The committed
+`usac_enc_drc_cpe_64k.loas` decodes in FDK, as written, without a
+failure.
+
 ## MPEG Surround
 
 Measured on 2026-10-30 against the Ittiam libxaac decoder (AOSP

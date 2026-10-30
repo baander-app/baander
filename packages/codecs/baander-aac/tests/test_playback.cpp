@@ -71,6 +71,7 @@ Encoded encode(const Profile& p, const std::vector<float>& pcm) {
   }
   if (p.usac_sbr >= 0) {
     AacUsacEncoderOptions o;
+    aac_usac_encoder_options_init(&o);
     o.noise_filling = 1;
     o.preroll = 1;
     o.independent_interval_frames = 8;

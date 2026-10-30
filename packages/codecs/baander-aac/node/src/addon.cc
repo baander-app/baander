@@ -820,17 +820,13 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
     }
     /* The USAC options: noise filling, the pre-roll, the independent
      * frame schedule (in frames, milliseconds or samples, with its
-     * distance bound), the segment size ceiling, the stream id, and SBR
-     * and MPS 212 as on, off or auto.  A field left out keeps the
-     * encoder's default. */
+     * distance bound), the segment size ceiling, the stream id, SBR and
+     * MPS 212 as on, off or auto, and the MPEG-D DRC gain sets with their
+     * target loudness range.  A field left out keeps the encoder's
+     * default. */
     bool have_usac = false;
     AacUsacEncoderOptions usac_opt;
-    memset(&usac_opt, 0, sizeof(usac_opt));
-    usac_opt.noise_filling = -1;
-    usac_opt.preroll = -1;
-    usac_opt.stream_id = -1;
-    usac_opt.sbr = -1;
-    usac_opt.mps212 = -1;
+    aac_usac_encoder_options_init(&usac_opt);
     if (option_given(o, "usac")) {
       if (!o.Get("usac").IsObject()) {
         throw_error(env, "AacEncoder: usac must be an object");
@@ -861,7 +857,15 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
                          &usac_opt.independent_max_distance_frames) ||
           !option_number(env, u, "segmentMaxBytes", "AacEncoder: usac.segmentMaxBytes",
                          &usac_opt.segment_max_bytes) ||
-          !option_number(env, u, "streamId", "AacEncoder: usac.streamId", &usac_opt.stream_id)) {
+          !option_number(env, u, "streamId", "AacEncoder: usac.streamId", &usac_opt.stream_id) ||
+          !option_number(env, u, "drcTargetRangeLu", "AacEncoder: usac.drcTargetRangeLu",
+                         &usac_opt.drc_target_range_lu)) {
+        return false;
+      }
+      usac_opt.drc = option_bool(u, "drc", false) ? 1 : 0;
+      if (option_given(u, "drcTargetRangeLu") &&
+          (usac_opt.drc_target_range_lu < 6 || usac_opt.drc_target_range_lu > 16)) {
+        throw_error(env, "AacEncoder: usac.drcTargetRangeLu must be 6 to 16");
         return false;
       }
       if (usac_opt.independent_interval_frames < 0 || usac_opt.independent_interval_ms < 0 ||

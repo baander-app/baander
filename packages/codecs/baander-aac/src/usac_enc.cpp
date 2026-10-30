@@ -10,8 +10,9 @@
  * UsacChannelPairElement with StereoCoreToolInfo (or with one core
  * channel when MPS 212 codes the pair), the UsacSbrData() and
  * Mps212Data() the SBR and MPS 212 encoders prepared for the element,
- * and the audio pre-roll extension element of the immediate playout
- * frames. */
+ * the audio pre-roll extension element of the immediate playout frames,
+ * and with the drc option the MPEG-D DRC gains of every frame in the
+ * UNI_DRC extension element that follows the pre-roll's. */
 #include "usac_enc.h"
 
 #include <algorithm>
@@ -20,7 +21,9 @@
 #include <cstring>
 
 #include "asc.h"
+#include "drc_gen.h"
 #include "encoder.h"
+#include "loudness.h"
 
 namespace {
 
@@ -528,6 +531,47 @@ int write_element(AacEncoderState* s, int e, AacBitWriter* w) {
   return write_element_tools(s, e, w);
 }
 
+/* usacExtElementPayloadLength (Table 21). */
+void write_ext_payload_length(AacBitWriter* w, int len) {
+  if (len < 255) {
+    aac_bitwriter_write(w, (uint32_t)len, 8);
+  } else {
+    aac_bitwriter_write(w, 255, 8);
+    aac_bitwriter_write(w, (uint32_t)(len - 255 + 2), 16);
+  }
+}
+
+/* The UNI_DRC extension element of a frame (Table 21 with the
+ * uniDrcGain() payload): present in every frame, with its length. */
+void write_drc_element(AacBitWriter* w, const uint8_t* payload, int len) {
+  aac_bitwriter_write(w, 1, 1); /* usacExtElementPresent */
+  aac_bitwriter_write(w, 0, 1); /* usacExtElementUseDefaultLength */
+  write_ext_payload_length(w, len);
+  aac_bitwriter_write_bytes(w, payload, len);
+}
+
+int drc_element_bits(int len) { return 1 + 1 + (len < 255 ? 8 : 24) + 8 * len; }
+
+/* uniDrcGain() of a frame of silence: every gain sequence holds 0 dB
+ * at the frame end, in the compact coding mode. */
+int silent_drc_payload(const AacEncoderState* s, uint8_t* out, int cap) {
+  AacUniDrcConfig c;
+  aac_drc_gen_config(&c, s->input_channels);
+  AacUniDrcGainFrame g;
+  g.sequence_count = AAC_DRC_GEN_SETS;
+  for (int i = 0; i < AAC_DRC_GEN_SETS; i++) {
+    g.seq[i].node_count = 1;
+    g.seq[i].node[0].time = s->frame_size - 1;
+    g.seq[i].node[0].gain_db = 0.0f;
+    g.seq[i].node[0].slope = 0.0f;
+  }
+  memset(out, 0, (size_t)cap);
+  AacBitWriter w;
+  aac_bitwriter_init(&w, out, cap);
+  const int bits = aac_drc_gen_write_gain(&w, &c, &g, s->frame_size, s->input_rate);
+  return bits < 0 ? bits : (bits + 7) / 8;
+}
+
 /* An access unit of silence with the stream's element list: one long
  * window per channel with the lowest band coded as zeros, independent,
  * with the SBR and MPS 212 data of silence.  The pre-roll of the first
@@ -542,6 +586,14 @@ int write_silent_au(const AacEncoderState* s, uint8_t* out, int cap) {
   aac_bitwriter_write(&w, 1, 1); /* usacIndependencyFlag */
   if (u->opt.preroll) {
     aac_bitwriter_write(&w, 0, 1); /* usacExtElementPresent */
+  }
+  if (u->opt.drc) {
+    uint8_t payload[AAC_DRC_GEN_MAX_PAYLOAD_BYTES];
+    const int len = silent_drc_payload(s, payload, (int)sizeof(payload));
+    if (len < 0) {
+      return len;
+    }
+    write_drc_element(&w, payload, len);
   }
   for (int e = 0; e < s->num_elements; e++) {
     const AacEncElement* el = &s->elem[e];
@@ -622,14 +674,29 @@ int write_preroll_payload(const AacEncoderState* s, uint8_t* out, int cap) {
   return aac_bitwriter_overflow(&w) ? AAC_ERR_OVERFLOW : aac_bitwriter_bytes_written(&w);
 }
 
-/* usacExtElementPayloadLength (Table 21). */
-void write_ext_payload_length(AacBitWriter* w, int len) {
-  if (len < 255) {
-    aac_bitwriter_write(w, (uint32_t)len, 8);
-  } else {
-    aac_bitwriter_write(w, 255, 8);
-    aac_bitwriter_write(w, (uint32_t)(len - 255 + 2), 16);
+/* The loudnessInfoSet() of a stream with DRC sets: the programme's
+ * entry (drcSetId 0) and one per DRC set, the measured figures where the
+ * caller gave them and the estimate otherwise.  Without any figures the
+ * set is empty but present: libxaac applies no DRC set to a stream
+ * without one. */
+int drc_loudness_set(const AacUsacEncoder* u, uint8_t* out, int cap) {
+  AacLoudnessInfo info[1 + AAC_DRC_GEN_SETS];
+  int ids[1 + AAC_DRC_GEN_SETS];
+  int n = 0;
+  if (u->has_program_loudness) {
+    info[n] = u->program_loudness;
+    ids[n++] = 0;
   }
+  for (int id = 1; id <= AAC_DRC_GEN_SETS; id++) {
+    if (aac_usac_enc_drc_set_figures(u, id, &info[n])) {
+      ids[n++] = id;
+    }
+  }
+  memset(out, 0, (size_t)cap);
+  AacBitWriter w;
+  aac_bitwriter_init(&w, out, cap);
+  const int bits = aac_drc_gen_write_loudness(&w, info, ids, n);
+  return bits < 0 ? bits : (bits + 7) / 8;
 }
 
 }  // namespace
@@ -668,6 +735,7 @@ void aac_usac_enc_destroy(AacUsacEncoder* u) {
   for (int i = 0; i < AAC_USAC_MAX_PREROLL_FRAMES; i++) {
     free(u->last_au[i]);
   }
+  aac_drc_gen_destroy(u->drc);
   free(u->scratch);
   free(u->preroll);
   free(u);
@@ -690,6 +758,11 @@ void aac_usac_enc_set_options(AacUsacEncoder* u, const AacUsacEncoderOptions* op
   o.stream_id = opt && opt->stream_id >= 0 && opt->stream_id <= 65535 ? opt->stream_id : -1;
   o.sbr = !opt || opt->sbr < 0 ? -1 : (opt->sbr != 0);
   o.mps212 = !opt || opt->mps212 < 0 ? -1 : (opt->mps212 != 0);
+  o.drc = opt && opt->drc == 1 ? 1 : 0;
+  o.drc_target_range_lu = opt && opt->drc_target_range_lu >= AAC_DRC_GEN_MIN_RANGE_LU &&
+                                  opt->drc_target_range_lu <= AAC_DRC_GEN_MAX_RANGE_LU
+                              ? opt->drc_target_range_lu
+                              : AAC_DRC_GEN_DEFAULT_RANGE_LU;
   u->opt = o;
 }
 
@@ -784,6 +857,8 @@ void aac_usac_enc_reset(AacUsacEncoder* u, int channels) {
   }
   u->preroll_len = 0;
   u->preroll_bytes = 0;
+  u->drc_payload_len = 0;
+  u->drc_payload_frame = 0;
   if (u->mps_active) {
     aac_mps212_enc_reset(&u->mps);
   }
@@ -810,6 +885,18 @@ void aac_usac_enc_config(const AacEncoderState* s, AacUsacConfig* c) {
     AacUsacElementConfig* e = &c->elem[n++];
     e->type = AAC_USAC_EXT;
     e->ext_type = AAC_USAC_EXT_AUDIOPREROLL;
+  }
+  if (u->opt.drc) {
+    /* the DRC gains of every frame, configured by the uniDrcConfig() */
+    AacUsacElementConfig* e = &c->elem[n++];
+    e->type = AAC_USAC_EXT;
+    e->ext_type = AAC_USAC_EXT_UNI_DRC;
+    AacUniDrcConfig drc;
+    aac_drc_gen_config(&drc, s->input_channels);
+    AacBitWriter w;
+    aac_bitwriter_init(&w, e->ext_config, (int)sizeof(e->ext_config));
+    const int bits = aac_drc_gen_write_config(&w, &drc);
+    e->ext_config_len = bits > 0 ? (bits + 7) / 8 : 0;
   }
   for (int i = 0; i < s->num_elements && n < AAC_USAC_MAX_ELEMENTS; i++) {
     AacUsacElementConfig* e = &c->elem[n++];
@@ -843,8 +930,30 @@ void aac_usac_enc_config(const AacEncoderState* s, AacUsacConfig* c) {
     ext->data[0] = (uint8_t)(u->opt.stream_id >> 8);
     ext->data[1] = (uint8_t)(u->opt.stream_id & 0xFF);
   }
+  /* With DRC sets the loudness info set gains their entries: it takes
+   * the place of the programme's own set, or follows the others. */
+  int loudness_slot = -1;
   for (int i = 0; i < u->num_config_exts && x < AAC_USAC_MAX_CONFIG_EXTS; i++) {
+    if (u->opt.drc && u->config_ext[i].type == AAC_USAC_CFG_EXT_LOUDNESS_INFO) {
+      loudness_slot = x;
+    }
     c->config_ext[x++] = u->config_ext[i];
+  }
+  if (u->opt.drc) {
+    if (loudness_slot < 0 && x < AAC_USAC_MAX_CONFIG_EXTS) {
+      loudness_slot = x++;
+    }
+    if (loudness_slot >= 0) {
+      AacUsacConfigExt* ext = &c->config_ext[loudness_slot];
+      ext->type = AAC_USAC_CFG_EXT_LOUDNESS_INFO;
+      ext->len = std::max(0, drc_loudness_set(u, ext->data, (int)sizeof(ext->data)));
+      if (ext->len == 0) {
+        for (int i = loudness_slot; i + 1 < x; i++) {
+          c->config_ext[i] = c->config_ext[i + 1];
+        }
+        x--;
+      }
+    }
   }
   c->num_config_exts = x;
 }
@@ -857,6 +966,9 @@ int aac_usac_enc_max_au_bytes(const AacEncoderState* s) {
       per_au += AAC_SBR_ENC_MAX_BYTES * (s->sbr[e]->mps ? 1 : s->elem[e].num_ch) +
                 (s->sbr[e]->mps ? AAC_MPS212_ENC_MAX_BYTES : 0);
     }
+  }
+  if (u->opt.drc) {
+    per_au += AAC_USAC_ENC_MAX_DRC_BYTES;
   }
   const int preroll = u->opt.preroll ? u->preroll_frames : 0;
   return (1 + preroll) * per_au + AAC_USAC_MAX_CONFIG_BYTES + 32;
@@ -914,6 +1026,9 @@ void aac_usac_enc_begin_frame(AacEncoderState* s) {
     if (s->sbr[e]) {
       s->sbr[e]->usac_indep = u->indep;
     }
+  }
+  if (u->opt.drc && u->drc_payload_frame != k + 1) {
+    aac_usac_enc_drc_input(s, nullptr);
   }
 }
 
@@ -986,6 +1101,9 @@ int aac_usac_enc_overhead_bits(const AacEncoderState* s) {
   if (u->opt.preroll) {
     bits += 1; /* usacExtElementPresent; the pre-roll itself is outside the budget */
   }
+  if (u->opt.drc) {
+    bits += drc_element_bits(u->drc_payload_len);
+  }
   /* The fill element's bits are counted with the last channel element. */
   for (int e = 0; e < s->num_elements; e++) {
     const AacEncElement* el = &s->elem[e];
@@ -1011,6 +1129,9 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
    * the pre-roll element in front can both be assembled from them. */
   AacBitWriter ew;
   aac_bitwriter_init(&ew, u->scratch, u->scratch_cap);
+  if (u->opt.drc) {
+    write_drc_element(&ew, u->drc_payload, u->drc_payload_len);
+  }
   for (int e = 0; e < s->num_elements; e++) {
     const int ret = write_element(s, e, &ew);
     if (ret) {
@@ -1079,4 +1200,122 @@ int aac_usac_enc_write_frame(AacEncoderState* s) {
   u->last_frame_bytes = au_len;
   u->frame_index++;
   return au_len + AAC_ADTS_HEADER_SIZE;
+}
+
+/* ── MPEG-D DRC ────────────────────────────────────────────────── */
+
+int aac_usac_enc_drc_input(AacEncoderState* s, const float* pcm) {
+  AacUsacEncoder* u = s->usac;
+  if (!u || !u->opt.drc) {
+    return AAC_OK;
+  }
+  if (u->frame_index == 0 || !u->drc) {
+    /* a new stream: the generator starts over, anchored on the
+     * programme's figures when the caller measured them */
+    aac_drc_gen_destroy(u->drc);
+    AacDrcGenParams p;
+    memset(&p, 0, sizeof(p));
+    p.sample_rate = s->input_rate;
+    p.channels = s->input_channels;
+    p.frame_length = s->frame_size;
+    p.delay = s->delay;
+    p.target_range_lu = u->opt.drc_target_range_lu;
+    if (u->has_program_loudness) {
+      p.has_anchor = 1;
+      p.anchor_lkfs = u->program_loudness.integrated_lkfs;
+      p.has_range = u->program_loudness.has_range;
+      p.range_lu = u->program_loudness.range_lu;
+    }
+    p.measure = s->loudness != nullptr;
+    u->drc = aac_drc_gen_create(&p);
+    if (!u->drc) {
+      return AAC_ERR_MEMORY;
+    }
+  }
+  AacUniDrcGainFrame g;
+  aac_drc_gen_frame(u->drc, pcm, &g);
+  AacUniDrcConfig c;
+  aac_drc_gen_config(&c, s->input_channels);
+  memset(u->drc_payload, 0, sizeof(u->drc_payload));
+  AacBitWriter w;
+  aac_bitwriter_init(&w, u->drc_payload, (int)sizeof(u->drc_payload));
+  const int bits = aac_drc_gen_write_gain(&w, &c, &g, s->frame_size, s->input_rate);
+  if (bits < 0) {
+    /* never for the generator's nodes; the frame keeps the gains of
+     * silence rather than fail */
+    u->drc_payload_len = silent_drc_payload(s, u->drc_payload, (int)sizeof(u->drc_payload));
+  } else {
+    u->drc_payload_len = (bits + 7) / 8;
+  }
+  u->drc_payload_frame = u->frame_index + 1;
+  return AAC_OK;
+}
+
+void aac_usac_enc_set_program_loudness(AacUsacEncoder* u, const AacLoudnessInfo* info) {
+  u->has_program_loudness = info != nullptr;
+  if (info) {
+    u->program_loudness = *info;
+  }
+}
+
+int aac_usac_enc_set_drc_loudness(AacUsacEncoder* u, int drc_set_id, const AacLoudnessInfo* info) {
+  if (drc_set_id < 1 || drc_set_id > AAC_DRC_GEN_SETS) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  u->has_set_loudness[drc_set_id - 1] = info != nullptr;
+  if (info) {
+    u->set_loudness[drc_set_id - 1] = *info;
+  }
+  return AAC_OK;
+}
+
+int aac_usac_enc_drc_loudness(const AacUsacEncoder* u, int drc_set_id, AacLoudnessInfo* out) {
+  if (drc_set_id < 1 || drc_set_id > AAC_DRC_GEN_SETS) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (!u->drc) {
+    return AAC_ERR_STATE;
+  }
+  return aac_drc_gen_loudness(u->drc, drc_set_id, out);
+}
+
+int aac_usac_enc_drc_set_figures(const AacUsacEncoder* u, int drc_set_id, AacLoudnessInfo* out) {
+  if (drc_set_id < 1 || drc_set_id > AAC_DRC_GEN_SETS) {
+    return 0;
+  }
+  /* A set's entry carries what the selection and the normalisation
+   * read, its program loudness and peaks; the LOAS transport repeats the
+   * configuration in every frame, so the other figures stay out. */
+  if (u->has_set_loudness[drc_set_id - 1]) {
+    *out = u->set_loudness[drc_set_id - 1];
+  } else if (u->has_program_loudness) {
+    *out = u->program_loudness;
+  } else {
+    return 0;
+  }
+  out->has_anchor = 0;
+  out->has_range = 0;
+  out->has_momentary = 0;
+  out->has_short_term = 0;
+  if (u->has_set_loudness[drc_set_id - 1]) {
+    return 1;
+  }
+  /* The estimate: the curve is centred on the programme's integrated
+   * loudness, which it roughly keeps; the peaks are bounds.  The general
+   * set's boost stops at -1 dBTP, so its peak is the programme's or that
+   * bound; the night set's limiter holds every peak to its ceiling, which
+   * the boost can reach. */
+  float ceiling = AAC_DRC_GEN_PEAK_TARGET_DB;
+  if (drc_set_id == AAC_DRC_GEN_SET_NIGHT) {
+    if (out->integrated_lkfs > -70.0f) {
+      ceiling = std::min(ceiling, AAC_DRC_GEN_PEAK_TARGET_DB -
+                                      (AAC_DRC_GEN_REFERENCE_LKFS - out->integrated_lkfs));
+    }
+    out->sample_peak_dbfs = ceiling;
+    out->true_peak_dbtp = ceiling;
+  } else {
+    out->sample_peak_dbfs = std::max(out->sample_peak_dbfs, ceiling);
+    out->true_peak_dbtp = std::max(out->true_peak_dbtp, ceiling);
+  }
+  return 1;
 }

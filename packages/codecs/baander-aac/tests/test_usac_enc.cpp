@@ -44,6 +44,7 @@ constexpr int kFrame = 1024;
 /* The defaults with SBR and the 2-1-2 off: the plain core. */
 AacUsacEncoderOptions plain_options() {
   AacUsacEncoderOptions o;
+  aac_usac_encoder_options_init(&o);
   memset(&o, 0, sizeof(o));
   o.noise_filling = 1;
   o.preroll = 1;

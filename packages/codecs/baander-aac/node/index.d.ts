@@ -273,6 +273,20 @@ export interface AacUsacOptions {
    * with it and is refused together with `sbr: 'off'`.
    */
   mps212?: AacUsacTool;
+  /**
+   * MPEG-D DRC gain sets (ISO/IEC 23003-4) for a quieter listening mode.
+   * The stream then carries two DRC sets a player applying MPEG-D DRC
+   * selects by the effect it asks for: "general compression" (a
+   * compressor that boosts the quiet passages and cuts the loud ones
+   * around the programme's integrated loudness) and "night" (the same
+   * with a limiter that holds the true peak at -1 dBTP after
+   * normalisation to -16 LUFS). With `loudnessInfo` the programme's
+   * figures anchor the compressor; without them it follows the input's
+   * loudness so far. Other decoders ignore the gains. Default false.
+   */
+  drc?: boolean;
+  /** The loudness range in LU the DRC sets bring the programme towards, 6 to 16. Default 10. */
+  drcTargetRangeLu?: number;
 }
 
 /**

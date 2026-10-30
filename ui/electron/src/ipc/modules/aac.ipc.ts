@@ -27,6 +27,8 @@ const MAX_BITRATE = 1_000_000;
 const MIN_BANDWIDTH = 1000;
 const MAX_BANDWIDTH = 48000;
 const VBR_MODES = new Set([1, 2, 3, 4, 5]);
+const MIN_DRC_RANGE_LU = 6;
+const MAX_DRC_RANGE_LU = 16;
 const MAX_LOUDNESS_CHANNELS = 6;
 const MIN_METER_RATE = 8000;
 const MAX_METER_RATE = 384000;
@@ -125,6 +127,9 @@ function usacOption(value: unknown): AacUsacOptions | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('usac');
   const { noiseFilling, preroll, streamId, sbr, mps212 } = value as Record<string, unknown>;
   const usac = value as Record<string, unknown>;
+  const range = usac.drcTargetRangeLu;
+  if (range !== undefined && !(typeof range === 'number' && Number.isInteger(range)
+    && range >= MIN_DRC_RANGE_LU && range <= MAX_DRC_RANGE_LU)) invalid('drcTargetRangeLu');
   if (streamId !== undefined && !(typeof streamId === 'number' && Number.isInteger(streamId)
     && streamId >= 0 && streamId <= MAX_STREAM_ID)) invalid('streamId');
   return {
@@ -138,6 +143,8 @@ function usacOption(value: unknown): AacUsacOptions | undefined {
     streamId: streamId as number | undefined,
     sbr: oneOf(sbr, USAC_TOOLS, 'sbr'),
     mps212: oneOf(mps212, USAC_TOOLS, 'mps212'),
+    drc: flag(usac.drc, 'drc'),
+    drcTargetRangeLu: range as number | undefined,
   };
 }
 

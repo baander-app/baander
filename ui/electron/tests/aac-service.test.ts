@@ -115,6 +115,14 @@ test('xHE-AAC encodes with loudness metadata and the meter reads the input', { s
   assert.equal(await service.encoderLoudness(plain.id), null, 'no meter without the option');
   await service.closeEncoder(plain.id);
 
+  // The DRC gain sets ride along; a decoder asked for the night effect applies them.
+  const drc = await service.encode(pcm, { sampleRate, channels: 2, bitrate: 96000, profile: 'xhe', loudnessInfo: measured, usac: { drc: true, drcTargetRangeLu: 8 } });
+  const off = await service.decode(drc, { channels: 0, drcEffect: 'off' });
+  const night = await service.decode(drc, { channels: 0, drcEffect: 'night' });
+  assert.equal(off.errors + night.errors, 0);
+  assert.equal(off.pcm.length, night.pcm.length);
+  assert.notDeepEqual(night.pcm, off.pcm, 'the night set changes the output');
+
   const sine = new Float32Array(sampleRate * 2 * 2);
   for (let i = 0; i < sampleRate * 2; i++) {
     const v = 10 ** (-23 / 20) * Math.sin((2 * Math.PI * 997 * i) / sampleRate);

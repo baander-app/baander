@@ -109,7 +109,8 @@ void test_peak_bitrate() {
       const Encoded e = encode_with(signals[k], sr, 2, c.bitrate, c.aot, c.rc, [&](AacEncoderHandle h) {
         if (c.aot == AAC_AOT_USAC) {
           /* the pre-roll repeats the previous unit outside the budget */
-          AacUsacEncoderOptions o{-1, -1, 0, -1, -1, -1};
+          AacUsacEncoderOptions o;
+          aac_usac_encoder_options_init(&o);
           o.preroll = 0;
           CHECK(aac_encoder_set_usac(h, &o) == AAC_OK, "usac options");
         }
