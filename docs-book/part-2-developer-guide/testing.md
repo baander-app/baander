@@ -454,7 +454,11 @@ Current qualification results are recorded in the roadmap.
 Workflow orchestration requires PHP 8.5+ with Swoole, Composer, Bash and GNU
 coreutils on the host. Process groups also require `setsid`. Generate the standalone
 loaders with `composer tooling:autoload`; this installs the Composer projects under
-`scripts/` and `relay/` without booting the application kernel.
+`scripts/` and `relay/` without booting the application kernel. Production worker
+images install only the standalone scripts project's loader without development
+dependencies, alongside the application's separate production loader. Worker and
+HTTP fixtures select the matching Composer boundary; host-source archives carry
+the standalone loader required by tooling entrypoints.
 
 With the root development dependencies installed, run the workflow checks from the
 repository root:
@@ -1039,7 +1043,7 @@ image:
 BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-two-command-deployment-container.sh
 ```
 
-It has a 600-second outer deadline. For an attached browser checkpoint, install web
+It has a 900-second outer deadline. For an attached browser checkpoint, install web
 dependencies and provide the pinned Playwright Docker image, then enable the
 optional hook:
 
@@ -1080,7 +1084,7 @@ the raw frame counter to increase alongside the clock.
 Set `BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1` to include client controls. With that
 flag, each engine runs all eight phases: authentication, attachment, client
 controls, paused seek, web restart, worker containment, worker recovery and
-completion. Each run retains the 600-second outer deadline. CI runs Chromium and
+completion. Each run uses the 900-second outer deadline. CI runs Chromium and
 then Firefox against the same built worker image, with separate
 `var/test-runs/two-command-chromium` and `var/test-runs/two-command-firefox`
 artifacts. Run the local engine checks sequentially as well; use
@@ -1111,8 +1115,8 @@ Native Play must then submit one source-zero seek, attach a new execution and
 receive current-generation media with advancing time and raw frame counts. The
 check does not force the clock to EOF, synthesize ended or accelerate playback.
 It qualifies completion after a user seek, not uninterrupted full-source playback
-or byte-exact decoding. The eight phases, phase deadlines and 600-second outer
-deadline remain unchanged.
+or byte-exact decoding. The eight phases and phase deadlines remain unchanged;
+the outer deadline is 900 seconds.
 
 The production fixture also submits a captured old-generation native seek after
 an explicit paused seek, while the worker is live and while it is absent. It must
@@ -1159,12 +1163,13 @@ image and run the dedicated drill:
 ```bash
 php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_USE_IMAGE=0 \
   bash scripts/test-worker-media-control-container.sh
 ```
 
 The runner selects ordinary maximum two, the combined web/worker fixture and
 `BAANDER_TEST_MEDIA_CONTROL_OBSERVATION=1`. It inherits the operator runner's
-600-second deadline, resource preflight and cleanup. Set `BAANDER_TEST_ARTIFACTS`
+900-second deadline, resource preflight and cleanup. Set `BAANDER_TEST_ARTIFACTS`
 to retain evidence at a chosen path; the default is
 `var/test-runs/media-control-*`. Previously recorded pressure, browser and cleanup
 evidence covers single-intention pause/seek/reconnect and reattachment with the
@@ -1174,10 +1179,8 @@ authority preserved; see
 [Playback controls and generations](../part-1-operator-guide/transcoding.md#playback-controls-and-generations).
 That interaction contract has focused backend and player-hook regressions; the
 recorded single-intention drill does not establish browser pressure coverage of
-rapid scrubbing. The launch observer still requires the HLS muxer and
-`stream.m3u8` output; the current demultiplexed encoder output needs a separate
-fixture update and qualification before this pressure drill can establish a new
-result.
+rapid scrubbing. The launch observer matches the current DASH `manifest.mpd`
+output. A new pressure result still requires the complete live drill.
 
 Observation mode builds a disposable fixture derived from the production image.
 Its test-only FFmpeg wrapper records each video encoder launch before executing
@@ -1200,6 +1203,13 @@ seek readiness, cancellation retirement, occupancy, sampling gaps and ordinary
 progress. Both p99 limits are one second and both maximum limits are two seconds;
 seek and cancel request handling also have two-second limits. Seek readiness and
 exact encoder retirement after cancellation each have a 30-second watchdog.
+Seek readiness ends when both audio and video init/fragment bytes are available,
+recorded with a monotonic clock before certification. HTTP retrieval uses bounded
+concurrent batches: two playlists, then four init/fragment resources. The fixture
+fetches both tracks before running ffprobe, decoding, signature-tampering and
+subtitle checks.
+All those checks remain mandatory: late bytes, corrupt media or accepted tampering
+fail the qualification. Certification time does not extend the availability limit.
 `media.json` holds the scenario receipts; `native-launches.jsonl` records each job,
 generation, output directory, process identity and live predecessors at launch.
 Process identity includes PID, start ticks, PID namespace and hostname. The ledger
@@ -1552,17 +1562,26 @@ DASH browser playback or formal CMAF conformance.
 Build the current worker image as above. The bounded comparison runner creates
 separate disposable pairs for resident
 ordinary maxima 1, 2 and 4, using the operator runner's dependency, lifecycle and
-cleanup ownership:
+cleanup ownership. Each profile derives a disposable fixture from the selected
+production image so it can inject scenario services. `BAANDER_TEST_USE_IMAGE=1`
+is rejected before provisioning. Fixture development classmaps expose workload
+classes without installing development dependencies or PHPUnit:
 
 ```bash
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_USE_IMAGE=0 \
   bash scripts/test-worker-autoscaling-container.sh
 ```
 
-Each profile has a 600-second bound, including setup; its observation callback has
-a separate 480-second deadline and a 470-second evidence-wait budget. Individual
+Each profile has a 900-second bound, including setup and workflow completion. Its
+observation callback has a separate 480-second deadline and a 470-second
+evidence-wait budget. Individual
 Docker observations have 12-second bounds. The runner also enforces a 2000-second
-deadline for the complete three-profile comparison. Image acquisition/build time depends on
+deadline for the complete three-profile comparison. The shared `workerCapacity`
+default is 900 seconds; cleanup retains its separate 120-second budget. Capacity,
+media and autoscaling callbacks retain their 240-, 300- and 480-second bounds,
+respectively. A profile whose outer deadline expires fails even if its measurements
+and cleanup later report success. Image acquisition/build time depends on
 the selected runner mode. Retain the printed artifact directory after a failure;
 a skipped profile or scenario is an acceptance gap.
 

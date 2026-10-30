@@ -7,8 +7,7 @@ final class MediaControlObservation
 {
     private static function logPath(): string
     {
-        $appHome = getenv('APP_HOME') ?: throw new RuntimeException('Observed APP_HOME is required.');
-        return $appHome . '/storage/two-command/native-launches.jsonl';
+        return dirname(__DIR__, 3) . '/storage/two-command/native-launches.jsonl';
     }
     private const MAX_BYTES = 4_194_304;
     private const MAX_RECORDS = 1024;
@@ -20,11 +19,12 @@ final class MediaControlObservation
     public static function outputScope(array $arguments): ?array
     {
         // Source generation, decoding and subtitle extraction are not video encoder attempts.
-        if (!in_array('hls', $arguments, true)) {
+        $format = array_search('-f', $arguments, true);
+        if ($format === false || ($arguments[$format + 1] ?? null) !== 'dash') {
             return null;
         }
         foreach ($arguments as $argument) {
-            if (preg_match('~^(/[^\x00]*/job-([a-f0-9-]{36})/generation-([1-9][0-9]*))/stream\.m3u8$~D', $argument, $match) === 1) {
+            if (preg_match('~^(/[^\x00]*/job-([a-f0-9-]{36})/generation-([1-9][0-9]*))/manifest\.mpd$~D', $argument, $match) === 1) {
                 return ['jobId' => $match[2], 'generation' => (int) $match[3], 'outputDirectory' => $match[1]];
             }
         }
@@ -205,6 +205,60 @@ final class MediaControlObservation
         return ['totalVideoLaunches' => count($records), 'byJob' => $byJob, 'overlappingLaunches' => 0, 'duplicateGenerations' => 0];
     }
 
+    /** @return array<string,mixed> */
+    public static function diagnostic(): array
+    {
+        $generations = [];
+        $selected = [];
+        $root = realpath(dirname(__DIR__, 3) . '/storage/conversions');
+        foreach (array_reverse(self::records()) as $record) {
+            if (isset($selected[$record['jobId']])) {
+                continue;
+            }
+            $selected[$record['jobId']] = true;
+            $entry = array_intersect_key($record, array_flip(['jobId', 'generation', 'outputDirectory', 'identity']));
+            $directory = realpath($record['outputDirectory']);
+            if ($root === false || $directory === false || !str_starts_with($directory, $root . '/')) {
+                $entry['error'] = 'generation_directory_outside_storage_or_missing';
+            } else {
+                try {
+                    $alive = self::identityAlive($record['identity']);
+                    $entry['native'] = ['alive' => $alive, 'stat' => $alive ? file_get_contents('/proc/' . $record['identity']['pid'] . '/stat', length: 4096) : null];
+                } catch (Throwable $error) {
+                    $entry['native'] = ['error' => $error->getMessage()];
+                }
+                foreach (['manifest.mpd' => 262_144, 'generation.json' => 65_536, 'master.m3u8' => 16_384, 'media_0.m3u8' => 65_536, 'media_1.m3u8' => 65_536] as $name => $limit) {
+                    $path = $directory . '/' . $name;
+                    if (is_link($path) || !is_file($path)) {
+                        $entry['documents'][$name] = ['error' => 'symlink_or_non_file'];
+                        continue;
+                    }
+                    $contents = @file_get_contents($path, length: $limit + 1);
+                    $entry['documents'][$name] = $contents === false ? ['error' => 'unreadable'] : [
+                        'contents' => substr($contents, 0, $limit), 'truncated' => strlen($contents) > $limit,
+                    ];
+                }
+                $files = [];
+                foreach (new DirectoryIterator($directory) as $file) {
+                    if ($file->isDot()) {
+                        continue;
+                    }
+                    if (count($files) >= 128) {
+                        $entry['filesTruncated'] = true;
+                        break;
+                    }
+                    $files[] = ['name' => $file->getFilename(), 'bytes' => $file->isFile() && !$file->isLink() ? $file->getSize() : null];
+                }
+                $entry['files'] = $files;
+            }
+            $generations[] = $entry;
+            if (count($generations) >= 4) {
+                break;
+            }
+        }
+        return ['monotonic' => hrtime(true) / 1e9, 'generations' => $generations];
+    }
+
     public static function monitor(string $path, int $seconds): void
     {
         if ($seconds < 1 || $seconds > 600) {
@@ -239,6 +293,7 @@ if (isset($argv) && realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
         'verify' => MediaControlObservation::verify(),
         'snapshot' => MediaControlObservation::snapshot($argv[2] ?? throw new RuntimeException('Missing job identity.')),
         'alive' => MediaControlObservation::identityAlive(json_decode(base64_decode($argv[2] ?? '', true) ?: '', true, flags: JSON_THROW_ON_ERROR)),
+        'diagnose' => MediaControlObservation::diagnostic(),
         'monitor' => MediaControlObservation::monitor($argv[2] ?? '', (int) ($argv[3] ?? 180)),
         default => throw new RuntimeException('Unknown native observation mode.'),
     };

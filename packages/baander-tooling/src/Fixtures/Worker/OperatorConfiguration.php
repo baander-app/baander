@@ -48,6 +48,9 @@ final readonly class OperatorConfiguration
         if ($this->mediaObservation && $this->useImage) {
             throw new InvalidArgumentException('Native launch observation requires a disposable fixture image');
         }
+        if ($this->checkpoint?->name === 'autoscaling' && $this->useImage) {
+            throw new InvalidArgumentException('Autoscaling qualification requires a disposable fixture image');
+        }
         if ($this->lifecyclePhase !== '' && ($this->twoCommand || $capacity)) {
             throw new InvalidArgumentException('Worker lifecycle qualification requires standalone operator mode');
         }

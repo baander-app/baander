@@ -245,12 +245,10 @@ final class ControlCapacity
                     'Execution capacity was not exhausted',
                 );
                 ControlCapacityVerifier::exhausted($checkpoint->artifacts, $phase);
-                $runtime->wait($failure);
                 $checkpoint->inspectAfter('containers-after-pressure.json');
             }
-            $checkpoint->measurements->finish();
-            if ($phase !== 'cpu') {
-                $runtime->wait($pressure);
+            if ($phase === 'cpu') {
+                $checkpoint->measurements->finish();
             }
             $started = $phase === 'cpu' ? Runtime::now() : $exhaustionStarted;
             file_put_contents(
@@ -309,6 +307,26 @@ final class ControlCapacity
                     'monitorExitCode' => $stopped->exitCode,
                 ],
             );
+            if ($phase !== 'cpu') {
+                $completion = new ContainedSamplerDrain($checkpoint->artifacts, $phase, [
+                    'control' => ['name' => $checkpoint->control, 'id' => $controlId],
+                    'execution' => ['name' => $checkpoint->execution, 'id' => $executionId],
+                ]);
+                $pressureResult = $runtime->wait($pressure, check: false);
+                $failureResult = $runtime->wait($failure, check: false);
+                $completion->checkOutcome($pressureResult);
+                $completion->checkOutcome($failureResult);
+                // The final atomic heartbeat survives PID 1; an in-container sampler may miss its brief drain window.
+                $source = $completion->terminalHeartbeatSource();
+                $checkpoint->copy($source, 'control-drain-heartbeat.json');
+                Runtime::writeJson($checkpoint->artifacts . '/control-drain-capture.json', [
+                    'containerId' => $controlId, 'source' => $source, 'copiedAfterStop' => true,
+                ]);
+                $checkpoint->measurements->finish($completion);
+                // Joint drain can retire pressure PHP after it has flushed terminal evidence.
+                $completion->completePressure($pressureResult);
+                $completion->completeOwnedFailure($failureResult);
+            }
             $runtime->close();
             return ControlCapacityVerifier::main(['verify', $checkpoint->artifacts, $phase]);
         } finally {

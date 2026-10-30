@@ -8,13 +8,70 @@ use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
 use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Docker\{Client, Target};
 use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessSpec, RunningProcess};
-use Baander\Tooling\Fixtures\Worker\{PostgresSampler, CompletionCursor, EvidenceMode};
+use Baander\Tooling\Fixtures\Worker\{PostgresSampler, CompletionCursor, EvidenceMode, AutoscalingStatusObservation};
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class WorkerSamplerTest extends TestCase
 {
+    public function testStatusObservationRetriesOnlyTransientAdmissionContentionWithFreshTime(): void
+    {
+        $times = [];
+        $expected = ['state' => 'known', 'desired' => 2, 'resources' => ['state' => 'unknown']];
+        $observation = AutoscalingStatusObservation::capture(static function (float $now) use (&$times, $expected): array {
+            $times[] = $now;
+            if (count($times) < 3) {
+                throw new RuntimeException('Admission lock deadline exceeded.');
+            }
+            return $expected;
+        });
+        self::assertSame($expected, $observation['status']);
+        self::assertSame(3, $observation['attempts']);
+        self::assertGreaterThan($times[0], $times[1]);
+        self::assertGreaterThan($times[1], $times[2]);
+    }
+
+    public function testStatusObservationPreservesImmediateSuccess(): void
+    {
+        $status = ['state' => 'known', 'desired' => 1];
+        self::assertSame(['status' => $status, 'attempts' => 1], AutoscalingStatusObservation::capture(static fn(float $now): array => $status));
+    }
+
+    public function testPersistentAdmissionContentionStillFailsWithinOneSampleInterval(): void
+    {
+        $started = hrtime(true);
+        $attempts = 0;
+        try {
+            AutoscalingStatusObservation::capture(static function (float $now) use (&$attempts): array {
+                ++$attempts;
+                usleep(50_000);
+                throw new RuntimeException('Admission lock deadline exceeded.');
+            });
+            self::fail('Persistent contention produced an observation');
+        } catch (RuntimeException $error) {
+            self::assertSame('Admission lock deadline exceeded.', $error->getMessage());
+            self::assertGreaterThan(1, $attempts);
+            self::assertLessThan(.5, (hrtime(true) - $started) / 1e9);
+        }
+    }
+
+    public function testOtherStatusErrorsPropagateWithoutRetry(): void
+    {
+        $attempts = 0;
+        $original = new RuntimeException('Admission lock unavailable.');
+        try {
+            AutoscalingStatusObservation::capture(static function (float $now) use (&$attempts, $original): array {
+                ++$attempts;
+                throw $original;
+            });
+            self::fail('Unexpected status failure was swallowed');
+        } catch (RuntimeException $error) {
+            self::assertSame($original, $error);
+            self::assertSame(1, $attempts);
+        }
+    }
+
     /** @return array<string,string> */
     private function records(int $pid = 42, string $ticks = '1234', int $pss = 10): array
     {

@@ -24,10 +24,9 @@ final readonly class Checkpoint
     public function __construct(array $arguments, string $root, float $seconds)
     {
         if (count($arguments) !== 6) {
-            throw new \InvalidArgumentException('Expected artifacts control execution ipc-volume postgres database');
+            throw new \InvalidArgumentException('Expected artifacts control execution web postgres database');
         }
-        [$this->artifacts, $this->control, $this->execution, , $this->postgres, $this->database] = $arguments;
-        $this->web = preg_replace('/-postgres$/D', '-web', $this->postgres);
+        [$this->artifacts, $this->control, $this->execution, $this->web, $this->postgres, $this->database] = $arguments;
         $this->runtime = new Runtime($root, $seconds);
         $this->docker = $this->runtime->docker();
         $this->measurements = new Measurements($this->runtime, $this->docker, $this->artifacts);

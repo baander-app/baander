@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/scripts/vendor/autoload.php';
 
 $unit = $argv[1] ?? '';
 $seconds = (int) ($argv[2] ?? 480);
@@ -29,7 +30,10 @@ while (true) {
         $profileFields['maximumConcurrency'] = count($state['slots']);
         $profile = App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
         $lease = new App\Shared\Infrastructure\Worker\DeploymentLease($state['namespace'], $state['bootId'], $state['epoch']);
-        $sample['status'] = (new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile))->snapshot(hrtime(true) / 1e9);
+        $status = new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile);
+        $observation = \Baander\Tooling\Fixtures\Worker\AutoscalingStatusObservation::capture($status->snapshot(...));
+        $sample['status'] = $observation['status'];
+        $sample['statusAttempts'] = $observation['attempts'];
     }
     $sample['processes'] = [];
     foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
@@ -60,5 +64,5 @@ while (true) {
     if ($stopping) {
         break;
     }
-    usleep(250000);
+    usleep(\Baander\Tooling\Fixtures\Worker\AutoscalingStatusObservation::INTERVAL_MICROSECONDS);
 }

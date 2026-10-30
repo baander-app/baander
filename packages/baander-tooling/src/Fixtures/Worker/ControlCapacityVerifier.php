@@ -334,7 +334,6 @@ final class ControlCapacityVerifier
             $report['drainTrigger'] = $trigger;
             $report['controlSurvivedExecutionExhaustion'] = !$after[0]['State']['OOMKilled'];
         }
-        Reports::publish($root . '/qualification.json', $report);
         return $report;
     }
 
@@ -479,7 +478,9 @@ final class ControlCapacityVerifier
         if ($arguments[0] === 'exhausted') {
             self::exhausted($arguments[1], $arguments[2]);
         } else {
-            echo json_encode(self::verify($arguments[1], $arguments[2]), JSON_THROW_ON_ERROR), "\n";
+            $report = self::verify($arguments[1], $arguments[2]);
+            Reports::publish($arguments[1] . '/qualification.json', $report);
+            echo json_encode($report, JSON_THROW_ON_ERROR), "\n";
         }
         return 0;
     }

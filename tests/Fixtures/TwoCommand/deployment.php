@@ -10,6 +10,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Fixtures\TwoCommand\TrackDelivery;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Symfony\Component\Process\Process;
@@ -175,52 +176,34 @@ function decodeVideo(StreamClient $client, array $state, float $readinessSeconds
     ensure(count($audioLines[0]) === 1, 'Master must expose one canonical audio rendition.');
     preg_match('/URI="([^"]+)"/', $audioLines[0][0], $audioUri);
     ensure(isset($audioUri[1]), 'Canonical audio rendition omitted its playlist.');
-    $tracks = [];
-    foreach (['video' => $mediaMatch[1], 'audio' => $audioUri[1]] as $kind => $playlistUrl) {
-        $media = (new HttpExchange(url($playlistUrl), []))->complete();
+    $resources = [];
+    $playlists = [];
+    $playlistUrls = ['video' => url($mediaMatch[1]), 'audio' => url($audioUri[1])];
+    $playlistRequests = array_map(static fn(string $playlistUrl): HttpExchange => new HttpExchange($playlistUrl, []), $playlistUrls);
+    foreach (HttpExchange::completeAll($playlistRequests) as $kind => $media) {
         ensure($media->status() === 200, $kind . ' media playlist is unavailable.');
         preg_match('/#EXT-X-MAP:URI="([^"]+)"/', $media->body, $initMatch);
         preg_match('~^([^#\r\n][^\r\n]*)~m', $media->body, $segmentMatch);
         preg_match('/#EXTINF:([0-9.]+)/', $media->body, $durationMatch);
         ensure(isset($initMatch[1], $segmentMatch[1], $durationMatch[1]), 'Playlist omitted init, fragment or duration.');
-        $tracks[$kind] = inspectTrack($kind, url($initMatch[1]), url($segmentMatch[1]), 'hls-' . $playback['generation']);
-        $tracks[$kind]['mediaUrl'] = url($playlistUrl);
-        $tracks[$kind]['firstDuration'] = (float) $durationMatch[1];
+        $resources[$kind] = ['initUrl' => url($initMatch[1]), 'segmentUrl' => url($segmentMatch[1])];
+        $playlists[$kind] = ['mediaUrl' => $playlistUrls[$kind], 'firstDuration' => (float) $durationMatch[1]];
     }
+    $delivery = TrackDelivery::inspect($resources, ROOT . '/hls-' . $playback['generation']);
+    $tracks = $delivery['tracks'];
+    foreach ($tracks as $kind => &$track) {
+        $track += $playlists[$kind];
+    }
+    unset($track);
     $decoded = decodeMedia(url($playback['manifestUrl']), 'decoded-hls-generation-' . $playback['generation'], 1.0);
     $subtitles = verifySubtitles($master->body, $playback);
-    return $playback + $decoded + ['tracks' => $tracks, 'decodedBytes' => array_sum(array_column($tracks, 'bytes')), 'subtitles' => $subtitles];
+    return $playback + $decoded + ['deliveryReadyAt' => $delivery['availableAt'], 'tracks' => $tracks, 'decodedBytes' => array_sum(array_column($tracks, 'bytes')), 'subtitles' => $subtitles];
 }
 
 /** @return array<string,mixed> */
 function inspectTrack(string $kind, string $initUrl, string $segmentUrl, string $name): array
 {
-    $init = (new HttpExchange($initUrl, []))->complete();
-    $segment = (new HttpExchange($segmentUrl, []))->complete();
-    ensure($init->status() === 200 && $segment->status() === 200, sprintf(
-        '%s init or fragment is unavailable (init HTTP %d, fragment HTTP %d).',
-        $kind, $init->status(), $segment->status(),
-    ));
-    ensure(str_contains($initUrl, '/tracks/' . $kind . '/init.mp4') && str_contains($segmentUrl, '/tracks/' . $kind . '/segment.m4s'), 'Track resource identity is absent.');
-    $path = ROOT . '/' . $name . '-' . $kind . '.mp4';
-    file_put_contents($path, $init->body . $segment->body);
-    $probe = new Process(['ffprobe', '-v', 'error', '-show_streams', '-of', 'json', $path]);
-    $probe->setTimeout(10); $probe->mustRun();
-    $streams = json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR)['streams'];
-    ensure(count($streams) === 1 && $streams[0]['codec_type'] === $kind, 'Fragment must contain exactly its declared track.');
-    $tampering = [
-        'track' => str_replace('/tracks/' . $kind . '/', '/tracks/' . ($kind === 'video' ? 'audio' : 'video') . '/', $segmentUrl),
-        'index' => $segmentUrl . '&index=999999',
-        'generation' => $segmentUrl . '&generation=999999',
-    ];
-    $statuses = [];
-    foreach ($tampering as $field => $altered) {
-        $response = (new HttpExchange($altered, []))->complete(5);
-        ensure(in_array($response->status(), [400, 403, 404], true), 'Altered ' . $field . ' signature was accepted.');
-        $statuses[$field] = $response->status();
-    }
-    return ['initUrl' => $initUrl, 'segmentUrl' => $segmentUrl, 'bytes' => strlen($init->body) + strlen($segment->body),
-        'codec' => $streams[0]['codec_name'], 'timeBase' => $streams[0]['time_base'], 'tamperedStatuses' => $statuses];
+    return TrackDelivery::inspect([$kind => ['initUrl' => $initUrl, 'segmentUrl' => $segmentUrl]], ROOT . '/' . $name)['tracks'][$kind];
 }
 
 /**
@@ -634,6 +617,12 @@ if ($mode === 'prepare') {
     await(static fn (): bool => (int) $db->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL") >= 3,
         'three durable video slots');
     ensure((int) $db->fetchOne("SELECT count(*) FROM audio_rendition_runtime WHERE state='running'") >= 1, 'Capacity audio slot is not occupied.');
+    $session = $sessions[0];
+    foreach (['pause' => 'paused', 'resume' => 'running'] as $action => $status) {
+        $response = twoCommandExchange($auth, '/api/transcode/sessions/' . $session['publicId'] . '/' . $action, 'PATCH')->complete(3);
+        ensure($response->status() === 200, 'Capacity preparation ' . $action . ' request failed.');
+        acknowledged($db, ['job' => $session['jobId']], $status);
+    }
     require_once $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),

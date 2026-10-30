@@ -13,13 +13,13 @@ final class Production
     {
         Runtime::require(($config['User'] ?? null) === 'www-data', 'Worker must run as application user');
         Runtime::require(
-            ($config['Entrypoint'] ?? null) === [
-                '/usr/local/bin/php',
-                $appHome . '/bin/console',
-                'app:worker',
-                '--no-interaction',
-            ],
+            ($config['Entrypoint'] ?? null) === ['/usr/local/bin/start-worker.sh'],
             'Worker target entrypoint differs',
+        );
+        Runtime::require(
+            ($config['WorkingDir'] ?? null) === $appHome
+                && in_array('APP_HOME=' . $appHome, $config['Env'] ?? [], true),
+            'Worker target application layout differs',
         );
         Runtime::require(
             in_array($config['Cmd'] ?? null, [null, []], true),

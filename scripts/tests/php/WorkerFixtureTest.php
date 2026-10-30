@@ -6,6 +6,7 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Fixtures\Worker\{AutoscalingVerifier, ControlCapacityVerifier, MediaControlVerifier, Reports, EvidenceMode};
+use Baander\Tooling\Configuration\ApplicationLayout;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -586,6 +587,8 @@ final class WorkerFixtureTest extends TestCase
         foreach (['control', 'execution', 'postgres', 'redis', 'web'] as $index => $name) {
             $containers[] = [
                 'Id' => $name,
+                'Config' => ['Env' => ['BAANDER_WORKER_BOOT_ID=boot']],
+                'Mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Destination' => '/run/baander-worker']],
                 'HostConfig' => [
                     'Memory' => ($index === 0 ? 2944 : ($index === 1 ? 4480 : 256)) * 1024 * 1024,
                     'PidsLimit' => $index === 0 ? 129 : 256,
@@ -619,6 +622,9 @@ final class WorkerFixtureTest extends TestCase
             'untilUnixSeconds' => 200,
         ];
         $this->json('worker-oom-events-capture.json', $capture);
+        $terminalHeartbeat = ['namespace' => 'worker.baander.app', 'bootId' => 'boot', 'unit' => 'control', 'epoch' => 1, 'ready' => false, 'draining' => true, 'time' => 65.01];
+        $this->json('control-drain-heartbeat.json', $terminalHeartbeat);
+        $this->json('control-drain-capture.json', ['containerId' => 'control', 'source' => 'control:/run/baander-worker/boot/control.json', 'copiedAfterStop' => true]);
         $this->lines('worker-oom-events-final.jsonl', []);
         $this->lines('worker-oom-events.jsonl', []);
         $this->values = [];
@@ -630,7 +636,7 @@ final class WorkerFixtureTest extends TestCase
             }
             $this->values[] = [
                 'monotonic' => $at,
-                'heartbeat' => ['bootId' => 'boot', 'epoch' => 1, 'draining' => false, 'time' => $at - .1],
+                'heartbeat' => ['namespace' => 'worker.baander.app', 'bootId' => 'boot', 'unit' => 'control', 'epoch' => 1, 'draining' => false, 'time' => $at - .1],
                 'lease' => ['owner_boot_id' => 'boot', 'epoch' => 1, 'state' => 'active', 'unexpired' => true],
                 'memory.events' => 'oom_kill ' . ($phase === 'memory' && $at > 5 ? 1 : 0) . "\nmax 0",
                 'pids.events' => 'max ' . ($phase === 'pid' && $at > 5 ? 1 : 0),
@@ -694,6 +700,350 @@ final class WorkerFixtureTest extends TestCase
             self::assertSame('execution-cgroup-counter', $report['exhaustion']['source']);
             self::assertTrue($report['controlSurvivedExecutionExhaustion']);
         }
+    }
+
+    /** @return iterable<string,array{string,string,bool}> */
+    public static function containedSamplerOutcomes(): iterable
+    {
+        yield 'memory drain' => ['memory', 'complete', true];
+        yield 'pid drain' => ['pid', 'complete', true];
+        yield 'clean completion after drain' => ['memory', 'zero', true];
+        yield 'bounded event fallback' => ['memory', 'fallback', true];
+        yield 'pid pressure retired' => ['pid', 'pressure', true];
+        yield 'pid pressure clean' => ['pid', 'pressure-zero', true];
+        yield 'pid pressure missing refusal' => ['pid', 'pressure-no-refusal', false];
+        yield 'pid pressure truncated' => ['pid', 'pressure-truncated', false];
+        foreach (['early-control', 'early-zero', 'early-execution', 'changed-drain-boot', 'gap', 'truncated', 'malformed', 'wrong-container', 'wrong-id', 'running', 'missing-events', 'other-exit', 'timeout', 'cancelled', 'signal', 'fallback-truncated', 'fallback-no-terminal', 'pressure'] as $case) {
+            yield $case => ['memory', $case, false];
+        }
+    }
+
+    #[DataProvider('containedSamplerOutcomes')]
+    public function testContainedSamplerTerminationRequiresCompleteDrainEvidence(string $phase, string $case, bool $success): void
+    {
+        $this->capacityFixture($phase);
+        $control = Reports::samples($this->root . '/control-samples.jsonl');
+        $control[array_key_last($control)]['heartbeat']['draining'] = !in_array($case, ['early-control', 'early-zero', 'fallback-no-terminal'], true);
+        if (in_array($case, ['early-control', 'early-zero'], true)) {
+            $control = array_slice($control, 0, 60);
+        }
+        if ($case === 'fallback-no-terminal') {
+            unlink($this->root . '/control-drain-capture.json');
+        }
+        if ($case === 'changed-drain-boot') {
+            $control[array_key_last($control)]['heartbeat']['bootId'] = 'foreign';
+        }
+        if ($case === 'gap') {
+            $control = array_merge(array_slice($control, 0, 4), array_slice($control, 10));
+        }
+        $this->lines('control-samples.jsonl', $control);
+        if ($case === 'early-execution') {
+            $this->lines('execution-samples.jsonl', array_slice($this->values, 0, 5));
+        }
+        if (str_starts_with($case, 'fallback')) {
+            foreach ($this->values as &$sample) {
+                $sample['memory.events'] = 'oom_kill 0' . "\nmax " . ($sample['monotonic'] > 5 ? '1' : '0');
+            }
+            unset($sample);
+            $this->lines('execution-samples.jsonl', $this->values);
+            $this->lines('worker-oom-events-final.jsonl', [['Type' => 'container', 'Action' => 'oom', 'Actor' => ['ID' => 'execution']]]);
+        }
+        if (in_array($case, ['truncated', 'malformed', 'fallback-truncated'], true)) {
+            file_put_contents($this->root . '/control-samples.jsonl', $case === 'malformed' ? "{broken}\n" : '{', FILE_APPEND);
+        }
+        if ($case === 'running') {
+            $drain = Reports::json($this->root . '/drain.json');
+            $drain[0]['State']['Running'] = true;
+            $this->json('drain.json', $drain);
+        }
+        if ($case === 'missing-events') {
+            unlink($this->root . '/worker-oom-events-capture.json');
+        }
+        if ($case === 'pressure-no-refusal') {
+            $this->lines('pressure.log', [['holdFinished' => true]]);
+        } elseif ($case === 'pressure-truncated') {
+            file_put_contents($this->root . '/pressure.log', '{', FILE_APPEND);
+        }
+        $result = new \Baander\Tooling\Process\ProcessResult(
+            $case === 'other-exit' ? 7 : (in_array($case, ['early-zero', 'zero', 'pressure-zero'], true) ? 0 : 137),
+            $case === 'signal' ? 9 : null,
+            $case === 'timeout',
+            $case === 'cancelled',
+            '',
+            '',
+            1,
+        );
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, $phase, [
+            'control' => ['name' => 'control-name', 'id' => $case === 'wrong-id' ? 'foreign' : 'control'],
+            'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+        ]);
+        if (!$success) {
+            $this->expectException(RuntimeException::class);
+        }
+        if (str_starts_with($case, 'pressure')) {
+            $completion->completePressure($result);
+            self::addToAssertionCount(1);
+            return;
+        }
+        $completion->complete($case === 'wrong-container' ? 'foreign' : 'control-name', 'control-samples.jsonl', $result);
+        if ($success) {
+            $completion->complete('execution-name', 'execution-samples.jsonl', $result);
+            self::addToAssertionCount(1);
+        }
+    }
+
+    public function testMeasurementsAcceptContainerTerminationOnlyAfterVerifiedContainedDrain(): void
+    {
+        $this->capacityFixture('memory');
+        $control = Reports::samples($this->root . '/control-samples.jsonl');
+        $control[array_key_last($control)]['heartbeat']['draining'] = true;
+        $this->lines('source-control.jsonl', $control);
+        $script = <<<'PHP_CHILD'
+            <?php
+            echo file_get_contents(__DIR__ . '/source-control.jsonl');
+            exit(137);
+            PHP_CHILD;
+        file_put_contents($this->root . '/docker', '#!' . PHP_BINARY . "\n" . $script);
+        chmod($this->root . '/docker', 0700);
+        $runtime = new \Baander\Tooling\Fixtures\Runtime(dirname(__DIR__, 3), 5);
+        $docker = new \Baander\Tooling\Docker\Client(
+            $runtime->executor,
+            new \Baander\Tooling\Docker\Target($this->root . '/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
+            [],
+        );
+        $measurements = new \Baander\Tooling\Fixtures\Worker\Measurements($runtime, $docker, $this->root);
+        try {
+            $process = $measurements->container(['exec', 'control-name', 'sampler'], 'control-samples.jsonl', 'errors.log', 3);
+            $runtime->await(static fn(): bool => !$runtime->alive($process), 2, .01);
+            $measurements->finish(new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+                'control' => ['name' => 'control-name', 'id' => 'control'],
+                'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+            ]));
+            self::assertSame(66, count(Reports::samples($this->root . '/control-samples.jsonl')));
+            self::assertFileDoesNotExist($this->root . '/qualification.json', 'Sampler completion must not publish before all producer outcomes are checked');
+        } finally {
+            $runtime->close();
+        }
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function terminalHeartbeatOutcomes(): iterable
+    {
+        yield 'preserved final heartbeat' => ['complete', true];
+        foreach (['missing-receipt', 'missing-frame', 'wrong-container', 'wrong-source', 'not-after-stop', 'wrong-namespace', 'wrong-boot', 'wrong-epoch', 'wrong-unit', 'not-draining', 'ready', 'stale', 'future', 'truncated'] as $case) {
+            yield $case => [$case, false];
+        }
+    }
+
+    #[DataProvider('terminalHeartbeatOutcomes')]
+    public function testPersistedDrainHeartbeatProvesTransitionAfterFinalSamplerRow(string $case, bool $success): void
+    {
+        $this->capacityFixture('memory');
+        $frame = Reports::json($this->root . '/control-drain-heartbeat.json');
+        match ($case) {
+            'wrong-namespace' => $frame['namespace'] = 'foreign.baander.app',
+            'wrong-boot' => $frame['bootId'] = 'foreign',
+            'wrong-epoch' => $frame['epoch'] = 2,
+            'wrong-unit' => $frame['unit'] = 'execution',
+            'not-draining' => $frame['draining'] = false,
+            'ready' => $frame['ready'] = true,
+            'stale' => $frame['time'] = 50,
+            'future' => $frame['time'] = 68,
+            default => null,
+        };
+        $this->json('control-drain-heartbeat.json', $frame);
+        if ($case === 'missing-receipt') {
+            unlink($this->root . '/control-drain-capture.json');
+        } elseif ($case === 'missing-frame') {
+            unlink($this->root . '/control-drain-heartbeat.json');
+        } elseif ($case === 'truncated') {
+            file_put_contents($this->root . '/control-drain-heartbeat.json', '{');
+        } elseif (in_array($case, ['wrong-container', 'wrong-source', 'not-after-stop'], true)) {
+            $receipt = Reports::json($this->root . '/control-drain-capture.json');
+            if ($case === 'not-after-stop') {
+                $receipt['copiedAfterStop'] = false;
+            } else {
+                $receipt[$case === 'wrong-container' ? 'containerId' : 'source'] = 'foreign';
+            }
+            $this->json('control-drain-capture.json', $receipt);
+        }
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+            'control' => ['name' => 'control-name', 'id' => 'control'],
+            'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+        ]);
+        if (!$success) {
+            $this->expectException(RuntimeException::class);
+        }
+        $completion->complete('control-name', 'control-samples.jsonl', new \Baander\Tooling\Process\ProcessResult(137, null, false, false, '', '', 1));
+        self::assertSame('control:/run/baander-worker/boot/control.json', $completion->terminalHeartbeatSource());
+        $samples = Reports::samples($this->root . '/control-samples.jsonl');
+        self::assertCount(66, $samples);
+        self::assertFalse($samples[array_key_last($samples)]['heartbeat']['draining']);
+        self::assertFileDoesNotExist($this->root . '/qualification.json');
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function memoryPressureOutcomes(): iterable
+    {
+        yield 'terminal native death' => ['complete', true];
+        yield 'clean native death' => ['zero', true];
+        yield 'clean early exit' => ['no-terminal-zero', false];
+        foreach (['no-terminal', 'wrong-pid', 'wrong-start', 'wrong-argv', 'missing-argv', 'truncated', 'reversed', 'other-exit', 'timeout', 'cancelled', 'signal'] as $case) {
+            yield $case => [$case, false];
+        }
+    }
+
+    #[DataProvider('memoryPressureOutcomes')]
+    public function testMemoryPressureKilledAfterTerminalEvidenceRetainsStrictCompletion(string $case, bool $success): void
+    {
+        $this->capacityFixture('memory');
+        $control = Reports::samples($this->root . '/control-samples.jsonl');
+        $control[array_key_last($control)]['heartbeat']['draining'] = true;
+        $this->lines('control-samples.jsonl', $control);
+        $layout = ApplicationLayout::load();
+        $target = ['pid' => 20, 'startTicks' => '100', 'argv' => ['/usr/local/bin/php', $layout->path('bin/worker-native.php')]];
+        if ($case === 'missing-argv') {
+            unset($target['argv']);
+        }
+        $dead = $target;
+        match ($case) {
+            'wrong-pid' => $dead['pid'] = 21,
+            'wrong-start' => $dead['startTicks'] = '101',
+            'wrong-argv' => $dead['argv'] = ['/usr/local/bin/php', $layout->path('bin/console')],
+            default => null,
+        };
+        $records = [['oomTarget' => $target], ['oomTargetDied' => $dead, 'monotonic' => 65]];
+        if (in_array($case, ['no-terminal', 'no-terminal-zero'], true)) {
+            array_pop($records);
+        } elseif ($case === 'reversed') {
+            $records = array_reverse($records);
+        }
+        $payload = implode('', array_map(static fn(array $row): string => json_encode($row, JSON_THROW_ON_ERROR) . "\n", $records));
+        if ($case === 'truncated') {
+            $payload .= '{';
+        }
+        $runner = new EngineExecutor(ExecutionContext::bounded(5, getenv(), dirname(__DIR__, 3)));
+        try {
+            $result = $runner->run(new ProcessSpec(
+                [PHP_BINARY, '-r', 'echo $argv[1]; exit((int)$argv[2]);', $payload, $case === 'other-exit' ? '7' : (in_array($case, ['zero', 'no-terminal-zero'], true) ? '0' : '137')],
+                logPath: $this->root . '/pressure.log',
+            ), new CompletionPolicy(null));
+            if (in_array($case, ['timeout', 'cancelled', 'signal'], true)) {
+                $result = new \Baander\Tooling\Process\ProcessResult(137, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
+            }
+            $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+                'control' => ['name' => 'control-name', 'id' => 'control'],
+                'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+            ]);
+            if (!$success) {
+                $this->expectException(RuntimeException::class);
+            }
+            try {
+                $completion->completePressure($result);
+            } catch (RuntimeException $error) {
+                if (!$success) {
+                    $expectedStatus = $result->timedOut ? 124 : ($result->cancelled ? 143 : ($result->exitCode ?: 1));
+                    $cleanup = new RuntimeException('Later cleanup failed', previous: $error);
+                    self::assertSame($expectedStatus, \Baander\Tooling\Fixtures\Runtime::status($cleanup));
+                    self::assertStringContainsString($error->getMessage(), \Baander\Tooling\Fixtures\Runtime::failure($cleanup));
+                    self::assertFileDoesNotExist($this->root . '/qualification.json');
+                }
+                throw $error;
+            }
+            self::assertFileDoesNotExist($this->root . '/qualification.json');
+        } finally {
+            $runner->close();
+        }
+    }
+
+    #[DataProvider('unexpectedContainedProbeExits')]
+    public function testUnexpectedPressureExitPrecedesSamplerProofFailure(int $status): void
+    {
+        $this->capacityFixture('memory');
+        $this->lines('pressure.log', []);
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, 'memory', [
+            'control' => ['name' => 'control-name', 'id' => 'control'],
+            'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+        ]);
+        $runner = new EngineExecutor(ExecutionContext::bounded(5, getenv(), dirname(__DIR__, 3)));
+        try {
+            $pressure = $runner->run(new ProcessSpec([PHP_BINARY, '-r', 'exit((int)$argv[1]);', (string) $status]), new CompletionPolicy(null));
+            $sampler = $runner->run(new ProcessSpec([PHP_BINARY, '-r', 'exit(137);']), new CompletionPolicy(null));
+            try {
+                $completion->checkOutcome($pressure);
+                $completion->complete('control-name', 'control-samples.jsonl', $sampler);
+                self::fail('Unexpected pressure exit was accepted');
+            } catch (\Baander\Tooling\Process\CommandFailure $error) {
+                self::assertSame($status, $error->getCode());
+                self::assertSame($pressure, $error->result);
+                self::assertFileDoesNotExist($this->root . '/qualification.json');
+            }
+        } finally {
+            $runner->close();
+        }
+    }
+
+    /** @return iterable<string,array{int}> */
+    public static function unexpectedContainedProbeExits(): iterable
+    {
+        yield 'ordinary failure' => [7];
+        yield 'PHP fatal failure' => [255];
+    }
+
+    /** @return iterable<string,array{string,int,bool}> */
+    public static function ownedProbeOutcomes(): iterable
+    {
+        foreach (['native-error', 'terminal-reply', 'native-error-pid'] as $case) {
+            yield $case . ' clean' => [$case, 0, true];
+            yield $case . ' contained' => [$case, 137, true];
+        }
+        foreach (['missing', 'wrong-boot', 'wrong-phase', 'no-attempt', 'successful-reply', 'foreign-reply', 'truncated', 'timeout', 'cancelled', 'signal'] as $case) {
+            yield $case => [$case, 137, false];
+        }
+        yield 'unexpected exit' => ['native-error', 7, false];
+    }
+
+    #[DataProvider('ownedProbeOutcomes')]
+    public function testOwnedProbeCompletionRequiresTerminalCurrentAuthority(string $case, int $status, bool $success): void
+    {
+        $phase = $case === 'native-error-pid' ? 'pid' : 'memory';
+        $this->capacityFixture($phase);
+        $identity = ['namespace' => 'worker.baander.app', 'bootId' => 'boot', 'epoch' => 1];
+        $control = Reports::samples($this->root . '/control-samples.jsonl');
+        foreach ($control as &$sample) {
+            $sample['heartbeat']['namespace'] = $identity['namespace'];
+        }
+        unset($sample);
+        $control[array_key_last($control)]['heartbeat']['draining'] = true;
+        $this->lines('control-samples.jsonl', $control);
+        $terminal = ['phase' => $phase, 'identity' => $identity, 'attempts' => 2, 'nativeFailure' => 'Native execution reply read failed.'];
+        if (in_array($case, ['terminal-reply', 'successful-reply', 'foreign-reply'], true)) {
+            unset($terminal['nativeFailure']);
+            $terminal['ownedTerminal'] = $identity + ['state' => 'exited', 'exitCode' => $case === 'successful-reply' ? 0 : 137, 'attempt' => 2];
+            if ($case === 'foreign-reply') {
+                $terminal['ownedTerminal']['bootId'] = 'foreign';
+            }
+        } elseif ($case === 'wrong-boot') {
+            $terminal['identity']['bootId'] = 'foreign';
+        } elseif ($case === 'wrong-phase') {
+            $terminal['phase'] = 'pid';
+        } elseif ($case === 'no-attempt') {
+            $terminal['attempts'] = 0;
+        }
+        $this->lines('owned-failure.jsonl', $case === 'missing' ? [] : [$terminal]);
+        if ($case === 'truncated') {
+            file_put_contents($this->root . '/owned-failure.jsonl', '{', FILE_APPEND);
+        }
+        $result = new \Baander\Tooling\Process\ProcessResult($status, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
+        $completion = new \Baander\Tooling\Fixtures\Worker\ContainedSamplerDrain($this->root, $phase, [
+            'control' => ['name' => 'control-name', 'id' => 'control'],
+            'execution' => ['name' => 'execution-name', 'id' => 'execution'],
+        ]);
+        if (!$success) {
+            $this->expectException(RuntimeException::class);
+        }
+        $completion->completeOwnedFailure($result);
+        self::assertFileDoesNotExist($this->root . '/qualification.json');
     }
 
     /** @return iterable<string,array{string}> */
@@ -993,6 +1343,7 @@ final class WorkerFixtureTest extends TestCase
         $this->capacityFixture('memory');
         $capacity = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'control-capacity-verify.php', 'verify', $this->root, 'memory']));
         self::assertTrue(json_decode($capacity->stdout, true, flags: JSON_THROW_ON_ERROR)['controlSurvivedExecutionExhaustion']);
+        self::assertSame('memory', Reports::json($this->root . '/qualification.json')['phase']);
         $this->mediaFixture();
         $media = $runner->run(new ProcessSpec([PHP_BINARY, $directory . 'media-control-verify.php', $this->root]));
         self::assertSame(2, json_decode($media->stdout, true, flags: JSON_THROW_ON_ERROR)['nativeLaunches']);

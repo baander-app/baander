@@ -307,6 +307,11 @@ final readonly class OperatorProvisioning
                 '-cf',
                 $archive,
                 'vendor',
+                'scripts/vendor',
+                'scripts/tests/php',
+                'scripts/composer.json',
+                'scripts/composer.lock',
+                'scripts/bootstrap.php',
                 'src',
                 'tests',
                 'config',
@@ -605,6 +610,7 @@ FROM ${FIXTURE_BASE}
 USER root
 RUN rm -rf %APP_HOME%/src %APP_HOME%/tests %APP_HOME%/config %APP_HOME%/packages %APP_HOME%/migrations %APP_HOME%/bin %APP_HOME%/templates %APP_HOME%/public %APP_HOME%/vendor
 COPY --chown=www-data:www-data checkout/ %APP_HOME%/
+RUN composer dump-autoload --dev --optimize --no-interaction --no-scripts --no-plugins
 ARG MEDIA_CONTROL_OBSERVATION=0
 RUN if [ "$MEDIA_CONTROL_OBSERVATION" = 1 ]; then \
         mkdir -p /usr/lib/baander-fixture && mv /usr/bin/ffmpeg /usr/lib/baander-fixture/ffmpeg \

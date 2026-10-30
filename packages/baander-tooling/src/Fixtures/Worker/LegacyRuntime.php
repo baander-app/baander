@@ -121,6 +121,10 @@ final class LegacyRuntime
                     $id . '-app',
                     [
                         'vendor',
+                        'scripts/vendor',
+                        'scripts/composer.json',
+                        'scripts/composer.lock',
+                        'scripts/bootstrap.php',
                         'src',
                         'tests',
                         'config',

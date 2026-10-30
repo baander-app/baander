@@ -10,7 +10,7 @@ use Baander\Tooling\Process\RunningProcess;
 
 final class Measurements
 {
-    /** @var list<array{process:RunningProcess,container:?string,stopFile:string}> */
+    /** @var list<array{process:RunningProcess,container:?string,stopFile:string,output:string}> */
     private array $producers = [];
 
     public function __construct(private readonly Runtime $runtime, private readonly Client $docker, private readonly string $artifacts) {}
@@ -27,7 +27,7 @@ final class Measurements
             stderrLogPath: $this->artifacts . '/' . $errors,
             terminationGrace: 3,
         );
-        $this->producers[] = ['process' => $process, 'container' => $arguments[1], 'stopFile' => $stopFile];
+        $this->producers[] = ['process' => $process, 'container' => $arguments[1], 'stopFile' => $stopFile, 'output' => $output];
         return $process;
     }
 
@@ -43,13 +43,17 @@ final class Measurements
             stderrLogPath: $this->artifacts . '/' . $errors,
             terminationGrace: 3,
         );
-        $this->producers[] = ['process' => $process, 'container' => null, 'stopFile' => $stopFile];
+        $this->producers[] = ['process' => $process, 'container' => null, 'stopFile' => $stopFile, 'output' => $output];
         return $process;
     }
 
-    public function finish(): void
+    public function finish(?ContainedSamplerDrain $drain = null): void
     {
         foreach ($this->producers as $producer) {
+            // A contained pair has already stopped; its exec wrappers may still be draining output.
+            if ($drain !== null && $producer['container'] !== null) {
+                continue;
+            }
             if (!$this->runtime->alive($producer['process'])) {
                 continue;
             }
@@ -61,8 +65,14 @@ final class Measurements
                 $this->docker->run(['cp', $local, $producer['container'] . ':' . $producer['stopFile']]);
             }
         }
+        $completed = [];
         foreach ($this->producers as $producer) {
-            $this->runtime->wait($producer['process']);
+            $completed[] = $this->runtime->wait($producer['process'], check: $drain === null || $producer['container'] === null);
+        }
+        foreach ($this->producers as $index => $producer) {
+            if ($drain !== null && $producer['container'] !== null) {
+                $drain->complete($producer['container'], $producer['output'], $completed[$index]);
+            }
         }
         $this->producers = [];
     }

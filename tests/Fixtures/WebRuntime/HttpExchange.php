@@ -23,6 +23,7 @@ final class HttpExchange
     private bool $stopped = false;
     private readonly CurlMultiHandle $multi;
     private readonly CurlHandle $handle;
+    private ?\Throwable $failure = null;
 
     /**
      * @param list<string> $headers
@@ -83,14 +84,16 @@ final class HttpExchange
      */
     public function until(callable $until, float $seconds = 15.0): bool
     {
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
         $deadline = microtime(true) + $seconds;
         while (!$until($this)) {
             if ($this->done || microtime(true) >= $deadline) {
                 return false;
             }
-            curl_multi_exec($this->multi, $running);
-            if ($running === 0) {
-                $this->finish();
+            $this->advance();
+            if ($this->done) {
                 continue;
             }
             curl_multi_select($this->multi, 0.05);
@@ -99,9 +102,67 @@ final class HttpExchange
         return true;
     }
 
+    /**
+     * @template TKey of array-key
+     * @param array<TKey,self> $exchanges
+     * @return array<TKey,self>
+     */
+    public static function completeAll(array $exchanges, float $seconds = 30.0): array
+    {
+        if (!is_finite($seconds) || $seconds <= 0) {
+            throw new \InvalidArgumentException('HTTP batch timeout must be positive finite seconds.');
+        }
+        $deadline = hrtime(true) / 1e9 + $seconds;
+        try {
+            do {
+                foreach ($exchanges as $exchange) {
+                    $exchange->advance();
+                }
+                if (hrtime(true) / 1e9 >= $deadline) {
+                    throw new RuntimeException('The HTTP batch did not finish in time.');
+                }
+                if (array_all($exchanges, static fn(self $exchange): bool => $exchange->done)) {
+                    return $exchanges;
+                }
+                usleep(1000);
+            } while (true);
+        } catch (\Throwable $error) {
+            foreach ($exchanges as $exchange) {
+                $exchange->abort($error);
+            }
+            throw $error;
+        }
+    }
+
+    private function advance(): void
+    {
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+        if ($this->done) {
+            return;
+        }
+        curl_multi_exec($this->multi, $running);
+        if ($running === 0) {
+            $this->finish();
+        }
+    }
+
+    private function abort(\Throwable $error): void
+    {
+        if (!$this->done) {
+            curl_multi_remove_handle($this->multi, $this->handle);
+            $this->failure = $error;
+            $this->done = true;
+            if ($this->result === CURLE_OK) {
+                $this->result = CURLE_ABORTED_BY_CALLBACK;
+            }
+        }
+    }
+
     public function complete(float $seconds = 30.0): self
     {
-        if (!$this->until(static fn (self $exchange): bool => $exchange->done, $seconds)) {
+        if (!$this->until(static fn(self $exchange): bool => $exchange->done, $seconds)) {
             throw new RuntimeException('The request did not finish in time.');
         }
 

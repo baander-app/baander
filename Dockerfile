@@ -585,6 +585,7 @@ USER www-data
 # auto-scripts, so bin/console still receives vendor/autoload_runtime.php.
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts && \
     COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction && \
+    COMPOSER_MEMORY_LIMIT=-1 composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts --no-plugins && \
     rm -rf /home/www-data/.cache/composer vendor/nelmio/api-doc-bundle/public
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -12,6 +12,14 @@ booting the application kernel. Workflow entrypoints call
 with Swoole. Leaf commands that do not run processes can pass `false`; commands
 needing additional extensions pass their names in the second argument.
 
+Production worker images install the standalone `scripts/` loader without
+development dependencies. The application loader also remains free of development
+packages, including PHPUnit. Worker and HTTP fixtures use the Composer loader for
+the code they execute; host-source archives include the required standalone loader.
+Disposable autoscaling fixtures generate development classmaps for their workload
+classes without installing development packages; PHPUnit remains absent. They
+require injected scenario services and reject immutable-image mode.
+
 ## Configuration and image roles
 
 [`resources/tooling-defaults.json`](resources/tooling-defaults.json) owns image
@@ -66,8 +74,11 @@ endpoint does not establish that client bind paths or loopback ports are usable.
 
 Budget overrides use named numeric seconds under `tooling.budgets`. Unknown keys,
 wrong types and nonpositive or nonfinite budgets fail preflight. The catalog lists
-every budget: backend defaults to 3600 seconds, messaging to 600 seconds and cleanup
-to a shared total of 120 seconds. `BAANDER_TEST_TIMEOUT` overrides `backend`;
+every budget: backend defaults to 3600 seconds, messaging to 600 seconds,
+`workerCapacity` to 900 seconds and cleanup to a shared total of 120 seconds.
+Autoscaling retains its 2000-second aggregate bound; its observation callback and
+performance thresholds have separate unchanged limits. `BAANDER_TEST_TIMEOUT`
+overrides `backend`;
 `BAANDER_CLEANUP_TIMEOUT` overrides `cleanup`. Bounded process calls are clamped to
 their owning deadline. Managed services and builds retain their explicit owning
 lifetimes. Interruption records failure and enters owned cleanup; exhausted cleanup
@@ -160,6 +171,26 @@ Use `stderrLogPath` when diagnostics must stay separate from structured stdout.
 `appendLog` preserves earlier output when several commands share a log. A command
 can set `terminationGrace` when its cancellation handler needs time to finish;
 normal completion retains the short descendant-cleanup bound.
+
+Worker measurements join and drain their samplers before final verification.
+Memory and PID exhaustion drills accept exit 137 from a contained probe only with
+typed evidence of the terminal event, native process identity, exhaustion and
+continuous heartbeat/drain observations for the exact stopped worker pair.
+The terminal drain proof comes from the actual persisted control heartbeat,
+captured from the stopped container and checked against the saved IPC volume,
+source, boot and epoch within the existing continuity bound. Sample rows and
+measurement thresholds remain unchanged.
+Unexpected statuses fail before evidence validation; timeout, cancellation and
+malformed evidence remain failures. Host samplers require successful completion.
+Only the main qualification path publishes the final result.
+
+Worker fixture readiness requires every expected Redis consumer within its
+bounded wait. Failure diagnostics preserve the original error. Media publication
+diagnostics are private, limited to four generations of capped metadata, and
+exclude media bytes; observation adds no readiness or performance allowance.
+Media seek readiness measures monotonic availability of both audio and video bytes.
+Decoding, signature-tampering and subtitle certification follow and remain mandatory;
+the same 30-second availability limit applies.
 
 The filesystem helpers preserve private state with same-directory replacement,
 file and directory synchronization, and process-owned locks. They reject symlink

@@ -361,8 +361,8 @@ The previous full CI run failed with 942 tests, 4,604 assertions, 16 errors, two
 failures, one warning and seven skips. Its three root causes have scoped fixes;
 those follow-ups do not establish a passing aggregate. The v5 CI image
 `sha256:76ae97dc04286e70bbbf28eab8755fdf51438b584c07d8b1d92719e6e5b3ae09`
-is running the full suite. Current tooling static analysis passes across 384 files,
-and formatting passes across 385 files. Five-lens simplification of the latest
+was running the full suite at this checkpoint. Tooling static analysis passes
+across 384 files, and formatting passes across 385 files. Five-lens simplification of the latest
 diff applied two comment changes; reuse, quality, efficiency and test review
 required no changes.
 
@@ -408,7 +408,7 @@ readiness; measurement thresholds and samples are unchanged. The worker-fixture
 subset passes 20 tests and 31 assertions. These focused results do not establish
 live pressure qualification.
 
-The full v8 CI suite is running against image
+The full v8 CI suite ran against image
 `sha256:87ccc6f4031ba50beb3262845c8cca4c7be2da5d03f4df823eb014f75b3d4bee`;
 its source proof is retained under
 `var/test-runs/ci-checkpoint-overlay-1793315529-1565964/source-proof.json`.
@@ -430,20 +430,21 @@ of the exact contained worker pair, exhaustion and continuous drain evidence.
 Implementation and independent focused review are complete. Verification passes
 130 tests and 204 assertions, followed by 27 tests and 33 assertions; source policy
 passes 32 tests and 100 assertions, with scoped static analysis and style clean.
-The live retry remains pending.
+Live retry was pending at this checkpoint.
 
 CI v8 gates pass static analysis across 388 files and formatting across 389.
 Deptrac reports 4,262 allowed and 360 external uncovered dependencies, with zero
 violations, errors or warnings; source policy passes. Registry subjects pass two
 tests and two assertions. Docker-context checks exclude 35 artifacts and preserve
-29 markers; all four Xdebug scenarios pass. The 1,022-test full v8 suite remains
-active; later live results are recorded below.
+29 markers; all four Xdebug scenarios pass. The full v8 suite finished with
+1,022 tests, 5,052 assertions, one failure and seven skips. Its only failure was a
+network fake, now corrected; this is failed aggregate evidence.
 
 Capacity CPU passes with 160 acknowledgements (maximum 0.369 seconds) and 1,451
 heartbeats (maximum gap 0.0227 seconds). Memory qualification failed on sampler
 exit 137 before the typed-proof repair; cleanup was verified, but live repair
-acceptance is pending. PID, media and container browser qualification remain
-pending. These results do not establish full pressure acceptance.
+acceptance was pending. PID, media and container browser qualification were also
+pending at this checkpoint. These results do not establish full pressure acceptance.
 
 Observer and review-fix follow-up, 2026-10-30: CI v11 passes 13 observer tests
 and 351 assertions, static analysis across 390 files and formatting across 391.
@@ -451,14 +452,195 @@ Deptrac reports 4,332 allowed and 361 external uncovered dependencies, with zero
 violations, warnings or errors. Autoscaling profile one passed its 369-second
 callback and cleanup. Profile two failed on a transient admission read-lock timeout
 of 50 milliseconds. The fixture now retries within the existing 250-millisecond
-bound; independent focused review is complete, and live retry remains pending.
+bound; independent focused review is complete. Live retry was pending at this
+checkpoint.
 Production behavior and measured thresholds are unchanged.
 
 Capacity v10 CPU passes again, but its memory pressure probe exits 137 after
 `oomTargetDied`; cleanup succeeds. Extending contained-probe completion with owned
-failure identity and terminal proof is in progress. Media v11 is running; PID and
-container browser checks remain pending. U11 stays open for final full CI evidence,
-remaining live qualification and verification of the contained-probe extension.
+failure identity and terminal proof was added in the follow-up below. These
+results do not establish passing memory or PID qualification.
+
+Final integration follow-up, 2026-10-30: contained-probe completion now checks
+exit status before sampler evidence. Exit 137 is accepted only with strict proof
+of the terminal event, native process identity, exhaustion and heartbeat/drain
+continuity for the exact worker pair. Unexpected statuses remain failures, and
+only the main qualification path publishes the final result. Focused review of
+these deltas has no outstanding findings after the test correction; final CI and
+live acceptance were still pending at this checkpoint.
+
+The autoscaling fixture retries only the exact admission lock-deadline error
+within its existing 250-millisecond observation budget. Callback identity and
+acknowledged pause/resume warmup remain as recorded above. The DASH native observer
+now matches the actual `manifest.mpd`; the network fake models temporary aliases
+and independent images, and production validation checks `start-worker.sh` against
+`APP_HOME` and the saved layout. The earlier review-fix CI group passes 116 tests
+and 1,031 assertions. CI v11 checks 390 static-analysis files and 391 formatting
+files, with 4,332 allowed and 361 external uncovered dependencies and zero Deptrac
+violations, errors or warnings. Later acceptance evidence follows.
+
+Persisted-drain and observer checkpoint, 2026-10-30: memory v14 failed when
+the last 50-millisecond sample preceded control drain and exit by 10 milliseconds;
+cleanup was verified. The verifier now captures the actual persisted `control.json`
+from the exact stopped container. It checks the saved IPC volume and source, boot,
+epoch, namespace, not-ready/draining flags and time within the existing two-second
+continuity bound. No samples are fabricated and thresholds are unchanged. The
+stopped-volume copy proof passed with cleanup; independent focused review found
+no outstanding issue. Final memory and PID qualification were pending at this
+checkpoint.
+
+Media v15 exposed an observer-only `APP_HOME` assumption: the native execution
+daemon intentionally supplies only `PATH`, `LANG` and `LC_ALL`. The observer now
+resolves the root from its file location. An alternate-root/minimal-environment
+regression failed before the fix and passes afterward; focused review found no
+outstanding issue. CI v16 passes 180 worker-drill/fixture tests and 302 assertions,
+plus 12 media-observer tests and 22 assertions. Static analysis passes 390 files,
+formatting passes 391, and source policy passes. Deptrac reports 4,367 allowed and
+365 external uncovered dependencies, with zero violations, errors or warnings.
+The v16 source proof is retained under
+`var/test-runs/ci-checkpoint-overlay-1793319476-1880270/source-proof.json` for image
+`sha256:314c6da932a397d5f8ed329ab17881248f9b2688f58212d0a7a80b63ea405941`.
+
+Container browser v13 passed with hostile ambient Docker settings and verified
+cleanup; its run is `baander-worker-operator-1793318503-1777841`. The earlier full
+v13 attempt was invalidated by temporary-helper mode loss and Composer's default
+300-second timeout, rather than an application failure. The helper now preserves
+modes, and Composer has an explicit 6,900-second budget inside the 7,000-second
+wrapper. Full CI v15 passes 1,092 tests and 5,335 assertions in 38:24.368, with
+seven known skips: six development-worker cases qualified separately by the live
+six-test/78-assertion run, and one unavailable optional clang-tidy 19 check. The
+aggregate predates the persisted-frame and later fixture/observer changes; their
+focused CI evidence follows.
+
+Capacity and final-source checkpoint, 2026-10-30: CPU v14 passed 162
+acknowledgements with a 0.400-second maximum and heartbeat gaps no greater than
+0.0218 seconds, with cleanup verified. Final memory and PID v17 passed under
+`contained-capacity-final-1793320101-1912574`, both with verified cleanup. Memory
+drained in six seconds with 125 heartbeats and a 0.00997-second maximum gap; PID
+drained in one second with 34 heartbeats and a 0.00958-second maximum gap.
+
+Autoscaling v15 profile one passed with cleanup. Profile two failed initial
+readiness without retaining its exact cause. The confirmed readiness defect was
+an any-consumer check where all expected Redis consumers were required. The
+three-file repair adds a bounded barrier and safe result diagnostics while
+preserving the original failure. Its actual-child regression fails before the fix
+and passes afterward: four tests and 16 assertions; focused review has no
+outstanding findings. CI v19 passes 18 readiness tests and 190 assertions, and the
+v17 pipe follow-up passes 15 tests and 18 assertions. Profiles two and four plus
+the comparison were launched under `autoscaling-final-1793320743-1962832`, using
+the verified profile-one baseline with recorded hash provenance.
+
+Media v18 passed the observer checks but exceeded the 30-second paused-seek
+acknowledgement watchdog at 30.39 seconds; cleanup was verified. The domain waits
+for cursor readiness and 21 seconds of lookahead. Bounded private publication
+diagnostics now retain at most four generations with capped metadata and no media
+bytes; tests and focused review pass. Behavior and thresholds are unchanged. Media
+will run alone after autoscaling. Final-source CI v20 passes 13 media-observer
+tests and 37 assertions, static analysis across 390 files and formatting across
+391. Source policy passes; Deptrac reports 4,368 allowed and 366 external uncovered
+dependencies, with zero violations, errors or warnings. The image is
+`sha256:e44bb9893b30052599d618d47f0b7fd4b0bf960578ef0e149d146138df8d4358`,
+with source proof under
+`var/test-runs/ci-checkpoint-overlay-1793321003-1976225/source-proof.json`.
+These scoped results supplement the passing v15 aggregate. U11 remains open for
+the autoscaling comparison and isolated media qualification.
+
+Worker budget and loader checkpoint, 2026-10-30: autoscaling profile four
+reported passing measurements after 564 seconds and verified cleanup at 606
+seconds, but its 600-second parent correctly timed out. The profile remains failed
+and the comparison did not run. The shared worker-capacity default is now 900
+seconds to cover setup and completion overhead; autoscaling's 2,000-second aggregate,
+callback deadlines, 470-second evidence wait, performance thresholds and
+120-second cleanup budget are unchanged. Configuration checks pass 27 tests and
+82 assertions. Profile four will rerun with the new production image and settings,
+using preserved profile-one/two baselines with recorded hash proof.
+
+Production builds now install the standalone scripts Composer loader without
+development dependencies; the application loader still excludes development
+packages and PHPUnit. Worker and HTTP fixtures use the matching loader, and
+host-source archives retain it. Host verification passes 52 tests and 275 assertions
+with two posix-related skips; CI verification of the actual build was pending at
+this checkpoint.
+
+Isolated media v20 failed its total watchdog after valid publication: the worker
+acknowledged paused state in 28.965 seconds, while decode and verification took
+35.5 seconds overall. Private diagnostics retained 19 KiB. This result establishes
+neither corrupt publication nor a definitive application defect. The measurement
+cause and correction are recorded below; final live media acceptance remains open.
+
+Media readiness measurement checkpoint, 2026-10-30: investigation confirmed
+a tooling clock error. The old seek timer included ffprobe, six signature-tampering
+checks, decoding and subtitle certification after media was available; it even
+fetched audio after certifying video. `TrackDelivery` now fetches paired bytes first
+and records monotonic availability before certification. The same 30-second seek
+readiness limit applies to that availability time. Every certification remains
+mandatory: slow fragments, corrupt media and accepted tampering still fail.
+Real HTTP/FFmpeg regression evidence reproduced 1.414 seconds of verification
+contamination and the wrong fetch order. CI v23 passes four tests and 24 assertions.
+The earlier application-scope question does not apply to this fixture correction.
+
+Production profile four v21 failed before pressure because `WorkloadCodec` could
+not load its fixture workload classes; cleanup was verified. Autoscaling now rejects
+immutable-image mode before provisioning because its scenario requires injected
+fixture services. The disposable image generates development classmaps without
+installing dependencies; root production dependencies still exclude PHPUnit, and
+host-source archives carry the matching classmap sources. CI v22 passes 79 tests
+and 381 assertions without skips, including the host posix cases. CI v23 passes
+18 fixture/configuration tests and 65 assertions. Static analysis passes 390 files,
+formatting passes 391, and source policy passes; Deptrac reports 4,387 allowed and
+366 external uncovered dependencies, with zero violations, errors or warnings.
+
+The final-source worker image is built. Production loader and sampler smoke checks
+passed on the preceding image; subsequent worker changes affect fixture measurement
+source. Profile four was launched from production-sourced disposable fixtures under
+`autoscaling-production-final-1793323460-2059006`, using verified profile-one/two
+baseline hashes. Its final acceptance result follows.
+
+Autoscaling acceptance checkpoint, 2026-10-30: profile four and the final
+comparison pass under `var/test-runs/autoscaling-production-final-1793323460-2059006`,
+with cleanup verified. Profile four used a production-sourced disposable fixture;
+profile-one/two baselines were copied with source-hash receipts. The two measured
+speedups are 1.712244 and 1.732753 at maximum two, and 2.464552 and 2.388083 at
+maximum four. Profile four's maximum heartbeat gap is 0.011047 seconds and maximum
+media acknowledgement is 0.208403 seconds. The parent completed with exit zero
+within its 900-second bound; no timed-out result was reclassified.
+
+Current acceptance: full CI, completed focused gates and autoscaling comparison
+pass. Isolated media v23 failed with original status one at the combined
+paused-seek readiness-or-intent assertion; cleanup exited zero with removal
+verified. Evidence is retained under `var/test-runs/media-control-1793324122-2083047`.
+Diagnostic v24 confirmed paused state and position were retained: acknowledgement
+took 29.299 seconds, while paired bytes arrived after 31.504826 seconds, beyond
+the 30-second limit. Cleanup passed. The client made eight serial HTTP requests;
+it now fetches two playlists concurrently, then four resources concurrently, with
+bounded waits. The 30-second limit and every certification remain unchanged.
+Real HTTP regression evidence reproduced 1.403 seconds for two serial 0.7-second
+responses; nine tests and 61 assertions now pass, including timeout, transport,
+status, stream, slow-fragment, corruption and tampering cases. Focused review and
+five simplification lenses found no outstanding issue. CI v25 passes nine tests
+and 61 assertions, static analysis across 390 files and formatting across 391.
+Source policy passes; Deptrac reports 4,387 allowed and 366 external uncovered
+dependencies, with zero violations, errors or warnings. All 48 source-proof files
+match its CI image. These focused results supplement the passing full v15 suite.
+
+Live media v25 fails the 30-second worker-paused acknowledgement before byte
+retrieval, under `var/test-runs/media-control-1793325242-2126320`. Desired revision
+five remained ahead of observed revision four. The record still carried outcome
+ready, while generation three had desired state paused and no current output.
+Cleanup was verified with exit zero. The
+concurrent retrieval fix is verified, but live application pause/seek acceptance
+still fails. Application readiness requires the 18-second cursor plus 21 seconds
+of lookahead, requiring seven six-second segments to cover second 39. The readiness SIGSTOP
+arrived 30.582 seconds after replacement start, beyond the unchanged 30-second
+watchdog. A scope decision on extending application work remains pending.
+
+The final worker image is
+`sha256:b3d2616a66ae9c3e3e0747376ccba61e92d6a3bcf373ea02a58dee03e7861dd9`;
+its inventory completed with exit zero under
+`var/tooling-audit/2026-10-29/integration/worker-final-v25-inventory`.
+Integrity verification passes for 77,048 files. Redistribution review remains not
+qualified with 5,464 gaps, a separate release classification. U11 remains open
+only for live media acceptance.
 
 Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
 package metadata/resource files. Independent source verification confirmed all

@@ -18,12 +18,12 @@ final class WorkerOperatorConfigurationTest extends TestCase
     public static function operatorBudgets(): iterable
     {
         yield 'standalone' => [[], 240.0];
-        yield 'paired deployment' => [['BAANDER_TEST_TWO_COMMAND' => '1'], 600.0];
+        yield 'paired deployment' => [['BAANDER_TEST_TWO_COMMAND' => '1'], 900.0];
         yield 'Redis lifecycle' => [['BAANDER_TEST_WORKER_LIFECYCLE_PHASE' => 'redis'], 1300.0];
         yield 'PostgreSQL lifecycle' => [['BAANDER_TEST_WORKER_LIFECYCLE_PHASE' => 'postgres'], 1300.0];
-        yield 'capacity checkpoint' => [['BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT' => '/fixture/capacity'], 600.0];
-        yield 'autoscaling checkpoint' => [['BAANDER_TEST_AUTOSCALING_CHECKPOINT' => '/fixture/autoscaling'], 600.0];
-        yield 'media observation' => [['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1'], 600.0];
+        yield 'capacity checkpoint' => [['BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT' => '/fixture/capacity'], 900.0];
+        yield 'autoscaling checkpoint' => [['BAANDER_TEST_AUTOSCALING_CHECKPOINT' => '/fixture/autoscaling'], 900.0];
+        yield 'media observation' => [['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1'], 900.0];
     }
 
     /** @param array<string,string> $environment */
@@ -56,7 +56,7 @@ final class WorkerOperatorConfigurationTest extends TestCase
     public function testAutoscalingAggregateHasASeparateBudgetFromEachProfile(): void
     {
         $configuration = ToolingConfiguration::resolve();
-        self::assertSame(600.0, $configuration->budgets->seconds('workerCapacity'));
+        self::assertSame(900.0, $configuration->budgets->seconds('workerCapacity'));
         self::assertSame(2000.0, $configuration->budgets->seconds('workerAutoscaling'));
     }
 
@@ -65,6 +65,18 @@ final class WorkerOperatorConfigurationTest extends TestCase
         $configuration = new OperatorConfiguration(['BAANDER_TEST_MEDIA_CONTROL_OBSERVATION' => '1']);
         self::assertTrue($configuration->mediaObservation);
         self::assertFalse($configuration->useImage);
+    }
+
+    public function testAutoscalingRejectsAnUnmodifiedProductionImage(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Autoscaling qualification requires a disposable fixture image');
+        new OperatorConfiguration([
+            'BAANDER_TEST_USE_IMAGE' => '1',
+            'BAANDER_TEST_OPERATOR_IN_CONTAINER' => '1',
+            'BAANDER_TEST_CHECKOUT_IN_IMAGE' => '1',
+            'BAANDER_TEST_AUTOSCALING_CHECKPOINT' => '/fixture/autoscaling',
+        ]);
     }
 
     public function testEmptyCheckpointDoesNotHideTheSelectedAutoscalingCheckpoint(): void

@@ -13,6 +13,39 @@ use RuntimeException;
 
 final class WorkerDrillTest extends TestCase
 {
+    /** @return iterable<string,array{list<array{name:string}>|false,list<string>}> */
+    public static function registeredConsumerSets(): iterable
+    {
+        yield 'partial pool' => [[['name' => 'consumer-0']], ['consumer-1']];
+        yield 'unrelated pool' => [[['name' => 'foreign']], ['consumer-0', 'consumer-1']];
+        yield 'all expected and unrelated' => [[['name' => 'consumer-1'], ['name' => 'foreign'], ['name' => 'consumer-0']], []];
+        yield 'unavailable registry' => [false, ['consumer-0', 'consumer-1']];
+    }
+
+    /** @param list<array{name:string}>|false $consumers
+     * @param list<string> $missing
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('registeredConsumerSets')]
+    public function testFixtureReadinessRequiresEveryConfiguredConsumer(array|false $consumers, array $missing): void
+    {
+        $runtime = new Runtime(dirname(__DIR__, 3), 5);
+        try {
+            $result = $runtime->run(
+                [PHP_BINARY, 'tests/Fixtures/Worker/worker-command-check.php', 'consumer-readiness',
+                    json_encode(['consumer-0', 'consumer-1'], JSON_THROW_ON_ERROR), json_encode($consumers, JSON_THROW_ON_ERROR)],
+                env: array_replace($runtime->environment, ['APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'DATABASE_URL' => 'unavailable']),
+                check: false,
+            );
+            self::assertSame($missing === [] ? 0 : 1, $result->exitCode, $result->stderr);
+            $evidence = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame($missing, $evidence['missing']);
+            self::assertSame(['consumer-0', 'consumer-1'], $evidence['expected']);
+            self::assertSame($consumers === false ? [] : array_column($consumers, 'name'), $evidence['observed']);
+        } finally {
+            $runtime->close();
+        }
+    }
+
     /** @return iterable<string,array{string,bool}> */
     public static function finalProducerOutcomes(): iterable
     {
@@ -128,19 +161,25 @@ final class WorkerDrillTest extends TestCase
     {
         $config = [
             'User' => 'www-data',
-            'Entrypoint' => ['/usr/local/bin/php', '/qualified/application/bin/console', 'app:worker', '--no-interaction'],
+            'Entrypoint' => ['/usr/local/bin/start-worker.sh'],
+            'WorkingDir' => '/qualified/application',
             'Cmd' => null,
             'Healthcheck' => ['Test' => ['NONE']],
-            'Env' => ['APP_ENV=prod', 'APP_DEBUG=0'],
+            'Env' => ['APP_HOME=/qualified/application', 'APP_ENV=prod', 'APP_DEBUG=0'],
             'Volumes' => null,
         ];
         Production::validateConfiguration($config, '/qualified/application');
         foreach ([
             ['User' => 'root'],
             ['Entrypoint' => ['app:serve']],
+            ['Entrypoint' => ['/usr/local/bin/php', '/qualified/application/bin/console', 'app:worker', '--no-interaction']],
+            ['WorkingDir' => '/obsolete/application'],
+            ['Env' => ['APP_ENV=prod', 'APP_DEBUG=0']],
+            ['Env' => ['APP_HOME=/obsolete/application', 'APP_ENV=prod', 'APP_DEBUG=0']],
             ['Cmd' => ['web']],
             ['Healthcheck' => ['Test' => ['CMD', 'curl']]],
-            ['Env' => ['APP_ENV=test']],
+            ['Env' => ['APP_HOME=/qualified/application', 'APP_ENV=test', 'APP_DEBUG=0']],
+            ['Env' => ['APP_HOME=/qualified/application', 'APP_ENV=prod', 'APP_DEBUG=1']],
             ['Volumes' => ['/source' => []]],
         ] as $change) {
             try {

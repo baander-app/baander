@@ -87,9 +87,7 @@ final readonly class OperatorScenario
         $this->qualification->publishManifest();
         $this->qualification->operator('start', 0);
         $this->qualification->operator('start', 3);
-        $this->qualification->awaitCheck('ready');
-        $this->qualification->awaitCheck('ready', $s->workerName);
-        $this->qualification->operator('readiness', 0);
+        $this->confirmReadiness();
         $this->qualification->expect($this->qualification->result('readiness')['readiness'] === 'ready', 'Worker did not become ready');
         if ($this->qualification->configuration->developmentSource) {
             $this->qualification->expect(
@@ -145,9 +143,53 @@ final readonly class OperatorScenario
         }
     }
 
+    private function confirmReadiness(): void
+    {
+        try {
+            $this->qualification->awaitCheck('ready');
+            $this->qualification->awaitCheck('ready', $this->qualification->state->workerName);
+            $this->qualification->operator('readiness', 0);
+        } catch (\Throwable $failure) {
+            foreach (['control' => $this->qualification->state->controlName, 'execution' => $this->qualification->state->workerName] as $unit => $container) {
+                try {
+                    $this->qualification->commands->docker(
+                        [
+                            'exec', $container, 'php', '-d', 'memory_limit=64M', 'tests/Fixtures/Worker/worker-command-check.php',
+                            'readiness-observation', $this->qualification->state->namespace, $this->qualification->state->boot,
+                        ],
+                        check: false,
+                        stdout: $this->qualification->artifact('readiness-observation-' . $unit . '.json'),
+                        stderr: $this->qualification->work('readiness-observation-' . $unit . '.stderr'),
+                        timeout: 5,
+                    );
+                } catch (\Throwable) {
+                    fwrite(STDERR, 'Readiness diagnostic capture failed for ' . $unit . ".\n");
+                }
+            }
+            throw $failure;
+        }
+    }
+
     private function capacityCheckpoint(): string
     {
         return $this->qualification->configuration->checkpoint === null ? '' : $this->qualification->configuration->checkpoint->path;
+    }
+
+    private function runCapacityCheckpoint(string $checkpoint): void
+    {
+        $s = $this->qualification->state;
+        $this->qualification->commands->run(
+            [
+                $checkpoint,
+                $s->artifacts,
+                $s->controlName,
+                $s->workerName,
+                $s->webName,
+                $s->runId . '-postgres',
+                'worker_operator_test',
+            ],
+            terminationGrace: 40,
+        );
     }
 
     public function assertRetired(bool $claimed = false): void
@@ -327,18 +369,7 @@ final readonly class OperatorScenario
         }
         $checkpoint = $this->capacityCheckpoint();
         if ($checkpoint !== '') {
-            $this->qualification->commands->run(
-                [
-                    $checkpoint,
-                    $s->artifacts,
-                    $s->controlName,
-                    $s->workerName,
-                    $s->ipcVolume,
-                    $s->runId . '-postgres',
-                    'worker_operator_test',
-                ],
-                terminationGrace: 40,
-            );
+            $this->runCapacityCheckpoint($checkpoint);
             $this->qualification->operator('recover', 0);
             $this->qualification->operator('recover', 0);
             $this->qualification->operator('status', 0);

@@ -14,6 +14,17 @@ final class ApplicationBuildContractTest extends TestCase
 {
     private string $source;
 
+    public function testProductionInstallsStandaloneToolingWithoutApplicationDevelopmentDependencies(): void
+    {
+        $dockerfile = file_get_contents(dirname(__DIR__, 3) . '/Dockerfile');
+        $production = $dockerfile
+            |> (static fn(string $source): string => explode('FROM runtime AS production', $source, 2)[1])
+            |> (static fn(string $source): string => explode('FROM production AS worker', $source, 2)[0]);
+        self::assertStringContainsString('composer install --no-dev --optimize-autoloader', $production);
+        self::assertStringContainsString('composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts --no-plugins', $production);
+        self::assertStringNotContainsString('composer tooling:autoload', $production);
+    }
+
     protected function setUp(): void
     {
         $this->source = sys_get_temp_dir() . '/baander.app-build-contract-' . bin2hex(random_bytes(8));

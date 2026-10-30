@@ -124,7 +124,22 @@ final class MediaControl
             );
             $checkpoint->pressureReady($pressure);
             $docker->run(['exec', $checkpoint->web, 'touch', 'storage/two-command/capacity-pressure-start']);
-            $runtime->wait($client);
+            try {
+                $runtime->wait($client);
+            } catch (\Throwable $error) {
+                try {
+                    $runtime->cleaning = true;
+                    $runtime->docker()->run(
+                        ['exec', $checkpoint->execution, 'php', 'tests/Fixtures/Worker/MediaControlObservation.php', 'diagnose'],
+                        timeout: 5,
+                        logPath: $checkpoint->artifacts . '/failed-client-publication.json',
+                        stderrLogPath: $checkpoint->artifacts . '/failed-client-publication.stderr',
+                    );
+                } catch (\Throwable $diagnosticError) {
+                    fwrite(STDERR, 'Media publication diagnostic failed: ' . $diagnosticError->getMessage() . "\n");
+                }
+                throw $error;
+            }
             $runtime->wait($pressure);
             $checkpoint->measurements->finish();
             $checkpoint->copy(

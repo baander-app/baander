@@ -70,7 +70,7 @@
         "fixture": 600,
         "workerLifecycle": 1300,
         "workerOperator": 240,
-        "workerCapacity": 600,
+        "workerCapacity": 900,
         "workerAutoscaling": 2000,
         "webShutdown": 900,
         "webRuntime": 180,
