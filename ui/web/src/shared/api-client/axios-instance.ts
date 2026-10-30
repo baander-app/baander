@@ -1,10 +1,11 @@
-import Axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
+import Axios, { AxiosError, type AxiosAdapter, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/features/auth/stores/auth-store';
 import { getDpopKeyPair, getDpopNonce, setDpopNonce } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
 import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS, outageWaitMs } from '@/shared/auth/refresh-budget';
 import { retryAfterSeconds } from '@/features/auth/lib/retry-after';
 import { coordinateRefresh } from '@/features/auth/services/auth-coordination';
+import { currentLiveReadSignal, getLiveReadContext, liveHttpAdmission } from '@/shared/live/http-admission';
 import { assertCurrentOwnership, captureOwnership, isCurrentOwnership, ownershipForSignal, waitForOwnershipAuthority, type OwnershipStamp } from '@/shared/live/ownership';
 
 const getAuthStore = () => useAuthStore.getState();
@@ -90,6 +91,15 @@ function isAuthorityControlRequest(config: AxiosRequestConfig): boolean {
     || (method === 'POST' && (path === '/api/ws/tickets' || credentialControlPaths.has(path)));
 }
 
+const resourcePermits = new WeakMap<object, () => void>();
+const admittedAdapters = new WeakMap<AxiosAdapter, AxiosAdapter>();
+
+function releaseResourcePermit(config: object | undefined): void {
+  if (!config) return;
+  resourcePermits.get(config)?.();
+  resourcePermits.delete(config);
+}
+
 // --- Request interceptor: attach DPoP proof + sender-constrained token ---
 AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const customConfig = config as CustomAxiosRequestConfig;
@@ -103,35 +113,66 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
     await waitForOwnershipAuthority(signal);
     assertCurrentOwnership(customConfig._ownership);
   }
-  const {accessToken} = getAuthStore();
-  const keyPair = getDpopKeyPair();
-  const session = getAuthSession(keyPair);
-  if (customConfig._authSession !== undefined && customConfig._authSession !== session) {
-    throw new Axios.CanceledError('Authentication changed before request retry');
-  }
-  customConfig._authSession = session;
-  customConfig._authToken = accessToken;
-
-  if (keyPair) {
-    // Attach DPoP proof whenever a key pair exists (including login).
-    // Only attach the Authorization header when _skipAuth is false.
-    if (!customConfig._skipAuth && accessToken) {
-      config.headers.Authorization = `DPoP ${accessToken}`;
-    }
-
-    const htu = buildHtu(AXIOS_INSTANCE.getUri(config));
-    const proof = await createDpopProof(keyPair, config.method ?? 'GET', htu, {
-      accessToken: !customConfig._skipAuth ? (accessToken ?? undefined) : undefined,
-      nonce: getDpopNonce() ?? undefined,
-    });
-    if (getAuthStore().accessToken !== accessToken || getDpopKeyPair() !== keyPair) {
-      throw new Axios.CanceledError('Authentication changed while signing');
+  const read = getLiveReadContext(signal);
+  try {
+    if (read && !isAuthorityControlRequest(config)) {
+      const release = await liveHttpAdmission.acquire(signal, read.priority);
+      resourcePermits.set(config, release);
+      const configuredAdapter = Axios.getAdapter(config.adapter ?? AXIOS_INSTANCE.defaults.adapter);
+      const adapter = admittedAdapters.get(configuredAdapter) ?? configuredAdapter;
+      const admittedAdapter: AxiosAdapter = async request => {
+        try {
+          return await adapter(request);
+        } finally {
+          releaseResourcePermit(request);
+        }
+      };
+      admittedAdapters.set(admittedAdapter, adapter);
+      config.adapter = admittedAdapter;
     }
     assertCurrentOwnership(customConfig._ownership);
-    config.headers.DPoP = proof;
-  }
+    if (signal?.aborted) throw new Axios.CanceledError('Resource request aborted');
+    const {accessToken} = getAuthStore();
+    const keyPair = getDpopKeyPair();
+    const session = getAuthSession(keyPair);
+    if (customConfig._authSession !== undefined && customConfig._authSession !== session) {
+      throw new Axios.CanceledError('Authentication changed before request retry');
+    }
+    customConfig._authSession = session;
+    customConfig._authToken = accessToken;
 
-  return config;
+    if (keyPair) {
+      if (!customConfig._skipAuth && accessToken) {
+        config.headers.Authorization = `DPoP ${accessToken}`;
+      }
+
+      const htu = buildHtu(AXIOS_INSTANCE.getUri(config));
+      const proof = await createDpopProof(keyPair, config.method ?? 'GET', htu, {
+        accessToken: !customConfig._skipAuth ? (accessToken ?? undefined) : undefined,
+        nonce: getDpopNonce() ?? undefined,
+      });
+      if (getAuthStore().accessToken !== accessToken || getDpopKeyPair() !== keyPair) {
+        throw new Axios.CanceledError('Authentication changed while signing');
+      }
+      assertCurrentOwnership(customConfig._ownership);
+      config.headers.DPoP = proof;
+    }
+
+    if (signal?.aborted) throw new Axios.CanceledError('Resource request aborted');
+    return config;
+  } catch (error) {
+    releaseResourcePermit(config);
+    throw error;
+  }
+});
+
+// Release before auth handling: a nonce/refresh retry must obtain its own permit.
+AXIOS_INSTANCE.interceptors.response.use(response => {
+  releaseResourcePermit(response.config);
+  return response;
+}, (error: unknown) => {
+  if (Axios.isAxiosError(error)) releaseResourcePermit(error.config);
+  return Promise.reject(error);
 });
 
 // --- Response interceptor: extract DPoP-Nonce from responses ---
@@ -359,7 +400,7 @@ export function customInstance(url: string, options: RequestInit): Promise<unkno
     method: rest.method as AxiosRequestConfig['method'],
     data: body as AxiosRequestConfig['data'],
     headers: headers as AxiosRequestConfig['headers'],
-    signal: signal as AxiosRequestConfig['signal'],
+    signal: (currentLiveReadSignal() ?? signal) as AxiosRequestConfig['signal'],
   }).then((response) => response.status === 204 ? undefined : response.data);
 }
 

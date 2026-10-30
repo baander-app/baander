@@ -59,6 +59,12 @@ export class SharedLiveTransport {
     return this.socket !== null && this.socket.readyState === WebSocket.OPEN
   }
 
+  reconnect(): void {
+    if (!this.references) return
+    this.stop()
+    this.attempt = this.connect()
+  }
+
   private async connect(): Promise<void> {
     const generation = ++this.generation
     const request = new AbortController()

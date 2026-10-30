@@ -62,8 +62,14 @@ export class LiveRecovery {
   private sequence = 0
   private started = false
   private principal: string | null = null
+  private deadline: ReturnType<typeof setTimeout> | null = null
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private fallback: ReturnType<typeof setTimeout> | null = null
+  private retryDelay = 1000
+  private deliveryAvailable = false
   private expectedFingerprint: string | null = null
 
+  private readonly subscriptionsEnabled: boolean
   private readonly transport: SharedLiveTransport
   private readonly purgeMirrors: () => void
   private readonly loadAuthority: (signal: AbortSignal) => Promise<LiveAuthority>
@@ -72,7 +78,10 @@ export class LiveRecovery {
     transport: SharedLiveTransport,
     purgeMirrors: () => void,
     loadAuthority: (signal: AbortSignal) => Promise<LiveAuthority> = signal => getLiveRecovery({ signal }),
+    subscriptionsEnabled = false,
   ) {
+    this.subscriptionsEnabled = subscriptionsEnabled
+    this.deliveryAvailable = !subscriptionsEnabled
     this.transport = transport
     this.purgeMirrors = purgeMirrors
     this.loadAuthority = loadAuthority
@@ -99,16 +108,21 @@ export class LiveRecovery {
         if (!this.ownsPrincipal()) return
         this.subscriptionId = null
         this.authorizationGeneration = null
-        this.recover()
+        this.opened()
       },
       onMessage: message => this.receive(message),
       onClose: () => this.disconnected(),
       onError: () => this.disconnected(),
     })
     const release = this.transport.retain()
-    if (this.transport.isConnected()) this.recover()
+    if (this.transport.isConnected()) this.opened()
+    this.scheduleFallback()
     return () => {
       this.started = false
+      this.clearDeadline()
+      this.clearRetry()
+      if (this.fallback) clearTimeout(this.fallback)
+      this.fallback = null
       this.sequence++
       this.request?.abort()
       this.request = null
@@ -117,10 +131,64 @@ export class LiveRecovery {
     }
   }
 
+  resourceReadFailed(): void {
+    this.update({ status: 'degraded' })
+  }
+
+  private opened(): void {
+    if (!this.subscriptionsEnabled) {
+      this.recover()
+      return
+    }
+    this.request?.abort()
+    this.request = null
+    this.sequence++
+    setAuthorityPending(true)
+    this.update({ authorityReady: false, status: 'connecting' })
+    this.transport.send({ type: 'live.subscribe', version: 1 })
+    this.armDeadline(10_000)
+  }
+
+  private clearDeadline(): void {
+    if (this.deadline) clearTimeout(this.deadline)
+    this.deadline = null
+  }
+
+  private clearRetry(): void {
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.retryTimer = null
+  }
+
+  private armDeadline(delay: number): void {
+    this.clearDeadline()
+    this.deadline = setTimeout(() => {
+      this.deadline = null
+      this.deliveryAvailable = false
+      this.recover('degraded')
+      if (this.subscriptionId === null) this.transport.reconnect?.()
+    }, delay)
+  }
+
+  private scheduleFallback(): void {
+    if (this.fallback) clearTimeout(this.fallback)
+    this.fallback = setTimeout(() => {
+      this.fallback = null
+      if (!this.started) return
+      if ((typeof document === 'undefined' || document.visibilityState !== 'hidden')
+        && (this.snapshot.status === 'degraded' || !this.snapshot.authorityReady || !this.deliveryAvailable)) {
+        if (this.subscriptionsEnabled && !this.deliveryAvailable && this.transport.isConnected()) {
+          this.transport.send({ type: 'live.subscribe', version: 1 })
+        }
+        this.recover('degraded')
+      }
+      this.scheduleFallback()
+    }, 30_000)
+  }
+
   /** Called after the baseline's required active resource reads complete. */
   completeRecovery(stamp = captureOwnership()): void {
     if (isCurrentOwnership(stamp) && this.snapshot.authorityReady) {
-      this.update({ status: this.snapshot.health.state === 'degraded' ? 'degraded' : 'current' })
+      this.update({ status: this.snapshot.health.state === 'degraded' || !this.deliveryAvailable ? 'degraded' : 'current' })
     }
   }
 
@@ -129,19 +197,22 @@ export class LiveRecovery {
     const message = parseLiveMessage(value)
     if (!message) return
     if (message.type === 'live.ready') {
-      // A ready frame establishes this socket's sole subscription identity.
       if (this.subscriptionId !== null) return
+      this.deliveryAvailable = true
       this.subscriptionId = message.subscriptionId
       this.authorizationGeneration = message.authorizationGeneration
       this.expectedFingerprint = message.authorizationFingerprint
       this.request?.abort()
       this.sequence++
       this.acceptAuthority(message)
+      if (this.subscriptionsEnabled) this.armDeadline(15_000)
       return
     }
     if (message.subscriptionId !== this.subscriptionId || this.authorizationGeneration === null) return
     if (message.type === 'live.reset') {
       if (BigInt(message.authorizationGeneration) <= BigInt(this.authorizationGeneration)) return
+      this.deliveryAvailable = true
+      if (this.subscriptionsEnabled) this.armDeadline(15_000)
       this.authorizationGeneration = message.authorizationGeneration
       this.expectedFingerprint = message.authorizationFingerprint
       this.fence(message.families)
@@ -150,6 +221,8 @@ export class LiveRecovery {
     }
     if (message.authorizationGeneration !== this.authorizationGeneration) return
     if (message.authorizationFingerprint !== this.expectedFingerprint) return
+    this.deliveryAvailable = true
+    if (this.subscriptionsEnabled) this.armDeadline(15_000)
     this.update({ health: message.health })
     if (message.type === 'live.changed') {
       this.update({ status: 'recovering' })
@@ -161,6 +234,10 @@ export class LiveRecovery {
 
   private disconnected(): void {
     if (!this.ownsPrincipal()) return
+    if (this.request && this.subscriptionId === null
+      && !this.snapshot.authorityReady && this.snapshot.status === 'degraded') return
+    this.clearDeadline()
+    this.deliveryAvailable = !this.subscriptionsEnabled
     this.subscriptionId = null
     this.authorizationGeneration = null
     this.recover('degraded')
@@ -175,6 +252,7 @@ export class LiveRecovery {
   }
 
   private recover(status: 'recovering' | 'degraded' = 'recovering'): void {
+    this.clearRetry()
     setAuthorityPending(true)
     this.request?.abort()
     const request = new AbortController()
@@ -193,12 +271,20 @@ export class LiveRecovery {
         : undefined
       if (response?.status === 401 || response?.status === 403) this.fence(this.snapshot.families)
       this.update({ status: 'degraded' })
+      this.clearRetry()
+      const delay = Math.min(30_000, this.retryDelay + Math.random() * this.retryDelay)
+      this.retryDelay = Math.min(30_000, this.retryDelay * 2)
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = null
+        if (this.started) this.recover('degraded')
+      }, delay)
     }).finally(() => {
       if (this.request === request) this.request = null
     })
   }
 
   private acceptAuthority(authority: LiveAuthority | LiveMessage): void {
+    this.clearRetry()
     if (this.snapshot.authorizationFingerprint !== null
       && authority.authorizationFingerprint !== this.snapshot.authorizationFingerprint) {
       this.fence(this.snapshot.families)
@@ -209,12 +295,13 @@ export class LiveRecovery {
       authorizationFingerprint: authority.authorizationFingerprint,
       health: authority.health,
     }
+    this.retryDelay = 1000
     this.expectedFingerprint = authority.authorizationFingerprint
     setAuthorityPending(false)
     this.update({
       ...normalized,
       authorityReady: true,
-      status: authority.health.state === 'degraded' ? 'degraded' : 'recovering',
+      status: authority.health.state === 'degraded' || !this.deliveryAvailable ? 'degraded' : 'recovering',
     })
     this.emit({ type: 'baseline', authority: normalized })
   }
@@ -228,6 +315,7 @@ export class LiveRecovery {
   }
 
   private update(patch: Partial<LiveSnapshot>): void {
+    if (Object.entries(patch).every(([key, value]) => this.snapshot[key as keyof LiveSnapshot] === value)) return
     this.snapshot = { ...this.snapshot, ...patch }
     this.listeners.forEach(listener => listener())
   }

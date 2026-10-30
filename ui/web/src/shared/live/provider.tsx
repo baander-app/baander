@@ -7,7 +7,9 @@ import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useEqProfilesStore } from '@/features/equalizer/stores/eq-profiles-store'
 import { OwnedQueryClient } from './query-client'
 import { LiveRecovery } from './recovery'
-import { LiveContext, useLiveRecovery } from './context'
+import { LIVE_QUERY_DESCRIPTORS } from './descriptors'
+import { LiveQueryCoordinator } from './query-coordinator'
+import { LiveCoordinatorContext, LiveContext, useLiveCoordinator, useLiveRecovery } from './context'
 import { authenticatedTransport } from './transport'
 
 function resetMirrors(): void {
@@ -23,42 +25,67 @@ export function LiveConnectionStatus() {
 }
 
 function ConnectionStatus({ recovery }: { recovery: LiveRecovery }) {
+  const coordinator = useLiveCoordinator()
   const snapshot = useSyncExternalStore(recovery.subscribe, recovery.getSnapshot)
-  // Until resource freshness is activated, a healthy authority handshake is sufficient.
-  if (snapshot.authorityReady && snapshot.health.state === 'current') return null
+  if ((!coordinator && snapshot.authorityReady && snapshot.health.state === 'current') || snapshot.status === 'current') return null
   return (
     <span role="status">
       <StatusDot
         color={snapshot.status === 'degraded' ? 'amber' : 'gray'}
-        label={snapshot.status === 'connecting' ? 'Connecting…' : snapshot.status === 'degraded' ? 'Updates unavailable' : 'Reconnecting…'}
+        label={snapshot.status === 'connecting' ? 'Connecting…' : snapshot.status === 'degraded' ? 'Updates unavailable' : 'Updating…'}
       />
     </span>
   )
 }
 
-/** The key replaces observers as well as cache ownership when a principal session changes. */
-export function AuthenticatedClientProvider({ children }: { children: ReactNode }) {
-  const principal = useAuthStore(state => state.principalSessionId)
-  return <PrincipalClient key={principal ?? 'anonymous'} principal={principal}>{children}</PrincipalClient>
+interface ClientProviderProps {
+  children: ReactNode
+  freshnessEnabled?: boolean
 }
 
-function PrincipalClient({ principal, children }: { principal: string | null; children: ReactNode }) {
+interface PrincipalClientProps {
+  principal: string | null
+  children: ReactNode
+  freshnessEnabled: boolean
+}
+
+export function AuthenticatedClientProvider({ children, freshnessEnabled = false }: ClientProviderProps) {
+  const principal = useAuthStore(state => state.principalSessionId)
+  return (
+    <PrincipalClient key={principal ?? 'anonymous'} principal={principal} freshnessEnabled={freshnessEnabled}>
+      {children}
+    </PrincipalClient>
+  )
+}
+
+function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalClientProps) {
   const [client] = useState(() => new OwnedQueryClient())
-  const [recovery] = useState(() => new LiveRecovery(authenticatedTransport, resetMirrors))
+  const [recovery] = useState(() => new LiveRecovery(authenticatedTransport, resetMirrors, undefined, freshnessEnabled))
+  const [coordinator] = useState(() => {
+    const instance = new LiveQueryCoordinator(client, recovery, LIVE_QUERY_DESCRIPTORS)
+    if (freshnessEnabled) client.setCoordinator(instance)
+    return instance
+  })
   useEffect(() => {
     resetMirrors()
     const detach = client.attach()
+    const stopCoordinator = principal && freshnessEnabled ? coordinator.start() : () => undefined
     const stop = principal ? recovery.start() : () => undefined
     return () => {
       stop()
+      stopCoordinator()
       detach()
       client.dispose()
       resetMirrors()
     }
-  }, [client, principal, recovery])
+  }, [client, coordinator, freshnessEnabled, principal, recovery])
   return (
     <QueryClientProvider client={client}>
-      <LiveContext.Provider value={principal ? recovery : null}>{children}</LiveContext.Provider>
+      <LiveContext.Provider value={principal ? recovery : null}>
+        <LiveCoordinatorContext.Provider value={principal && freshnessEnabled ? coordinator : null}>
+          {children}
+        </LiveCoordinatorContext.Provider>
+      </LiveContext.Provider>
     </QueryClientProvider>
   )
 }

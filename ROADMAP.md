@@ -121,6 +121,30 @@ and the same eight pre-existing warnings; the final recovery changes pass scoped
 ESLint. Prose and whitespace checks pass. Query scheduling, feature adoption,
 general subscription activation, and browser/capacity qualification remain open.
 
+U5 delivered locally, 2026-10-30: a shared dirty-generation coordinator matches
+feature-owned query families, coalesces hints over 100 milliseconds and spaces
+family refresh passes by at least 500 milliseconds. Reads acknowledge only the
+generation captured when they start, so a later hint requires another read.
+Actual HTTP attempts share admission capped at four background requests in
+flight and twenty starts per second. Logical reads and HTTP work each have a
+256-item bound, with logical capacity reserved for foreground work. Shared
+sampling and a recovery watchdog retain retry work after failed reads or stalled
+recovery. General application freshness remains disabled pending U6–U8 adoption.
+
+U5 verification checkpoint: the stable full frontend suite passes 2,700 tests
+across 215 files. Both TypeScript projects pass; full ESLint reports zero errors
+and eight existing warnings. The focused group passes 141 tests across eleven
+files, and the additional capacity group passes all four tests. Its real
+QueryClient and Axios path converges 300 active variants with at most four
+background HTTP attempts in flight, twenty starts per second, bounded pending
+work and at most two timers. Four retained ten-page chains preserve their pages
+and cursors while admitting a later ordinary read before the chains finish.
+Three reviewed regressions fail before their fixes and pass afterward. Final
+receipts are `/tmp/live-u5-frontend-stable.log`,
+`/tmp/live-u5-typecheck-final.log` and `/tmp/live-u5-lint-final.log`.
+Prose audits and whitespace checks pass. U6–U9 remain open for feature adoption,
+subscription activation, browser acceptance and full-system capacity qualification.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

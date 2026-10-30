@@ -314,6 +314,30 @@ contain every discovered test file exactly once.
 
 ## Live updates
 
+### Principal session
+
+The browser's ownership lifetime for one login and account. It owns query caches
+and observers and remains unchanged when access tokens rotate. Logging out or
+switching accounts ends that ownership.
+
+### Authorization generation
+
+The browser's current access boundary within a principal session. Advancing it
+fences requests and callbacks from former access and clears protected data while
+preserving the mounted player.
+
+### Query family
+
+One category in the finite shared live-update protocol used to group related
+queries and guarded readers for invalidation and sampling. Feature-owned
+descriptors map query keys to these categories.
+
+### Dirty generation
+
+A browser-local freshness marker for a query or guarded reader. A successful read
+acknowledges the generation captured when that read started; a hint received
+later requires another read, even if the first read succeeds.
+
 ### Scope revision
 
 The live-update design's durable freshness marker for a query topic and audience.

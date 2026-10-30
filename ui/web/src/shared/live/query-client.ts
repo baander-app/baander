@@ -1,10 +1,26 @@
+import { CanceledError } from 'axios'
+import { withLiveReadSignal } from './http-admission'
+import type { LiveQueryCoordinator } from './query-coordinator'
 import { MutationCache, QueryClient, type MutationFunctionContext } from '@tanstack/react-query'
-import { assertCurrentOwnership, bindOwnershipToSignal, captureOwnership, isCurrentOwnership, subscribeOwnership, waitForOwnershipAuthority, type OwnershipStamp } from './ownership'
+import {
+  assertCurrentOwnership,
+  bindOwnershipToSignal,
+  captureOwnership,
+  isCurrentOwnership,
+  subscribeOwnership,
+  waitForOwnershipAuthority,
+  type OwnershipStamp,
+} from './ownership'
 
 const executionOwners = new WeakMap<MutationFunctionContext, OwnershipStamp>()
 const wrappedOptions = new WeakSet<object>()
 /** Fences hook options at execution time, including callbacks retained by existing observers. */
 export class OwnedQueryClient extends QueryClient {
+  coordinator: LiveQueryCoordinator | null = null
+
+  setCoordinator(coordinator: LiveQueryCoordinator): void {
+    this.coordinator = coordinator
+  }
   private readonly owner = captureOwnership().principal
   private unsubscribeOwnership: (() => void) | null = null
 
@@ -44,17 +60,32 @@ export class OwnedQueryClient extends QueryClient {
     const resolved = super.defaultQueryOptions(options)
     if (wrappedOptions.has(resolved) || typeof resolved.queryFn !== 'function') return resolved
     const fn = resolved.queryFn
+    const coordinated = this.coordinator?.matches(resolved.queryKey) ?? false
     const queryFn: typeof fn = async (context) => {
       const stamp = captureOwnership()
       if (stamp.principal !== this.owner) throw new Error('Query belongs to another principal')
       bindOwnershipToSignal(context.signal, stamp)
+      const foreground = context.meta?.livePriority === 'foreground'
+      if (coordinated) this.coordinator?.acquireRead(context.queryKey, context.signal, foreground)
       await waitForOwnershipAuthority(context.signal)
       assertCurrentOwnership(stamp)
-      const result = await fn(context)
+      this.coordinator?.readStarted(context.queryKey, context.signal)
+      const result = await withLiveReadSignal(context.signal, () => fn(context))
+      if (context.signal.aborted) throw new CanceledError('Query was cancelled')
       assertCurrentOwnership(stamp)
       return result
     }
-    const wrapped = { ...resolved, queryFn }
+    const wrapped = coordinated
+      ? {
+          ...resolved,
+          queryFn,
+          refetchOnMount: false,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
+          refetchInterval: false as const,
+          staleTime: resolved.staleTime === 'static' ? 0 : resolved.staleTime,
+        }
+      : { ...resolved, queryFn }
     wrappedOptions.add(wrapped)
     return wrapped
   }
@@ -87,19 +118,25 @@ export class OwnedQueryClient extends QueryClient {
     if (resolved.onMutate) {
       const callback = resolved.onMutate
       wrapped.onMutate = (variables, context) => {
-        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) return callback(variables, context)
+        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) {
+          return callback(variables, context)
+        }
       }
     }
     if (resolved.onSuccess) {
       const callback = resolved.onSuccess
       wrapped.onSuccess = (data, variables, result, context) => {
-        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) return callback(data, variables, result, context)
+        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) {
+          return callback(data, variables, result, context)
+        }
       }
     }
     if (resolved.onError) {
       const callback = resolved.onError
       wrapped.onError = (error, variables, result, context) => {
-        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) return callback(error, variables, result, context)
+        if (stampFor(context).principal === this.owner && isCurrentOwnership(stampFor(context))) {
+          return callback(error, variables, result, context)
+        }
       }
     }
     if (resolved.onSettled) {
