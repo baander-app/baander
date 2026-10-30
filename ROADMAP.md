@@ -1764,6 +1764,25 @@ louder low band of low-rate xHE-AAC decodes, the decoder's loudness
 default. Not run: listening tests, speech, 44.1 kHz, multichannel and
 low-delay comparisons.
 
+Checkpoint, 2026-10-30, encoder tuning against Apple AAC: Apple's Core
+Audio encoder probed by its output streams only (no disassembly), with
+the new `aac-probe` tool, in
+[apple-aac-probe.md](packages/baander-aac/docs/apple-aac-probe.md).
+Delivered for AAC-LC and the HE-AAC core, each measured on the ten-item
+corpus with paired 95 % intervals: sine long windows and a TNS switch-on
+gain of 2 (PEAQ +0.14 and +0.16 at 96 and 128 kbit/s); a rate loop with
+a warm-started false-position reduction search and estimated
+scalefactors (128 kbit/s from 15 to 37 times realtime, PEAQ cost at most
+0.008); sparse 6 dB SNR bands from the lowpass up to 20 kHz at 48 to
+95 kbit/s per channel (96 kbit/s PEAQ +0.21, ViSQOL +0.15 to +0.21 at 96
+to 160 kbit/s). The low-delay and xHE-AAC encoders keep their committed
+streams. The concealment smoke and continuity tests were made
+independent of encoder tuning. CTest 46/46, Node smoke tests 14/14.
+Open: true VBR (Apple leads our CBR by 0.23 PEAQ at an equal 136
+kbit/s, and our quality scale is off), bandwidth at 192 kbit/s and up
+(PEAQ and ViSQOL disagree), encode speed (Apple about 94 times realtime,
+ours about 34). Not run: listening tests, mono.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

@@ -1381,6 +1381,9 @@ and its random sequence would then run ahead of a conforming decoder's.
 FFmpeg's encoder, FDK AAC, libxaac and Apple's AAC (perceptual quality,
 speed, memory, decoder agreement) and lists where it falls short;
 [bench/](../bench/README.md) reproduces it.
+[apple-aac-probe.md](apple-aac-probe.md) records what Apple's encoder
+does as its output streams show it, which of those behaviours improved
+ours, and the remaining gaps; `tools/aac-probe.cpp` is the probe.
 
 Five fuzz harnesses under `tools/fuzz/` drive the decoder, the
 AudioSpecificConfig and StreamMuxConfig parsers, the encoder, MPEG-D
