@@ -445,8 +445,9 @@ bool write_version(AacBitWriter* w, const AacUniDrcConfig* c, int version, int c
 /* ── the generator ─────────────────────────────────────────────── */
 
 constexpr int kMaxChannels = 6;
-/* K-weighting (BS.1770-4 clause 2): the channel weights of the canonical
- * order L, R, C, LFE, Ls, Rs and the loudness formula's offset. */
+/* K-weighted levels (BS.1770-4 clause 2, the filter of loudness.h): the
+ * channel weights of the canonical order L, R, C, LFE, Ls, Rs and the
+ * loudness formula's offset. */
 const double kChannelWeight[kMaxChannels] = {1.0, 1.0, 1.0, 0.0, 1.41, 1.41};
 constexpr double kLoudnessOffsetDb = -0.691;
 constexpr float kSilenceLkfs = -70.0f; /* the absolute gate */
@@ -490,42 +491,6 @@ constexpr float kHistMinLkfs = -70.0f;
 constexpr float kHistMaxLkfs = 10.0f;
 constexpr int kHistBins = (int)((kHistMaxLkfs - kHistMinLkfs) * kHistBinsPerLu);
 
-struct Biquad {
-  double b0, b1, b2, a1, a2;
-};
-
-/* The K-weighting's two biquads, derived for the sample rate from the
- * analogue prototypes behind the 48 kHz table of BS.1770-4: a +4 dB high
- * shelf at 1681.97 Hz and a high-pass at 38.135 Hz, through the bilinear
- * transform with pre-warping. */
-Biquad k_shelf(double rate) {
-  const double f0 = 1681.974450955533, gain_db = 3.999843853973347, q = 0.7071752369554196;
-  const double k = tan(M_PI * f0 / rate);
-  const double vh = pow(10.0, gain_db / 20.0);
-  const double vb = pow(vh, 0.4996667741545416);
-  const double a0 = 1.0 + k / q + k * k;
-  return {(vh + vb * k / q + k * k) / a0, 2.0 * (k * k - vh) / a0, (vh - vb * k / q + k * k) / a0,
-          2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0};
-}
-
-Biquad k_highpass(double rate) {
-  const double f0 = 38.13547087602444, q = 0.5003270373238773;
-  const double k = tan(M_PI * f0 / rate);
-  const double a0 = 1.0 + k / q + k * k;
-  return {1.0, -2.0, 1.0, 2.0 * (k * k - 1.0) / a0, (1.0 - k / q + k * k) / a0};
-}
-
-struct BiquadState {
-  double z1, z2;
-};
-
-double run_biquad(const Biquad& b, BiquadState* s, double x) {
-  const double y = b.b0 * x + s->z1;
-  s->z1 = b.b1 * x - b.a1 * y + s->z2;
-  s->z2 = b.b2 * x - b.a2 * y;
-  return y;
-}
-
 double power_to_lkfs(double p) { return p > 1e-20 ? kLoudnessOffsetDb + 10.0 * log10(p) : -200.0; }
 
 float lin_to_db(float v) { return v > 1e-10f ? 20.0f * log10f(v) : -200.0f; }
@@ -552,8 +517,8 @@ struct AacDrcGen_ {
   long long fed; /* input samples fed */
   long long frame_index;
   /* the level detector */
-  Biquad shelf, highpass;
-  BiquadState ks[kMaxChannels][2];
+  AacKWeighting kw;
+  AacKWeightingState ks[kMaxChannels];
   double block_energy; /* weighted sum of squares of the open block */
   double* window;      /* window_blocks block energies, a ring */
   double window_sum;
@@ -720,7 +685,7 @@ void feed(AacDrcGen* g, const float* pcm, int n) {
     for (int c = 0; c < nch; c++) {
       const float x = pcm ? pcm[(size_t)i * nch + c] : 0.0f;
       slot[c] = x;
-      const double y = run_biquad(g->highpass, &g->ks[c][1], run_biquad(g->shelf, &g->ks[c][0], x));
+      const double y = aac_k_weighting_run(&g->kw, &g->ks[c], x);
       e += kChannelWeight[c] * y * y;
     }
     g->block_energy += e;
@@ -975,47 +940,6 @@ int aac_drc_gen_write_gain(AacBitWriter* w, const AacUniDrcConfig* c, const AacU
   return aac_bitwriter_bits_written(w) - start;
 }
 
-int aac_drc_gen_write_loudness(AacBitWriter* w, const AacLoudnessInfo* info, const int* ids,
-                               int n) {
-  if (!w || n < 0 || n > 63 || (n > 0 && (!info || !ids))) {
-    return AAC_ERR_INVALID_ARG;
-  }
-  const int start = aac_bitwriter_bits_written(w);
-  aac_bitwriter_write(w, 0, 6); /* loudnessInfoAlbumCount */
-  aac_bitwriter_write(w, (uint32_t)n, 6);
-  for (int i = 0; i < n; i++) {
-    if (ids[i] < 0 || ids[i] > 63) {
-      return AAC_ERR_INVALID_ARG;
-    }
-    /* aac_loudness_info_write codes a set of one loudnessInfo() with
-     * drcSetId 0: the two 6-bit counts, the entry, and the extension
-     * flag.  The entry is taken from it with its drcSetId replaced. */
-    uint8_t tmp[128]; /* one entry: at most 300 bits */
-    memset(tmp, 0, sizeof(tmp));
-    AacBitWriter tw;
-    aac_bitwriter_init(&tw, tmp, (int)sizeof(tmp));
-    const int bits = aac_loudness_info_write(&tw, &info[i]);
-    if (bits < 0) {
-      return bits;
-    }
-    AacBitReader r;
-    aac_bitreader_init(&r, tmp, (bits + 7) / 8);
-    aac_bitreader_skip(&r, 12 + 6); /* the counts and drcSetId */
-    aac_bitwriter_write(w, (uint32_t)ids[i], 6);
-    int left = bits - 12 - 6 - 1;
-    while (left > 0) {
-      const int k = std::min(left, 16);
-      aac_bitwriter_write(w, aac_bitreader_read(&r, k), k);
-      left -= k;
-    }
-  }
-  aac_bitwriter_write(w, 0, 1); /* loudnessInfoSetExtPresent */
-  if (aac_bitwriter_overflow(w)) {
-    return AAC_ERR_OVERFLOW;
-  }
-  return aac_bitwriter_bits_written(w) - start;
-}
-
 AacDrcGen* aac_drc_gen_create(const AacDrcGenParams* p) {
   if (!p || p->sample_rate < 8000 || p->sample_rate > 192000 || p->channels < 1 ||
       p->channels > kMaxChannels || p->frame_length < 64 || p->frame_length > 4096 ||
@@ -1063,8 +987,7 @@ AacDrcGen* aac_drc_gen_create(const AacDrcGenParams* p) {
   g->hist_len = p->delay + 2 * p->frame_length + 4 * grid + kTpTaps;
   g->gain_len = g->hist_len / grid + g->lookahead_blocks + 4;
   true_peak_taps(g->tp_taps);
-  g->shelf = k_shelf(p->sample_rate);
-  g->highpass = k_highpass(p->sample_rate);
+  aac_k_weighting_init(&g->kw, p->sample_rate);
   const int nq = g->steps + kHorizonSteps;
   g->hist = (float*)calloc((size_t)g->hist_len * p->channels, sizeof(float));
   g->peak = (float*)calloc((size_t)g->hist_len, sizeof(float));

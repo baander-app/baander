@@ -520,9 +520,9 @@ true peak are FFmpeg's `ebur128` on each decode.
 
 | Stream | kbit/s (LOAS / config once) | SNR against the source, all four | Night: ours / FDK / libxaac | General: ours / FDK / libxaac |
 |--------|----------------------------:|---------------------------------:|-----------------------------|-------------------------------|
-| 64 kbit/s, one-pass, 10 LU | 78.6 / 69.5 | 23.3 dB | -17.1 LUFS, 10.2 LU, -2.1 dBTP / -17.0, 10.3, -1.0 / -17.0, 10.3, -0.8 | -17.1, 10.1, -2.0 / -17.0, 10.2, -1.0 / -17.0, 10.2, -0.8 |
-| 64 kbit/s, two-pass, 10 LU | 85.0 / 69.7 | 23.3 dB | -17.6, 10.6, -2.2 / -17.5, 10.7, -1.0 / -17.5, 10.7, -0.9 | -17.5, 10.6, -2.0 / -17.4, 10.7, -1.0 / -17.4, 10.7, -0.7 |
-| 128 kbit/s, one-pass, 6 LU | 144.7 / 127.8 | 27.7 dB | -17.0, 8.7, -0.9 / -16.9, 8.7, -1.0 / -16.9, 8.7, -0.8 | -16.9, 8.7, -0.8 / -16.9, 8.7, -1.0 / -16.8, 8.7, -0.6 |
+| 64 kbit/s, one-pass, 10 LU | 78.6 / 69.5 | 23.3 dB | -17.0 LUFS, 10.3 LU, -0.8 dBTP / -17.0, 10.3, -1.0 / -17.0, 10.3, -0.8 | -17.0, 10.2, -0.8 / -17.0, 10.2, -1.0 / -17.0, 10.2, -0.8 |
+| 64 kbit/s, two-pass, 10 LU | 85.0 / 69.7 | 23.3 dB | -17.5, 10.7, -0.9 / -17.5, 10.7, -1.0 / -17.5, 10.7, -0.9 | -17.4, 10.7, -0.8 / -17.4, 10.7, -1.0 / -17.4, 10.7, -0.7 |
+| 128 kbit/s, one-pass, 6 LU | 144.7 / 127.8 | 27.7 dB | -16.9, 8.8, -0.9 / -16.9, 8.7, -1.0 / -16.9, 8.7, -0.8 | -16.9, 8.7, -0.6 / -16.9, 8.7, -1.0 / -16.8, 8.7, -0.6 |
 
 Without a DRC request every decoder plays the stream as before: the
 same SNR against the source as the stream without gain sets, FFmpeg
@@ -539,14 +539,14 @@ measured on the encoder's model of the decode; FDK and libxaac land at
 The FDK decoder and libxaac apply the same gains at the same time. The
 gain curve, the ratio of the DRC decode to the plain one in 32-sample
 blocks, agrees between them within 0.07 dB rms (p99 0.13 dB) at
-64 kbit/s and 0.02 dB rms at 128 kbit/s. Both apply the gains a frame
-carries to the next frame's output, and the encoder places them
-accordingly. Our decoder applies them to the frame that carries them,
-one frame early: its curve agrees with FDK's within 0.07 dB rms once
-shifted by one frame (2048 samples with SBR, 1024 without), against
-0.2 to 0.28 dB rms (p99 up to 1.06 dB) as it stands, which moves its
-night set's peaks and its loudness by about 0.1 LU. The FDK decoder
-fails frames of LOAS streams that repeat a large StreamMuxConfig in
+64 kbit/s and 0.02 dB rms at 128 kbit/s. Both apply the gains an access
+unit carries to the next frame's output, and the encoder places them
+accordingly; so does our decoder. Its curve agrees with libxaac's within
+0.015 dB rms and with FDK's within 0.07 dB rms (0.02 dB at 128 kbit/s),
+at a lag of zero. Before the decoder took the one-frame delay it applied
+the gains a frame early, 0.2 to 0.28 dB rms (p99 up to 1.06 dB) from
+FDK; the "ours" figures in the table are from the corrected decoder.
+The FDK decoder fails frames of LOAS streams that repeat a large StreamMuxConfig in
 every frame, with or without the gain sets (10 and 19 failed frames on
 the two 64 kbit/s streams, 16 and 31 on plain streams at 96 and
 128 kbit/s, none at 128 kbit/s with the gain sets); the same streams

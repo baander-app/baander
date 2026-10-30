@@ -5,7 +5,8 @@
  * inter-sample peaks), the derived K-weighting against the standard's
  * 48 kHz table, the invariance to the feed chunking, and the
  * loudnessInfoSet() writer against hand-computed bit layouts, the FDK
- * encoder's own loudnessInfoSet() bytes and the decoder's parser. */
+ * encoder's own loudnessInfoSet() bytes and the decoder's parser, for
+ * the single program and for entries per DRC set. */
 #include "loudness.h"
 #include "test_util.h"
 #include "unidrc.h"
@@ -95,6 +96,21 @@ static void test_k_weighting() {
   const double gain = 10.0 * log10(biquad_power_gain(kShelf48, 997.0, 48000.0) *
                                    biquad_power_gain(kHighpass48, 997.0, 48000.0));
   CHECK(fabs(gain - 0.691) < 0.01, "K-weighting at 997 Hz is +0.691 dB (%.3f)", gain);
+  /* The shared filter's coefficients at 48 kHz are the table's, and its
+   * impulse response starts with the shelf's b0 (the high-pass's is 1). */
+  AacKWeighting k;
+  aac_k_weighting_init(&k, 48000);
+  for (int i = 0; i < 5; i++) {
+    CHECK(fabs(k.shelf[i] - kShelf48[i]) < 1e-7 && fabs(k.highpass[i] - kHighpass48[i]) < 1e-7,
+          "coefficient %d: %.12f %.12f against the table", i, k.shelf[i], k.highpass[i]);
+  }
+  AacKWeightingState st;
+  memset(&st, 0, sizeof(st));
+  const double y0 = aac_k_weighting_run(&k, &st, 1.0);
+  const double y1 = aac_k_weighting_run(&k, &st, 0.0);
+  const double expected1 = k.shelf[1] - k.shelf[3] * k.shelf[0] + k.shelf[0] * (-2.0 - k.highpass[3]);
+  CHECK(fabs(y0 - k.shelf[0]) < 1e-12 && fabs(y1 - expected1) < 1e-12,
+        "impulse response %.9f %.9f", y0, y1);
 }
 
 /* ── EBU Tech 3341: levels, gating, maxima ─────────────────────── */
@@ -443,6 +459,64 @@ static void test_writer_layout() {
   CHECK(aac_loudness_info_write(&w, nullptr) == AAC_ERR_INVALID_ARG, "no info");
 }
 
+static void test_writer_sets() {
+  /* Entries per DRC set: each is the single program's entry with its
+   * drcSetId, and the parser reads the ids and figures back. */
+  AacLoudnessInfo info[3];
+  memset(info, 0, sizeof(info));
+  for (int i = 0; i < 3; i++) {
+    info[i].sample_peak_dbfs = -1.0f - (float)i;
+    info[i].integrated_lkfs = -20.0f - (float)i;
+    info[i].true_peak_dbtp = -0.5f - (float)i;
+    info[i].has_true_peak = i != 1;
+    info[i].range_lu = 5.0f + (float)i;
+    info[i].has_range = i == 2;
+  }
+  const int ids[3] = {0, 1, 2};
+  Bits b;
+  const int bits = aac_loudness_info_set_write(&b.w, info, ids, 3);
+  CHECK(bits > 0 && bits == aac_loudness_info_set_bits(info, ids, 3), "set of three: %d bits", bits);
+  int entries = 0;
+  for (int i = 0; i < 3; i++) {
+    Bits one;
+    const int one_bits = aac_loudness_info_write(&one.w, &info[i]);
+    /* the single set: two counts, the entry, the extension flag */
+    std::string entry = one.string().substr(12, (size_t)one_bits - 13);
+    for (int k = 0; k < 6; k++) {
+      entry[(size_t)k] = (ids[i] >> (5 - k)) & 1 ? '1' : '0';
+    }
+    const std::string all = b.string();
+    const size_t at = 12 + (size_t)entries;
+    CHECK(all.compare(at, entry.size(), entry) == 0, "entry %d is the single entry with drcSetId %d",
+          i, ids[i]);
+    entries += (int)entry.size();
+  }
+  CHECK(bits == 12 + entries + 1, "two counts, three entries and the extension flag");
+  AacBitReader r;
+  aac_bitreader_init(&r, b.buf.data(), (int)b.buf.size());
+  AacUniDrcLoudnessSet set;
+  CHECK(aac_unidrc_parse_loudness(&r, &set) == AAC_OK && r.pos == bits, "parse the set");
+  CHECK(set.album_count == 0 && set.count == 3, "three entries (%d)", set.count);
+  for (int i = 0; i < 3 && i < set.count; i++) {
+    const AacUniDrcLoudnessInfo* li = &set.info[i];
+    CHECK(li->drc_set_id == ids[i] && li->downmix_id == 0, "entry %d ids", i);
+    CHECK(li->true_peak_present == info[i].has_true_peak && li->measurement_count == 1 + info[i].has_range,
+          "entry %d fields", i);
+    CHECK(fabsf(li->m[0].value - info[i].integrated_lkfs) < 1e-4f, "entry %d loudness %g", i,
+          li->m[0].value);
+  }
+  /* An empty set, and the limits of the ids and the count. */
+  Bits empty;
+  CHECK(aac_loudness_info_set_write(&empty.w, nullptr, nullptr, 0) == 13 &&
+            empty.string() == "0000000000000",
+        "empty set");
+  const int bad_id = 64;
+  CHECK(aac_loudness_info_set_write(&b.w, info, &bad_id, 1) == AAC_ERR_INVALID_ARG, "drcSetId 64");
+  CHECK(aac_loudness_info_set_bits(info, &bad_id, 1) == AAC_ERR_INVALID_ARG, "drcSetId 64 counted");
+  CHECK(aac_loudness_info_set_write(&b.w, info, ids, 64) == AAC_ERR_INVALID_ARG, "64 entries");
+  CHECK(aac_loudness_info_set_write(&b.w, nullptr, ids, 1) == AAC_ERR_INVALID_ARG, "no figures");
+}
+
 static void test_measure_and_write() {
   /* The meter's result of a shaped signal, written and read back. */
   std::vector<float> pcm = stereo_sine(4.0, -20.0);
@@ -483,6 +557,7 @@ int main() {
   test_true_peak();
   test_api();
   test_writer_layout();
+  test_writer_sets();
   test_measure_and_write();
   return test_summary("test_loudness");
 }

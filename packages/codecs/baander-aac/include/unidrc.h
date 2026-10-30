@@ -232,8 +232,9 @@ const AacUniDrcLoudnessSet* aac_unidrc_loudness(const AacUniDrc* d);
 int aac_unidrc_selected_instructions(const AacUniDrc* d);
 const AacUniDrcLoudnessInfo* aac_unidrc_selected_loudness(const AacUniDrc* d);
 /* The gain of the current frame per sample for channel `channel`, as the
- * next aac_unidrc_apply would apply it (the DRC gain times the
- * normalisation gain), written to out[0..frame_length-1]. */
+ * next aac_unidrc_apply would apply it (the DRC gain of the previous
+ * access unit's payload times the normalisation gain), written to
+ * out[0..frame_length-1]. */
 void aac_unidrc_channel_gain(const AacUniDrc* d, int channel, float* out, int frame_length);
 
 /* The player's request. */
@@ -266,15 +267,19 @@ void aac_unidrc_set_stream(AacUniDrc* d, int sample_rate, int channels, int fram
 
 void aac_unidrc_set_request(AacUniDrc* d, const AacUniDrcRequest* req);
 
-/* Parses the uniDrcGain() payload of one frame (`payload_bits` long; the
- * reader is left past it).  `indep` is usacIndependencyFlag.  A frame
- * without the payload is noted with aac_unidrc_no_gain. */
+/* Parses the uniDrcGain() payload of one access unit (`payload_bits`
+ * long; the reader is left past it).  `indep` is usacIndependencyFlag.
+ * The gains shape the output of the next access unit: the gain decoder
+ * runs one DRC frame behind the payloads (its default delay mode), so
+ * the next aac_unidrc_apply still applies the previous access unit's
+ * gains.  An access unit without the payload is noted with
+ * aac_unidrc_no_gain, and the frame after it holds the last gain. */
 int aac_unidrc_read_gain(AacUniDrc* d, AacBitReader* r, int payload_bits, int indep);
 void aac_unidrc_no_gain(AacUniDrc* d);
 
 /* Applies the selected DRC set's gains and the loudness normalisation to
- * one frame: ch[c] points at `frame_length` samples of channel c at full
- * scale 1.0. */
+ * one frame (the gains read with the previous access unit): ch[c] points
+ * at `frame_length` samples of channel c at full scale 1.0. */
 void aac_unidrc_apply(AacUniDrc* d, float* const* ch, int channels, int frame_length);
 
 /* Readback: the program loudness the stream declares (LUFS times 100, or

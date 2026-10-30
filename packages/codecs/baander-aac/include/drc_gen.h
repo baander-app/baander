@@ -141,12 +141,6 @@ int aac_drc_gen_write_config(AacBitWriter* w, const AacUniDrcConfig* c);
 int aac_drc_gen_write_gain(AacBitWriter* w, const AacUniDrcConfig* c, const AacUniDrcGainFrame* g,
                            int frame_length, int sample_rate);
 
-/* Writes loudnessInfoSet() with one loudnessInfo() per entry (drcSetId
- * ids[i], downmixId 0, the figures of info[i] as aac_loudness_info_write
- * codes them), no album entries and no extension.  Returns the bits
- * written, AAC_ERR_INVALID_ARG or AAC_ERR_OVERFLOW. */
-int aac_drc_gen_write_loudness(AacBitWriter* w, const AacLoudnessInfo* info, const int* ids, int n);
-
 #ifdef __cplusplus
 }
 #endif

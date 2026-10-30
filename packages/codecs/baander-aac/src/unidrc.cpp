@@ -32,7 +32,19 @@
  * spline type) after the gain modifiers and the request's boost and cut
  * scaling, times the normalisation gain.  A multi-band gain set is
  * applied with the gain of its first band to the whole band width, since
- * the decoder has no DRC filter bank. */
+ * the decoder has no DRC filter bank.
+ *
+ * Timing: the gain decoder runs one DRC frame behind the payloads (its
+ * default delay mode in ISO/IEC 23003-4): the gains an access unit
+ * carries shape the output of the next access unit, with node times
+ * counted from that frame's start.  The first frame after a reset
+ * therefore has no gains of its own and applies 0 dB, and its 0 dB
+ * starting node stays where it is, so that the next frame interpolates
+ * from it across both frames (on random access the first frame is the
+ * pre-roll's, whose output is discarded).  Later, a frame without a
+ * payload (or a lost one) leaves the frame after it holding the last
+ * gain.  libxaac does the same in all three respects; the FDK decoder
+ * applies the gains with the same delay. */
 
 namespace {
 
@@ -89,9 +101,13 @@ struct AacUniDrc_ {
   int has_program_loudness;
   float program_loudness; /* LUFS */
   float norm_gain_db;
-  /* the frame's gains */
-  AacUniDrcGainFrame frame;
-  int frame_valid;
+  /* The gains of the last two access units: gains[applied] those the
+   * next apply uses (from the access unit before), the other one those
+   * of the current access unit, which shape the following frame. */
+  AacUniDrcGainFrame gains[2];
+  int gains_valid[2];
+  int applied;
+  int started; /* a frame has been applied since the reset */
   SequenceState state[AAC_UNIDRC_MAX_SEQUENCES];
   float* scratch; /* AAC_USAC_MAX_OUTPUT_FRAME_ gains */
 };
@@ -109,7 +125,9 @@ void reset_sequences(AacUniDrc* d) {
     d->state[i].node[0].slope = 0.0f;
     d->state[i].last_gain_db = 0.0f;
   }
-  d->frame_valid = 0;
+  d->gains_valid[0] = d->gains_valid[1] = 0;
+  d->applied = 0;
+  d->started = 0;
 }
 
 /* The loudness level of a loudnessInfo, by method preference; 0 when it
@@ -298,7 +316,8 @@ float modify(const AacUniDrc* d, const AacUniDrcGroup* g, float gain_db) {
 void interpolate(const AacUniDrc* d, int seq, const AacUniDrcGainSet* gs, const AacUniDrcGroup* g,
                  float* out, int n) {
   const SequenceState* st = &d->state[seq];
-  const AacUniDrcSequence* cur = d->frame_valid ? &d->frame.seq[seq] : nullptr;
+  const AacUniDrcSequence* cur =
+      d->gains_valid[d->applied] ? &d->gains[d->applied].seq[seq] : nullptr;
   /* Gather the nodes: the previous frame's (already relative to this
    * frame), then this frame's. */
   int times[2 * AAC_UNIDRC_MAX_NODES + 2];
@@ -358,14 +377,21 @@ void interpolate(const AacUniDrc* d, int seq, const AacUniDrcGainSet* gs, const 
   }
 }
 
-/* Moves this frame's nodes into the history for the next frame. */
+/* Moves this frame's nodes into the history for the next frame, and
+ * the current access unit's gains in line for it. */
 void advance(AacUniDrc* d) {
   const int fl = d->frame_length;
+  const AacUniDrcGainFrame* frame = d->gains_valid[d->applied] ? &d->gains[d->applied] : nullptr;
   for (int seq = 0; seq < AAC_UNIDRC_MAX_SEQUENCES; seq++) {
     SequenceState* st = &d->state[seq];
-    const AacUniDrcSequence* cur = (d->frame_valid && seq < d->frame.sequence_count) ? &d->frame.seq[seq]
-                                                                                        : nullptr;
+    const AacUniDrcSequence* cur =
+        (frame && seq < frame->sequence_count) ? &frame->seq[seq] : nullptr;
     if (!cur || cur->node_count == 0) {
+      if (!d->started) {
+        /* the first frame after a reset: its starting node carries over */
+        st->node[0].time -= fl;
+        continue;
+      }
       /* no nodes this frame: the last gain holds at the frame end */
       st->node_count = 1;
       st->node[0].time = -1;
@@ -389,7 +415,9 @@ void advance(AacUniDrc* d) {
     st->node_count = n;
     st->last_gain_db = cur->node[cur->node_count - 1].gain_db;
   }
-  d->frame_valid = 0;
+  d->gains_valid[d->applied] = 0;
+  d->applied ^= 1;
+  d->started = 1;
 }
 
 } // namespace
@@ -477,21 +505,22 @@ void aac_unidrc_set_request(AacUniDrc* d, const AacUniDrcRequest* req) {
 
 int aac_unidrc_read_gain(AacUniDrc* d, AacBitReader* r, int payload_bits, int indep) {
   (void)indep; /* every frame codes its first gain absolutely */
+  const int next = d->applied ^ 1;
   if (!d->has_config || d->frame_length <= 0 || d->sample_rate <= 0) {
     aac_bitreader_skip(r, payload_bits);
-    d->frame_valid = 0;
+    d->gains_valid[next] = 0;
     return AAC_OK;
   }
   const int start = r->pos;
   const int err = aac_unidrc_parse_gain(&d->config, r, payload_bits, d->frame_length,
-                                        d->sample_rate, &d->frame);
+                                        d->sample_rate, &d->gains[next]);
   r->pos = start;
   aac_bitreader_skip(r, payload_bits);
-  d->frame_valid = err == AAC_OK;
+  d->gains_valid[next] = err == AAC_OK;
   return err;
 }
 
-void aac_unidrc_no_gain(AacUniDrc* d) { d->frame_valid = 0; }
+void aac_unidrc_no_gain(AacUniDrc* d) { d->gains_valid[d->applied ^ 1] = 0; }
 
 void aac_unidrc_channel_gain(const AacUniDrc* d, int channel, float* out, int frame_length) {
   const int n = frame_length > kMaxFrame ? kMaxFrame : frame_length;

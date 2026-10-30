@@ -695,7 +695,7 @@ int drc_loudness_set(const AacUsacEncoder* u, uint8_t* out, int cap) {
   memset(out, 0, (size_t)cap);
   AacBitWriter w;
   aac_bitwriter_init(&w, out, cap);
-  const int bits = aac_drc_gen_write_loudness(&w, info, ids, n);
+  const int bits = aac_loudness_info_set_write(&w, info, ids, n);
   return bits < 0 ? bits : (bits + 7) / 8;
 }
 

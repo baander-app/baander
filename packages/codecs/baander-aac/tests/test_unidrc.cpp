@@ -813,8 +813,12 @@ static void test_selection_built() {
   q = request(AAC_DRC_EFFECT_NIGHT, -2400, 0);
   aac_unidrc_set_request(d, &q);
   CHECK(selected_id(d) == 1, "NIGHT set");
+  /* Past the first frame after the reset, whose starting node carries
+   * over into the next one. */
+  aac_unidrc_apply(d, nullptr, 0, 1024);
   /* -8 dB at the frame end: attenuation scaling 0.5 and offset -1.5 give
-   * -5.5 dB at the last sample, from 0 dB (offset -1.5) at the start. */
+   * -5.5 dB at the last sample, from 0 dB (offset -1.5) at the start.
+   * The gains shape the frame after the one that carries them. */
   Bits b;
   b.bits("0 1 01000000 0");
   const std::vector<uint8_t> payload = b.bytes();
@@ -822,6 +826,10 @@ static void test_selection_built() {
   aac_bitreader_init(&r, payload.data(), (int)payload.size());
   CHECK(aac_unidrc_read_gain(d, &r, (int)payload.size() * 8, 1) == AAC_OK, "read -8 dB node");
   float gains[1024];
+  aac_unidrc_channel_gain(d, 0, gains, 1024);
+  CHECK(fabsf(gains[1023] - powf(10.0f, -1.5f / 20.0f)) < 1e-4f,
+        "the payload does not shape its own frame, got %g dB", 20.0f * log10f(gains[1023]));
+  aac_unidrc_apply(d, nullptr, 0, 1024);
   aac_unidrc_channel_gain(d, 0, gains, 1024);
   CHECK(fabsf(gains[1023] - powf(10.0f, -5.5f / 20.0f)) < 1e-4f, "scaled and offset node gain, got %g dB",
         20.0f * log10f(gains[1023]));
@@ -833,12 +841,12 @@ static void test_selection_built() {
   CHECK(fabsf(gains[1023] - powf(10.0f, -3.5f / 20.0f)) < 1e-4f, "cut 50%% halves the attenuation, got %g dB",
         20.0f * log10f(gains[1023]));
   /* +8 dB: amplification scaling 0.75, boost 50 %, offset -1.5. */
-  aac_unidrc_apply(d, nullptr, 0, 1024);
   Bits b2;
   b2.bits("0 0 01000000 0");
   const std::vector<uint8_t> payload2 = b2.bytes();
   aac_bitreader_init(&r, payload2.data(), (int)payload2.size());
   CHECK(aac_unidrc_read_gain(d, &r, (int)payload2.size() * 8, 0) == AAC_OK, "read +8 dB node");
+  aac_unidrc_apply(d, nullptr, 0, 1024);
   q = request(AAC_DRC_EFFECT_NIGHT, -2400, 0, 0, 1, 50, 100);
   aac_unidrc_set_request(d, &q);
   aac_unidrc_channel_gain(d, 0, gains, 1024);
@@ -871,17 +879,31 @@ static void test_interpolation() {
     std::fill(l.begin(), l.end(), 1.0f);
     std::fill(rch.begin(), rch.end(), 0.5f);
   };
-  /* A -20 dB node at the frame end: the linear gain ramps linearly from
-   * 1 to 0.1, so the frame middle sits near 0.55 (not -10 dB). */
+  /* The gains of an access unit shape the output of the next one (the
+   * gain decoder runs one DRC frame behind the payloads): the first
+   * frame after the reset has none and applies 0 dB. */
   feed("0 1 10100000 0");
   fill();
   aac_unidrc_apply(d, ch, 2, 1024);
-  CHECK(fabsf(l[1023] - 0.1f) < 1e-3f, "last sample at -20 dB, got %g", l[1023]);
-  CHECK(fabsf(l[511] - 0.55f) < 0.01f, "middle of the ramp at 0.55, got %g", l[511]);
-  CHECK(fabsf(rch[511] - 0.275f) < 0.005f, "both channels of the group, got %g", rch[511]);
-  /* The next frame continues from -20 dB: a node at sample 511 with
-   * 0 dB and the end at -2 dB (delta code 0000). */
+  CHECK(l[0] == 1.0f && l[1023] == 1.0f, "the first frame applies 0 dB: %g %g", l[0], l[1023]);
+  /* The next frame applies the -20 dB node at its end.  The 0 dB node
+   * the decoder starts from stayed at the end of the frame before the
+   * first, so the linear gain ramps from 1 to 0.1 across both frames:
+   * 0.55 at this frame's start (not -10 dB), 0.325 in its middle. */
   feed("1 01 1 11 000010 000000000 0000 0");
+  fill();
+  aac_unidrc_apply(d, ch, 2, 1024);
+  CHECK(fabsf(l[1023] - 0.1f) < 1e-3f, "last sample at -20 dB, got %g", l[1023]);
+  CHECK(fabsf(l[0] - (1.0f - 0.9f * 1024.0f / 2048.0f)) < 1e-3f, "ramp across two frames, got %g",
+        l[0]);
+  CHECK(fabsf(l[511] - (1.0f - 0.9f * 1535.0f / 2048.0f)) < 1e-3f, "middle of the ramp, got %g",
+        l[511]);
+  CHECK(fabsf(rch[511] - 0.5f * (1.0f - 0.9f * 1535.0f / 2048.0f)) < 1e-3f,
+        "both channels of the group, got %g", rch[511]);
+  /* The frame after continues from -20 dB: a node at sample 511 with
+   * 0 dB and the end at -2 dB (delta code 0000).  Its own access unit
+   * carries no payload. */
+  aac_unidrc_no_gain(d);
   fill();
   aac_unidrc_apply(d, ch, 2, 1024);
   CHECK(fabsf(l[0] - (0.1f + 0.9f / 512.0f)) < 1e-3f, "continues from the previous node, got %g", l[0]);
@@ -889,23 +911,36 @@ static void test_interpolation() {
   const float minus2 = powf(10.0f, -2.0f / 20.0f);
   CHECK(fabsf(l[1023] - minus2) < 1e-3f, "-2 dB at the frame end, got %g", l[1023]);
   CHECK(fabsf(l[767] - (1.0f + minus2) / 2.0f) < 1e-3f, "linear between the nodes, got %g", l[767]);
-  /* A frame without payload holds the last gain. */
-  aac_unidrc_no_gain(d);
+  /* The frame after an access unit without payload holds the last gain;
+   * the readback shows what the next apply uses, not the payload just
+   * read.  A node beyond the frame end (as the FDK encoder writes before
+   * an IPF) shapes the frame it applies to and the next one. */
+  feed("1 01 0 11 010010 11 010010 000000000 0000 0");
+  float gains[1024];
+  aac_unidrc_channel_gain(d, 0, gains, 1024);
+  CHECK(fabsf(gains[0] - minus2) < 1e-3f && fabsf(gains[1023] - minus2) < 1e-3f,
+        "readback before the apply: %g %g", gains[0], gains[1023]);
   fill();
   aac_unidrc_apply(d, ch, 2, 1024);
   CHECK(fabsf(l[0] - minus2) < 1e-3f && fabsf(l[1023] - minus2) < 1e-3f, "hold without payload: %g %g",
         l[0], l[1023]);
-  /* A node beyond the frame end (as the FDK encoder writes before an
-   * IPF) shapes this frame and the next one. */
-  feed("1 01 0 11 010010 11 010010 000000000 0000 0");
+  feed("0 0 00000000 0");
   fill();
   aac_unidrc_apply(d, ch, 2, 1024);
   CHECK(fabsf(l[1023] - 1.0f) < 1e-3f, "0 dB at this frame end, got %g", l[1023]);
-  feed("0 0 00000000 0");
+  aac_unidrc_no_gain(d);
   fill();
   aac_unidrc_apply(d, ch, 2, 1024);
   CHECK(fabsf(l[511] - (1.0f + minus2) / 2.0f) < 2e-3f, "ramps toward the carried-over node at -2 dB, got %g",
         l[511]);
+  /* A reset forgets the pending gains. */
+  feed("0 1 10100000 0");
+  aac_unidrc_set_stream(d, 48000, 2, 1024);
+  fill();
+  aac_unidrc_apply(d, ch, 2, 1024);
+  fill();
+  aac_unidrc_apply(d, ch, 2, 1024);
+  CHECK(l[0] == 1.0f && l[1023] == 1.0f, "no gains survive a reset: %g %g", l[0], l[1023]);
   aac_unidrc_destroy(d);
 }
 

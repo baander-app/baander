@@ -32,10 +32,6 @@ constexpr int kTruePeakTaps = 25;
 constexpr double kTruePeakKaiserBeta = 7.0;
 constexpr double kTruePeakCutoff = 0.96;
 
-using Biquad = struct Biquad_ {
-  double b0, b1, b2, a1, a2;
-};
-
 /* The channel weights G of BS.1770-4 Table 3 for the canonical order
  * L, R, C, LFE, Ls, Rs; a shorter layout is that order's prefix. */
 const double kChannelWeight[kMaxChannels] = {1.0, 1.0, 1.0, 0.0, 1.41, 1.41};
@@ -60,7 +56,7 @@ float linear_to_db(double v) {
  * 1681.97 Hz (Q 0.7072) and a second-order high-pass at 38.135 Hz
  * (Q 0.5003), both through the bilinear transform with frequency
  * pre-warping.  At 48 kHz the derived values match the table. */
-Biquad k_shelf(double rate) {
+void k_shelf(double rate, double* b) {
   const double f0 = 1681.974450955533;
   const double gain_db = 3.999843853973347;
   const double q = 0.7071752369554196;
@@ -68,35 +64,23 @@ Biquad k_shelf(double rate) {
   const double vh = pow(10.0, gain_db / 20.0);
   const double vb = pow(vh, 0.4996667741545416);
   const double a0 = 1.0 + k / q + k * k;
-  Biquad b;
-  b.b0 = (vh + vb * k / q + k * k) / a0;
-  b.b1 = 2.0 * (k * k - vh) / a0;
-  b.b2 = (vh - vb * k / q + k * k) / a0;
-  b.a1 = 2.0 * (k * k - 1.0) / a0;
-  b.a2 = (1.0 - k / q + k * k) / a0;
-  return b;
+  b[0] = (vh + vb * k / q + k * k) / a0;
+  b[1] = 2.0 * (k * k - vh) / a0;
+  b[2] = (vh - vb * k / q + k * k) / a0;
+  b[3] = 2.0 * (k * k - 1.0) / a0;
+  b[4] = (1.0 - k / q + k * k) / a0;
 }
 
-Biquad k_highpass(double rate) {
+void k_highpass(double rate, double* b) {
   const double f0 = 38.13547087602444;
   const double q = 0.5003270373238773;
   const double k = tan(M_PI * f0 / rate);
   const double a0 = 1.0 + k / q + k * k;
-  Biquad b;
-  b.b0 = 1.0;
-  b.b1 = -2.0;
-  b.b2 = 1.0;
-  b.a1 = 2.0 * (k * k - 1.0) / a0;
-  b.a2 = (1.0 - k / q + k * k) / a0;
-  return b;
-}
-
-/* Direct form II transposed; s[0] and s[1] are the two delays. */
-inline double biquad_run(const Biquad& b, double* s, double x) {
-  const double y = b.b0 * x + s[0];
-  s[0] = b.b1 * x - b.a1 * y + s[1];
-  s[1] = b.b2 * x - b.a2 * y;
-  return y;
+  b[0] = 1.0;
+  b[1] = -2.0;
+  b[2] = 1.0;
+  b[3] = 2.0 * (k * k - 1.0) / a0;
+  b[4] = (1.0 - k / q + k * k) / a0;
 }
 
 double bessel_i0(double x) {
@@ -150,7 +134,7 @@ int true_peak_factor(int rate) {
 }
 
 using ChannelState = struct ChannelState_ {
-  double shelf[2], highpass[2];
+  AacKWeightingState k;
   double history[2 * kTruePeakTaps]; /* the last taps input samples, doubled for a wrap-free read */
 };
 
@@ -158,7 +142,7 @@ using ChannelState = struct ChannelState_ {
 
 struct AacLoudnessMeter_ {
   int rate, channels;
-  Biquad shelf, highpass;
+  AacKWeighting k;
   int tp_factor;
   std::vector<double> tp_coef;
   int history_pos;
@@ -185,8 +169,7 @@ AacLoudnessMeter* aac_loudness_create(int sample_rate, int channels) {
   }
   m->rate = sample_rate;
   m->channels = channels;
-  m->shelf = k_shelf((double)sample_rate);
-  m->highpass = k_highpass((double)sample_rate);
+  aac_k_weighting_init(&m->k, sample_rate);
   m->tp_factor = true_peak_factor(sample_rate);
   if (m->tp_factor > 1) {
     design_true_peak_filter(m->tp_factor, &m->tp_coef);
@@ -288,7 +271,7 @@ void aac_loudness_feed(AacLoudnessMeter* m, const float* interleaved, int frames
       }
       /* BS.1770-4 clause 2: the shelf then the high-pass; the mean square
        * of the weighted signal accumulates over the sub-block. */
-      const double w = biquad_run(m->highpass, s->highpass, biquad_run(m->shelf, s->shelf, x));
+      const double w = aac_k_weighting_run(&m->k, &s->k, x);
       m->sub_acc[c] += w * w;
     }
     m->history_pos = pos + 1 == kTruePeakTaps ? 0 : pos + 1;
@@ -352,6 +335,11 @@ double loudness_range(const std::vector<double>& shorts) {
 
 } // namespace
 
+void aac_k_weighting_init(AacKWeighting* k, int sample_rate) {
+  k_shelf((double)sample_rate, k->shelf);
+  k_highpass((double)sample_rate, k->highpass);
+}
+
 int aac_loudness_result(const AacLoudnessMeter* m, AacLoudnessInfo* out) {
   if (!m || !out) {
     return AAC_ERR_INVALID_ARG;
@@ -410,7 +398,7 @@ using Measurement = struct Measurement_ {
   int code;
 };
 
-/* The measurements of the single loudnessInfo(), in the order written. */
+/* The measurements of one loudnessInfo(), in the order written. */
 int collect_measurements(const AacLoudnessInfo* info, Measurement* out) {
   int n = 0;
   out[n++] = {AAC_UNIDRC_METHOD_PROGRAM_LOUDNESS, level_code(info->integrated_lkfs)};
@@ -431,51 +419,73 @@ int collect_measurements(const AacLoudnessInfo* info, Measurement* out) {
 
 } // namespace
 
-int aac_loudness_info_bits(const AacLoudnessInfo* info) {
-  if (!info) {
+int aac_loudness_info_set_bits(const AacLoudnessInfo* info, const int* drc_set_ids, int count) {
+  if (count < 0 || count > 63 || (count > 0 && (!info || !drc_set_ids))) {
     return AAC_ERR_INVALID_ARG;
   }
-  Measurement m[5];
-  const int n = collect_measurements(info, m);
-  /* the counts, drcSetId, downmixId, the sample peak with its flag, the
-   * true peak flag, measurementCount and the terminating extension flag */
-  int bits = 6 + 6 + 6 + 7 + 1 + 12 + 1 + 4 + 1;
-  if (info->has_true_peak) {
-    bits += 12 + 4 + 2;
+  /* the two counts and the terminating extension flag */
+  int bits = 6 + 6 + 1;
+  for (int i = 0; i < count; i++) {
+    if (drc_set_ids[i] < 0 || drc_set_ids[i] > 63) {
+      return AAC_ERR_INVALID_ARG;
+    }
+    Measurement m[5];
+    const int n = collect_measurements(&info[i], m);
+    /* drcSetId, downmixId, the sample peak with its flag, the true peak
+     * flag and measurementCount */
+    bits += 6 + 7 + 1 + 12 + 1 + 4;
+    if (info[i].has_true_peak) {
+      bits += 12 + 4 + 2;
+    }
+    bits += n * (4 + 8 + 4 + 2);
   }
-  return bits + n * (4 + 8 + 4 + 2);
+  return bits;
 }
 
-int aac_loudness_info_write(AacBitWriter* w, const AacLoudnessInfo* info) {
-  if (!w || !info) {
+int aac_loudness_info_set_write(AacBitWriter* w, const AacLoudnessInfo* info,
+                                const int* drc_set_ids, int count) {
+  if (!w || aac_loudness_info_set_bits(info, drc_set_ids, count) < 0) {
     return AAC_ERR_INVALID_ARG;
   }
   const int start = aac_bitwriter_bits_written(w);
-  aac_bitwriter_write(w, 0, 6); /* loudnessInfoAlbumCount */
-  aac_bitwriter_write(w, 1, 6); /* loudnessInfoCount */
-  /* loudnessInfo() */
-  aac_bitwriter_write(w, 0, 6); /* drcSetId */
-  aac_bitwriter_write(w, 0, 7); /* downmixId */
-  aac_bitwriter_write(w, 1, 1); /* samplePeakLevelPresent */
-  aac_bitwriter_write(w, (uint32_t)peak_code(info->sample_peak_dbfs), 12);
-  aac_bitwriter_write(w, info->has_true_peak ? 1u : 0u, 1); /* truePeakLevelPresent */
-  if (info->has_true_peak) {
-    aac_bitwriter_write(w, (uint32_t)peak_code(info->true_peak_dbtp), 12);
-    aac_bitwriter_write(w, kSystemBs1770_4, 4);
-    aac_bitwriter_write(w, kReliabilityAccurate, 2);
-  }
-  Measurement m[5];
-  const int n = collect_measurements(info, m);
-  aac_bitwriter_write(w, (uint32_t)n, 4); /* measurementCount */
-  for (int i = 0; i < n; i++) {
-    aac_bitwriter_write(w, (uint32_t)m[i].method, 4); /* methodDefinition */
-    aac_bitwriter_write(w, (uint32_t)m[i].code, 8);   /* methodValue */
-    aac_bitwriter_write(w, kSystemBs1770_4, 4);        /* measurementSystem */
-    aac_bitwriter_write(w, kReliabilityAccurate, 2);   /* reliability */
+  aac_bitwriter_write(w, 0, 6);               /* loudnessInfoAlbumCount */
+  aac_bitwriter_write(w, (uint32_t)count, 6); /* loudnessInfoCount */
+  for (int i = 0; i < count; i++) {
+    const AacLoudnessInfo* li = &info[i];
+    /* loudnessInfo() */
+    aac_bitwriter_write(w, (uint32_t)drc_set_ids[i], 6); /* drcSetId */
+    aac_bitwriter_write(w, 0, 7);                        /* downmixId */
+    aac_bitwriter_write(w, 1, 1);                        /* samplePeakLevelPresent */
+    aac_bitwriter_write(w, (uint32_t)peak_code(li->sample_peak_dbfs), 12);
+    aac_bitwriter_write(w, li->has_true_peak ? 1u : 0u, 1); /* truePeakLevelPresent */
+    if (li->has_true_peak) {
+      aac_bitwriter_write(w, (uint32_t)peak_code(li->true_peak_dbtp), 12);
+      aac_bitwriter_write(w, kSystemBs1770_4, 4);
+      aac_bitwriter_write(w, kReliabilityAccurate, 2);
+    }
+    Measurement m[5];
+    const int n = collect_measurements(li, m);
+    aac_bitwriter_write(w, (uint32_t)n, 4); /* measurementCount */
+    for (int j = 0; j < n; j++) {
+      aac_bitwriter_write(w, (uint32_t)m[j].method, 4); /* methodDefinition */
+      aac_bitwriter_write(w, (uint32_t)m[j].code, 8);   /* methodValue */
+      aac_bitwriter_write(w, kSystemBs1770_4, 4);       /* measurementSystem */
+      aac_bitwriter_write(w, kReliabilityAccurate, 2);  /* reliability */
+    }
   }
   aac_bitwriter_write(w, 0, 1); /* loudnessInfoSetExtPresent */
   if (aac_bitwriter_overflow(w)) {
     return AAC_ERR_OVERFLOW;
   }
   return aac_bitwriter_bits_written(w) - start;
+}
+
+int aac_loudness_info_bits(const AacLoudnessInfo* info) {
+  const int id = 0;
+  return info ? aac_loudness_info_set_bits(info, &id, 1) : AAC_ERR_INVALID_ARG;
+}
+
+int aac_loudness_info_write(AacBitWriter* w, const AacLoudnessInfo* info) {
+  const int id = 0;
+  return info ? aac_loudness_info_set_write(w, info, &id, 1) : AAC_ERR_INVALID_ARG;
 }

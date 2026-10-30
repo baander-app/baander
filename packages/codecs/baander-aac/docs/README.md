@@ -210,7 +210,13 @@ signal. MPEG-D DRC and loudness (ISO/IEC 23003-4) are parsed from the
 configuration extensions and the `uniDrc` extension elements; the
 selection process with the effect fallbacks, album mode and peak
 protection picks the gain sets, and the gains are interpolated and
-applied in the time domain. `aac_decoder_set_loudness` (on by default,
+applied in the time domain. As in the gain decoder's default delay mode,
+the gains of an access unit shape the output of the next one; after a
+reset the first frame (on random access, the pre-roll's) applies 0 dB,
+and the next ramps from there to the first gains received. The gain
+curve agrees with libxaac's within 0.02 dB rms and with the FDK
+decoder's within 0.08 dB rms (0.02 dB without SBR), which is how far
+the two references differ from each other. `aac_decoder_set_loudness` (on by default,
 normalising to -24 LUFS), `aac_decoder_set_drc_effect` and the
 `aac_decoder_loudness` readback are the C API of that path; the binding
 options are listed under the Node-API binding. Concealment covers a lost
@@ -447,25 +453,26 @@ comparison has the figures per mode against the FDK encoder.
 
 ### Loudness
 
-The loudness meter (`include/loudness.h`, `src/loudness.cpp`) measures
-a programme in one pass per ITU-R BS.1770-4: the K-weighting as two
+The loudness meter (`include/loudness.h`, `src/loudness.cpp`) measures a
+programme in one pass per ITU-R BS.1770-4: the K-weighting as two
 biquads whose coefficients are derived for the sample rate from the
 analogue prototypes behind the standard's 48 kHz table (and match it
-there), the mean square over 400 ms blocks with 75 % overlap, the
-absolute gate at -70 LKFS and the relative gate 10 LU below the mean of
-the blocks above it. It takes 1 to 6 channels in the canonical order L,
-R, C, LFE, Ls, Rs (the LFE does not count, the surrounds count at
-+1.5 dB). Alongside the integrated loudness it reports the loudness
-range of EBU Tech 3342 (3 s windows every 100 ms, the absolute gate at
--70 LUFS, the relative gate 20 LU below the mean, the spread between the
-10th and the 95th percentile), the maximum momentary and short-term
-loudness of EBU Tech 3341 (ungated), the sample peak and the true peak
-of BS.1770-4 Annex 2 (4 times oversampled below 96 kHz, twice from
-96 kHz, through a 25-tap Kaiser-windowed sinc per phase). A result
-needs 400 ms of input; the range and the short-term maximum need 3 s,
-and `has_range` and `has_short_term` say when they exist. No level is
-reported below `AAC_LOUDNESS_SILENCE` (-150 dB), which digital silence
-reads. On 48 kHz stereo the meter runs at about 300 times real time.
+there; the DRC gain generator uses the same filter), the mean square
+over 400 ms blocks with 75 % overlap, the absolute gate at -70 LKFS and
+the relative gate 10 LU below the mean of the blocks above it. It takes
+1 to 6 channels in the canonical order L, R, C, LFE, Ls, Rs (the LFE
+does not count, the surrounds count at +1.5 dB). Alongside the
+integrated loudness it reports the loudness range of EBU Tech 3342 (3 s
+windows every 100 ms, the absolute gate at -70 LUFS, the relative gate
+20 LU below the mean, the spread between the 10th and the 95th
+percentile), the maximum momentary and short-term loudness of EBU Tech
+3341 (ungated), the sample peak and the true peak of BS.1770-4 Annex 2
+(4 times oversampled below 96 kHz, twice from 96 kHz, through a 25-tap
+Kaiser-windowed sinc per phase). A result needs 400 ms of input; the
+range and the short-term maximum need 3 s, and `has_range` and
+`has_short_term` say when they exist. No level is reported below
+`AAC_LOUDNESS_SILENCE` (-150 dB), which digital silence reads. On 48 kHz
+stereo the meter runs at about 300 times real time.
 
 `aac_loudness_info_write` writes the loudnessInfoSet() of ISO/IEC
 23003-4 that a USAC configuration carries in the
@@ -475,6 +482,8 @@ true peak, the program loudness, the anchor loudness when the caller
 supplies one, the loudness range and the momentary and short-term
 maxima, all marked BS.1770-4 and "accurate"; `aac_loudness_info_bits`
 counts the bits, and the configuration extension pads them to bytes.
+`aac_loudness_info_set_write` writes the same entries for several DRC
+sets, one per drcSetId, which the encoder's DRC gain sets use.
 The decoder's `aac_unidrc_parse_loudness` reads the set back. Checked
 against FFmpeg's `ebur128` filter on the EBU test signals that can be
 synthesised (sine levels in mono, stereo and 5.1, the three gating
@@ -493,8 +502,8 @@ program loudness from it and normalises by it with `-target_level`
 decoder normalises by it. The suite `test_loudness` holds the
 synthetic cases against the standards' figures, the derived K-weighting
 against the 48 kHz table, the feed chunking, the writer's bit layout
-against hand-computed fields and the FDK encoder's own set, and the
-round trip through the decoder's parser.
+against hand-computed fields and the FDK encoder's own set, the entries
+per DRC set, and the round trip through the decoder's parser.
 
 The encoder carries the figures in two forms. `aac_encoder_set_loudness_info`
 takes an `AacLoudnessInfo` before the first frame of an xHE-AAC stream and
@@ -641,9 +650,9 @@ passages 30 to 40 LU below the anchor and quieter), smoothed with a
 its boost bounded so that the true peak stays at or below -1 dBTP; the
 night set adds a limiter that holds the true peak (4 times oversampled)
 at -1 dBTP after the programme is normalised to -16 LUFS, which its
-`limiterPeakTarget` declares. The decoders apply the gains of a frame to
-the next frame's output, so the generator uses what the codec delay
-leaves beyond one frame as its lookahead. With
+`limiterPeakTarget` declares. The decoders, this one included, apply
+the gains of a frame to the next frame's output, so the generator uses
+what the codec delay leaves beyond one frame as its lookahead. With
 `aac_encoder_set_loudness_info` the programme's figures anchor the curve
 and size the ratio (two-pass); without them the anchor is the
 integrated loudness of the input so far and the range is assumed to be

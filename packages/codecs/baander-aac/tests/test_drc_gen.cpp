@@ -4,7 +4,9 @@
  * alternates between loud and quiet passages (the direction and bounds
  * of its gains, its smoothing, the limiter's ceiling, the loudness range
  * of its output), and whole streams with the gain sets on and off
- * through the public API and the decoder's DRC requests.
+ * through the public API and the decoder's DRC requests, with the
+ * decoder's timing: the gains an access unit carries shape the output of
+ * the next one.
  *
  * `test_drc_gen --write-streams DIR` writes the committed stream. */
 #include <cmath>
@@ -18,6 +20,8 @@
 #include "bitstream.h"
 #include "drc_gen.h"
 #include "encoder.h"
+#include "loudness.h"
+#include "latm.h"
 #include "test_util.h"
 #include "unidrc.h"
 #include "usac.h"
@@ -269,7 +273,7 @@ void test_loudness_round_trip() {
     memset(buf, 0, sizeof(buf));
     AacBitWriter w;
     aac_bitwriter_init(&w, buf, (int)sizeof(buf));
-    const int bits = aac_drc_gen_write_loudness(&w, info, ids, n);
+    const int bits = aac_loudness_info_set_write(&w, info, ids, n);
     CHECK(bits > 0, "%d entries written", n);
     AacBitReader r;
     aac_bitreader_init(&r, buf, (bits + 7) / 8);
@@ -829,6 +833,87 @@ void test_api() {
 
 /* ── the committed stream ──────────────────────────────────────── */
 
+/* The uniDrcGain() nodes of every access unit of a LOAS stream of the
+ * encoder (the pre-roll element first, then the UNI_DRC element);
+ * false when the stream does not parse that way. */
+bool stream_nodes(const std::vector<uint8_t>& stream, int frame_length,
+                  std::vector<AacUniDrcGainFrame>* out) {
+  AacUniDrcConfig c;
+  aac_drc_gen_config(&c, 2);
+  AacLatmConfig cfg;
+  memset(&cfg, 0, sizeof(cfg));
+  std::vector<uint8_t> au(AAC_LOAS_MAX_PAYLOAD);
+  for (size_t pos = 0; pos + AAC_LOAS_HEADER_BYTES <= stream.size();) {
+    if (!aac_loas_is_sync(stream.data() + pos, (int)(stream.size() - pos))) {
+      return false;
+    }
+    const int len = aac_loas_payload_length(stream.data() + pos);
+    AacLatmPayload pl[AAC_LATM_MAX_SUBFRAMES];
+    int used;
+    if (pos + AAC_LOAS_HEADER_BYTES + (size_t)len > stream.size() ||
+        aac_latm_read_mux_element(stream.data() + pos + AAC_LOAS_HEADER_BYTES, len, 1, &cfg,
+                                  au.data(), (int)au.size(), pl, AAC_LATM_MAX_SUBFRAMES,
+                                  &used) != 1) {
+      return false;
+    }
+    pos += AAC_LOAS_HEADER_BYTES + (size_t)len;
+    AacBitReader r;
+    aac_bitreader_init(&r, au.data() + pl[0].offset, pl[0].size);
+    aac_bitreader_read(&r, 1);       /* usacIndependencyFlag */
+    if (aac_bitreader_read(&r, 1)) { /* the pre-roll element, never with the default length */
+      aac_bitreader_read(&r, 1);
+      aac_bitreader_skip(&r, 8 * aac_usac_ext_payload_length(&r));
+    }
+    if (!aac_bitreader_read(&r, 1) || aac_bitreader_read(&r, 1)) {
+      return false; /* the UNI_DRC element is present in every frame, with its length */
+    }
+    const int bits = 8 * aac_usac_ext_payload_length(&r);
+    AacUniDrcGainFrame g;
+    if (aac_unidrc_parse_gain(&c, &r, bits, frame_length, kRate, &g) != AAC_OK) {
+      return false;
+    }
+    out->push_back(g);
+  }
+  return !out->empty();
+}
+
+/* The decoder's timing on the committed stream: the gain the night set
+ * applies at the last sample of output frame k + 1 is the gain of the
+ * node that access unit k carries at its frame end. */
+void check_gain_timing(const std::vector<uint8_t>& stream, const std::vector<float>& plain,
+                       const std::vector<float>& night) {
+  std::vector<AacUniDrcGainFrame> nodes;
+  const int frame_length = kSbrFrame; /* 2:1 SBR at 64 kbit/s */
+  CHECK(stream_nodes(stream, frame_length, &nodes), "%s: the gains of every access unit",
+        kCommittedName);
+  CHECK(plain.size() == nodes.size() * frame_length * 2, "%s: %zu frames of %d samples",
+        kCommittedName, nodes.size(), frame_length);
+  int checked = 0, matched = 0, moving = 0;
+  for (size_t k = 0; k + 1 < nodes.size() && (k + 2) * frame_length * 2 <= plain.size(); k++) {
+    const AacUniDrcSequence* s = &nodes[k].seq[1];
+    const AacUniDrcSequence* next = &nodes[k + 1].seq[1];
+    if (s->node_count == 0 || s->node[s->node_count - 1].time != frame_length - 1 ||
+        next->node_count == 0) {
+      continue;
+    }
+    /* frames whose gain differs from the next one's tell the timings apart */
+    const float want = s->node[s->node_count - 1].gain_db;
+    moving += fabsf(want - next->node[next->node_count - 1].gain_db) > 0.1f;
+    const size_t at = ((k + 1) * frame_length + frame_length - 1) * 2;
+    for (int c = 0; c < 2; c++) {
+      if (fabsf(plain[at + c]) < 1e-3f || fabsf(night[at + c]) > 0.99f) {
+        continue;
+      }
+      checked++;
+      matched += fabsf(20.0f * log10f(fabsf(night[at + c] / plain[at + c])) - want) < 0.01f;
+    }
+  }
+  CHECK(checked > 100 && moving > 10 && matched == checked,
+        "%s: the gains of access unit k at the end of output frame k + 1 (%d of %d samples, %d "
+        "frames where the gain moves)",
+        kCommittedName, matched, checked, moving);
+}
+
 std::vector<float> committed_signal() { return gen_alternation(kPassages, 0.5, 2); }
 
 int write_streams(const char* dir) {
@@ -857,6 +942,7 @@ void test_committed() {
   CHECK(errors == 0 && night.size() == plain.size() &&
             snr_db(plain.data(), night.data(), plain.size()) < 20.0,
         "%s: the night set applies", kCommittedName);
+  check_gain_timing(stream, plain, night);
   const Encoded e = encode(pcm, 2, 64000, options(1));
 #if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
   CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)",
