@@ -919,9 +919,18 @@ struct OttBox {
   }
 };
 
-/* The TTT box parameters of a frame from its three inputs: the
- * prediction coefficients as the least squares fit of the centre on the
- * downmix pair, the prediction quality as ICC, or the energy ratios. */
+/* The TTT box of the 525 tree: the downmix is l0 = l + c / sqrt 2 and
+ * r0 = r + c / sqrt 2, the decoder rebuilding the centre as sqrt 2
+ * times the scaled centre it estimates from the pair. */
+constexpr float kCentreScale = 0.70710678f;
+
+/* The TTT box parameters of a frame from its three inputs (l, r and the
+ * scaled centre): the prediction coefficients as the least squares fit
+ * of the centre on the downmix pair with, as ICC, the share of the
+ * three signals' energy the prediction keeps (the decoder restores the
+ * rest by 1 / ICC in mode 1, by its decorrelator in mode 0; an ICC
+ * index above 4 would make the decoder's 1 / ICC vanish, so the share
+ * is held at index 4), or the energy ratios of the energy modes. */
 void ttt_params(const Hyb* l, const Hyb* r, const Hyb* c, const int* slot, int num_sets,
                 const uint8_t* kernel, const Config& cfg, FrameParams& p) {
   int from = 0;
@@ -964,9 +973,15 @@ void ttt_params(const Hyb* l, const Hyb* r, const Hyb* c, const int* slot, int n
         }
         p.ttt_cpc1[s][pb] = quantise_cpc((float)(1.0 - 3.0 * a));
         p.ttt_cpc2[s][pb] = quantise_cpc((float)(1.0 - 3.0 * bb));
-        const double e_pred = a * pcl[pb] + bb * pcr[pb];
-        const double rho = sqrt(std::max(0.0, std::min(1.0, e_pred / (ecc[pb] + kEps))));
-        p.ttt_icc[s][pb] = quantise_icc((float)rho);
+        /* the energies of the predicted centre and of l0 and r0 minus it
+         * against those of the signals, the centre counted at its
+         * output scale */
+        const double e_c = a * a * pll[pb] + bb * bb * prr[pb] + 2.0 * a * bb * plr[pb];
+        const double e_l = pll[pb] - 2.0 * (a * pll[pb] + bb * plr[pb]) + e_c;
+        const double e_r = prr[pb] - 2.0 * (a * plr[pb] + bb * prr[pb]) + e_c;
+        const double kept = (e_l + e_r + 2.0 * e_c) / (el[pb] + er[pb] + 2.0 * ecc[pb] + kEps);
+        const double rho = sqrt(std::max(0.0, std::min(1.0, kept)));
+        p.ttt_icc[s][pb] = std::min(4, quantise_icc((float)rho));
       } else {
         p.ttt_cld1[s][pb] = quantise_cld((float)(10.0 * log10((el[pb] + er[pb] + kEps) / (ecc[pb] + kEps))));
         p.ttt_cld2[s][pb] = quantise_cld((float)(10.0 * log10((el[pb] + kEps) / (er[pb] + kEps))));
@@ -1006,6 +1021,13 @@ struct Tree {
         ott(0, C, LFE, tmp[0]);  /* c */
         ott(1, L, Ls, tmp[1]);   /* l */
         ott(2, R, Rs, tmp[2]);   /* r */
+        for (int t = 0; t < kSlots; t++) {
+          for (int k = 0; k < kHyb; k++) {
+            for (int c = 0; c < 2; c++) {
+              tmp[0][t][k][c] *= kCentreScale;
+            }
+          }
+        }
         ttt_params(tmp[1], tmp[2], tmp[0], slot, num_sets, kernel, cfg, p);
         for (int t = 0; t < kSlots; t++) {
           for (int k = 0; k < kHyb; k++) {

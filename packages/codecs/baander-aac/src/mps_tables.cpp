@@ -29,15 +29,15 @@ const float aac_mps_icc_value[8] = {
     1.0f, 0.937f, 0.84118f, 0.60092f, 0.36764f, 0.0f, -0.589f, -0.99f,
 };
 
-/* CPC quantiser, index -20..30: 0.05 per step from -1.0 to 1.5 (the
+/* CPC quantiser, index -20..30: 0.1 per step from -2.0 to 3.0 (the
  * coarse quantiser takes every second value). */
 const float aac_mps_cpc_value[51] = {
-    -1.00f, -0.95f, -0.90f, -0.85f, -0.80f, -0.75f, -0.70f, -0.65f, -0.60f, -0.55f,
-    -0.50f, -0.45f, -0.40f, -0.35f, -0.30f, -0.25f, -0.20f, -0.15f, -0.10f, -0.05f,
-    0.00f, 0.05f, 0.10f, 0.15f, 0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f,
-    0.50f, 0.55f, 0.60f, 0.65f, 0.70f, 0.75f, 0.80f, 0.85f, 0.90f, 0.95f,
-    1.00f, 1.05f, 1.10f, 1.15f, 1.20f, 1.25f, 1.30f, 1.35f, 1.40f, 1.45f,
-    1.50f,
+    -2.0f, -1.9f, -1.8f, -1.7f, -1.6f, -1.5f, -1.4f, -1.3f, -1.2f, -1.1f,
+    -1.0f, -0.9f, -0.8f, -0.7f, -0.6f, -0.5f, -0.4f, -0.3f, -0.2f, -0.1f,
+    0.0f,  0.1f,  0.2f,  0.3f,  0.4f,  0.5f,  0.6f,  0.7f,  0.8f,  0.9f,
+    1.0f,  1.1f,  1.2f,  1.3f,  1.4f,  1.5f,  1.6f,  1.7f,  1.8f,  1.9f,
+    2.0f,  2.1f,  2.2f,  2.3f,  2.4f,  2.5f,  2.6f,  2.7f,  2.8f,  2.9f,
+    3.0f,
 };
 
 /* The fixed gains: bsFixedGainSur and bsFixedGainDmx in 1.5 dB steps,

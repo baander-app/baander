@@ -107,11 +107,17 @@ double channel_snr_db(const std::vector<float>& ref, const std::vector<float>& o
 }
 
 /* The decodes of the 5.1 trees against libxaac's, channel by channel,
- * with no offset: both decoders carry the same delay. */
+ * with no offset: both decoders carry the same delay.  The 525 tree in
+ * the TTT prediction mode (1) and, from a broadband programme, in the
+ * energy mode (5); libxaac's fixed-point energy weights lose precision
+ * beyond about 45 dB of level difference, so the energy stream keeps
+ * every band populated. */
 void test_against_libxaac() {
-  const char* streams[2] = {"mps_5151_header_q.loas", "mps_5152_header_q.loas"};
-  const char* wavs[2] = {"mps_5151_header_q_xaac.wav", "mps_5152_header_q_xaac.wav"};
-  for (int i = 0; i < 2; i++) {
+  const char* streams[4] = {"mps_5151_header_q.loas", "mps_5152_header_q.loas", "mps_525_header_q.loas",
+                            "mps_525_energy_q.loas"};
+  const char* wavs[4] = {"mps_5151_header_q_xaac.wav", "mps_5152_header_q_xaac.wav",
+                         "mps_525_header_q_xaac.wav", "mps_525_energy_q_xaac.wav"};
+  for (int i = 0; i < 4; i++) {
     const Decoded d = decode_stream(streams[i], 0);
     CHECK(d.errors == 0, "%s: %d errors", streams[i], d.errors);
     CHECK(d.frames == 96, "%s: %d frames", streams[i], d.frames);

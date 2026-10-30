@@ -748,8 +748,9 @@ void test_committed_streams() {
     CHECK(mux_version == (i == 3 ? 1 : 0), "%s: audioMuxVersion %d", names[i], mux_version);
   }
   /* the libxaac decodes are six channels of the quiet streams' first second */
-  const char* wavs[2] = {"mps_5151_header_q_xaac.wav", "mps_5152_header_q_xaac.wav"};
-  for (int i = 0; i < 2; i++) {
+  const char* wavs[4] = {"mps_5151_header_q_xaac.wav", "mps_5152_header_q_xaac.wav",
+                         "mps_525_header_q_xaac.wav", "mps_525_energy_q_xaac.wav"};
+  for (int i = 0; i < 4; i++) {
     const std::vector<uint8_t> w = read_file(data_path(wavs[i]));
     CHECK(w.size() > 44, "%s present", wavs[i]);
     if (w.size() <= 44) continue;

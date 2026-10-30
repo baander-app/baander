@@ -332,8 +332,9 @@ void test_tables() {
   printf("decorrelator denominators vs lattice step-up: max error %.5f\n", max_err);
   CHECK(max_err < 0.02, "decorrelator denominators differ from the lattice form by %f", max_err);
   CHECK(aac_mps_cld_db[15] == 0.0f && aac_mps_cld_db[30] == 150.0f, "CLD scale");
-  CHECK(fabsf(aac_mps_cpc_value[20]) < 1e-6f && fabsf(aac_mps_cpc_value[50] - 1.5f) < 1e-6f,
-        "CPC scale");
+  CHECK(fabsf(aac_mps_cpc_value[20]) < 1e-6f && fabsf(aac_mps_cpc_value[0] + 2.0f) < 1e-6f &&
+            fabsf(aac_mps_cpc_value[30] - 1.0f) < 1e-6f && fabsf(aac_mps_cpc_value[50] - 3.0f) < 1e-6f,
+        "CPC scale: 0.1 per index from -2.0 to 3.0");
   CHECK(fabsf(aac_mps_lfe_gain[2] - 10.0f) < 1e-5f, "LFE gain 20 dB");
 }
 
@@ -416,17 +417,24 @@ void test_ttt_matrix() {
   CHECK(fabsf(m[0][2] - res / 3.0f) < 1e-6f && fabsf(m[1][2] - res / 3.0f) < 1e-6f &&
             fabsf(m[2][2] + sqrtf(2.0f) / 3.0f) < 1e-6f,
         "TTT residual column");
-  /* CPC 1, 1: the inputs pass straight through */
-  aac_mps_ttt_matrix(1, 20, 20, 0, 0, 0, 0, m);
+  /* CPC 1, 1 (index 10): the inputs pass straight through */
+  aac_mps_ttt_matrix(1, 10, 10, 0, 0, 0, 0, m);
   CHECK(fabsf(m[0][0] - 1.0f) < 1e-6f && fabsf(m[0][1]) < 1e-6f && fabsf(m[1][1] - 1.0f) < 1e-6f &&
             fabsf(m[2][0]) < 1e-6f && fabsf(m[2][1]) < 1e-6f,
         "TTT CPC 1 pass-through");
-  /* mode 0 outside the residual bands divides by the ICC, the direct
-   * parts of M2 multiply it back */
-  float m0[3][3];
+  /* both prediction modes divide the input columns by the ICC outside
+   * the residual bands (the energy compensation); mode 0 has M2 scale
+   * the direct parts back by it; a residual band is not scaled */
+  float m0[3][3], m1[3][3], mr[3][3];
   aac_mps_ttt_matrix(0, 0, 0, 3, 0, 0, 0, m0);
+  aac_mps_ttt_matrix(1, 0, 0, 3, 0, 0, 0, m1);
+  aac_mps_ttt_matrix(1, 0, 0, 3, 0, 0, 1, mr);
   CHECK(fabsf(m0[0][0] * aac_mps_icc_value[3] - m[0][0] * 2.0f / 3.0f) < 1e-5f,
         "TTT mode 0 ICC scaling");
+  CHECK(fabsf(m1[0][0] - m0[0][0]) < 1e-6f && fabsf(m1[2][1] - m0[2][1]) < 1e-6f,
+        "TTT mode 1 ICC scaling");
+  CHECK(fabsf(mr[0][0] - 2.0f / 3.0f) < 1e-6f && fabsf(m1[0][2] - mr[0][2]) < 1e-6f,
+        "TTT residual band unscaled");
   /* energy modes: with CLD1 the level of l + r against the centre
    * input and CLD2 the level of l against r, uncorrelated l and r come
    * back at their energies; the centre is the energy-weighted mean of
@@ -470,13 +478,13 @@ void test_ttt_matrix() {
             fabsf(h[0][1][0]) < 1e-4f && fabsf(h[1][0][0]) < 1e-4f && fabsf(h[0][0][1]) < 1e-4f,
         "TTT inverse identity");
   /* and the inverse of the matrix-compatible downmix otherwise */
-  aac_mps_ttt_inverse(2, -3, 1, 4, -14, h);
+  aac_mps_ttt_inverse(2, -3, 1, 4, -7, h);
   {
     /* rebuild the downmix from the same weights */
     const double w1 = pow(10.0, -aac_mps_cld_db[2 + 15] / 10.0);
     const double w2 = pow(10.0, -aac_mps_cld_db[-3 + 15] / 10.0);
     const double c1 = 1.0 / 3.0 + 2.0 / 3.0 * aac_mps_cpc_value[4 + 20];
-    const double c2 = -1.0 - 2.0 * aac_mps_cpc_value[-14 + 20];
+    const double c2 = -1.0 - 2.0 * aac_mps_cpc_value[-7 + 20];
     const double g1 = c1 * w1 / (1.0 + w1), g2 = c2 * w2 / (1.0 + w2);
     const double l1 = sqrt(1.0 - 2.0 * g1 + 2.0 * g1 * g1), l2 = sqrt(1.0 - 2.0 * g2 + 2.0 * g2 * g2);
     const double d[2][2][2] = {{{(1.0 - g1) / l1, g1 / l1}, {0.0, -g2 / l2 / sqrt(3.0)}},
@@ -544,7 +552,7 @@ void test_tree_energy() {
     AacMpsFrameParams p;
     default_params(&p, 32);
     for (int pb = 0; pb < 20; pb++) {
-      p.ttt_cpc1[0][0][pb] = p.ttt_cpc2[0][0][pb] = 20;
+      p.ttt_cpc1[0][0][pb] = p.ttt_cpc2[0][0][pb] = 10;
       p.ott_cld[1][0][pb] = 4;
       p.ott_icc[1][0][pb] = 3;
       p.ott_cld[2][0][pb] = -6;
@@ -565,11 +573,37 @@ void test_tree_energy() {
     CHECK(aac_mps_tree_layout(&cfg, &t) == AAC_OK && t.num_decorr == 3 && t.ttt_decorr_band[3],
           "525 mode 0 layout");
     for (int pb = 0; pb < 20; pb++) p.ttt_icc[0][0][pb] = 2;
+    AacMpsBandMatrices m1;
+    aac_mps_tree_matrices(&cfg, &t, &p, 0, 5, &m1);
+    cfg.ttt_mode_low[0] = 1;
+    CHECK(aac_mps_tree_layout(&cfg, &t) == AAC_OK, "525 mode 1 layout");
     aac_mps_tree_matrices(&cfg, &t, &p, 0, 5, &m);
+    cfg.ttt_mode_low[0] = 0;
+    CHECK(aac_mps_tree_layout(&cfg, &t) == AAC_OK, "525 mode 0 layout again");
     const float rho = aac_mps_icc_value[2];
-    CHECK(fabsf(m.m2_wet[0][5] - sqrtf((1.0f - rho * rho) / 3.0f) * sqrtf(r / (1.0 + r))) < 1e-5f,
-          "525 TTT decorrelator weight %f", m.m2_wet[0][5]);
-    CHECK(fabsf(m.m1[5][0][0] - m.m1[2][0][0]) < 1e-6f, "525 TTT decorrelator input");
+    const float g_dd = sqrtf((1.0f - rho * rho) / 3.0f);
+    /* the TTT decorrelator feeds L, R and C with the energy the
+     * prediction loses, the centre's weight carrying the sqrt 2 of the
+     * centre row and the C/LFE split; the direct parts of those three
+     * carry the ICC on top of the mode 1 matrices (M1 is shared) */
+    const float c_lfe = sqrtf(pow(10.0, aac_mps_cld_db[0 + 15] / 10.0) / 2.0);
+    CHECK(fabsf(m1.m2_wet[0][5] - g_dd * sqrtf(r / (1.0 + r))) < 1e-5f,
+          "525 TTT decorrelator weight %f", m1.m2_wet[0][5]);
+    CHECK(fabsf(m1.m2_wet[2][5] + sqrtf(2.0f) * g_dd * c_lfe) < 1e-5f,
+          "525 TTT decorrelator centre weight %f", m1.m2_wet[2][5]);
+    CHECK(fabsf(m1.m2_wet[4][5]) < 1e-6f && fabsf(m1.m2_wet[3][5]) < 1e-6f,
+          "525 TTT decorrelator reaches no surround or LFE");
+    CHECK(fabsf(m1.m2_dry[0][0] - rho * m.m2_dry[0][0]) < 1e-6f &&
+              fabsf(m1.m2_dry[1][1] - rho * m.m2_dry[1][1]) < 1e-6f &&
+              fabsf(m1.m2_dry[2][2] - rho * m.m2_dry[2][2]) < 1e-6f &&
+              fabsf(m1.m2_dry[4][0] - m.m2_dry[4][0]) < 1e-6f,
+          "525 mode 0 direct parts scaled by the ICC");
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 3; col++) {
+        CHECK(fabsf(m1.m1[row][col][0] - m.m1[row][col][0]) < 1e-6f, "525 mode 0 and 1 share M1");
+      }
+    }
+    CHECK(fabsf(m1.m1[5][0][0] - m1.m1[2][0][0]) < 1e-6f, "525 TTT decorrelator input");
   }
 }
 

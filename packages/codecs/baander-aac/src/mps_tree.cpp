@@ -404,8 +404,9 @@ void aac_mps_ttt_matrix(int mode, int cpc1_idx, int cpc2_idx, int icc_idx, int c
   memset(m, 0, sizeof(float) * 9);
   if (mode < 2) {
     /* prediction: the pseudo-inverse of the downmix corrected by the
-     * CPCs; with the ICC (mode 0) the direct parts are scaled back by
-     * it in M2 and the TTT decorrelator carries the rest */
+     * CPCs, scaled by 1/ICC outside the residual bands to restore the
+     * energy the prediction loses; in mode 0 M2 scales the direct parts
+     * back by the ICC and the TTT decorrelator carries the rest */
     const float c1 = cpc_of(cpc1_idx), c2 = cpc_of(cpc2_idx);
     m[0][0] = (c1 + 2.0f) / 3.0f;
     m[0][1] = (c2 - 1.0f) / 3.0f;
@@ -413,7 +414,7 @@ void aac_mps_ttt_matrix(int mode, int cpc1_idx, int cpc2_idx, int icc_idx, int c
     m[1][1] = (c2 + 2.0f) / 3.0f;
     m[2][0] = (1.0f - c1) / 3.0f;
     m[2][1] = (1.0f - c2) / 3.0f;
-    if (mode == 0 && !residual_band) {
+    if (!residual_band) {
       const float rho = icc_of(icc_idx);
       const float k = rho != 0.0f ? 1.0f / rho : 0.0f;
       for (int row = 0; row < 3; row++) {
