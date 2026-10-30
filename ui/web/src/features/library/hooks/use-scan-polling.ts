@@ -1,43 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { getLibraries } from '../api/library-api'
-import type { Library } from '../api/library-api'
+import { libraryKeys } from '../query-keys'
 
+/** The fallback scan observer shares the authoritative library list. */
 export function useScanPolling(intervalMs = 3000) {
-  const [scanningIds, setScanningIds] = useState<Set<string>>(new Set())
-  const librariesRef = useRef<Library[]>([])
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const checkForScanning = useCallback(async () => {
-    try {
-      const libraries = await getLibraries()
-      librariesRef.current = libraries
-      const ids = new Set(
-        libraries
-          .filter((l) => l.scanStatus === 'scanning')
-          .map((l) => l.publicId),
-      )
-      setScanningIds(ids)
-    } catch {
-      // Silently ignore — will retry next interval
-    }
-  }, [])
-
-  const startPolling = useCallback(() => {
-    if (timerRef.current) return
-    checkForScanning()
-    timerRef.current = setInterval(checkForScanning, intervalMs)
-  }, [checkForScanning, intervalMs])
-
-  const stopPolling = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => stopPolling()
-  }, [stopPolling])
-
-  return { scanningIds, startPolling, stopPolling, refresh: checkForScanning }
+  const [enabled, setEnabled] = useState(false)
+  const { data, refetch } = useQuery({
+    queryKey: libraryKeys.list(),
+    queryFn: ({ signal }) => getLibraries(undefined, signal),
+    enabled,
+    refetchInterval: enabled ? intervalMs : false,
+  })
+  const scanningIds = new Set(
+    data?.filter(library => library.scanStatus === 'scanning').map(library => library.publicId),
+  )
+  const startPolling = useCallback(() => setEnabled(true), [])
+  const stopPolling = useCallback(() => setEnabled(false), [])
+  return { scanningIds, startPolling, stopPolling, refresh: refetch }
 }

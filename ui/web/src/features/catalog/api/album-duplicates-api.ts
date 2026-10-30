@@ -5,9 +5,9 @@ import { useQuery } from '@tanstack/react-query'
 export function useAlbumDuplicates(albumPublicId: string | undefined) {
   return useQuery({
     queryKey: ['album-duplicates', albumPublicId],
-    queryFn: () => {
+    queryFn: ({ signal }) => {
       if (!albumPublicId) return []
-      return AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(`/api/albums/${albumPublicId}/duplicates`)
+      return AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(`/api/albums/${albumPublicId}/duplicates`, { signal })
         .then((r) => r.data.data)
     },
     enabled: !!albumPublicId,

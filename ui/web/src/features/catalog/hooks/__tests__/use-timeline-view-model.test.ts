@@ -1,5 +1,7 @@
+import { createElement, type ReactNode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 
 // --- Mocks ---
 
@@ -45,6 +47,11 @@ function makeResponse(albums: ReturnType<typeof makeAlbum>[]) {
   }
 }
 
+function wrapper({ children }: { children: ReactNode }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
+  return createElement(QueryClientProvider, { client }, children)
+}
+
 describe('useTimelineViewModel', () => {
   beforeEach(() => {
     mockGet.mockReset()
@@ -58,7 +65,7 @@ describe('useTimelineViewModel', () => {
       makeAlbum('d', 2014),
     ]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -87,7 +94,7 @@ describe('useTimelineViewModel', () => {
       makeAlbum('c', null, 'Unknown Album'),
     ]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -106,7 +113,7 @@ describe('useTimelineViewModel', () => {
       makeAlbum('b', null),
     ]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -119,7 +126,7 @@ describe('useTimelineViewModel', () => {
   it('returns empty array when no albums', async () => {
     mockGet.mockResolvedValue({ data: makeResponse([]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -131,7 +138,7 @@ describe('useTimelineViewModel', () => {
   it('reports loading state', () => {
     mockGet.mockReturnValue(new Promise(() => {})) // Never resolves
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     expect(result.current.isLoading).toBe(true)
     expect(result.current.decades).toHaveLength(0)
@@ -140,7 +147,7 @@ describe('useTimelineViewModel', () => {
   it('reports error state', async () => {
     mockGet.mockRejectedValue(new Error('Network error'))
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -156,7 +163,7 @@ describe('useTimelineViewModel', () => {
       makeAlbum('c', 2022),
     ]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -173,7 +180,7 @@ describe('useTimelineViewModel', () => {
       makeAlbum('c', 2024),
     ]) })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
@@ -196,11 +203,12 @@ describe('useTimelineViewModel', () => {
         meta: { current_page: 2, last_page: 2, per_page: 100, total: 2 },
       } })
 
-    const { result } = renderHook(() => useTimelineViewModel())
+    const { result } = renderHook(() => useTimelineViewModel(), { wrapper })
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     expect(mockGet).toHaveBeenCalledTimes(2)
     expect(mockGet).toHaveBeenNthCalledWith(2, '/api/albums', {
+      signal: expect.any(AbortSignal),
       params: { sort: 'year', order: 'asc', limit: 100, page: 2 },
     })
     expect(result.current.decades.flatMap((decade) =>
@@ -208,4 +216,46 @@ describe('useTimelineViewModel', () => {
     )).toEqual(['first', 'second'])
   })
 
+})
+
+it('retains the complete previous walk during refresh and serializes repeated refresh requests', async () => {
+  mockGet.mockReset()
+  let resolvePage!: (value: unknown) => void
+  mockGet.mockResolvedValueOnce({ data: makeResponse([makeAlbum('before', 2024)]) })
+  const hook = renderHook(() => useTimelineViewModel(), { wrapper })
+  await waitFor(() => expect(hook.result.current.decades[0]?.years[0]?.albums[0]?.publicId).toBe('before'))
+  mockGet.mockImplementationOnce(() => new Promise(resolve => {
+    resolvePage = resolve
+  }))
+  act(() => {
+    hook.result.current.refetch()
+    hook.result.current.refetch()
+  })
+  expect(mockGet).toHaveBeenCalledTimes(2)
+  expect(hook.result.current.decades[0].years[0].albums[0].publicId).toBe('before')
+  await act(async () => {
+    resolvePage({ data: makeResponse([makeAlbum('after', 2024)]) })
+  })
+  await waitFor(() => expect(hook.result.current.decades[0].years[0].albums[0].publicId).toBe('after'))
+})
+
+it('aborts an unfinished whole-catalog walk without starting its next page', async () => {
+  mockGet.mockReset()
+  let resolvePage!: (value: unknown) => void
+  mockGet.mockImplementationOnce(() => new Promise(resolve => {
+    resolvePage = resolve
+  }))
+  const hook = renderHook(() => useTimelineViewModel(), { wrapper })
+  const signal = mockGet.mock.calls[0][1].signal as AbortSignal
+  hook.unmount()
+  expect(signal.aborted).toBe(true)
+  await act(async () => {
+    resolvePage({
+      data: {
+        data: [makeAlbum('discarded', 2024)],
+        meta: { last_page: 2 },
+      },
+    })
+  })
+  expect(mockGet).toHaveBeenCalledOnce()
 })

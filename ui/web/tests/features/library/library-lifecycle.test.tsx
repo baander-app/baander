@@ -9,6 +9,7 @@ import {
   ScanLibraryDialog,
 } from '@/features/library/components/LibraryDialogs'
 import { usePathValidation } from '@/features/library/hooks/use-path-validation'
+import { advanceAuthorization } from '@/shared/live/ownership'
 import { validatePath, type Library } from '@/features/library/api/library-api'
 
 vi.mock('@/features/library/api/library-api', () => ({
@@ -145,4 +146,45 @@ it('ignores validation replies after path reset or a newer request', async () =>
     resolvedPath: '/new',
   })
   expect(result.current.isValidating).toBe(false)
+})
+
+it('clears validation state on authorization change without letting an old reply finish a newer request', async () => {
+  const pending = new Map<string, (value: ValidationResult) => void>()
+  vi.mocked(validatePath).mockImplementation(path => new Promise(resolve => {
+    pending.set(path, resolve)
+  }))
+  const { result, unmount } = renderHook(() => usePathValidation())
+  let first!: Promise<void>
+  act(() => {
+    first = result.current.validate('/old-authorization')
+  })
+  await waitFor(() => expect(pending.has('/old-authorization')).toBe(true))
+  expect(result.current.isValidating).toBe(true)
+
+  act(() => advanceAuthorization())
+  expect(result.current.isValidating).toBe(false)
+  expect(result.current.result).toBeNull()
+
+  let current!: Promise<void>
+  act(() => {
+    current = result.current.validate('/current-authorization')
+  })
+  await waitFor(() => expect(pending.has('/current-authorization')).toBe(true))
+  await act(async () => {
+    pending.get('/old-authorization')!({ valid: true, error: null, resolvedPath: '/old' })
+    await first
+  })
+  expect(result.current.isValidating).toBe(true)
+  expect(result.current.result).toBeNull()
+
+  await act(async () => {
+    pending.get('/current-authorization')!({ valid: true, error: null, resolvedPath: '/current' })
+    await current
+  })
+  expect(result.current.isValidating).toBe(false)
+  expect(result.current.result?.resolvedPath).toBe('/current')
+  act(() => advanceAuthorization())
+  expect(result.current.result).toBeNull()
+  unmount()
+  act(() => advanceAuthorization())
 })

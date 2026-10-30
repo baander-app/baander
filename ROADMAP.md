@@ -145,6 +145,46 @@ receipts are `/tmp/live-u5-frontend-stable.log`,
 Prose audits and whitespace checks pass. U6–U9 remain open for feature adoption,
 subscription activation, browser acceptance and full-system capacity qualification.
 
+U6 implementation checkpoint, 2026-10-30: sidebar Recents now uses a shared
+query and refreshes after local playback while retaining readable data during
+outages. Timeline serializes signalled page walks and preserves loaded data.
+Library list, detail and statistics readers share canonical query keys and
+signals; scan status uses a shared observer. Metadata editing uses the reusable
+draft mechanism, with independent server baselines and local revisions, explicit
+conflict and unavailable states, and access-revocation clearing. A completed save
+clears only submitted edits that have not changed while it was pending.
+
+U6 focused verification: metadata passes 25 tests across three files: seven
+rendered InfoPanel cases, eight form-hook cases and ten shared-draft cases.
+The rendered cases cover holding a remote update, newer input during save,
+401/403 responses, deletion, access reset and switching resources. Lyrics passes
+14 tests across two files, including reset during a pending save and release in
+the `finally` block; activity passes six tests. The scheduler and library
+regression group passes 27 tests across four files. Its second-library-observer
+regression fails before the fix and passes afterward: nested cache events had
+caused duplicate fetches, and invalidation now accepts only authoritative query
+updates.
+
+Focused review found two defects: pending draft reverts lost intent after access
+revocation or a conflict, and path validation could remain at Checking after an
+authentication change within the same account. Both regressions fail before
+their fixes in `/tmp/u6-draft-revert-red.log` and
+`/tmp/u6-path-review-red.log`. The repaired group passes 29 tests across four
+files in `/tmp/u6-review-fixes-green.log`, including the 25 metadata/draft tests
+and four library cases. The original full run had eleven sidebar fixture failures
+and two new regression failures. Adding the query provider to the two sidebar
+fixtures passes all eleven focused cases; that failed aggregate remains recorded.
+
+The coverage inventory records these unit-proof paths while retaining pending
+end-to-end acceptance. The stable full frontend suite passes 2,734 tests across
+219 files in `/tmp/live-u6-frontend-stable.log`. Both TypeScript projects pass;
+full ESLint reports zero errors and eight existing warnings. Their receipts are
+`/tmp/live-u6-typecheck-final.log` and `/tmp/live-u6-lint-final.log`. Prose audits
+and whitespace checks pass. Final code review remains open. General subscription
+activation remains disabled. U7–U8 adoption remains open, including
+draft protection in `EditLibraryDialog`; U9 still owns full producer, browser and
+capacity acceptance.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

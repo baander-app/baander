@@ -43,3 +43,63 @@ describe('ActivityService playback attempts', () => {
     } finally { log.mockRestore() }
   })
 })
+
+it('does not refresh a replacement account after an older play completes', async () => {
+  const { QueryClient } = await import('@tanstack/react-query')
+  const { synchronizeOwnership } = await import('@/shared/live/ownership')
+  synchronizeOwnership('old-principal')
+  const oldClient = new QueryClient()
+  const detachOld = activityService.attachRefresh(oldClient)
+  let finish!: () => void
+  post.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+  const pending = activityService.recordPlay({ songId: 'old' })
+  synchronizeOwnership('new-principal')
+  const nextClient = new QueryClient()
+  const nextRefresh = vi.spyOn(nextClient, 'invalidateQueries')
+  const detachNext = activityService.attachRefresh(nextClient)
+  detachOld()
+  finish()
+  await pending
+  expect(nextRefresh).not.toHaveBeenCalled()
+  post.mockResolvedValueOnce(undefined)
+  await activityService.recordPlay({ songId: 'new' })
+  expect(nextRefresh).toHaveBeenCalledOnce()
+  detachNext()
+  oldClient.clear()
+  nextClient.clear()
+  synchronizeOwnership(null)
+})
+
+it('refreshes observed history and recommendations after a successful local play without a socket', async () => {
+  const { QueryClient, QueryObserver } = await import('@tanstack/react-query')
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } })
+  let revision = 'before'
+  const keys = ['/api/activity/history', '/api/recommendations/', '/api/recommendations/for-you']
+  const observers = keys.map(key => new QueryObserver(client, { queryKey: [key], queryFn: async () => revision }))
+  const unsubscribe = observers.map(observer => observer.subscribe(() => undefined))
+  await vi.waitFor(() => expect(keys.map(key => client.getQueryData([key]))).toEqual(['before', 'before', 'before']))
+  const detach = activityService.attachRefresh(client)
+  revision = 'after'
+  post.mockResolvedValueOnce(undefined)
+  await activityService.recordPlay({ songId: 'song' })
+  expect(keys.map(key => client.getQueryData([key]))).toEqual(['after', 'after', 'after'])
+  unsubscribe.forEach(stop => stop())
+  detach()
+  client.clear()
+})
+
+it('does not publish a new principal play through the previous provider binding before cleanup', async () => {
+  const { QueryClient } = await import('@tanstack/react-query')
+  const { synchronizeOwnership } = await import('@/shared/live/ownership')
+  synchronizeOwnership('previous-principal')
+  const client = new QueryClient()
+  const invalidate = vi.spyOn(client, 'invalidateQueries')
+  const detach = activityService.attachRefresh(client)
+  synchronizeOwnership('replacement-principal')
+  post.mockResolvedValueOnce(undefined)
+  await activityService.recordPlay({ songId: 'replacement-song' })
+  expect(invalidate).not.toHaveBeenCalled()
+  detach()
+  client.clear()
+  synchronizeOwnership(null)
+})

@@ -51,14 +51,14 @@ export interface ScanAllResult {
   skipped: number
 }
 
-export async function getLibraries(type?: string): Promise<Library[]> {
+export async function getLibraries(type?: string, signal?: AbortSignal): Promise<Library[]> {
   const params = type ? { type } : undefined
-  const { data } = await AXIOS_INSTANCE.get('/api/libraries', { params })
+  const { data } = await AXIOS_INSTANCE.get('/api/libraries', { params, signal })
   return data.data
 }
 
-export async function getLibrary(id: string): Promise<Library> {
-  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}`)
+export async function getLibrary(id: string, signal?: AbortSignal): Promise<Library> {
+  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}`, { signal })
   return data.data
 }
 
@@ -83,8 +83,8 @@ export async function scanLibrary(id: string, options?: { rescan?: boolean }): P
   return data.data
 }
 
-export async function getLibraryStats(id: string): Promise<LibraryStats> {
-  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}/stats`)
+export async function getLibraryStats(id: string, signal?: AbortSignal): Promise<LibraryStats> {
+  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}/stats`, { signal })
   return data.data
 }
 

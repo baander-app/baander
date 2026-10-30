@@ -5,6 +5,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useEqProfilesStore } from '@/features/equalizer/stores/eq-profiles-store'
+import { activityService } from '@/features/player/services/activity-service'
 import { OwnedQueryClient } from './query-client'
 import { LiveRecovery } from './recovery'
 import { LIVE_QUERY_DESCRIPTORS } from './descriptors'
@@ -71,7 +72,11 @@ function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalCli
     const detach = client.attach()
     const stopCoordinator = principal && freshnessEnabled ? coordinator.start() : () => undefined
     const stop = principal ? recovery.start() : () => undefined
+    const detachActivity = principal
+      ? activityService.attachRefresh(client, freshnessEnabled ? coordinator : undefined)
+      : () => undefined
     return () => {
+      detachActivity()
       stop()
       stopCoordinator()
       detach()

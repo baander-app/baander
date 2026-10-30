@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -9,14 +9,21 @@ import {
   getGetAlbumShowQueryKey,
   getGetArtistShowQueryKey,
 } from '@/shared/api-client/gen/endpoints'
+import { useDraft } from '@/shared/drafts/use-draft'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 
 type EntityType = 'song' | 'album' | 'artist'
+
+const NO_LOCKS: string[] = []
 
 interface UseMetadataFormOptions {
   entityType: EntityType
   publicId: string
   initialData: Record<string, unknown>
   lockedFields: string[]
+  unavailable?: boolean
+  unauthorized?: boolean
 }
 
 export function useMetadataForm({
@@ -24,46 +31,65 @@ export function useMetadataForm({
   publicId,
   initialData,
   lockedFields: initialLocked,
+  unavailable = false,
+  unauthorized = false,
 }: UseMetadataFormOptions) {
-  const [formState, setFormState] = useState<Record<string, unknown>>(() => ({ ...initialData }))
-  const [lockedFields, setLockedFields] = useState<string[]>(() => [...initialLocked])
-  const [dirty, setDirty] = useState<Set<string>>(new Set())
-  const [isSaving, setIsSaving] = useState(false)
+  const draft = useDraft<Record<string, unknown>>({
+    identity: `${entityType}:${publicId}`,
+    initialData: { ...initialData, lockedFields: initialLocked },
+  })
+  const { receive, revokeAccess, beginSave, completeSave, failSave, resolveConflict, updateField: updateDraftField } = draft
+  const lockedFields = (draft.values.lockedFields ?? NO_LOCKS) as string[]
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
+  const mounted = useRef<typeof beginSave | null>(null)
+  const revokedSnapshot = useRef<Record<string, unknown> | null>(null)
+  const lastServerData = useRef(initialData)
   const patchSong = usePatchSongUpdate()
   const patchAlbum = usePatchAlbumUpdate()
   const patchArtist = usePatchArtistUpdate()
 
-  const getQueryKey = useCallback(() => {
-    switch (entityType) {
-      case 'song': return getGetSongShowQueryKey(publicId)
-      case 'album': return getGetAlbumShowQueryKey(publicId)
-      case 'artist': return getGetArtistShowQueryKey(publicId)
+  useEffect(() => {
+    mounted.current = beginSave
+    const unsubscribe = subscribeOwnership(() => {
+      revokedSnapshot.current = lastServerData.current
+      revokeAccess()
+    })
+    return () => {
+      mounted.current = null
+      unsubscribe()
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [entityType, publicId])
+  }, [revokeAccess, beginSave])
 
-  const buildPayload = useCallback(
-    (fields: Set<string>, state: Record<string, unknown>, locks: string[]) => {
-      const payload: Record<string, unknown> = {}
-      for (const key of fields) {
-        if (key in state) {
-          payload[key] = state[key] ?? null
-        }
-      }
-      // Always send lockedFields when saving
-      payload.lockedFields = locks
-      return payload
-    },
-    [],
-  )
+  useEffect(() => {
+    lastServerData.current = initialData
+    if (unauthorized) {
+      revokedSnapshot.current = initialData
+      revokeAccess()
+    } else if (unavailable) {
+      receive(null)
+    } else if (revokedSnapshot.current !== initialData) {
+      receive({ ...initialData, lockedFields: initialLocked })
+    }
+  }, [initialData, initialLocked, unavailable, unauthorized, receive, revokeAccess])
+
+  const saveRef = useRef<() => Promise<void>>(async () => {})
+  const scheduleSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      saveRef.current().catch(() => { /* The save reports current-owner failures. */ })
+    }, 800)
+  }, [])
 
   const save = useCallback(async () => {
-    if (dirty.size === 0) return
-
-    setIsSaving(true)
-    const payload = buildPayload(dirty, formState, lockedFields)
+    const submission = beginSave()
+    if (!submission) return
+    const stamp = captureOwnership()
+    const release = coordinator?.beginMutation(['catalog', 'lyrics', 'recommendations'])
+    const payload: Record<string, unknown> = { lockedFields: submission.values.lockedFields }
+    for (const key of submission.fields) payload[key] = submission.values[key] ?? null
 
     try {
       switch (entityType) {
@@ -77,95 +103,60 @@ export function useMetadataForm({
           await patchArtist.mutateAsync({ publicId, data: payload })
           break
       }
-
-      // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: getQueryKey() })
-
-      // Also invalidate list queries
-      queryClient.invalidateQueries({
-        predicate: (query) => {
-          const key = query.queryKey[0]
-          return typeof key === 'string' && key.includes(entityType)
-        },
+      if (mounted.current !== beginSave || !isCurrentOwnership(stamp)) return
+      completeSave(submission)
+      const queryKey = entityType === 'song' ? getGetSongShowQueryKey(publicId)
+        : entityType === 'album' ? getGetAlbumShowQueryKey(publicId)
+          : getGetArtistShowQueryKey(publicId)
+      // Mark caches stale while the coordinator's mutation hold still protects reads.
+      await queryClient.invalidateQueries({ queryKey, refetchType: 'none' })
+      if (mounted.current !== beginSave || !isCurrentOwnership(stamp)) return
+      await queryClient.invalidateQueries({
+        predicate: query => typeof query.queryKey[0] === 'string' && query.queryKey[0].includes(entityType),
+        refetchType: coordinator ? 'none' : 'active',
       })
-
-      setDirty(new Set())
+      if (mounted.current !== beginSave || !isCurrentOwnership(stamp)) return
       toast.success(`${entityType.charAt(0).toUpperCase() + entityType.slice(1)} updated`)
+      scheduleSave()
     } catch {
+      if (mounted.current !== beginSave || !isCurrentOwnership(stamp)) return
+      failSave(submission)
       toast.error('Failed to save changes')
     } finally {
-      setIsSaving(false)
+      release?.()
     }
-  }, [dirty, formState, lockedFields, entityType, publicId, patchSong, patchAlbum, patchArtist, queryClient, getQueryKey, buildPayload])
+  }, [beginSave, completeSave, failSave, coordinator, entityType, publicId, patchSong, patchAlbum, patchArtist, queryClient, scheduleSave])
 
-  // The debounced save runs the save of the latest render. The one in scope when a field changed
-  // still holds the state from before that change: its edit, and any lock set in the meantime.
-  const saveRef = useRef(save)
   useEffect(() => {
     saveRef.current = save
   }, [save])
 
-  const updateField = useCallback(
-    (key: string, value: unknown) => {
-      setFormState((prev) => ({ ...prev, [key]: value }))
-      setDirty((prev) => new Set(prev).add(key))
+  const updateField = useCallback((key: string, value: unknown) => {
+    updateDraftField(key, value)
+    scheduleSave()
+  }, [updateDraftField, scheduleSave])
 
-      // Auto-save with debounce (800ms)
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current)
-      }
-      saveTimerRef.current = setTimeout(() => {
-        saveRef.current()
-      }, 800)
-    },
-    [],
-  )
+  const toggleLock = useCallback((field: string) => {
+    const locks = lockedFields
+    updateDraftField('lockedFields', locks.includes(field) ? locks.filter(key => key !== field) : [...locks, field])
+    saveRef.current().catch(() => { /* The save reports current-owner failures. */ })
+  }, [lockedFields, updateDraftField])
 
-  const toggleLock = useCallback(
-    (field: string) => {
-      setLockedFields((prev) => {
-        const next = prev.includes(field)
-          ? prev.filter((f) => f !== field)
-          : [...prev, field]
-
-        // Save lock changes immediately
-        const payload: Record<string, unknown> = { lockedFields: next }
-        switch (entityType) {
-          case 'song':
-            patchSong.mutate({ publicId, data: payload })
-            break
-          case 'album':
-            patchAlbum.mutate({ publicId, data: payload })
-            break
-          case 'artist':
-            patchArtist.mutate({ publicId, data: payload })
-            break
-        }
-
-        return next
-      })
-    },
-    [entityType, publicId, patchSong, patchAlbum, patchArtist],
-  )
-
-  // Reset form when initial data changes (e.g. after query refresh)
-  const resetForm = useCallback(
-    (newData: Record<string, unknown>, newLocks: string[]) => {
-      setFormState({ ...newData })
-      setLockedFields([...newLocks])
-      setDirty(new Set())
-    },
-    [],
-  )
+  const resolveDraft = useCallback((choice: 'server' | 'local') => {
+    resolveConflict(choice)
+    if (choice === 'local') scheduleSave()
+  }, [resolveConflict, scheduleSave])
 
   return {
-    formState,
+    formState: draft.values,
     lockedFields,
-    dirty,
-    isSaving,
+    dirty: draft.dirty,
+    isSaving: draft.pending !== null,
+    status: draft.status,
+    canSave: draft.canSave,
     updateField,
     toggleLock,
     save,
-    resetForm,
+    resolveConflict: resolveDraft,
   }
 }

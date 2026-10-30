@@ -1,3 +1,4 @@
+import { useLiveCoordinator } from '@/shared/live/context'
 import styled from 'styled-components'
 import { useState, useCallback } from 'react'
 import {
@@ -18,6 +19,8 @@ import {
   usePostLyricsSongLyricsFetch,
   useGetLyricsSearch,
   usePostLyricsApply,
+  postLyricsSongLyricsFetch,
+  postLyricsApply,
   getGetLyricsSongLyricsQueryKey,
 } from '@/shared/api-client/gen/endpoints'
 import type {
@@ -178,6 +181,7 @@ export function LyricsDialog({
   const activeTab = isAdmin ? tab : 'lyrics'
 
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
 
   // Fetch cached lyrics
   const { data: lyricsData, isLoading: lyricsLoading, isError: lyricsError } = useGetLyricsSongLyrics(songPublicId, {
@@ -190,8 +194,19 @@ export function LyricsDialog({
   // Fetch from LRCLIB
   const fetchMutation = usePostLyricsSongLyricsFetch({
     mutation: {
+      mutationFn: async ({ publicId }) => {
+        const release = coordinator?.beginMutation(['lyrics'])
+        try {
+          return await postLyricsSongLyricsFetch(publicId)
+        } finally {
+          release?.()
+        }
+      },
       onSuccess: (data, variables) => {
-        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.publicId) })
+        queryClient.invalidateQueries({
+          queryKey: getGetLyricsSongLyricsQueryKey(variables.publicId),
+          ...(coordinator ? { refetchType: 'none' as const } : {}),
+        })
         // LRCLIB having no lyrics is a success with an empty array.
         if (!data.data || Array.isArray(data.data)) {
           toast.info('No lyrics found on LRCLIB')
@@ -216,8 +231,19 @@ export function LyricsDialog({
   // Apply search result
   const applyMutation = usePostLyricsApply({
     mutation: {
+      mutationFn: async ({ resultId, data }) => {
+        const release = coordinator?.beginMutation(['lyrics'])
+        try {
+          return await postLyricsApply(resultId, data)
+        } finally {
+          release?.()
+        }
+      },
       onSuccess: (_data, variables) => {
-        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.data.songPublicId) })
+        queryClient.invalidateQueries({
+          queryKey: getGetLyricsSongLyricsQueryKey(variables.data.songPublicId),
+          ...(coordinator ? { refetchType: 'none' as const } : {}),
+        })
         toast.success('Lyrics applied')
         setTab('lyrics')
       },

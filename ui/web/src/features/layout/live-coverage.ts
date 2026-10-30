@@ -21,7 +21,10 @@ export const layoutLiveCoverage = [
       "src/features/layout/components/LyricsTab.tsx#useGetLyricsSongLyrics:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: ["tests/live-updates/catalog-consumers.test.tsx"],
+      endToEnd: 'pending',
+    },
   },
   {
     id: "layout.catalog",
@@ -75,7 +78,10 @@ export const layoutLiveCoverage = [
       "src/features/layout/components/panels/ArtistDetailsPanel.tsx#useGetArtistShow:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: ["tests/live-updates/catalog-consumers.test.tsx"],
+      endToEnd: 'pending',
+    },
   },
   {
     id: "layout.activity",
@@ -88,13 +94,16 @@ export const layoutLiveCoverage = [
     sourceTables: ["media_activities", "albums", "artists", "songs", "movies", "user_favorites"],
     deploymentTables: [],
     sources: ["`/api/user/recent?${params}`"],
-    keyVariants: [],
+    keyVariants: ["['/api/user/recent',{limit,mediaType}]"],
     dependentFamilies: ["recommendations"],
-    mirrors: ["Recents component state"],
+    mirrors: [],
     responseCaches: ["authoritative-read"],
-    consumers: ["src/features/layout/hooks/use-recent-items.ts#AXIOS_INSTANCE.get:`/api/user/recent?${params}`"],
+    consumers: [
+      "src/features/layout/hooks/use-recent-items.ts#useQuery:['/api/user/recent',{limit,mediaType}]",
+      "src/features/layout/hooks/use-recent-items.ts#AXIOS_INSTANCE.get:`/api/user/recent?${params}`",
+    ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/features/layout/hooks/use-recent-items.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "layout.preferences",

@@ -1,63 +1,55 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type UseMutateFunction } from '@tanstack/react-query'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { assertCurrentOwnership, captureOwnership, guardMutationCallbacks } from '@/shared/live/ownership'
 import { createLibrary, updateLibrary, deleteLibrary, scanLibrary, scanAllLibraries } from '../api/library-api'
 import type { CreateLibraryPayload, UpdateLibraryPayload } from '../api/library-api'
+import { libraryKeys } from '../query-keys'
 
-export function useCreateLibrary() {
+function useLibraryMutation<TData, TVariables>(write: (variables: TVariables) => Promise<TData>) {
   const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (payload: CreateLibraryPayload) => createLibrary(payload),
+  const coordinator = useLiveCoordinator()
+  const mutation = useMutation({
+    mutationFn: async (variables: TVariables) => {
+      const owner = captureOwnership()
+      const release = coordinator?.beginMutation(['libraries'])
+      try {
+        const result = await write(variables)
+        assertCurrentOwnership(owner)
+        return result
+      } finally {
+        release?.()
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] })
+      if (!coordinator) {
+        queryClient.invalidateQueries({ queryKey: libraryKeys.all }).catch(() => undefined)
+      }
     },
   })
+  const mutate: UseMutateFunction<TData, Error, TVariables> = (variables, callbacks) => {
+    mutation.mutate(variables, callbacks ? guardMutationCallbacks(callbacks) : undefined)
+  }
+  return { ...mutation, mutate }
+}
+
+export function useCreateLibrary() {
+  return useLibraryMutation((payload: CreateLibraryPayload) => createLibrary(payload))
 }
 
 export function useUpdateLibrary() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateLibraryPayload }) =>
-      updateLibrary(id, payload),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] })
-      queryClient.invalidateQueries({ queryKey: ['libraries', variables.id] })
-    },
-  })
+  return useLibraryMutation(({ id, payload }: { id: string; payload: UpdateLibraryPayload }) =>
+    updateLibrary(id, payload))
 }
 
 export function useDeleteLibrary() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (id: string) => deleteLibrary(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] })
-    },
-  })
+  return useLibraryMutation((id: string) => deleteLibrary(id))
 }
 
 export function useScanLibrary() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ id, rescan }: { id: string; rescan?: boolean }) =>
-      scanLibrary(id, { rescan }),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] })
-      queryClient.invalidateQueries({ queryKey: ['libraries', variables.id] })
-      queryClient.invalidateQueries({ queryKey: ['libraries', variables.id, 'stats'] })
-    },
-  })
+  return useLibraryMutation(({ id, rescan }: { id: string; rescan?: boolean }) =>
+    scanLibrary(id, { rescan }))
 }
 
 export function useScanAllLibraries() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: () => scanAllLibraries(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] })
-    },
-  })
+  return useLibraryMutation(() => scanAllLibraries())
 }

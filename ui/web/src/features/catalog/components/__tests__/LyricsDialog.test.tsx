@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { OwnedQueryClient } from '@/shared/live/query-client'
+import { LiveQueryCoordinator } from '@/shared/live/query-coordinator'
+import { catalogLiveDescriptors } from '@/features/catalog/live-descriptors'
+import { LiveCoordinatorContext } from '@/shared/live/context'
+import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/ownership'
+import type { LiveSnapshot } from '@/shared/live/recovery'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -144,4 +150,69 @@ describe('LyricsDialog', () => {
     await user.click(screen.getByRole('button', { name: /Fetch from LRCLIB/ }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LYRICS_PROVIDER_UNAVAILABLE))
   })
+  it('releases a pending lyrics mutation hold after authorization changes so later reads recover', async () => {
+    synchronizeOwnership('lyrics-owner')
+    const owned = new OwnedQueryClient()
+    client = owned
+    const snapshot: LiveSnapshot = {
+      status: 'current',
+      authorityReady: true,
+      families: ['lyrics'],
+      authorizationFingerprint: 'a'.repeat(64),
+      health: { state: 'current', oldestPendingAgeMs: null },
+    }
+    const coordinator = new LiveQueryCoordinator(owned, {
+      getSnapshot: () => snapshot,
+      subscribe: () => () => undefined,
+      subscribeEvents: () => () => undefined,
+      completeRecovery: () => undefined,
+      resourceReadFailed: () => undefined,
+    }, catalogLiveDescriptors)
+    owned.setCoordinator(coordinator)
+    const stop = coordinator.start()
+    let finish!: () => void
+    let reads = 0
+    mockRequest.mockImplementation((url: string) => {
+      if (url.endsWith('/lyrics/fetch')) {
+        return new Promise(resolve => {
+          finish = () => resolve({ data: [] })
+        })
+      }
+      if (url.endsWith('/lyrics')) {
+        reads++
+        return Promise.resolve({ data: reads > 1 ? { plainLyrics: 'Recovered lyrics' } : [] })
+      }
+      return Promise.reject(new Error(`Unexpected request ${url}`))
+    })
+    const view = render(
+      <QueryClientProvider client={owned}>
+        <LiveCoordinatorContext value={coordinator}>
+          <ThemeProvider theme={resolveTheme('dark', 'violet')}>
+            <LyricsDialog open onOpenChange={() => {}} songPublicId={SONG} songTitle="Still Alive" />
+          </ThemeProvider>
+        </LiveCoordinatorContext>
+      </QueryClientProvider>,
+    )
+    try {
+      const user = userEvent.setup()
+      await user.click(await screen.findByRole('button', { name: /Fetch from LRCLIB/ }))
+      await waitFor(() => expect(finish).toBeDefined())
+      act(() => {
+        advanceAuthorization()
+        coordinator.hint(['lyrics'])
+      })
+      await new Promise(resolve => setTimeout(resolve, 150))
+      expect(reads).toBe(1)
+      await act(async () => finish())
+      await waitFor(() => expect(reads).toBe(2))
+      expect(await screen.findByText('Recovered lyrics')).toBeInTheDocument()
+      expect(toast.info).not.toHaveBeenCalled()
+    } finally {
+      view.unmount()
+      stop()
+      owned.dispose()
+      synchronizeOwnership(null)
+    }
+  })
+
 })

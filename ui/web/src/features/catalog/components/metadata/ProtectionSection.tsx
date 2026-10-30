@@ -82,9 +82,10 @@ interface ProtectionSectionProps {
   fields: FieldDef[]
   lockedFields: string[]
   onToggleLock: (field: string) => void
+  disabled?: boolean
 }
 
-export function ProtectionSection({ fields, lockedFields, onToggleLock }: ProtectionSectionProps) {
+export function ProtectionSection({ fields, lockedFields, onToggleLock, disabled }: ProtectionSectionProps) {
   const lockableFields = fields.filter((f) => f.lockable)
 
   if (lockableFields.length === 0) return null
@@ -102,6 +103,7 @@ export function ProtectionSection({ fields, lockedFields, onToggleLock }: Protec
           <LockButton
             key={field.key}
             type="button"
+            disabled={disabled}
             onClick={() => onToggleLock(field.key)}
             $isLocked={isLocked}
           >

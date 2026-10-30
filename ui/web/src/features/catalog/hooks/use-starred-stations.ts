@@ -12,12 +12,14 @@ import type { RadioStation, StarredStation } from '@/features/radio/api/radio-ap
 export function useStarredStations() {
   return useQuery({
     queryKey: ['catalog', 'starred-stations'],
-    queryFn: async (): Promise<RadioStation[]> => {
-      const { data: starredRes } = await AXIOS_INSTANCE.get('/api/radio/starred')
+    queryFn: async ({ signal }): Promise<RadioStation[]> => {
+      const { data: starredRes } = await AXIOS_INSTANCE.get('/api/radio/starred', { signal })
+      signal.throwIfAborted()
       const starred = (starredRes?.data ?? []) as StarredStation[]
       if (starred.length === 0) return []
 
-      const { data: stationsRes } = await AXIOS_INSTANCE.get('/api/radio/stations')
+      const { data: stationsRes } = await AXIOS_INSTANCE.get('/api/radio/stations', { signal })
+      signal.throwIfAborted()
       const allStations = (stationsRes?.data ?? []) as RadioStation[]
 
       const starredIds = new Set(starred.map((s) => s.stationId))

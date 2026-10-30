@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
 import { Sidebar } from '@/features/layout/components/Sidebar'
@@ -9,6 +10,10 @@ import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useMediaModeStore } from '@/features/layout/stores/media-mode-store'
 
 const testTheme = resolveTheme('dark', 'violet')
+
+vi.mock('@/shared/api-client/axios-instance', () => ({
+  AXIOS_INSTANCE: { get: vi.fn().mockResolvedValue({ data: { data: [] } }) },
+}))
 
 vi.mock('@/features/layout/hooks/use-sidebar-config', () => ({
   useSidebarConfig: () => ({ items: [], isLoading: false, error: null }),
@@ -26,12 +31,15 @@ beforeEach(() => {
 })
 
 function renderSidebar(initialPath = '/') {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
   return render(
-    <SCTypedThemeProvider theme={testTheme}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <Sidebar />
-      </MemoryRouter>
-    </SCTypedThemeProvider>,
+    <QueryClientProvider client={client}>
+      <SCTypedThemeProvider theme={testTheme}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Sidebar />
+        </MemoryRouter>
+      </SCTypedThemeProvider>
+    </QueryClientProvider>,
   )
 }
 

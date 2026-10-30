@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { assertCurrentOwnership, captureOwnership } from '@/shared/live/ownership'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { AlbumSummary } from '../types'
 import { extractPaginatedMeta } from '../utils/api-adapters'
@@ -83,93 +85,69 @@ function groupAlbumsByDecadeAndYear(albums: AlbumSummary[]): TimelineDecade[] {
 }
 
 export function useTimelineViewModel(): UseTimelineViewModelReturn {
-  const [albums, setAlbums] = useState<AlbumSummary[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<unknown>(null)
-  const fetchIdRef = useRef(0)
+  const query = useQuery({
+    queryKey: ['catalog', 'timeline'],
+    queryFn: async ({ signal }) => {
+      const owner = captureOwnership()
+      let page = 1
+      const results: AlbumSummary[] = []
+      while (true) {
+        signal.throwIfAborted()
+        assertCurrentOwnership(owner)
+        const res = await AXIOS_INSTANCE.get('/api/albums', {
+          signal,
+          params: { sort: 'year', order: 'asc', limit: PER_PAGE, page },
+        })
+        signal.throwIfAborted()
+        assertCurrentOwnership(owner)
+        const body = res.data as Record<string, unknown>
+        const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
+        const lastPage = extractPaginatedMeta(body).lastPage
 
-  const refetch = useCallback(() => {
-    void ++fetchIdRef.current
-    let cancelled = false
-
-    async function fetchAll() {
-      setIsLoading(true)
-      setError(null)
-      try {
-        let page = 1
-        const results: AlbumSummary[] = []
-        while (true) {
-          const res = await AXIOS_INSTANCE.get('/api/albums', {
-            params: { sort: 'year', order: 'asc', limit: PER_PAGE, page },
+        for (const raw of items) {
+          const coverImage = raw.coverImage as Record<string, unknown> | null | undefined
+          const artists = raw.artists as Array<Record<string, unknown>> | undefined
+          results.push({
+            publicId: (raw.publicId as string) ?? '',
+            title: (raw.title as string) ?? '',
+            type: (raw.type as string) ?? '',
+            year: typeof raw.year === 'number' ? raw.year : null,
+            label: typeof raw.label === 'string' ? raw.label : null,
+            barcode: typeof raw.barcode === 'string' ? raw.barcode : null,
+            country: typeof raw.country === 'string' ? raw.country : null,
+            catalogNumber: typeof raw.catalogNumber === 'string' ? raw.catalogNumber : null,
+            language: typeof raw.language === 'string' ? raw.language : null,
+            disambiguation: typeof raw.disambiguation === 'string' ? raw.disambiguation : null,
+            annotation: typeof raw.annotation === 'string' ? raw.annotation : null,
+            mbid: typeof raw.mbid === 'string' ? raw.mbid : null,
+            discogsId: typeof raw.discogsId === 'string' ? raw.discogsId : null,
+            spotifyId: typeof raw.spotifyId === 'string' ? raw.spotifyId : null,
+            createdAt: (raw.createdAt as string) ?? '',
+            coverImage: coverImage
+              ? {
+                  url: (coverImage.url as string) ?? '',
+                  blurhash: typeof coverImage.blurhash === 'string' ? coverImage.blurhash : null,
+                }
+              : null,
+            artists: artists
+              ? artists.map((a) => ({
+                  name: (a.name as string) ?? '',
+                  role: typeof a.role === 'string' ? a.role : null,
+                }))
+              : [],
           })
-          const body = res.data as Record<string, unknown>
-          const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
-          const lastPage = extractPaginatedMeta(body).lastPage
-
-          for (const raw of items) {
-            const coverImage = raw.coverImage as Record<string, unknown> | null | undefined
-            const artists = raw.artists as Array<Record<string, unknown>> | undefined
-            results.push({
-              publicId: (raw.publicId as string) ?? '',
-              title: (raw.title as string) ?? '',
-              type: (raw.type as string) ?? '',
-              year: typeof raw.year === 'number' ? raw.year : null,
-              label: typeof raw.label === 'string' ? raw.label : null,
-              barcode: typeof raw.barcode === 'string' ? raw.barcode : null,
-              country: typeof raw.country === 'string' ? raw.country : null,
-              catalogNumber: typeof raw.catalogNumber === 'string' ? raw.catalogNumber : null,
-              language: typeof raw.language === 'string' ? raw.language : null,
-              disambiguation: typeof raw.disambiguation === 'string' ? raw.disambiguation : null,
-              annotation: typeof raw.annotation === 'string' ? raw.annotation : null,
-              mbid: typeof raw.mbid === 'string' ? raw.mbid : null,
-              discogsId: typeof raw.discogsId === 'string' ? raw.discogsId : null,
-              spotifyId: typeof raw.spotifyId === 'string' ? raw.spotifyId : null,
-              createdAt: (raw.createdAt as string) ?? '',
-              coverImage: coverImage
-                ? {
-                    url: (coverImage.url as string) ?? '',
-                    blurhash: typeof coverImage.blurhash === 'string' ? coverImage.blurhash : null,
-                  }
-                : null,
-              artists: artists
-                ? artists.map((a) => ({
-                    name: (a.name as string) ?? '',
-                    role: typeof a.role === 'string' ? a.role : null,
-                  }))
-                : [],
-            })
-          }
-
-          if (page >= lastPage) break
-          page++
         }
 
-        if (!cancelled) {
-          setAlbums(results)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err)
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
+        if (page >= lastPage) break
+        page++
       }
-    }
 
-    fetchAll()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    const cleanup = refetch()
-    return cleanup
-  }, [refetch])
-
-  const decades = useMemo(() => groupAlbumsByDecadeAndYear(albums), [albums])
-
-  return { decades, isLoading, error, refetch }
+      return results
+    },
+  })
+  const decades = useMemo(() => groupAlbumsByDecadeAndYear(query.data ?? []), [query.data])
+  const refetch = () => {
+    query.refetch({ cancelRefetch: false }).catch(() => { /* Query exposes read failures. */ })
+  }
+  return { decades, isLoading: query.isLoading, error: query.error, refetch }
 }

@@ -7,7 +7,7 @@ import { useLibraryStats } from '../hooks/use-library-stats'
 import { useScanLibrary, useDeleteLibrary } from '../hooks/use-library-mutations'
 import { LibraryStatsPanel } from '../components/LibraryStatsPanel'
 import { DeleteLibraryDialog, ScanLibraryDialog } from '../components/LibraryDialogs'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { formatRelativeTime } from '../utils/format'
 
 const PageWrapper = styled.div`
@@ -235,15 +235,6 @@ export function LibraryDetailPage() {
   const deleteMutation = useDeleteLibrary()
   const [deleteTarget, setDeleteTarget] = useState<NonNullable<typeof library> | null>(null)
   const [scanDialogOpen, setScanDialogOpen] = useState(false)
-
-  // Poll stats while scanning
-  useEffect(() => {
-    if (library?.scanStatus !== 'scanning') return
-    const timer = setInterval(() => {
-      // React Query refetch via invalidation would be cleaner but this is simpler
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [library?.scanStatus])
 
   if (isLoading) return <Skeleton />
 

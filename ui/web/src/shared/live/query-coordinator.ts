@@ -115,7 +115,9 @@ export class LiveQueryCoordinator {
         state.retryAt = Date.now() + Math.min(30_000, 1_000 * 2 ** Math.min(state.failures - 1, 5))
         this.recovery.resourceReadFailed()
       }
-      if (state.generation > state.acknowledged && !query.state.isInvalidated) query.invalidate()
+      if (event.type === 'updated' && state.generation > state.acknowledged && !query.state.isInvalidated) {
+        query.invalidate()
+      }
       this.schedule()
     }))
     this.stops.push(this.client.getMutationCache().subscribe(event => {

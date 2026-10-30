@@ -60,6 +60,12 @@ describe('live query coverage census', () => {
   })
 })
 
+const proofSources = import.meta.glob(['../../src/**/*.{test,spec}.{ts,tsx}', '../../tests/**/*.{test,spec}.{ts,tsx}'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
 const applicationSources = import.meta.glob('../../src/**/*.{ts,tsx}', {
   query: '?raw',
   import: 'default',
@@ -130,7 +136,16 @@ describe('registered application coverage', () => {
       expect(descriptor.policy.reason.length).toBeGreaterThan(20)
       expect(descriptor.audiences.length).toBeGreaterThan(0)
       expect(descriptor.consumers.length).toBeGreaterThan(0)
-      expect(descriptor.behaviorVerification).toBe('pending-adoption')
+      if (descriptor.behaviorVerification !== 'pending-adoption') {
+        expect(descriptor.behaviorVerification.endToEnd, descriptor.id).toBe('pending')
+        expect(descriptor.behaviorVerification.unitProofs.length, descriptor.id).toBeGreaterThan(0)
+        for (const proof of descriptor.behaviorVerification.unitProofs) {
+          const source = Object.entries(proofSources).find(([file]) =>
+            new URL(file, import.meta.url).pathname.endsWith(`/${proof}`),
+          )?.[1]
+          expect(source, `${descriptor.id}: ${proof}`).toBeDefined()
+        }
+      }
       expect(descriptor.coverageVerification).toContain('tests/live-updates/coverage.test.ts')
       if (descriptor.policy.kind === 'stored') expect(descriptor.sourceTables.length).toBeGreaterThan(0)
     }

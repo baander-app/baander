@@ -87,7 +87,15 @@ export const catalogLiveCoverage = [
       "src/features/catalog/views/GridView.tsx#useGetAlbumIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: {
+      unitProofs: [
+        "tests/live-updates/catalog-consumers.test.tsx",
+        "src/features/catalog/components/metadata/__tests__/InfoPanel.test.tsx",
+        "src/features/catalog/components/metadata/__tests__/use-metadata-form.test.tsx",
+        "src/shared/drafts/__tests__/use-draft.test.tsx",
+      ],
+      endToEnd: 'pending',
+    },
   },
   {
     id: "catalog.lyrics",
@@ -106,7 +114,7 @@ export const catalogLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/catalog/components/LyricsDialog.tsx#useGetLyricsSongLyrics:generated"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/catalog-consumers.test.tsx", "src/features/catalog/components/__tests__/LyricsDialog.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.lyrics-demand",
@@ -207,7 +215,7 @@ export const catalogLiveCoverage = [
       "src/features/catalog/pages/HomePage.tsx#useGetActivityHistory:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/features/layout/hooks/use-recent-items.test.tsx", "tests/features/player/services/activity-service.test.ts", "src/features/catalog/hooks/__tests__/use-activity-view-model.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.recommendations",
@@ -244,7 +252,7 @@ export const catalogLiveCoverage = [
       "src/features/catalog/hooks/use-for-you-view-model.ts#useGetRecommendationForYou:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["tests/live-updates/catalog-consumers.test.tsx"], endToEnd: 'pending' },
   },
   {
     id: "catalog.radio-user",
@@ -298,12 +306,15 @@ export const catalogLiveCoverage = [
     sourceTables: ["albums", "artist_album", "artists", "libraries", "user_library_access"],
     deploymentTables: [],
     sources: ["'/api/albums'"],
-    keyVariants: [],
+    keyVariants: ["['catalog','timeline']"],
     dependentFamilies: [],
-    mirrors: ["Timeline fetched-albums component state"],
+    mirrors: [],
     responseCaches: ["authoritative-read"],
-    consumers: ["src/features/catalog/hooks/use-timeline-view-model.ts#AXIOS_INSTANCE.get:'/api/albums'"],
+    consumers: [
+      "src/features/catalog/hooks/use-timeline-view-model.ts#useQuery:['catalog','timeline']",
+      "src/features/catalog/hooks/use-timeline-view-model.ts#AXIOS_INSTANCE.get:'/api/albums'",
+    ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: "pending-adoption",
+    behaviorVerification: { unitProofs: ["src/features/catalog/hooks/__tests__/use-timeline-view-model.test.ts"], endToEnd: 'pending' },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

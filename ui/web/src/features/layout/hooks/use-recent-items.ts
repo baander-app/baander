@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { RecentItem } from '@/features/layout/components/SidebarRecentItems'
-import { createLogger } from '@/shared/lib/logger'
-
-const logger = createLogger('RecentItems')
 
 export interface UseRecentItemsOptions {
   limit?: number
@@ -15,64 +12,18 @@ export interface UseRecentItemsResult {
   isLoading: boolean
 }
 
-interface RecentItemsState extends UseRecentItemsResult {
-  request: string
-}
-
 export function useRecentItems(options: UseRecentItemsOptions = {}): UseRecentItemsResult {
   const { limit = 5, mediaType } = options
-  const request = JSON.stringify([limit, mediaType ?? null])
-  const [state, setState] = useState<RecentItemsState>(() => ({
-    request,
-    items: [],
-    isLoading: true,
-  }))
-
-  if (state.request !== request) {
-    setState({
-      request,
-      items: [],
-      isLoading: true,
-    })
-  }
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const params = new URLSearchParams()
-    params.set('limit', String(limit))
-    if (mediaType) {
-      params.set('mediaType', mediaType)
-    }
-
-    AXIOS_INSTANCE.get(`/api/user/recent?${params}`, { signal: controller.signal })
-      .then((res) => {
-        if (controller.signal.aborted) return
-
-        const items = ((res.data?.data ?? []) as RecentActivityItem[]).map(mapToRecentItem)
-        setState({
-          request,
-          items,
-          isLoading: false,
-        })
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return
-
-        logger.warn('Failed to load recent items:', error)
-        setState({
-          request,
-          items: [],
-          isLoading: false,
-        })
-      })
-    return () => {
-      controller.abort()
-    }
-  }, [limit, mediaType, request])
-
-  return state.request === request
-    ? { items: state.items, isLoading: state.isLoading }
-    : { items: [], isLoading: true }
+  const query = useQuery({
+    queryKey: ['/api/user/recent', { limit, mediaType }],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ limit: String(limit) })
+      if (mediaType) params.set('mediaType', mediaType)
+      const response = await AXIOS_INSTANCE.get<{ data: RecentActivityItem[] }>(`/api/user/recent?${params}`, { signal })
+      return response.data.data.map(mapToRecentItem)
+    },
+  })
+  return { items: query.data ?? [], isLoading: query.isLoading }
 }
 
 /** Raw shape of a `/api/user/recent` response item (music + movies).

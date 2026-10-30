@@ -1,5 +1,6 @@
 import styled from 'styled-components'
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { isAxiosError } from 'axios'
 import { RefreshCw } from 'lucide-react'
 import { Separator } from '@/shared/components/ui/separator'
 import { Button } from '@/shared/components/ui/button'
@@ -80,7 +81,11 @@ interface InfoPanelProps {
   publicId: string
 }
 
-export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
+export function InfoPanel(props: InfoPanelProps) {
+  return <InfoPanelContent key={`${props.entityType}:${props.publicId}`} {...props} />
+}
+
+function InfoPanelContent({ entityType, publicId }: InfoPanelProps) {
   const config = useMemo(() => getFieldConfig(entityType), [entityType])
 
   // Fetch entity data
@@ -103,6 +108,9 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
     (entityType === 'song' && songQuery.isError) ||
     (entityType === 'album' && albumQuery.isError) ||
     (entityType === 'artist' && artistQuery.isError)
+
+  const queryError = entityType === 'song' ? songQuery.error : entityType === 'album' ? albumQuery.error : artistQuery.error
+  const errorStatus = isAxiosError(queryError) ? queryError.response?.status : undefined
 
   const rawData =
     entityType === 'song' ? songQuery.data :
@@ -189,22 +197,18 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
     isSaving,
     updateField,
     toggleLock,
-    resetForm,
+    status,
+    resolveConflict,
   } = useMetadataForm({
     entityType,
     publicId,
     initialData: entity?.data ?? {},
     lockedFields: entity?.lockedFields ?? [],
+    unavailable: !entity || (isError && errorStatus === 404),
+    unauthorized: isError && (errorStatus === 401 || errorStatus === 403),
   })
 
-  // Reset form when entity data changes or publicId changes
-  useEffect(() => {
-    if (entity) {
-      resetForm(entity.data, entity.lockedFields)
-    }
-  }, [entity, resetForm])
-
-  if (isLoading) {
+  if (isLoading && !Object.keys(formState).some(key => key !== 'lockedFields')) {
     return (
       <LoadingContainer>
         {Array.from({ length: 4 }).map((_, i) => (
@@ -217,7 +221,7 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
     )
   }
 
-  if (isError || !entity) {
+  if ((!entity || isError) && !Object.keys(formState).some(key => key !== 'lockedFields')) {
     return (
       <ErrorContainer>
         <ErrorText>Failed to load {entityType}</ErrorText>
@@ -227,8 +231,18 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
 
   return (
     <Container>
+      {status === 'conflict' && (
+        <div role="alert">
+          <ErrorText>This {entityType} changed elsewhere. Your edits are kept. Choose which version to use before saving.</ErrorText>
+          <Button variant="outline" size="sm" disabled={isSaving} onClick={() => resolveConflict('local')}>Keep my edits</Button>
+          <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => resolveConflict('server')}>Use server version</Button>
+        </div>
+      )}
+      {status === 'unavailable' && (
+        <ErrorText role="alert">This {entityType} is unavailable. Your edits are kept; saving is disabled.</ErrorText>
+      )}
       {/* Cover image upload for albums and artists */}
-      {(entityType === 'album' || entityType === 'artist') && (
+      {entity && status !== 'unavailable' && (entityType === 'album' || entityType === 'artist') && (
         <>
           <CoverImageUpload
             entityType={entityType}
@@ -270,7 +284,7 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
                   value={value}
                   isLocked={lockedFields.includes(field.key)}
                   isDirty={dirty.has(field.key)}
-                  isSaving={isSaving}
+                  isSaving={status === 'unavailable'}
                   onChange={(v) => updateField(field.key, v)}
                   onToggleLock={() => toggleLock(field.key)}
                 />
@@ -286,6 +300,7 @@ export function InfoPanel({ entityType, publicId }: InfoPanelProps) {
         fields={getAllLockableFields(config)}
         lockedFields={lockedFields}
         onToggleLock={toggleLock}
+        disabled={status === 'unavailable' || status === 'conflict' || isSaving}
       />
 
       {/* Sync placeholder */}

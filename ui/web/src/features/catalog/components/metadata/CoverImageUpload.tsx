@@ -1,9 +1,14 @@
 import styled from 'styled-components'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Camera, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { getGetAlbumShowQueryKey, getGetArtistShowQueryKey } from '@/shared/api-client/gen/endpoints'
+import { useLiveCoordinator } from '@/shared/live/context'
+import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { useImageBlob } from '@/shared/hooks/use-image-blob'
+import { Button } from '@/shared/components/ui/button'
 
 const Container = styled.div`
   display: flex;
@@ -58,7 +63,7 @@ const HoverOverlay = styled.div`
   }
 `
 
-const OverlayButton = styled.button`
+const OverlayButton = styled(Button)`
   border-radius: 50%;
   background-color: rgba(255, 255, 255, 0.2);
   padding: 0.5rem;
@@ -108,6 +113,35 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
   const fileRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
   const queryClient = useQueryClient()
+  const coordinator = useLiveCoordinator()
+  const { src } = useImageBlob(coverImage?.url)
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+
+  const updateCover = async (write: () => Promise<unknown>, success: string, failure: string) => {
+    if (isUploading) return
+    const stamp = captureOwnership()
+    const release = coordinator?.beginMutation(['catalog'])
+    setIsUploading(true)
+    try {
+      await write()
+      if (!mounted.current || !isCurrentOwnership(stamp)) return
+      await queryClient.invalidateQueries({
+        queryKey: entityType === 'album' ? getGetAlbumShowQueryKey(publicId) : getGetArtistShowQueryKey(publicId),
+        refetchType: coordinator ? 'none' : 'active',
+      })
+      if (!mounted.current || !isCurrentOwnership(stamp)) return
+      toast.success(success)
+    } catch {
+      if (mounted.current && isCurrentOwnership(stamp)) toast.error(failure)
+    } finally {
+      release?.()
+      if (mounted.current && isCurrentOwnership(stamp)) setIsUploading(false)
+    }
+  }
 
   const handleUpload = async (file: File) => {
     if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
@@ -119,29 +153,21 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
       return
     }
 
-    setIsUploading(true)
     const form = new FormData()
     form.append('cover', file)
-
-    try {
-      await AXIOS_INSTANCE.post(`/api/${entityType}s/${publicId}/cover`, form)
-      await queryClient.invalidateQueries({ queryKey: [`get${capitalize(entityType)}Show`, publicId] })
-      toast.success('Image uploaded')
-    } catch {
-      toast.error('Failed to upload image')
-    } finally {
-      setIsUploading(false)
-    }
+    await updateCover(
+      () => AXIOS_INSTANCE.post(`/api/${entityType}s/${publicId}/cover`, form),
+      'Image uploaded',
+      'Failed to upload image',
+    )
   }
 
   const handleDelete = async () => {
-    try {
-      await AXIOS_INSTANCE.delete(`/api/${entityType}s/${publicId}/cover`)
-      await queryClient.invalidateQueries({ queryKey: [`get${capitalize(entityType)}Show`, publicId] })
-      toast.success('Image removed')
-    } catch {
-      toast.error('Failed to remove image')
-    }
+    await updateCover(
+      () => AXIOS_INSTANCE.delete(`/api/${entityType}s/${publicId}/cover`),
+      'Image removed',
+      'Failed to remove image',
+    )
   }
 
   const label = entityType === 'album' ? 'Cover Art' : 'Photo'
@@ -150,8 +176,8 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
     <Container>
       <Label>{label}</Label>
       <ImageArea>
-        {coverImage?.url ? (
-          <CoverImage src={coverImage.url} alt={label} />
+        {src ? (
+          <CoverImage src={src} alt={label} loading="lazy" />
         ) : (
           <Placeholder>
             <Camera size={24} style={{ color: 'color-mix(in srgb, var(--color-muted-foreground) 40%, transparent)' }} />
@@ -162,6 +188,7 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
         <HoverOverlay>
           <OverlayButton
             type="button"
+            aria-label="Upload image"
             onClick={() => fileRef.current?.click()}
             disabled={isUploading}
           >
@@ -170,6 +197,8 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
           {coverImage?.url && (
             <OverlayButton
               type="button"
+              aria-label="Remove image"
+              disabled={isUploading}
               onClick={handleDelete}
             >
               <Trash2 size={16} style={{ color: 'white' }} />
@@ -196,8 +225,4 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
       />
     </Container>
   )
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
