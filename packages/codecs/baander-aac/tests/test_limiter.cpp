@@ -80,7 +80,9 @@ static void test_overload() {
       ratio_max = std::max(ratio_max, r);
     }
   }
-  CHECK(ratio_max - ratio_min < 1e-5 && ratio_max > 0.49 && ratio_max <= 0.5,
+  /* The tone's sampled peak may fall an ulp short of 2, which puts the
+   * gain an ulp above one half; full scale itself is checked above. */
+  CHECK(ratio_max - ratio_min < 1e-5 && ratio_max > 0.49 && ratio_max <= 0.5 + 1e-6,
         "settled gain of one half (%g..%g)", ratio_min, ratio_max);
 }
 

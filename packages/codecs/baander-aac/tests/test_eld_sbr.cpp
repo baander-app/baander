@@ -512,10 +512,10 @@ static void worst_case_payload() {
 
 /* The references were written by the release build before LD-SBR was
  * wired in; the signal and the encoder's arithmetic only reproduce them
- * under the same optimisation and fast-math flags, so other builds skip
+ * under the same optimisation and Release math flags, so other builds skip
  * the comparison. */
 static void plain_eld_identity(int fl, int channels) {
-#if !defined(__OPTIMIZE__) || !defined(__FAST_MATH__)
+#if !defined(__OPTIMIZE__) || !BAAC_RELEASE_MATH
   printf("plain ELD %d %d ch: identity check needs the release build's flags, skipped\n", fl,
          channels);
   return;

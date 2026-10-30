@@ -681,7 +681,7 @@ int write_streams(const char* dir) {
  * so a change of the encoder's output shows up here and the streams are
  * regenerated with --write-streams on purpose.  The streams were written
  * by the release build, whose arithmetic only another build with its
- * optimisation and fast-math flags and without sanitizers reproduces;
+ * optimisation and Release math flags and without sanitizers reproduces;
  * other builds compare the decodes instead. */
 void test_committed() {
   for (const Committed& s : kCommitted) {
@@ -698,7 +698,7 @@ void test_committed() {
           "%s: %d frames, %d errors, %.1f dB", s.name, d.frames, d.errors, snr);
     const AacUsacEncoderOptions o = options(-1, s.mps ? 1 : -1);
     const Encoded e = encode(pcm, s.channels, s.bitrate, &o);
-#if defined(__OPTIMIZE__) && defined(__FAST_MATH__) && !BAAC_SANITIZED
+#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
     CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
           e.stream.size(), stream.size());
 #else

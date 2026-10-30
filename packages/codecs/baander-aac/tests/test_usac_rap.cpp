@@ -794,7 +794,7 @@ void test_committed() {
   }
   CHECK(largest <= 3000, "%s: largest segment %zu bytes", kCommittedName, largest);
   const Encoded e = encode(pcm, 2, 64000, committed_options(), AAC_TRANSPORT_LOAS, kCommittedRequests);
-#if defined(__OPTIMIZE__) && defined(__FAST_MATH__) && !BAAC_SANITIZED
+#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
   CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", kCommittedName,
         e.stream.size(), stream.size());
 #else

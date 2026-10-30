@@ -70,10 +70,26 @@ if(BAAC_AAC_BUILD_ENCODER)
     list(APPEND ALL_SOURCES ${BAAC_AAC_ENCODER_SOURCES})
 endif()
 
-add_compile_options(
-    $<$<CONFIG:Release>:-O3>
-    $<$<CONFIG:Release>:-ffast-math>
-    $<$<CONFIG:Release>:-fno-math-errno>)
+# Release builds take the fast-math rewrites except the unsafe-math
+# group as a whole: under -funsafe-math-optimizations x86 compilers turn
+# 1/sqrt(x) into the RSQRTSS/RSQRTPS estimate plus a Newton step, and
+# the estimate differs between processor vendors, so one binary would
+# encode differently on Intel and AMD machines.  Reassociation,
+# reciprocal multiplication and the finite-math assumptions stay; with
+# exact division and square root the output is a function of the input.
+# BAAC_RELEASE_MATH tells the tests that compare committed streams byte
+# for byte that this arithmetic is in force.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:Release>:-fno-math-errno>
+        $<$<CONFIG:Release>:-fassociative-math>
+        $<$<CONFIG:Release>:-freciprocal-math>
+        $<$<CONFIG:Release>:-fno-signed-zeros>
+        $<$<CONFIG:Release>:-fno-trapping-math>
+        $<$<CONFIG:Release>:-ffinite-math-only>)
+    add_compile_definitions($<$<CONFIG:Release>:BAAC_RELEASE_MATH=1>)
+endif()
 
 # BAAC_FUZZ: the sanitizers over the whole tree and, when the compiler
 # links libFuzzer, its coverage instrumentation; the harnesses under

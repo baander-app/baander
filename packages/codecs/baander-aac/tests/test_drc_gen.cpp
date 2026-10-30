@@ -858,7 +858,7 @@ void test_committed() {
             snr_db(plain.data(), night.data(), plain.size()) < 20.0,
         "%s: the night set applies", kCommittedName);
   const Encoded e = encode(pcm, 2, 64000, options(1));
-#if defined(__OPTIMIZE__) && defined(__FAST_MATH__) && !BAAC_SANITIZED
+#if defined(__OPTIMIZE__) && BAAC_RELEASE_MATH && !BAAC_SANITIZED
   CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)",
         kCommittedName, e.stream.size(), stream.size());
 #else

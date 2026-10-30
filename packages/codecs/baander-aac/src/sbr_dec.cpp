@@ -656,7 +656,7 @@ void aac_sbr_lpc_band(float alpha0[2], float alpha1[2], const float (*x)[2], int
   autocorrelate(x, n, phi);
   /* A band whose energy sits far below any audible level predicts
    * nothing; its tiny correlations, divided by each other, would
-   * overflow (and under -ffast-math the overflow is not caught below). */
+   * overflow (and under -ffinite-math-only the overflow is not caught below). */
   if (phi[1][0][0] <= 1e-15f) {
     alpha1[0] = alpha1[1] = 0.0f;
     alpha0[0] = alpha0[1] = 0.0f;
