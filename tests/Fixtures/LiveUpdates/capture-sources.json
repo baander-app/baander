@@ -64,7 +64,7 @@
     },
     "playlist-self": {
       "kind": "playlist",
-      "derivation": "OLD.id and NEW.id; capture OLD.user_id and OLD.is_public before deletion or access changes",
+      "derivation": "OLD.id and NEW.id; capture OLD.user_id before deletion or access changes",
       "audience": "Current owner, collaborators and authorized readers; old audience gets opaque personal access changes."
     },
     "admin": {
@@ -75,7 +75,7 @@
     "public": {
       "kind": "global",
       "derivation": "Singleton authenticated public scope; no personal data",
-      "audience": "All signed-in clients; only public radio catalog and public playlist discovery."
+      "audience": "All signed-in clients; only the public radio catalog."
     },
     "recommendation": {
       "kind": "user",
@@ -109,7 +109,7 @@
     "privacy": "Inbox rows contain family and scope identifiers only. Source values, credentials, paths, network metadata, payloads and raw event bodies never enter the browser protocol. Secret-bearing structured settings may trigger safe invalidation without copying their value.",
     "scope_routing": "Routes name the root family audience. Dependent private families require reverse lookup of affected owners, never broadcasting a user family to every library reader. Admin families always use the admin route even when another root route applies.",
     "cascades": "Before deleting a parent, capture its own and dependent family scopes while links remain readable. Child DELETE/SET NULL capture must not depend on reading the removed parent. Keep direct OLD foreign-key scopes; parent capture covers vanished join paths.",
-    "public_playlists": "Only publicly discoverable playlists dirty the global discovery audience. Owner/collaborator changes always dirty the old and new personal audiences; loss of access sends an opaque personal reset.",
+    "public_playlists": "Playlist visibility flags grant no additional read authority. Owner/collaborator changes dirty the old and new personal audiences; loss of access sends an opaque personal reset.",
     "expiry": "Time passing creates no SQL change; expiry and continuously varying gauges need the declared bounded active-visible sampling policy."
   },
   "response_caches": {
@@ -792,6 +792,18 @@
   ],
   "sources": [
     {
+      "table": "query_change_inbox",
+      "mapping": "migrations/Version20261030210000.php",
+      "classification": "excluded",
+      "reason": "Transactional freshness hints; recapturing them would recursively amplify publication."
+    },
+    {
+      "table": "query_scope_revision",
+      "mapping": "migrations/Version20261030210000.php",
+      "classification": "excluded",
+      "reason": "Durable projection counters and deletion tombstones; these are freshness infrastructure, not query producers."
+    },
+    {
       "table": "albums",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/AlbumEntity.php",
       "classification": "capture",
@@ -1026,7 +1038,7 @@
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "public_id", "name", "slug", "path", "type", "filesystem_type", "sort_order", "last_scan", "created_at", "scan_status"],
       "excluded_columns": ["claim_id", "claim_kind", "claim_expires_at", "updated_at"],
-      "families": ["libraries", "catalog"],
+      "families": ["libraries", "catalog", "activity", "playlists", "recommendations", "admin-metadata"],
       "scope_routes": ["library-self", "admin"],
       "readers": ["src/Library/Infrastructure/Doctrine/Repository/LibraryRepository.php"],
       "response_cache": "authoritative-read"
@@ -1038,7 +1050,7 @@
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "library_id", "path", "hash", "size", "extension", "modified_at", "available"],
       "excluded_columns": ["discovered_at"],
-      "families": ["catalog", "libraries", "activity", "admin-media"],
+      "families": ["catalog", "libraries", "activity", "admin-media", "playlists", "recommendations"],
       "scope_routes": ["library"],
       "readers": ["src/Library/Infrastructure/LibraryFileAvailability.php"],
       "response_cache": "authoritative-read"
@@ -1086,7 +1098,7 @@
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "public_id", "user_id", "activity_type", "song_id", "album_id", "artist_id", "movie_id", "play_count", "love", "last_played_at", "last_platform", "last_player", "created_at"],
       "excluded_columns": ["updated_at"],
-      "families": ["activity", "recommendations"],
+      "families": ["activity", "recommendations", "admin-metadata"],
       "scope_routes": ["user"],
       "readers": ["src/Activity/Infrastructure/Doctrine/Repository/ActivityAnalyticsRepository.php"],
       "response_cache": "authoritative-read"
@@ -1321,7 +1333,7 @@
       "relevant_columns": ["id", "public_id", "user_id", "name", "description", "is_public", "is_collaborative", "is_smart", "smart_rules", "created_at"],
       "excluded_columns": ["persistence_version", "updated_at"],
       "families": ["playlists"],
-      "scope_routes": ["playlist-self", "public"],
+      "scope_routes": ["playlist-self"],
       "readers": ["src/Playlist/Infrastructure/Doctrine/Repository/PlaylistRepository.php"],
       "response_cache": "authoritative-read"
     },
@@ -1482,7 +1494,7 @@
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["key", "value"],
       "excluded_columns": ["updated_at"],
-      "families": ["admin-settings", "admin-metadata"],
+      "families": ["admin-settings", "admin-metadata", "recommendations"],
       "scope_routes": ["admin"],
       "readers": ["src/Shared/Infrastructure/Doctrine/Repository/SystemSettingRepository.php"],
       "response_cache": "authoritative-read"

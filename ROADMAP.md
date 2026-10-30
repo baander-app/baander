@@ -55,6 +55,23 @@ U1 verification checkpoint: the disposable backend CI runner passes 10 tests wit
 scoped ESLint, scoped PHPStan, PHP formatting, prose preservation, and whitespace
 checks pass. No application subscription has been activated.
 
+U2 delivered locally, 2026-10-30: migration-owned triggers capture the 65 declared
+sources in their writer transactions. The projector folds committed pending rows
+into durable scope revisions without a commit-order cursor. Reads use bounded
+scope batches; failed projection discards the connection. Private dependency
+recipients, delete cascades, bulk changes, heartbeat exclusions, and TOTP status
+transitions have explicit capture behavior. The source catalog now includes both
+freshness tables as exclusions (86 tables total).
+
+U2 verification checkpoint: the disposable CI runner passes 39 tests with 2,070
+assertions, including 29 PostgreSQL tests with 545 assertions. These cover rollback,
+late lower-ID commit, crash/retry, real transaction timeout, installed trigger
+definitions, old/new ownership, delayed notification projection, and review
+regressions for TOTP, playlist visibility, and file availability. All 14 frontend
+contract tests and scoped PHPStan pass; Deptrac reports zero violations without
+baseline changes. Formatting and whitespace checks pass. Full browser delivery
+and capacity qualification remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

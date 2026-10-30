@@ -108,6 +108,12 @@ services:
     App\Shared\Application\Port\ListeningSessionInteractionInterface:
         alias: App\Session\Infrastructure\Messaging\ListeningSessionInteractionAdapter
 
+    App\Shared\Application\LiveUpdates\LiveRevisionStore:
+        alias: App\Shared\Infrastructure\LiveUpdates\DoctrineLiveRevisionStore
+
+    App\Shared\Application\LiveUpdates\LiveChangeProjector:
+        alias: App\Shared\Infrastructure\LiveUpdates\DoctrineLiveChangeProjector
+
     App\Shared\Interface\Controller\WebSocketController:
         tags:
             - { name: 'monolog.logger', channel: 'swoole' }
