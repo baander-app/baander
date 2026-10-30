@@ -261,3 +261,44 @@ matches the FDK decoder on every stream and the gain curves agree within
 of the enhanced SBR, and stereoConfigIndex 2, are exercised by
 constructed data only: the FDK encoder emits none of them, so their
 interoperability is unverified.
+
+## MPEG Surround
+
+Measured on 2026-10-30 against the Ittiam libxaac decoder (AOSP
+`external/libxaac`, run as a black box) on the streams the test tool
+`mps-enc` wrote from a synthetic 5.1 programme with the codec's own
+AAC-LC encoder (`tests/data/mps_*_q.loas`, 48 kHz, at -12 dB because
+the loud versions saturated the references). No free encoder writes
+MPEG Surround 5.1, and the FDK decoder binary pads the AAC-LC core to
+six channels without running its surround decoder, so libxaac is the
+only oracle for the 5.1 trees; its parameter mapping equals ours bit for
+bit on every frame. Difference SNR of our decode against libxaac's over
+the first second, per channel, at delay 0 (both decoders carry the same
+1521 samples: 560 of input alignment, 384 of hybrid delay and 577 of
+QMF synthesis); the libxaac decodes are 16-bit.
+
+| Stream | Tree, downmix, form | L | R | C | LFE | Ls | Rs |
+|--------|---------------------|--:|--:|--:|----:|---:|---:|
+| `mps_5151_header_q` | 5151, mono, in-band header | 69.6 dB | 62.0 dB | 62.0 dB | 72.4 dB | 67.2 dB | 63.8 dB |
+| `mps_5152_header_q` | 5152, mono, in-band header | 69.6 dB | 68.4 dB | 69.0 dB | 72.3 dB | 65.0 dB | 63.7 dB |
+| `mps_525_header_q` | 525, stereo, in-band header, TTT prediction mode 1 | 69.4 dB | 68.9 dB | 68.1 dB | 73.1 dB | 64.9 dB | 63.3 dB |
+| `mps_525_energy_q` | 525, stereo, in-band header, TTT energy mode 5 on a broadband programme | 66.3 dB | 54.4 dB | 46.6 dB | 52.4 dB | 65.5 dB | 46.8 dB |
+
+AAC-ELD v2 (`mps_212_eld`, an ELD core of 512 samples with the low-delay
+2-1-2 payload in the ELD extension, stereo out of a mono core) decodes at
+77.0 / 76.6 dB L/R against libxaac at delay 0 and at 76.6 dB against the
+FDK decoder, which does decode ELD v2, at the 256-sample delay of the
+low-delay filterbank pair.
+
+The object type 30 form (`mps_525_asc_q`, the configuration in a second
+LATM layer) is checked against the in-band form of the same content only,
+at 40 dB or better per channel. TTT prediction mode 0 and the
+centre-subtraction modes 2 and 3 are verified by construction against
+the standard's equations, since libxaac's own output breaks on them; in
+the energy modes a band whose two level differences exceed about 48 dB
+cannot be matched against libxaac's fixed-point weights, which is why
+the energy stream keeps every band populated. SBR input (HE-AAC plus
+surround) is wired but exercised by no stream; LD-SBR with the spatial
+payload, temporal shaping in the low-delay path and ELD frame lengths
+other than 512 are not covered; the 7.1 trees, the HRTF and binaural
+modes and the 3D audio mode are refused.

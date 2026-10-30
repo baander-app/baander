@@ -1,7 +1,7 @@
 ---
 title: AAC codec MPEG Surround decoder: 5.1 from a downmix and 212 in AAC-ELD
 date: 2026-10-29
-status: draft
+status: delivered
 execution: code
 ---
 

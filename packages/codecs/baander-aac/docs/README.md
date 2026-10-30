@@ -249,6 +249,68 @@ USAC decoder (master at the time of writing) decodes the 2:1 and 8:3
 streams wrongly and served as no oracle for them; see
 [reference-comparison.md](reference-comparison.md).
 
+An MPEG Surround stream (ISO/IEC 23003-1) carries a 5.1 programme as a
+mono or stereo downmix coded by AAC-LC plus a spatial payload, and the
+decoder rebuilds the six channels from it. The payload travels as
+`EXT_SAC_DATA` extension payloads in the fill elements of a block
+(gathered across them, the in-band `bsSacHeader` ahead of the spatial
+frame), or its configuration comes from a two-layer LATM stream whose
+second layer signals object type 30 with the `SpatialSpecificConfig`;
+both land in the same place. Three trees are decoded: 5151 and 5152
+build 5.1 from a mono downmix through five one-to-two (OTT) boxes in
+two orders, and 525 from a stereo downmix through a two-to-three (TTT)
+box that rebuilds left, right and centre, followed by three OTT boxes.
+The baseline tools are implemented: the OTT and TTT boxes (TTT
+prediction modes 0 and 1, energy modes 4 and 5 and the
+centre-subtraction modes 2 and 3), the decorrelators of the baseline
+profile with their ducking, residual coding (the residual channel
+elements decoded by the core and mixed in their bands in place of the
+decorrelated signal), smoothing, the temporal shaping tools (subband
+temporal processing and guided envelope shaping), arbitrary downmix
+gains, the fixed gains and the matrix mode. The core is aligned by the
+560 samples the reference decoder applies its parameters late, analysed
+into the QMF domain (or taken as the SBR's QMF output when the core has
+one), run through the spatial decoder and synthesised; the output is six
+channels in the canonical order, or the existing stereo downmix when two
+channels are requested, while `aac_decoder_stream_channels` keeps
+reporting the core's channels. `aac_decoder_has_surround` (`hasSurround`
+in the binding) says that the last frame carried a surround payload that
+was decoded, and `aac_decoder_delay` includes the surround decoder's
+delay: 1521 samples for AAC-LC plus surround (560 of input alignment,
+384 of hybrid delay and 577 of QMF synthesis). AAC-ELD v2, an ELD core
+of 512 samples with the low-delay 2-1-2 payload in the ELD extension
+(its configuration in the ELD-specific configuration, the frame as the
+extension payload of type 9), decodes to stereo through the low-delay
+filterbank pair, the low-delay decorrelator and the 2-1-2 mixing, with
+256 samples of added delay. The normative tables (the CPC codebooks, the
+quantisers, the decorrelator configurations and the filter prototypes)
+are ISO/IEC 23003-1 data transcribed from libxaac (Apache-2.0) with
+attribution, as the USAC tables are.
+
+No free encoder writes MPEG Surround 5.1, so the test tool `mps-enc`
+(`tools/mps-enc.cpp`, built next to `baac`) writes the committed streams
+from 5.1 or stereo WAV with the codec's own AAC-LC or ELD encoder, and
+libxaac is the reference decoder: its parameter mapping equals ours bit
+for bit on every frame, and its decodes of the committed streams are the
+oracle. The FDK decoder binary pads the AAC-LC core to six channels
+without running its surround decoder, so it is no oracle for 5.1, though
+it does decode ELD v2. Against libxaac (delay 0, the first second, per
+channel) the 5151 tree reaches 62 to 72 dB, the 5152 tree 64 to 72 dB,
+the 525 tree 63 to 73 dB in TTT prediction mode 1 and 47 to 66 dB in
+energy mode 5 on a broadband programme; ELD v2 reaches 77 dB against
+libxaac and 77 dB against the FDK decoder. Limits: TTT prediction mode 0
+and the centre-subtraction modes 2 and 3 are verified by construction
+only, since libxaac's own output breaks there; energy modes whose two
+level differences exceed about 48 dB cannot be matched against libxaac's
+fixed-point weights; the object type 30 form is checked against the
+in-band form only (40 dB or better); SBR input (HE-AAC plus surround,
+the SBR's QMF output handed to the spatial decoder) is wired but
+exercised by no stream; LD-SBR with the spatial payload, temporal
+shaping in the low-delay path and ELD frame lengths other than 512 are
+not covered; the 7.1 trees (7271, 7272, 7571 and 7572), the HRTF and
+binaural output modes and the 3D audio mode are refused. Figures per
+stream and channel are in [reference-comparison.md](reference-comparison.md).
+
 ### Encoder
 
 The encoder follows the structure of the Fraunhofer FDK encoder and
@@ -438,6 +500,7 @@ int aac_decoder_output_sample_rate(AacDecoderHandle ctx);
 int aac_decoder_channels(AacDecoderHandle ctx);
 int aac_decoder_stream_channels(AacDecoderHandle ctx);
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps);
+int aac_decoder_has_surround(AacDecoderHandle ctx);
 void aac_decoder_destroy(AacDecoderHandle ctx);
 /* stream settings */
 int aac_decoder_set_transport(AacDecoderHandle ctx, AacTransport transport);
@@ -477,6 +540,13 @@ int aac_decoder_pending_bytes(AacDecoderHandle ctx);
   mono stream goes to both stereo channels at -3 dB, as FFmpeg mixes
   them), 3 to 8 copy the stream's channels and zero the rest.
   `aac_decoder_stream_channels` reports what the last frame carried.
+- `aac_decoder_has_surround` reports that the last frame carried MPEG
+  Surround data that was decoded: the output is then the surround
+  channels (5.1 in the canonical order from the 5151, 5152 and 525
+  trees, or a stereo pair from the 2-1-2 tree of ELD v2) built from the
+  mono or stereo core, `aac_decoder_stream_channels` keeps reporting the
+  core's channels, and `aac_decoder_delay` includes the surround
+  decoder's delay while it runs.
 - The ADTS header overrides the creation sample rate and channel
   configuration; `aac_decoder_sample_rate` reports the stream's rate. A
   change of rate or layout mid-stream resets the decoder state.
@@ -598,7 +668,9 @@ between calls. The decoder options add `transport` (`detect`, `adts`,
 `loas`, `latm`, `latm-raw`, `raw`), `config` (AudioSpecificConfig bytes),
 `frameLength`, `concealment` (`off`, `noise`, `interpolate`) and
 `limiter` (`true` or `{ attackMs, releaseMs }`), and the decoder reports
-`concealedFrames`, `channelMode` and `delay`; the encoder options add
+`concealedFrames`, `channelMode`, `delay` and `hasSurround` (the last
+frame carried MPEG Surround data that was decoded, so the stream plays as
+5.1, or as stereo for ELD v2); the encoder options add
 `transport`, `signaling`, `frameLength`, `crc`, `mpeg2` and `channelMode`
 (`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`), and the encoder exposes
 `config` and the `unitSizes` of its last result, which a packetiser needs
@@ -617,7 +689,7 @@ result carries the `loudness` readback.
 
 ## Testing
 
-`ctest` runs thirty-four suites, and the transform, filterbank and
+`ctest` runs thirty-seven suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -696,7 +768,40 @@ normalisation off (`*_fdk.wav`) and the stored LPD core output
 (`usac_lpd_*_core.s16`); libxaac is the bit-level oracle these suites
 were pinned against (frame boundaries, parameters and the MPS 212 upmix
 on the reference downmix), FDK the behavioural one through its binaries,
-and FFmpeg plays no part in the USAC suites. The interop test skips when
+and FFmpeg plays no part in the USAC suites. MPEG Surround has three
+suites: the syntax (`test_mps`: configuration and frame round trips
+through the test tool's writer, which the suite compiles in, the
+refusals, the extension configurations, the low-delay form with its
+frames and filterbank, the quantisation modes, concealment and reset,
+the residual positions, temporal shaping and the committed streams), the
+signal path (`test_mps_signal`: the tables, the OTT and TTT matrices
+against hand-computed values and libxaac's tables, energy preservation
+through every tree, the decorrelators, the residual path and synthetic
+round trips through the 525 tree with and without residual and the 5151
+tree) and the streams (`test_mps_stream`: the four quiet committed
+streams against libxaac's decodes per channel at 40 dB or better, the
+stereo request against the mixed 5.1 decode, the object type 30 form
+against the in-band form, the louder streams decoding to six channels,
+and ELD v2 against libxaac). The MPEG Surround data under `tests/data`
+is the test tool's output (`mps_*.loas`, 96 access units of 48 kHz 5.1:
+the 5151, 5152 and 525 trees with the in-band header and 525 with the
+object type 30 configuration, each loud and at -12 dB (`_q`, since the
+loud ones saturated the references), 525 in the TTT energy
+mode at -12 dB, and the ELD v2 stream `mps_212_eld.loas`) and libxaac's
+16-bit decodes of the first second of the quiet streams and the ELD v2
+stream (`mps_*_xaac.wav`). No free encoder writes MPEG Surround 5.1, so
+`mps-enc` (`tools/mps-enc.cpp`, the CMake target next to `baac`; test
+tooling, not a product feature) wrote them: it takes 48 kHz 5.1 or
+stereo WAV, measures the OTT and TTT parameters of the chosen tree
+(CLD from band energies, ICC from the normalised cross-correlation, CPC
+as the least squares prediction of the centre), codes the downmix with
+the codec's AAC-LC or ELD encoder and writes the spatial payload in the
+in-band or object type 30 form, with options for Huffman coding and
+paired sets, the number of parameter sets, the TTT modes and the dual
+mode, the fixed gains, the quantisation mode, smoothing, arbitrary
+downmix gains and the header and independency cadence; `--verify`
+parses every frame back and compares the indices, `--dump` prints the
+parameters as the decoder maps them. The interop test skips when
 `ffmpeg` is
 not on PATH; otherwise it requires our decoder to match FFmpeg's decode
 of FFmpeg-encoded streams (ADTS and LATM), and FFmpeg to decode our
@@ -717,9 +822,9 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ```
 include/      public aac.h and internal headers
-src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
-tools/        baac command-line tool
-tests/        CTest suites and the committed HE-AAC, ELD and USAC reference streams and decodes (tests/data)
+src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
+tools/        baac command-line tool, mps-enc test stream writer for MPEG Surround
+tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test)
 docs/         this file and the reference comparison
 ```
@@ -770,3 +875,15 @@ core, the MPS 212 codebooks, quantisers, mixing kernels, prototypes and
 decorrelator filters, and the enhanced SBR tables as they are sourced)
 are ISO/IEC 23003-3 and 23003-1 data transcribed from libxaac's ROM files under its
 Apache-2.0 licence and verified against it entry by entry.
+
+The MPEG Surround decoder is written from ISO/IEC 23003-1 with libxaac
+as the bit-level oracle (its parameter mapping compared frame by frame
+and its decodes committed as references) and the FDK decoder binary as
+a behavioural oracle for ELD v2 only; no code of either was copied. The
+CPC codebooks and the quantisers of the parameters, the decorrelator
+configurations and all-pass coefficients, the fixed gains, the envelope
+quantiser of the guided envelope shaping and the low-delay filterbank
+and decorrelator tables are ISO/IEC 23003-1 data transcribed from
+libxaac's ROM files under its Apache-2.0 licence, with the attribution
+header the USAC tables carry, and checked against it. The MPEG Surround
+test streams were written by the package's own test tool.

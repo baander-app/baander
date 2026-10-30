@@ -864,6 +864,53 @@ Electron client are pending. Not run: listening tests and the ISO
 conformance suite. Figures and limits are in the
 [reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
 
+Checkpoint, 2026-10-30, MPEG Surround decoder: the third tier's second
+plan, per the
+[plan](docs/plans/2026-10-29-006-feat-aac-codec-mpeg-surround-decoder-plan.md),
+is delivered. Decoder: MPEG Surround (ISO/IEC 23003-1) 5.1 in AAC-LC
+streams from a mono downmix (trees 5151 and 5152, five OTT boxes) or a
+stereo downmix (tree 525, a TTT box with three OTT boxes), the payload as
+EXT_SAC_DATA fill elements with the in-band header or signalled by an
+object type 30 configuration in a two-layer LATM stream; the baseline
+tools (OTT and TTT boxes with the TTT prediction modes 0 and 1, energy
+modes 4 and 5 and centre-subtraction modes 2 and 3, decorrelators with
+ducking, residual coding, smoothing, STP and GES temporal shaping,
+arbitrary downmix gains, fixed gains and the matrix mode); six channels
+in the canonical order, the existing stereo downmix when two are
+requested; the surround flag (`aac_decoder_has_surround`, `hasSurround`
+in the binding) and the added delay reported (1521 samples for AAC-LC
+plus surround, 256 for ELD v2); AAC-ELD v2 (an ELD 512-frame core with
+the low-delay 2-1-2 payload in the ELD extension) decoding to stereo. The
+normative tables are ISO/IEC 23003-1 data transcribed from libxaac
+(Apache-2.0) with attribution, as the USAC ones. Oracles: no free encoder
+writes MPEG Surround 5.1, so the test tool `mps-enc` (`tools/mps-enc.cpp`,
+a CMake target) writes streams from 5.1 or stereo WAV with the codec's
+own AAC-LC or ELD encoder; libxaac is the reference decoder (its
+parameter mapping equals ours bit for bit; its decodes of the first
+second are committed as `tests/data/mps_*_xaac.wav`); the FDK decoder
+binary pads the AAC-LC core to six channels without running its surround
+decoder, so it is no oracle for 5.1, but it decodes ELD v2. Verification
+against libxaac (delay 0, first second, per channel L R C LFE Ls Rs):
+62 to 72 dB on the 5151 tree, 64 to 72 dB on 5152, 63 to 73 dB on 525 in
+TTT prediction mode 1 and 47 to 66 dB in energy mode 5 on a broadband
+programme; ELD v2 at 77 dB against libxaac and 77 dB against the FDK
+decoder. CTest 37/37 (`test_mps`, `test_mps_signal` and
+`test_mps_stream` added) and the binding's smoke test (12 tests,
+`hasSurround` among them). Open: TTT prediction mode 0 and the
+centre-subtraction modes 2 and 3 are verified by construction only, since
+libxaac's own output breaks there; energy modes whose two level
+differences exceed about 48 dB cannot be matched against libxaac's
+fixed-point weights; the object type 30 form is checked against the
+in-band form only (40 dB or better); SBR input (HE-AAC plus surround) is
+wired but exercised by no stream; LD-SBR with the spatial payload,
+temporal shaping in the low-delay path and ELD frame lengths other than
+512 are not covered; the 7.1 trees, the HRTF and binaural modes and the
+3D mode are refused; per-platform prebuilt binaries for the Electron
+client remain pending. Not run: listening tests, the ISO conformance
+suite and streams from a third-party MPEG Surround encoder, which does
+not exist as free software. Figures and limits are in the
+[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

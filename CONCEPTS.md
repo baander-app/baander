@@ -401,7 +401,7 @@ Spectral band replication as USAC carries it: the header travels in the configur
 ### MPS 212
 
 The MPEG Surround one-to-two tool of a USAC channel pair: one core channel plus per-band level, correlation and phase parameters, optionally a residual signal, from which the decoder widens the pair in the QMF domain. The order in which it runs against the SBR is named by the stereoConfigIndex.
-*Avoid: MPEG Surround alone, whose 515 and 525 trees the codec does not decode.*
+*Avoid: MPEG Surround alone, which also names the 5.1 trees; the 2-1-2 tool is one OTT box.*
 
 ### stereoConfigIndex
 
@@ -416,4 +416,22 @@ The loudness and dynamic range standard of USAC streams (ISO/IEC 23003-4): loudn
 
 The audio pre-roll of a USAC stream access point: an extension element at the front of an independent frame (one whose `usacIndependencyFlag` is set, so that it decodes without history) that carries the stream configuration and the previous access units a decoder needs to warm its state. A cold decoder decodes them and drops their output; a warm one skips them. A seek or a configuration change lands on such a frame.
 *Avoid: keyframe, which belongs to video.*
+
+### MPEG Surround
+
+ISO/IEC 23003-1 as AAC carries it: a 5.1 programme coded as a mono or stereo AAC-LC downmix plus a spatial payload of per-band level, correlation and prediction parameters, from which the decoder rebuilds the six channels in the QMF domain. The payload travels as `EXT_SAC_DATA` fill elements with an in-band header, or its configuration as an object type 30 layer of a two-layer LATM stream. The tree names the box layout: 5151 and 5152 build 5.1 from a mono downmix through five OTT boxes in two orders, 525 from a stereo downmix through a TTT box and three OTT boxes. The decoder decodes these three trees, reports the decoded surround as `hasSurround` and refuses the 7.1 trees, the HRTF and binaural modes and the 3D mode; the codec has no MPEG Surround encoder, and the test tool `mps-enc` writes the suites' streams.
+*Avoid: MPS alone for the 5.1 trees; MPS 212 is the one-box tool of USAC and ELD v2.*
+
+### OTT box
+
+A one-to-two box of an MPEG Surround tree: from one input channel, a per-band level difference and correlation, and a decorrelated copy of the input (or, in the residual bands, a coded residual signal) it produces two output channels. An LFE box carries the level difference alone. The 2-1-2 tool is a tree of one OTT box.
+
+### TTT box
+
+The two-to-three box of the 525 tree, which rebuilds left, right and centre from the stereo downmix: in the prediction modes 0 and 1 from two prediction coefficients, a correlation and the residual where coded; in the energy modes 2 to 5 from two level differences, modes 2 and 3 with the centre's share subtracted from the other input before the split. A dual-mode box uses one mode below a band boundary and another above it.
+
+### ELD v2
+
+AAC-ELD with the 2-1-2 tool: an ELD core of 512 samples carrying a mono downmix, the low-delay form of the spatial configuration in the ELD-specific configuration and the spatial frame in the ELD extension payload, decoded to stereo through the low-delay filterbank pair and decorrelator with 256 samples of added delay. The decoder reads it; the test tool writes it on the codec's ELD encoder.
+*Avoid: ELD with LD-SBR, which is a different extension of the same core.*
 
