@@ -12,7 +12,6 @@ constexpr int kShort = AAC_FRAME_SIZE_SHORT; /* lines per short window slot */
 
 /* ── TNS (libfdk-aac aacenc_tns.cpp) ────────────────────────────── */
 
-constexpr float kTnsGainOnHigh = 1.437f; /* prediction gain that switches TNS on */
 constexpr float kTnsGainOnLow = 1.5f;
 constexpr int kTnsLowOrder = 5;
 /* Lag windows of the autocorrelation: 1 - (slope * lag)^2. */
@@ -138,7 +137,8 @@ void decide_window(const AacEncoderState* s, AacEncChannel* c, int w, const floa
   if (w == 0) {
     c->tns_gain = gain_hi;
   }
-  if (!(gain_hi > kTnsGainOnHigh || sum_sq > max_order / 2 + 2) || order_hi == 0) {
+  if (!(gain_hi > s->tns_gain_on || (s->tns_coef_trigger && sum_sq > max_order / 2 + 2)) ||
+      order_hi == 0) {
     return;
   }
   /* Filter lengths count down from num_swb (ISO/IEC 14496-3 4.6.9.3); the
@@ -194,7 +194,6 @@ void decide_window(const AacEncoderState* s, AacEncChannel* c, int w, const floa
   c->tns_n_filt[w] = 2;
   c->tns_order[w][1] = used_lo;
   c->tns_length[w][1] = hi_band - lo_band;
-  (void)s;
   (void)top_band;
 }
 
@@ -289,6 +288,18 @@ void aac_enc_tools_init(AacEncoderState* s) {
   const int* lo = aac_sfb_offset(s->frame_length, s->rate_index, 0);
   const int* so = aac_sfb_offset(s->frame_length, s->rate_index, 1);
 
+  /* The AAC-LC and HE-AAC cores switch a filter on only for a
+   * prediction gain above 2.  The libfdk-aac setting (1.437, or large
+   * coefficients alone) also fires on stationary tonal frames, where a
+   * sparse spectrum looks predictable across frequency although the
+   * time envelope is flat; a pure 6 kHz tone used two filters of order
+   * 6 in every frame.  Raising the threshold measured +0.006 to +0.018
+   * PEAQ at 64 to 128 kbit/s on the comparison corpus.  The low-delay
+   * and xHE-AAC encoders, which were not measured, keep the libfdk-aac
+   * setting. */
+  const bool fdk_tns = s->aot == AAC_AOT_USAC || aac_encoder_aot_low_delay(s->aot);
+  s->tns_gain_on = fdk_tns ? 1.437f : 2.0f;
+  s->tns_coef_trigger = fdk_tns;
   s->tns_order_long = channel_bitrate < 16000 ? 10 : 12;
   s->tns_order_short = channel_bitrate < 16000 ? 3 : 5;
   s->tns_lo_band_long = sr < 9391 ? 2 : (sr < 18783 ? 4 : 8);

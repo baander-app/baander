@@ -157,6 +157,10 @@ using AacEncoderState = struct AacEncoderState_ {
   int tns_order_long, tns_order_short;
   int tns_lo_band_long, tns_hi_band_long, tns_top_long;
   int tns_hi_band_short, tns_top_short;
+  /* A filter is used when its prediction gain exceeds tns_gain_on, or,
+   * with tns_coef_trigger, when its quantized coefficients are large. */
+  float tns_gain_on;
+  int tns_coef_trigger;
   /* PNS configuration (libfdk-aac pnsparam.cpp, AAC-LC rows). */
   int use_pns;
   int pns_start_band;
