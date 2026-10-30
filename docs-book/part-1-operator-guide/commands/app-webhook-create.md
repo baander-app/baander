@@ -4,6 +4,11 @@ Add an outgoing webhook and print its signing secret. The command does what `POS
 
 ## Quick start
 
+The Make examples below target the checkout's development preview. For an
+installed instance, use the `dc` function from
+[Getting started](../getting-started.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+
 ```bash
 make exec cmd="php bin/console app:webhook:create https://hooks.baander.app/notify --category=security --category=media_changes"
 ```

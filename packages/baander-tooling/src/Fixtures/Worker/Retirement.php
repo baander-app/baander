@@ -18,11 +18,8 @@ final class Retirement
         $docker = $resources->docker;
         $boot = str_repeat('a', 32);
         try {
-            $resources->containers[] = $resources->id;
-            $container = $docker->run([
-                'create',
-                '--name',
-                $resources->id,
+
+            $container = $resources->createContainer($resources->id, [
                 '--network',
                 'none',
                 '--memory',
@@ -49,10 +46,9 @@ final class Retirement
                 'app.baander.worker.role=execution',
                 '--entrypoint',
                 'php',
-                $runtime->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest',
+                $runtime->image('application')->id,
                 '/tmp/tests/Fixtures/Worker/contained-supervisor.php',
-            ])->stdout
-                |> trim(...);
+            ]);
             Containment::stageStopped($resources, $container);
             $docker->run(['start', $container]);
             $runtime->await(
@@ -68,17 +64,11 @@ final class Retirement
                 )->exitCode === 0,
                 5,
             );
-            $endpoint = $docker->configuration['host'] ?? $docker->run([
-                'context',
-                'inspect',
-                '--format',
-                '{{.Endpoints.docker.Host}}',
-            ])->stdout
-                |> trim(...);
+            $endpoint = $docker->target->endpoint;
             $command = [
                 PHP_BINARY,
                 'tests/Fixtures/Worker/retire-container.php',
-                $docker->configuration['executable'],
+                $docker->target->executable,
                 $endpoint,
                 $container,
             ];
@@ -122,7 +112,7 @@ final class Retirement
                 )->exitCode !== 0,
                 'Absent predecessor treated as retirement receipt',
             );
-            $resources->containers = [];
+
             echo "PASS: wrong-owner and restart-policy rejection and running deployment retirement with restart prevention\n";
             return 0;
         } finally {

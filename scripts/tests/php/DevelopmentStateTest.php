@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\Target;
+use Baander\Tooling\Process\CommandFailure;
 use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use PHPUnit\Framework\TestCase;
@@ -158,7 +160,7 @@ final class DevelopmentStateTest extends TestCase
         );
         putenv('COMPOSE_PROJECT_NAME=wrong');
         try {
-            $result = new Runner()->run(
+            $result = new DevelopmentCommandExecutor()->execute(
                 [PHP_BINARY, '-r', 'echo json_encode([getenv("DATABASE_URL"),getenv("COMPOSE_PROJECT_NAME")]);'],
                 env: ['DATABASE_URL' => 'selected'],
             );
@@ -173,7 +175,7 @@ final class DevelopmentStateTest extends TestCase
         $this->store->save('persistent', ['id' => 'persistent', 'phase' => 'preparing']);
         $lock = $this->store->lock('persistent');
         try {
-            $result = new Runner()->run([PHP_BINARY, __DIR__ . '/Fixtures/dev-core-lock.php', $this->store->root], check: false);
+            $result = new DevelopmentCommandExecutor()->execute([PHP_BINARY, __DIR__ . '/Fixtures/dev-core-lock.php', $this->store->root], check: false);
             self::assertSame(2, $result->exitCode);
             self::assertSame("preparing\n", $result->stdout);
             self::assertStringContainsString('another operation', $result->stderr);
@@ -182,23 +184,25 @@ final class DevelopmentStateTest extends TestCase
         }
     }
 
-    public function testCommandFailureDoesNotPublishArgumentsOrOutput(): void
+    public function testCommandFailurePreservesStatusAndDiagnosticsWithoutArguments(): void
     {
         try {
-            new Runner()->run([PHP_BINARY, '-r', 'fwrite(STDERR,"secret-output");exit(3);', 'secret-argument']);
+            new DevelopmentCommandExecutor()->execute([PHP_BINARY, '-r', 'fwrite(STDERR,"secret-output");exit(3);', 'secret-argument']);
             self::fail('Failure accepted');
-        } catch (WorkflowError $error) {
+        } catch (CommandFailure $error) {
+            self::assertSame(3, $error->getCode());
             self::assertStringContainsString('status 3', $error->getMessage());
-            self::assertStringNotContainsString('secret', $error->getMessage());
+            self::assertStringContainsString('secret-output', $error->getMessage());
+            self::assertStringNotContainsString('secret-argument', $error->getMessage());
         }
     }
 
-    public function testDockerPinsContextAndValidatesDaemonIdentity(): void
+    public function testDockerPinsCapturedEndpointAndValidatesDaemonIdentity(): void
     {
-        $runner = new class extends Runner {
+        $runner = new class extends DevelopmentCommandExecutor {
             /** @var list<non-empty-list<string>> */
             public array $seen = [];
-            public function run(
+            public function execute(
                 array $arguments,
                 ?string $cwd = null,
                 ?array $env = null,
@@ -212,14 +216,14 @@ final class DevelopmentStateTest extends TestCase
                 return new \Baander\Tooling\Process\ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
             }
         };
-        $docker = new Docker($runner, ['executable' => '/selected/docker', 'context' => 'selected', 'daemon_id' => 'daemon']);
-        self::assertSame(['ID' => 'daemon'], $docker->validate());
-        $docker->compose(['project' => 'selected-project', 'compose_file' => '/selected/compose.json'], ['up', '-d']);
+        $docker = new Client($runner, Target::fromArray(DevelopmentCommandExecutor::target('/selected/docker', 'selected', 'daemon')), []);
+        self::assertSame(['ID' => 'daemon'], $docker->validateIdentity());
+        $docker->compose('selected-project', '/selected/compose.json', ['up', '-d']);
         self::assertSame(
             [
                 '/selected/docker',
-                '--context',
-                'selected',
+                '--host',
+                'unix:///var/run/docker.sock',
                 'compose',
                 '--project-name',
                 'selected-project',
@@ -231,6 +235,6 @@ final class DevelopmentStateTest extends TestCase
             $runner->seen[1],
         );
         $this->expectExceptionMessage('identity changed');
-        new Docker($runner, ['executable' => '/selected/docker', 'context' => 'selected', 'daemon_id' => 'other'])->validate();
+        new Client($runner, Target::fromArray(DevelopmentCommandExecutor::target('/selected/docker', 'selected', 'other')), [])->validateIdentity();
     }
 }

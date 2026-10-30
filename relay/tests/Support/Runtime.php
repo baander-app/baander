@@ -205,7 +205,8 @@ final class Runtime
             $run();
         } catch (Throwable $failure) {
             fwrite(STDERR, $failure . "\n");
-            $exitCode = $failure instanceof Interrupted ? 128 + $failure->signal : 1;
+            $exitCode = $failure instanceof Interrupted ? 128 + $failure->signal
+                : ($failure->getCode() > 0 && $failure->getCode() <= 255 ? $failure->getCode() : 1);
         } finally {
             if (extension_loaded('swoole')) {
                 SwooleProcess::signal(2, null);

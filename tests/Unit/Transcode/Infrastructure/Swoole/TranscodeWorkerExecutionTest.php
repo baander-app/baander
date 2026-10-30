@@ -633,7 +633,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 $this->current = $this->claim(1, 2, 'paused', position: 30.0);
             } elseif ($polls === 4) {
                 $pausedBeforeTarget = in_array('signal-19:1', $this->spawner->events, true);
-                $this->spawner->publish(9);
+                $this->spawner->publish(6);
             } elseif ($polls >= 6) {
                 $this->current = $this->claim(1, 3, 'cancelled', position: 30.0);
             }
@@ -870,7 +870,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $pausedBeforeTarget = false;
         $readyBeforeTarget = false;
         $pausedWithTarget = false;
-        $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget, &$readyBeforeTarget, &$pausedWithTarget, $target, $position): void {
+        $readyWithTarget = false;
+        $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget, &$readyBeforeTarget, &$pausedWithTarget, &$readyWithTarget, $target, $position): void {
             ++$polls;
             $command = $this->spawner->commands[0];
             $directory = dirname($command[array_key_last($command)]);
@@ -880,19 +881,19 @@ final class TranscodeWorkerExecutionTest extends TestCase
             } elseif ($polls === 3) {
                 $pausedBeforeTarget = in_array('signal-19:1', $this->spawner->events, true);
                 $readyBeforeTarget = in_array('ready', $this->observed, true);
-                // Closing just the cursor fragment still does not provide the player's holdback.
                 $this->spawner->publish($target + 1, $this->sourceDuration <= $position);
-            } elseif ($polls === 4 && $this->sourceDuration > $position) {
-                $this->spawner->publish($target + 5);
-            } elseif ($polls >= 6) {
+            } elseif ($polls === 4) {
                 $pausedWithTarget = in_array('signal-19:1', $this->spawner->events, true);
+                $readyWithTarget = in_array('ready', $this->observed, true);
+            } elseif ($polls >= 6) {
                 $this->current = $this->claim(1, 2, 'cancelled');
             }
         };
         $this->worker->run($this->current, static fn(): bool => false);
         self::assertFalse($pausedBeforeTarget, 'The encoder paused with only preroll and an unfinished target fragment.');
         self::assertFalse($readyBeforeTarget, 'A paused cursor was acknowledged before its fragment was published.');
-        self::assertTrue($pausedWithTarget);
+        self::assertTrue($pausedWithTarget, 'Closed cursor fragments must allow pause without publishing future fragments.');
+        self::assertTrue($readyWithTarget, 'A published paused cursor must acknowledge readiness without future coverage.');
         self::assertSame(['accepted', 'ready', 'cancelled'], $this->observed);
         self::assertSame(0, $this->allocations);
         self::assertSame(1, $this->releases);

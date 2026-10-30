@@ -4,6 +4,11 @@ Show, set or reset one user's settings, such as the language Baander emails them
 
 ## Quick start
 
+The Make examples below target the checkout's development preview. For an
+installed instance, use the `dc` function from
+[Getting started](../getting-started.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+
 List a user's settings:
 
 ```bash

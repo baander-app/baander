@@ -6,7 +6,7 @@ namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Cli;
 use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Process\ProcessResult;
@@ -23,6 +23,7 @@ final class DevelopmentCliTest extends TestCase
         $this->directory = '/tmp/baander-cli-' . bin2hex(random_bytes(8));
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/checkout', 0700);
+        $this->sourceLayout($this->directory . '/checkout');
     }
 
     protected function tearDown(): void
@@ -43,6 +44,74 @@ final class DevelopmentCliTest extends TestCase
         putenv('BAANDER_COMMAND');
     }
 
+    public function testNewOwnershipRejectsUnsupportedWorkerTransportBeforeContainerCommands(): void
+    {
+        $previous = getenv('BAANDER_TOOLING_TARGET_FILE');
+        $path = $this->directory . '/captured-target.json';
+        $runner = new class extends DevelopmentCommandExecutor {
+            /** @var list<list<string>> */
+            public array $calls = [];
+            public function execute(
+                array $arguments,
+                ?string $cwd = null,
+                ?array $env = null,
+                ?string $input = null,
+                ?float $timeout = 120,
+                bool $check = true,
+                ?string $logPath = null,
+                bool $interactive = false,
+            ): ProcessResult {
+                $this->calls[] = $arguments;
+                if (in_array('info', $arguments, true)) {
+                    return new ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
+                }
+                throw new \RuntimeException('Unexpected Docker command.');
+            }
+        };
+        try {
+            putenv('BAANDER_TOOLING_TARGET_FILE=' . $path);
+            foreach (['tcp://daemon.baander.app:2375', 'unix:///tmp/daemon,socket'] as $endpoint) {
+                \Baander\Tooling\Filesystem\AtomicFile::writeJson(
+                    $path,
+                    new \Baander\Tooling\Docker\Target('/fake/docker', $endpoint, 'daemon', null, null)->toArray(),
+                );
+                try {
+                    Cli::dockerTarget($runner, \Baander\Tooling\Configuration\ToolingConfiguration::resolve(), $this->directory . '/unused-snapshot', getenv());
+                    self::fail('Unsupported development transport was admitted.');
+                } catch (\RuntimeException $error) {
+                    self::assertNotSame('Unexpected Docker command.', $error->getMessage());
+                }
+            }
+            self::assertCount(2, $runner->calls);
+            self::assertTrue(array_all($runner->calls, static fn(array $arguments): bool => in_array('info', $arguments, true)));
+            self::assertDirectoryDoesNotExist($this->directory . '/unused-snapshot');
+        } finally {
+            putenv($previous === false ? 'BAANDER_TOOLING_TARGET_FILE' : 'BAANDER_TOOLING_TARGET_FILE=' . $previous);
+        }
+    }
+
+    /** @param array<string,mixed> $options
+     * @param array<string,string>|null $environment
+     * @return array<string,mixed>
+     */
+    private function configure(StateStore $store, DevelopmentCommandExecutor $runner, string $root, string $repository, array $options, ?array $environment = null): array
+    {
+        return Cli::configure(
+            $store,
+            $runner,
+            $root,
+            $repository,
+            $options,
+            environment: $environment ?? array_replace(getenv(), ['CI' => '0']),
+        );
+    }
+
+    private function sourceLayout(string $root): void
+    {
+        mkdir($root . '/packages/baander-tooling/resources', 0700, true);
+        file_put_contents($root . '/packages/baander-tooling/resources/application-layout.json', '{"version":1,"root":"/var/www/html"}');
+    }
+
     /** @return array{StateStore,array<string,mixed>} */
     private function savedLibraryInstance(string $phase = 'stopped'): array
     {
@@ -52,12 +121,15 @@ final class DevelopmentCliTest extends TestCase
         $store = new StateStore($this->directory . '/state');
         $instance = [
             'id' => 'persistent', 'repository' => 'repository', 'phase' => $phase,
+            'version' => 1, 'docker' => DevelopmentCommandExecutor::target(),
             'media' => [
                 ['source' => $this->directory . '/manual', 'target' => '/manual'],
                 ['source' => $this->directory . '/movies', 'target' => '/media/movies'],
             ],
             'libraries' => [['slug' => 'movies', 'name' => 'Movies', 'type' => 'movie', 'source' => $this->directory . '/movies', 'target' => '/media/movies']],
         ];
+        $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::resolve(environment: getenv());
+        $instance['tooling'] = $configuration->toArray();
         $store->save('persistent', $instance);
         file_put_contents($store->directory('persistent') . '/env.json', '{}');
         return [$store, $instance];
@@ -75,7 +147,7 @@ final class DevelopmentCliTest extends TestCase
             if ($content !== null) {
                 file_put_contents($this->directory . '/checkout/dev.local.json', $content);
             }
-            $instance = Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
+            $instance = $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
             self::assertEquals($saved, $instance);
         }
     }
@@ -84,28 +156,62 @@ final class DevelopmentCliTest extends TestCase
     {
         [$store, $saved] = $this->savedLibraryInstance();
         file_put_contents($this->directory . '/checkout/dev.local.json', '{"libraries":[]}');
-        $instance = Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
+        $instance = $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
         self::assertSame([], $instance['libraries']);
         self::assertSame([$saved['media'][0]], $instance['media']);
+    }
+
+    public function testCapturedEnvironmentDefinesConfigurationAfterAmbientChanges(): void
+    {
+        [$store] = $this->savedLibraryInstance();
+        $previous = getenv('BAANDER_TEST_TIMEOUT');
+        $captured = array_replace(getenv(), ['BAANDER_TEST_TIMEOUT' => '7']);
+        try {
+            putenv('BAANDER_TEST_TIMEOUT=99');
+            $instance = $this->configure(
+                $store,
+                new DevelopmentCommandExecutor(),
+                $this->directory . '/checkout',
+                'repository',
+                Cli::parse(['up', '--instance', 'persistent']),
+                environment: $captured,
+            );
+            self::assertSame(7.0, $instance['tooling']['budgets']['backend']);
+            self::assertSame('environment', $instance['tooling']['provenance']['budgets.backend']);
+        } finally {
+            putenv($previous === false ? 'BAANDER_TEST_TIMEOUT' : 'BAANDER_TEST_TIMEOUT=' . $previous);
+        }
+    }
+
+    public function testCommandVariableUsesTheCapturedInvocationEnvironment(): void
+    {
+        putenv('BAANDER_COMMAND=php bin/console changed');
+        self::assertSame(['php', 'bin/console', 'captured'], Cli::execCommand(
+            Cli::parse(['exec', '--command-env', 'BAANDER_COMMAND']),
+            ['BAANDER_COMMAND' => 'php bin/console captured'],
+        ));
     }
 
     public function testCliOverridePersistsEffectiveLibrarySourceAndStableTarget(): void
     {
         [$store] = $this->savedLibraryInstance();
         $this->localLibrary($this->directory . '/movies');
-        $instance = Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent', '--media', $this->directory . '/replacement=/media/movies']));
+        $instance = $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent', '--media', $this->directory . '/replacement=/media/movies']));
         self::assertSame($this->directory . '/replacement', $instance['libraries'][0]['source']);
         self::assertSame('/media/movies', $instance['libraries'][0]['target']);
         self::assertEquals($instance, $store->load('persistent'));
         unlink($this->directory . '/checkout/dev.local.json');
-        self::assertEquals($instance, Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent'])));
+        self::assertEquals($instance, $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent'])));
     }
 
     public function testNewPreviewInheritsDefinitionsAndExplicitEmptyRetainsManualMounts(): void
     {
         [$store, $saved] = $this->savedLibraryInstance();
-        $runner = $this->createStub(Runner::class);
-        $runner->method('run')->willReturn(new ProcessResult(0, null, false, false, '{"ID":"fixture-daemon"}', '', 0));
+        $runner = $this->createStub(DevelopmentCommandExecutor::class);
+        $runner->method('run')->willReturnCallback(static function (ProcessSpec $command): ProcessResult {
+            $output = in_array('inspect', $command->argv, true) ? '[{"Endpoints":{"docker":{"Host":"unix:///var/run/docker.sock"}}}]' : (in_array('show', $command->argv, true) ? 'fixture-context' : '{"ID":"fixture-daemon"}');
+            return new ProcessResult(0, null, false, false, $output, '', 0);
+        });
         file_put_contents($this->directory . '/docker', '#!/bin/sh');
         chmod($this->directory . '/docker', 0700);
         $originalPath = getenv('PATH');
@@ -114,13 +220,14 @@ final class DevelopmentCliTest extends TestCase
             foreach ([false, true] as $clear) {
                 $root = $this->directory . ($clear ? '/empty-preview' : '/inherited-preview');
                 mkdir($root, 0700);
+                $this->sourceLayout($root);
                 if ($clear) {
                     file_put_contents($root . '/dev.local.json', '{"libraries":[]}');
                 }
                 $id = Environment::previewId($root, 'repository');
                 mkdir($store->directory($id), 0700);
                 file_put_contents($store->directory($id) . '/env.json', '{}');
-                $instance = Cli::configure($store, $runner, $root, 'repository', Cli::parse(['up']));
+                $instance = $this->configure($store, $runner, $root, 'repository', Cli::parse(['up']));
                 self::assertEquals($clear ? [] : $saved['libraries'], $instance['libraries']);
                 self::assertSame($clear ? [$saved['media'][0]] : $saved['media'], $instance['media']);
             }
@@ -141,7 +248,7 @@ final class DevelopmentCliTest extends TestCase
                 file_put_contents($this->directory . '/checkout/dev.local.json', '{"libraries":[]}');
             }
             try {
-                Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
+                $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--instance', 'persistent']));
                 self::fail('Changing running media must fail.');
             } catch (WorkflowError $error) {
                 self::assertStringContainsString('Stop this instance', $error->getMessage());
@@ -156,7 +263,7 @@ final class DevelopmentCliTest extends TestCase
         $this->localLibrary($this->directory . '/checkout');
         foreach (['/media', '/etc'] as $target) {
             try {
-                Cli::configure(new StateStore($this->directory . '/state'), new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--media', $this->directory . '/checkout=' . $target]));
+                $this->configure(new StateStore($this->directory . '/state'), new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up', '--media', $this->directory . '/checkout=' . $target]));
                 self::fail('Overlapping media must fail.');
             } catch (WorkflowError $error) {
                 self::assertStringContainsString('overlap', $error->getMessage());
@@ -171,7 +278,7 @@ final class DevelopmentCliTest extends TestCase
         foreach ([[$entry, $entry], [array_replace($entry, ['type' => 'invalid'])], [array_replace($entry, ['path' => 'relative'])]] as $libraries) {
             file_put_contents($this->directory . '/checkout/dev.local.json', json_encode(['libraries' => $libraries], JSON_THROW_ON_ERROR));
             try {
-                Cli::configure(new StateStore($this->directory . '/state'), new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up']));
+                $this->configure(new StateStore($this->directory . '/state'), new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up']));
                 self::fail('Invalid libraries must fail.');
             } catch (WorkflowError $error) {
                 self::assertNotSame('', $error->getMessage());
@@ -184,7 +291,7 @@ final class DevelopmentCliTest extends TestCase
     {
         file_put_contents($this->directory . '/checkout/dev.local.json', '{broken');
         try {
-            Cli::configure(new StateStore($this->directory . '/state'), new Runner(), $this->directory . '/checkout', 'repository', Cli::parse(['up']));
+            $this->configure(new StateStore($this->directory . '/state'), new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse(['up']));
             self::fail('Malformed local configuration must fail.');
         } catch (WorkflowError $error) {
             self::assertStringContainsString('dev.local.json', $error->getMessage());
@@ -232,9 +339,9 @@ final class DevelopmentCliTest extends TestCase
     {
         foreach ([$this->directory . '/checkout', $this->directory . '/checkout/private-state'] as $path) {
             try {
-                Cli::configure(
+                $this->configure(
                     new StateStore($path),
-                    new Runner(),
+                    new DevelopmentCommandExecutor(),
                     $this->directory . '/checkout',
                     'repository',
                     Cli::parse(['up']),
@@ -244,7 +351,7 @@ final class DevelopmentCliTest extends TestCase
                 self::assertStringContainsString('outside the worktree', $error->getMessage());
             }
         }
-        self::assertSame(['.', '..'], scandir($this->directory . '/checkout'));
+        self::assertSame(['.', '..', 'packages'], scandir($this->directory . '/checkout'));
     }
 
     public function testMediaCannotExposeStateOrPrivateSubdirectories(): void
@@ -254,9 +361,9 @@ final class DevelopmentCliTest extends TestCase
         mkdir($store->root . '/gateway', 0700);
         foreach ([$this->directory, $store->root, $store->root . '/gateway'] as $source) {
             try {
-                Cli::configure(
+                $this->configure(
                     $store,
-                    new Runner(),
+                    new DevelopmentCommandExecutor(),
                     $this->directory . '/checkout',
                     'repository',
                     Cli::parse(['up', '--media', $source]),
@@ -283,7 +390,7 @@ final class DevelopmentCliTest extends TestCase
         $saved = file_get_contents($store->directory('persistent') . '/state.json');
         foreach ([['up'], ['up', '--instance', 'persistent']] as $arguments) {
             try {
-                Cli::configure($store, new Runner(), $this->directory . '/checkout', 'repository', Cli::parse($arguments));
+                $this->configure($store, new DevelopmentCommandExecutor(), $this->directory . '/checkout', 'repository', Cli::parse($arguments));
                 self::fail('Saved media exposing state must fail.');
             } catch (WorkflowError $error) {
                 self::assertStringContainsString('Media directories', $error->getMessage());
@@ -374,8 +481,8 @@ final class DevelopmentCliTest extends TestCase
 
     public function testHostSetupRejectsStateInsideCheckoutBeforeWritingFiles(): void
     {
-        $runner = new Runner();
-        $runner->run(['git', 'init', '-q', $this->directory . '/checkout']);
+        $runner = new DevelopmentCommandExecutor();
+        $runner->execute(['git', 'init', '-q', $this->directory . '/checkout']);
         $result = new ProcessRunner()->run(new ProcessSpec(
             argv: [
                 PHP_BINARY,
@@ -430,15 +537,15 @@ final class DevelopmentCliTest extends TestCase
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertFileExists($this->directory . '/state/host-setup/README.md');
         self::assertStringContainsString($this->directory . '/state/host-setup/README.md', $result->stdout);
-        self::assertSame(['.', '..'], scandir($this->directory . '/checkout'));
+        self::assertSame(['.', '..', 'packages'], scandir($this->directory . '/checkout'));
     }
 
     public function testWorktreeWithoutRemoteKeepsTheSharedRepositoryIdentity(): void
     {
-        $runner = new Runner();
+        $runner = new DevelopmentCommandExecutor();
         $root = $this->directory . '/checkout';
-        $runner->run(['git', 'init', '-q', $root]);
-        $runner->run(
+        $runner->execute(['git', 'init', '-q', $root]);
+        $runner->execute(
             [
                 'git',
                 '-c',
@@ -452,7 +559,7 @@ final class DevelopmentCliTest extends TestCase
             ],
             cwd: $root,
         );
-        $runner->run(['git', 'worktree', 'add', '--detach', $this->directory . '/worktree'], cwd: $root);
+        $runner->execute(['git', 'worktree', 'add', '--detach', $this->directory . '/worktree'], cwd: $root);
         [$checkout, $identity] = Cli::repositoryContext($runner, $this->directory . '/worktree');
         self::assertSame($this->directory . '/worktree', $checkout);
         self::assertSame(realpath($root . '/.git'), $identity);

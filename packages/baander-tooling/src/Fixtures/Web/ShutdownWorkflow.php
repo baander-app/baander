@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Web;
 
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\Client as DockerClient;
+use Baander\Tooling\Resources\{ResourceLedger, ResourceKind};
 use Baander\Tooling\Fixtures\Runtime;
 use Baander\Tooling\Process\ProcessResult;
 use Throwable;
@@ -16,7 +17,8 @@ final class ShutdownWorkflow
     private const int WINDOW_SECONDS = 3;
     private const string LISTENER = 'drain-listener@baander.app';
     private Runtime $runtime;
-    private Docker $docker;
+    private DockerClient $docker;
+    private ResourceLedger $resources;
     private string $id;
     private string $image;
     private string $appDirectory;
@@ -31,12 +33,12 @@ final class ShutdownWorkflow
     private array $appEnvironment;
     public function __construct(string $root)
     {
-        $this->runtime = new Runtime($root, 900);
-        $this->runtime->environment['LC_ALL'] = 'C';
+        $this->runtime = new Runtime($root, environment: array_replace(getenv(), ['LC_ALL' => 'C']), budget: 'webShutdown');
         $this->docker = $this->runtime->docker();
         $this->id = 'baander-web-shutdown-' . time() . '-' . getmypid();
-        $this->image = $this->runtime->environment['BAANDER_TEST_IMAGE'] ?? '' ?: 'martinjuul/baander-app:latest';
-        $this->appDirectory = $this->baked() ? '/var/www/html' : '/tmp/baander-web-shutdown';
+        $this->image = $this->runtime->image('application')->id;
+        $this->appDirectory = $this->baked() ? $this->runtime->layout()->root : '/tmp/baander-web-shutdown';
+        $this->resources = $this->runtime->resources(Runtime::artifacts($root, $this->id));
         $this->temporary = sys_get_temp_dir() . '/' . $this->id . '-' . bin2hex(random_bytes(4));
         Runtime::require(mkdir($this->temporary, 0700), 'Cannot create private shutdown workflow directory.');
         $this->appEnvironment = [
@@ -86,34 +88,35 @@ final class ShutdownWorkflow
      * @param list<string> $arguments
      */
 
-    private function docker(array $arguments, bool $check = true, float $timeout = 120): ProcessResult
+    private function docker(array $arguments, bool $check = true, ?float $timeout = null): ProcessResult
     {
-        return $this->docker->run($arguments, check: $check, timeout: $timeout);
+        return $this->docker->run($arguments, check: $check, timeout: $timeout ?? $this->runtime->configuration->budgets->seconds('process'));
+    }
+    /** @param list<string> $arguments */
+    private function container(string $name, array $arguments, bool $start = false): void
+    {
+        $this->resources->create(ResourceKind::Container, $this->id . '-' . $name, $arguments);
+        if ($start) {
+            $this->docker(['start', $this->id . '-' . $name]);
+        }
     }
     /**
      * @param non-empty-list<string> $arguments
      */
 
-    private function exec(string $container, array $arguments, bool $check = true, ?string $input = null, float $timeout = 120): ProcessResult
+    private function exec(string $container, array $arguments, bool $check = true, ?string $input = null, ?float $timeout = null): ProcessResult
     {
         return $this->docker->run(
             ['exec', '-i', '-w', $this->appDirectory, $this->id . '-' . $container, ...$arguments],
             check: $check,
             input: $input,
-            timeout: $timeout,
+            timeout: $timeout ?? $this->runtime->configuration->budgets->seconds('process'),
         );
     }
     private function logs(string $container): string
     {
-        return $this->runtime->run([
-            'bash',
-            '-c',
-            'exec "$@" 2>&1',
-            'shutdown-logs',
-            ...$this->docker->commandPrefix(),
-            'logs',
-            $this->id . '-' . $container,
-        ])->stdout;
+        $spec = $this->docker->command(['logs', $this->id . '-' . $container], timeout: $this->runtime->configuration->budgets->seconds('process'));
+        return $this->runtime->executor->run($spec->withArguments(['bash', '-c', 'exec "$@" 2>&1', 'shutdown-logs', ...$spec->argv]))->stdout;
     }
     private function runLog(): string
     {
@@ -157,21 +160,13 @@ final class ShutdownWorkflow
         $archive = $this->temporary . '/web.tar';
         $errors = $this->temporary . '/web-tar.stderr';
         try {
-            $this->runtime->run(
-                [
-                    ...$this->docker->commandPrefix(),
-                    'exec',
-                    '-w',
-                    $this->appDirectory,
-                    $this->id . '-client',
-                    'tar',
-                    '-cf',
-                    '-',
-                    $this->baked() ? 'storage' : '.',
-                ],
+            $process = $this->docker->start(
+                ['exec', '-w', $this->appDirectory, $this->id . '-client', 'tar', '-cf', '-', $this->baked() ? 'storage' : '.'],
+                timeout: $this->runtime->configuration->budgets->seconds('process'),
                 logPath: $archive,
                 stderrLogPath: $errors,
             );
+            $this->runtime->wait($process);
             $this->copyArchive($archive, $this->id . '-web:' . $this->appDirectory, true);
         } finally {
             foreach ([$archive, $errors] as $path) {
@@ -188,17 +183,8 @@ final class ShutdownWorkflow
             $arguments[] = '-a';
         }
         array_push($arguments, '-', $destination);
-        $this->runtime->run([
-            'bash',
-            '-o',
-            'pipefail',
-            '-c',
-            'cat -- "$1" | "${@:2}"',
-            'shutdown-copy',
-            $archive,
-            ...$this->docker->commandPrefix(),
-            ...$arguments,
-        ]);
+        $spec = $this->docker->command($arguments, timeout: $this->runtime->configuration->budgets->seconds('process'));
+        $this->runtime->executor->run($spec->withArguments(['bash', '-o', 'pipefail', '-c', 'cat -- "$1" | "${@:2}"', 'shutdown-copy', $archive, ...$spec->argv]));
     }
     private function file(string $container, string $path): string
     {
@@ -216,25 +202,17 @@ final class ShutdownWorkflow
     }
     private function setup(): void
     {
-        $this->docker(['network', 'create', '--internal', $this->id]);
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-redis',
+        $this->resources->create(ResourceKind::Network, $this->id, ['--internal']);
+        $this->container('redis', [
             '--network',
             $this->id,
             '--network-alias',
             'redis',
             '-e',
             'REDIS_ARGS=--requirepass test-only',
-            'redis/redis-stack-server:edge',
-        ]);
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-postgres',
+            $this->runtime->image('fixtureRedis')->id,
+        ], start: true);
+        $this->container('postgres', [
             '--network',
             $this->id,
             '--network-alias',
@@ -245,13 +223,9 @@ final class ShutdownWorkflow
             'POSTGRES_PASSWORD=test-only',
             '-e',
             'POSTGRES_DB=web_shutdown_test',
-            $this->runtime->environment['BAANDER_TEST_POSTGRES_IMAGE'] ?? '' ?: 'baander-database:latest',
-        ]);
-        $this->docker([
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-client',
+            $this->runtime->image('postgres')->id,
+        ], start: true);
+        $this->container('client', [
             '--privileged',
             '--network',
             $this->id,
@@ -260,7 +234,7 @@ final class ShutdownWorkflow
             ...$this->appEnvironment,
             $this->image,
             'infinity',
-        ]);
+        ], start: true);
         if (!$this->baked()) {
             $this->exec('client', ['mkdir', '-p', $this->appDirectory]);
             $this->stage(
@@ -303,10 +277,7 @@ final class ShutdownWorkflow
     }
     private function probe(): void
     {
-        $this->docker([
-            'create',
-            '--name',
-            $this->id . '-probe',
+        $this->container('probe', [
             '--network',
             $this->id,
             '--network-alias',
@@ -425,10 +396,7 @@ final class ShutdownWorkflow
         $this->exec('client', ['php', 'tests/Fixtures/web-runtime.php', 'prepare']);
         $prepared = $this->exec('client', ['cat', '/tmp/baander-web-runtime.json'])->stdout
             |> (static fn(string $json): array => json_decode($json, true, flags: JSON_THROW_ON_ERROR));
-        $this->docker([
-            'create',
-            '--name',
-            $this->id . '-web',
+        $this->container('web', [
             '--privileged',
             '--network',
             $this->id,
@@ -868,6 +836,7 @@ final class ShutdownWorkflow
     private function cleanup(bool $failed): void
     {
         $this->runtime->cleaning = true;
+        $this->docker = $this->runtime->docker();
         try {
             if ($failed) {
                 foreach (['probe', 'web'] as $container) {
@@ -884,23 +853,12 @@ final class ShutdownWorkflow
                     }
                 }
             }
-            foreach ([
-                [
-                    'rm',
-                    '-f',
-                    '-v',
-                    $this->id . '-web',
-                    $this->id . '-probe',
-                    $this->id . '-client',
-                    $this->id . '-redis',
-                    $this->id . '-postgres',
-                ],
-                ['network', 'rm', $this->id],
-            ] as $arguments) {
-                try {
-                    $this->docker($arguments, false);
-                } catch (Throwable $error) {
-                    fwrite(STDERR, $error->getMessage() . "\n");
+            $report = $this->resources->cleanup(max(0.0, ($this->runtime->cleanupExecutor()->context->deadline ?? 0.0) - Runtime::now()));
+            if (!$report->successful()) {
+                if ($failed) {
+                    fwrite(STDERR, $report->message() . "\n");
+                } else {
+                    throw new \RuntimeException($report->message());
                 }
             }
         } finally {

@@ -12,6 +12,7 @@
 # Provides the common foundation for both builder and runtime.
 # FFmpeg is installed from Debian apt (build with: make build-ffmpeg for static).
 # -----------------------------------------------------------------------------
+ARG OPERATOR_HELPER_IMAGE=scratch
 FROM php:8.5.2-zts-bookworm AS base
 
 ARG LIBURING_VERSION=2.13
@@ -366,7 +367,9 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG INSIDE_DOCKER_CONTAINER=1
 
-ENV APP_HOME=/var/www/html \
+ARG APP_HOME
+RUN test -n "$APP_HOME" || { echo 'APP_HOME is required. Use php scripts/build-application.php --target production --tag baander:local' >&2; exit 1; }
+ENV APP_HOME=${APP_HOME} \
     USERNAME=www-data \
     INSIDE_DOCKER_CONTAINER=$INSIDE_DOCKER_CONTAINER \
     COMPOSER_ALLOW_SUPERUSER=1
@@ -459,7 +462,7 @@ RUN set -xe && \
     chown -R ${USERNAME}:${USERNAME} ${APP_HOME}
 
 # Web and worker roles run as foreground container processes.
-COPY --chmod=755 ./docker/general/start-web.sh /usr/local/bin/start-web.sh
+COPY --chmod=755 ./docker/general/start-web.sh ./docker/general/start-worker.sh ./docker/general/start-operator.sh /usr/local/bin/
 
 # Set working directory
 WORKDIR ${APP_HOME}
@@ -520,8 +523,8 @@ RUN set -xe && \
     groupmod -o -g ${HOST_GID} www-data
 
 # Set up bash aliases
-RUN echo 'alias sf="php /var/www/html/bin/console"' >> /home/www-data/.bashrc && \
-    echo 'alias sf-dev="php /var/www/html/bin/console app:serve"' >> /home/www-data/.bashrc && \
+RUN echo 'alias sf="php ${APP_HOME}/bin/console"' >> /home/www-data/.bashrc && \
+    echo 'alias sf-dev="php ${APP_HOME}/bin/console app:serve"' >> /home/www-data/.bashrc && \
     echo '' >> /home/www-data/.bashrc && \
     echo '# ----- Xdebug quick toggle (entrypoint disables it at boot) -----' >> /home/www-data/.bashrc && \
     echo 'alias debug-on="sed -i \"s/^;zend_extension/zend_extension/\" /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini; sed -i \"s/^xdebug\\.mode.*/xdebug.mode = debug,develop/\" /usr/local/etc/php/conf.d/xdebug.ini; echo \"Xdebug ON — restart Swoole or start a new PHP process to activate\""' >> /home/www-data/.bashrc && \
@@ -582,6 +585,7 @@ USER www-data
 # auto-scripts, so bin/console still receives vendor/autoload_runtime.php.
 RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts && \
     COMPOSER_MEMORY_LIMIT=-1 composer dump-autoload --no-dev --optimize --no-interaction && \
+    COMPOSER_MEMORY_LIMIT=-1 composer --working-dir=scripts install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts --no-plugins && \
     rm -rf /home/www-data/.cache/composer vendor/nelmio/api-doc-bundle/public
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
@@ -594,7 +598,7 @@ CMD ["/usr/local/bin/start-web.sh"]
 FROM production AS worker
 HEALTHCHECK NONE
 STOPSIGNAL SIGTERM
-ENTRYPOINT ["/usr/local/bin/php", "/var/www/html/bin/console", "app:worker", "--no-interaction"]
+ENTRYPOINT ["/usr/local/bin/start-worker.sh"]
 CMD []
 
 # -----------------------------------------------------------------------------
@@ -647,9 +651,13 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
     composer dump-autoload --optimize --no-interaction && \
     composer tooling:autoload
 
+FROM ${OPERATOR_HELPER_IMAGE} AS operator-helper
+
 FROM production AS dev-operator
 USER root
-COPY --from=docker:29.7.2-cli /usr/local/bin/docker /usr/local/bin/docker
+ARG OPERATOR_HELPER_IMAGE
+RUN test "$OPERATOR_HELPER_IMAGE" != scratch || { echo 'Use php scripts/build-application.php --target dev-operator --tag baander-operator:local' >&2; exit 1; }
+COPY --from=operator-helper /usr/local/bin/docker /usr/local/bin/docker
 HEALTHCHECK NONE
-ENTRYPOINT ["php", "/var/www/html/bin/worker-deployment.php"]
+ENTRYPOINT ["/usr/local/bin/start-operator.sh"]
 CMD []

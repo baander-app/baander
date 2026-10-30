@@ -15,11 +15,18 @@ final class LegacySupervisor
         Runtime::require(is_array($configuration), 'Malformed legacy Supervisor configuration');
         unset($configuration['program:swoole']);
         foreach ($configuration as &$section) {
-            foreach (['command', 'directory'] as $option) {
-                if (isset($section[$option])) {
-                    $section[$option] = str_replace('/var/www/html', $root, $section[$option]);
-                }
+            if (!isset($section['directory'])) {
+                continue;
             }
+            $sourceDirectory = rtrim($section['directory'], '/');
+            if (isset($section['command'])) {
+                $section['command'] = preg_replace_callback(
+                    '~(^|[ \t])(["\']?)' . preg_quote($sourceDirectory . '/', '~') . '~',
+                    static fn(array $match): string => $match[1] . $match[2] . rtrim($root, '/') . '/',
+                    $section['command'],
+                );
+            }
+            $section['directory'] = $root;
         }
         unset($section);
         $configuration['program:messenger-worker']['autorestart'] = 'false';
@@ -41,7 +48,7 @@ final class LegacySupervisor
     public static function main(array $arguments, string $root): int
     {
         Runtime::require($arguments === [], 'Legacy Supervisor fixture takes no arguments');
-        $runtime = new Runtime($root, 300);
+        $runtime = new Runtime($root, budget: 'fixture');
         $artifacts = Runtime::artifacts($root, 'legacy-supervisor');
         $command = [PHP_BINARY, 'tests/Fixtures/messaging-runtime.php'];
         $await = static function (string $mode, int $seconds, array $values = []) use ($runtime, $command): void {

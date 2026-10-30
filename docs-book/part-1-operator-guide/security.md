@@ -1,13 +1,28 @@
 # Security Guide
 
-Guidance for operators on rotating secrets, recovering from a breach, and hardening a Baander installation.
+Choose the operation by what was exposed. Disabling one account, revoking OAuth
+grants, replacing signing keys and ending signed media URLs affect different
+state. Clearing Redis does not revoke the OAuth grants stored in PostgreSQL.
+
+Run commands on the installation host, from its checkout, with the
+[`dc` wrapper](getting-started.md). Before planned downtime, follow
+[Background work](background-work.md) to stop or drain separately managed workers.
+Keep matching data and secrets together as described in
+[Backup and recovery](backup-and-recovery.md).
 
 The [application threat model](../part-2-developer-guide/application-threat-model.md)
 records trust boundaries, regression evidence and unresolved findings.
 
 ## Rotating APP_SECRET
 
-`APP_SECRET` is one literal value used by Symfony security components and to encrypt stored webhook signing secrets. Changing it invalidates existing sessions and CSRF tokens. Webhook delivery cannot decrypt its stored secrets until each webhook is rotated under the new value or the matching old value is restored. Comma-separated values are not a rotation mechanism in this application.
+`APP_SECRET` is one literal value used by Symfony security components and to
+encrypt stored webhook signing secrets. It is not the OAuth signing key, and
+changing it does not revoke PostgreSQL OAuth grants. Symfony session/CSRF state is
+separate from the token-pair sessions used by the API.
+
+Webhook delivery cannot decrypt its stored secrets until each webhook is rotated
+under the new value or the matching old value is restored. Comma-separated values
+are not a rotation mechanism in this application.
 
 ### Step-by-step
 
@@ -19,7 +34,10 @@ records trust boundaries, regression evidence and unresolved findings.
 php -r 'echo bin2hex(random_bytes(32));'
 ```
 
-3. **Install one new value on every instance.** Keep workers stopped. Start one web instance and sign in as an administrator with a new session.
+3. **Install one new value on every instance.** Keep delivery workers stopped. Start
+   one web instance to perform webhook administration, keeping ordinary traffic
+   drained. Authenticate as an administrator; APP_SECRET rotation alone has not
+   revoked existing API tokens.
 
 ```env
 APP_SECRET=new_secret_here
@@ -29,9 +47,11 @@ APP_SECRET=new_secret_here
 
 5. **Resume and verify.** Restart every instance with the same new `APP_SECRET`, resume worker delivery, and check fresh authentication and webhook verification.
 
-```bash
-make stop && make start
-```
+Apply the new environment to the web service using the
+[configuration lifecycle](configuration.md#where-a-change-takes-effect), then
+refresh separately managed workers through [Background work](background-work.md).
+If values are injected by Compose, recreate the container with the new values;
+`docker compose restart` retains the old container environment.
 
 If rekeying fails, keep workers stopped. Restore the database backup and its matching old `APP_SECRET` together, then restore receiver secrets changed during this attempt before resuming delivery. Restoring only the old value cannot decrypt webhook rows already rekeyed under the new value. If the old value is unavailable, rotate affected webhooks under the new value and update their receivers before starting workers.
 
@@ -39,11 +59,14 @@ If rekeying fails, keep workers stopped. Restore the database backup and its mat
 
 - After any suspected secret leak
 - When a developer with env access leaves the project
-- As part of regular security maintenance (quarterly is reasonable)
+- When your installation's credential policy requires a change
 
 ## Rotating OAuth 2.0 Keys
 
-OAuth keys sign JWT access tokens. Rotating them invalidates all existing access and refresh tokens — all API clients must re-authenticate.
+OAuth keys sign JWT access tokens. The supported offline rotation also deletes
+access and refresh tokens, authorization codes, device codes and token metadata
+from PostgreSQL. All API clients must authenticate again. Replacing a key alone
+is not the same operation as revoking stored grants.
 
 ### Staged offline rotation
 
@@ -64,34 +87,26 @@ not provide a zero-downtime transition for existing tokens.
 
 ## Rotating Redis Password
 
-Redis stores sessions, rate limiter state, messenger jobs, and cache tags. Rotating the password requires updating all references simultaneously.
+Redis holds framework sessions, rate-limit and DPoP state, caches and queued work.
+API access and refresh grants are stored in PostgreSQL. Changing a Redis password
+is a connectivity cutover, not a token-revocation operation.
 
-### Step-by-step
+1. Drain traffic and stop all application processes and background workers that
+   connect to Redis. Preserve queued work using the
+   [backup procedure](backup-and-recovery.md) before changing the Redis service.
+2. Update the Redis server credential and every client reference together:
+   `REDIS_PASSWORD`, `REDIS_URL`, `MESSENGER_TRANSPORT_DSN` and any explicit
+   deployment overrides. Keep the values in the installation's protected
+   configuration; see [Redis configuration](configuration.md#redis).
+3. Apply the server configuration and restart clients with matching credentials.
+   Check Redis connectivity, fresh authentication and worker progress before
+   reopening traffic.
 
-1. **Update `.env`:**
-
-```env
-REDIS_PASSWORD=new_password_here
-```
-
-2. **Update `docker-compose.yml`** (the Redis service and any services that pass it as a variable):
-
-```yaml
-redis:
-  command: redis-server --maxmemory-policy noeviction --requirepass new_password_here
-  environment:
-    REDIS_PASSWORD: new_password_here
-```
-
-3. **Restart everything at once:**
-
-```bash
-docker compose down && docker compose up -d
-```
-
-The `FLUSHDB` approach doesn't work here because you can't authenticate with the new password against the old Redis instance. A full restart is required.
-
-**Consequence:** All sessions are lost (users logged out), all cached data is cleared, and pending messenger jobs are lost.
+Changing a password does not itself erase Redis data. Restart or recreation can
+lose it when the deployment has no durable Redis storage; the supplied base
+Compose service declares no Redis data volume. Do not assume a restart preserves
+queues. Loss of that state also loses pending deliveries and other work; rerunning
+a scan cannot reconstruct every lost message. See [Storage and data](storage-and-data.md).
 
 ## Rotating VAPID Keys
 
@@ -102,131 +117,99 @@ Rotating VAPID keys invalidates all existing push subscriptions. Browsers must r
 1. **Generate new keys:**
 
 ```bash
-make exec cmd="php bin/console app:generate-vapid-keys"
+dc exec app php bin/console app:generate-vapid-keys
 ```
 
-2. **Update `.env`** with the new public and private keys.
+2. **Update the protected web configuration and worker credentials** with the new
+   public and private keys.
 
-3. **Restart the application:**
-
-```bash
-make stop && make start
-```
+3. **Apply the environment and refresh delivery.** Follow the
+   [configuration lifecycle](configuration.md#where-a-change-takes-effect) for the
+   web service and [Background work](background-work.md) for separately managed
+   workers. A Compose-injected value needs container recreation; restarting the
+   existing container retains its environment.
 
 Users will need to re-enable push notifications in their browser/client. There is no way to migrate existing subscriptions to new keys.
 
 ## Rotating Database Credentials
 
-1. **Create a new database user and grant access:**
+Database role changes depend on who owns the existing schemas, tables and sequences.
+A new role with only database-level privileges is not automatically a replacement
+for that owner. Do not drop the old role after granting only database access.
 
-```sql
-CREATE USER baander_new WITH PASSWORD 'new_password';
-GRANT ALL PRIVILEGES ON DATABASE baander TO baander_new;
-```
-
-2. **Update `DATABASE_URL` in `.env`:**
-
-```env
-DATABASE_URL="postgresql://baander_new:new_password@database:5432/baander?serverVersion=18&charset=utf8"
-```
-
-3. **Restart the application:**
-
-```bash
-make stop && make start
-```
-
-4. **Drop the old user** once the application is confirmed running:
-
-```sql
-DROP USER baander;
-```
+Drain traffic and stop application processes and workers, retain a verified backup,
+and have the database administrator prepare the replacement credential with the
+required object privileges and ownership. Update `DATABASE_URL` and the deployment's
+server-side credential configuration, restart all clients, and verify protected API
+access, writes and worker progress before retiring the old credential. Changing a
+Compose initialization password does not update a role in an already initialized
+PostgreSQL data directory. See [Backup and recovery](backup-and-recovery.md) and
+[database configuration](configuration.md#database).
 
 ## Breach Recovery
 
-If you suspect or confirm that the installation has been breached, follow these steps in order.
+Drain external traffic and stop affected application processes before restoring
+trust. Preserve logs, configuration and data for investigation in a protected
+location. Use [Backup and recovery](backup-and-recovery.md) to establish which
+state can be restored; do not reset the installation as an investigation step.
 
 ### 1. Identify what was exposed
 
-Check which secrets an attacker may have accessed:
+| Exposure | State to investigate |
+|----------|----------------------|
+| Application environment or secret provider | Database/Redis credentials, OAuth key paths and key access, APP_SECRET, stream URL secret, VAPID and external-provider credentials |
+| PostgreSQL | Accounts and password hashes, OAuth grants and codes, token metadata, notification data, encrypted webhook secrets and push subscriptions |
+| Redis | Framework sessions, rate limits, DPoP state, handshake tickets, caches and pending work |
+| Application host or process | All credentials it can read, running processes, open connections and source media permissions |
 
-| Access level | Exposed secrets |
-|-------------|----------------|
-| `.env` file read | All secrets — this is the worst case |
-| Database access | User passwords (hashed), email addresses, OAuth tokens, push subscriptions |
-| Redis access | Active sessions, rate limiter state, pending jobs |
-| Source code read | No secrets directly, but reveals architecture |
+### 2. Contain the affected accounts and credentials
 
-### 2. Rotate all secrets
+Disable suspicious accounts using [app:user:disable](commands/app-user-disable.md)
+from the web container. This revokes their access and refresh tokens and requests
+closure of their sockets. Audit user creation and assigned roles through the admin
+Users page or [app:user:list](commands/app-user-list.md); remove unauthorized
+privileges only after preserving the evidence needed for investigation.
 
-There is no shortcut — rotate everything:
+For exposure affecting all OAuth grants or signing keys, follow the
+[offline OAuth rotation](#rotating-oauth-20-keys). Keep issuers, resource servers
+and workers stopped until invalidation, token-cache cleanup and configuration
+installation are confirmed. Restarting the web server ends sockets opened before
+the cutover. Restoring old signing keys does not restore deleted grants.
 
-First follow the [offline `APP_SECRET` procedure](#rotating-app_secret), keeping
-workers stopped through webhook rekeying. Then follow the staged OAuth rotation
-runbook linked above; keep every instance stopped through invalidation and
-configuration replacement. Rotate the remaining secrets as needed:
+Do not use `FLUSHALL` as session revocation. It deletes all Redis databases,
+including queues and rate-limit state, while PostgreSQL OAuth grants remain.
+The supported OAuth invalidation command deletes the related grant/code tables
+transactionally and clears the token cache without a blanket Redis flush.
 
-```bash
-# Generate new VAPID keys
-make exec cmd="php bin/console app:generate-vapid-keys"
+### 3. Rotate each exposed secret with its own recovery conditions
 
-# Generate new Redis password and update docker-compose.yml
+- Follow [APP_SECRET rotation](#rotating-app_secret) with delivery workers stopped
+  until every stored webhook secret and receiver has been rekeyed. Keep the
+  database and matching old value together for recovery.
+- Replace exposed database and Redis credentials using the procedures above.
+  Preserve pending work before a Redis service change.
+- Replace `STREAM_URL_HMAC_SECRET` and restart the web server if signed video
+  URLs must end globally. OAuth revocation does not end those URLs; see
+  [Disabled accounts](#disabled-accounts).
+- Rotate exposed webhook receiver credentials, external-provider credentials and
+  VAPID keys. VAPID rotation requires users to subscribe again; a webhook signing
+  secret is independent of the receiver URL's own credentials.
 
-# Generate new database password (see section above)
-```
+### 4. Verify before reopening traffic
 
-### 3. Invalidate all sessions and tokens
-
-```bash
-# Flush Redis (clears sessions, caches, rate limiter state, pending jobs)
-docker compose exec redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL
-```
-
-**Warning:** This also clears pending messenger jobs (library scans, notification deliveries). Re-run any critical scans after recovery.
-
-### 4. Force all users to re-authenticate
-
-After rotating `APP_SECRET` and flushing Redis, all existing sessions and OAuth tokens are invalid. Users will need to log in again.
-
-If OAuth refresh tokens are a concern, truncate the token tables in one statement. Refresh tokens and token metadata reference access tokens, so PostgreSQL rejects truncating `oauth_access_tokens` on its own. Include the authorization code and device code tables: an unredeemed code can still be exchanged for a new token pair.
-
-```sql
-TRUNCATE oauth_access_tokens, oauth_refresh_tokens, oauth_token_metadata, oauth_auth_codes, oauth_device_codes;
-```
-
-Removing tokens does not close WebSocket connections that were opened before. Restart the web server to end them. Signed stream URLs do not use OAuth tokens. They stay valid until you set a new `STREAM_URL_HMAC_SECRET` and restart the web server; see [Disabled accounts](#disabled-accounts).
-
-### 5. Audit user accounts
-
-Check for accounts that may have been created or modified during the breach:
-
-```sql
--- Users created in the last 24 hours
-SELECT id, email, name, created_at
-FROM users
-WHERE created_at > NOW() - INTERVAL '24 hours'
-ORDER BY created_at DESC;
-
--- Users with admin roles
-SELECT id, email, name
-FROM users
-WHERE roles::jsonb ? 'ROLE_ADMIN';
-```
-
-Revoke admin privileges from any suspicious accounts and consider locking down user registration (`auth.rate_limit.register.max_attempts`).
-
-### 6. Review access logs
-
-Check for suspicious API activity:
+Review application and proxy access logs without publishing tokens or secret-bearing
+URLs. From the installed checkout, application logs can be inspected with:
 
 ```bash
-# Check Docker logs for unusual patterns
-docker compose logs app --since 24h | grep -i "auth\|login\|password"
+dc logs --since 24h app
 ```
 
-### 7. Harden before going live
-
-After recovery, review the [hardening checklist](#hardening-checklist) before bringing the instance back online.
+Confirm fresh authentication, refusal of the accounts/grants you disabled or
+invalidated, protected API access for an authorized account, component health and
+worker progress. Verify webhook signatures at receivers and check for missing or
+duplicate work after any Redis loss. Confirm the affected host and software are
+trusted before resuming traffic. The [hardening checklist](#hardening-checklist)
+is a configuration review, not proof that an attacker has been removed.
 
 ## Securing the Installation
 
@@ -345,14 +328,19 @@ A session is a chain of token pairs: the pair a login issued and every pair a re
 
 ### Network security
 
-Baander runs behind Nginx in Docker Compose. By default:
+The supplied Compose topology places Nginx in front of the web server. Inspect the
+actual published ports before exposing the installation:
 
 - **Port 80/443** — Nginx handles TLS termination and proxies to the Swoole server
 - **Port 9200** — Swoole management API. It has no authentication and can report status, reload workers and shut the server down, so it listens only on `127.0.0.1` inside the app container and no compose file publishes it. `swoole:server:status` and `swoole:server:reload` reach it from inside the container. Keep `swoole.http_server.api.host` on loopback; the bundle also defaults to `127.0.0.1` when no host is configured.
-- **Port 5432** — PostgreSQL (should NOT be exposed — Docker internal network only)
-- **Port 6379** — Redis (should NOT be exposed — Docker internal network only)
+- **Port 5432** — the base Compose file publishes PostgreSQL on the host; remove or
+  restrict this publication for an exposed installation.
+- **Port 6379** — the base Compose file binds Redis on host loopback. Keep it
+  inaccessible to untrusted clients.
 
-Review your `docker-compose.yml` and ensure only the Nginx ports are published to the host.
+The base file also binds the web service on host loopback port 9501 and publishes
+UDP port 41234. Review every publication and host firewall rule for your deployment;
+[Getting started](getting-started.md) describes the source-install topology.
 
 ### Outbound provider requests
 

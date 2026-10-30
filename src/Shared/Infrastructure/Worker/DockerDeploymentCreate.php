@@ -98,8 +98,12 @@ FORMAT;
             }
         }
         $binding = new DeploymentContainer($recipe->namespace, $recipe->bootId, $recipe->daemonId, $state['id'], $recipe->unit);
-        (new DockerWorkerContainment(fn (array $arguments): string => $this->execute($recipe, $arguments), $recipe))
-            ->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        $containment = new DockerWorkerContainment(fn (array $arguments): string => $this->execute($recipe, $arguments), $recipe);
+        if ($forRetirement) {
+            $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        } else {
+            $containment->verifyAdmission($binding->containerId, $binding->namespace, $binding->bootId, $binding->unit);
+        }
         if (!($forRetirement ? $this->inventory->registerForRetirement($binding) : $this->inventory->register($binding))) {
             throw new \RuntimeException('Created container conflicts with immutable deployment inventory.');
         }

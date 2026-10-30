@@ -12,10 +12,27 @@ use RuntimeException;
 
 final class WorkerReadinessObservationTest extends TestCase
 {
+    public function testReadinessRecognizesChildrenFromObservedImageHome(): void
+    {
+        $processes = self::processes('control');
+        foreach ($processes as &$process) {
+            $process['command'] = array_map(static fn (string $argument): string => str_replace('/var/www/html', '/opt/baander', $argument), $process['command']);
+        }
+        unset($process);
+        self::assertCount(4, WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander'));
+    }
+
+    public function testChildrenFromAnotherApplicationHomeDoNotConfirmReadiness(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('incomplete');
+        WorkerReadinessObservation::verifyProcesses(self::processes('control'), self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander');
+    }
+
     public function testCurrentGenerationsAreAcceptedForCompletePair(): void
     {
         foreach (['control', 'execution'] as $unit) {
-            $roles = WorkerReadinessObservation::verifyProcesses(self::processes($unit), self::lease(), $unit, new WorkerAutoscalingProfile());
+            $roles = WorkerReadinessObservation::verifyProcesses(self::processes($unit), self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html');
             self::assertContains(2, $roles);
             self::assertCount($unit === 'control' ? 4 : 3, $roles);
         }
@@ -39,7 +56,7 @@ final class WorkerReadinessObservationTest extends TestCase
             };
             $rejected = false;
             try {
-                WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'execution', new WorkerAutoscalingProfile());
+                WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'execution', new WorkerAutoscalingProfile(), '/var/www/html');
             } catch (RuntimeException) {
                 $rejected = true;
             }

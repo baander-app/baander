@@ -34,7 +34,15 @@ try {
         required: ['workspace', 'state-root'],
     );
     umask(0077);
-    $qualification = new Qualification($args);
+    Support::check(!file_exists(Support::path((string) $args['workspace'])), 'Select a new workspace for disposable qualification.');
+    $environment = getenv();
+    $configuration = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded((float) $args['timeout'], $environment));
+    $target = new \Baander\Tooling\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $args['state-root'] . '/host-setup/acceptance-transport');
+    $targetFile = $args['state-root'] . '/host-setup/acceptance-target.json';
+    \Baander\Tooling\Filesystem\AtomicFile::writeJson($targetFile, $target->toArray());
+    $environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
+    $qualification = new Qualification($args, $executor, new \Baander\Tooling\Docker\Client($executor, $target, $environment), $environment);
     $qualification->run();
 } catch (Throwable $error) {
     if ($qualification !== null) {
@@ -45,5 +53,5 @@ try {
         }
     }
     fwrite(STDERR, 'FAIL: ' . $error->getMessage() . ($qualification === null ? '' : "\nRetained evidence: " . $qualification->workspace) . "\n");
-    exit($error instanceof InvalidArgumentException ? 2 : 1);
+    exit($error instanceof InvalidArgumentException ? 2 : ($error->getCode() > 0 && $error->getCode() < 256 ? $error->getCode() : 1));
 }

@@ -14,7 +14,7 @@ final class StateStore
 
     public function __construct(string $root)
     {
-        $this->root = Environment::absolutePath($root);
+        $this->root = \Baander\Tooling\Filesystem\Paths::absolutePath($root);
         $this->guard(fn() => PrivateDirectory::assertNoSymlinks($this->root));
     }
 
@@ -23,9 +23,12 @@ final class StateStore
         return substr(hash('sha256', $this->root), 0, 12);
     }
 
-    public static function default(): self
+    /** @param array<string,string>|null $environment */
+    public static function default(?array $environment = null): self
     {
-        return new self((getenv('XDG_STATE_HOME') ?: (getenv('HOME') . '/.local/state')) . '/baander/development');
+        $environment ??= getenv();
+        $stateHome = ($environment['XDG_STATE_HOME'] ?? '') !== '' ? $environment['XDG_STATE_HOME'] : (($environment['HOME'] ?? '') . '/.local/state');
+        return new self($stateHome . '/baander/development');
     }
 
     public function directory(string $instanceId): string
@@ -65,6 +68,14 @@ final class StateStore
     {
         if (($record['id'] ?? null) !== $instanceId) {
             throw new WorkflowError('Instance record identity does not match its destination.');
+        }
+        RetainedState::assertVersion($record);
+        $existing = $this->load($instanceId);
+        if ($existing !== null) {
+            RetainedState::assertVersion($existing);
+            if (isset($existing['version']) && ($record['version'] ?? null) !== $existing['version']) {
+                throw new WorkflowError('Refusing to downgrade saved instance schema.');
+            }
         }
         $path = $this->prepare($instanceId) . '/state.json';
         $this->guard(function () use ($path, $record): void {

@@ -10,7 +10,7 @@ final class FileLock
     private function __construct(private $stream) {}
 
     #[\NoDiscard]
-    public static function acquire(string $path, bool $nonBlocking = true): self
+    public static function acquire(string $path, bool $nonBlocking = true, bool $shared = false): self
     {
         PrivateDirectory::assertNoSymlinks($path);
         PrivateDirectory::ensure(dirname($path));
@@ -35,14 +35,27 @@ final class FileLock
                 || $info['dev'] !== $opened['dev'] || $info['ino'] !== $opened['ino']) {
                 throw new \RuntimeException("Operation lock changed while opening: {$path}");
             }
-            if (!flock($stream, LOCK_EX | ($nonBlocking ? LOCK_NB : 0))) {
-                throw new \RuntimeException('Wait for another operation on this instance to finish.');
+            if (!flock($stream, ($shared ? LOCK_SH : LOCK_EX) | ($nonBlocking ? LOCK_NB : 0), $wouldBlock)) {
+                throw new \RuntimeException('Wait for another operation on this instance to finish.', $wouldBlock === 1 ? 11 : 0);
             }
 
             return new self($stream);
         } catch (\Throwable $error) {
             fclose($stream);
             throw $error;
+        }
+    }
+
+    #[\NoDiscard]
+    public static function tryAcquire(string $path, bool $shared = false): ?self
+    {
+        try {
+            return self::acquire($path, shared: $shared);
+        } catch (\RuntimeException $error) {
+            if ($error->getCode() !== 11) {
+                throw $error;
+            }
+            return null;
         }
     }
 

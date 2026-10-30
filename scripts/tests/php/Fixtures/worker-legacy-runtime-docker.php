@@ -12,6 +12,8 @@ file_put_contents(
     json_encode($arguments, JSON_THROW_ON_ERROR) . "\n",
     FILE_APPEND | LOCK_EX,
 );
+require dirname(__DIR__, 4) . '/vendor/autoload.php';
+\Baander\Tooling\Tests\Fixtures\WorkerResourceState::handle($arguments);
 if (in_array('redis-cli', $arguments, true)) {
     echo 'PONG';
 }

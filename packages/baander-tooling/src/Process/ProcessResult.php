@@ -14,5 +14,6 @@ final readonly class ProcessResult
         public string $stdout,
         public string $stderr,
         public float $duration,
+        public ?int $requestedSignal = null,
     ) {}
 }

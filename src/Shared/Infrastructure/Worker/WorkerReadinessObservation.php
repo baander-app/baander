@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final class WorkerReadinessObservation
 {
     /** @return array<string,int> Role to current generation. */
-    public static function observe(string $namespace, string $bootId, int $epoch, string $unit, string $profileJson): array
+    public static function observe(string $namespace, string $bootId, int $epoch, string $unit, string $profileJson, string $appHome): array
     {
         $lease = new DeploymentLease($namespace, $bootId, $epoch);
         $profile = WorkerAutoscalingProfile::fromJson($profileJson);
@@ -32,7 +32,7 @@ final class WorkerReadinessObservation
                 $processes[] = ['command' => explode("\0", rtrim($command, "\0")), 'status' => $status, 'environment' => $environment];
             }
         }
-        $roles = self::verifyProcesses($processes, $lease, $unit, $profile);
+        $roles = self::verifyProcesses($processes, $lease, $unit, $profile, $appHome);
         $environment = ['REDIS_URL' => getenv('REDIS_URL'), 'MESSENGER_TRANSPORT_DSN' => getenv('MESSENGER_TRANSPORT_DSN')];
         WorkerTransportConfiguration::validate($environment, true);
         foreach (['REDIS_URL' => 'scheduler_occurrences', 'MESSENGER_TRANSPORT_DSN' => 'messages'] as $key => $stream) {
@@ -72,7 +72,7 @@ final class WorkerReadinessObservation
      * @param list<array{command:list<string>,status:string,environment:string}> $processes
      * @return array<string,int>
      */
-    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile): array
+    public static function verifyProcesses(array $processes, DeploymentLease $lease, string $unit, WorkerAutoscalingProfile $profile, string $appHome): array
     {
         $roles = [];
         foreach ($processes as $process) {
@@ -80,10 +80,10 @@ final class WorkerReadinessObservation
             $role = match (true) {
                 in_array('messenger:consume', $arguments, true) => in_array('scheduler', $arguments, true) ? 'scheduled-consumer' : 'consumer',
                 in_array('app:outbox:consume', $arguments, true) => 'relay',
-                in_array('/var/www/html/bin/worker-scheduler.php', $arguments, true) => 'scheduler',
-                in_array('/var/www/html/bin/worker-media.php', $arguments, true) => 'media',
-                in_array('/var/www/html/bin/worker-native.php', $arguments, true) => 'native',
-                in_array('/var/www/html/bin/worker-autoscaler.php', $arguments, true) => 'autoscaler',
+                in_array($appHome . '/bin/worker-scheduler.php', $arguments, true) => 'scheduler',
+                in_array($appHome . '/bin/worker-media.php', $arguments, true) => 'media',
+                in_array($appHome . '/bin/worker-native.php', $arguments, true) => 'native',
+                in_array($appHome . '/bin/worker-autoscaler.php', $arguments, true) => 'autoscaler',
                 default => null,
             };
             if ($role === null) {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
@@ -16,10 +16,10 @@ final class DevelopmentRunningTest extends TestCase
     /** @param list<array<string,mixed>> $containers */
     private function observe(array $containers, string $kind = 'persistent'): bool
     {
-        $runner = new class ($containers) extends Runner {
+        $runner = new class ($containers) extends DevelopmentCommandExecutor {
             /** @param list<array<string,mixed>> $containers */
             public function __construct(private readonly array $containers) {}
-            public function run(
+            public function execute(
                 array $arguments,
                 ?string $cwd = null,
                 ?array $env = null,
@@ -37,7 +37,7 @@ final class DevelopmentRunningTest extends TestCase
         return new Runtime(new StateStore('/tmp/baander-unused'), $runner)->running([
             'project' => 'owned',
             'kind' => $kind,
-            'docker' => ['executable' => 'fake', 'context' => 'owned', 'daemon_id' => 'daemon'],
+            'docker' => DevelopmentCommandExecutor::target('fake', 'owned', 'daemon'),
             'compose_file' => '/disposable/compose.json',
         ]);
     }

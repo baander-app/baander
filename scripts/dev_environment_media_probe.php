@@ -34,7 +34,10 @@ try {
     );
     umask(0077);
     $output = Support::path((string) $args['workspace']) . '/media-evidence.json';
-    $result = MediaProbe::qualify($args);
+    $environment = getenv();
+    $executor = new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded((float) $args['timeout'], $environment));
+    $result = new MediaProbe($executor, $executor->context)->qualify($args);
+    $executor->close();
     AtomicFile::writeJson($output, $result);
     echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . "\n";
 } catch (Throwable $error) {
@@ -42,5 +45,5 @@ try {
         AtomicFile::writeJson($output, ['passed' => false, 'error' => $error->getMessage()]);
     }
     fwrite(STDERR, $error->getMessage() . "\n");
-    exit($error instanceof InvalidArgumentException ? 2 : 1);
+    exit($error instanceof InvalidArgumentException ? 2 : ($error->getCode() > 0 && $error->getCode() < 256 ? $error->getCode() : 1));
 }

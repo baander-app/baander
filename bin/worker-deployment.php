@@ -37,7 +37,11 @@ try {
     if ($json === false) {
         throw new InvalidArgumentException('Cannot read manifest.');
     }
-    $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json);
+    $appHome = getenv('APP_HOME');
+    if (!is_string($appHome) || $appHome === '') {
+        throw new InvalidArgumentException('Operator image must declare APP_HOME.');
+    }
+    $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json, $appHome);
     $credentials = \App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials::fromFile($arguments[3]);
     $recipes = [
         'control' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $credentials->runtimeEnvironment),
@@ -133,7 +137,7 @@ try {
                 && $boot->control->binding !== null && $lease?->bootId === $manifest->bootId) {
                 try {
                     $status = json_decode($docker->execute(['exec', $boot->control->binding->containerId,
-                        '/usr/local/bin/php', '-d', 'memory_limit=64M', '/var/www/html/bin/worker-autoscaling-status.php',
+                        '/usr/local/bin/php', '-d', 'memory_limit=64M', $manifest->appHome . '/bin/worker-autoscaling-status.php',
                         $manifest->namespace, $manifest->bootId, (string) $lease->epoch, $manifest->autoscaling->toJson()]), true, 8, JSON_THROW_ON_ERROR);
                     if (!is_array($status)) {
                         throw new RuntimeException('Invalid autoscaling status.');

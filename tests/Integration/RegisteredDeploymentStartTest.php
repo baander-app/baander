@@ -178,7 +178,7 @@ final class RegisteredDeploymentStartTest extends TestCase
     {
         return new DeploymentContainerRecipe('baander.app:startup', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
             ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker', '--unit=' . $unit->value],
-            'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc');
+            'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', '/var/www/html');
     }
 
     private function binding(): DeploymentContainer

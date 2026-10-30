@@ -23,6 +23,78 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Cohesive operator manual
+
+Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)
+now connects component responsibilities, storage, setup, daily tasks, monitoring
+and recovery. Five new explanatory chapters join the twelve existing narrative
+chapters. Task, symptom and component indexes provide direct entry; 41 command
+reference pages, including their index, preserve the installed/development
+execution distinction. Adjacent developer and registry documentation links back
+to the manual. The change covers 66 documentation files and changes no runtime code.
+
+Unit checkpoints: U1 explains components and data ownership; U2 updates the source
+build recipe and connects queues, outbox, scheduling and worker lifecycle; U3
+separates discovery, ingestion, enrichment and playback; U4 corrects credential
+revocation and notification delivery; U5 connects diagnostics, upgrades, backups
+and the independent registry; U6 reconciles command references; U7 integrates
+navigation and reader acceptance. Source checks corrected unsupported ingestion
+and watcher claims, stale storage descriptions and misleading health/recovery
+advice. Existing useful procedure details and command family headings remain.
+
+Verification: the public backend runner provisioned the current documentation
+into the CI image and passed command coverage with 4 tests, 4 assertions and zero
+skips. Source discovery matched 146 command declarations to index entries and
+pages. All 66 documentation files received prose audits with intentional factual
+and structural changes accounted for. Shell syntax checks passed for 166 fenced
+examples; 805 local destinations and fragments passed, including 43 inbound links
+from untouched documentation. Whitespace checks passed. The simplification preflight
+found no executable code in scope.
+
+Independent reader walkthroughs covered all five acceptance examples from the
+index and direct task/symptom entries. They found and resolved an omitted frontend
+upgrade build and a diagnostic that pointed at the web image instead of the worker
+image. The focused code review, including an independent local adversarial read,
+found two further corrections: disclose the unsupported worker provider-secret
+handoff and keep installed media paths consistent in command references. Both
+fixes were verified with no remaining findings. Cross-model review was disabled
+by checkout configuration.
+
+Qualification limits remain explicit: these checks did not deploy a new instance,
+scan user media, rotate secrets, replace workers or restore data. The current
+worker credentials contract cannot provision private Discogs tokens for queued
+enrichment; documentation now identifies that runtime gap. Coordinated application
+restore, actual registry destination/RPO/RTO and whole-host capacity remain
+unqualified. The revised source-build procedure is source-verified, without a new
+bootstrap run. Work is committed locally on `docs/cohesive-operator-manual`;
+publishing remains separate.
+
+Requirements checkpoint, 2026-10-30: the user confirmed an easy-to-follow manual
+built from the existing operator book, covering understanding Baander, setup,
+daily operation, maintenance and recovery. The
+[implementation plan](docs/plans/2026-10-30-1817-docs-cohesive-operator-manual-plan.md)
+defines 11 requirements and five acceptance examples. Operational facts and command
+examples must be verified against source before prose is revised with `prose-fix`.
+
+Independent grounding verified four repository claims with no refutations. All
+four Ready for Planning checks pass: complete, consistent, focused and usable.
+Source paths, sequential IDs, prose preservation and whitespace checks pass.
+That checkpoint delivered requirements only.
+
+Planning checkpoint, 2026-10-30: the knowledge-work plan now defines seven
+implementation units and six technical decisions. All 11 requirements and five
+acceptance examples are preserved, and both deferred planning questions are
+resolved. Research identified corrections to command execution contexts, supported
+ingestion and watcher behavior, and health/recovery limits for source verification
+during the rewrite.
+
+Confidence checks pass. Six document reviewers covered coherence, feasibility,
+scope, design, security and adversarial review, with zero findings, fixes or open
+decisions; cross-model review was disabled by checkout configuration. Plan prose
+preservation, requirement/example preservation and whitespace checks pass. Manual
+implementation remains open. Planning ran source and document checks only, with
+no tests or runtime commands.
+
 ## Configurable development libraries
 
 Delivered, 2026-10-29: the managed preview has one Movies library backed by the
@@ -75,6 +147,644 @@ cover configuration, startup reconciliation, privacy and actual preview setup.
 Four document-review personas completed; one conflicting optional-field description
 was corrected, with no remaining findings. Prose and whitespace checks passed.
 Implementation and runtime verification remain open.
+
+## Paused seek readiness
+
+Delivered, 2026-10-30: the user authorized the application correction after
+merging tooling into master and pushing both `origin/master` and
+`baander-github/master` at `5fc3f901`. The correction is implemented on
+`fix/paused-seek-readiness` under the reviewed
+[implementation plan](docs/plans/2026-10-30-1141-fix-paused-seek-readiness-plan.md),
+committed as `b31baff1`.
+
+The two-file application patch removes both extra 21-second paused lookahead
+gates. It retains closed paired-track cursor coverage, subtitle completion,
+execution fences and running-playback throttling. Before the fix, the cursor group
+ran two tests and 11 assertions with one failure; the running-pause control ran
+one test and two assertions with one failure. Host verification now passes 32 tests
+and 259 assertions. The initial CI backend run passes 117 tests and 5,040
+assertions under `var/test-runs/20261030-105007-4701e8e4`. The final rerun passes
+117 tests and 5,039 assertions: ordinary 102/553, native 1/4,367 and services
+14/119, with cleanup exiting zero. Its evidence is retained under
+`var/test-runs/20261030-110149-359dc578`. Three player
+test files pass 245 tests. The two changed PHP files pass CI static analysis and
+basic whitespace checks. Application Deptrac reports zero violations, errors or warnings,
+with 484 existing baseline skips, 17,169 allowed and 18,283 uncovered dependencies.
+
+Independent code review completed with zero findings under
+`/tmp/compound-engineering-1000/ce-code-review/20261030-114820-paused-seek`;
+its frozen verdict was not ready because CI, consumer, live and preview
+acceptance were pending at that snapshot, with no source findings. Caller
+verification has now closed those gates without changing the frozen review.
+Five simplification lenses found no changes. The CI image and worker image were built from verified
+bases plus exactly the two frozen source files, with hash proof. The final CI
+image is `sha256:024ebca6614343faadbd29a253181b9e71b63a81fe854fcaa91f8602d5e6c777`
+and the worker is
+`sha256:cf6eb035fd2b9d427b3691c265d7f878afec62b340820dc363e230a5414c45ce`.
+The temporary image helper now copies files without inheriting private staging
+directory modes. A real loader probe with UID zero and dropped capabilities
+reproduces permission-denied exit two before the fix and exits zero afterward;
+application source is unchanged.
+The full root-image build was intentionally cancelled while recompiling unchanged
+TSDuck; that cancellation is not application-failure evidence.
+
+The public live media runner passes with original status zero, cleanup status zero
+and removal verified under `var/test-runs/media-control-1793358242-2704041`.
+Seek readiness is 17.679436945 seconds within the unchanged 30-second limit.
+All 162 control acknowledgements pass, with maximum 0.239333687 seconds and p99
+0.22219033 seconds. The run records 1,226 heartbeats with maximum gap 0.029245592
+seconds, 778 full-occupancy samples and cancellation retirement in 0.223762875
+seconds. Byte, status and ownership checks all pass.
+
+`make preview-up` completed with exit zero after the full controller runtime and
+worker build. The preview at
+[preview-fd790a887b6899cb.baander.test](https://preview-fd790a887b6899cb.baander.test)
+is ready, with web and workers ready. Running, target and worker-snapshot identities
+all match `a9c02556`. Decoded `libraries-after.json` exactly matches
+`/tmp/baander-paused-seek-work/libraries-before.json`: Movies/Music IDs, paths,
+creation/update timestamps and null scan timestamps are retained. The local
+configuration hash is unchanged (`7803eaff`); no reset or scan ran. All acceptance
+for the tooling plan's U11 and this plan's U1 is complete.
+
+## Cohesive project tooling
+
+Requirements checkpoint, 2026-10-29: the user confirmed the scope in the
+[implementation plan](docs/plans/2026-10-29-1854-refactor-cohesive-project-tooling-plan.md)
+after the whole-package audit of `packages/baander-tooling`. The intended outcome
+is shared configuration, image selection, application layout, Docker targeting,
+process completion, cleanup and evidence contracts, with every retained correctness
+finding repaired. Necessary caller, build and CI wiring belongs in scope.
+Commands, flags, configuration and interfaces may change incompatibly when all
+consumers migrate in the same delivery, including installed or generated controllers
+and retained-state readers. Preserve local data and remove obsolete interfaces
+without speculative compatibility layers.
+
+Planning checkpoint, 2026-10-29: the plan defines 11 ordered implementation units
+and 11 technical decisions, preserving all 27 requirements and 17 acceptance
+examples. Mandatory document review completed through five personas: coherence,
+feasibility, scope, security and adversarial. One P2 finding was corrected: ordinary
+and nested Docker operations use immutable connection transport even if the
+original named context changes. The plan includes a verification case for that
+boundary. No unresolved findings or product questions remain. Implementation and
+runtime qualification remain open; no implementation tests or runtime probes ran
+during planning.
+
+Foundation checkpoint (U1–U2), 2026-10-29: local commits `593ac7af` and
+`3305507a` add shared typed configuration, image and application-layout contracts,
+checked process completion and Docker connection ownership. Explicit stop/drain
+operations retain their observed outcomes, requested SIGINT reaches the child,
+and completed output is released. Private TLS snapshots and recorded daemon
+identity preserve the selected connection across context changes. Combined host
+verification passes 108 tests and 419 assertions. Full tooling PHPStan reports no
+errors, and formatting passes across all 304 tooling PHP files.
+
+Five-persona phase simplification completed with two quality extractions, one
+bounded-diagnostic allocation fix and two redundant comments removed; all proof
+tests remain unchanged. A reproduced exit 139 occurred when a retained timeout
+exception kept SignalScope alive until late destruction. That failure is fixed;
+the subprocess regression covering shutdown-callback execution now exits 0.
+Implementation units U3–U11 and authoritative CI-image and live qualification
+remain open.
+
+Resource and controller checkpoint (U3, U5), 2026-10-29: local commits
+`a852c3d6` and `20819351` add durable resource ownership and complete controller
+publication. Cleanup uses its own execution budget, retains unresolved receipts
+and preserves the primary failure alongside cleanup diagnostics. Inventory runs
+through a package-owned entrypoint, uses saved layout evidence offline and accounts
+for special-file metadata without opening those files. U3 includes the prerequisite
+ApplicationImage contract from U4; the remaining build/layout work in U4 is active.
+
+Controller generations retain their lease through shutdown. Uncertain publication
+keeps the affected generation available for inspection and recovery. Root
+integration passes 108 tests and 404 assertions; the inventory CLI-close follow-up
+passes one test and four assertions. Full tooling PHPStan passes, and formatting
+checks 320 PHP files with zero fixes. U4, U6–U11, authoritative CI-image and live
+qualification, and final code review remain open.
+
+Build/layout checkpoint (U4), 2026-10-29: commit `fea50d77` delivers the shared
+build contract and CLI, which supply the required `APP_HOME` to
+the Dockerfile; environment-aware entrypoints replace their process and preserve
+PID 1 behavior. CI and Compose callers use that contract. The image-catalog helper
+preserves retained storage-image pins, and the default PostgreSQL image build
+continues to use tracked configuration.
+
+Host verification passes 29 tests and 147 assertions for build, topology and
+initialization; 31 tests and 157 assertions for lifecycle and ledger behavior;
+nine tests and 38 assertions for final CLI/status boundaries; and two Compose
+tests and 15 assertions. Two initialization-cleanup regressions fail before their
+fixes and pass in the 29-test group. U3/U5 simplification applies two quality
+changes and removes two redundant comments while retaining all proof tests.
+Full tooling static analysis passes; formatting checks 327 PHP files with zero
+fixes.
+
+The shared Docker client accepts Compose execution options without changing its
+completion policy. Its 12 existing tests pass with 49 assertions; the added
+expected-exit and timeout control passes with three assertions. Scoped static
+analysis and formatting pass.
+
+The default CI image builds successfully as `baander-ci-cohesive-tooling:local`
+with PHP 8.5.2 and Swoole. An alternate-layout worker image builds successfully
+at `/srv/baander` as `baander-worker-cohesive-alternate:local`. Real entrypoint
+probes verify PID 1 behavior and the absence of Xdebug and PHPUnit; ledger-owned
+resource cleanup succeeds. A direct build without `APP_HOME` fails and names
+the supported build command. U6–U11, final workflow gates, the authoritative
+CI-image suites on the current tree, live preview qualification and final code
+review remain open.
+
+Migration foundation checkpoint, 2026-10-29: shared RepositoryConfiguration
+selects the local configuration file and ignores developer overrides in CI.
+Inventory receives the resolved configuration snapshot. Neutral Source and Paths
+helpers provide the shared ownership needed for the pending workflow migrations.
+Resource cleanup uses immutable container IDs, detects renamed resources and
+retains unresolved receipts. DisposableContainer also removes by immutable ID
+with an independent cleanup context.
+
+Current-tree integration passes 20 configuration, fixture and startup tests with
+54 assertions; startup-fixture changes remain part of U7. Ledger identity checks
+pass ten tests and 41 assertions, and disposable-container checks pass four tests
+and 19 assertions. Scoped static analysis passes across 37 files; formatting
+checks 14 files with zero fixes. This checkpoint covers the shared configuration,
+Docker client, process specification and resource foundation. U6–U10 delivery,
+family integration, authoritative CI-image and live qualification, and final code
+review remain open.
+
+Registry implementation checkpoint (U9), 2026-10-29: package-owned static
+analysis helpers and injected storage validation remove incidental test-support
+dependencies while preserving the self-contained relay qualification build
+context. Nested ownership ledgers retain the saved Docker target and primary
+failure through cleanup. Image cleanup uses immutable IDs across lost tags,
+foreign retagging and uncertain build outcomes.
+
+Root integration passes 50 registry tests and 251 assertions, with one skip for
+unavailable host clang-tidy 19. The separate close-failure control passes one test
+and six assertions. Full tooling PHPStan passes across 373 files before the final
+three-file U9 refactor; the focused follow-up also passes for all three files.
+These are host-only checks. U6–U8, U10–U11, final CI-image and live qualification,
+and final code review remain open.
+
+Backend implementation checkpoint (U10), 2026-10-29: backend workflows use
+shared checked execution, finite budgets, canonical layout and catalog image IDs.
+Compose recovery retains immutable Docker connection ownership and resource
+receipts; named-resource guards prevent cleanup of unrelated resources. A child
+readiness handshake replaces the 100 ms startup assumption. Later-lane failures
+remain visible, and coverage, source-archive and exit-status contracts are
+preserved. Shared target resolution uses the saved invocation target even when
+ambient Docker settings change.
+
+Root event evidence records 103 passing backend and Compose cases: 22 comparison,
+26 coordinator, 36 coverage, 11 static-check and eight Compose cases. The combined
+309-test run remains nonpassing with 28 errors in worker classes that loaded the
+old target resolver before the runtime edit. Full integration acceptance remains
+open. The separate neutral Source suite passes 13 tests and 58 assertions,
+and Docker-client checks pass 14 tests and 56 assertions. Scoped static analysis
+passes across 16 files. Formatting processed 18 files and fixed Backend/Runtime.php.
+U6–U8, U11, final CI-image and live qualification, and final code review remain
+open.
+
+Phase simplification checkpoint (U9–U10), 2026-10-29: five reviewers examined
+`a2253e72..e05fad63`. Reuse, efficiency and test review returned no findings.
+Quality review removed the unused backend Runtime volumes property and its
+append; comment review removed three redundant production comments. All proof
+tests remain unchanged. The canonical BackendCoordinator rerun passes 26 tests
+and 469 assertions; scoped static analysis and formatting pass across four files.
+
+A fresh WorkerCleanup and WorkerOperatorResources run passes 41 tests and 263
+assertions, resolving the 28 mixed-loaded-class errors recorded above. The earlier
+combined run remains nonpassing evidence; full CI acceptance remains open.
+
+Development migration checkpoint (U6), 2026-10-29: implementation is prepared
+for saved versioned release contracts carrying configuration, layout, image IDs,
+Docker target and source inputs. Mount validation precedes mutation; disposable
+helpers have independent cleanup, and historical image retirement works without
+current media paths. CLI composition captures environment, local settings and
+budgets. Worker-domain consumers receive explicit `APP_HOME` and distinguish
+admission checks from retirement checks.
+
+The final affected development group passes 61 tests and 242 assertions. An
+earlier 280-test integration run had 12 fixture/configuration failures: nine are
+covered by that final group, while separate bootstrap and database controls pass
+one test/four assertions and two tests/six assertions. Local/invocation checks
+under `CI=1` pass 13 tests and 39 assertions. These follow-ups repair the named
+failures without establishing a passing 280-test run. Worker-domain checks pass
+327 tests and 534 assertions; focused domain static analysis passes nine files.
+Full tooling static analysis passes across 376 files, and formatting fixes 12
+files. Six generated-manifest Docker cases, actual preview state conversion,
+U7–U8/U11 delivery, final CI-image and live qualification, and final code review
+remain open.
+
+Acceptance and fixture migration checkpoint (U7), 2026-10-29: acceptance,
+HTTP, web, messaging and startup workflows use shared configuration, checked
+execution and the Docker client, with catalog-pinned images, canonical layout,
+named finite budgets and durable scoped cleanup. Browser preparation checks the
+installed Playwright version; recovery uses its saved target receipt. JSON stdout
+and diagnostic separation remain intact. The raw Support::run helper and obsolete
+HTTP drill are removed.
+
+The initial affected run reached 86 tests and 361 assertions with eight fixture
+failures. All eight are repaired; the focused identity/fixture run passes 14 tests
+and 71 assertions, and the separate cancellation control passes one test and four
+assertions. Configuration/runtime/startup integration passes 20 tests and 54
+assertions. These follow-ups do not establish a passing 86-test aggregate. The
+full 376-file static-analysis result and 12-file formatting normalization are
+recorded in U6 above. U8/U11 delivery, final CI-image and live qualification, and
+final code review remain open.
+
+Worker migration checkpoint (U8), 2026-10-29: worker workflows use shared
+transport, image catalog, layout and named budgets. Typed operator run, topology,
+provisioning, scenario, command and resource collaborators replace the untyped
+parameter bag. Explicit container provisioning preserves PHP `-d` arguments and
+literal `--rm` arguments.
+
+Live and completed evidence modes reject corrupt complete records; only live
+mode tolerates an incomplete trailing record. A bounded completion cursor avoids
+replaying historical output. Measurements stop cooperatively and join/drain the
+producer before final verification; reports publish atomically. PostgreSQL
+sampling releases completed captures.
+
+The final worker, drill, sampler, legacy and resource group passes 116 tests and
+532 assertions. The earlier canonical cleanup/resource group passes 41 tests and
+263 assertions. Full 376-file static analysis and the 12-file formatting
+normalization are recorded above. U11 delivery, live worker/cgroup/operator
+qualification, final CI-image and preview acceptance, and final code review remain
+open.
+
+Boundary and integration checkpoint (U11), 2026-10-29: the tooling Deptrac
+and source-policy gates now run through Composer and CI. The policy checks raw
+process/Docker calls, manual loaders, image/layout literals and obsolete helpers;
+callsite exceptions have reasons and fail when their source anchors become stale.
+Composer consumers replace manual loading, and the obsolete Development Runner
+and Docker helpers are removed. Standalone relay inventory verification owns its
+Docker resources and cleanup receipts; the public registry-image wrapper supplies
+resolved transport and finite budgets. Guides and CI use the current contracts.
+
+Host gate/inventory verification passes 54 tests and 384 assertions; source policy
+passes 32 tests and 100 assertions; the public CLI passes two tests and 28
+assertions. Full tooling static analysis passes across 380 files. Deptrac reports
+zero violations, errors or warnings, with 4,029 allowed and 321 external uncovered
+dependencies. Loader integration initially had five failures across 73 tests and
+490 assertions. After executable fixture copies were repaired, the web follow-up
+passes eight tests and 41 assertions; the full loader aggregate remains unverified.
+The application-build contract passes eight host tests and 32 assertions.
+
+Five-lens simplification of U6–U8 applied one quality change and five comment
+changes; follow-up verification passes 10 tests and 176 assertions and three-file
+static analysis. U11 simplification applied one efficiency change and seven comment
+changes in two groups; source policy, two-file static analysis and style checks
+pass. The full 942-test CI-image run exceeded Composer's 300-second timeout before
+completion and reported two PHP-path fixture failures, since repaired on the host.
+Its retry, final CI-image and live preview acceptance, worker and relay
+qualification, and independent code review remain open.
+
+Live acceptance follow-up: DNS and web runtime qualification pass in the rebuilt CI
+image. Retained-state recovery exposed a valid historical Dockerfile form that the
+converter rejected: a literal APP_HOME environment value followed by a variable
+WORKDIR. The converter now accepts that observed form while rejecting ambiguous
+declarations; 17 retained-state tests and 190 assertions, scoped static analysis
+and formatting pass. Worker scenario deadlines now use their selected catalog
+budget, with a separate 2,000-second autoscaling aggregate and configurable profile
+budgets. The budget regression group passes 14 tests and 42 assertions, and the combined
+configuration/resources/cleanup group passes 55 tests and 305 assertions. Integrated
+host checks pass 76 tests and 372 assertions, full tooling static analysis, and
+formatting across 383 files. Deptrac reports 4,066 allowed dependencies, 326
+external uncovered dependencies and zero violations, warnings or errors. Full CI
+and live acceptance remain open.
+
+Integration repair checkpoint, 2026-10-29: acceptance polling now uses the shared
+signal owner. Its eight tests and 53 assertions pass with displayed warnings
+enabled. Composer fixture helpers now load lazily as classes; vendor-only consumers
+and the affected web/worker fixtures pass 30 tests and 105 assertions. A missed
+worker-recipe test consumer now supplies its explicit application root. Docker
+client fixtures use the executing PHP binary; 14 tests and 56 assertions pass.
+
+Recovery failures return accepted attempts to blocked state without replacing the
+primary error; 22 activation/update tests and 142 assertions pass. Worker validation
+runs as the image user, while the trusted controller has read access to retained
+Composer files. Validation precedes resource creation; bounded inputs and creation
+intent precede admission, and IPC cleanup uses the shared ledger. The worker group
+passes 49 cases and 141 assertions with six live-image cases still gated; a loader
+follow-up passes 13 tests and 43 assertions.
+
+Cleanup now enumerates resource identities without asking Docker for filesystem
+sizes of unrelated containers. Both ownership implementations pass 18 tests and
+101 assertions; the new relay success case also passes with the shared executor.
+Three retained cleanup receipts from live checks were reconciled after this fix.
+The CI-image repair subset passes 53 tests and 396 assertions, and the unchanged
+Python-subject boundary passes two tests and two assertions. These are focused
+results; the full CI aggregate remains open.
+
+Live DNS, web runtime, security, shutdown, outbox, producer and worker-containment
+checks pass. Messaging passes 165 tests and 2,488 assertions in the CI image. The
+retained blocked preview recovered to ready with its workers ready and data kept.
+Its current-source refresh, configured-library/browser checks, worker and registry
+qualification, alternate-layout checks and final independent review remain open.
+
+Qualification repair checkpoint, 2026-10-29: source discovery now works from
+source archives and linked worktrees; 32 tests and 73 assertions pass, with one
+skip requiring clang-tidy 19. Private operator diagnostics pass five tests and
+41 assertions. Real read-only filesystem probes confirm that temporary-file and
+directory creation fail without writable temporary storage and succeed with a
+private 16 MiB tmpfs at mode 0700; the operator regression passes two tests and
+17 assertions. Generated worker manifests pass the real production-recipe check:
+six tests and 78 assertions, with cleanup verified.
+
+The previous full CI run failed with 942 tests, 4,604 assertions, 16 errors, two
+failures, one warning and seven skips. Its three root causes have scoped fixes;
+those follow-ups do not establish a passing aggregate. The v5 CI image
+`sha256:76ae97dc04286e70bbbf28eab8755fdf51438b584c07d8b1d92719e6e5b3ae09`
+was running the full suite at this checkpoint. Tooling static analysis passes
+across 384 files, and formatting passes across 385 files. Five-lens simplification of the latest
+diff applied two comment changes; reuse, quality, efficiency and test review
+required no changes.
+
+Preview shutdown now succeeds, but its saved blocked phase still requires
+recovery before changing media configuration. Final CI results, preview and
+remaining live qualification, and independent code review remain open.
+
+Build and live qualification checkpoint, 2026-10-29: builds use the captured
+daemon's default BuildKit builder and verified temporary aliases for selected local
+image IDs. Shared bases retain an independent verified reference; dangling inputs
+fail before mutation, and cleanup owns no shared base. CI v6 build-contract checks
+pass 58 tests and 347 assertions without skips. Full tooling static analysis
+passes across 387 files and formatting across 388. Deptrac reports 4,246 allowed
+and 357 external uncovered dependencies, with zero violations, warnings or errors;
+source policy passes. Five-lens simplification applied two comment changes and
+required no reuse, quality, efficiency or test changes.
+
+The real v9 worker operator and Redis/PostgreSQL lifecycle checks pass with
+cleanup. The backend native lane passes 16 tests; the service lane passes 14 tests
+and 8,983 assertions. All three websocket proxy variants pass. Relay API/rqlite
+inventories and the TLS cluster contract pass, as do 89 encrypted-backup CLI
+contract checks, restore and the 600-second cadence check. Relay cleanup passes.
+The current alternate-root worker runs at `/srv/baander` as PID 1 without
+development tools; inventory integrity passes for 52,535 files. Redistribution
+review remains not qualified with 5,404 gaps, a separate existing classification.
+
+Host Playwright passes preview login and Library UI checks with normal TLS
+verification and zero page errors. Repeated startup preserves the same two library
+records with null scan timestamps; no reset ran. The v5 full CI run failed with
+984 tests, 4,660 assertions, five failures and seven skips; its failures concern
+stale identity-format assertions and fakes. The registry inventory regression
+passes one test and 199 assertions. The complete worker cleanup class passes
+41 tests and 273 assertions without failures or skips; scoped static analysis,
+style and source policy pass. The subsequent v7 run was interrupted; final CI
+acceptance continues below. Build ownership landed in local commit `7a22c44d`;
+subsequent repairs remain under qualification.
+
+Callback and fixture checkpoint, 2026-10-30: worker callbacks receive the
+actual randomized web-container name instead of deriving it from the PostgreSQL
+name. The checkpoint regression passes one test and five assertions. Fixture
+warmup now waits for acknowledged pause and resume before publishing capacity
+readiness; measurement thresholds and samples are unchanged. The worker-fixture
+subset passes 20 tests and 31 assertions. These focused results do not establish
+live pressure qualification.
+
+The full v8 CI suite ran against image
+`sha256:87ccc6f4031ba50beb3262845c8cca4c7be2da5d03f4df823eb014f75b3d4bee`;
+its source proof is retained under
+`var/test-runs/ci-checkpoint-overlay-1793315529-1565964/source-proof.json`.
+Capacity v8 uses current host source with `BAANDER_TEST_CHECKOUT_IN_IMAGE=0`.
+The fixture difference from that image is deletion of a redundant warmup comment;
+executable source is unchanged. Later sampler, backend and controller repairs need
+focused CI proof from an updated image. The acceptance results below remain
+incomplete.
+
+Final review and sampler checkpoint, 2026-10-30: independent code review
+completed eight lenses and confirmed two P2 defects: nested backend cleanup owners
+received fresh budgets, and a superseded installed controller could wait on its own
+generation lease during conversion. Both findings and a follow-up prepared-checkout
+error-handling correction are now fixed and verified. The source-proven v10 CI
+image passes 116 tests and 1,031 assertions; the review findings are closed.
+
+The five-file sampler repair admits interrupted completion only with typed proof
+of the exact contained worker pair, exhaustion and continuous drain evidence.
+Implementation and independent focused review are complete. Verification passes
+130 tests and 204 assertions, followed by 27 tests and 33 assertions; source policy
+passes 32 tests and 100 assertions, with scoped static analysis and style clean.
+Live retry was pending at this checkpoint.
+
+CI v8 gates pass static analysis across 388 files and formatting across 389.
+Deptrac reports 4,262 allowed and 360 external uncovered dependencies, with zero
+violations, errors or warnings; source policy passes. Registry subjects pass two
+tests and two assertions. Docker-context checks exclude 35 artifacts and preserve
+29 markers; all four Xdebug scenarios pass. The full v8 suite finished with
+1,022 tests, 5,052 assertions, one failure and seven skips. Its only failure was a
+network fake, now corrected; this is failed aggregate evidence.
+
+Capacity CPU passes with 160 acknowledgements (maximum 0.369 seconds) and 1,451
+heartbeats (maximum gap 0.0227 seconds). Memory qualification failed on sampler
+exit 137 before the typed-proof repair; cleanup was verified, but live repair
+acceptance was pending. PID, media and container browser qualification were also
+pending at this checkpoint. These results do not establish full pressure acceptance.
+
+Observer and review-fix follow-up, 2026-10-30: CI v11 passes 13 observer tests
+and 351 assertions, static analysis across 390 files and formatting across 391.
+Deptrac reports 4,332 allowed and 361 external uncovered dependencies, with zero
+violations, warnings or errors. Autoscaling profile one passed its 369-second
+callback and cleanup. Profile two failed on a transient admission read-lock timeout
+of 50 milliseconds. The fixture now retries within the existing 250-millisecond
+bound; independent focused review is complete. Live retry was pending at this
+checkpoint.
+Production behavior and measured thresholds are unchanged.
+
+Capacity v10 CPU passes again, but its memory pressure probe exits 137 after
+`oomTargetDied`; cleanup succeeds. Extending contained-probe completion with owned
+failure identity and terminal proof was added in the follow-up below. These
+results do not establish passing memory or PID qualification.
+
+Final integration follow-up, 2026-10-30: contained-probe completion now checks
+exit status before sampler evidence. Exit 137 is accepted only with strict proof
+of the terminal event, native process identity, exhaustion and heartbeat/drain
+continuity for the exact worker pair. Unexpected statuses remain failures, and
+only the main qualification path publishes the final result. Focused review of
+these deltas has no outstanding findings after the test correction; final CI and
+live acceptance were still pending at this checkpoint.
+
+The autoscaling fixture retries only the exact admission lock-deadline error
+within its existing 250-millisecond observation budget. Callback identity and
+acknowledged pause/resume warmup remain as recorded above. The DASH native observer
+now matches the actual `manifest.mpd`; the network fake models temporary aliases
+and independent images, and production validation checks `start-worker.sh` against
+`APP_HOME` and the saved layout. The earlier review-fix CI group passes 116 tests
+and 1,031 assertions. CI v11 checks 390 static-analysis files and 391 formatting
+files, with 4,332 allowed and 361 external uncovered dependencies and zero Deptrac
+violations, errors or warnings. Later acceptance evidence follows.
+
+Persisted-drain and observer checkpoint, 2026-10-30: memory v14 failed when
+the last 50-millisecond sample preceded control drain and exit by 10 milliseconds;
+cleanup was verified. The verifier now captures the actual persisted `control.json`
+from the exact stopped container. It checks the saved IPC volume and source, boot,
+epoch, namespace, not-ready/draining flags and time within the existing two-second
+continuity bound. No samples are fabricated and thresholds are unchanged. The
+stopped-volume copy proof passed with cleanup; independent focused review found
+no outstanding issue. Final memory and PID qualification were pending at this
+checkpoint.
+
+Media v15 exposed an observer-only `APP_HOME` assumption: the native execution
+daemon intentionally supplies only `PATH`, `LANG` and `LC_ALL`. The observer now
+resolves the root from its file location. An alternate-root/minimal-environment
+regression failed before the fix and passes afterward; focused review found no
+outstanding issue. CI v16 passes 180 worker-drill/fixture tests and 302 assertions,
+plus 12 media-observer tests and 22 assertions. Static analysis passes 390 files,
+formatting passes 391, and source policy passes. Deptrac reports 4,367 allowed and
+365 external uncovered dependencies, with zero violations, errors or warnings.
+The v16 source proof is retained under
+`var/test-runs/ci-checkpoint-overlay-1793319476-1880270/source-proof.json` for image
+`sha256:314c6da932a397d5f8ed329ab17881248f9b2688f58212d0a7a80b63ea405941`.
+
+Container browser v13 passed with hostile ambient Docker settings and verified
+cleanup; its run is `baander-worker-operator-1793318503-1777841`. The earlier full
+v13 attempt was invalidated by temporary-helper mode loss and Composer's default
+300-second timeout, rather than an application failure. The helper now preserves
+modes, and Composer has an explicit 6,900-second budget inside the 7,000-second
+wrapper. Full CI v15 passes 1,092 tests and 5,335 assertions in 38:24.368, with
+seven known skips: six development-worker cases qualified separately by the live
+six-test/78-assertion run, and one unavailable optional clang-tidy 19 check. The
+aggregate predates the persisted-frame and later fixture/observer changes; their
+focused CI evidence follows.
+
+Capacity and final-source checkpoint, 2026-10-30: CPU v14 passed 162
+acknowledgements with a 0.400-second maximum and heartbeat gaps no greater than
+0.0218 seconds, with cleanup verified. Final memory and PID v17 passed under
+`contained-capacity-final-1793320101-1912574`, both with verified cleanup. Memory
+drained in six seconds with 125 heartbeats and a 0.00997-second maximum gap; PID
+drained in one second with 34 heartbeats and a 0.00958-second maximum gap.
+
+Autoscaling v15 profile one passed with cleanup. Profile two failed initial
+readiness without retaining its exact cause. The confirmed readiness defect was
+an any-consumer check where all expected Redis consumers were required. The
+three-file repair adds a bounded barrier and safe result diagnostics while
+preserving the original failure. Its actual-child regression fails before the fix
+and passes afterward: four tests and 16 assertions; focused review has no
+outstanding findings. CI v19 passes 18 readiness tests and 190 assertions, and the
+v17 pipe follow-up passes 15 tests and 18 assertions. Profiles two and four plus
+the comparison were launched under `autoscaling-final-1793320743-1962832`, using
+the verified profile-one baseline with recorded hash provenance.
+
+Media v18 passed the observer checks but exceeded the 30-second paused-seek
+acknowledgement watchdog at 30.39 seconds; cleanup was verified. The domain waits
+for cursor readiness and 21 seconds of lookahead. Bounded private publication
+diagnostics now retain at most four generations with capped metadata and no media
+bytes; tests and focused review pass. Behavior and thresholds are unchanged. Media
+will run alone after autoscaling. Final-source CI v20 passes 13 media-observer
+tests and 37 assertions, static analysis across 390 files and formatting across
+391. Source policy passes; Deptrac reports 4,368 allowed and 366 external uncovered
+dependencies, with zero violations, errors or warnings. The image is
+`sha256:e44bb9893b30052599d618d47f0b7fd4b0bf960578ef0e149d146138df8d4358`,
+with source proof under
+`var/test-runs/ci-checkpoint-overlay-1793321003-1976225/source-proof.json`.
+These scoped results supplement the passing v15 aggregate. U11 remains open for
+the autoscaling comparison and isolated media qualification.
+
+Worker budget and loader checkpoint, 2026-10-30: autoscaling profile four
+reported passing measurements after 564 seconds and verified cleanup at 606
+seconds, but its 600-second parent correctly timed out. The profile remains failed
+and the comparison did not run. The shared worker-capacity default is now 900
+seconds to cover setup and completion overhead; autoscaling's 2,000-second aggregate,
+callback deadlines, 470-second evidence wait, performance thresholds and
+120-second cleanup budget are unchanged. Configuration checks pass 27 tests and
+82 assertions. Profile four will rerun with the new production image and settings,
+using preserved profile-one/two baselines with recorded hash proof.
+
+Production builds now install the standalone scripts Composer loader without
+development dependencies; the application loader still excludes development
+packages and PHPUnit. Worker and HTTP fixtures use the matching loader, and
+host-source archives retain it. Host verification passes 52 tests and 275 assertions
+with two posix-related skips; CI verification of the actual build was pending at
+this checkpoint.
+
+Isolated media v20 failed its total watchdog after valid publication: the worker
+acknowledged paused state in 28.965 seconds, while decode and verification took
+35.5 seconds overall. Private diagnostics retained 19 KiB. This result establishes
+neither corrupt publication nor a definitive application defect. The measurement
+cause and correction are recorded below; final live media acceptance remains open.
+
+Media readiness measurement checkpoint, 2026-10-30: investigation confirmed
+a tooling clock error. The old seek timer included ffprobe, six signature-tampering
+checks, decoding and subtitle certification after media was available; it even
+fetched audio after certifying video. `TrackDelivery` now fetches paired bytes first
+and records monotonic availability before certification. The same 30-second seek
+readiness limit applies to that availability time. Every certification remains
+mandatory: slow fragments, corrupt media and accepted tampering still fail.
+Real HTTP/FFmpeg regression evidence reproduced 1.414 seconds of verification
+contamination and the wrong fetch order. CI v23 passes four tests and 24 assertions.
+The earlier application-scope question does not apply to this fixture correction.
+
+Production profile four v21 failed before pressure because `WorkloadCodec` could
+not load its fixture workload classes; cleanup was verified. Autoscaling now rejects
+immutable-image mode before provisioning because its scenario requires injected
+fixture services. The disposable image generates development classmaps without
+installing dependencies; root production dependencies still exclude PHPUnit, and
+host-source archives carry the matching classmap sources. CI v22 passes 79 tests
+and 381 assertions without skips, including the host posix cases. CI v23 passes
+18 fixture/configuration tests and 65 assertions. Static analysis passes 390 files,
+formatting passes 391, and source policy passes; Deptrac reports 4,387 allowed and
+366 external uncovered dependencies, with zero violations, errors or warnings.
+
+The final-source worker image is built. Production loader and sampler smoke checks
+passed on the preceding image; subsequent worker changes affect fixture measurement
+source. Profile four was launched from production-sourced disposable fixtures under
+`autoscaling-production-final-1793323460-2059006`, using verified profile-one/two
+baseline hashes. Its final acceptance result follows.
+
+Autoscaling acceptance checkpoint, 2026-10-30: profile four and the final
+comparison pass under `var/test-runs/autoscaling-production-final-1793323460-2059006`,
+with cleanup verified. Profile four used a production-sourced disposable fixture;
+profile-one/two baselines were copied with source-hash receipts. The two measured
+speedups are 1.712244 and 1.732753 at maximum two, and 2.464552 and 2.388083 at
+maximum four. Profile four's maximum heartbeat gap is 0.011047 seconds and maximum
+media acknowledgement is 0.208403 seconds. The parent completed with exit zero
+within its 900-second bound; no timed-out result was reclassified.
+
+Current acceptance: full CI, completed focused gates and autoscaling comparison
+pass. Isolated media v23 failed with original status one at the combined
+paused-seek readiness-or-intent assertion; cleanup exited zero with removal
+verified. Evidence is retained under `var/test-runs/media-control-1793324122-2083047`.
+Diagnostic v24 confirmed paused state and position were retained: acknowledgement
+took 29.299 seconds, while paired bytes arrived after 31.504826 seconds, beyond
+the 30-second limit. Cleanup passed. The client made eight serial HTTP requests;
+it now fetches two playlists concurrently, then four resources concurrently, with
+bounded waits. The 30-second limit and every certification remain unchanged.
+Real HTTP regression evidence reproduced 1.403 seconds for two serial 0.7-second
+responses; nine tests and 61 assertions now pass, including timeout, transport,
+status, stream, slow-fragment, corruption and tampering cases. Focused review and
+five simplification lenses found no outstanding issue. CI v25 passes nine tests
+and 61 assertions, static analysis across 390 files and formatting across 391.
+Source policy passes; Deptrac reports 4,387 allowed and 366 external uncovered
+dependencies, with zero violations, errors or warnings. All 48 source-proof files
+match its CI image. These focused results supplement the passing full v15 suite.
+
+Live media v25 failed the 30-second worker-paused acknowledgement before byte
+retrieval, under `var/test-runs/media-control-1793325242-2126320`. Desired revision
+five remained ahead of observed revision four. The record still carried outcome
+ready, while generation three had desired state paused and no current output.
+Cleanup was verified with exit zero. The
+concurrent retrieval fix is verified, but live application pause/seek acceptance
+still fails. Application readiness requires the 18-second cursor plus 21 seconds
+of lookahead, requiring seven six-second segments to cover second 39. The readiness SIGSTOP
+arrived 30.582 seconds after replacement start, beyond the unchanged 30-second
+watchdog. The user authorized the application correction recorded in the paused-seek
+readiness checkpoint above.
+
+The final worker image is
+`sha256:b3d2616a66ae9c3e3e0747376ccba61e92d6a3bcf373ea02a58dee03e7861dd9`;
+its inventory completed with exit zero under
+`var/tooling-audit/2026-10-29/integration/worker-final-v25-inventory`.
+Integrity verification passes for 77,048 files. Redistribution review remains not
+qualified with 5,464 gaps, a separate release classification. The paused-seek
+checkpoint above records the passing media and preview follow-up that completes
+U11 acceptance.
+
+Audit checkpoint, 2026-10-29: reviewers read all 92 PHP source files and four
+package metadata/resource files. Independent source verification confirmed all
+14 core factual claims with their stated limits. Safe host-only probes reproduced
+behavioral defects without contacting Docker. Detailed evidence remains under
+`var/tooling-audit/2026-10-29`, including `review.md` and `claim-verification.md`.
+
+The targeted host suite ran 238 tests and 1,073 assertions, with one failure and
+one skip. The failure assumes configured PHP startup and output within 100 ms;
+measured startup took about 149 ms. The skip requires unavailable clang-tidy 19.
+Neither the authoritative CI image suite nor live Docker qualification ran for
+this audit. These results establish the audit baseline, not remediation acceptance.
 
 ## PHP-first testing and development tooling
 

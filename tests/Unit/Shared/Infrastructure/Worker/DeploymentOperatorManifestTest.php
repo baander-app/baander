@@ -14,9 +14,44 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentOperatorManifestTest extends TestCase
 {
+    public function testSavedManifestRemainsInspectableAfterItsSourceDirectoryDisappears(): void
+    {
+        $source = sys_get_temp_dir() . '/baander-media-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($source));
+        $mounts = self::mounts();
+        $mounts[0] = ['source' => $source, 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
+        $json = $this->json(['sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]);
+        try {
+            $before = DeploymentOperatorManifest::fromJson($json, '/var/www/html');
+            $environment = new DeploymentRuntimeEnvironment();
+            $fingerprint = $before->fingerprint($environment);
+            self::assertTrue(rmdir($source));
+            $saved = DeploymentOperatorManifest::fromJson($json, '/var/www/html');
+            self::assertSame($fingerprint, $saved->fingerprint($environment));
+            $this->expectException(InvalidArgumentException::class);
+            $saved->recipe(DeploymentUnit::Control, $environment)->createArguments();
+        } finally {
+            if (is_dir($source)) {
+                rmdir($source);
+            }
+        }
+    }
+
+    public function testObservedImageHomeDeterminesWorkerCommandAndWritableStorage(): void
+    {
+        $mounts = array_map(static function (array $mount): array {
+            $mount['target'] = str_replace('/var/www/html', '/opt/baander', $mount['target']);
+            return $mount;
+        }, self::mounts());
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/opt/baander');
+        $recipe = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
+        self::assertContains('/opt/baander/bin/console', $recipe->command);
+        self::assertSame('/opt/baander', $recipe->appHome);
+    }
+
     public function testConfiguredSourceRootMustBelongToAnAdmittedSourceVolume(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html');
         $recipe = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/audio']));
         self::assertSame('/media/library/audio', $recipe->runtimeEnvironment->variables['MEDIA_STORAGE_PATH']);
         $this->expectException(InvalidArgumentException::class);
@@ -26,7 +61,7 @@ final class DeploymentOperatorManifestTest extends TestCase
 
     public function testConfiguredSourceRootCannotEscapeItsVolume(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html');
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('canonical absolute');
         $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/../private']));
@@ -34,7 +69,7 @@ final class DeploymentOperatorManifestTest extends TestCase
 
     public function testRecipeBindsIdentityBudgetsAndFixedWorkerCommand(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html');
         $environment = new DeploymentRuntimeEnvironment(['APP_ENV' => 'prod']);
         $recipe = $manifest->recipe(DeploymentUnit::Control, $environment);
         self::assertSame([
@@ -49,7 +84,7 @@ final class DeploymentOperatorManifestTest extends TestCase
         self::assertSame($environment, $recipe->runtimeEnvironment);
         self::assertSame('/usr/bin/docker', $manifest->dockerBinary);
         self::assertSame('unix:///var/run/docker.sock', $manifest->dockerEndpoint);
-        self::assertSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json())->recipe(DeploymentUnit::Control, $environment)->fingerprint());
+        self::assertSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html')->recipe(DeploymentUnit::Control, $environment)->fingerprint());
         $arguments = $recipe->createArguments('/tmp/baander-worker-test.env');
         $memory = array_search('--memory', $arguments, true);
         self::assertNotFalse($memory);
@@ -59,14 +94,14 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testManifestMountsAreValidatedAndParticipateInCreateIdentity(): void
     {
         $mounts = self::mounts();
-        $recipe = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
+        $recipe = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/var/www/html')->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment());
         self::assertSame($mounts, $recipe->mediaMounts);
         self::assertContains('type=volume,src=baander-source,dst=/media/library,readonly,volume-nocopy', $recipe->createArguments());
         $mounts[0]['volume'] = 'replacement-source';
-        self::assertNotSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]))->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->fingerprint());
+        self::assertNotSame($recipe->fingerprint(), DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/var/www/html')->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->fingerprint());
         $mounts[0]['readOnly'] = false;
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]));
+        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/var/www/html');
     }
 
     public function testManifestRejectsMissingSharedStateStorage(): void
@@ -74,18 +109,18 @@ final class DeploymentOperatorManifestTest extends TestCase
         $mounts = self::mounts();
         array_pop($mounts);
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]));
+        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/var/www/html');
     }
 
     public function testManifestRejectsMissingSourceStorage(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => array_slice(self::mounts(), 1)]));
+        DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => array_slice(self::mounts(), 1)]), '/var/www/html');
     }
 
     public function testConversionPathMustBelongToWritableSharedStorage(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(), '/var/www/html');
         $recipe = $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions']));
         self::assertSame('/var/www/html/storage/conversions', $recipe->runtimeEnvironment->variables['CONVERT_STORAGE_PATH']);
         $this->expectException(InvalidArgumentException::class);
@@ -95,7 +130,7 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testAlternateConversionPathUsesAnExplicitVolumeAtThatPath(): void
     {
         $mounts = [...self::mounts(), ['volume' => 'baander-conversions', 'target' => '/storage/conversions', 'readOnly' => false, 'role' => 'derived']];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]));
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=volume,src=baander-conversions,dst=/storage/conversions,volume-nocopy',
             $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']))->createArguments('/tmp/baander-test.env'));
     }
@@ -104,10 +139,10 @@ final class DeploymentOperatorManifestTest extends TestCase
     {
         $mounts = self::mounts();
         $mounts[0] = ['source' => '/tmp', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'];
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]));
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'local-development', 'mediaMounts' => $mounts]), '/var/www/html');
         self::assertContains('type=bind,src=/tmp,dst=/media/library,readonly,bind-propagation=rprivate,bind-recursive=readonly', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->createArguments());
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]));
+        DeploymentOperatorManifest::fromJson($this->json(['version' => 5, 'sourceMountPolicy' => 'production', 'mediaMounts' => $mounts]), '/var/www/html');
     }
 
     /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
@@ -118,14 +153,14 @@ final class DeploymentOperatorManifestTest extends TestCase
 
     public function testDisabledScheduledConsoleAndMaximumMemoryAreAccepted(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['controlMemoryMiB' => 1048576, 'scheduledConsoleMiB' => 0]));
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['controlMemoryMiB' => 1048576, 'scheduledConsoleMiB' => 0]), '/var/www/html');
         self::assertSame(1024 * 1024 * 1024 * 1024, $manifest->control->memoryBytes);
         self::assertContains('--scheduled-console-mib=0', $manifest->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment())->command);
     }
 
     public function testDockerBinaryExistenceIsDeferredToExecutor(): void
     {
-        $manifest = DeploymentOperatorManifest::fromJson($this->json(['dockerBinary' => '/nonexistent/baander-test-docker']));
+        $manifest = DeploymentOperatorManifest::fromJson($this->json(['dockerBinary' => '/nonexistent/baander-test-docker']), '/var/www/html');
         self::assertSame('/nonexistent/baander-test-docker', $manifest->dockerBinary);
     }
 
@@ -136,7 +171,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             $fields = self::fields();
             unset($fields[$field]);
             try {
-                DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR));
+                DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
                 self::fail('Missing field accepted: ' . $field);
             } catch (InvalidArgumentException) {
                 $rejected[] = $field;
@@ -149,7 +184,7 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testInvalidFieldsAreRejected(string $field, mixed $value): void
     {
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($this->json([$field => $value]));
+        DeploymentOperatorManifest::fromJson($this->json([$field => $value]), '/var/www/html');
     }
 
     /** @return iterable<string,array{string,mixed}> */
@@ -210,7 +245,7 @@ final class DeploymentOperatorManifestTest extends TestCase
     public function testInvalidJsonIsRejected(string $json): void
     {
         $this->expectException(InvalidArgumentException::class);
-        DeploymentOperatorManifest::fromJson($json);
+        DeploymentOperatorManifest::fromJson($json, '/var/www/html');
     }
 
     /** @return iterable<string,array{string}> */

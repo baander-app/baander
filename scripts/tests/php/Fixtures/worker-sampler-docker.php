@@ -14,7 +14,11 @@ if (in_array($arguments[0] ?? '', ['--host', '--context'], true)) {
     $arguments = array_slice($arguments, 2);
 }
 if (($arguments[0] ?? '') === 'context') {
-    echo 'fixture';
+    echo ($arguments[1] ?? '') === 'inspect' ? json_encode([['Endpoints' => ['docker' => ['Host' => 'unix:///fixture.sock']]]], JSON_THROW_ON_ERROR) : 'fixture';
+    exit(0);
+}
+if (($arguments[0] ?? '') === 'info') {
+    echo json_encode(['ID' => 'fixture-daemon']);
     exit(0);
 }
 if (($arguments[0] ?? '') === 'inspect') {

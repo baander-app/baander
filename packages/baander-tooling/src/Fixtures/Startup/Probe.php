@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Fixtures\Startup;
 
 use Baander\Tooling\Filesystem\{AtomicFile, PrivateDirectory};
+use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Fixtures\Runtime;
 
 final class Probe
@@ -12,7 +13,7 @@ final class Probe
     private const string RM = <<<'PHP_CODE'
         <?php
         $case = getenv('PROBE_CASE');
-        if (array_slice($_SERVER['argv'], 1) !== ['-rf', '/var/www/html/var/cache/dev']) {
+        if (array_slice($_SERVER['argv'], 1) !== ['-rf', getenv('APP_HOME') . '/var/cache/dev']) {
             fwrite(STDERR, "Unexpected startup cleanup command\n");
             exit(91);
         }
@@ -94,6 +95,7 @@ final class Probe
         $env['PATH'] = $directory . '/bin:' . ($env['PATH'] ?? '/usr/bin:/bin');
         $env['PROBE_CASE'] = $case;
         $env['PROBE_MODE'] = $signal ? 'signal' : 'exit';
+        $env['APP_HOME'] = ApplicationLayout::load()->root;
         if ($environment !== null) {
             $env['APP_ENV'] = $environment;
         }
@@ -117,16 +119,17 @@ final class Probe
                 5,
                 .01,
             );
-            $process->cancel();
+            $result = $runtime->stop($process);
+        } else {
+            $result = $runtime->wait($process, check: false);
         }
-        $result = $runtime->wait($process, check: false);
         Runtime::require(!$result->timedOut, 'Startup probe timed out: ' . $name);
         Runtime::require(is_file($case . '/pid'), 'The startup PHP probe did not run: ' . $result->stderr);
         Runtime::require(
             file_get_contents($case . '/pid') === file_get_contents($case . '/launched-pid'),
             'Startup did not exec PHP with the original PID.',
         );
-        $expected = ['bin/console', 'app:serve', '--no-interaction', ...$extra]
+        $expected = [$env['APP_HOME'] . '/bin/console', 'app:serve', '--no-interaction', ...$extra]
             |> (static fn(array $arguments): string => implode("\0", $arguments) . "\0");
         Runtime::require(file_get_contents($case . '/arguments') === $expected, 'Startup changed the forwarded arguments.');
         Runtime::require(is_file($case . '/cache/prod/marker'), 'Startup changed the production-cache fixture.');

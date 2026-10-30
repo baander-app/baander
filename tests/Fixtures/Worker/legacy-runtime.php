@@ -3,7 +3,7 @@
 
 declare(strict_types=1);
 
-require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require dirname(__DIR__, 3) . '/scripts/bootstrap.php';
 try {
     Baander\Tooling\Runtime\Requirements::check();
     exit(Baander\Tooling\Fixtures\Worker\LegacySupervisor::main(

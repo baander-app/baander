@@ -6,15 +6,13 @@
 declare(strict_types=1);
 
 use Baander\Registry\Inventory\Inventory;
-use Baander\Registry\StaticAnalysis\Pins;
+use Baander\Tooling\Registry\StaticAnalysis\Pins;
 use Baander\Tooling\Process\SignalScope;
 use Baander\Tooling\Registry\StaticQualification;
 use Baander\Tooling\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
-require dirname(__DIR__) . '/relay/tests/bootstrap.php';
-require dirname(__DIR__) . '/relay/tools/static/Pins.php';
-require dirname(__DIR__) . '/relay/tools/static/Diagnostics.php';
+require dirname(__DIR__) . '/relay/vendor/autoload.php';
 
 $arguments = array_slice($_SERVER['argv'] ?? [], 1);
 if (!in_array($arguments, [[], ['--pins-notices-only']], true)) {
@@ -39,7 +37,7 @@ try {
     }
 } catch (Throwable $failure) {
     fwrite(STDERR, $failure->getMessage() . "\n");
-    $status = 1;
+    $status = $failure->getCode() > 0 && $failure->getCode() <= 255 ? $failure->getCode() : 1;
 } finally {
     if ($signals?->receivedSignal() !== null) {
         $status = 128 + $signals->receivedSignal();

@@ -113,39 +113,32 @@ LOG;
         try {
             $result = $runner->run(new ProcessSpec(
                 argv: [PHP_BINARY, dirname(__DIR__, 2) . '/test-web-shutdown-container.php'],
-                environment: array_replace(getenv(), ['PATH' => $directory . ':' . getenv('PATH'), 'WEB_WORKFLOW_TRACE' => $trace]),
-                timeout: 10,
+                environment: array_replace(getenv(), [
+                    'PATH' => $directory . ':' . getenv('PATH'),
+                    'WEB_WORKFLOW_TRACE' => $trace,
+                    'BAANDER_TEST_ARTIFACTS' => $directory . '/artifacts',
+                ]),
+                timeout: 60,
                 processGroup: true,
             ));
-            self::assertSame(42, $result->exitCode);
+            self::assertSame(42, $result->exitCode, $result->stdout . $result->stderr);
             self::assertStringContainsString('injected client start failure', $result->stderr);
             $commands = file($trace, FILE_IGNORE_NEW_LINES)
                 |> (static fn(array $lines): array => array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines));
             $network = array_values(array_filter($commands, static fn(array $command): bool => in_array('--internal', $command, true)))[0];
             $id = $network[array_key_last($network)];
-            $removals = array_values(array_filter($commands, static fn(array $command): bool => in_array('-f', $command, true)));
-            self::assertCount(1, $removals);
+            $removals = array_values(array_filter($commands, static fn(array $command): bool => ($command[2] ?? '') === 'rm'));
             self::assertSame(
-                [
-                    '--context',
-                    'web-fixture',
-                    'rm',
-                    '-f',
-                    '-v',
-                    $id . '-web',
-                    $id . '-probe',
-                    $id . '-client',
-                    $id . '-redis',
-                    $id . '-postgres',
-                ],
-                $removals[0],
+                array_map(static fn(string $suffix): string => hash('sha256', $id . '-' . $suffix), ['client', 'postgres', 'redis']),
+                array_column($removals, 6),
             );
-            self::assertContains(['--context', 'web-fixture', 'network', 'rm', $id], $commands);
-        } finally {
-            foreach (glob($directory . '/*') as $path) {
-                unlink($path);
+            foreach ($removals as $removal) {
+                self::assertSame(['--host', 'unix:///web-fixture.sock', 'rm', '--force', '--volumes', '--'], array_slice($removal, 0, 6));
+                self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $removal[6]);
             }
-            rmdir($directory);
+            self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 2, 2) === ['network', 'rm']));
+        } finally {
+            self::removeDirectory($directory);
         }
     }
 
@@ -166,16 +159,17 @@ LOG;
                     'DOCKER_HOST' => '',
                     'DOCKER_CONTEXT' => '',
                     'WEB_WORKFLOW_TRACE' => $trace,
+                    'BAANDER_TEST_ARTIFACTS' => $directory . '/artifacts',
                     'WEB_WORKFLOW_HANG' => '1',
                     'WEB_WORKFLOW_READY' => $ready,
                 ],
             ),
-            timeout: 20,
+            timeout: 60,
             processGroup: true,
-            terminationGrace: 10,
+            terminationGrace: 30,
         ));
         try {
-            $until = hrtime(true) / 1e9 + 5;
+            $until = hrtime(true) / 1e9 + 20;
             do {
                 clearstatcache(true, $ready);
                 if (is_file($ready)) {
@@ -186,21 +180,27 @@ LOG;
             self::assertFileExists($ready);
             $process->cancel(15);
             $result = $runner->wait($process);
-            self::assertSame(143, $result->exitCode);
+            self::assertSame(143, $result->exitCode, $result->stderr);
             $commands = file($trace, FILE_IGNORE_NEW_LINES)
                 |> (static fn(array $lines): array => array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines));
-            self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 2, 2) === ['rm', '-f']));
+            self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 2, 2) === ['rm', '--force']));
             self::assertTrue(array_any($commands, static fn(array $command): bool => array_slice($command, 2, 2) === ['network', 'rm']));
         } finally {
             if ($process->result() === null) {
                 $process->cancel(9);
                 $runner->wait($process);
             }
-            foreach (glob($directory . '/*') as $path) {
-                unlink($path);
-            }
-            rmdir($directory);
+            self::removeDirectory($directory);
         }
+    }
+
+    private static function removeDirectory(string $directory): void
+    {
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($files as $file) {
+            $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+        }
+        rmdir($directory);
     }
 
     /** @return iterable<string,array{bool}> */
@@ -230,15 +230,16 @@ LOG;
                         'DOCKER_HOST' => '',
                         'DOCKER_CONTEXT' => '',
                         'WEB_WORKFLOW_TRACE' => $trace,
+                        'BAANDER_TEST_ARTIFACTS' => $directory . '/artifacts',
                         'WEB_WORKFLOW_TAR_TRACE' => $tarTrace,
                         'WEB_WORKFLOW_STAGE' => '1',
                         'BAANDER_TEST_CHECKOUT_IN_IMAGE' => $baked ? '1' : '0',
                     ],
                 ),
-                timeout: 20,
+                timeout: 60,
                 processGroup: true,
             ));
-            self::assertSame(43, $result->exitCode);
+            self::assertSame(43, $result->exitCode, $result->stdout . $result->stderr);
             $archives = file($tarTrace, FILE_IGNORE_NEW_LINES)
                 |> (static fn(array $lines): array => array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), $lines));
             self::assertCount($baked ? 1 : 2, $archives);
@@ -275,10 +276,7 @@ LOG;
                 }
             }
         } finally {
-            foreach (glob($directory . '/*') as $path) {
-                unlink($path);
-            }
-            rmdir($directory);
+            self::removeDirectory($directory);
         }
     }
 }

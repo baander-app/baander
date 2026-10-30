@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Build\Builder;
-use Baander\Tooling\Development\Build\SourceUnavailable;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Build\SourceUnavailable;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\Updater;
@@ -41,9 +41,11 @@ final class DevelopmentUpdatesTest extends TestCase
             'release' => ['revision' => 'old'],
             'readiness' => ['web_ready' => true],
         ];
+        $this->instance['docker'] = DevelopmentCommandExecutor::target();
+        $this->instance['release'] = DevelopmentCommandExecutor::release($this->instance['release'], $this->instance);
         $this->store->save('persistent', $this->instance);
         $this->store->setEnabled('persistent', true);
-        $this->updater = $this->getMockBuilder(Updater::class)->setConstructorArgs([$this->store, new Runner()])->onlyMethods(['head', 'activate'])->getMock();
+        $this->updater = $this->getMockBuilder(Updater::class)->setConstructorArgs([$this->store, new DevelopmentCommandExecutor()])->onlyMethods(['head', 'activate'])->getMock();
         $this->updater->builder = $this->builder = $this->createMock(Builder::class);
         $this->updater->runtime = $this->runtime = $this->createMock(Runtime::class);
         $this->updater->workers = $this->workers = $this->createMock(Workers::class);
@@ -53,7 +55,25 @@ final class DevelopmentUpdatesTest extends TestCase
 
     protected function tearDown(): void
     {
-        new Runner()->run(['rm', '-rf', '--', $this->root]);
+        new DevelopmentCommandExecutor()->execute(['rm', '-rf', '--', $this->root]);
+    }
+
+    public function testInvalidSavedMediaFailsBeforeUpdatingState(): void
+    {
+        $this->instance['media'] = [['source' => $this->root . '/missing-media', 'target' => '/media/movies']];
+        $this->store->save('persistent', $this->instance);
+        $path = $this->store->directory('persistent') . '/state.json';
+        $original = file_get_contents($path);
+        $this->runtime->method('environment')->willReturn([]);
+        $this->updater->expects(self::never())->method('head');
+        $this->builder->expects(self::never())->method('prepare');
+        try {
+            $this->updater->update('persistent');
+            self::fail('Invalid source media reached update mutation.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('media directory', $error->getMessage());
+        }
+        self::assertSame($original, file_get_contents($path));
     }
 
     public function testHealthySameRevisionOnlyObservesContainers(): void
@@ -160,7 +180,7 @@ final class DevelopmentUpdatesTest extends TestCase
         $this->updater->method('head')->willReturn('old');
         $this->builder->expects(self::never())->method('prepare');
         $this->updater->expects(self::once())->method('activate')->willReturnCallback(function (array &$instance, array $release): void {
-            self::assertSame(['revision' => 'old'], $release);
+            self::assertEquals($this->instance['release'], $release);
             $this->updater->save($instance, ['phase' => 'preflight']);
             throw new WorkflowError('dependency unavailable');
         });

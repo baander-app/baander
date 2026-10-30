@@ -4,15 +4,101 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Fixtures\Runtime;
 use Baander\Tooling\Fixtures\Failure;
-use Baander\Tooling\Fixtures\Worker\{Command, ControlCapacity, LegacySupervisor, Production};
+use Baander\Tooling\Fixtures\Worker\{Command, ControlCapacity, LegacySupervisor, Production, Measurements, Reports};
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class WorkerDrillTest extends TestCase
 {
+    /** @return iterable<string,array{list<array{name:string}>|false,list<string>}> */
+    public static function registeredConsumerSets(): iterable
+    {
+        yield 'partial pool' => [[['name' => 'consumer-0']], ['consumer-1']];
+        yield 'unrelated pool' => [[['name' => 'foreign']], ['consumer-0', 'consumer-1']];
+        yield 'all expected and unrelated' => [[['name' => 'consumer-1'], ['name' => 'foreign'], ['name' => 'consumer-0']], []];
+        yield 'unavailable registry' => [false, ['consumer-0', 'consumer-1']];
+    }
+
+    /** @param list<array{name:string}>|false $consumers
+     * @param list<string> $missing
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('registeredConsumerSets')]
+    public function testFixtureReadinessRequiresEveryConfiguredConsumer(array|false $consumers, array $missing): void
+    {
+        $runtime = new Runtime(dirname(__DIR__, 3), 5);
+        try {
+            $result = $runtime->run(
+                [PHP_BINARY, 'tests/Fixtures/Worker/worker-command-check.php', 'consumer-readiness',
+                    json_encode(['consumer-0', 'consumer-1'], JSON_THROW_ON_ERROR), json_encode($consumers, JSON_THROW_ON_ERROR)],
+                env: array_replace($runtime->environment, ['APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'DATABASE_URL' => 'unavailable']),
+                check: false,
+            );
+            self::assertSame($missing === [] ? 0 : 1, $result->exitCode, $result->stderr);
+            $evidence = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame($missing, $evidence['missing']);
+            self::assertSame(['consumer-0', 'consumer-1'], $evidence['expected']);
+            self::assertSame($consumers === false ? [] : array_column($consumers, 'name'), $evidence['observed']);
+        } finally {
+            $runtime->close();
+        }
+    }
+
+    /** @return iterable<string,array{string,bool}> */
+    public static function finalProducerOutcomes(): iterable
+    {
+        yield 'late final record' => ['complete', true];
+        yield 'failed producer' => ['failed', false];
+        yield 'truncated final record' => ['truncated', false];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('finalProducerOutcomes')]
+    public function testFinalEvidenceWaitsForProducerAndRejectsFailedOrTruncatedOutput(string $mode, bool $success): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-measurements-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $runtime = new Runtime(dirname(__DIR__, 3), 5);
+        $docker = new \Baander\Tooling\Docker\Client(
+            $runtime->executor,
+            new \Baander\Tooling\Docker\Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
+            [],
+        );
+        $measurements = new Measurements($runtime, $docker, $directory);
+        $code = <<<'PHP_CHILD'
+            echo "{\"sequence\":0}\n"; fflush(STDOUT);
+            while (!is_file(getenv('BAANDER_TEST_SAMPLER_STOP_FILE'))) { usleep(1000); }
+            usleep(10000);
+            echo $argv[1] === 'truncated' ? '{' : "{\"sequence\":1}\n";
+            exit($argv[1] === 'failed' ? 7 : 0);
+            PHP_CHILD;
+        $measurements->host([PHP_BINARY, '-r', $code, $mode], 'samples.jsonl', 'errors.log', 3);
+        try {
+            $runtime->await(static function () use ($directory): bool {
+                clearstatcache(true, $directory . '/samples.jsonl');
+                return is_file($directory . '/samples.jsonl') && filesize($directory . '/samples.jsonl') > 0;
+            }, 2, .01);
+            try {
+                $measurements->finish();
+                Reports::publish($directory . '/qualification.json', ['count' => count(Reports::samples($directory . '/samples.jsonl'))]);
+                self::assertTrue($success, 'Failed collection published successful evidence');
+                self::assertSame(2, Reports::json($directory . '/qualification.json')['count']);
+            } catch (RuntimeException $error) {
+                if ($success) {
+                    throw $error;
+                }
+                self::assertFileDoesNotExist($directory . '/qualification.json');
+            }
+        } finally {
+            $runtime->close();
+            foreach (glob($directory . '/*') as $path) {
+                unlink($path);
+            }
+            rmdir($directory);
+        }
+    }
+
     public function testCleanupFailureRetainsThePrimaryFailureMessage(): void
     {
         $error = new RuntimeException('resource cleanup failed', previous: new RuntimeException('original drill failed'));
@@ -25,9 +111,9 @@ final class WorkerDrillTest extends TestCase
 
     public function testRuntimePreservesChildTimeoutAndSignalExitContracts(): void
     {
-        $runner = new Runner();
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         foreach (['exit' => 7, 'timeout' => 124, 'term' => 143, 'int' => 130] as $mode => $status) {
-            $result = $runner->run([PHP_BINARY, __DIR__ . '/Fixtures/worker-runtime.php', $mode], check: false);
+            $result = $runner->run(new ProcessSpec([PHP_BINARY, __DIR__ . '/Fixtures/worker-runtime.php', $mode]), new CompletionPolicy(null));
             self::assertSame($status, $result->exitCode, $mode . ': ' . $result->stdout . $result->stderr);
             self::assertNotSame('', $result->stderr);
         }
@@ -75,28 +161,54 @@ final class WorkerDrillTest extends TestCase
     {
         $config = [
             'User' => 'www-data',
-            'Entrypoint' => ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker', '--no-interaction'],
+            'Entrypoint' => ['/usr/local/bin/start-worker.sh'],
+            'WorkingDir' => '/qualified/application',
             'Cmd' => null,
             'Healthcheck' => ['Test' => ['NONE']],
-            'Env' => ['APP_ENV=prod', 'APP_DEBUG=0'],
+            'Env' => ['APP_HOME=/qualified/application', 'APP_ENV=prod', 'APP_DEBUG=0'],
             'Volumes' => null,
         ];
-        Production::validateConfiguration($config);
+        Production::validateConfiguration($config, '/qualified/application');
         foreach ([
             ['User' => 'root'],
             ['Entrypoint' => ['app:serve']],
+            ['Entrypoint' => ['/usr/local/bin/php', '/qualified/application/bin/console', 'app:worker', '--no-interaction']],
+            ['WorkingDir' => '/obsolete/application'],
+            ['Env' => ['APP_ENV=prod', 'APP_DEBUG=0']],
+            ['Env' => ['APP_HOME=/obsolete/application', 'APP_ENV=prod', 'APP_DEBUG=0']],
             ['Cmd' => ['web']],
             ['Healthcheck' => ['Test' => ['CMD', 'curl']]],
-            ['Env' => ['APP_ENV=test']],
+            ['Env' => ['APP_HOME=/qualified/application', 'APP_ENV=test', 'APP_DEBUG=0']],
+            ['Env' => ['APP_HOME=/qualified/application', 'APP_ENV=prod', 'APP_DEBUG=1']],
             ['Volumes' => ['/source' => []]],
         ] as $change) {
             try {
-                Production::validateConfiguration(array_replace($config, $change));
+                Production::validateConfiguration(array_replace($config, $change), '/qualified/application');
                 self::fail('Accepted invalid production worker configuration');
             } catch (RuntimeException $error) {
                 self::assertNotSame('', $error->getMessage());
             }
         }
+    }
+
+    public function testLegacySupervisorRelocatesEachDeclaredProgramDirectoryAtArgumentBoundaries(): void
+    {
+        $source = <<<'INI'
+            [program:messenger-worker]
+            directory=/historical/application
+            command=/usr/local/bin/php /historical/application/bin/console messenger:consume async --keep=/historical/application /historical/application-archive/input
+            [program:outbox-worker]
+            directory=/historical/outbox
+            command=/usr/local/bin/php /historical/outbox/bin/console app:outbox:consume
+            INI;
+        $configuration = parse_ini_string(LegacySupervisor::configuration($source, '/tmp/baander-runtime'), true, INI_SCANNER_RAW);
+        self::assertSame('/tmp/baander-runtime', $configuration['program:messenger-worker']['directory']);
+        self::assertSame('/tmp/baander-runtime', $configuration['program:outbox-worker']['directory']);
+        self::assertSame(
+            '/usr/local/bin/php /tmp/baander-runtime/bin/console messenger:consume async --keep=/historical/application /historical/application-archive/input',
+            $configuration['program:messenger-worker']['command'],
+        );
+        self::assertSame('/usr/local/bin/php /tmp/baander-runtime/bin/console app:outbox:consume', $configuration['program:outbox-worker']['command']);
     }
 
     public function testLegacySupervisorConfigurationPreservesConsumerIdentityAndDisablesHttpAndAutorestart(): void
@@ -119,15 +231,15 @@ final class WorkerDrillTest extends TestCase
     {
         $directory = sys_get_temp_dir() . '/baander-capacity-baseline-' . bin2hex(random_bytes(8));
         mkdir($directory, 0700);
-        $runner = new Runner();
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         try {
             $sample = [
                 'monotonic' => 1,
                 'cpu.stat' => 'usage_usec 0',
                 'memory.events' => 'oom_kill 0',
                 'pids.events' => 'max 0',
-                'heartbeat' => new \stdClass(),
-                'lease' => new \stdClass(),
+                'heartbeat' => ['bootId' => 'fixture-boot', 'epoch' => 1],
+                'lease' => ['owner_boot_id' => 'fixture-boot', 'epoch' => 1],
             ];
             foreach (['control', 'execution'] as $unit) {
                 file_put_contents(
@@ -144,7 +256,7 @@ final class WorkerDrillTest extends TestCase
             $this->expectExceptionMessage('eleven valid baseline samples');
             ControlCapacity::baseline($directory);
         } finally {
-            $runner->run(['rm', '-rf', '--', $directory]);
+            $runner->run(new ProcessSpec(['rm', '-rf', '--', $directory]));
         }
     }
 

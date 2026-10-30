@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\FileLock;
 use Baander\Tooling\Filesystem\PrivateDirectory;
@@ -13,8 +14,11 @@ final class Gateway
     public readonly string $directory;
     public readonly string $configuration;
 
-    public function __construct(private readonly StateStore $store, private readonly Runner $runner)
+    private readonly Connections $connections;
+
+    public function __construct(private readonly StateStore $store, CommandExecutor $runner, ?Connections $connections = null)
     {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
         $this->directory = $store->root . '/gateway';
         $this->configuration = $this->directory . '/conf.d/routes.conf';
     }
@@ -26,7 +30,7 @@ final class Gateway
     }
 
     /** @return array<string,mixed> */
-    public static function ownedNetwork(Docker $docker, string $name, string $owner, bool $internal = false): array
+    public static function ownedNetwork(\Baander\Tooling\Docker\Client $docker, string $name, string $owner, bool $internal = false): array
     {
         $result = $docker->run(['network', 'inspect', $name], check: false);
         if ($result->exitCode !== 0) {
@@ -60,14 +64,14 @@ final class Gateway
     {
         $lock = $this->lock();
         try {
-            $docker = new Docker($this->runner, $instance['docker']);
-            $docker->validate();
+            $docker = $this->connections->client($instance['docker']);
+            $docker->validateIdentity();
             $saved = $this->directory . '/state.json';
-            $image = $release['nginx_image'];
+            $image = $release['images']['nginx_image']['resolvedId'];
             if (file_exists($saved)) {
                 $record = AtomicFile::readJson($saved);
                 $image = $record['nginx_image'];
-                if ($record['docker'] != $instance['docker']) {
+                if (!Connections::sameTarget($record['docker'], $instance['docker'])) {
                     throw new WorkflowError('The shared gateway belongs to another Docker target.');
                 }
             }
@@ -108,6 +112,7 @@ final class Gateway
                 'compose_file' => $this->directory . '/compose.json',
                 'gateway' => $gateway,
                 'nginx_image' => $image,
+                'cleanup_budget' => $release['effective']['budgets']['cleanup'] ?? 120.0,
             ];
             AtomicFile::writeJson($saved, $record);
             return $gateway;
@@ -138,7 +143,7 @@ final class Gateway
                     throw new WorkflowError('Run explicit host certificate setup before starting the gateway.');
                 }
             }
-            new Docker($this->runner, $record['docker'])->compose($record, ['up', '-d', '--wait']);
+            $this->connections->client($record['docker'])->compose($record['project'], $record['compose_file'], ['up', '-d', '--wait']);
         } finally {
             $lock->release();
         }
@@ -186,6 +191,10 @@ final class Gateway
     /** @param array<string,mixed> $instance */
     public function remove(array $instance): void
     {
+        PrivateDirectory::assertNoSymlinks($this->directory . '/state.json');
+        if (!file_exists($this->directory . '/state.json')) {
+            return;
+        }
         $this->change($instance, null);
     }
 
@@ -195,7 +204,7 @@ final class Gateway
         $lock = $this->lock();
         try {
             $record = $this->record();
-            if ($instance['docker'] != $record['docker']) {
+            if (!Connections::sameTarget($instance['docker'], $record['docker'])) {
                 throw new WorkflowError('Route target differs from the shared gateway Docker target.');
             }
             $path = $this->directory . '/routes.json';
@@ -211,11 +220,9 @@ final class Gateway
             }
             $candidate = $this->directory . '/candidate.conf';
             AtomicFile::write($candidate, $this->render($routes));
-            $docker = new Docker($this->runner, $record['docker']);
-            $docker->validate();
-            $docker->run([
-                'run',
-                '--rm',
+            $docker = $this->connections->client($record['docker']);
+            $docker->validateIdentity();
+            \Baander\Tooling\Resources\DisposableContainer::run($docker, $this->directory . '/config-probe-resources.json', [
                 '--network',
                 'none',
                 '--mount',
@@ -225,13 +232,13 @@ final class Gateway
                 $record['nginx_image'],
                 'nginx',
                 '-t',
-            ]);
+            ], $this->connections->environment(), $record['cleanup_budget'] ?? 120.0);
             $old = (string) file_get_contents($this->configuration);
             AtomicFile::write($this->configuration, (string) file_get_contents($candidate));
             try {
-                $docker->compose($record, ['exec', '-T', 'gateway', 'nginx', '-t']);
-                $docker->compose($record, ['exec', '-T', 'gateway', 'nginx', '-s', 'reload']);
-            } catch (WorkflowError $error) {
+                $docker->compose($record['project'], $record['compose_file'], ['exec', '-T', 'gateway', 'nginx', '-t']);
+                $docker->compose($record['project'], $record['compose_file'], ['exec', '-T', 'gateway', 'nginx', '-s', 'reload']);
+            } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
                 AtomicFile::write($this->configuration, $old);
                 throw $error;
             }

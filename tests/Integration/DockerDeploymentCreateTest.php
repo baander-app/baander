@@ -351,7 +351,7 @@ final class DockerDeploymentCreateTest extends TestCase
     /** @param array<string, string> $environment */
     private function recipe(array $environment = [], DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', new DeploymentRuntimeEnvironment($environment));
+        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', 67108864, 1000000000, 32, $unit, $unit === DeploymentUnit::Control ? [0] : [1], 'worker-ipc', '/app', new DeploymentRuntimeEnvironment($environment));
     }
 
     private function reserve(DeploymentContainerRecipe $recipe): void

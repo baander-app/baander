@@ -19,11 +19,8 @@ final class Containment
         try {
             foreach (['term', 'kill'] as $scenario) {
                 $name = $resources->id . '-' . $scenario;
-                $resources->containers[] = $name;
-                $container = $docker->run([
-                    'create',
-                    '--name',
-                    $name,
+
+                $container = $resources->createContainer($name, [
                     '--network',
                     'none',
                     '--memory',
@@ -40,10 +37,9 @@ final class Containment
                     'no-new-privileges',
                     '--entrypoint',
                     'php',
-                    $runtime->environment['BAANDER_TEST_IMAGE'] ?? 'martinjuul/baander-app:latest',
+                    $runtime->image('application')->id,
                     '/tmp/tests/Fixtures/Worker/contained-supervisor.php',
-                ])->stdout
-                    |> trim(...);
+                ]);
                 self::stageStopped($resources, $container);
                 $docker->run(['start', $container]);
                 $runtime->await(

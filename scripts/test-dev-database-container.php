@@ -5,14 +5,25 @@ declare(strict_types=1);
 
 use Baander\Tooling\Development\Bootstrap;
 use Baander\Tooling\Development\Database;
-use Baander\Tooling\Development\Docker;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\TargetResolver;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Process\CommandExecutor;
+use Baander\Tooling\Process\CommandFailure;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Process\RunningProcess;
 use Baander\Tooling\Development\Runtime;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 use Baander\Tooling\Inventory\SafeTar;
+use Baander\Tooling\Resources\{ResourceLedger, ResourceKind, DisposableContainer};
 use Baander\Tooling\Process\ProcessResult;
 use Baander\Tooling\Runtime\Requirements;
 
@@ -31,7 +42,7 @@ function drillLines(string $value): array
     return $value === '' ? [] : explode("\n", $value);
 }
 
-function drillSql(Docker $docker, string $container, string $statement): string
+function drillSql(Client $docker, string $container, string $statement): string
 {
     return $docker->run(
         [
@@ -42,7 +53,7 @@ function drillSql(Docker $docker, string $container, string $statement): string
     )->stdout |> trim(...);
 }
 
-function drillRedis(Docker $docker, string $container, string ...$arguments): string
+function drillRedis(Client $docker, string $container, string ...$arguments): string
 {
     return $docker->run([
         'exec', $container, '/bin/sh', '-ec',
@@ -51,7 +62,27 @@ function drillRedis(Docker $docker, string $container, string ...$arguments): st
     ])->stdout |> trim(...);
 }
 
-final class DatabaseDrillRunner extends Runner
+/** @param array<string,mixed> $model */
+function drillCreateService(ResourceLedger $ledger, Client $docker, array $model, string $service, string $project, string $network): string
+{
+    $definition = $model['services'][$service];
+    $arguments = ['--network', $network, '--network-alias', $service === 'postgres' ? 'database' : $service,
+        '--label', 'com.docker.compose.project=' . $project, '--label', 'com.docker.compose.service=' . $service];
+    foreach ($definition['environment'] as $key => $_) {
+        array_push($arguments, '--env', $key);
+    }
+    foreach ($definition['volumes'] as $mount) {
+        array_push($arguments, '--mount', 'type=volume,src=' . $model['volumes'][$mount['source']]['name'] . ',dst=' . $mount['target']);
+    }
+    $environment = array_map(static fn(string $value): string => str_replace('$$', '$', $value), $definition['environment']);
+    $command = array_map(static fn(string $value): string => str_replace('$$', '$', $value), $definition['command'] ?? []);
+    $name = $project . '-' . $service;
+    $ledger->create(ResourceKind::Container, $name, [...$arguments, $definition['image'], ...$command], $environment);
+    $docker->run(['start', $name]);
+    return $name;
+}
+
+final class DatabaseDrillExecutor implements CommandExecutor
 {
     /** @var list<string> */
     public array $privateValues = [];
@@ -59,32 +90,93 @@ final class DatabaseDrillRunner extends Runner
     public array $expectedVersions = [];
     /** @var list<list<string>> */
     public array $rehearsalVersions = [];
-    public Docker $docker;
+    public Client $docker;
 
-    public function run(
-        array $arguments,
-        ?string $cwd = null,
-        ?array $env = null,
-        ?string $input = null,
-        ?float $timeout = 120,
-        bool $check = true,
-        ?string $logPath = null,
-        bool $interactive = false,
-    ): ProcessResult {
-        $result = parent::run($arguments, $cwd, $env, $input, $timeout, false, $logPath, $interactive);
-        if ($check && $result->exitCode !== 0) {
-            $diagnostic = substr($result->stdout . "\n" . $result->stderr, -20000);
-            foreach ($this->privateValues as $value) {
-                if ($value !== '') {
-                    $diagnostic = str_replace($value, '[redacted]', $diagnostic);
-                }
-            }
-            $diagnostics = sys_get_temp_dir() . '/baander-dev-database-failure-' . bin2hex(random_bytes(8));
-            PrivateDirectory::prepare($diagnostics);
-            $log = $diagnostics . '/failure.log';
-            AtomicFile::write($log, $diagnostic);
-            throw new WorkflowError('Disposable database drill command failed; sanitized diagnostic: ' . $log);
+    /** @var \WeakMap<RunningProcess,ProcessSpec> */
+    private \WeakMap $commands;
+
+    public function __construct(private readonly CommandExecutor $executor)
+    {
+        $this->commands = new \WeakMap();
+    }
+
+    public function run(ProcessSpec $command, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult
+    {
+        try {
+            $result = $this->executor->run($command, $policy);
+        } catch (CommandFailure $error) {
+            $this->failure($error);
         }
+        return $this->observe($command, $result);
+    }
+
+    public function start(ProcessSpec $command): RunningProcess
+    {
+        try {
+            $process = $this->executor->start($command);
+        } catch (CommandFailure $error) {
+            $this->failure($error);
+        }
+        $this->commands[$process] = $command;
+        return $process;
+    }
+
+    public function wait(RunningProcess $process, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult
+    {
+        try {
+            $result = $this->executor->wait($process, $policy);
+            return $this->observe($this->commands[$process], $result);
+        } catch (CommandFailure $error) {
+            $this->failure($error);
+        } finally {
+            unset($this->commands[$process]);
+        }
+    }
+
+    public function stop(RunningProcess $process, int $signal = 15): ProcessResult
+    {
+        try {
+            return $this->executor->stop($process, $signal);
+        } catch (CommandFailure $error) {
+            $this->failure($error);
+        } finally {
+            unset($this->commands[$process]);
+        }
+    }
+
+    private function redact(string $value): string
+    {
+        foreach ($this->privateValues as $secret) {
+            if ($secret !== '') {
+                $value = str_replace($secret, '[redacted]', $value);
+            }
+        }
+        return $value;
+    }
+
+    private function failure(CommandFailure $error): never
+    {
+        $result = $error->result;
+        $sanitized = $result === null ? null : new ProcessResult(
+            $result->exitCode,
+            $result->signal,
+            $result->timedOut,
+            $result->cancelled,
+            $this->redact($result->stdout),
+            $this->redact($result->stderr),
+            $result->duration,
+            $result->requestedSignal,
+        );
+        $diagnostics = sys_get_temp_dir() . '/baander-dev-database-failure-' . bin2hex(random_bytes(8));
+        PrivateDirectory::prepare($diagnostics);
+        $log = $diagnostics . '/failure.log';
+        AtomicFile::write($log, $this->redact(substr($error->getMessage() . "\n" . ($result->stdout ?? '') . "\n" . ($result->stderr ?? ''), -20000)));
+        throw new CommandFailure('Disposable database drill command failed; sanitized diagnostic: ' . $log, $error->getCode(), $sanitized);
+    }
+
+    private function observe(ProcessSpec $command, ProcessResult $result): ProcessResult
+    {
+        $arguments = $command->argv;
         if ($result->exitCode === 0 && in_array('start', $arguments, true) && in_array('--attach', $arguments, true)) {
             $candidate = $arguments[array_key_last($arguments)];
             if (str_starts_with($candidate, 'baander-rehearsal-') && str_contains($candidate, '-app-')) {
@@ -101,7 +193,7 @@ final class DatabaseDrillRunner extends Runner
 final class VerifiedDrillDatabase extends Database
 {
     public bool $restoredProbe = false;
-    public Docker $drillDocker;
+    public Client $drillDocker;
 
     public function sql(array $instance, string $sql, ?string $container = null): array
     {
@@ -135,22 +227,18 @@ try {
     Requirements::check();
     chdir(dirname(__DIR__));
     $name = 'baander-dev-database-' . time() . '-' . getmypid();
-    $runner = new DatabaseDrillRunner();
-    $context = $runner->run(['docker', 'context', 'show'])->stdout |> trim(...);
-    $daemon = $runner->run(['docker', '--context', $context, 'info', '--format', '{{json .}}'])->stdout
-        |> (static fn(string $json): array => json_decode($json, true, flags: JSON_THROW_ON_ERROR));
-    $configuration = [
-        'executable' => 'docker',
-        'context' => $context,
-        'daemon_id' => $daemon['ID'],
-    ];
-    $docker = new Docker($runner, $configuration);
-    $runner->docker = $docker;
-    $containers = [];
-    $volumes = [];
+    $invocationEnvironment = getenv();
+    $commandEnvironment = Environment::clean($invocationEnvironment);
+    $tooling = ToolingConfiguration::resolve(environment: $invocationEnvironment);
+    $runner = new DatabaseDrillExecutor(new EngineExecutor(ExecutionContext::bounded($tooling->budgets->seconds('backend'), $commandEnvironment)));
     $root = sys_get_temp_dir() . '/' . $name . '-' . bin2hex(random_bytes(8));
     PrivateDirectory::prepare($root);
     try {
+        $target = new TargetResolver($runner, $invocationEnvironment)->resolve($tooling->docker, $root . '/docker-transport');
+        $configuration = $target->toArray();
+        $docker = new Client($runner, $target, $commandEnvironment);
+        $docker->requireCompose();
+        $runner->docker = $docker;
         $store = new StateStore($root . '/state');
         $instance = [
             'id' => 'persistent',
@@ -162,14 +250,22 @@ try {
             'writers_stopped' => true,
             'compose_file' => $root . '/compose.json',
         ];
-        $release = [
-            'source' => getcwd(),
-            'revision' => str_repeat('d', 40),
-            'app_image' => getenv('BAANDER_DATABASE_APP_IMAGE') ?: (getenv('BAANDER_TEST_IMAGE') ?: 'baander-development-app:qualification'),
-            'postgres_image' => getenv('BAANDER_DATABASE_TEST_IMAGE') ?: 'baander-database:latest',
-            'redis_image' => getenv('BAANDER_DATABASE_REDIS_IMAGE') ?: 'redis/redis-stack-server:edge',
+        $applicationReference = ($invocationEnvironment['BAANDER_DATABASE_APP_IMAGE'] ?? '') ?: (($invocationEnvironment['BAANDER_TEST_IMAGE'] ?? '') ?: 'baander-development-app:qualification');
+        $imageReferences = [
+            'app_image' => $applicationReference, 'nginx_image' => $applicationReference,
+            'worker_image' => $applicationReference, 'operator_image' => $applicationReference, 'tool_image' => $applicationReference,
+            'postgres_image' => ($invocationEnvironment['BAANDER_DATABASE_TEST_IMAGE'] ?? '') ?: $tooling->images->role('postgres')->reference,
+            'redis_image' => ($invocationEnvironment['BAANDER_DATABASE_REDIS_IMAGE'] ?? '') ?: $tooling->images->role('fixtureRedis')->reference,
         ];
-        $release['nginx_image'] = $release['app_image'];
+        $release = ['source' => getcwd(), 'revision' => str_repeat('d', 40), 'images' => []];
+        $imageMetadata = [];
+        foreach ($imageReferences as $role => $reference) {
+            $imageMetadata[$reference] ??= json_decode($docker->run(['image', 'inspect', $reference])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
+            drillCheck(is_string($imageMetadata[$reference]['Id'] ?? null) && $imageMetadata[$reference]['Id'] !== '', 'Selected drill image has no immutable identity.');
+            $release['images'][$role] = ['reference' => $reference, 'resolvedId' => $imageMetadata[$reference]['Id'],
+                'capabilities' => [], 'daemonId' => $target->daemonId];
+        }
+        $release['layout'] = ApplicationLayout::fromImage($imageMetadata[$applicationReference])->toArray();
         $instance = new Bootstrap($store, $runner)->configure($instance);
         $runtime = new Runtime($store, $runner);
         $environment = $runtime->environment($instance);
@@ -194,17 +290,34 @@ try {
         $runner->expectedVersions = array_map(static fn(string $path): string => 'DoctrineMigrations\\' . basename($path, '.php'), $migrationFiles);
         $sourceVersion = $runner->expectedVersions[count($migrationFiles) - 2];
         $pendingVersion = $runner->expectedVersions[count($migrationFiles) - 1];
-        try {
-            $docker->run(['network', 'create', '--internal', $name]);
+        $ledger = new ResourceLedger($root . '/drill-resources.json', $docker, $commandEnvironment);
+        $ledger->scoped(function () use (
+            $docker,
+            $ledger,
+            $name,
+            $model,
+            $database,
+            $instance,
+            $release,
+            $sourceVersion,
+            $environment,
+            $store,
+            $runner,
+            $pendingVersion,
+            $root,
+            $tooling,
+            $commandEnvironment
+        ): void {
+            $ledger->create(ResourceKind::Network, $name, ['--internal']);
             foreach (['database', 'redis', 'var', 'secrets', 'storage', 'conversions', 'transcode_state'] as $key) {
-                $volumeName = $model['volumes'][$key]['name'];
-                $docker->run(['volume', 'create', $volumeName]);
-                $volumes[] = $volumeName;
+                $ledger->create(ResourceKind::Volume, $model['volumes'][$key]['name'], []);
             }
-            $docker->compose($instance, ['up', '-d', '--wait', 'postgres', 'redis']);
-            $postgres = trim($docker->compose($instance, ['ps', '-q', 'postgres'])->stdout);
-            $sourceRedis = trim($docker->compose($instance, ['ps', '-q', 'redis'])->stdout);
-            drillCheck($postgres !== '' && $sourceRedis !== '');
+            $postgres = drillCreateService($ledger, $docker, $model, 'postgres', $name, $name);
+            $sourceRedis = drillCreateService($ledger, $docker, $model, 'redis', $name, $name);
+            $docker->run(['exec', $postgres, '/bin/sh', '-ec',
+                'for n in $(seq 1 60); do pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" && exit 0; sleep 1; done; exit 1'], timeout: 70);
+            $docker->run(['exec', $sourceRedis, '/bin/sh', '-ec',
+                'export REDISCLI_AUTH="$REDIS_PASSWORD"; for n in $(seq 1 60); do redis-cli ping | grep -qx PONG && exit 0; sleep 1; done; exit 1'], timeout: 70);
             drillCheck($database->inspect($instance, $release)['fresh']);
             drillSql($docker, $postgres, "CREATE EXTENSION IF NOT EXISTS pgroonga; CREATE TABLE development_checkpoint_probe(id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, value text); INSERT INTO development_checkpoint_probe(value) VALUES ('retained library identity'); CREATE INDEX development_checkpoint_probe_search ON development_checkpoint_probe USING pgroonga(value);");
             try {
@@ -221,8 +334,8 @@ try {
             foreach ($migrationEnv as $key => $value) {
                 array_push($migrationArguments, '--env', $key);
             }
-            $docker->run(['run', '--rm', '--network', $name, '--user', '0:0', ...$migrationArguments,
-                '--entrypoint', 'php', $release['app_image'], '-d', 'memory_limit=512M', 'bin/console', 'doctrine:migrations:migrate', $sourceVersion, '--no-interaction', '--env=prod'], env: $migrationEnv, timeout: null);
+            DisposableContainer::run($docker, $root . '/source-migration-resources.json', ['--network', $name, '--user', '0:0', ...$migrationArguments,
+                '--entrypoint', 'php', $release['images']['app_image']['resolvedId'], '-d', 'memory_limit=512M', 'bin/console', 'doctrine:migrations:migrate', $sourceVersion, '--no-interaction', '--env=prod'], $commandEnvironment, $tooling->budgets->seconds('cleanup'), timeout: null, containerEnvironment: $migrationEnv);
             drillSql($docker, $postgres, "CREATE TABLE development_checkpoint_probe(id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, value text); INSERT INTO development_checkpoint_probe(value) VALUES ('retained library identity'); CREATE INDEX development_checkpoint_probe_search ON development_checkpoint_probe USING pgroonga(value);");
             $catalog = $database->inspect($instance, $release);
             drillCheck($catalog['versions'] === array_slice($runner->expectedVersions, 0, -1));
@@ -230,14 +343,14 @@ try {
             drillCheck((bool) $catalog['objects']);
             drillCheck($catalog['objects'] === $database->inspect($instance, $release)['objects']);
             foreach (['var', 'secrets', 'storage', 'conversions', 'transcode_state'] as $key) {
-                $docker->run(['run', '--rm', '--network', 'none', '--user', '0:0', '--entrypoint', '/bin/sh',
-                    '--mount', 'type=volume,src=' . $model['volumes'][$key]['name'] . ',dst=/seed', $release['app_image'], '-ec',
-                    'umask 077; printf "%s" "$1" > /seed/checkpoint-probe; chown -R www-data:www-data /seed', 'seed', $key]);
+                DisposableContainer::run($docker, $root . '/seed-resources.json', ['--network', 'none', '--user', '0:0', '--entrypoint', '/bin/sh',
+                    '--mount', 'type=volume,src=' . $model['volumes'][$key]['name'] . ',dst=/seed', $release['images']['app_image']['resolvedId'], '-ec',
+                    'umask 077; printf "%s" "$1" > /seed/checkpoint-probe; chown -R www-data:www-data /seed', 'seed', $key], $commandEnvironment, $tooling->budgets->seconds('cleanup'));
             }
-            $docker->run(['run', '--rm', '--network', 'none', '--user', '0:0', '--entrypoint', '/bin/sh',
-                '--mount', 'type=volume,src=' . $model['volumes']['secrets']['name'] . ',dst=/seed', $release['app_image'], '-ec',
+            DisposableContainer::run($docker, $root . '/seed-resources.json', ['--network', 'none', '--user', '0:0', '--entrypoint', '/bin/sh',
+                '--mount', 'type=volume,src=' . $model['volumes']['secrets']['name'] . ',dst=/seed', $release['images']['app_image']['resolvedId'], '-ec',
                 'umask 077; mkdir -p /seed/oauth; openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /seed/oauth/private.key 2>/dev/null; '
-                . 'openssl pkey -in /seed/oauth/private.key -pubout -out /seed/oauth/public.key; chown -R www-data:www-data /seed']);
+                . 'openssl pkey -in /seed/oauth/private.key -pubout -out /seed/oauth/public.key; chown -R www-data:www-data /seed'], $commandEnvironment, $tooling->budgets->seconds('cleanup'));
             drillCheck(drillLines(drillRedis($docker, $sourceRedis, 'CONFIG', 'GET', 'appendonly')) === ['appendonly', 'yes']);
             drillCheck(drillLines(drillRedis($docker, $sourceRedis, 'CONFIG', 'GET', 'dir')) === ['dir', '/data'], 'Redis persistence must use its mounted volume');
             drillCheck(drillRedis($docker, $sourceRedis, 'SET', 'checkpoint:durable', 'queue-payload') === 'OK');
@@ -289,26 +402,20 @@ try {
             drillCheck(AtomicFile::readJson($directory . '/checkpoint.json')['verified']);
             foreach ($checkpoint['state'] as $key) {
                 $restoredVolume = $name . '-restored-' . $key;
-                $docker->run(['volume', 'create', $restoredVolume]);
-                $volumes[] = $restoredVolume;
+                $ledger->create(ResourceKind::Volume, $restoredVolume, []);
                 $extractor = $name . '-extract-' . $key;
-                $containers[] = $extractor;
-                $docker->run(['create', '--name', $extractor, '--network', 'none', '--user', '0:0', '--entrypoint', 'tar',
-                    '--mount', 'type=volume,src=' . $restoredVolume . ',dst=/restore', $release['app_image'],
+                $ledger->create(ResourceKind::Container, $extractor, [ '--network', 'none', '--user', '0:0', '--entrypoint', 'tar',
+                    '--mount', 'type=volume,src=' . $restoredVolume . ',dst=/restore', $release['images']['app_image']['resolvedId'],
                     '-xpf', '/tmp/state.tar', '-C', '/restore']);
                 $docker->run(['cp', $directory . '/' . $key . '.tar', $extractor . ':/tmp/state.tar']);
                 $docker->run(['start', '--attach', $extractor]);
                 drillCheck(trim($docker->run(['inspect', '--format', '{{.State.ExitCode}}', $extractor])->stdout) === '0');
-                $docker->run(['rm', $extractor]);
-                $containers = array_diff($containers, [$extractor]) |> array_values(...);
                 if ($key !== 'redis') {
                     $inspector = $name . '-inspect-' . $key;
-                    $containers[] = $inspector;
-                    $marker = $docker->run(['run', '--rm', '--name', $inspector, '--network', 'none', '--user', '0:0',
+                    $marker = DisposableContainer::run($docker, $root . '/inspect-resources.json', [ '--network', 'none', '--user', '0:0',
                         '--entrypoint', 'cat', '--mount', 'type=volume,src=' . $restoredVolume . ',dst=/restore,readonly',
-                        $release['app_image'], '/restore/checkpoint-probe'])->stdout;
+                        $release['images']['app_image']['resolvedId'], '/restore/checkpoint-probe'], $commandEnvironment, $tooling->budgets->seconds('cleanup'))->stdout;
                     drillCheck($marker === $key, 'Restored volume marker differs from its writable state class.');
-                    $containers = array_diff($containers, [$inspector]) |> array_values(...);
                 }
                 $extracted = $root . '/archive-inspection/' . $key;
                 SafeTar::extract($directory . '/' . $key . '.tar', $extracted);
@@ -326,11 +433,11 @@ try {
                 }
             }
             $restoredRedis = $name . '-restored-redis';
-            $containers[] = $restoredRedis;
-            $docker->run(['run', '-d', '--name', $restoredRedis, '--network', 'none',
+            $ledger->create(ResourceKind::Container, $restoredRedis, [ '--network', 'none',
                 '--mount', 'type=volume,src=' . $restoredRedis . ',dst=/data', '--env', 'REDIS_PASSWORD',
-                '--entrypoint', '/bin/sh', $release['redis_image'], '-ec',
-                'exec redis-server --dir /data --appendonly yes --requirepass "$REDIS_PASSWORD"'], env: ['REDIS_PASSWORD' => $environment['REDIS_PASSWORD']]);
+                '--entrypoint', '/bin/sh', $release['images']['redis_image']['resolvedId'], '-ec',
+                'exec redis-server --dir /data --appendonly yes --requirepass "$REDIS_PASSWORD"'], ['REDIS_PASSWORD' => $environment['REDIS_PASSWORD']]);
+            $docker->run(['start', $restoredRedis]);
             $readyDeadline = hrtime(true) / 1_000_000_000 + 30;
             do {
                 $remaining = $readyDeadline - hrtime(true) / 1_000_000_000;
@@ -359,20 +466,25 @@ try {
                 drillCheck(str_contains($error->getMessage(), 'migration history'));
             }
             echo "PASS: actual checkpoint and isolated pending migration rehearsal plus idempotent second pass; unchanged source migration history; deterministic catalogs, archive integrity, PGroonga and sequence restore; private identity and six state archives; stopped Redis AOF restore with unchanged expiry and expired-key removal.\n";
-        } finally {
-            foreach ($containers as $container) {
-                $docker->run(['rm', '--force', '--volumes', $container], check: false);
-            }
-            $docker->compose($instance, ['down', '--volumes'], check: false);
-            foreach ($volumes as $volumeName) {
-                $docker->run(['volume', 'rm', $volumeName], check: false);
-            }
-            $docker->run(['network', 'rm', $name], check: false);
-        }
+        }, $tooling->budgets->seconds('cleanup'));
     } finally {
-        drillRemoveTree($root);
+        $retainedReceipt = false;
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->isFile() && str_ends_with($file->getFilename(), '.json')) {
+                $data = json_decode(file_get_contents($file->getPathname()), true);
+                if (is_array($data) && isset($data['token'], $data['resources'], $data['target'])) {
+                    $retainedReceipt = true;
+                    break;
+                }
+            }
+        }
+        if (!$retainedReceipt) {
+            drillRemoveTree($root);
+        } else {
+            fwrite(STDERR, 'Disposable database drill retains unresolved ownership and archives: ' . $root . "\n");
+        }
     }
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
-    exit(1);
+    exit($error->getCode() >= 1 && $error->getCode() <= 255 ? $error->getCode() : 1);
 }

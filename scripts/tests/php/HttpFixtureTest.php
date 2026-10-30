@@ -411,9 +411,13 @@ final class HttpFixtureTest extends TestCase
     public static function containerOutcomes(): iterable
     {
         yield 'successful cleanup' => ['success', 0];
+        yield 'remote published topology rejected before creation' => ['remote-target', 1];
         yield 'failed removal' => ['cleanup-failure', 1];
+        yield 'cleanup budget retains recovery receipt' => ['cleanup-budget', 1];
         yield 'cancellation during execution and cleanup' => ['cancellation', 143];
         yield 'command timeout' => ['timeout', 124];
+        yield 'zero exit after timeout' => ['timeout-zero', 124];
+        yield 'primary failure survives cleanup failure' => ['primary-cleanup-failure', 7];
         yield 'command exit status' => ['command-failure', 7];
     }
 
@@ -421,43 +425,7 @@ final class HttpFixtureTest extends TestCase
     public function testContainerDrillRecordsCleanupAndPreservesItsFailure(string $mode, int $status): void
     {
         $docker = $this->directory . '/docker';
-        file_put_contents(
-            $docker,
-            <<<'PHP_DOCKER'
-            #!/usr/bin/env php
-            <?php
-            $arguments = array_slice($_SERVER['argv'], 1);
-            if (($arguments[0] ?? '') === '--context') {
-                $arguments = array_slice($arguments, 2);
-            }
-            $marker = getenv('HTTP_FIXTURE_MARKER');
-            $mode = getenv('HTTP_FIXTURE_MODE');
-            $command = $arguments[0] ?? '';
-            if ($command === 'info') {
-                echo '{"ID":"fixture-daemon"}';
-            } elseif ($command === 'create') {
-                file_put_contents($marker, 'owned');
-            } elseif ($command === 'start' && $mode === 'cancellation') {
-                preg_match('/^PPid:\s+(\d+)$/m', file_get_contents('/proc/self/status'), $match);
-                Swoole\Process::kill((int) $match[1], 15);
-                sleep(2);
-            } elseif ($command === 'rm') {
-                if ($mode === 'cleanup-failure') {
-                    fwrite(STDERR, "fixture removal failed\n");
-                    exit(7);
-                }
-                if ($mode === 'cancellation') {
-                    preg_match('/^PPid:\s+(\d+)$/m', file_get_contents('/proc/self/status'), $match);
-                    Swoole\Process::kill((int) $match[1], 15);
-                }
-                unlink($marker);
-            } elseif ($command === 'ps' && is_file($marker)) {
-                echo 'retained-fixture-container';
-            } elseif ($command === 'logs') {
-                echo 'retained fixture log';
-            }
-            PHP_DOCKER,
-        );
+        copy(__DIR__ . '/Fixtures/http-qualification-docker.php', $docker);
         chmod($docker, 0700);
         $harness = $this->directory . '/qualification.php';
         $autoload = var_export(dirname(__DIR__, 3) . '/vendor/autoload.php', true);
@@ -465,13 +433,21 @@ final class HttpFixtureTest extends TestCase
             $harness,
             '<?php require ' . $autoload . ';' . <<<'PHP_HARNESS'
             exit(Baander\Tooling\Fixtures\Http\ContainerQualification::run(
-                getcwd(),
+                new Baander\Tooling\Fixtures\Runtime(
+                    getcwd(),
+                    configuration: getenv('HTTP_FIXTURE_MODE') === 'cleanup-budget'
+                        ? Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv(), ['budgets' => ['cleanup' => 0.05]])
+                        : null,
+                    budget: 'http',
+                ),
                 'baander-http-fixture',
                 ['fixture-image', 'sleep'],
-                static function (Baander\Tooling\Fixtures\Http\Drill $drill): void {
+                static function (Baander\Tooling\Fixtures\Runtime $drill): void {
                     if (getenv('HTTP_FIXTURE_MODE') === 'timeout') {
                         $drill->run([PHP_BINARY, '-r', 'usleep(2000000);'], timeout: 0.05);
-                    } elseif (getenv('HTTP_FIXTURE_MODE') === 'command-failure') {
+                    } elseif (getenv('HTTP_FIXTURE_MODE') === 'timeout-zero') {
+                        $drill->run(['bash', '-c', 'trap "exit 0" TERM; while true; do sleep 0.02; done'], timeout: 0.05, check: false);
+                    } elseif (in_array(getenv('HTTP_FIXTURE_MODE'), ['command-failure', 'primary-cleanup-failure'], true)) {
                         $drill->run([PHP_BINARY, '-r', 'exit(7);']);
                     }
                 },
@@ -487,6 +463,14 @@ final class HttpFixtureTest extends TestCase
                     'PATH' => $this->directory . ':' . getenv('PATH'),
                     'HTTP_FIXTURE_MARKER' => $this->directory . '/owned',
                     'HTTP_FIXTURE_MODE' => $mode,
+                    'BAANDER_DOCKER_EXECUTABLE' => $docker,
+                    'DOCKER_HOST' => $mode === 'remote-target' ? 'tcp://127.0.0.1:2375' : 'unix:///http-fixture.sock',
+                    'HTTP_FIXTURE_ENDPOINT' => $mode === 'remote-target' ? 'tcp://127.0.0.1:2375' : 'unix:///http-fixture.sock',
+                    'DOCKER_CONTEXT' => '',
+                    'BAANDER_TEST_DOCKER_CONTEXT' => '',
+                    'BAANDER_TOOLING_TARGET_FILE' => '',
+                    'BAANDER_TEST_ARTIFACTS' => $this->directory . '/artifacts',
+                    'HTTP_FIXTURE_COMMANDS' => $this->directory . '/commands',
                 ],
             ),
             timeout: 10,
@@ -497,15 +481,30 @@ final class HttpFixtureTest extends TestCase
         $this->artifacts[] = $match[1];
         $receipt = json_decode((string) file_get_contents($match[1] . '/results.json'), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($status, $receipt['status']);
-        self::assertSame('retained fixture log', file_get_contents($match[1] . '/container.log'));
-        if ($mode === 'cleanup-failure') {
+        if ($mode === 'remote-target') {
+            self::assertStringContainsString('host-local published-port access', $receipt['error']);
+            self::assertFileDoesNotExist($match[1] . '/resources.json');
+            self::assertStringNotContainsString('create', file_get_contents($this->directory . '/commands'));
+            return;
+        }
+        if ($mode === 'cleanup-budget') {
             self::assertNotEmpty($receipt['cleanup_errors']);
-            self::assertSame(['retained-fixture-container'], $receipt['remaining_containers']);
+            self::assertFileExists($match[1] . '/resources.json');
+            self::assertFileExists($this->directory . '/owned');
+            self::assertStringNotContainsString('"rm"', file_get_contents($this->directory . '/commands'));
+            return;
+        }
+        self::assertSame('retained fixture log', file_get_contents($match[1] . '/container.log'));
+        if (in_array($mode, ['cleanup-failure', 'primary-cleanup-failure'], true)) {
+            self::assertNotEmpty($receipt['cleanup_errors']);
+            self::assertSame([$receipt['container']], $receipt['remaining_containers']);
+            self::assertFileExists($match[1] . '/resources.json');
         } else {
             self::assertSame([], $receipt['cleanup_errors']);
             self::assertSame([], $receipt['remaining_containers']);
             self::assertFileDoesNotExist($this->directory . '/owned');
         }
+        self::assertStringNotContainsString('compose', file_get_contents($this->directory . '/commands'));
         if ($mode === 'cancellation') {
             self::assertNotNull($receipt['error']);
         }

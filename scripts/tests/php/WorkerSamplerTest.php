@@ -4,14 +4,74 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\{Docker, Environment, Runner};
-use Baander\Tooling\Fixtures\Worker\PostgresSampler;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext};
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Docker\{Client, Target};
+use Baander\Tooling\Process\{CommandExecutor, CompletionPolicy, ProcessSpec, RunningProcess};
+use Baander\Tooling\Fixtures\Worker\{PostgresSampler, CompletionCursor, EvidenceMode, AutoscalingStatusObservation};
 use Baander\Tooling\Process\ProcessResult;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class WorkerSamplerTest extends TestCase
 {
+    public function testStatusObservationRetriesOnlyTransientAdmissionContentionWithFreshTime(): void
+    {
+        $times = [];
+        $expected = ['state' => 'known', 'desired' => 2, 'resources' => ['state' => 'unknown']];
+        $observation = AutoscalingStatusObservation::capture(static function (float $now) use (&$times, $expected): array {
+            $times[] = $now;
+            if (count($times) < 3) {
+                throw new RuntimeException('Admission lock deadline exceeded.');
+            }
+            return $expected;
+        });
+        self::assertSame($expected, $observation['status']);
+        self::assertSame(3, $observation['attempts']);
+        self::assertGreaterThan($times[0], $times[1]);
+        self::assertGreaterThan($times[1], $times[2]);
+    }
+
+    public function testStatusObservationPreservesImmediateSuccess(): void
+    {
+        $status = ['state' => 'known', 'desired' => 1];
+        self::assertSame(['status' => $status, 'attempts' => 1], AutoscalingStatusObservation::capture(static fn(float $now): array => $status));
+    }
+
+    public function testPersistentAdmissionContentionStillFailsWithinOneSampleInterval(): void
+    {
+        $started = hrtime(true);
+        $attempts = 0;
+        try {
+            AutoscalingStatusObservation::capture(static function (float $now) use (&$attempts): array {
+                ++$attempts;
+                usleep(50_000);
+                throw new RuntimeException('Admission lock deadline exceeded.');
+            });
+            self::fail('Persistent contention produced an observation');
+        } catch (RuntimeException $error) {
+            self::assertSame('Admission lock deadline exceeded.', $error->getMessage());
+            self::assertGreaterThan(1, $attempts);
+            self::assertLessThan(.5, (hrtime(true) - $started) / 1e9);
+        }
+    }
+
+    public function testOtherStatusErrorsPropagateWithoutRetry(): void
+    {
+        $attempts = 0;
+        $original = new RuntimeException('Admission lock unavailable.');
+        try {
+            AutoscalingStatusObservation::capture(static function (float $now) use (&$attempts, $original): array {
+                ++$attempts;
+                throw $original;
+            });
+            self::fail('Unexpected status failure was swallowed');
+        } catch (RuntimeException $error) {
+            self::assertSame($original, $error);
+            self::assertSame(1, $attempts);
+        }
+    }
+
     /** @return array<string,string> */
     private function records(int $pid = 42, string $ticks = '1234', int $pss = 10): array
     {
@@ -25,6 +85,45 @@ final class WorkerSamplerTest extends TestCase
         ];
     }
 
+    public function testExitedPostgresIdentitiesDoNotAccumulateAcrossSamples(): void
+    {
+        $sampler = new PostgresSampler(new Client(
+            new WorkerSamplerRecordingRunner(),
+            new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
+            [],
+        ), 'fixture', 'disposable_db');
+        $before = memory_get_usage();
+        for ($pid = 1; $pid < 20_000; ++$pid) {
+            $sampler->sample($this->records($pid), (float) $pid);
+        }
+        self::assertLessThan(1_048_576, memory_get_usage() - $before);
+    }
+
+    public function testCompletionCursorRetainsPartialAppendAndReleasesHistoricalBatches(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'baander-completions-');
+        try {
+            $cursor = new CompletionCursor($path);
+            file_put_contents($path, "{\"sequence\":0}\n{\"sequence\":");
+            self::assertSame("{\"sequence\":0}\n", $cursor->read(EvidenceMode::Live));
+            self::assertSame('', $cursor->read(EvidenceMode::Live));
+            file_put_contents($path, "1}\n", FILE_APPEND);
+            self::assertSame("{\"sequence\":1}\n", $cursor->read(EvidenceMode::Completed));
+            for ($sequence = 2; $sequence < 300; ++$sequence) {
+                $line = json_encode(['sequence' => $sequence, 'payload' => str_repeat('x', 512)], JSON_THROW_ON_ERROR) . "\n";
+                file_put_contents($path, $line, FILE_APPEND);
+                self::assertSame($line, $cursor->read(EvidenceMode::Live));
+            }
+            self::assertGreaterThan(65_536, filesize($path));
+            file_put_contents($path, '{', FILE_APPEND);
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessage('Incomplete final sample');
+            $cursor->read(EvidenceMode::Completed);
+        } finally {
+            unlink($path);
+        }
+    }
+
     public function testRawNamespaceDecoderPreservesNulCmdlineAndMissingMetrics(): void
     {
         $raw = $this->records();
@@ -34,7 +133,7 @@ final class WorkerSamplerTest extends TestCase
         }
         self::assertSame($raw, PostgresSampler::decode($encoded));
         $sampler = new PostgresSampler(
-            new Docker(new Runner(), ['executable' => '/usr/bin/docker', 'context' => 'fixture']),
+            new Client(new WorkerSamplerRecordingRunner(), new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', 'fixture', null), []),
             'fixture-id',
             'worker_operator_test',
         );
@@ -53,7 +152,7 @@ final class WorkerSamplerTest extends TestCase
     {
         $runner = new WorkerSamplerRecordingRunner();
         $sampler = new PostgresSampler(
-            new Docker($runner, ['executable' => '/usr/bin/docker', 'host' => 'tcp://docker.baander.app:2376']),
+            new Client($runner, new Target('/usr/bin/docker', 'tcp://docker.baander.app:2376', 'fixture-daemon', null, null), []),
             'immutable-container',
             'disposable_db',
         );
@@ -98,7 +197,7 @@ final class WorkerSamplerTest extends TestCase
     {
         $runner = new WorkerSamplerRecordingRunner();
         $sampler = new PostgresSampler(
-            new Docker($runner, ['executable' => '/usr/bin/docker', 'context' => 'fixture']),
+            new Client($runner, new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', 'fixture', null), []),
             'fixture',
             'disposable_db',
         );
@@ -114,7 +213,7 @@ final class WorkerSamplerTest extends TestCase
     public function testDisappearedAndNonPostgresProcessesAreIgnored(): void
     {
         $sampler = new PostgresSampler(
-            new Docker(new Runner(), ['executable' => '/usr/bin/docker', 'context' => 'fixture']),
+            new Client(new WorkerSamplerRecordingRunner(), new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', 'fixture', null), []),
             'fixture',
             'disposable_db',
         );
@@ -150,7 +249,7 @@ final class WorkerSamplerTest extends TestCase
         mkdir($directory . '/bin', 0700, true);
         copy(__DIR__ . '/Fixtures/worker-sampler-docker.php', $directory . '/bin/docker');
         chmod($directory . '/bin/docker', 0755);
-        $runner = new Runner();
+        $runner = new EngineExecutor(ExecutionContext::bounded(120, getenv(), dirname(__DIR__, 3)));
         $environment = array_replace(
             Environment::clean(),
             [
@@ -169,7 +268,7 @@ final class WorkerSamplerTest extends TestCase
             $directory . '/ready.json',
         ];
         try {
-            $result = $runner->run($command, env: $environment);
+            $result = $runner->run(new ProcessSpec($command, environment: $environment));
             $sample = json_decode(trim($result->stdout), true, flags: JSON_THROW_ON_ERROR);
             self::assertSame(9876.5, $sample['monotonic']);
             self::assertSame("100\n", $sample['cgroup']['memory.current']);
@@ -212,34 +311,35 @@ final class WorkerSamplerTest extends TestCase
                 $executions,
             );
             unlink($directory . '/ready.json');
-            $failed = $runner->run($command, env: array_replace($environment, ['WORKER_SAMPLER_EMPTY' => '1']), check: false);
+            $failed = $runner->run(new ProcessSpec($command, environment: array_replace($environment, ['WORKER_SAMPLER_EMPTY' => '1'])), new CompletionPolicy(null));
             self::assertSame(1, $failed->exitCode);
             self::assertStringContainsString('no postgres process identity', $failed->stderr);
             self::assertFileDoesNotExist($directory . '/ready.json');
         } finally {
-            $runner->run(['rm', '-rf', '--', $directory]);
+            $runner->run(new ProcessSpec(['rm', '-rf', '--', $directory]));
         }
     }
 }
 
-final class WorkerSamplerRecordingRunner extends Runner
+final class WorkerSamplerRecordingRunner implements CommandExecutor
 {
     /** @var list<non-empty-list<string>> */
     public array $calls = [];
-    /** @param non-empty-list<string> $arguments
-     * @param array<string,string>|null $env
-     */
-    public function run(
-        array $arguments,
-        ?string $cwd = null,
-        ?array $env = null,
-        ?string $input = null,
-        ?float $timeout = 120,
-        bool $check = true,
-        ?string $logPath = null,
-        bool $interactive = false,
-    ): ProcessResult {
-        $this->calls[] = $arguments;
+    public function run(ProcessSpec $command, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult
+    {
+        $this->calls[] = $command->argv;
         return new ProcessResult(0, null, false, false, 't', '', .01);
+    }
+    public function start(ProcessSpec $command): RunningProcess
+    {
+        throw new \LogicException('Unexpected start');
+    }
+    public function wait(RunningProcess $process, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult
+    {
+        throw new \LogicException('Unexpected wait');
+    }
+    public function stop(RunningProcess $process, int $signal = 15): ProcessResult
+    {
+        throw new \LogicException('Unexpected stop');
     }
 }

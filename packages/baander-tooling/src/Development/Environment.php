@@ -6,40 +6,9 @@ namespace Baander\Tooling\Development;
 
 final class Environment
 {
-    public static function absolutePath(string $path): string
-    {
-        if ($path === '~' || str_starts_with($path, '~/')) {
-            $path = (getenv('HOME') ?: '') . substr($path, 1);
-        }
-        if (!str_starts_with($path, '/')) {
-            $path = getcwd() . '/' . $path;
-        }
-        $parts = [];
-        foreach (explode('/', $path) as $part) {
-            if ($part === '..') {
-                array_pop($parts);
-            } elseif ($part !== '' && $part !== '.') {
-                $parts[] = $part;
-            }
-        }
-        return '/' . implode('/', $parts);
-    }
-
-    public static function resolvedPath(string $path): string
-    {
-        $path = self::absolutePath($path);
-        if (($resolved = realpath($path)) !== false) {
-            return $resolved;
-        }
-        if ($path === '/') {
-            return $path;
-        }
-        return rtrim(self::resolvedPath(dirname($path)), '/') . '/' . basename($path);
-    }
-
     public static function previewId(string $worktree, string $repository): string
     {
-        return 'preview-' . substr(hash('sha256', $repository . "\0" . self::resolvedPath($worktree)), 0, 16);
+        return 'preview-' . substr(hash('sha256', $repository . "\0" . \Baander\Tooling\Filesystem\Paths::resolvedPath($worktree)), 0, 16);
     }
 
     /** @param array<string,string>|null $source
@@ -75,7 +44,7 @@ final class Environment
         foreach (explode(PATH_SEPARATOR, getenv('PATH') ?: '/usr/bin:/bin') as $directory) {
             $candidate = $directory . '/' . $name;
             if (is_file($candidate) && is_executable($candidate)) {
-                return self::absolutePath($candidate);
+                return \Baander\Tooling\Filesystem\Paths::absolutePath($candidate);
             }
         }
         return null;

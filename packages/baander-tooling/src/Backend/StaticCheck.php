@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Backend;
 
-use Baander\Tooling\Development\Build\Builder;
-use Baander\Tooling\Development\Build\Source;
-use Baander\Tooling\Development\Cli;
-use Baander\Tooling\Development\Docker;
-use Baander\Tooling\Development\Runner;
-use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Build\ApplicationImage;
+use Baander\Tooling\Configuration\ApplicationLayout;
+use Baander\Tooling\Configuration\ToolingConfiguration;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Docker\TargetResolver;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Resources\ResourceKind;
+use Baander\Tooling\Resources\ResourceLedger;
+use Baander\Tooling\Build\Source;
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec};
+use RuntimeException;
 
 final class StaticCheck
 {
@@ -23,9 +29,9 @@ final class StaticCheck
                 && self::inventory([...$lock['packages'], ...$lock['packages-dev']]) === self::inventory($installed['packages'])) {
                 return;
             }
-        } catch (\JsonException|WorkflowError) {
+        } catch (\JsonException|RuntimeException) {
         }
-        throw new WorkflowError('Composer dependencies do not match composer.lock; run composer install with development dependencies first.');
+        throw new RuntimeException('Composer dependencies do not match composer.lock; run composer install with development dependencies first.');
     }
 
     /** @return array<string,mixed> */
@@ -33,11 +39,11 @@ final class StaticCheck
     {
         $contents = is_file($path) ? file_get_contents($path) : false;
         if ($contents === false) {
-            throw new WorkflowError('Cannot read Composer metadata.');
+            throw new RuntimeException('Cannot read Composer metadata.');
         }
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($decoded)) {
-            throw new WorkflowError('Invalid Composer metadata.');
+            throw new RuntimeException('Invalid Composer metadata.');
         }
         return $decoded;
     }
@@ -50,13 +56,13 @@ final class StaticCheck
         $inventory = [];
         foreach ($packages as $package) {
             if (!is_array($package) || !is_string($package['name'] ?? null) || !is_string($package['version'] ?? null)) {
-                throw new WorkflowError('Invalid Composer package metadata.');
+                throw new RuntimeException('Invalid Composer package metadata.');
             }
             $references = [];
             foreach (['source', 'dist'] as $kind) {
                 $section = $package[$kind] ?? [];
                 if (!is_array($section) || (!is_null($section['reference'] ?? null) && !is_string($section['reference']))) {
-                    throw new WorkflowError('Invalid Composer reference metadata.');
+                    throw new RuntimeException('Invalid Composer reference metadata.');
                 }
                 $references[] = $section['reference'] ?? null;
             }
@@ -67,18 +73,18 @@ final class StaticCheck
     }
 
     /** @return array{string,string,string} */
-    public static function prepareCheckout(Runner $runner, string $root, string $directory): array
+    public static function prepareCheckout(CommandExecutor $runner, string $root, string $directory): array
     {
         if (!is_file($root . '/vendor/autoload.php')) {
-            throw new WorkflowError('Install Composer dependencies first.');
+            throw new RuntimeException('Install Composer dependencies first.');
         }
         if (!is_file($root . '/scripts/vendor/autoload.php')) {
-            throw new WorkflowError('Install workflow tooling first: composer --working-dir=scripts install --no-dev');
+            throw new RuntimeException('Install workflow tooling first: composer --working-dir=scripts install --no-dev');
         }
         $dependencies = ['vendor', 'scripts/vendor'];
         if (is_file($root . '/relay/composer.json')) {
             if (!is_file($root . '/relay/vendor/autoload.php')) {
-                throw new WorkflowError('Install registry tooling first: composer --working-dir=relay install --no-dev');
+                throw new RuntimeException('Install registry tooling first: composer --working-dir=relay install --no-dev');
             }
             $dependencies[] = 'relay/vendor';
         }
@@ -86,49 +92,53 @@ final class StaticCheck
         $source = $directory . '/source';
         $revision = Source::snapshotWorktree($runner, $root, $source);
         $archive = $directory . '/checkout.tar';
-        $runner->run(['tar', '--exclude=__pycache__', '--exclude=.phpunit.cache', '-cf', $archive,
-            '-C', $source, '.', '-C', $root, ...$dependencies], timeout: null);
+        $runner->run(new ProcessSpec(['tar', '--exclude=__pycache__', '--exclude=.phpunit.cache', '-cf', $archive,
+            '-C', $source, '.', '-C', $root, ...$dependencies]));
         return [$source, $revision, $archive];
     }
 
     /** @param non-empty-list<string> $command */
-    public static function runCheck(Docker $docker, string $image, string $archive, array $command): int
+    public static function runCheck(Client $docker, string $image, string $archive, array $command, ApplicationLayout $layout, ResourceLedger $ledger, float $cleanupSeconds): int
     {
+        $inspection = json_decode($docker->run(['image', 'inspect', '--', $image])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($inspection) || !array_is_list($inspection) || count($inspection) !== 1 || !is_array($inspection[0])
+            || ApplicationLayout::fromImage($inspection[0])->toArray() !== $layout->toArray()) {
+            throw new \RuntimeException('Static-check image layout differs from the selected source layout.');
+        }
         $name = 'baander-check-' . bin2hex(random_bytes(6));
-        try {
-            $docker->run(['create', '--name', $name, '--user', '0:0', '--network', 'none',
-                '--workdir', '/var/www/html', '--entrypoint', 'sh',
+        return $ledger->scoped(static function () use ($docker, $image, $archive, $command, $layout, $ledger, $name): int {
+            $ledger->create(ResourceKind::Container, $name, ['--user', '0:0', '--network', 'none',
+                '--workdir', $layout->root, '--entrypoint', 'sh',
                 '--env', 'APP_ENV=test', '--env', 'APP_DEBUG=0', '--env', 'XDEBUG_MODE=off',
                 $image, '-ec', 'exec sleep infinity']);
             $docker->run(['start', $name]);
             $docker->run(['cp', $archive, $name . ':/tmp/checkout.tar'], timeout: null);
-            $docker->run(['exec', $name, 'sh', '-ec', <<<'SH'
+            $provision = <<<'SH'
                 umask 077
-                rm -rf /var/www/html
-                mkdir -p /var/www/html
-                tar -xf /tmp/checkout.tar -C /var/www/html
+                rm -rf APPLICATION_ROOT
+                mkdir -p APPLICATION_ROOT
+                tar -xf /tmp/checkout.tar -C APPLICATION_ROOT
                 rm /tmp/checkout.tar
-                mkdir -p /var/www/html/config/secrets/oauth /var/www/html/var
-                openssl genrsa -out /var/www/html/config/secrets/oauth/private.key 2048 2>/dev/null
-                openssl rsa -in /var/www/html/config/secrets/oauth/private.key -pubout -out /var/www/html/config/secrets/oauth/public.key 2>/dev/null
-                chown -R www-data:www-data /var/www/html
-                SH], timeout: null);
+                mkdir -p APPLICATION_ROOT/config/secrets/oauth APPLICATION_ROOT/var
+                openssl genrsa -out APPLICATION_ROOT/config/secrets/oauth/private.key 2048 2>/dev/null
+                openssl rsa -in APPLICATION_ROOT/config/secrets/oauth/private.key -pubout -out APPLICATION_ROOT/config/secrets/oauth/public.key 2>/dev/null
+                chown -R www-data:www-data APPLICATION_ROOT
+                SH;
+            $docker->run(['exec', $name, 'sh', '-ec', str_replace('APPLICATION_ROOT', escapeshellarg($layout->root), $provision)]);
             return $docker->run(
                 ['exec', '--user', 'www-data', $name, ...$command],
                 timeout: null,
                 check: false,
                 interactive: true,
             )->exitCode;
-        } finally {
-            $docker->run(['rm', '--force', $name], check: false);
-        }
+        }, $cleanupSeconds);
     }
 
     /** @param list<string> $arguments */
     public static function main(array $arguments, string $root): int
     {
         $image = null;
-        $context = 'default';
+        $context = null;
         $command = [];
         while ($arguments !== []) {
             $argument = array_shift($arguments);
@@ -162,18 +172,50 @@ final class StaticCheck
         if ($command === []) {
             throw new \InvalidArgumentException('Supply a check command after --.');
         }
-        $runner = new Runner();
-        $docker = new Docker($runner, Cli::dockerTarget($runner, $context));
+        $environment = getenv();
+        $configuration = ToolingConfiguration::forRepository($root, $environment, $context === null ? [] : ['docker' => ['context' => $context]]);
         $directory = sys_get_temp_dir() . '/baander-check-' . bin2hex(random_bytes(12));
-        if (!mkdir($directory, 0700)) {
-            throw new WorkflowError('Cannot create static-check workspace.');
-        }
+        $executor = null;
+        $ownsDirectory = false;
+        $primary = null;
+        $status = 0;
         try {
-            [$source, $revision, $archive] = self::prepareCheckout($runner, $root, $directory);
-            $image ??= new Builder(null, $runner)->build($docker, $source, 'ci', $revision);
-            return self::runCheck($docker, $image, $archive, $command);
+            if (!mkdir($directory, 0700)) {
+                throw new RuntimeException('Cannot create static-check workspace.');
+            }
+            $ownsDirectory = true;
+            $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+            $docker = new Client($executor, new TargetResolver($executor, $environment)->resolve($configuration->docker, $directory . '/transport'), $environment);
+            $ledger = new ResourceLedger($directory . '/resources.json', $docker, $environment);
+            [$source, $revision, $archive] = self::prepareCheckout($executor, $root, $directory);
+            $image ??= new ApplicationImage($docker, $configuration->images)->build($source, 'ci', $revision, 'baander-check:' . $revision . '-' . basename($directory));
+            $status = self::runCheck($docker, $image, $archive, $command, ApplicationLayout::load($source . '/packages/baander-tooling/resources/application-layout.json'), $ledger, $configuration->budgets->seconds('cleanup'));
+            return $status;
+        } catch (\Throwable $error) {
+            $primary = $error;
+            throw $error;
         } finally {
-            $runner->run(['rm', '-rf', '--', $directory], check: false);
+            $errors = [];
+            try {
+                $executor?->close();
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            try {
+                if ($ownsDirectory && !file_exists($directory . '/resources.json') && !is_link($directory . '/resources.json')) {
+                    $cleanup = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('cleanup'), $environment, ignoreCancellation: true));
+                    try {
+                        $cleanup->run(new ProcessSpec(['rm', '-rf', '--', $directory]));
+                    } finally {
+                        $cleanup->close();
+                    }
+                }
+            } catch (\Throwable $error) {
+                $errors[] = $error->getMessage();
+            }
+            if ($errors !== []) {
+                throw new RuntimeException(($primary !== null ? $primary->getMessage() . '; ' : '') . 'Static-check staging cleanup failed: ' . implode('; ', $errors), $primary !== null ? ($primary->getCode() ?: 1) : ($status ?: 1), $primary);
+            }
         }
     }
 }

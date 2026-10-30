@@ -15,25 +15,20 @@ final class ControlCapacity
         $receipt = [];
         foreach (['control', 'execution'] as $unit) {
             $valid = [];
-            foreach (explode("\n", Reports::text($artifacts . '/' . $unit . '-samples.jsonl')) as $line) {
-                try {
-                    $sample = json_decode($line, flags: JSON_THROW_ON_ERROR);
-                } catch (\JsonException) {
-                    continue;
-                }
-                if (!$sample instanceof \stdClass || (!is_int($sample->monotonic ?? null) && !is_float($sample->monotonic ?? null))) {
+            foreach (Reports::samples($artifacts . '/' . $unit . '-samples.jsonl', EvidenceMode::Live) as $sample) {
+                if (!is_int($sample['monotonic'] ?? null) && !is_float($sample['monotonic'] ?? null)) {
                     continue;
                 }
                 $counters = true;
                 foreach (['cpu.stat', 'memory.events', 'pids.events'] as $key) {
-                    if (!is_string($sample->{$key} ?? null)) {
+                    if (!is_string($sample[$key] ?? null)) {
                         $counters = false;
                     }
                 }
-                if (!$counters || ($unit === 'control' && (!(($sample->heartbeat ?? null) instanceof \stdClass) || !(($sample->lease ?? null) instanceof \stdClass)))) {
+                if (!$counters || ($unit === 'control' && (!is_array($sample['heartbeat'] ?? null) || array_is_list($sample['heartbeat']) || !is_array($sample['lease'] ?? null) || array_is_list($sample['lease'])))) {
                     continue;
                 }
-                $valid[] = $sample->monotonic;
+                $valid[] = $sample['monotonic'];
             }
             Runtime::require(count($valid) > 10, 'Capacity sampler requires eleven valid baseline samples');
             $receipt[$unit] = [
@@ -49,7 +44,7 @@ final class ControlCapacity
     public static function main(array $arguments, string $root): int
     {
         if ($arguments === []) {
-            $runtime = new Runtime($root, 2000);
+            $runtime = new Runtime($root, budget: 'workerCapacity');
             $artifacts = Runtime::artifacts($root, 'control-capacity');
             try {
                 foreach (['cpu', 'memory', 'pid'] as $phase) {
@@ -80,9 +75,8 @@ final class ControlCapacity
         try {
             $checkpoint->capture(['info', '--format', '{{json .}}'], 'daemon.json');
             $checkpoint->inspectBefore();
-            $runtime->run(
+            $docker->run(
                 [
-                    ...$docker->commandPrefix(),
                     'exec',
                     '-i',
                     $checkpoint->postgres,
@@ -97,7 +91,7 @@ final class ControlCapacity
                 input: self::POSTGRES_DIAGNOSTICS,
                 logPath: $checkpoint->artifacts . '/postgres-before.txt',
             );
-            $control = $checkpoint->background(
+            $control = $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->control,
@@ -110,7 +104,7 @@ final class ControlCapacity
                 'control-sampler.log',
                 185,
             );
-            $execution = $checkpoint->background(
+            $execution = $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->execution,
@@ -145,20 +139,13 @@ final class ControlCapacity
                 180,
             );
             $since = (new \DateTimeImmutable(Runtime::json($checkpoint->artifacts . '/daemon.json')['SystemTime']))->getTimestamp() - 1;
-            $postgres = $runtime->start(
-                [
-                    PHP_BINARY,
-                    'tests/Fixtures/Worker/control-capacity-postgres-sample.php',
-                    $checkpoint->postgres,
-                    $checkpoint->web,
-                    '180',
-                    $checkpoint->database,
-                    $checkpoint->artifacts . '/postgres-sampler-ready.json',
-                ],
-                timeout: 185,
-                logPath: $checkpoint->artifacts . '/postgres-samples.jsonl',
-                stderrLogPath: $checkpoint->artifacts . '/postgres-sampler.log',
-                terminationGrace: 3,
+            $postgres = $checkpoint->measurements->host(
+                [PHP_BINARY, 'tests/Fixtures/Worker/control-capacity-postgres-sample.php',
+                    $checkpoint->postgres, $checkpoint->web, '180', $checkpoint->database,
+                    $checkpoint->artifacts . '/postgres-sampler-ready.json'],
+                'postgres-samples.jsonl',
+                'postgres-sampler.log',
+                185,
             );
             $client = null;
             if ($phase === 'cpu') {
@@ -238,7 +225,7 @@ final class ControlCapacity
                 $docker->run(['exec', $checkpoint->web, 'touch', 'storage/two-command/capacity-pressure-start']);
                 $runtime->wait($client);
                 $checkpoint->copy(
-                    $checkpoint->web . ':/var/www/html/storage/two-command/result-capacity.json',
+                    $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/result-capacity.json'),
                     'media.json',
                 );
                 $checkpoint->inspectAfter('containers-after-pressure.json');
@@ -258,11 +245,11 @@ final class ControlCapacity
                     'Execution capacity was not exhausted',
                 );
                 ControlCapacityVerifier::exhausted($checkpoint->artifacts, $phase);
-                $runtime->wait($failure);
                 $checkpoint->inspectAfter('containers-after-pressure.json');
             }
-            $runtime->stop($control);
-            $runtime->stop($execution);
+            if ($phase === 'cpu') {
+                $checkpoint->measurements->finish();
+            }
             $started = $phase === 'cpu' ? Runtime::now() : $exhaustionStarted;
             file_put_contents(
                 $checkpoint->artifacts . '/drain-trigger.txt',
@@ -290,9 +277,8 @@ final class ControlCapacity
             Runtime::require($runtime->alive($subscriber), 'Docker OOM subscriber exited before drain evidence');
             $until = (new \DateTimeImmutable($docker->run(['info', '--format', '{{.SystemTime}}'])->stdout
                 |> trim(...)))->getTimestamp() + 1;
-            $runtime->run(
+            $docker->run(
                 [
-                    ...$docker->commandPrefix(),
                     'events',
                     '--since',
                     (string) $since,
@@ -321,6 +307,26 @@ final class ControlCapacity
                     'monitorExitCode' => $stopped->exitCode,
                 ],
             );
+            if ($phase !== 'cpu') {
+                $completion = new ContainedSamplerDrain($checkpoint->artifacts, $phase, [
+                    'control' => ['name' => $checkpoint->control, 'id' => $controlId],
+                    'execution' => ['name' => $checkpoint->execution, 'id' => $executionId],
+                ]);
+                $pressureResult = $runtime->wait($pressure, check: false);
+                $failureResult = $runtime->wait($failure, check: false);
+                $completion->checkOutcome($pressureResult);
+                $completion->checkOutcome($failureResult);
+                // The final atomic heartbeat survives PID 1; an in-container sampler may miss its brief drain window.
+                $source = $completion->terminalHeartbeatSource();
+                $checkpoint->copy($source, 'control-drain-heartbeat.json');
+                Runtime::writeJson($checkpoint->artifacts . '/control-drain-capture.json', [
+                    'containerId' => $controlId, 'source' => $source, 'copiedAfterStop' => true,
+                ]);
+                $checkpoint->measurements->finish($completion);
+                // Joint drain can retire pressure PHP after it has flushed terminal evidence.
+                $completion->completePressure($pressureResult);
+                $completion->completeOwnedFailure($failureResult);
+            }
             $runtime->close();
             return ControlCapacityVerifier::main(['verify', $checkpoint->artifacts, $phase]);
         } finally {

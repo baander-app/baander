@@ -6,11 +6,13 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Registry;
 
-use Baander\Registry\StaticAnalysis\Diagnostics;
-use Baander\Registry\StaticAnalysis\Pins;
-use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Registry\StaticAnalysis\Diagnostics;
+use Baander\Tooling\Registry\StaticAnalysis\Pins;
 use Baander\Tooling\Process\ProcessSpec;
-use Baander\RegistryTests\Runtime;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Configuration\ToolingConfiguration;
 use RuntimeException;
 
 final class StaticQualification
@@ -20,52 +22,55 @@ final class StaticQualification
         . ',bugprone-misplaced-widening-cast,bugprone-sizeof-expression'
         . ',bugprone-suspicious-memset-usage,bugprone-undefined-memory-manipulation';
 
-    /** @param non-empty-list<string> $command */
-    private static function logged(array $command, string $log, ?string $cwd = null, float $timeout = 1800): int
+    private EngineExecutor $executor;
+    /** @var array<string,string> */
+    private array $environment;
+
+    public function __construct(string $root)
     {
-        $result = new ProcessRunner()->run(new ProcessSpec(
+        $this->environment = array_replace(getenv(), ['CC' => 'clang-19', 'CXX' => 'clang++-19']);
+        $configuration = ToolingConfiguration::forRepository($root, $this->environment);
+        $this->executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('registryStatic'), $this->environment));
+    }
+
+    /** @param non-empty-list<string> $command */
+    private function logged(array $command, string $log, ?string $cwd = null, float $timeout = 1800): int
+    {
+        $result = $this->executor->run(new ProcessSpec(
             $command,
             cwd: $cwd,
-            environment: getenv(),
+            environment: $this->environment,
             timeout: $timeout,
             logPath: $log,
             processGroup: true,
             appendLog: true,
-        ));
-        Runtime::requireThat(
-            !$result->cancelled && !$result->timedOut,
-            'Registry static command interrupted or timed out: ' . json_encode($command),
-        );
+        ), new CompletionPolicy(null));
         return $result->exitCode;
     }
 
     /** @param non-empty-list<string> $command */
-    private static function checked(array $command, float $timeout = 30): string
+    private function checked(array $command, float $timeout = 30): string
     {
-        $result = new ProcessRunner()->run(new ProcessSpec(
+        $result = $this->executor->run(new ProcessSpec(
             $command,
-            environment: getenv(),
+            environment: $this->environment,
             timeout: $timeout,
             processGroup: true,
         ));
-        Runtime::requireThat(
-            $result->exitCode === 0 && !$result->cancelled && !$result->timedOut,
-            'Registry static command failed: ' . json_encode($command) . "\n" . $result->stderr,
-        );
         return $result->stdout;
     }
 
     /** @param non-empty-list<string> $command */
-    private static function build(array $command, string $log, ?string $cwd = null): void
+    private function build(array $command, string $log, ?string $cwd = null): void
     {
-        $status = self::logged($command, $log, $cwd);
+        $status = $this->logged($command, $log, $cwd);
         if ($status !== 0) {
-            self::tail($log, 80);
-            throw new RuntimeException('Registry static build failed: ' . json_encode($command));
+            $this->tail($log, 80);
+            throw new RuntimeException('Registry static build failed: ' . json_encode($command), $status);
         }
     }
 
-    private static function tail(string $log, int $lines): void
+    private function tail(string $log, int $lines): void
     {
         $content = $log
             |> Pins::read(...)
@@ -75,9 +80,9 @@ final class StaticQualification
         fwrite(STDERR, $content . "\n");
     }
 
-    private static function download(string $url, string $target, string $digest): void
+    private function download(string $url, string $target, string $digest): void
     {
-        self::checked(
+        $this->checked(
             [
                 'curl',
                 '--fail',
@@ -94,50 +99,59 @@ final class StaticQualification
             ],
             timeout: 600,
         );
-        Runtime::requireThat(hash_file('sha256', $target) === $digest, 'Upstream archive or notice digest changed: ' . $url);
+        Support::requireThat(hash_file('sha256', $target) === $digest, 'Upstream archive or notice digest changed: ' . $url);
     }
 
-    private static function same(string $retained, string $upstream): void
+    private function same(string $retained, string $upstream): void
     {
-        Runtime::requireThat(Pins::read($retained) === Pins::read($upstream), 'Retained notice differs from upstream: ' . $retained);
+        Support::requireThat(Pins::read($retained) === Pins::read($upstream), 'Retained notice differs from upstream: ' . $retained);
     }
 
     public static function run(string $root): void
     {
-        Runtime::requireThat(extension_loaded('yaml'), 'Registry static analysis requires ext-yaml.');
-        putenv('CC=clang-19');
-        putenv('CXX=clang++-19');
+        $qualification = new self($root);
+        try {
+            $qualification->execute($root);
+        } finally {
+            $qualification->executor->close();
+        }
+    }
+
+    private function execute(string $root): void
+    {
+        Support::requireThat(extension_loaded('yaml'), 'Registry static analysis requires ext-yaml.');
         foreach (['cmake', 'ninja', 'clang-19', 'clang++-19', 'clang-tidy-19', 'make', 'perl', 'curl', 'tar', 'pkg-config'] as $command) {
             $found = false;
-            foreach (explode(PATH_SEPARATOR, getenv('PATH') ?: '') as $directory) {
+            foreach (explode(PATH_SEPARATOR, $this->environment['PATH'] ?? '') as $directory) {
                 $found = $found || is_executable($directory . '/' . $command);
             }
-            Runtime::requireThat($found, 'Missing required executable: ' . $command);
+            Support::requireThat($found, 'Missing required executable: ' . $command);
         }
-        Runtime::requireThat(
-            preg_match('/LLVM version 19\./', self::checked(['clang-tidy-19', '--version'])) === 1,
+        Support::requireThat(
+            preg_match('/LLVM version 19\./', $this->checked(['clang-tidy-19', '--version'])) === 1,
             'Registry static qualification requires clang-tidy 19.',
         );
-        $work = Runtime::temporaryDirectory('baander-registry-static-');
-        $previousPkg = getenv('PKG_CONFIG_PATH');
+        $work = Support::temporaryDirectory('baander-registry-static-');
+        $previousPkg = $this->environment['PKG_CONFIG_PATH'] ?? '';
+        $primary = null;
         try {
-            self::download(
+            $this->download(
                 'https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz',
                 $work . '/openssl.tar.gz',
                 'c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf',
             );
-            self::checked(['tar', '-xzf', $work . '/openssl.tar.gz', '-C', $work], timeout: 180);
-            self::same($root . '/relay/third_party/openssl-LICENSE.txt', $work . '/openssl-3.5.3/LICENSE.txt');
+            $this->checked(['tar', '-xzf', $work . '/openssl.tar.gz', '-C', $work], timeout: 180);
+            $this->same($root . '/relay/third_party/openssl-LICENSE.txt', $work . '/openssl-3.5.3/LICENSE.txt');
             $log = $work . '/openssl-build.log';
-            self::build(
+            $this->build(
                 ['./Configure', '--prefix=' . $work . '/openssl', '--libdir=lib', 'no-shared', 'no-tests'],
                 $log,
                 $work . '/openssl-3.5.3',
             );
-            self::build(['make', '-j2'], $log, $work . '/openssl-3.5.3');
-            self::build(['make', 'install_sw'], $log, $work . '/openssl-3.5.3');
-            putenv('PKG_CONFIG_PATH=' . $work . '/openssl/lib/pkgconfig' . ($previousPkg ? ':' . $previousPkg : ''));
-            self::build(
+            $this->build(['make', '-j2'], $log, $work . '/openssl-3.5.3');
+            $this->build(['make', 'install_sw'], $log, $work . '/openssl-3.5.3');
+            $this->environment['PKG_CONFIG_PATH'] = $work . '/openssl/lib/pkgconfig' . ($previousPkg ? ':' . $previousPkg : '');
+            $this->build(
                 [
                     'cmake',
                     '-S',
@@ -161,14 +175,14 @@ final class StaticQualification
                 'json' => 'json-src/LICENSE.MIT',
                 'googletest' => 'googletest-src/LICENSE',
             ] as $name => $path) {
-                self::same($root . '/relay/third_party/' . $name . '-LICENSE.txt', $work . '/build/_deps/' . $path);
+                $this->same($root . '/relay/third_party/' . $name . '-LICENSE.txt', $work . '/build/_deps/' . $path);
             }
-            self::download(
+            $this->download(
                 'https://raw.githubusercontent.com/rqlite/rqlite/v10.5.1/LICENSE',
                 $work . '/rqlite-LICENSE',
                 'eebaac1ed2a0deece5e8ea39c679bd2c8813aa8da3ec95cdda953b95ce349629',
             );
-            self::same($root . '/relay/third_party/rqlite-LICENSE.txt', $work . '/rqlite-LICENSE');
+            $this->same($root . '/relay/third_party/rqlite-LICENSE.txt', $work . '/rqlite-LICENSE');
             echo "All seven reviewed direct dependency notices match pinned upstream contents.\n";
             foreach (glob($root . '/relay/cpp/*.cpp') ?: [] as $source) {
                 echo 'Analyzing ' . $source . "\n";
@@ -177,33 +191,43 @@ final class StaticQualification
                     unlink($export);
                 }
                 $log = $work . '/clang-tidy.log';
-                $status = self::logged(
+                $status = $this->logged(
                     [
                         'clang-tidy-19',
                         $source,
                         '-p',
                         $work . '/build',
                         '--export-fixes=' . $export,
-                        '--config=' . self::config(true),
+                        '--config=' . $this->config(true),
                     ],
                     $log,
                 );
                 try {
                     Diagnostics::check($status, $export, $work . '/build/_deps');
                 } catch (RuntimeException $failure) {
-                    self::tail($log, 120);
+                    $this->tail($log, 120);
                     throw $failure;
                 }
             }
-            self::controls($work);
+            $this->executeControls($work);
             echo "Registry production static analysis and direct dependency license qualification passed.\n";
+        } catch (\Throwable $failure) {
+            $primary = $failure;
+            throw $failure;
         } finally {
-            putenv($previousPkg === false ? 'PKG_CONFIG_PATH' : 'PKG_CONFIG_PATH=' . $previousPkg);
-            Runtime::removeTree($work);
+            try {
+                Support::removeTree($work);
+            } catch (\Throwable $cleanup) {
+                throw new RuntimeException(
+                    ($primary !== null ? $primary->getMessage() . '; ' : '') . 'Registry static cleanup failed: ' . $cleanup->getMessage(),
+                    $primary !== null ? ($primary->getCode() ?: 1) : 1,
+                    $primary ?? $cleanup,
+                );
+            }
         }
     }
 
-    private static function config(bool $headers = false): string
+    private function config(bool $headers = false): string
     {
         return json_encode(
             [
@@ -215,14 +239,14 @@ final class StaticQualification
         );
     }
 
-    private static function rejected(int $status, string $export, string $dependencies, string $expected): void
+    private function rejected(int $status, string $export, string $dependencies, string $expected): void
     {
         ob_start();
         try {
             try {
                 Diagnostics::check($status, $export, $dependencies);
             } catch (RuntimeException $failure) {
-                Runtime::requireThat(
+                Support::requireThat(
                     str_contains($failure->getMessage(), $expected),
                     'Scope control failed without expected rejection: ' . $failure->getMessage(),
                 );
@@ -235,6 +259,16 @@ final class StaticQualification
     }
 
     public static function controls(string $work): void
+    {
+        $qualification = new self(dirname(__DIR__, 4));
+        try {
+            $qualification->executeControls($work);
+        } finally {
+            $qualification->executor->close();
+        }
+    }
+
+    private function executeControls(string $work): void
     {
         $negative = $work . '/analyzer-negative.cpp';
         file_put_contents(
@@ -253,26 +287,26 @@ CPP,
         );
         $export = $work . '/negative-diagnostics.yaml';
         $log = $work . '/analyzer-negative.log';
-        $status = self::logged(
-            ['clang-tidy-19', $negative, '--export-fixes=' . $export, '--config=' . self::config(), '--', '-std=c++20'],
+        $status = $this->logged(
+            ['clang-tidy-19', $negative, '--export-fixes=' . $export, '--config=' . $this->config(), '--', '-std=c++20'],
             $log,
         );
         $output = Pins::read($log);
-        Runtime::requireThat(
+        Support::requireThat(
             $status !== 0
                 && str_contains($output, 'clang-analyzer-core.NullDereference')
                 && str_contains($output, 'clang-analyzer-core.CallAndMessage'),
             'Static analyzer controls did not report both expected memory bugs. ' . $output,
         );
-        self::rejected($status, $export, $work . '/build/_deps', 'Blocking diagnostic: clang-analyzer-core.');
+        $this->rejected($status, $export, $work . '/build/_deps', 'Blocking diagnostic: clang-analyzer-core.');
         $compiler = $work . '/compiler-negative.cpp';
         file_put_contents($compiler, 'int broken() { return missing_symbol; }' . "\n");
         $export = $work . '/compiler-diagnostics.yaml';
-        $status = self::logged(
-            ['clang-tidy-19', $compiler, '--export-fixes=' . $export, '--config=' . self::config(), '--', '-std=c++20'],
+        $status = $this->logged(
+            ['clang-tidy-19', $compiler, '--export-fixes=' . $export, '--config=' . $this->config(), '--', '-std=c++20'],
             $work . '/compiler-negative.log',
         );
         Diagnostics::mixCompilerControl($export, $work . '/build/_deps');
-        self::rejected($status, $export, $work . '/build/_deps', 'Blocking diagnostic: clang-diagnostic-error');
+        $this->rejected($status, $export, $work . '/build/_deps', 'Blocking diagnostic: clang-diagnostic-error');
     }
 }

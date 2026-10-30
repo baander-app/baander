@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Tooling\Fixtures\Worker;
 
 use InvalidArgumentException;
+use Baander\Tooling\Configuration\{CheckpointSelection, ToolingConfiguration};
 use RuntimeException;
 
 final readonly class OperatorConfiguration
@@ -17,10 +18,10 @@ final readonly class OperatorConfiguration
     public bool $movieEndpoint;
     public bool $useImage;
     public string $lifecyclePhase;
-    public int $timeout;
+    public ?CheckpointSelection $checkpoint;
 
     /** @param array<string,string> $environment */
-    public function __construct(public array $environment)
+    public function __construct(public array $environment, ?ToolingConfiguration $tooling = null)
     {
         $this->container = $this->flag('BAANDER_TEST_OPERATOR_IN_CONTAINER', 1);
         $this->twoCommand = $this->flag('BAANDER_TEST_TWO_COMMAND');
@@ -33,8 +34,8 @@ final readonly class OperatorConfiguration
         if (!in_array($this->lifecyclePhase, ['', 'redis', 'postgres'], true)) {
             throw new InvalidArgumentException('Invalid worker lifecycle phase');
         }
-        $capacity = ($environment['BAANDER_TEST_CONTROL_CAPACITY_CHECKPOINT'] ?? '') !== ''
-            || ($environment['BAANDER_TEST_AUTOSCALING_CHECKPOINT'] ?? '') !== '';
+        $this->checkpoint = ($tooling ?? ToolingConfiguration::resolve(environment: $environment))->checkpoint;
+        $capacity = $this->checkpoint !== null;
         if ($this->developmentSource && !$this->container) {
             throw new InvalidArgumentException('Development source qualification requires the container operator');
         }
@@ -47,6 +48,9 @@ final readonly class OperatorConfiguration
         if ($this->mediaObservation && $this->useImage) {
             throw new InvalidArgumentException('Native launch observation requires a disposable fixture image');
         }
+        if ($this->checkpoint?->name === 'autoscaling' && $this->useImage) {
+            throw new InvalidArgumentException('Autoscaling qualification requires a disposable fixture image');
+        }
         if ($this->lifecyclePhase !== '' && ($this->twoCommand || $capacity)) {
             throw new InvalidArgumentException('Worker lifecycle qualification requires standalone operator mode');
         }
@@ -57,7 +61,7 @@ final readonly class OperatorConfiguration
         if ($this->movieEndpoint && ($this->browserControls || $this->mediaObservation || $capacity || $this->lifecyclePhase !== '')) {
             throw new InvalidArgumentException('Movie endpoint qualification requires only two-command mode and an executable browser checkpoint');
         }
-        $this->timeout = $capacity || $this->lifecyclePhase !== '' || $this->mediaObservation || $this->browserControls ? 600 : 240;
+
     }
 
     private function flag(string $name, int $status = 2): bool
@@ -67,6 +71,15 @@ final readonly class OperatorConfiguration
             throw new InvalidArgumentException($name . ' must be 0 or 1', $status);
         }
         return $value === '1';
+    }
+
+    public function budget(): string
+    {
+        return match (true) {
+            $this->lifecyclePhase !== '' => 'workerLifecycle',
+            $this->twoCommand || $this->mediaObservation || $this->checkpoint !== null => 'workerCapacity',
+            default => 'workerOperator',
+        };
     }
 
     public static function workerName(string $namespace, string $boot): string

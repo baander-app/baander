@@ -10,20 +10,12 @@ execution. The host `bin/worker-deployment.php` supplies the options from a vers
 
 ## Quick start
 
-The deployment tool runs the command as the container's PID 1. These examples use
-the measured minimum-one/maximum-two admission envelope and the complete `autoscaling` object from the
-admitted manifest:
-
-```bash
-profile=$(php -r '$m = json_decode(file_get_contents($argv[1]), true, 8, JSON_THROW_ON_ERROR); echo json_encode($m["autoscaling"], JSON_THROW_ON_ERROR);' /etc/baander/worker-manifest.json)
-php bin/console app:worker --no-interaction --deployment=worker.baander.app --boot-id=0123456789abcdef0123456789abcdef \
-  --unit=control --memory-mib=2944 --pids-limit=129 --scheduled-console-mib=0 \
-  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --autoscaling-profile="$profile"
-
-php bin/console app:worker --no-interaction --deployment=worker.baander.app --boot-id=0123456789abcdef0123456789abcdef \
-  --unit=execution --memory-mib=4800 --pids-limit=257 --scheduled-console-mib=320 \
-  --lock-dir=/tmp/baander-worker-locks --ipc-dir=/run/baander-worker --autoscaling-profile="$profile"
-```
+The host deployment controller constructs this command and runs it as PID 1 in
+each admitted worker container. Do not launch it with `dc exec` or as an
+additional web-container process. Use the host
+[manifest reference](README.md#worker-deployment) to provision the pair, and
+[Background work](../background-work.md#stop-replace-or-recover-workers) for
+start, stop, replacement and uncertain outcomes.
 
 ## Options
 
@@ -74,14 +66,13 @@ for URL forms. Invalid configuration exits without child launch, and errors omit
 credential-bearing values. The host deployment controller applies the same URL
 checks before container creation.
 
-Control acquires and renews the deployment lease; execution only observes its
-committed authority. Before business admission, both units require matching peer
-boot/epoch evidence and execution requires a ready native daemon. Startup without
-admission fails after 30 seconds. Child exit, peer failure, authority loss,
-`SIGTERM` or `SIGINT` starts a drain. If children remain after 35 seconds, PID 1
-exits with code 1 for container teardown. A completed direct-child drain emits
-`worker_supervisor_stopped` with launch attempts and exit code; this is no readiness
-or containment receipt.
+Control owns the deployment lease; execution observes it. Both units require
+matching boot/epoch peer evidence before business admission.
+[Background work](../background-work.md#stop-replace-or-recover-workers) defines
+peer failure and the 35-second drain deadline; the
+[worker pair](../background-work.md#the-worker-deployment-pair) has a 30-second
+startup admission deadline. A `worker_supervisor_stopped` log entry is neither
+a readiness result nor a containment receipt.
 
 The media coordinator admits at most three video jobs and one audio rendition.
 Each job uses a fresh kernel in control and sends bounded native requests over
@@ -92,7 +83,8 @@ identity. Uncertain completion retains ownership until containment or a confirme
 release; caller cancellation alone does not free a native slot. Encoder and file
 I/O threads count against execution's PID ceiling.
 
-The supervisor does not restart itself. A failed deployment must be reconciled with `bin/worker-deployment.php` before it is replaced.
+The supervisor does not restart itself. Reconcile a failed deployment through the
+host controller before replacing it; see the lifecycle procedure linked above.
 
 ## Exit codes
 

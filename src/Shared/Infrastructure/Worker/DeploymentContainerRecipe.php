@@ -39,11 +39,16 @@ final readonly class DeploymentContainerRecipe
         public DeploymentUnit $unit,
         array $cpuSet,
         public string $ipcVolume,
+        public string $appHome,
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
         array $mediaMounts = [],
         public string $sourceMountPolicy = 'production',
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
+        if (strlen($appHome) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $appHome) !== 1
+            || preg_match('~(?:^|/)\.\.?(?:/|$)~', $appHome) !== 0) {
+            throw new InvalidArgumentException('Observed application home requires a canonical absolute path.');
+        }
         $this->cpuSet = (new DeploymentResourceBudget($memoryBytes, $nanoCpus, $pidsLimit, $cpuSet))->cpuSet;
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $ipcVolume) !== 1) {
             throw new InvalidArgumentException('Worker IPC requires an explicitly named private volume.');
@@ -85,7 +90,7 @@ final readonly class DeploymentContainerRecipe
     {
         return hash('sha256', json_encode([
             'namespace' => $this->namespace, 'bootId' => $this->bootId, 'daemonId' => $this->daemonId,
-            'imageId' => $this->imageId, 'command' => $this->command, 'network' => $this->network,
+            'imageId' => $this->imageId, 'appHome' => $this->appHome, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
             'unit' => $this->unit->value, 'cpuSet' => $this->cpuSet, 'ipcVolume' => $this->ipcVolume,
             'sourceMountPolicy' => $this->sourceMountPolicy,
@@ -153,7 +158,7 @@ final readonly class DeploymentContainerRecipe
                 throw new InvalidArgumentException('Only local development permits read-only source binds.');
             }
             if ($bind) {
-                self::verifySourceDirectory($mount['source']);
+                self::verifySourcePath($mount['source']);
             }
             if (!is_array($mount) || count($mount) !== 4
                 || (!$bind && (!is_string($mount['volume'] ?? null)
@@ -173,11 +178,11 @@ final readonly class DeploymentContainerRecipe
                     throw new InvalidArgumentException('Media mounts cannot expose operating-system or private worker paths.');
                 }
             }
-            if (($target === '/var' || $target === '/var/www' || $target === '/var/www/html'
-                || str_starts_with($target, '/var/www/html/'))
-                && $target !== '/var/www/html/var/transcode_state'
-                && $target !== '/var/www/html/storage'
-                && !str_starts_with($target, '/var/www/html/storage/')) {
+            if (($target === $this->appHome || str_starts_with($this->appHome, $target . '/')
+                || str_starts_with($target, $this->appHome . '/'))
+                && $target !== $this->appHome . '/var/transcode_state'
+                && $target !== $this->appHome . '/storage'
+                && !str_starts_with($target, $this->appHome . '/storage/')) {
                 throw new InvalidArgumentException('Media mounts cannot replace application code.');
             }
             foreach ($validated as $existing) {
@@ -196,11 +201,18 @@ final readonly class DeploymentContainerRecipe
     /** The trusted operator sees admitted host directories at their daemon-visible paths. */
     public static function verifySourceDirectory(string $source): void
     {
+        self::verifySourcePath($source);
         clearstatcache(true, $source);
-        if (strlen($source) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_. -]+/)*[A-Za-z0-9_. -]+\z~D', $source) !== 1
-            || preg_match('~(?:^|/)\.\.?(?:/|$)~', $source) !== 0 || !is_dir($source) || realpath($source) !== $source) {
+        if (!is_dir($source) || realpath($source) !== $source) {
             throw new InvalidArgumentException('Source binds require an existing canonical absolute directory without symlink aliases.');
         }
     }
 
+    private static function verifySourcePath(string $source): void
+    {
+        if (strlen($source) > 4096 || preg_match('~\A/(?:[A-Za-z0-9_. -]+/)*[A-Za-z0-9_. -]+\z~D', $source) !== 1
+            || preg_match('~(?:^|/)\.\.?(?:/|$)~', $source) !== 0) {
+            throw new InvalidArgumentException('Source binds require a canonical absolute directory path.');
+        }
+    }
 }

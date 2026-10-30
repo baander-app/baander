@@ -16,27 +16,17 @@ services:
         environment:
             SERVER_NAME: ${SERVER_NAME:-baander.test}
         volumes:
-            - ./:/var/www/html:ro,cached
+            - ./:${APP_HOME:?Use the generated build --compose-env file}:ro,cached
         depends_on:
             - app
 
     app:
-        image: martinjuul/baander-app:latest
+        image: ${BAANDER_APPLICATION_IMAGE:?Build with php scripts/build-application.php --target dev --tag baander:local --compose-env .env.compose.local and pass --env-file .env.compose.local}
         privileged: true
         container_name: baander-app
         # The web server drains within WEB_DRAIN_SECONDS (default 30); Docker must wait a
         # little longer before it sends SIGKILL.
         stop_grace_period: 35s
-        build:
-            context: .
-            target: dev
-            args:
-                GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-                HOST_UID: ${HOST_UID:-1000}
-                HOST_GID: ${HOST_GID:-1000}
-                XDEBUG_CONFIG: ${XDEBUG_CONFIG:-main}
-                XDEBUG_VERSION: ${XDEBUG_VERSION:-3.5.0}
-            dockerfile: ./Dockerfile
         ulimits:
             nofile:
                 soft: 10000
@@ -66,7 +56,7 @@ services:
             - "127.0.0.1:9501:9501"
         volumes:
             - /home/martin/dev/baander-musik:/home/martin/dev/baander-musik:ro
-            - ./:/var/www/html:cached
+            - ./:${APP_HOME:?Use the generated build --compose-env file}:cached
             - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
             - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
             - /home/martin/Music:/home/martin/Music
@@ -139,8 +129,8 @@ services:
         stdin_open: true
         tty: true
         volumes:
-            - ./:/var/www/html:cached
-        working_dir: /var/www/html
+            - ./:${APP_HOME:?Use the generated build --compose-env file}:cached
+        working_dir: ${APP_HOME:?Use the generated build --compose-env file}
         networks:
             - baander-backtier
         profiles:

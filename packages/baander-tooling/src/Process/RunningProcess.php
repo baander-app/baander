@@ -28,6 +28,7 @@ final class RunningProcess
     private bool $killed = false;
     private bool $timedOut = false;
     private bool $cancelled = false;
+    private ?int $requestedSignal = null;
     private int $inputOffset = 0;
     private string $stdout = '';
     private string $stderr = '';
@@ -113,6 +114,7 @@ final class RunningProcess
             return;
         }
         $this->cancelled = true;
+        $this->requestedSignal = $signal;
         $this->stop($signal);
     }
 
@@ -306,6 +308,7 @@ final class RunningProcess
             stdout: $this->stdout,
             stderr: $this->stderr,
             duration: self::now() - $this->started,
+            requestedSignal: $this->requestedSignal,
         );
     }
 

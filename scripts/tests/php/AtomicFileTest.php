@@ -155,6 +155,24 @@ final class AtomicFileTest extends TestCase
         self::assertSame(0600, fileperms($this->directory . '/operation.lock') & 0777);
     }
 
+    public function testSharedReadersCoexistAndNonblockingRetirementReportsContention(): void
+    {
+        $path = $this->directory . '/generation.lock';
+        $first = FileLock::acquire($path, shared: true);
+        $second = FileLock::acquire($path, shared: true);
+        self::assertNull(FileLock::tryAcquire($path));
+        $first->release();
+        self::assertNull(FileLock::tryAcquire($path));
+        $second->release();
+        $exclusive = FileLock::tryAcquire($path);
+        self::assertInstanceOf(FileLock::class, $exclusive);
+        $exclusive->release();
+        symlink($path, $this->directory . '/hostile.lock');
+        $this->expectException(\RuntimeException::class);
+        $unexpected = FileLock::tryAcquire($this->directory . '/hostile.lock');
+        $unexpected?->release();
+    }
+
     /** @return array{int, string, string} */
     private function contender(): array
     {

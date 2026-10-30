@@ -18,6 +18,8 @@
 !tools/packaged_inventory.php
 !tools/inventory/
 !tools/inventory/**
+!tools/qualification/
+!tools/qualification/**
 !tools/issue_enrollment.py
 !tests/
 !tests/*.php

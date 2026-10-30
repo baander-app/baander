@@ -4,54 +4,49 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Worker;
 
-use Baander\Tooling\Development\{Docker, Environment, Runner};
-use Baander\Tooling\Fixtures\Failure;
-use Baander\Tooling\Process\{ProcessResult, ProcessRunner, ProcessSpec, SignalScope};
-use RuntimeException;
+use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Docker\Client;
+use Baander\Tooling\Filesystem\AtomicFile;
+use Baander\Tooling\Process\{CompletionPolicy, ProcessResult, ProcessSpec};
 
 final class OperatorCommands
 {
-    private readonly ProcessRunner $runner;
-    private readonly SignalScope $signals;
-    private readonly float $deadline;
-    /** @var non-empty-list<string> */
-    public readonly array $dockerPrefix;
+    public readonly Runtime $runtime;
+    private ?string $targetFile = null;
 
     /** @param array<string,string> $environment */
-    public function __construct(public readonly string $root, public readonly array $environment, int $timeout)
+    public function __construct(public readonly string $root, public readonly array $environment, ?int $timeout = null)
     {
-        $this->runner = new ProcessRunner();
-        $this->signals = new SignalScope();
-        $this->deadline = self::now() + $timeout;
-        $binary = Environment::executable('docker') ?? throw new RuntimeException('Docker is required');
-        $ambient = ($environment['BAANDER_TEST_OPERATOR_IN_CONTAINER'] ?? '0') === '1'
-            && ($environment['BAANDER_TEST_DOCKER_ENDPOINT'] ?? '') === '';
-        $target = ['executable' => $binary];
-        if (!$ambient) {
-            $target['host'] = $environment['BAANDER_TEST_DOCKER_ENDPOINT'] ?? 'unix:///var/run/docker.sock';
-        } elseif (($environment['DOCKER_CONTEXT'] ?? '') !== '') {
-            $target['context'] = $environment['DOCKER_CONTEXT'];
-        } elseif (($environment['DOCKER_HOST'] ?? '') !== '') {
-            $target['host'] = $environment['DOCKER_HOST'];
-        } else {
-            $target['context'] = trim($this->run([$binary, 'context', 'show'])->stdout);
-            if ($target['context'] === '') {
-                throw new RuntimeException('Cannot determine the current Docker context');
-            }
-        }
-        $this->dockerPrefix = new Docker(new Runner(), $target)->commandPrefix();
+        $tooling = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository($root, $environment);
+        $configuration = new OperatorConfiguration($environment, $tooling);
+        $this->runtime = new Runtime($root, $timeout, $environment, $tooling, budget: $configuration->budget());
+    }
+
+    public function exportTarget(string $path): void
+    {
+        AtomicFile::writeJson($path, $this->client()->target->toArray());
+        $this->targetFile = $path;
     }
 
     public static function now(): float
     {
-        return hrtime(true) / 1_000_000_000;
-    }
-    public function close(): void
-    {
-        $this->signals->close();
+        return Runtime::now();
     }
 
-    /** @param non-empty-list<string> $arguments */
+    public function close(): void
+    {
+        $this->runtime->close();
+    }
+
+    public function client(bool $cleanup = false): Client
+    {
+        $client = $this->runtime->docker();
+        return $cleanup ? new Client($this->runtime->cleanupExecutor(), $client->target, $this->environment) : $client;
+    }
+
+    /** @param non-empty-list<string> $arguments
+     * @param array<string,string>|null $environment
+     */
     public function run(
         array $arguments,
         bool $check = true,
@@ -62,50 +57,21 @@ final class OperatorCommands
         ?float $timeout = null,
         bool $cleanup = false,
         float $terminationGrace = 0.25,
+        ?array $environment = null,
     ): ProcessResult {
-        if (!$cleanup) {
-            $this->signals->dispatch();
-            if ($this->signals->receivedSignal() !== null) {
-                throw new Failure('Worker qualification interrupted', 128 + $this->signals->receivedSignal());
-            }
-            $remaining = $this->deadline - self::now();
-            if ($remaining <= 0) {
-                throw new Failure('Worker qualification timed out', 124);
-            }
-            $timeout = $timeout === null ? $remaining : min($remaining, $timeout);
-        }
-        $errorLog = $stderr ?? ($stdout === null ? null : $stdout . '.stderr');
-        $result = $this->runner->run(new ProcessSpec(
+        $executor = $cleanup ? $this->runtime->cleanupExecutor() : $this->runtime->executor;
+        return $executor->run(new ProcessSpec(
             argv: $arguments,
             cwd: $this->root,
-            environment: $this->environment,
-            timeout: $timeout ?? 20,
+            environment: array_replace($environment ?? $this->environment, $this->targetFile === null ? [] : ['BAANDER_TOOLING_TARGET_FILE' => $this->targetFile]),
+            timeout: $timeout,
             stdin: $input,
             logPath: $log ?? $stdout,
             processGroup: true,
-            ignoreCancellation: $cleanup,
-            stderrLogPath: $errorLog,
+            stderrLogPath: $stderr ?? ($stdout === null ? null : $stdout . '.stderr'),
             terminationGrace: $terminationGrace,
-        ));
-        if ($result->timedOut || $result->cancelled || ($check && $result->exitCode !== 0)) {
-            if ($log === null && $stdout === null) {
-                $errors = $errorLog === null ? $result->stderr : (file_get_contents($errorLog) ?: '');
-                $detail = "\n" . substr($result->stdout . $errors, -4000);
-            } else {
-                $detail = '; see ' . ($log ?? $stdout);
-            }
-            $status = match (true) {
-                $result->timedOut => 124,
-                $result->cancelled => 128 + ($result->signal ?? $this->signals->receivedSignal() ?? 15),
-                default => $result->exitCode,
-            };
-            throw new Failure(
-                'Command failed (' . $result->exitCode . '): ' . implode(' ', array_slice($arguments, 0, 4))
-                . $detail,
-                $status,
-            );
-        }
-        return $result;
+            replaceEnvironment: true,
+        ), new CompletionPolicy($check ? [0] : null));
     }
 
     /** @param list<string> $arguments */
@@ -119,30 +85,19 @@ final class OperatorCommands
         ?float $timeout = null,
         bool $cleanup = false,
     ): ProcessResult {
-        return $this->run(
-            [...$this->dockerPrefix, ...$arguments],
-            $check,
-            $input,
-            $log,
-            $stdout,
-            $stderr,
-            $timeout,
-            $cleanup,
+        return $this->client($cleanup)->run(
+            $arguments,
+            cwd: $this->root,
+            input: $input,
+            timeout: $timeout,
+            check: $check,
+            logPath: $log ?? $stdout,
+            stderrLogPath: $stderr ?? ($stdout === null ? null : $stdout . '.stderr'),
         );
     }
 
     public function pause(float $seconds): void
     {
-        $until = self::now() + $seconds;
-        do {
-            $this->signals->dispatch();
-            usleep(10_000);
-        } while (self::now() < $until && $this->signals->receivedSignal() === null);
-        if ($this->signals->receivedSignal() !== null) {
-            throw new Failure('Worker qualification interrupted', 128 + $this->signals->receivedSignal());
-        }
-        if (self::now() >= $this->deadline) {
-            throw new Failure('Worker qualification timed out', 124);
-        }
+        $this->runtime->pause($seconds);
     }
 }

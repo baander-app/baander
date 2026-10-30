@@ -14,6 +14,50 @@ final class RegistryQualificationTest extends TestCase
     /** @var array<string,string> */
     private array $environment;
 
+    public function testTimedOutZeroExitFailsEvenWhenDiagnosticExitIsPermitted(): void
+    {
+        $qualification = new \Baander\Tooling\Registry\QualificationRunner($this->root);
+        $reflection = new \ReflectionObject($qualification);
+        $reflection->getProperty('work')->setValue($qualification, $this->root);
+        $signals = new \Baander\Tooling\Process\SignalScope();
+        $reflection->getProperty('signals')->setValue($qualification, $signals);
+        try {
+            try {
+                $reflection->getMethod('command')->invokeArgs($qualification, [
+                    'argv' => [PHP_BINARY, '-r', 'pcntl_async_signals(true); pcntl_signal(15, static function (): never { exit(0); }); usleep(30000000);'],
+                    'requireZero' => false,
+                    'timeout' => 1.0,
+                ]);
+                self::fail('An interrupted diagnostic command must not pass.');
+            } catch (\Baander\Tooling\Process\CommandFailure $failure) {
+                self::assertSame(124, $failure->getCode());
+                self::assertNotNull($failure->result);
+                self::assertTrue($failure->result->timedOut);
+                self::assertSame(0, $failure->result->exitCode);
+            }
+        } finally {
+            $reflection->getProperty('runner')->getValue($qualification)->close();
+            $signals->close();
+        }
+    }
+
+    public function testPackageLoaderAndInjectedStorageValidationNeedNoRelayTestSupport(): void
+    {
+        $result = new \Baander\Tooling\Process\ProcessRunner()->run(new \Baander\Tooling\Process\ProcessSpec(
+            [PHP_BINARY, __DIR__ . '/Fixtures/registry-storage-injection.php', $this->root],
+            environment: array_replace(getenv(), [
+                'REGISTRY_FULL_DISK_ROOT' => $this->root,
+                'CI' => '1',
+                'REGISTRY_CLUSTER_NODES' => '3',
+                'REGISTRY_QUALIFICATION_OUTPUT' => '',
+            ]),
+            timeout: 10,
+            processGroup: true,
+        ));
+        self::assertSame(31, $result->exitCode, $result->stdout . $result->stderr);
+        self::assertStringContainsString('Explicit storage validation reached without test support.', $result->stderr);
+    }
+
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir() . '/baander-registry-qualification-test-' . bin2hex(random_bytes(8));
@@ -55,6 +99,7 @@ final class RegistryQualificationTest extends TestCase
                 'CC' => 'clang',
                 'CXX' => 'clang++',
                 'REGISTRY_TEST_STATE' => $this->root,
+                'CI' => '1',
                 'REGISTRY_QUALIFICATION_OUTPUT' => $this->root . '/output',
                 'REGISTRY_SUBJECT_PYTHON' => PHP_BINARY,
             ],

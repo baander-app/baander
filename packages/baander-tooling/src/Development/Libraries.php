@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
+
 class Libraries
 {
-    public function __construct(private readonly Runner $runner) {}
+    private readonly Connections $connections;
+
+    public function __construct(CommandExecutor $runner, ?Connections $connections = null)
+    {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance */
     public function ensure(array $instance): void
@@ -15,10 +22,10 @@ class Libraries
         if ($definitions === []) {
             return;
         }
-        $docker = new Docker($this->runner, $instance['docker']);
+        $docker = $this->connections->client($instance['docker']);
         $command = ['exec', '-T', 'app', 'php', 'bin/console'];
         try {
-            $catalog = $docker->compose($instance, [...$command, 'app:library:list', '--json'])->stdout
+            $catalog = $docker->compose($instance['project'], $instance['compose_file'], [...$command, 'app:library:list', '--json'])->stdout
                 |> (static fn(string $output): mixed => json_decode($output, flags: JSON_THROW_ON_ERROR));
             if (!is_array($catalog)) {
                 throw new WorkflowError('Development library list must be a JSON array.');
@@ -36,7 +43,7 @@ class Libraries
                 }
                 $existing[$library['slug']] = $library;
             }
-        } catch (WorkflowError|\JsonException $error) {
+        } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure|\JsonException $error) {
             throw new WorkflowError('Cannot list development libraries: ' . $error->getMessage(), previous: $error);
         }
         foreach ($definitions as $definition) {
@@ -62,7 +69,7 @@ class Libraries
                 continue;
             }
             try {
-                $docker->compose($instance, [
+                $docker->compose($instance['project'], $instance['compose_file'], [
                     ...$command,
                     'app:library:create',
                     '--slug',
@@ -73,7 +80,7 @@ class Libraries
                     $definition['target'],
                     $definition['type'],
                 ]);
-            } catch (WorkflowError $error) {
+            } catch (WorkflowError|\Baander\Tooling\Process\CommandFailure $error) {
                 throw new WorkflowError(sprintf(
                     'Cannot create development library "%s": %s',
                     $definition['slug'],

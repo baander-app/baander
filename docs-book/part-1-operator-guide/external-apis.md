@@ -1,57 +1,76 @@
 # External APIs
 
-Baander enriches your media library by querying external metadata services. No API key is strictly required -- the application works without them -- but metadata quality depends on which services are configured.
+A library scan reads local files and tags. External services can add identifiers, genres and artist information after those catalog records exist. You can import and play local media without configuring API credentials; a failed lookup is a different problem from a missing source file or failed import.
+
+See [Library Management](library-management.md#what-happens-to-new-music) for automatic requests and [Background Work](background-work.md) for the workers that process them.
 
 ## Supported APIs
 
-| API | Role | Env Vars | What It Provides |
-|-----|------|----------|------------------|
-| MusicBrainz | Primary (required) | `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` | Artist names, MBIDs, release groups, recordings, tags |
-| Discogs | Fallback | `DISCOGS_TOKEN` | Release info, genres, styles, cover art URLs |
-| Last.fm | Optional | `LASTFM_API_KEY`, `LASTFM_API_SECRET` | Artist bios, similar artists, tags, top tracks |
-| Spotify | Integrated, unused | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | Not currently consumed by any service |
-| TasteDive | Integrated, unused | `TASTE_DIVE_API_KEY` | Not currently consumed by any service |
+| API | Current use | Configuration |
+|-----|-------------|---------------|
+| MusicBrainz | First source for stored album, artist and song enrichment | No API key. The adapter sends a fixed application User-Agent. |
+| Discogs | Album and artist fallback when MusicBrainz returns no search results | `DISCOGS_TOKEN` |
+| Last.fm | Artist search and artist information in metadata browse responses | `LASTFM_API_KEY` |
+| Spotify | Adapter exists, but no application service currently calls it | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` are not needed for current workflows |
+| TasteDive | Adapter exists, but no application service currently calls it | `TASTE_DIVE_API_KEY` is not needed for current workflows |
+| LRCLIB | Lyrics fetches for songs without local lyrics | No API key |
 
-For full environment variable details including defaults, see [Configuration](configuration.md).
+These uses describe the adapters when the process doing the lookup has the
+required configuration. The admitted worker recipe currently cannot receive
+`DISCOGS_TOKEN`; see the [configuration limit](#configuration) before relying on
+Discogs for queued enrichment.
+
+The template also lists `MUSICBRAINZ_VERSION`, `MUSICBRAINZ_CONTACT` and `LASTFM_API_SECRET`. The current adapters do not consume those values: changing them does not change the MusicBrainz User-Agent or authenticate Last.fm requests. See [Configuration](configuration.md) for the effective deployment settings.
 
 ## Degradation Matrix
 
-The table below shows what each API contributes and what you lose when its credentials are missing.
+Use this table when catalog records exist but enrichment is missing.
 
-| Missing API | Impact |
-|-------------|--------|
-| **MusicBrainz** | No artist or release matching. This is the primary enrichment source -- without it, most metadata fields remain empty and fallback to Discogs is limited. |
-| **Discogs** | No fallback release info, genres, styles, or cover art when MusicBrainz returns no results. |
-| **Last.fm** | No artist biographies, similar-artist suggestions, or top-track lists. Music and release metadata are unaffected. |
-| **Spotify** | No impact. The adapter is wired but no service currently queries it. |
-| **TasteDive** | No impact. The adapter is wired but no service currently queries it. |
+| Unavailable service | Impact |
+|---------------------|--------|
+| **MusicBrainz** | Song enrichment has no alternate provider. Album and artist searches can fall back to Discogs when MusicBrainz returns no results; an exception is not a guaranteed fallback. Existing local metadata remains available. |
+| **Discogs** | No album or artist fallback results when MusicBrainz finds none. |
+| **Last.fm** | Last.fm artist search and browse information are unavailable. Stored album, artist and song syncs do not call Last.fm. |
+| **Spotify / TasteDive** | No impact on current application workflows. |
+| **LRCLIB** | Remote lyrics fetches cannot supply lyrics; readable `.lrc` sidecars still provide local lyrics during ingestion. |
+
+Provider availability alone does not guarantee a match. Enrichment checks match quality before applying data. A completed sync can therefore leave a record unchanged.
 
 ## How Enrichment Works
 
-A metadata sync runs in the background, either when an administrator starts one or, while the `metadata.auto_sync` [server setting](configuration.md#server-settings) is on, for each new album a scan adds. The setting is off by default, so a fresh install makes no external lookups after a scan until you turn it on. A sync queries external services in this order:
+An administrator can request a metadata sync. With the `metadata.auto_sync` [server setting](configuration.md#server-settings) enabled, ingestion also requests one for each newly created album. The setting is off by default. It controls that automatic album request; it does not disable administrator requests or metadata browsing.
 
-1. **MusicBrainz** is queried first. It provides structured identifiers (MBIDs), release groups, and canonical artist/release data. This is the authoritative source for music metadata.
+1. Album and artist syncs search MusicBrainz first. If the search returns no results, they search Discogs. Song syncs search MusicBrainz only.
+2. The chosen result must pass the match-quality check. Ordinary syncs apply eligible identifiers and metadata according to each field's update rules; force-update requests can replace more existing values. Fields locked by an operator retain their values.
+3. Accepted changes are stored in the catalog and appear on later reads. Last.fm browse responses do not become an automatic third stage of stored enrichment.
 
-2. **Discogs** acts as a fallback. If MusicBrainz returns no match or incomplete data, Baander queries Discogs for release information, genre/style tags, and cover art URLs.
+A rescan of existing music does not request another automatic album sync. Use an administrator metadata sync for existing records, including recovery after an automatic request could not be queued. Follow background jobs and logs in [Monitoring](monitoring.md), then check the affected record: acceptance or job completion alone does not establish a successful provider match.
 
-3. **Last.fm** supplements the results. When its API key is configured, Baander fetches artist biographies, similar artists, tags, and top tracks from Last.fm regardless of whether MusicBrainz or Discogs returned results.
-
-Enrichment results are stored in the database and served to clients on subsequent requests. Re-scanning a library does not sync albums Baander already has; only new albums are queued, and only while `metadata.auto_sync` is on.
-
-For details on how scans are triggered and what happens to new music, see [Library Management](library-management.md#what-happens-to-new-music).
+Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar. The bulk [`app:lyrics:fetch`](commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
 
 ## Configuration
 
-Set the environment variables listed above in your `.env` file or deployment configuration. The MusicBrainz adapter sends a fixed application name in its User-Agent header; operators cannot rename it. The rest are standard API keys.
+Put web lookup credentials in the private Compose environment file described in
+[Getting Started](getting-started.md#command-context), rather than committing them
+to the checkout. Apply changes using the [configuration lifecycle](configuration.md).
+This configures web; it does not configure the independent worker image.
 
-See [Configuration](configuration.md) for the full variable reference with defaults.
+Queued metadata sync runs in workers. Their credentials file accepts a restricted
+set of keys that currently excludes `DISCOGS_TOKEN` and `LASTFM_API_KEY`, and the
+worker image excludes private environment files. The documented worker recipe
+therefore has no supported way to provision these provider secrets. Setting a
+Discogs token for web does not enable its fallback in queued sync. MusicBrainz
+and LRCLIB do not need these credentials; Last.fm's current browse requests run
+in web. Do not bake private tokens into a tracked environment file or image to
+work around this limitation.
+
+Server settings such as `metadata.auto_sync` are read during the work that uses them.
 
 ## Getting API Keys
 
-Each service requires registration on its own platform:
+For current optional integrations, obtain the credential from its provider:
 
-- **MusicBrainz** -- Create an account at [musicbrainz.org](https://musicbrainz.org), then set `MUSICBRAINZ_VERSION` to your Baander version, and `MUSICBRAINZ_CONTACT` to an email address where MusicBrainz can reach you.
-- **Discogs** -- Generate a personal access token at [discogs.com/settings/developers](https://www.discogs.com/settings/developers).
-- **Last.fm** -- Register an API application at [last.fm/api/account/create](https://www.last.fm/api/account/create). You will receive both an API key and a shared secret.
-- **Spotify** -- Create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard). Not needed unless a future release activates the Spotify adapter.
-- **TasteDive** -- Request an API key at [tastedive.com/read_api](https://tastedive.com/read_api). Not needed unless a future release activates the TasteDive adapter.
+- **Discogs**: generate a personal access token in the provider's developer settings and set `DISCOGS_TOKEN`.
+- **Last.fm**: register an API application and set its API key as `LASTFM_API_KEY`.
+
+MusicBrainz and LRCLIB do not require an API key for these lookups. Spotify and TasteDive credentials do not activate an application workflow in the current implementation.

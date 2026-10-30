@@ -9,17 +9,17 @@ use Baander\Tooling\Fixtures\Runtime;
 final class Production
 {
     /** @param array<string,mixed> $config */
-    public static function validateConfiguration(array $config): void
+    public static function validateConfiguration(array $config, string $appHome): void
     {
         Runtime::require(($config['User'] ?? null) === 'www-data', 'Worker must run as application user');
         Runtime::require(
-            ($config['Entrypoint'] ?? null) === [
-                '/usr/local/bin/php',
-                '/var/www/html/bin/console',
-                'app:worker',
-                '--no-interaction',
-            ],
+            ($config['Entrypoint'] ?? null) === ['/usr/local/bin/start-worker.sh'],
             'Worker target entrypoint differs',
+        );
+        Runtime::require(
+            ($config['WorkingDir'] ?? null) === $appHome
+                && in_array('APP_HOME=' . $appHome, $config['Env'] ?? [], true),
+            'Worker target application layout differs',
         );
         Runtime::require(
             in_array($config['Cmd'] ?? null, [null, []], true),
@@ -44,30 +44,19 @@ final class Production
     public static function main(array $arguments, string $root): int
     {
         Runtime::require($arguments === [], 'Production worker qualification takes no arguments');
-        $runtime = new Runtime($root, 300);
+        $runtime = new Runtime($root, budget: 'fixture');
         $resources = new Resources($runtime, 'worker-production');
         try {
             $docker = $resources->docker;
-            $image = $runtime->environment['BAANDER_TEST_IMAGE'] ?? '';
-            Runtime::require($image !== '', 'Set BAANDER_TEST_IMAGE to an image built with --target worker');
-            $identity = $docker->run(['image', 'inspect', '--format', '{{.Id}}', $image])->stdout
-                |> trim(...);
+            $identity = $runtime->image('application')->id;
             $information = json_decode(
                 $docker->run(['image', 'inspect', $identity])->stdout,
                 true,
                 flags: JSON_THROW_ON_ERROR,
             );
-            self::validateConfiguration($information[0]['Config']);
-            $resources->containers = [
-                $resources->id . '-runtime',
-                $resources->id . '-platform',
-                $resources->id . '-file',
-            ];
-            $docker->run([
-                'run',
-                '--rm',
-                '--name',
-                $resources->id . '-runtime',
+            self::validateConfiguration($information[0]['Config'], $runtime->layout()->root);
+
+            $resources->runContainer($resources->id . '-runtime', [
                 '--network',
                 'none',
                 '--entrypoint',
@@ -76,11 +65,7 @@ final class Production
                 '-r',
                 self::RUNTIME_PROBE,
             ]);
-            $docker->run([
-                'run',
-                '--rm',
-                '--name',
-                $resources->id . '-platform',
+            $resources->runContainer($resources->id . '-platform', [
                 '--network',
                 'none',
                 '--entrypoint',
@@ -89,11 +74,7 @@ final class Production
                 'check-platform-reqs',
                 '--no-dev',
             ]);
-            $docker->run([
-                'run',
-                '--rm',
-                '--name',
-                $resources->id . '-file',
+            $resources->runContainer($resources->id . '-file', [
                 '--network',
                 'none',
                 '--cap-drop',
@@ -109,7 +90,7 @@ final class Production
             $runtime->run(
                 [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
                 env: array_replace(
-                    $runtime->environment,
+                    Checkpoint::operatorEnvironment($runtime, $resources->artifacts),
                     [
                         'BAANDER_TEST_IMAGE' => $identity,
                         'BAANDER_TEST_USE_IMAGE' => '1',

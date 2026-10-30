@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Registry\StaticAnalysis\Diagnostics;
-use Baander\Registry\StaticAnalysis\Pins;
+use Baander\Tooling\Registry\StaticAnalysis\Diagnostics;
+use Baander\Tooling\Registry\StaticAnalysis\Pins;
 use Baander\Tooling\Registry\StaticQualification;
 use Baander\RegistryTests\Process;
 use Baander\RegistryTests\Runtime;
@@ -14,8 +14,6 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 require_once dirname(__DIR__, 3) . '/relay/vendor/autoload.php';
-require_once dirname(__DIR__, 3) . '/relay/tools/static/Diagnostics.php';
-require_once dirname(__DIR__, 3) . '/relay/tools/static/Pins.php';
 
 final class RegistryStaticTest extends TestCase
 {
@@ -32,6 +30,29 @@ final class RegistryStaticTest extends TestCase
     protected function tearDown(): void
     {
         Runtime::removeTree($this->work);
+    }
+
+    public function testMissingCompilerDoesNotChangeCallerCompilerEnvironment(): void
+    {
+        $names = ['CC', 'CXX', 'PATH'];
+        $before = array_combine($names, array_map(getenv(...), $names));
+        putenv('CC=caller-cc');
+        putenv('CXX=caller-cxx');
+        putenv('PATH=' . $this->work);
+        try {
+            try {
+                StaticQualification::run($this->work);
+                self::fail('Missing executable must fail qualification.');
+            } catch (RuntimeException $failure) {
+                self::assertStringContainsString('Missing required executable:', $failure->getMessage());
+            }
+            self::assertSame('caller-cc', getenv('CC'));
+            self::assertSame('caller-cxx', getenv('CXX'));
+        } finally {
+            foreach ($before as $name => $value) {
+                putenv($value === false ? $name : $name . '=' . $value);
+            }
+        }
     }
 
     public function testDependencyAnalyzerWarningsAreExcludedByPrimaryLocation(): void
@@ -125,22 +146,7 @@ if (basename($argv[0]) === 'curl') {
     sleep(30);
 }
 PHP;
-        file_put_contents($bin . '/tool', $fixture);
-        chmod($bin . '/tool', 0755);
-        foreach ([
-            'cmake',
-            'ninja',
-            'clang-19',
-            'clang++-19',
-            'clang-tidy-19',
-            'make',
-            'perl',
-            'curl',
-            'tar',
-            'pkg-config',
-        ] as $name) {
-            symlink($bin . '/tool', $bin . '/' . $name);
-        }
+        $this->tools($bin, $fixture);
         $pidFile = $this->work . '/child.pid';
         $process = new Process(
             [PHP_BINARY, dirname(__DIR__, 3) . '/scripts/test-registry-static.php'],
@@ -160,6 +166,53 @@ PHP;
         self::assertSame(143, $code, $process->stderr);
         $stat = @file_get_contents('/proc/' . trim(Pins::read($pidFile)) . '/stat');
         self::assertTrue($stat === false || preg_match('/\) Z /', $stat) === 1, 'The download descendant must have exited.');
+    }
+
+    public function testDownloadFailurePreservesItsCommandStatus(): void
+    {
+        $bin = $this->work . '/bin';
+        mkdir($bin);
+        $fixture = '#!' . PHP_BINARY . "\n<?php\n" . <<<'PHP'
+if (basename($argv[0]) === 'clang-tidy-19') {
+    echo "LLVM version 19.1.7\n";
+    exit(0);
+}
+if (basename($argv[0]) === 'curl') {
+    fwrite(STDERR, "injected static download failure\n");
+    exit(19);
+}
+PHP;
+        $this->tools($bin, $fixture);
+        $process = new Process(
+            [PHP_BINARY, dirname(__DIR__, 3) . '/scripts/test-registry-static.php'],
+            env: ['PATH' => $bin . ':' . getenv('PATH')],
+        );
+        try {
+            self::assertSame(19, $process->wait(5), $process->stderr);
+            self::assertStringContainsString('injected static download failure', $process->stderr);
+        } finally {
+            $process->close(false);
+        }
+    }
+
+    private function tools(string $bin, string $fixture): void
+    {
+        file_put_contents($bin . '/tool', $fixture);
+        chmod($bin . '/tool', 0755);
+        foreach ([
+            'cmake',
+            'ninja',
+            'clang-19',
+            'clang++-19',
+            'clang-tidy-19',
+            'make',
+            'perl',
+            'curl',
+            'tar',
+            'pkg-config',
+        ] as $name) {
+            symlink($bin . '/tool', $bin . '/' . $name);
+        }
     }
 
     /** @return iterable<array{string,string,string}> */

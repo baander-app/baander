@@ -8,7 +8,7 @@ declare(strict_types=1);
 use Baander\Registry\Inventory\Inventory;
 use Baander\Registry\Inventory\InventoryError;
 
-require_once __DIR__ . '/inventory/Inventory.php';
+require dirname(__DIR__) . '/vendor/autoload.php';
 
 $argv = $_SERVER['argv'] ?? [];
 

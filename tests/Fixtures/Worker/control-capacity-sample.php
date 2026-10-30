@@ -12,7 +12,9 @@ if ($mode === 'control') {
 }
 $redis = null;
 if ($db !== null) {
-    $redis = new Redis(); $redis->connect('redis', 6379, 1); $redis->auth(['default', 'test-only']);
+    $redis = new Redis();
+    $redis->connect('redis', 6379, 1);
+    $redis->auth(['default', 'test-only']);
 }
 $deadline = hrtime(true) + (int) ($seconds * 1e9);
 while (hrtime(true) < $deadline) {
@@ -38,5 +40,8 @@ while (hrtime(true) < $deadline) {
     }
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
     flush();
+    if (($stopFile = getenv('BAANDER_TEST_SAMPLER_STOP_FILE')) !== false && is_file($stopFile)) {
+        break;
+    }
     usleep(50000);
 }

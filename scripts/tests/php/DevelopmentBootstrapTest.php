@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Development\Bootstrap;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Process\{EngineExecutor, ExecutionContext, ProcessSpec, ProcessResult};
+use Baander\Tooling\Development\Environment;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Development\WorkflowError;
 use Baander\Tooling\Filesystem\AtomicFile;
 use PHPUnit\Framework\Attributes\DataProvider;
-
-require_once __DIR__ . '/Fixtures/dev-data.php';
 
 final class DevelopmentBootstrapTest extends DevDataTestCase
 {
@@ -42,12 +42,35 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
      * @param array<string,mixed>|null $observation
      * @param list<array<string,string>> $extraMounts
      */
-    private function inventoryRunner(?array $appEnvironment = null, ?array $observation = null, array $extraMounts = []): DevDataRunner
+    private function inventoryRunner(?array $appEnvironment = null, ?array $observation = null, array $extraMounts = [], string $applicationRoot = '/var/www/html', bool $resources = false, bool $attachedFailure = false): DevDataRunner
     {
         $environment = $this->environment();
-        return new DevDataRunner(static function (array $arguments) use ($environment, $appEnvironment, $observation, $extraMounts): string {
+        $engine = null;
+        if ($resources) {
+            $configuration = $this->root . '/bootstrap-resource-fixture.json';
+            AtomicFile::writeJson($configuration, ['root' => $this->root, 'catalog' => ['versions' => [], 'objects' => []],
+                'adoptionEnvironment' => $environment, 'applicationRoot' => $applicationRoot, 'extraMounts' => $extraMounts,
+                'attachedFailure' => $attachedFailure, 'instancePath' => $this->store->directory('persistent') . '/state.json']);
+            $executable = $this->root . '/bootstrap-docker';
+            file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\n\$_SERVER['argv'] = [\$_SERVER['argv'][0], "
+                . var_export($configuration, true) . ", ...array_slice(\$_SERVER['argv'], 1)];\nrequire "
+                . var_export(__DIR__ . '/Fixtures/development-database-docker.php', true) . ";\n");
+            chmod($executable, 0700);
+            $this->instance['docker']['executable'] = $executable;
+            $engine = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
+        }
+        return new DevDataRunner(static function (array $arguments, ?string $input, ?array $env) use ($environment, $appEnvironment, $observation, $extraMounts, $applicationRoot, $engine): string|ProcessResult {
+            if ($engine !== null) {
+                return $engine->run(new ProcessSpec($arguments, environment: $env ?? [], stdin: $input, processGroup: true));
+            }
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon"}';
+            }
+            if (in_array('image', $arguments, true) && in_array('inspect', $arguments, true)) {
+                return json_encode([['Id' => 'existing-image', 'Config' => [
+                    'Labels' => ['org.baander.application-layout' => json_encode(['version' => 1, 'root' => $applicationRoot], JSON_THROW_ON_ERROR)],
+                    'Env' => ['APP_HOME=' . $applicationRoot], 'WorkingDir' => $applicationRoot,
+                ]]], JSON_THROW_ON_ERROR);
             }
             if (in_array('inspect', $arguments, true) && in_array('--format', $arguments, true)) {
                 return '0';
@@ -68,7 +91,7 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
                     $mounts = [['Type' => 'volume', 'Name' => 'existing-redis', 'Destination' => '/data']];
                 } else {
                     $mounts = [
-                        ['Type' => 'bind', 'Source' => '/original/checkout', 'Destination' => '/var/www/html'],
+                        ['Type' => 'bind', 'Source' => '/original/checkout', 'Destination' => $applicationRoot],
                         ['Type' => 'bind', 'Source' => '/original/library', 'Destination' => '/storage/media'],
                         ['Type' => 'bind', 'Source' => '/original/conversions', 'Destination' => '/storage/conversions'],
                         ...$extraMounts,
@@ -97,7 +120,7 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
 
     public function testConfigurePreservesGeneratedIdentityOnResumeAndTargetsManagedServices(): void
     {
-        $bootstrap = new Bootstrap($this->store, new Runner());
+        $bootstrap = new Bootstrap($this->store, new DevelopmentCommandExecutor());
         $configured = $bootstrap->configure($this->instance);
         $path = $this->store->directory('persistent') . '/env.json';
         $before = file_get_contents($path);
@@ -116,7 +139,7 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', ['APP_SECRET' => 'original']);
         $this->expectExceptionMessage('Saved instance identity differs');
-        new Bootstrap($this->store, new Runner())->configure($this->instance, ['APP_SECRET' => 'different']);
+        new Bootstrap($this->store, new DevelopmentCommandExecutor())->configure($this->instance, ['APP_SECRET' => 'different']);
     }
 
     public function testUnknownAdoptionRoleIsRejectedBeforeContainerInspection(): void
@@ -146,6 +169,26 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
         self::assertSame('/original/checkout/storage', $configured['state_mounts']['storage']['source']);
         self::assertTrue($configured['state_mounts']['media']['read_only']);
         self::assertSame('/original/library', $configured['state_mounts']['media']['source']);
+    }
+
+    public function testImageLayoutControlsAdoptionPathsAndIdentityProbes(): void
+    {
+        $digests = [];
+        foreach (['APP_SECRET', 'STREAM_URL_HMAC_SECRET', 'VAPID_PRIVATE_KEY', 'VAPID_PUBLIC_KEY'] as $key) {
+            $digests[$key] = hash('sha256', $this->environment()[$key]);
+        }
+        $runner = $this->inventoryRunner([], $digests, applicationRoot: '/srv/baander');
+        $configured = new Bootstrap($this->store, $runner)->configure($this->instance, $this->environment(), $this->adoption());
+        self::assertSame('/srv/baander/var', $configured['state_mounts']['var']['target']);
+        self::assertSame('/srv/baander/config/secrets', $configured['state_mounts']['secrets']['target']);
+        self::assertSame('/srv/baander/storage', $configured['state_mounts']['storage']['target']);
+        self::assertSame('/original/checkout/storage', $configured['state_mounts']['storage']['source']);
+        $probes = array_values(array_filter($runner->calls, static fn(array $call): bool => in_array('php', $call['arguments'], true)));
+        self::assertCount(2, $probes);
+        foreach ($probes as $probe) {
+            self::assertContains('/srv/baander', $probe['arguments']);
+            self::assertStringNotContainsString('/var/www/html', implode(' ', $probe['arguments']));
+        }
     }
 
     public function testWrongSecretRefusesWithoutPersistingOrStoppingAndDoesNotDiscloseSecrets(): void
@@ -219,11 +262,13 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
 
     public function testTransferCopiesWritableArchivesWithoutHostBindsAndRetainsSourceVolumes(): void
     {
-        $runner = $this->inventoryRunner();
+        $runner = $this->inventoryRunner(resources: true);
         $bootstrap = new Bootstrap($this->store, $runner);
         $configured = $bootstrap->configure($this->instance, $this->environment(), $this->adoption());
         $configured['writers_stopped'] = true;
-        $transferred = $bootstrap->transfer($configured, $this->release, ['verified' => true, 'directory' => $this->root . '/checkpoint']);
+        $release = array_replace($this->release, ['layout' => ['version' => 1, 'root' => '/srv/prepared-release']]);
+        $transferred = $bootstrap->transfer($configured, $release, ['verified' => true, 'directory' => $this->root . '/checkpoint']);
+        self::assertSame('/srv/prepared-release/var/transcode_state', $transferred['state_mounts']['transcode_state']['target']);
         self::assertSame($configured['state_mounts']['media'], $transferred['state_mounts']['media']);
         self::assertSame('existing-redis', $transferred['volumes']['redis']);
         self::assertSame('existing-database', $transferred['volumes']['database']);
@@ -263,7 +308,7 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
             'Destination' => '/var/www/html/var/transcode_state',
             'Name' => 'original-transcode',
             'Source' => '/original/transcode',
-        ]]);
+        ]], resources: true);
         $bootstrap = new Bootstrap($this->store, $runner);
         $configured = $bootstrap->inventory($this->instance, $this->adoption(), $this->environment());
         self::assertSame($kind, $configured['state_mounts']['transcode_state']['type']);
@@ -280,25 +325,51 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
         }
     }
 
+    public function testInterruptedAdoptionCopyPreservesPartialVolumeAndRejectsAutomaticRetry(): void
+    {
+        $runner = $this->inventoryRunner(resources: true, attachedFailure: true);
+        $bootstrap = new Bootstrap($this->store, $runner);
+        $configured = $bootstrap->configure($this->instance, $this->environment(), $this->adoption());
+        $configured['writers_stopped'] = true;
+        $environment = file_get_contents($this->store->directory('persistent') . '/env.json');
+        $checkpoint = ['verified' => true, 'directory' => $this->root . '/checkpoint'];
+        try {
+            $bootstrap->transfer($configured, $this->release, $checkpoint);
+            self::fail('Interrupted adoption extraction was accepted.');
+        } catch (\RuntimeException $error) {
+            self::assertSame(17, $error->getCode());
+        }
+        $saved = $this->store->load('persistent');
+        self::assertSame('copying', $saved['adoption_transfer']['var']['phase']);
+        self::assertArrayNotHasKey('ownership_transferred', $saved);
+        self::assertSame($environment, file_get_contents($this->store->directory('persistent') . '/env.json'));
+        self::assertEquals($configured['state_mounts']['var'], $saved['state_mounts']['var']);
+        $resourceFiles = glob($this->root . '/docker-resources/*.json');
+        self::assertCount(1, $resourceFiles);
+        $volume = AtomicFile::readJson($resourceFiles[0]);
+        self::assertSame('volume', $volume['kind']);
+        self::assertSame($saved['adoption_transfer']['var']['volume'], $volume['Name']);
+        $copies = count(array_filter($runner->calls, static fn(array $call): bool => in_array('cp', $call['arguments'], true)));
+        try {
+            $bootstrap->transfer($saved, $this->release, $checkpoint);
+            self::fail('Partial extraction was reset by automatic retry.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString('interrupted', $error->getMessage());
+            self::assertSame($copies, count(array_filter($runner->calls, static fn(array $call): bool => in_array('cp', $call['arguments'], true))));
+        }
+    }
+
     public function testFreshSetupPersistsMutationBoundaryBeforeCommandAndRetainsFailure(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', ['APP_SECRET' => 'fixture']);
         $store = $this->store;
-        $runner = new DevDataRunner(static function (array $arguments) use ($store): string {
-            if (in_array('app:dev:setup', $arguments, true)) {
-                self::assertTrue($store->load('persistent')['database_mutation_started']);
-                throw new WorkflowError('setup interrupted');
-            }
-            if (in_array('info', $arguments, true)) {
-                return '{"ID":"daemon"}';
-            }
-            return str_contains(implode(' ', $arguments), 'psql') ? '{"versions":[],"objects":[]}' : 'container';
-        });
+        $runner = $this->inventoryRunner(resources: true, attachedFailure: true);
         try {
             new Bootstrap($store, $runner)->initialize($this->instance, $this->release);
             self::fail('Interrupted setup accepted');
-        } catch (WorkflowError $error) {
-            self::assertSame('setup interrupted', $error->getMessage());
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('fixture migration failed after an earlier commit', $error->getMessage());
+            self::assertSame(17, $error->getCode());
         }
         self::assertTrue($store->load('persistent')['database_mutation_started']);
         self::assertSame('blocked', $store->load('persistent')['phase']);

@@ -5,7 +5,7 @@ server {
     server_name ${SERVER_NAME};
     allow ${GATEWAY_ADDRESS};
     deny all;
-    root /var/www/html/public;
+    root ${APP_HOME}/public;
     set $app_backend http://app:9501;
     set $vite_backend http://vite:5174;
     client_max_body_size 100m;

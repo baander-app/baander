@@ -13,6 +13,12 @@ file_put_contents(
 if (in_array($arguments[0] ?? '', ['--context', '--host'], true)) {
     $arguments = array_slice($arguments, 2);
 }
+while (in_array($arguments[0] ?? '', ['--tls', '--tlsverify', '--tlscacert', '--tlscert', '--tlskey'], true)) {
+    $option = array_shift($arguments);
+    if (!in_array($option, ['--tls', '--tlsverify'], true)) {
+        array_shift($arguments);
+    }
+}
 $statePath = $directory . '/state.json';
 $state = is_file($statePath) ? json_decode(file_get_contents($statePath), true, flags: JSON_THROW_ON_ERROR) : ['containers' => [], 'projects' => []];
 $save = static function () use (&$state, $statePath): void {
@@ -52,7 +58,23 @@ if ($command === 'context' && ($arguments[1] ?? '') === 'show') {
     echo 'fixture-current';
     exit(0);
 }
+if ($command === 'context' && ($arguments[1] ?? '') === 'inspect') {
+    echo json_encode([['Endpoints' => ['docker' => ['Host' => 'unix:///baander.app/' . $arguments[2] . '.sock']]]]);
+    exit(0);
+}
+if ($command === 'image' && ($arguments[1] ?? '') === 'inspect') {
+    if (in_array('--format', $arguments, true)) {
+        echo 'sha256:' . str_repeat('a', 64);
+        exit(0);
+    }
+    $layout = ['version' => 1, 'root' => getenv('BACKEND_APP_HOME') ?: '/var/www/html'];
+    echo json_encode([['Config' => ['Labels' => ['org.baander.application-layout' => json_encode($layout)], 'Env' => ['APP_HOME=' . $layout['root']], 'WorkingDir' => $layout['root']]]]);
+    exit(0);
+}
 if ($command === 'info') {
+    if (is_file($directory . '/cleanup-started')) {
+        usleep((int) (getenv('BACKEND_CLEANUP_DELAY_MICROSECONDS') ?: 0));
+    }
     file_put_contents(
         $directory . '/docker-environment.json',
         json_encode(
@@ -68,9 +90,17 @@ if ($command === 'info') {
 }
 if ($command === 'create') {
     $name = $arguments[array_search('--name', $arguments, true) + 1];
-    $state['containers'][$name] = true;
+    $labels = [];
+    foreach ($arguments as $index => $argument) {
+        if ($argument === '--label') {
+            [$key, $value] = explode('=', $arguments[$index + 1], 2);
+            $labels[$key] = $value;
+        }
+    }
+    $state['containers'][$name] = ['id' => hash('sha256', $name), 'labels' => $labels];
     $save();
     mkdir($directory . '/containers/' . $name . '/tmp/baander-run', 0700, true);
+    echo hash('sha256', $name);
     exit(0);
 }
 if ($command === 'compose') {
@@ -79,10 +109,14 @@ if ($command === 'compose') {
         exit(0);
     }
     $project = $arguments[array_search('--project-name', $arguments, true) + 1];
+    if (in_array('config', $arguments, true)) {
+        echo json_encode(['services' => ['app' => ['image' => 'app'], 'postgres' => ['image' => 'postgres'], 'redis' => ['image' => 'redis']], 'networks' => ['private' => ['name' => $state['configured_names']['network'] ?? $project . '_private']], 'volumes' => ['postgres_data' => ['name' => $state['configured_names']['volume'] ?? $project . '_postgres_data'], 'redis_data' => ['name' => $project . '_redis_data']]]);
+        exit(0);
+    }
     if (in_array('down', $arguments, true)) {
         unset($state['projects'][$project]);
         $save();
-        exit($failure === 'cleanup' ? 7 : 0);
+        exit(($failure === 'cleanup' || getenv('BACKEND_FAIL_CLEANUP') === '1') ? 7 : 0);
     }
     if (in_array('logs', $arguments, true)) {
         echo "compose log\n";
@@ -97,7 +131,9 @@ if ($command === 'compose') {
         echo $name;
         exit(0);
     }
-    $state['projects'][$project] = true;
+    $file = $arguments[array_search('--file', $arguments, true) + 1];
+    $config = json_decode(file_get_contents($file), true, flags: JSON_THROW_ON_ERROR);
+    $state['projects'][$project] = $config['services']['app']['labels'];
     $save();
     exit(0);
 }
@@ -154,17 +190,57 @@ if ($command === 'exec') {
     exit(0);
 }
 if ($command === 'rm') {
-    unset($state['containers'][$arguments[array_key_last($arguments)]]);
+    $identifier = $arguments[array_key_last($arguments)];
+    foreach ($state['containers'] as $name => $container) {
+        if ($name === $identifier || $container['id'] === $identifier) {
+            unset($state['containers'][$name]);
+        }
+    }
     $save();
-    exit($failure === 'cleanup' ? 7 : 0);
+    exit(($failure === 'cleanup' || getenv('BACKEND_FAIL_CLEANUP') === '1') ? 7 : 0);
 }
 if ($command === 'logs') {
     echo "container log\n";
     exit(0);
 }
+if ($command === 'container' && ($arguments[1] ?? '') === 'inspect') {
+    $name = $arguments[array_key_last($arguments)];
+    if (isset($state['containers'][$name])) {
+        $container = $state['containers'][$name];
+        echo json_encode([['Name' => '/' . $name, 'Id' => $container['id'], 'Config' => ['Labels' => $container['labels']]]]);
+        exit(0);
+    }
+    foreach ($state['projects'] as $project => $labels) {
+        if (in_array($name, [substr(hash('sha256', $project . 'app'), 0, 12), hash('sha256', $project . 'app')], true)) {
+            echo json_encode([['Name' => '/' . $project . '-app-1', 'Id' => $state['project_ids'][$project] ?? hash('sha256', $project . 'app'), 'Config' => ['Labels' => $labels], 'Mounts' => [['Type' => 'volume', 'Name' => 'anonymous-fixture-volume']]]]);
+            exit(0);
+        }
+    }
+    fwrite(STDERR, 'Error: No such container: ' . $name);
+    exit(1);
+}
+if ($command === 'container' && ($arguments[1] ?? '') === 'ls') {
+    $filter = array_search('--filter', $arguments, true);
+    if ($filter !== false) {
+        $project = substr($arguments[$filter + 1], strlen('label=com.docker.compose.project='));
+        if (isset($state['projects'][$project])) {
+            echo substr(hash('sha256', $project . 'app'), 0, 12);
+        }
+    }
+    exit(0);
+}
 if ($command === 'inspect') {
     echo '[{"Mounts":[{"Type":"volume","Name":"anonymous-fixture-volume"}]}]';
     exit(0);
+}
+if (in_array($command, ['network', 'volume'], true) && ($arguments[1] ?? '') === 'inspect') {
+    $name = $arguments[array_key_last($arguments)];
+    if (isset($state['foreign_resources'][$command][$name])) {
+        echo json_encode([$state['foreign_resources'][$command][$name]]);
+        exit(0);
+    }
+    fwrite(STDERR, 'Error: No such ' . $command . ': ' . $name);
+    exit(1);
 }
 if (in_array($command, ['ps', 'network', 'volume'], true)) {
     if ($failure === 'inventory' && $command === 'volume') {

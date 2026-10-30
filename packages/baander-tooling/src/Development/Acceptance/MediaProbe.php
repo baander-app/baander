@@ -7,14 +7,23 @@ namespace Baander\Tooling\Development\Acceptance;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Process\{CommandExecutor, ExecutionContext, ProcessResult, ProcessSpec};
 
 final class MediaProbe
 {
+    public function __construct(private readonly CommandExecutor $executor, private readonly ExecutionContext $context) {}
+
+    /** @param non-empty-list<string> $arguments */
+    private function execute(array $arguments, ?float $timeout = null): ProcessResult
+    {
+        return $this->executor->run(new ProcessSpec($arguments, environment: $this->context->environment, timeout: $timeout, processGroup: true, replaceEnvironment: true));
+    }
+
     /** @return array<string,mixed> */
-    public static function decodedAudio(string $path): array
+    public function decodedAudio(string $path): array
     {
         $metadata = json_decode(
-            Support::run(
+            $this->execute(
                 ['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $path],
                 timeout: 60,
             )->stdout,
@@ -28,7 +37,7 @@ final class MediaProbe
             ))
             |> array_values(...);
         Support::check(count($audio) === 1, 'Playback response must contain exactly one audio stream.');
-        $pcm = Support::run([
+        $pcm = $this->execute([
             'ffmpeg',
             '-v',
             'error',
@@ -62,7 +71,7 @@ final class MediaProbe
     /** @param array<string,string|bool> $args
      * @return array<string,mixed>
      */
-    public static function qualify(array $args): array
+    public function qualify(array $args): array
     {
         $workspace = Support::path((string) $args['workspace']);
         Support::check(
@@ -77,7 +86,7 @@ final class MediaProbe
         $fixture = $media . '/workflow-qualification-tone.flac';
         PrivateDirectory::assertNoSymlinks($fixture);
         if (!file_exists($fixture)) {
-            Support::run([
+            $this->execute([
                 'ffmpeg',
                 '-v',
                 'error',
@@ -132,6 +141,7 @@ final class MediaProbe
         $client = new MediaClient(
             'https://' . $instance['hostname'],
             (string) ($args['ca-file'] ?: $store->root . '/host-setup/ca/rootCA.pem'),
+            $this->context,
         );
         [, $login] = $client->request(
             '/api/auth/login',
@@ -239,7 +249,7 @@ final class MediaProbe
                 '/api/stream/track?id=' . $song['publicId'] . $suffix,
                 destination: $destination,
             );
-            $result = array_replace($result, self::decodedAudio($destination));
+            $result = array_replace($result, $this->decodedAudio($destination));
             Support::check(
                 $result['status'] === 200
                     && $result['bytes'] > 0

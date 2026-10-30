@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Development\Supervisor;
 use Baander\Tooling\Development\WorkflowError;
+use Baander\Tooling\Process\CommandFailure;
 use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Process\ProcessRunner;
+use Baander\Tooling\Process\ProcessSpec;
 use PHPUnit\Framework\TestCase;
-
-require_once __DIR__ . '/Fixtures/dev-core-runner.php';
 
 final class DevelopmentSupervisorTest extends TestCase
 {
@@ -89,9 +89,9 @@ PHP,
     }
 
     /** @param (\Closure(array<string>):void)|null $callback */
-    private function runner(?\Closure $callback = null): DevCoreRunner
+    private function runner(?\Closure $callback = null): HostCommandExecutor
     {
-        return new DevCoreRunner(static function (array $arguments) use ($callback): ?ProcessResult {
+        return new HostCommandExecutor(static function (array $arguments) use ($callback): ?ProcessResult {
             if ($callback !== null) {
                 $callback($arguments);
             }
@@ -99,41 +99,43 @@ PHP,
         });
     }
 
-    private function supervisor(Runner $runner): Supervisor
+    private function supervisor(HostCommandExecutor $runner): Supervisor
     {
         return new Supervisor($this->store, $runner, $this->root . '/source');
     }
 
-    public function testCopiedPhpControllerReplacesLegacyWithAbsoluteQuotedExecutable(): void
+    public function testCopiedPhpControllerPreservesLegacyWithAbsoluteQuotedExecutable(): void
     {
         mkdir($this->store->root . '/controller/scripts/dev_environment', 0700, true);
         file_put_contents($this->store->root . '/controller/scripts/dev_environment/updater.py', 'legacy');
         file_put_contents($this->store->root . '/controller/scripts/dev-environment.py', 'legacy');
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
-        $controller = $this->store->root . '/controller/scripts/dev-environment.php';
+        $payload = new \Baander\Tooling\Development\ControllerPayload($this->store->root);
+        $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
+        $controller = $payload->launcher();
         $unit = (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.service');
         self::assertFileExists($controller);
-        self::assertFileExists(dirname($controller) . '/bootstrap.php');
-        self::assertFileExists($this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php');
-        self::assertSame('../../../packages/baander-tooling', readlink(dirname($controller) . '/vendor/baander/tooling'));
+        self::assertFileExists($generation . '/scripts/bootstrap.php');
+        self::assertFileExists($generation . '/packages/baander-tooling/src/Process/ProcessRunner.php');
+        self::assertSame('../../../packages/baander-tooling', readlink($generation . '/scripts/vendor/baander/tooling'));
         rename($this->root . '/source', $this->root . '/source-offline');
-        self::assertFileExists(dirname($controller) . '/vendor/autoload.php');
-        self::assertSame('controller', new Runner()->run([PHP_BINARY, '-n', $controller])->stdout);
+        self::assertFileExists($generation . '/scripts/vendor/autoload.php');
+        self::assertSame('controller', new ProcessRunner()->run(new ProcessSpec([PHP_BINARY, '-n', $controller]))->stdout);
         $probe = json_decode(
-            new Runner()->run([PHP_BINARY, $controller, '--probe-package'])->stdout,
+            new ProcessRunner()->run(new ProcessSpec([PHP_BINARY, $controller, '--probe-package']))->stdout,
             true,
             flags: JSON_THROW_ON_ERROR,
         );
         self::assertSame('package-helper', $probe['stdout']);
         self::assertSame(0, $probe['exit']);
         self::assertSame(
-            $this->store->root . '/controller/packages/baander-tooling/src/Process/ProcessRunner.php',
+            $generation . '/packages/baander-tooling/src/Process/ProcessRunner.php',
             $probe['source'],
         );
-        self::assertFileDoesNotExist(dirname($controller) . '/dev-environment.py');
-        self::assertDirectoryDoesNotExist(dirname($controller) . '/dev_environment');
-        self::assertFileDoesNotExist($this->store->root . '/controller/docker/dev/private.key');
+        self::assertFileExists($this->store->root . '/controller/scripts/dev-environment.py');
+        self::assertDirectoryExists($this->store->root . '/controller/scripts/dev_environment');
+        self::assertFileDoesNotExist($generation . '/docker/dev/private.key');
         self::assertStringContainsString(Supervisor::systemdArgument((string) realpath(PHP_BINARY)), $unit);
         self::assertStringContainsString(Supervisor::systemdArgument($controller), $unit);
         self::assertStringNotContainsString($this->root . '/source', $unit);
@@ -141,6 +143,37 @@ PHP,
             'Unit=' . $supervisor->unit . '.service',
             (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.timer'),
         );
+    }
+
+    public function testLegacyServiceFenceLetsWaitingWriterFinishOutsideInstanceLock(): void
+    {
+        mkdir($this->store->root . '/controller/scripts', 0700, true);
+        file_put_contents($this->store->root . '/controller/scripts/dev-environment.php', '<?php // legacy');
+        $this->store->setEnabled('persistent', true);
+        $writer = $this->store->lock('persistent');
+        $observations = 0;
+        $runner = new HostCommandExecutor(function (array $arguments) use (&$observations, $writer): ?ProcessResult {
+            if ($arguments[2] === 'stop') {
+                self::assertStringEndsWith('.timer', $arguments[3]);
+            }
+            if ($arguments[2] === 'show') {
+                ++$observations;
+                if ($observations === 1) {
+                    $writer->release();
+                    $operation = $this->store->lock('persistent');
+                    $this->store->save('persistent', ['id' => 'persistent', 'phase' => 'ready']);
+                    $operation->release();
+                    return new ProcessResult(0, null, false, false, "active\n", '', 0);
+                }
+                return new ProcessResult(0, null, false, false, "inactive\n", '', 0);
+            }
+            return null;
+        });
+        $this->supervisor($runner)->fenceLegacyService();
+        self::assertSame(2, $observations);
+        self::assertSame('ready', $this->store->load('persistent')['phase']);
+        self::assertTrue($this->store->enabled('persistent'));
+        self::assertFileExists($this->store->root . '/controller/scripts/dev-environment.php');
     }
 
     public function testOnlyTheDeclaredComposerPackageLinkCanEnterThePayload(): void
@@ -159,9 +192,11 @@ PHP,
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
         $supervisor->install();
+        $payload = new \Baander\Tooling\Development\ControllerPayload($this->store->root);
+        $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
         self::assertSame(
-            realpath($this->store->root . '/controller/packages/baander-tooling'),
-            realpath($this->store->root . '/controller/scripts/vendor/baander/tooling'),
+            realpath($generation . '/packages/baander-tooling'),
+            realpath($generation . '/scripts/vendor/baander/tooling'),
         );
     }
 
@@ -258,6 +293,36 @@ PHP,
             ['systemctl', '--user', 'disable', '--now', $supervisor->unit . '.timer'],
             $runner->calls[array_key_last($runner->calls)]['arguments'],
         );
+    }
+
+    public function testCommandFailureRetainsExitStatusAndRollsBackEnableIntent(): void
+    {
+        $executor = new HostCommandExecutor(static function (array $arguments): ?ProcessResult {
+            return ($arguments[2] ?? '') === 'enable'
+                ? new ProcessResult(23, null, false, false, '', 'systemctl rejected enable', 0)
+                : null;
+        });
+        try {
+            $this->supervisor($executor)->enable();
+            self::fail('Failed systemctl command was accepted.');
+        } catch (CommandFailure $error) {
+            self::assertSame(23, $error->getCode());
+            self::assertStringContainsString('systemctl rejected enable', $error->getMessage());
+            self::assertFalse($this->store->enabled('persistent'));
+        }
+    }
+
+    public function testUncheckedDisableStillReportsTimeout(): void
+    {
+        $this->store->setEnabled('persistent', true);
+        $executor = new HostCommandExecutor(static fn(): ProcessResult => new ProcessResult(0, null, true, false, '', '', 0));
+        try {
+            $this->supervisor($executor)->disable();
+            self::fail('Timed out disable was accepted.');
+        } catch (CommandFailure $error) {
+            self::assertSame(124, $error->getCode());
+            self::assertFalse($this->store->enabled('persistent'));
+        }
     }
 
     public function testFailedEnableRollsBackIntent(): void

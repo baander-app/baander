@@ -4,207 +4,151 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures;
 
-use Baander\Tooling\Development\{Docker, Environment, Runner};
-use Baander\Tooling\Process\{ProcessResult, ProcessRunner, ProcessSpec, RunningProcess, SignalScope};
+use Baander\Tooling\Configuration\{ApplicationLayout, ToolingConfiguration};
+use Baander\Tooling\Docker\{Client, ResolvedImage, Target, TargetResolver};
+use Baander\Tooling\Process\{CommandFailure, CompletionPolicy, EngineExecutor, ExecutionContext, ProcessResult, ProcessSpec, RunningProcess};
+use Baander\Tooling\Resources\ResourceLedger;
 use RuntimeException;
 use Throwable;
 
-final class Runtime extends Runner
+final class Runtime
 {
-    private readonly ProcessRunner $processes;
-    private readonly SignalScope $signals;
-    private readonly float $deadline;
+    public readonly EngineExecutor $executor;
+    public readonly ToolingConfiguration $configuration;
+    private ?EngineExecutor $cleanupExecutor = null;
+    private ?Target $target = null;
+    private ?ApplicationLayout $layout = null;
+    /** @var array<string,ResolvedImage> */
+    private array $images = [];
+    /** @var \WeakMap<RunningProcess,EngineExecutor> */
+    private \WeakMap $owners;
     public bool $cleaning = false;
     /** @var array<string,string> */
-    public array $environment;
-    /** @var list<RunningProcess> */
-    private array $children = [];
-
+    public readonly array $environment;
     /** @param array<string,string>|null $environment */
-    public function __construct(public readonly string $root, float $seconds = 600, ?array $environment = null)
+    public function __construct(public readonly string $root, ?float $seconds = null, ?array $environment = null, ?ToolingConfiguration $configuration = null, string $budget = 'fixture')
     {
         $this->environment = $environment ?? getenv();
-        $this->deadline = self::now() + $seconds;
-        $this->processes = new ProcessRunner();
-        $this->signals = new SignalScope();
+        $this->configuration = $configuration ?? ToolingConfiguration::forRepository($root, $this->environment);
+        $this->executor = new EngineExecutor(ExecutionContext::bounded($seconds ?? $this->configuration->budgets->seconds($budget), $this->environment, $root));
+        $this->owners = new \WeakMap();
     }
-
     public static function now(): float
     {
         return hrtime(true) / 1_000_000_000;
     }
-
-    /** @param non-empty-list<string> $arguments
-     * @param array<string,string>|null $env
-     */
-    public function run(
-        array $arguments,
-        ?string $cwd = null,
-        ?array $env = null,
-        ?string $input = null,
-        ?float $timeout = 120,
-        bool $check = true,
-        ?string $logPath = null,
-        bool $interactive = false,
-        ?string $stderrLogPath = null,
-        float $terminationGrace = .25,
-    ): ProcessResult {
-        return $this->wait(
-            $this->start(
-                $arguments,
-                $cwd,
-                $env,
-                $input,
-                $timeout,
-                $logPath,
-                $interactive,
-                $stderrLogPath,
-                $terminationGrace,
-            ),
-            $check,
-        );
+    public function cleanupExecutor(): EngineExecutor
+    {
+        return $this->cleanupExecutor ??= new EngineExecutor(ExecutionContext::bounded($this->configuration->budgets->seconds('cleanup'), $this->environment, $this->root, ignoreCancellation: true));
     }
-
+    private function commands(): EngineExecutor
+    {
+        return $this->cleaning ? $this->cleanupExecutor() : $this->executor;
+    }
     /** @param non-empty-list<string> $arguments
      * @param array<string,string>|null $env
      */
-    public function start(
-        array $arguments,
-        ?string $cwd = null,
-        ?array $env = null,
-        ?string $input = null,
-        ?float $timeout = 120,
-        ?string $logPath = null,
-        bool $interactive = false,
-        ?string $stderrLogPath = null,
-        float $terminationGrace = .25,
-    ): RunningProcess {
-        $this->checkpoint();
-        if (!$this->cleaning) {
-            $remaining = $this->deadline - self::now();
-            $timeout = $timeout === null ? $remaining : min($timeout, $remaining);
-        }
-        $process = $this->processes->start(new ProcessSpec(
-            argv: $arguments,
-            cwd: $cwd ?? $this->root,
-            environment: $env ?? $this->environment,
-            timeout: $timeout,
-            stdin: $input,
-            logPath: $logPath,
-            passthrough: $interactive,
-            processGroup: !$interactive,
-            ignoreCancellation: $this->cleaning,
-            stderrLogPath: $stderrLogPath,
-            terminationGrace: $terminationGrace,
-        ));
-        $this->children[] = $process;
+    public function run(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, bool $check = true, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25): ProcessResult
+    {
+        return $this->wait($this->start($arguments, $cwd, $env, $input, $timeout, $logPath, $interactive, $stderrLogPath, $terminationGrace), $check);
+    }
+    /** @param non-empty-list<string> $arguments
+     * @param array<string,string>|null $env
+     */
+    public function start(array $arguments, ?string $cwd = null, ?array $env = null, ?string $input = null, ?float $timeout = null, ?string $logPath = null, bool $interactive = false, ?string $stderrLogPath = null, float $terminationGrace = .25): RunningProcess
+    {
+        $executor = $this->commands();
+        $process = $executor->start(new ProcessSpec($arguments, cwd: $cwd, environment: $env ?? $this->environment, timeout: $timeout, stdin: $input, logPath: $logPath, passthrough: $interactive, processGroup: !$interactive, stderrLogPath: $stderrLogPath, terminationGrace: $terminationGrace, replaceEnvironment: true));
+        $this->owners[$process] = $executor;
         return $process;
     }
-
     public function wait(RunningProcess $process, bool $check = true): ProcessResult
     {
-        $result = $this->processes->wait($process);
-        if ($check && ($result->exitCode !== 0 || $result->timedOut || $result->cancelled)) {
-            throw new Failure(
-                'Fixture command failed (exit ' . $result->exitCode . ')'
-                . ($result->timedOut ? ' after timeout' : '') . ($result->cancelled ? ' after interruption' : '')
-                . ': ' . substr($result->stdout . $result->stderr, -4000),
-                $result->timedOut ? 124 : ($result->cancelled ? 128 + ($result->signal ?? 15) : $result->exitCode),
-            );
+        try {
+            return ($this->owners[$process] ?? $this->executor)->wait($process, new CompletionPolicy($check ? [0] : null));
+        } finally {
+            unset($this->owners[$process]);
         }
-        return $result;
     }
-
     public function checkpoint(): void
     {
-        $this->signals->dispatch();
-        if (!$this->cleaning && $this->signals->receivedSignal() !== null) {
-            throw new Failure('Fixture interrupted', 128 + $this->signals->receivedSignal());
-        }
-        if (!$this->cleaning && self::now() >= $this->deadline) {
-            throw new Failure('Fixture overall timeout expired', 124);
-        }
+        $this->commands()->checkpoint();
     }
-
     public function pause(float $seconds): void
     {
         $until = self::now() + $seconds;
         do {
             $this->checkpoint();
-            foreach ($this->children as $child) {
-                $child->pump();
-            }
+            $this->executor->pump();
+            $this->cleanupExecutor?->pump();
             usleep((int) min(10_000, max(0, ($until - self::now()) * 1_000_000)));
         } while (self::now() < $until);
     }
-
     public function alive(RunningProcess $process): bool
     {
-        $process->pump();
+        $this->executor->pump();
+        $this->cleanupExecutor?->pump();
         return $process->result() === null;
     }
-
     /** @param callable():bool $condition */
-    public function await(
-        callable $condition,
-        float $seconds,
-        float $interval = .1,
-        string $message = 'Fixture did not become ready',
-    ): void {
+    public function await(callable $condition, float $seconds, float $interval = .1, string $message = 'Fixture did not become ready'): void
+    {
         $until = self::now() + $seconds;
         do {
             if ($condition()) {
                 return;
-            }
-            $this->pause($interval);
+            } $this->pause($interval);
         } while (self::now() < $until);
         throw new RuntimeException($message);
     }
-
     public function stop(RunningProcess $process, bool $check = false): ProcessResult
     {
-        $process->cancel();
-        return $this->wait($process, $check);
+        try {
+            $result = ($this->owners[$process] ?? $this->executor)->stop($process);
+            if ($check && $result->exitCode !== 0) {
+                throw new CommandFailure('Stopped fixture command returned a nonzero status.', $result->exitCode, $result);
+            }
+            return $result;
+        } finally {
+            unset($this->owners[$process]);
+        }
     }
-
     public function close(): void
     {
-        $this->cleaning = true;
-        foreach ($this->children as $child) {
-            if ($child->result() === null) {
-                try {
-                    $this->stop($child);
-                } catch (Throwable $error) {
-                    fwrite(STDERR, $error->getMessage() . "\n");
-                }
-            }
+        try {
+            $this->executor->close();
+        } finally {
+            $this->cleanupExecutor?->close();
+            $this->owners = new \WeakMap();
         }
-        $this->signals->close();
     }
-
-    public function docker(bool $operator = false): Docker
+    public function docker(): Client
     {
-        $binary = Environment::executable('docker') ?? throw new RuntimeException('Install Docker first');
-        $endpoint = $this->environment['BAANDER_TEST_DOCKER_ENDPOINT'] ?? '';
-        if ($operator && (($this->environment['BAANDER_TEST_OPERATOR_IN_CONTAINER'] ?? '0') !== '1' || $endpoint !== '')) {
-            $endpoint = $endpoint !== '' ? $endpoint : 'unix:///var/run/docker.sock';
+        if ($this->target === null) {
+            $directory = self::artifacts($this->root, 'fixture-transport', $this->environment) . '/transport-' . bin2hex(random_bytes(8));
+            $this->target = new TargetResolver($this->commands(), $this->environment)->resolve($this->configuration->docker, $directory);
         }
-        if ($endpoint !== '') {
-            return new Docker($this, ['executable' => $binary, 'host' => $endpoint]);
+        return new Client($this->commands(), $this->target, $this->environment);
+    }
+    public function image(string $role): ResolvedImage
+    {
+        return $this->images[$role] ??= $this->docker()->resolveImage($this->configuration->images->role($role), pull: false);
+    }
+    public function layout(): ApplicationLayout
+    {
+        if ($this->layout === null) {
+            $image = $this->image('application');
+            $inspection = json_decode($this->docker()->run(['image', 'inspect', $image->id])->stdout, true, flags: JSON_THROW_ON_ERROR);
+            if (!is_array($inspection) || !array_is_list($inspection) || count($inspection) !== 1 || !is_array($inspection[0])) {
+                throw new RuntimeException('Application image inspection must contain one image.');
+            }
+            $this->layout = ApplicationLayout::fromImage($inspection[0]);
         }
-        $context = $this->environment['DOCKER_CONTEXT'] ?? '';
-        $host = $this->environment['DOCKER_HOST'] ?? '';
-        if ($context === '' && $host !== '') {
-            return new Docker($this, ['executable' => $binary, 'host' => $host]);
-        }
-        if ($context === '') {
-            $context = $this->run([$binary, 'context', 'show'])->stdout
-                |> trim(...);
-        }
-        if ($context === '') {
-            throw new RuntimeException('Cannot determine Docker context');
-        }
-        return new Docker($this, ['executable' => $binary, 'context' => $context]);
+        return $this->layout;
+    }
+    public function resources(string $artifacts): ResourceLedger
+    {
+        return new ResourceLedger($artifacts . '/resources.json', $this->docker(), $this->environment);
     }
 
     public static function require(bool $condition, string $message): void
@@ -228,7 +172,9 @@ final class Runtime extends Runner
     {
         $status = 1;
         do {
-            if ($error instanceof Failure) {
+            if ($error instanceof CommandFailure) {
+                $status = $error->getCode();
+            } elseif ($error instanceof Failure) {
                 $status = $error->status;
             } elseif ($error instanceof \InvalidArgumentException) {
                 $status = 2;
@@ -259,9 +205,11 @@ final class Runtime extends Runner
         }
     }
 
-    public static function artifacts(string $root, string $name): string
+    /** @param array<string,string>|null $environment */
+    public static function artifacts(string $root, string $name, ?array $environment = null): string
     {
-        $path = getenv('BAANDER_TEST_ARTIFACTS') ?: $root . '/var/test-runs/' . $name . '-' . time() . '-' . getmypid();
+        $environment ??= getenv();
+        $path = ($environment['BAANDER_TEST_ARTIFACTS'] ?? '') ?: $root . '/var/test-runs/' . $name . '-' . time() . '-' . getmypid();
         if (!is_dir($path) && !mkdir($path, 0700, true)) {
             throw new RuntimeException('Cannot create fixture artifacts');
         }

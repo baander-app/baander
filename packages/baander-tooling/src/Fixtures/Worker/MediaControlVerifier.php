@@ -126,7 +126,7 @@ final class MediaControlVerifier
         $report['sampling'] = [];
         foreach (['control', 'execution'] as $name) {
             $window = Reports::window(
-                Reports::samples($root . '/' . $name . '-samples.jsonl', true),
+                Reports::samples($root . '/' . $name . '-samples.jsonl', EvidenceMode::Completed),
                 $start,
                 $end,
             );
@@ -224,13 +224,13 @@ final class MediaControlVerifier
                 );
             }
         }
-        $backlog = Reports::window(Reports::samples($root . '/backlog.jsonl', true), $start, $end);
+        $backlog = Reports::window(Reports::samples($root . '/backlog.jsonl', EvidenceMode::Completed), $start, $end);
         Reports::require(
             count($backlog) > 1 && $backlog[array_key_last($backlog)]['acknowledged'] > $backlog[0]['acknowledged'],
             'Ordinary consumer made no progress',
         );
         $report['ordinaryBacklog'] = ['acknowledgedProgress' => $backlog[array_key_last($backlog)]['acknowledged'] - $backlog[0]['acknowledged']];
-        $launches = Reports::samples($root . '/native-launches.jsonl', true);
+        $launches = Reports::samples($root . '/native-launches.jsonl', EvidenceMode::Completed);
         $seen = [];
         foreach ($launches as $launch) {
             $key = json_encode([$launch['jobId'], $launch['generation']], JSON_THROW_ON_ERROR);

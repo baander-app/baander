@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Tests;
 
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Tests\DevelopmentCommandExecutor;
 use Baander\Tooling\Process\ProcessResult;
 
-final class DevCoreRunner extends Runner
+final class DevCoreRunner extends DevelopmentCommandExecutor
 {
     /** @var list<array{arguments:non-empty-list<string>,env:array<string,string>|null,timeout:float|null,interactive:bool}> */
     public array $calls = [];
@@ -15,7 +15,7 @@ final class DevCoreRunner extends Runner
     /** @param (\Closure(non-empty-list<string>):?ProcessResult)|null $callback */
     public function __construct(private readonly ?\Closure $callback = null) {}
 
-    public function run(
+    public function execute(
         array $arguments,
         ?string $cwd = null,
         ?array $env = null,

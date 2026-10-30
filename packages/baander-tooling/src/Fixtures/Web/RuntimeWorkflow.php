@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Fixtures\Web;
 
-use Baander\Tooling\Development\Docker;
+use Baander\Tooling\Docker\Client as DockerClient;
+use Baander\Tooling\Resources\{ResourceLedger, ResourceKind};
 use Baander\Tooling\Fixtures\Runtime;
 use Baander\Tooling\Process\ProcessResult;
 use Throwable;
@@ -15,20 +16,22 @@ use Throwable;
 final class RuntimeWorkflow
 {
     public readonly Runtime $runtime;
-    public readonly Docker $docker;
+    public readonly DockerClient $docker;
     public readonly string $id;
     public readonly string $appDirectory;
     private readonly string $serveLog;
+    private readonly ResourceLedger $resources;
     private ?string $archive = null;
     private ?string $archiveDirectory = null;
     public function __construct(private readonly string $root, private readonly bool $security = false)
     {
-        $this->runtime = new Runtime($root, $security ? 360 : 180);
+        $this->runtime = new Runtime($root, budget: $security ? 'webSecurity' : 'webRuntime');
         $this->docker = $this->runtime->docker();
         $this->id = ($security ? 'baander-security-' : 'baander-web-') . time() . '-' . getmypid();
         $this->appDirectory = ($this->runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1'
-            ? '/var/www/html'
+            ? $this->runtime->layout()->root
             : '/tmp/baander-' . ($security ? 'security' : 'web') . '-runtime';
+        $this->resources = $this->runtime->resources(Runtime::artifacts($root, $this->id));
         $this->serveLog = '/tmp/' . ($security ? 'security' : 'web') . '-runtime-serve.log';
     }
 
@@ -53,26 +56,18 @@ final class RuntimeWorkflow
             $this->runtime->cleaning = true;
             if ($failed) {
                 try {
-                    if ($this->docker->run(['inspect', $this->id . '-app'], check: false)->exitCode === 0) {
+                    if ($this->runtime->docker()->run(['inspect', $this->id . '-app'], check: false, timeout: $this->runtime->configuration->budgets->seconds('process'))->exitCode === 0) {
                         fwrite(STDERR, "--- app:serve output (last 100 lines)\n");
-                        $log = $this->docker->run(['exec', $this->id . '-app', 'tail', '-n', '100', $this->serveLog], check: false);
+                        $log = $this->runtime->docker()->run(['exec', $this->id . '-app', 'tail', '-n', '100', $this->serveLog], check: false, timeout: $this->runtime->configuration->budgets->seconds('process'));
                         fwrite(STDERR, $log->stdout . $log->stderr);
                     }
                 } catch (Throwable $diagnostic) {
                     fwrite(STDERR, $diagnostic->getMessage() . "\n");
                 }
             }
-            $containers = [$this->id . '-app'];
-            if (!$this->security) {
-                $containers[] = $this->id . '-mailpit';
-            }
-            array_push($containers, $this->id . '-redis', $this->id . '-postgres');
-            foreach ([['rm', '-f', '-v', ...$containers], ['network', 'rm', $this->id]] as $command) {
-                try {
-                    $this->docker->run($command, check: false);
-                } catch (Throwable $cleanup) {
-                    fwrite(STDERR, $cleanup->getMessage() . "\n");
-                }
+            $report = $this->resources->cleanup(max(0.0, ($this->runtime->cleanupExecutor()->context->deadline ?? 0.0) - Runtime::now()));
+            if (!$report->successful()) {
+                fwrite(STDERR, $report->message() . "\n");
             }
             if ($this->archive !== null && is_file($this->archive)) {
                 unlink($this->archive);
@@ -81,7 +76,21 @@ final class RuntimeWorkflow
                 rmdir($this->archiveDirectory);
             }
             $this->runtime->close();
+            if (!$failed && !$report->successful()) {
+                throw new \RuntimeException($report->message());
+            }
         }
+    }
+
+    /** @param list<string> $arguments */
+    public function docker(array $arguments, ?string $input = null, bool $check = true): ProcessResult
+    {
+        return $this->docker->run(
+            $arguments,
+            input: $input,
+            check: $check,
+            timeout: $this->runtime->configuration->budgets->seconds('process'),
+        );
     }
 
     /**
@@ -89,7 +98,7 @@ final class RuntimeWorkflow
      */
     public function app(array $arguments, ?string $input = null, bool $check = true): ProcessResult
     {
-        return $this->docker->run(
+        return $this->docker(
             ['exec', '-i', '-w', $this->appDirectory, $this->id . '-app', ...$arguments],
             input: $input,
             check: $check,
@@ -108,13 +117,13 @@ final class RuntimeWorkflow
 
     public function redisReady(): bool
     {
-        $result = $this->docker->run(['exec', '-e', 'REDISCLI_AUTH=test-only', $this->id . '-redis', 'redis-cli', 'ping'], check: false);
+        $result = $this->docker(['exec', '-e', 'REDISCLI_AUTH=test-only', $this->id . '-redis', 'redis-cli', 'ping'], check: false);
         return $result->exitCode === 0 && trim($result->stdout) === 'PONG';
     }
 
     private function postgresReady(bool $check = false): bool
     {
-        return $this->docker->run(
+        return $this->docker(
             ['exec', $this->id . '-postgres', 'pg_isready', '-h', '127.0.0.1', '-U', 'baander', '-d', 'web_test'],
             check: $check,
         )->exitCode === 0;
@@ -135,25 +144,17 @@ final class RuntimeWorkflow
 
     private function prepare(): void
     {
-        $this->docker->run(['network', 'create', '--internal', $this->id]);
-        $this->docker->run([
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-redis',
+        $this->resources->create(ResourceKind::Network, $this->id, ['--internal']);
+        $this->container($this->id . '-redis', [
             '--network',
             $this->id,
             '--network-alias',
             'redis',
             '-e',
             'REDIS_ARGS=--requirepass test-only',
-            'redis/redis-stack-server:edge',
+            $this->runtime->image('fixtureRedis')->id,
         ]);
-        $this->docker->run([
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-postgres',
+        $this->container($this->id . '-postgres', [
             '--network',
             $this->id,
             '--network-alias',
@@ -164,19 +165,15 @@ final class RuntimeWorkflow
             'POSTGRES_PASSWORD=test-only',
             '-e',
             'POSTGRES_DB=web_test',
-            $this->image('BAANDER_TEST_POSTGRES_IMAGE', 'baander-database:latest'),
+            $this->runtime->image('postgres')->id,
         ]);
         if (!$this->security) {
-            $this->docker->run([
-                'run',
-                '-d',
-                '--name',
-                $this->id . '-mailpit',
+            $this->container($this->id . '-mailpit', [
                 '--network',
                 $this->id,
                 '--network-alias',
                 'mailpit',
-                'axllent/mailpit:v1.31.4',
+                $this->runtime->image('mailpit')->id,
             ]);
         }
         $this->attempts(fn(): bool => $this->postgresReady() && $this->redisReady() && $this->mailReady(), 30);
@@ -197,7 +194,7 @@ final class RuntimeWorkflow
         if (!$this->security) {
             $this->provisionUsers();
         }
-        $this->docker->run([
+        $this->docker([
             'exec',
             '-d',
             '-w',
@@ -216,13 +213,14 @@ final class RuntimeWorkflow
 
     private function mailReady(bool $check = false): bool
     {
-        return $this->security || $this->docker->run(['exec', $this->id . '-mailpit', '/mailpit', 'readyz'], check: $check)->exitCode === 0;
+        return $this->security || $this->docker(['exec', $this->id . '-mailpit', '/mailpit', 'readyz'], check: $check)->exitCode === 0;
     }
 
-    private function image(string $variable, string $fallback): string
+    /** @param list<string> $arguments */
+    private function container(string $name, array $arguments): void
     {
-        $configured = $this->runtime->environment[$variable] ?? '';
-        return $configured === '' ? $fallback : $configured;
+        $this->resources->create(ResourceKind::Container, $name, $arguments);
+        $this->docker(['start', $name]);
     }
 
     private function startApp(): void
@@ -249,10 +247,6 @@ final class RuntimeWorkflow
             'DATABASE_URL=postgresql://baander:test-only@postgres:5432/web_test?serverVersion=18&charset=utf8',
         ];
         $arguments = [
-            'run',
-            '-d',
-            '--name',
-            $this->id . '-app',
             '--privileged',
             '--network',
             $this->id,
@@ -262,19 +256,19 @@ final class RuntimeWorkflow
         foreach ($environment as $variable) {
             array_push($arguments, '-e', $variable);
         }
-        $this->docker->run([
+        $this->container($this->id . '-app', [
             ...$arguments,
-            $this->image('BAANDER_TEST_IMAGE', 'martinjuul/baander-app:latest'),
+            $this->runtime->image('application')->id,
             'infinity',
         ]);
     }
 
     private function stageCheckout(): void
     {
-        if ($this->appDirectory === '/var/www/html') {
+        if (($this->runtime->environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] ?? '0') === '1') {
             return;
         }
-        $this->docker->run(['exec', $this->id . '-app', 'mkdir', '-p', $this->appDirectory]);
+        $this->docker(['exec', $this->id . '-app', 'mkdir', '-p', $this->appDirectory]);
         $directory = sys_get_temp_dir() . '/baander-web-checkout-' . bin2hex(random_bytes(8));
         Runtime::require(mkdir($directory, 0700), 'Cannot reserve private checkout directory.');
         $this->archiveDirectory = $directory;
@@ -307,7 +301,7 @@ final class RuntimeWorkflow
         ]);
         Runtime::require(chmod($this->archive, 0644), 'Cannot make copied checkout readable in the app container.');
         $destination = '/tmp/baander-runtime-checkout.tar';
-        $this->docker->run(['cp', $this->archive, $this->id . '-app:' . $destination]);
+        $this->docker(['cp', $this->archive, $this->id . '-app:' . $destination]);
         $this->app(['tar', '-xf', $destination]);
     }
 
@@ -409,7 +403,7 @@ final class RuntimeWorkflow
     private function postgresOutage(): void
     {
         $stopped = time();
-        $this->docker->run(['stop', $this->id . '-postgres']);
+        $this->docker(['stop', $this->id . '-postgres']);
         $this->runtime->pause(4);
         $this->attempts(fn(): bool => $this->degradationCount('postgresql') >= 1, 10);
         Runtime::require(
@@ -435,7 +429,7 @@ final class RuntimeWorkflow
         );
         echo "PostgreSQL stopped; the monitor saw it and the server reloaded its workers during the outage.\n";
         $started = time();
-        $this->docker->run(['start', $this->id . '-postgres']);
+        $this->docker(['start', $this->id . '-postgres']);
         $this->attempts($this->postgresReady(...), 30);
         $this->postgresReady(check: true);
         $arguments = [
@@ -456,7 +450,7 @@ final class RuntimeWorkflow
     private function redisAlerts(): string
     {
         return rtrim(
-            $this->docker->run([
+            $this->docker([
                 'exec',
                 '-e',
                 'PGPASSWORD=test-only',
@@ -482,7 +476,7 @@ final class RuntimeWorkflow
         $fixture = ['php', 'scripts/web-runtime/redis-outage.php'];
         $admins = "web-runtime-admin@baander.app\nweb-runtime-super-admin@baander.app";
         $this->fixture([...$fixture, 'login']);
-        $this->docker->run(['stop', $this->id . '-redis']);
+        $this->docker(['stop', $this->id . '-redis']);
         $result = $this->app([...$fixture, 'outage']);
         echo $result->stdout;
         $this->attempts(fn(): bool => $this->degradationCount('redis') >= 1, 10);
@@ -491,7 +485,7 @@ final class RuntimeWorkflow
             'The health monitor did not report Redis unhealthy while it was stopped.',
         );
         echo "Redis stopped; the monitor saw it.\n";
-        $this->docker->run(['start', $this->id . '-redis']);
+        $this->docker(['start', $this->id . '-redis']);
         $this->attempts($this->redisReady(...), 30);
         Runtime::require($this->redisReady(), 'Redis did not recover.');
         $result = $this->app([...$fixture, 'recovered']);

@@ -9,11 +9,33 @@ use Doctrine\DBAL\Tools\DsnParser;
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once __DIR__ . '/../Messaging/MessageCodecFactory.php';
 
+/** @param list<string> $expected
+ * @return array{expected:list<string>,observed:list<string>,missing:list<string>}
+ */
+function workerConsumerReadiness(array $expected, mixed $consumers): array
+{
+    $observed = [];
+    if (is_array($consumers)) {
+        $observed = array_column($consumers, 'name')
+            |> (static fn(array $names): array => array_filter($names, is_string(...)))
+            |> array_values(...);
+    }
+    $missing = array_diff($expected, $observed) |> array_values(...);
+    return ['expected' => $expected, 'observed' => $observed, 'missing' => $missing];
+}
+
 $arguments = $_SERVER['argv'] ?? [];
 if (!is_array($arguments)) {
     throw new RuntimeException('Invalid isolated worker command arguments.');
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
+if ($mode === 'consumer-readiness') {
+    $expected = json_decode($namespace, true, flags: JSON_THROW_ON_ERROR);
+    $consumers = json_decode($bootId, true, flags: JSON_THROW_ON_ERROR);
+    $evidence = workerConsumerReadiness($expected, $consumers);
+    echo json_encode($evidence, JSON_THROW_ON_ERROR) . "\n";
+    exit($evidence['missing'] === [] ? 0 : 1);
+}
 $allowedModes = [
     'reserve-pair',
     'claim-unit',
@@ -47,6 +69,7 @@ $allowedModes = [
     'kill-relay-claimed',
     'ready',
     'ready-recovered',
+    'readiness-observation',
     'kill-consumer',
     'kill-scheduler',
     'reserved',
@@ -701,12 +724,32 @@ if (count($roles) !== count($expectedRoles) || array_diff($expectedRoles, array_
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
 $redis->auth(['default', 'test-only']);
+$consumerReadiness = [];
 foreach (['messages' => ($profile ?? throw new RuntimeException('No resident autoscaling profile.'))->consumerIds(), 'scheduler_occurrences' => ['scheduled-consumer']] as $stream => $consumerRoles) {
     $expected = array_map(static fn (string $role): string => 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1', $consumerRoles);
     $consumers = $redis->xInfo('CONSUMERS', $stream, 'baander');
-    if (!is_array($consumers) || array_intersect($expected, array_column($consumers, 'name')) === []) {
-        throw new RuntimeException('Expected an admitted Redis consumer on ' . $stream);
+    $consumerReadiness[$stream] = workerConsumerReadiness($expected, $consumers);
+    if ($mode !== 'readiness-observation' && $consumerReadiness[$stream]['missing'] !== []) {
+        throw new RuntimeException('Admitted Redis consumer registration incomplete: ' . json_encode([$stream => $consumerReadiness[$stream]], JSON_THROW_ON_ERROR));
     }
+}
+if ($mode === 'readiness-observation') {
+    try {
+        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3));
+        $observation = ['success' => true, 'roles' => $observed];
+    } catch (Throwable $error) {
+        $safeMessages = [
+            'Worker dependency endpoint unavailable.', 'Worker dependency unavailable.', 'Admitted worker consumer is unavailable.',
+            'Worker role is not a live direct child of PID 1.', 'Duplicate worker launch identity.',
+            'Unexpected ordinary consumer identity or transport.', 'Scheduler consumer uses the wrong transport.',
+            'Duplicate or unidentified worker generation.', 'Worker launch identity differs from admission.',
+            'Unknown worker unit.', 'Worker process pair is incomplete.',
+        ];
+        $observation = ['success' => false, 'class' => $error::class,
+            'reason' => in_array($error->getMessage(), $safeMessages, true) ? $error->getMessage() : 'Private observer error omitted.'];
+    }
+    echo json_encode(['unit' => $unit, 'consumerRegistration' => $consumerReadiness, 'productionObservation' => $observation], JSON_THROW_ON_ERROR) . "\n";
+    exit(0);
 }
 if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-after-send'], true)
     && !posix_kill($roles['relay'], SIGKILL)) {

@@ -7,7 +7,10 @@ require __DIR__ . '/bootstrap.php';
 
 use Baander\Tooling\Development\Acceptance\Support;
 use Baander\Tooling\Development\Host;
-use Baander\Tooling\Development\Runner;
+use Baander\Tooling\Process\EngineExecutor;
+use Baander\Tooling\Process\ExecutionContext;
+use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Development\Environment;
 use Baander\Tooling\Development\StateStore;
 use Baander\Tooling\Runtime\Requirements;
 
@@ -16,8 +19,9 @@ $status = 0;
 try {
     Requirements::check(extensions: ['sockets']);
     $temporary = Support::temporary('baander-host-check-');
-    new Host(new StateStore($temporary), new Runner())->inspect();
-    Support::run(['systemctl', '--user', 'show-environment']);
+    $executor = new EngineExecutor(ExecutionContext::bounded(120, Environment::clean()));
+    new Host(new StateStore($temporary), $executor)->inspect();
+    $executor->run(new ProcessSpec(['systemctl', '--user', 'show-environment'], processGroup: true));
     foreach (['baander.test', 'host-check.baander.test'] as $name) {
         $addresses = socket_addrinfo_lookup($name, '443', ['ai_socktype' => SOCK_STREAM]);
         Support::check($addresses !== false, $name . ' must resolve only to loopback for this development workflow.');

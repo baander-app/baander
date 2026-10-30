@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\CommandExecutor;
+use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Process\CompletionPolicy;
+use Baander\Tooling\Process\CommandFailure;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
 
@@ -13,7 +17,7 @@ final class Supervisor
 
     public function __construct(
         private readonly StateStore $store,
-        private readonly Runner $runner,
+        private readonly CommandExecutor $executor,
         private readonly ?string $sourceRoot = null,
         private readonly ?string $phpExecutable = null,
     ) {
@@ -54,22 +58,14 @@ final class Supervisor
         if (!is_file($root . '/scripts/dev-environment.php')) {
             throw new WorkflowError('The PHP development controller entrypoint is missing.');
         }
-        $this->runner->run(['systemctl', '--user', 'show-environment']);
-        $controller = $this->store->root . '/controller';
-        PrivateDirectory::prepare($controller);
-        foreach (['packages/baander-tooling', 'scripts/vendor', 'docker/dev'] as $relative) {
-            PrivateDirectory::assertNoSymlinks($root . '/' . $relative);
-            $this->copyTree($root . '/' . $relative, $controller . '/' . $relative, $root);
-        }
-        foreach (['scripts/bootstrap.php', 'scripts/dev-environment.php'] as $relative) {
-            PrivateDirectory::assertNoSymlinks($root . '/' . $relative);
-            AtomicFile::write($controller . '/' . $relative, (string) file_get_contents($root . '/' . $relative));
-        }
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'show-environment'], processGroup: true));
+        $payload = new ControllerPayload($this->store->root);
+        $payload->publish($root);
         $unitHome = (getenv('XDG_CONFIG_HOME') ?: (getenv('HOME') . '/.config')) . '/systemd/user';
         PrivateDirectory::ensure($unitHome);
         $arguments = [
             $php,
-            $controller . '/scripts/dev-environment.php',
+            $payload->launcher(),
             '--state-root',
             $this->store->root,
             'update',
@@ -84,25 +80,53 @@ final class Supervisor
         AtomicFile::write($unitHome . '/' . $this->unit . '.service', str_replace(['${COMMAND}', '${SEARCH_PATH}'], [$command, $searchPath], $template));
         $timer = (string) file_get_contents($root . '/docker/dev/systemd/baander-development.timer');
         AtomicFile::write($unitHome . '/' . $this->unit . '.timer', str_replace('Unit=baander-development.service', 'Unit=' . $this->unit . '.service', $timer));
-        $this->runner->run(['systemctl', '--user', 'daemon-reload']);
-        $this->removeTree($controller . '/scripts/dev_environment');
-        $legacy = $controller . '/scripts/dev-environment.py';
-        PrivateDirectory::assertNoSymlinks($legacy);
-        if (is_file($legacy)) {
-            unlink($legacy);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'daemon-reload'], processGroup: true));
+    }
+
+    /** Fence systemd starts and join its old invocation before taking an instance lock.
+     * Direct legacy invocations still require independent proof before conversion.
+     */
+    public function fenceLegacyService(float $timeoutSeconds = 60): void
+    {
+        if (!is_finite($timeoutSeconds) || $timeoutSeconds <= 0) {
+            throw new WorkflowError('Legacy controller completion requires a positive finite timeout.');
+        }
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'stop', $this->unit . '.timer'], processGroup: true));
+        try {
+            $this->install();
+            $deadline = hrtime(true) / 1_000_000_000 + $timeoutSeconds;
+            do {
+                $state = $this->executor->run(new ProcessSpec(
+                    ['systemctl', '--user', 'show', '--property=ActiveState', '--value', $this->unit . '.service'],
+                    timeout: max(0.001, $deadline - hrtime(true) / 1_000_000_000),
+                    processGroup: true,
+                ));
+                if (in_array(trim($state->stdout), ['inactive', 'failed'], true)) {
+                    return;
+                }
+                if (hrtime(true) / 1_000_000_000 >= $deadline) {
+                    throw new WorkflowError('The old controller service is still running; let it finish before retrying retained-state conversion.');
+                }
+                usleep(50_000);
+            } while (true);
+        } finally {
+            $this->executor->run(new ProcessSpec([
+                'systemctl', '--user', $this->store->enabled('persistent') ? 'enable' : 'disable',
+                '--now', $this->unit . '.timer',
+            ], processGroup: true));
         }
     }
 
     public function refresh(): void
     {
         $this->install();
-        $this->runner->run([
+        $this->executor->run(new ProcessSpec([
             'systemctl',
             '--user',
             $this->store->enabled('persistent') ? 'enable' : 'disable',
             '--now',
             $this->unit . '.timer',
-        ]);
+        ], processGroup: true));
     }
 
     public function enable(): void
@@ -110,7 +134,7 @@ final class Supervisor
         $this->store->setEnabled('persistent', true);
         try {
             $this->refresh();
-        } catch (WorkflowError $error) {
+        } catch (WorkflowError|CommandFailure $error) {
             $this->store->setEnabled('persistent', false);
             throw $error;
         }
@@ -119,66 +143,6 @@ final class Supervisor
     public function disable(): void
     {
         $this->store->setEnabled('persistent', false);
-        $this->runner->run(['systemctl', '--user', 'disable', '--now', $this->unit . '.timer'], check: false);
-    }
-
-    private function copyTree(string $source, string $destination, string $root): void
-    {
-        PrivateDirectory::prepare($destination);
-        foreach (scandir($source) ?: [] as $name) {
-            if ($name === '.' || $name === '..' || $name === '__pycache__' || str_ends_with($name, '.pem') || str_ends_with($name, '.key')) {
-                continue;
-            }
-            $from = $source . '/' . $name;
-            if (is_link($from)) {
-                $this->copyPackageLink($from, $destination . '/' . $name, $root);
-            } elseif (is_dir($from)) {
-                $this->copyTree($from, $destination . '/' . $name, $root);
-            } else {
-                AtomicFile::write($destination . '/' . $name, (string) file_get_contents($from));
-            }
-        }
-    }
-
-    private function copyPackageLink(string $source, string $destination, string $root): void
-    {
-        $package = realpath($root . '/packages/baander-tooling');
-        if ($source !== $root . '/scripts/vendor/baander/tooling' || $package === false || realpath($source) !== $package) {
-            throw new WorkflowError('Refusing symlink controller payload.');
-        }
-        $relative = '../../../packages/baander-tooling';
-        $copiedPackage = realpath($this->store->root . '/controller/packages/baander-tooling');
-        if (is_link($destination)) {
-            if (readlink($destination) !== $relative || realpath($destination) !== $copiedPackage) {
-                throw new WorkflowError('Refusing symlink controller payload.');
-            }
-            return;
-        }
-        if (file_exists($destination) || !symlink($relative, $destination)) {
-            throw new WorkflowError('Cannot install the controller Composer package link.');
-        }
-    }
-
-    private function removeTree(string $path): void
-    {
-        PrivateDirectory::assertNoSymlinks($path);
-        if (!is_dir($path)) {
-            return;
-        }
-        foreach (scandir($path) ?: [] as $name) {
-            if ($name === '.' || $name === '..') {
-                continue;
-            }
-            $child = $path . '/' . $name;
-            if (is_link($child)) {
-                throw new WorkflowError('Refusing symlink obsolete controller payload.');
-            }
-            if (is_dir($child)) {
-                $this->removeTree($child);
-            } else {
-                unlink($child);
-            }
-        }
-        rmdir($path);
+        $this->executor->run(new ProcessSpec(['systemctl', '--user', 'disable', '--now', $this->unit . '.timer'], processGroup: true), new CompletionPolicy(null));
     }
 }

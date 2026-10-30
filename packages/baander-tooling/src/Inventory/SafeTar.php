@@ -77,6 +77,22 @@ final class SafeTar
                     throw new InventoryError('Cannot create archive symlink');
                 }
             }
+            $special = [];
+            foreach ($entries as $name => $entry) {
+                if (in_array($entry['type'], ['3', '4', '6'], true)) {
+                    $special['/' . $name] = [
+                        'archive_type' => match ($entry['type']) {
+                            '3' => 'character', '4' => 'block', '6' => 'fifo',
+                        },
+                        'mode' => $entry['mode'],
+                        'device_major' => $entry['major'],
+                        'device_minor' => $entry['minor'],
+                    ];
+                }
+            }
+            if ($special !== []) {
+                \Baander\Tooling\Filesystem\AtomicFile::writeJson($root . '.archive-metadata.json', $special);
+            }
             $directories = array_filter($entries, static fn(array $entry): bool => $entry['type'] === '5');
             uksort($directories, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
             foreach ($directories as $name => $entry) {
@@ -108,7 +124,7 @@ final class SafeTar
     }
 
     /** @param resource $stream
-     * @return array<string, array{type: string, link: string, offset: int, size: int, mode: int}>
+     * @return array<string, array{type: string, link: string, offset: int, size: int, mode: int, major: int, minor: int}>
      */
     private static function scan($stream, bool $allowAbsoluteLinks): array
     {
@@ -181,6 +197,9 @@ final class SafeTar
                 if (!in_array($type, ['0', '1', '2', '3', '4', '5', '6'], true)) {
                     throw new InventoryError('unsupported archive entry type: ' . $type);
                 }
+                if (in_array($type, ['3', '4', '6'], true) && $size !== 0) {
+                    throw new InventoryError('special archive entry contains unsupported data: ' . $name);
+                }
                 if ($name === '' && $type !== '5') {
                     throw new InventoryError('unsafe archive root entry');
                 }
@@ -218,6 +237,8 @@ final class SafeTar
                         'offset' => $offset,
                         'size' => $size,
                         'mode' => self::number(substr($header, 100, 8)) & 0777,
+                        'major' => self::number(substr($header, 329, 8)),
+                        'minor' => self::number(substr($header, 337, 8)),
                     ];
                 }
                 $pax = [];
@@ -269,7 +290,7 @@ final class SafeTar
         return $values;
     }
 
-    /** @param array<string, array{type: string, link: string, offset: int, size: int, mode: int}> $entries
+    /** @param array<string, array{type: string, link: string, offset: int, size: int, mode: int, major: int, minor: int}> $entries
      * @param array<string, true> $seen
      */
     private static function hardlink(string $name, array $entries, array $seen): string

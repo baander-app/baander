@@ -12,7 +12,7 @@ final class Autoscaling
     public static function main(array $arguments, string $root): int
     {
         if ($arguments === []) {
-            $runtime = new Runtime($root, 2000);
+            $runtime = new Runtime($root, budget: 'workerAutoscaling');
             $artifacts = Runtime::artifacts($root, 'autoscaling');
             try {
                 $runtime->run(
@@ -28,7 +28,7 @@ final class Autoscaling
                             'BAANDER_TEST_TWO_COMMAND' => '1',
                             'BAANDER_TEST_AUTOSCALING_CHECKPOINT' => $root . '/scripts/test-worker-autoscaling-container.sh',
                         ],
-                        600,
+                        $runtime->configuration->budgets->seconds('workerCapacity'),
                     );
                 }
                 $runtime->run(
@@ -57,9 +57,8 @@ final class Autoscaling
             );
             $checkpoint->capture(['info', '--format', '{{json .}}'], 'daemon.json');
             $checkpoint->inspectBefore();
-            $runtime->run(
+            $docker->run(
                 [
-                    ...$docker->commandPrefix(),
                     'exec',
                     $checkpoint->control,
                     'php',
@@ -71,7 +70,7 @@ final class Autoscaling
                 terminationGrace: 2,
             );
             AutoscalingVerifier::main(['gap', $checkpoint->artifacts]);
-            $control = $checkpoint->background(
+            $control = $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->control,
@@ -84,7 +83,7 @@ final class Autoscaling
                 'control-sampler.log',
                 480,
             );
-            $execution = $checkpoint->background(
+            $execution = $checkpoint->measurements->container(
                 [
                     'exec',
                     $checkpoint->execution,
@@ -185,7 +184,7 @@ final class Autoscaling
             $runtime->wait($client);
             $runtime->wait($pressure);
             $checkpoint->copy(
-                $checkpoint->web . ':/var/www/html/storage/two-command/result-capacity.json',
+                $checkpoint->web . ':' . $runtime->layout()->path('storage/two-command/result-capacity.json'),
                 'media.json',
             );
             $await('idle', AutoscalingVerifier::THRESHOLDS['idleDeadlineSeconds']);
@@ -197,6 +196,7 @@ final class Autoscaling
                 ),
                 'Autoscaling qualification must leave pair running',
             );
+            $checkpoint->measurements->finish();
             AutoscalingVerifier::main(['verify', $checkpoint->artifacts, $maximum]);
             file_put_contents(
                 $checkpoint->artifacts . '/checkpoint-seconds.txt',

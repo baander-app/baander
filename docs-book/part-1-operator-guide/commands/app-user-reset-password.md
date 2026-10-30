@@ -4,22 +4,26 @@ Set a new password for a user and sign them out of every session. Use it when a 
 
 ## Quick start
 
+Run from the installed-instance host shell with the `dc` function from
+[Getting started](../getting-started.md#command-context). Password files in these
+examples are protected files on that host. Use `-T` for redirected input.
+
 The command asks for the new password without echoing it:
 
 ```bash
-make exec cmd="php bin/console app:user:reset-password alice@baander.app"
+dc exec app php bin/console app:user:reset-password alice@baander.app
 ```
 
 By public ID:
 
 ```bash
-make exec cmd="php bin/console app:user:reset-password aB3dE5fG7hJ9kL1mN3pQr"
+dc exec app php bin/console app:user:reset-password aB3dE5fG7hJ9kL1mN3pQr
 ```
 
-For scripts, pipe the password on stdin with `--password`:
+For scripts, redirect the protected password file to stdin with `--password`:
 
 ```bash
-echo "new-secure-password" | make exec cmd="php bin/console app:user:reset-password alice@baander.app --password"
+dc exec -T app php bin/console app:user:reset-password alice@baander.app --password < /secure/baander-user-password
 ```
 
 ## Arguments and options

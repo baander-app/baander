@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Registry\Inventory\ImageVerifier;
+use Baander\Registry\Qualification\DockerOwnership;
 use Baander\Registry\Inventory\Inventory;
 use Baander\Registry\Inventory\InventoryError;
 use PHPUnit\Framework\TestCase;
 
-require_once dirname(__DIR__, 3) . '/relay/tools/inventory/ImageVerifier.php';
+require dirname(__DIR__, 3) . '/relay/vendor/autoload.php';
 
 final class RegistryInventoryTest extends TestCase
 {
@@ -496,79 +497,121 @@ FIXTURE;
         $this->rejects(static fn() => Inventory::words('escape\\'), 'unfinished command escape');
     }
 
-    public function testImageVerificationPinsIdRetainsReceiptAndAlwaysRemovesContainer(): void
+    public function testImageVerificationOwnsFailedCreatesAndPreservesPrimaryFailure(): void
     {
         $this->generate();
-        $bin = $this->temporary . '/bin';
-        Inventory::directory($bin);
-        $docker = '#!' . PHP_BINARY . "\n<?php\n" . <<<'FIXTURE'
-require_once getenv('INVENTORY_LIBRARY');
-use Baander\Registry\Inventory\Inventory;
-file_put_contents(getenv('DOCKER_LOG'), json_encode(array_slice($argv, 1)) . "\n", FILE_APPEND);
-if ($argv[1] === 'image') {
-    echo 'sha256:' . str_repeat('a', 64) . "\n";
-} elseif ($argv[1] === 'create') {
-    echo "inspection-container\n";
-} elseif ($argv[1] === 'cp') {
-    if (getenv('FAIL_COPY') === '1') {
-        exit(4);
-    }
-    Inventory::copyTree(getenv('IMAGE_ROOT'), $argv[3]);
-} elseif ($argv[1] !== 'rm') {
-    exit(8);
-}
-FIXTURE;
-        Inventory::write($bin . '/docker', $docker);
-        chmod($bin . '/docker', 0755);
-        $environment = [
-            'PATH' => $bin . ':' . getenv('PATH'),
-            'INVENTORY_LIBRARY' => dirname(__DIR__, 3) . '/relay/tools/inventory/Inventory.php',
-            'DOCKER_LOG' => $this->temporary . '/docker.log',
-            'IMAGE_ROOT' => $this->root,
-        ];
-        $previous = [];
-        foreach ($environment as $key => $value) {
-            $previous[$key] = getenv($key);
-            putenv($key . '=' . $value);
-        }
-        try {
+        foreach (['passed', 'copy', 'create', 'cleanup', 'copy-cleanup', 'kind'] as $scenario) {
+            $directory = $this->temporary . '/' . $scenario;
+            mkdir($directory, 0700);
+            $ownership = $directory . '/ownership.json';
+            $resource = null;
+            $calls = [];
+            $id = str_repeat('b', 64);
+            $target = [
+                'version' => 1,
+                'executable' => PHP_BINARY,
+                'endpoint' => 'unix:///fixture-docker.sock',
+                'daemonId' => 'inventory-daemon',
+                'originalContext' => null,
+                'snapshotDirectory' => null,
+                'transportArguments' => [],
+                'files' => [],
+            ];
+            $execute = function (array $arguments, ?string $input, float $seconds) use (&$resource, &$calls, $scenario, $ownership, $id): array {
+                self::assertGreaterThan(0, $seconds);
+                self::assertSame([PHP_BINARY, '--host', 'unix:///fixture-docker.sock'], array_slice($arguments, 0, 3));
+                $arguments = array_slice($arguments, 3);
+                $calls[] = $arguments;
+                $result = ['code' => 0, 'stdout' => '', 'stderr' => ''];
+                if ($arguments[0] === 'info') {
+                    $result['stdout'] = json_encode(['ID' => 'inventory-daemon']);
+                } elseif ($arguments[0] === 'image') {
+                    $result['stdout'] = 'sha256:' . str_repeat('a', 64);
+                } elseif ($arguments[0] === 'create') {
+                    self::assertFileExists($ownership);
+                    $saved = DockerOwnership::read($ownership);
+                    self::assertNull($saved['resources'][0]['id']);
+                    self::assertSame('sha256:' . str_repeat('a', 64), $arguments[array_key_last($arguments)]);
+                    $resource = ['Id' => $id, 'Name' => '/' . $saved['resources'][0]['name'],
+                        'Config' => ['Labels' => ['org.baander.tooling.run' => $saved['token']]]];
+                    $result['stdout'] = $id;
+                    if ($scenario === 'create') {
+                        $result['code'] = 4;
+                        $result['stderr'] = 'create failed after allocation';
+                    }
+                } elseif ($arguments[0] === 'container' && $arguments[1] === 'inspect') {
+                    if ($resource === null) {
+                        $result['code'] = 1;
+                        $result['stderr'] = 'Error: No such container: ' . $arguments[array_key_last($arguments)];
+                    } else {
+                        $result['stdout'] = json_encode([$resource]);
+                    }
+                } elseif ($arguments[0] === 'container' && $arguments[1] === 'ls') {
+                    self::assertNull($resource);
+                } elseif ($arguments[0] === 'cp') {
+                    if (str_starts_with($scenario, 'copy')) {
+                        $result['code'] = 5;
+                        $result['stderr'] = 'copy primary failed';
+                    } else {
+                        Inventory::copyTree($this->root, $arguments[2]);
+                    }
+                } elseif ($arguments[0] === 'rm') {
+                    self::assertLessThanOrEqual(2, $seconds);
+                    self::assertSame($id, $arguments[array_key_last($arguments)]);
+                    if (str_contains($scenario, 'cleanup')) {
+                        $result['code'] = 6;
+                        $result['stderr'] = 'cleanup failed';
+                    } else {
+                        $resource = null;
+                    }
+                } else {
+                    self::fail('Unexpected Docker command: ' . json_encode($arguments));
+                }
+                return $result;
+            };
+            $owner = new DockerOwnership($ownership, $target, $execute);
+            $verifier = new ImageVerifier($owner, 2);
+            $destination = $directory . '/evidence/' . ($scenario === 'kind' ? 'api' : 'backup') . '/' . str_repeat('a', 64) . '/receipt.json';
             ob_start();
             try {
-                ImageVerifier::qualify('mutable-tag', 'backup', $this->temporary . '/evidence', $this->resolutions);
+                if ($scenario === 'passed') {
+                    $verifier->qualify('mutable-tag', 'backup', $directory . '/evidence', $this->resolutions);
+                    $receipt = Inventory::readJson($destination);
+                    self::assertSame('passed', $receipt['status']);
+                    self::assertSame('sha256:' . str_repeat('a', 64), $receipt['image_id']);
+                    self::assertSame(Inventory::digest(Inventory::read($this->bundle . '/inventory.json')), $receipt['inventory_sha256']);
+                } else {
+                    $expected = match ($scenario) {
+                        'create' => 'create failed after allocation',
+                        'cleanup' => 'cleanup failed',
+                        'kind' => 'expected api image',
+                        default => 'copy primary failed',
+                    };
+                    try {
+                        $verifier->qualify('tag', $scenario === 'kind' ? 'api' : 'backup', $directory . '/evidence', $this->resolutions);
+                        self::fail('Expected qualification failure');
+                    } catch (InventoryError $error) {
+                        self::assertStringContainsString($expected, $error->getMessage());
+                        if ($scenario === 'copy-cleanup') {
+                            self::assertStringContainsString('cleanup failed', $error->getMessage());
+                            self::assertSame('Docker command failed (5): copy primary failed', $error->getPrevious()->getMessage());
+                        }
+                    }
+                    self::assertFileDoesNotExist($destination);
+                }
             } finally {
                 ob_end_clean();
             }
-            $receipt = Inventory::readJson($this->temporary . '/evidence/backup/' . str_repeat('a', 64) . '/receipt.json');
-            self::assertSame('passed', $receipt['status']);
-            self::assertSame('sha256:' . str_repeat('a', 64), $receipt['image_id']);
-            self::assertSame(Inventory::digest(Inventory::read($this->bundle . '/inventory.json')), $receipt['inventory_sha256']);
-            $calls = ($this->temporary . '/docker.log')
-                |> Inventory::read(...)
-                |> trim(...)
-                |> (static fn(string $log): array => explode("\n", $log))
-                |> (static fn(array $lines): array => array_map(
-                    static fn(string $line): mixed => json_decode($line, true),
-                    $lines,
-                ));
-            self::assertSame(['create', 'sha256:' . str_repeat('a', 64)], $calls[1]);
-            self::assertSame(['rm', 'inspection-container'], end($calls));
-            putenv('FAIL_COPY=1');
-            $this->rejects(
-                fn() => ImageVerifier::qualify('tag', 'backup', $this->temporary . '/failed', $this->resolutions),
-                'command failed',
-            );
-            self::assertStringEndsWith('["rm","inspection-container"]' . "\n", Inventory::read($this->temporary . '/docker.log'));
-            putenv('FAIL_COPY');
-            $this->rejects(
-                fn() => ImageVerifier::qualify('tag', 'api', $this->temporary . '/wrong-kind', $this->resolutions),
-                'expected api image',
-            );
-            self::assertStringEndsWith('["rm","inspection-container"]' . "\n", Inventory::read($this->temporary . '/docker.log'));
-        } finally {
-            putenv('FAIL_COPY');
-            foreach ($previous as $key => $value) {
-                putenv($value === false ? $key : $key . '=' . $value);
+            self::assertContains('rm', array_column($calls, 0));
+            if (str_contains($scenario, 'cleanup')) {
+                self::assertFileExists($ownership);
+                self::assertNotNull($resource);
+            } else {
+                self::assertNull($resource);
+                self::assertFileDoesNotExist($ownership);
+                self::assertSame(['container', 'ls', '--all', '--no-trunc', '--format', '{"ID":{{json .ID}},"Names":{{json .Names}}}'], end($calls));
             }
+            unset($verifier, $owner);
         }
     }
 }

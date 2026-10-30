@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Inventory;
 
+use Baander\Tooling\Configuration\ApplicationLayout;
+
 final class ApplicationInventory
 {
     public const string NATIVE = '/usr/share/baander-build-evidence';
-    public const string APP = '/var/www/html';
     public const string SCHEMA = 'baander-application-packaged-inventory/v1';
 
     public static function fileHash(string $path): string
@@ -74,12 +75,14 @@ final class ApplicationInventory
             'target' => $target,
             'platform' => $platform,
             'revision' => $value['Config']['Labels']['org.opencontainers.image.revision'] ?? '',
+            'application_layout' => ApplicationLayout::fromImage($value)->toArray(),
         ];
     }
 
     /** @param array<string, mixed> $identity */
     public static function checkIdentity(array $identity, string $revision): void
     {
+        ApplicationLayout::fromArray($identity['application_layout'] ?? []);
         foreach (['image_id', 'target', 'platform', 'revision'] as $key) {
             if (empty($identity[$key])) {
                 throw new InventoryError('image identity, platform, target and observed revision are required');
@@ -189,6 +192,26 @@ final class ApplicationInventory
         return 'file';
     }
 
+    /** @return array<string,array<string,mixed>> */
+    private static function specialEntries(string $root): array
+    {
+        $path = $root . '.archive-metadata.json';
+        if (!file_exists($path)) {
+            return [];
+        }
+        $entries = \Baander\Tooling\Filesystem\AtomicFile::readJson($path);
+        foreach ($entries as $name => $entry) {
+            if (!is_string($name) || !str_starts_with($name, '/') || self::normalize($name) !== $name || !is_array($entry)
+                || count($entry) !== 4 || !in_array($entry['archive_type'] ?? null, ['character', 'block', 'fifo'], true)
+                || !is_int($entry['mode'] ?? null) || $entry['mode'] < 0 || $entry['mode'] > 0777
+                || !is_int($entry['device_major'] ?? null) || $entry['device_major'] < 0
+                || !is_int($entry['device_minor'] ?? null) || $entry['device_minor'] < 0) {
+                throw new InventoryError('Invalid archive metadata');
+            }
+        }
+        return $entries;
+    }
+
     /** @return list<string> */
     public static function files(string $root): array
     {
@@ -199,6 +222,7 @@ final class ApplicationInventory
                 $paths[] = substr($file->getPathname(), strlen(rtrim($root, '/')));
             }
         }
+        $paths = array_values(array_unique([...$paths, ...array_keys(self::specialEntries($root))]));
         sort($paths, SORT_STRING);
         return $paths;
     }
@@ -208,6 +232,8 @@ final class ApplicationInventory
      */
     public static function observe(string $root, array $identity): array
     {
+        $app = ApplicationLayout::fromArray($identity['application_layout'] ?? [])->root;
+        $special = self::specialEntries($root);
         $gaps = [];
         $evidence = [];
         $gap = static function (string $path, string $reason, ?string $component = null) use (&$gaps): void {
@@ -274,7 +300,7 @@ final class ApplicationInventory
             }
             $packages[] = $record;
         }
-        $installedPath = self::APP . '/vendor/composer/installed.json';
+        $installedPath = $app . '/vendor/composer/installed.json';
         $installed = Json::read(self::rootFile($root, $installedPath));
         $evidence[$installedPath] = true;
         if (is_array($installed) && !array_is_list($installed)) {
@@ -295,8 +321,8 @@ final class ApplicationInventory
                 if (!is_string($install) || $install === '') {
                     throw new InventoryError('missing Composer installation path: ' . $name);
                 }
-                $full = self::normalize(self::APP . '/vendor/composer/' . $install);
-                if (!str_starts_with($full, self::APP . '/')) {
+                $full = self::normalize($app . '/vendor/composer/' . $install);
+                if (!str_starts_with($full, $app . '/')) {
                     throw new InventoryError('Composer installation path escapes application: ' . $name);
                 }
                 $composerRoots[] = [$full, $component];
@@ -398,7 +424,12 @@ final class ApplicationInventory
             $local = $root . $path;
             $name = basename($path);
             $entry = ['path' => $path];
-            if (is_link($local)) {
+            if (isset($special[$path])) {
+                if (file_exists($local) || is_link($local)) {
+                    throw new InventoryError('Archive metadata conflicts with exported file: ' . $path);
+                }
+                $entry += ['type' => 'special', 'kind' => 'special', ...$special[$path]];
+            } elseif (is_link($local)) {
                 $entry += ['type' => 'symlink', 'target' => readlink($local)];
                 try {
                     $resolved = self::rootFile($root, $path);
@@ -438,7 +469,7 @@ final class ApplicationInventory
                         break;
                     }
                 }
-                if ($group === 'unresolved' && str_starts_with($path, self::APP . '/')) {
+                if ($group === 'unresolved' && str_starts_with($path, $app . '/')) {
                     $group = 'copied-repository';
                 }
                 if (isset($nativeOwners[$path])) {
@@ -453,7 +484,7 @@ final class ApplicationInventory
             if (
                 ($group === 'build-evidence' && isset($entry['sha256']))
                 || $kind === 'notice'
-                || (str_starts_with($path, self::APP . '/third_party/inventory/')
+                || (str_starts_with($path, $app . '/third_party/inventory/')
                     && $name === 'source.json'
                     && isset($entry['sha256']))
             ) {

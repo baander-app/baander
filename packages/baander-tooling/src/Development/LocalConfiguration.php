@@ -4,71 +4,42 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
+use Baander\Tooling\Configuration\LocalFile;
+
 final class LocalConfiguration
 {
+    public static function discover(CommandExecutor $runner, string $root): ?string
+    {
+        return \Baander\Tooling\Configuration\RepositoryConfiguration::discover($runner, $root);
+    }
+
+    /** @param array<string,string>|null $environment
+     * @return array<string,mixed>
+     */
+    public static function load(CommandExecutor $runner, string $root, ?array $environment = null): array
+    {
+        try {
+            return \Baander\Tooling\Configuration\RepositoryConfiguration::local($runner, $root, $environment ?? getenv());
+        } catch (\InvalidArgumentException $error) {
+            throw new WorkflowError($error->getMessage(), previous: $error);
+        }
+    }
+
     /**
+     * @param array<string,mixed>|null $configuration
      * @return list<array{slug:string,name:string,type:string,source:string,target:string}>|null
      * @phpstan-impure
      */
-    public static function libraries(Runner $runner, string $root): ?array
+    public static function libraries(CommandExecutor $runner, string $root, ?array $configuration = null): ?array
     {
-        $path = $root . '/dev.local.json';
-        if (!file_exists($path)) {
-            $metadata = $runner->run(['git', 'rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir'], cwd: $root, check: false);
-            $directories = explode("\n", trim($metadata->stdout));
-            if ($metadata->exitCode !== 0 || count($directories) !== 2 || $directories[0] === $directories[1]) {
-                return null;
-            }
-            $worktrees = $runner->run(['git', 'worktree', 'list', '--porcelain', '-z'], cwd: $root);
-            $primary = explode("\0", $worktrees->stdout)[0];
-            $checkout = substr($primary, strlen('worktree '));
-            $configured = $runner->run(['git', 'config', '--get', 'core.worktree'], cwd: $root, check: false);
-            if ($configured->exitCode === 0) {
-                $checkout = trim($configured->stdout);
-                if (!str_starts_with($checkout, '/')) {
-                    $checkout = $directories[1] . '/' . $checkout;
-                }
-            }
-            // Separate Git directories need core.worktree to record the primary checkout.
-            if (!file_exists($checkout . '/.git')) {
-                return null;
-            }
-            $candidate = $runner->run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd: $checkout, check: false);
-            if (
-                $candidate->exitCode !== 0
-                || ($candidate->stdout |> trim(...) |> Environment::resolvedPath(...)) !== Environment::resolvedPath($directories[1])
-            ) {
-                return null;
-            }
-            $path = $checkout . '/dev.local.json';
-            if (!file_exists($path)) {
-                return null;
-            }
-        }
-        $content = @file_get_contents($path);
-        if ($content === false) {
-            throw new WorkflowError('Cannot read development configuration: ' . $path);
-        }
-        try {
-            $configuration = json_decode($content, flags: JSON_THROW_ON_ERROR);
-        } catch (\JsonException $error) {
-            throw new WorkflowError('Invalid JSON in ' . $path, previous: $error);
-        }
-        if (
-            !$configuration instanceof \stdClass
-            || array_diff($configuration |> get_object_vars(...) |> array_keys(...), ['libraries']) !== []
-        ) {
-            throw new WorkflowError('dev.local.json must be an object containing only libraries.');
-        }
-        if (!property_exists($configuration, 'libraries')) {
+        $configuration ??= self::load($runner, $root);
+        if (!array_key_exists('libraries', $configuration)) {
             return null;
-        }
-        if (!is_array($configuration->libraries)) {
-            throw new WorkflowError('dev.local.json libraries must be an array.');
         }
         $libraries = [];
         $slugs = [];
-        foreach ($configuration->libraries as $entry) {
+        foreach ($configuration['libraries'] as $entry) {
             if (
                 !$entry instanceof \stdClass
                 || array_diff($entry |> get_object_vars(...) |> array_keys(...), ['slug', 'name', 'type', 'path']) !== []
@@ -95,7 +66,7 @@ final class LocalConfiguration
                 'slug' => $slug,
                 'name' => $entry->name,
                 'type' => $entry->type,
-                'source' => Environment::resolvedPath($entry->path),
+                'source' => \Baander\Tooling\Filesystem\Paths::resolvedPath($entry->path),
                 'target' => '/media/' . $slug,
             ];
         }

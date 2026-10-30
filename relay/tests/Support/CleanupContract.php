@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Baander\Registry\Qualification\BoundedStorage;
+
 final class CleanupContract
 {
     public static function cluster(): void

@@ -4,6 +4,10 @@ Baander converts video files into streamable CMAF segments on-the-fly using FFmp
 
 Music tracks can also be transcoded to Opus, AAC or MP3 for clients that cannot play the original. That is off until you turn it on; see [Audio Transcoding](#audio-transcoding).
 
+Before testing conversion, confirm that the media is in the catalog, its source path is readable, and the independent worker deployment is running with shared output storage. A healthy web endpoint alone does not establish encoder availability. [Storage and Data](storage-and-data.md#shared-media-paths) explains the mounts; [Background Work](background-work.md) explains the deployment and its recovery boundary.
+
+For a playback failure, first distinguish original-file audio from converted audio or video. Original audio can stream without an encoder. Converted playback needs the worker, source access and writable derived storage. Use [Monitoring](monitoring.md) to check the responsible job and worker before changing playback settings or restarting services.
+
 ## How It Works
 
 When a client requests a video stream, web commits the session and its durable execution intent together. The independent worker claims that intent, probes the source and starts FFmpeg under its media role. Web serves the published files and keeps the client connections.
@@ -86,7 +90,7 @@ forks or reactor startup. The shipped Swoole build uses its thread backend for
 coroutine file reads under the worker's default Docker security restrictions.
 AIO threads and encoder threads both count toward the container PID ceiling.
 
-The version 5 host manifest reserves control at least 2944 MiB and 129 PID slots.
+The version 5 host manifest reserves at least 2944 MiB and 129 PID slots for control.
 Execution requires at least `4160 + 320 * (maximumConcurrency - 1)` MiB plus any
 scheduled console reservation, and `256 + maximumConcurrency - 1` PID slots,
 including encoder threads. Ordinary admission can change within the profile's
@@ -150,7 +154,7 @@ media and its current local position. The player keeps the requested status unti
 a fresh authenticated read can reconcile it with the server's accepted status;
 newer local pause or resume intent takes precedence. Reconciliation changes only
 play or pause status, without replaying the command, rewinding to an older server
-position or submitting another seek. Initial signing failures, nontransient
+position or submitting another seek. Initial signing failures and nontransient
 control failures retain their existing handling.
 
 A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
@@ -232,6 +236,14 @@ When the web server restarts during a transcoded stream, the connection is cut a
 Audio transcoding is switched on and capped with the [server settings](#settings) above. Execution uses the worker deployment's admitted resources and shared storage:
 
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
-- **Application storage and state** require shared writable worker volumes covering `/var/www/html/storage` and `/var/www/html/var/transcode_state`.
+- **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](getting-started.md).
 - **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
 - **Capacity** is fixed at three video jobs and one audio rendition in the current media role; configure its explicit memory and descendant reservations in the [host manifest](commands/README.md#worker-deployment).
+
+## Checking playback
+
+Start with one known catalog item. For audio, try its original format before enabling a conversion fallback. For video or converted audio, confirm that the job leaves `pending`, output becomes available and the player actually plays it. A completed job with missing cached files is different from a pending job with no worker capacity.
+
+If playback stops during a restart, identify which role restarted. Web owns the client connection; the worker owns FFmpeg. Restarting web does not restart encoders or repair an unavailable worker. Follow [Troubleshooting](troubleshooting.md) for evidence collection and [Background Work](background-work.md) for worker recovery. Do not remove runtime rows or generation files to force replacement work.
+
+Derived output can be regenerated when the source remains readable, but application storage also holds uploads and extracted assets. Follow [Storage and Data](storage-and-data.md#what-must-be-preserved) and [Backup and Recovery](backup-and-recovery.md) before removing storage directories.

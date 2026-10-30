@@ -1,5 +1,9 @@
 # Baander registry
 
+Operators can start with the book's [Registry chapter](../docs-book/part-1-operator-guide/registry.md)
+for component roles, readiness, maintenance and recovery. This page retains the
+service contract, deployment inventory and qualification evidence.
+
 The registry is a C++20 service backed exclusively by rqlite's HTTP API. Its
 container deployment path replaces the obsolete PHP service. Existing SQLite
 data and legacy volumes are left untouched; they are never opened or migrated.
@@ -495,10 +499,17 @@ uploaded artifact for 14 days. To verify an existing local image and retain its
 evidence:
 
 ```sh
-php relay/tools/verify_packaged_image.php \
+php scripts/verify-registry-image.php \
   --image baander/registry:0.1.0 --kind api \
   --output var/test-runs/registry-inventory/manual
 ```
+
+The command verifies the selected existing image without rebuilding it. It captures
+the Docker target from the repository tooling configuration and keeps private
+transport and ownership evidence under `var/test-runs/registry-image/<run-id>/`.
+Verification and cleanup use that captured target. If cleanup cannot prove that
+its resources are absent, the command reports the retained receipt path; retry it
+with the cleanup command above and keep its transport snapshot alongside it.
 
 Use `--kind rqlite` or `--kind backup` for the other images. This inventory records
 packaged components and their license evidence; it does not make a legal approval
@@ -580,13 +591,29 @@ of the operating-system package set. Dependency updates require new verified pin
 and qualification. First-party code is Apache-2.0; each runtime image retains its
 packaged dependency inventory and license evidence.
 
+The entrypoint saves a private Docker target file and transport snapshot in the
+evidence directory. It passes `BAANDER_TOOLING_TARGET_FILE` and
+`BAANDER_REGISTRY_OWNERSHIP_RECEIPT` to the relay helper. To run that helper against
+prepared images, supply the saved target file and a new ownership receipt path
+in an existing private directory:
+
 ```sh
-docker build --platform linux/amd64 -f relay/docker/Dockerfile \
-  -t baander/registry:0.1.0 relay
-docker build --platform linux/amd64 -f relay/docker/rqlite.Dockerfile \
-  -t baander/registry-rqlite:10.5.1 relay
 php relay/tests/run_container_contract.php \
+  --target-file /absolute/private/run/target.json \
+  --ownership-receipt /absolute/private/run/relay-resources.json \
   --api-image baander/registry:0.1.0 --rqlite-image baander/registry-rqlite:10.5.1
+```
+
+The helper records resource intentions before creation, then saves their immutable
+identities. Cleanup checks the original daemon and ownership labels, attempts
+independent resources within its bounded cleanup budget, and preserves the primary
+gate status when cleanup also fails. Unresolved resources keep their receipt; the
+parent outcome records its path. Keep that receipt and its transport snapshot
+together. Retry nested relay cleanup using the exact receipt path reported by the
+failed run:
+
+```sh
+php relay/tools/qualification/cleanup.php --receipt /absolute/private/run/relay-resources.json
 ```
 
 The container check creates a unique network and uniquely named disposable voter

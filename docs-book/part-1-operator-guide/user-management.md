@@ -1,6 +1,13 @@
 # User Management
 
-How to create user accounts, assign roles, and manage authentication methods.
+Use this chapter to create an account, choose its authority and end its access.
+Library membership separately controls which media a user can read; see
+[Library management](library-management.md).
+
+Run commands on the installation host, from its checkout, in the shell where the
+[`dc` wrapper](getting-started.md) is defined. Console access carries full authority;
+it does not apply the admin API's role checks. Make commands target development
+instances; see the [development environment guide](../part-2-developer-guide/development-environment.md).
 
 ## Creating Users
 
@@ -9,13 +16,13 @@ Users can self-register through the public `POST /api/auth/register` endpoint, o
 Create a regular user:
 
 ```bash
-make exec cmd="php bin/console app:user:create alice@baander.app Alice"
+dc exec app php bin/console app:user:create alice@baander.app Alice
 ```
 
 Create an admin (the command asks for confirmation before granting admin privileges):
 
 ```bash
-make exec cmd="php bin/console app:user:create admin@baander.app Admin --role admin"
+dc exec app php bin/console app:user:create admin@baander.app Admin --role admin
 ```
 
 ### Arguments and options
@@ -25,14 +32,15 @@ make exec cmd="php bin/console app:user:create admin@baander.app Admin --role ad
 | `email` | Yes | — | User's email address |
 | `name` | Yes | — | Display name |
 | `--password` | No | — | Read password from stdin instead of prompting interactively |
-| `--role` | No | `user` | User role: `user` or `admin` |
+| `--role` | No | `user` | Role: `user`, `admin` or `super-admin`; repeat the option for several |
 | `--force` | No | — | Grant an admin role without the confirmation prompt; required when no terminal is attached |
 | `--json` | No | — | Print the created user as JSON, the same data as `POST /api/admin/users` |
 
-For scripted or CI usage, pipe the password via stdin with `--password`:
+For scripted use, provide a protected password file through stdin with `--password`
+and disable Compose terminal allocation with `-T`:
 
 ```bash
-echo "securepassword" | make exec cmd="php bin/console app:user:create alice@baander.app Alice --password"
+dc exec -T app php bin/console app:user:create alice@baander.app Alice --password < /secure/path/initial-password
 ```
 
 See the [full command reference](commands/app-user-create.md) for exit codes and additional details.
@@ -54,7 +62,7 @@ Baander uses three roles:
 Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{id}/roles`):
 
 ```bash
-make exec cmd="php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN"
+dc exec app php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN
 ```
 
 ### Who can manage users
@@ -74,33 +82,30 @@ The console commands are not affected by these settings: console access carries 
 
 Users register passkeys through their browser using the standard WebAuthn API. This is a user-initiated action — operators do not manage passkeys on behalf of users.
 
-Passkeys are supported in all modern browsers:
-
-| Browser | Supported |
-|---------|-----------|
-| Chrome 67+ | Yes |
-| Firefox 60+ | Yes |
-| Safari 13+ | Yes |
-| Edge 79+ | Yes |
+Browser and authenticator support depend on the client device. Test registration and
+sign-in with the clients your installation supports.
 
 Users can register multiple passkeys on the same account and use any of them to authenticate. If a passkey is lost or the device is unavailable, users fall back to password authentication.
 
 ## TOTP 2FA
 
-Users enable and disable time-based one-time password (TOTP) two-factor authentication through the API. This requires an authenticator app such as Google Authenticator, Authy, or 1Password.
+Users enable and disable time-based one-time password (TOTP) two-factor
+authentication through the API, using a compatible authenticator app.
 
-Key points for operators:
-
-- 2FA is entirely user-managed — there is no CLI command to enable or disable it on behalf of a user.
-- When a user enables 2FA, they receive a QR code and a set of recovery codes.
-- If a user loses access to their authenticator and has exhausted their recovery codes, the operator must intervene by resetting the 2FA secret directly in the database and then providing the new secret to the user out of band.
+The setup endpoint returns a secret and provisioning URI. The user confirms a code
+from their authenticator before TOTP is enabled; disabling TOTP also requires a
+current code. There is no operator CLI reset or recovery-code workflow in the
+current implementation. Do not promise a password reset will remove this second
+factor. If the authenticator is lost, the manual has no qualified account-recovery
+procedure for that case; preserve the account while investigating rather than
+handing out a replacement database secret.
 
 ## Resetting a Password
 
 Set a new password for a user who has forgotten theirs:
 
 ```bash
-make exec cmd="php bin/console app:user:reset-password alice@baander.app"
+dc exec app php bin/console app:user:reset-password alice@baander.app
 ```
 
 The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or UUID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](commands/app-user-reset-password.md).
@@ -129,7 +134,7 @@ See [Email verification](configuration.md#email-verification) for the lifetime, 
 Users change their own address in **Settings**. Operators change it in the admin panel or with the CLI:
 
 ```bash
-make exec cmd="php bin/console app:user:change-email alice@baander.app alice.new@baander.app"
+dc exec app php bin/console app:user:change-email alice@baander.app alice.new@baander.app
 ```
 
 The command accepts the current email address or the UUID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](commands/app-user-change-email.md).
@@ -141,9 +146,9 @@ Each user has settings of their own. Currently there is one, `language`, the lan
 Users change their own language in **Settings**. Administrators see a user's language in the admin user dialog; super administrators can change it there, and other administrators see it read-only. Operators use the CLI:
 
 ```bash
-make exec cmd="php bin/console app:user:setting get alice@baander.app"
-make exec cmd="php bin/console app:user:setting set alice@baander.app language da"
-make exec cmd="php bin/console app:user:setting reset alice@baander.app language"
+dc exec app php bin/console app:user:setting get alice@baander.app
+dc exec app php bin/console app:user:setting set alice@baander.app language da
+dc exec app php bin/console app:user:setting reset alice@baander.app language
 ```
 
 The command accepts an email address or UUID. `reset` removes the choice, so the user follows the server default again. See [app:user:setting](commands/app-user-setting.md).
@@ -163,25 +168,32 @@ Super administrators can set every user setting, including any that users cannot
 Disable a user account to revoke access without deleting it:
 
 ```bash
-make exec cmd="php bin/console app:user:disable alice@baander.app"
+dc exec app php bin/console app:user:disable alice@baander.app
 ```
 
 Re-enable a disabled account:
 
 ```bash
-make exec cmd="php bin/console app:user:enable alice@baander.app"
+dc exec app php bin/console app:user:enable alice@baander.app
 ```
 
-Both commands accept an email address or UUID as the identifier. Disabling revokes the user's tokens and closes their open WebSocket connections. See [app:user:disable](commands/app-user-disable.md) and [app:user:enable](commands/app-user-enable.md) for details.
+Both commands accept an email address or UUID as the identifier. Disabling saves the
+account state and revokes access and refresh tokens in one transaction, then asks
+the web server to close open WebSocket connections. Run it in the app container so
+it can reach that server. Enabling restores the account, but restores none of its
+revoked tokens: the user signs in again. See [app:user:disable](commands/app-user-disable.md) and [app:user:enable](commands/app-user-enable.md) for details.
 
-To revoke all authentication for a user in one step, rotate all secrets as described in the [security guide](security.md). This forces every user to re-authenticate.
+Use disabling for one account. Global credential rotation affects every user and
+belongs to [Security](security.md). A response already streaming can finish, and
+signed video URLs use a separate secret; see [Disabled accounts](security.md#disabled-accounts)
+before treating a disable as immediate termination of every media transfer.
 
 ## Deleting Users
 
 [app:user:delete](commands/app-user-delete.md) deletes an account through the same use case as the admin panel. It asks for confirmation on a terminal and needs `--force` in a script:
 
 ```bash
-make exec cmd="php bin/console app:user:delete alice@baander.app"
+dc exec app php bin/console app:user:delete alice@baander.app
 ```
 
 Deletion cannot be undone. To stop someone from signing in while keeping their account, disable it instead.
@@ -218,13 +230,13 @@ Anyone with console access can run the `app:oauth:client:*` commands. In the adm
 Register a device client with a name the user will recognize when approving it:
 
 ```bash
-make exec cmd="php bin/console app:oauth:client:create 'Living room TV' --type device"
+dc exec app php bin/console app:oauth:client:create 'Living room TV' --type device
 ```
 
 Public and confidential clients need at least one redirect URI, and at most 10. This is where Baander sends the user back after the decision:
 
 ```bash
-make exec cmd="php bin/console app:oauth:client:create 'Baander Player' --type public --redirect-uri https://player.baander.app/callback"
+dc exec app php bin/console app:oauth:client:create 'Baander Player' --type public --redirect-uri https://player.baander.app/callback
 ```
 
 A redirect URI must be absolute, without a fragment or credentials, and use `https`, plain `http` on a loopback host (`localhost`, `127.0.0.1` or `[::1]`), or a private-use scheme in reverse domain form such as `app.baander.tv:/callback`. A request at the authorization endpoint must name a registered URI exactly. A loopback URI also matches on any port, because native apps listen on a port the system picks. Device clients have no redirect URIs. See [app:oauth:client:create](commands/app-oauth-client-create.md) for the full rules.

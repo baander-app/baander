@@ -12,14 +12,14 @@ final class Lifecycle
     public static function main(array $arguments, string $root): int
     {
         Runtime::require($arguments === [], 'Worker lifecycle qualification takes no arguments');
-        $runtime = new Runtime($root, 1300);
+        $runtime = new Runtime($root, budget: 'workerLifecycle');
         $artifacts = Runtime::artifacts($root, 'worker-lifecycle');
         try {
             foreach (['redis', 'postgres'] as $phase) {
                 $runtime->run(
                     [PHP_BINARY, 'scripts/test-worker-operator-container.php'],
                     env: array_replace(
-                        $runtime->environment,
+                        Checkpoint::operatorEnvironment($runtime, $artifacts),
                         [
                             'BAANDER_TEST_ARTIFACTS' => $artifacts . '/' . $phase,
                             'BAANDER_TEST_WORKER_LIFECYCLE_PHASE' => $phase,

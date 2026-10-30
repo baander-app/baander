@@ -17,14 +17,14 @@ final class SecurityWorkflow
             $fixture = ['php', 'tests/Fixtures/websocket-runtime.php'];
             $workflow->fixture([...$fixture, 'normal']);
             $workflow->fixture([...$fixture, 'prepare-outage']);
-            $workflow->docker->run(['pause', $workflow->id . '-redis']);
+            $workflow->docker(['pause', $workflow->id . '-redis']);
             $workflow->fixture([...$fixture, 'outage']);
-            $workflow->docker->run(['unpause', $workflow->id . '-redis']);
+            $workflow->docker(['unpause', $workflow->id . '-redis']);
             $workflow->fixture([...$fixture, 'recovered']);
             $workflow->fixture([...$fixture, 'prepare-outage']);
-            $workflow->docker->run(['stop', '-t', '1', $workflow->id . '-redis']);
+            $workflow->docker(['stop', '-t', '1', $workflow->id . '-redis']);
             $workflow->fixture([...$fixture, 'outage']);
-            $workflow->docker->run(['start', $workflow->id . '-redis']);
+            $workflow->docker(['start', $workflow->id . '-redis']);
             $workflow->attempts($workflow->redisReady(...), 20);
             $workflow->fixture([...$fixture, 'recovered']);
             $workflow->fixture([...$fixture, 'logs']);

@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace Baander\Tooling\Tests;
 
 use Baander\Tooling\Backend\StaticCheck;
-use Baander\Tooling\Development\Docker;
-use Baander\Tooling\Development\Runner;
-use Baander\Tooling\Development\WorkflowError;
-use Baander\Tooling\Process\ProcessResult;
+use Baander\Tooling\Inventory\Collector;
+use Baander\Tooling\Process\{CompletionPolicy, EngineExecutor, ExecutionContext, ProcessSpec};
+use RuntimeException;
 use Baander\Tooling\Inventory\SafeTar;
 use PHPUnit\Framework\TestCase;
 
 final class BackendStaticCheckTest extends TestCase
 {
     private string $root;
-    private Runner $runner;
+    private EngineExecutor $executor;
 
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir() . '/baander-static-check-' . bin2hex(random_bytes(8));
         mkdir($this->root, 0700);
-        $this->runner = new Runner();
+        $this->executor = new EngineExecutor(ExecutionContext::bounded(60, getenv()));
     }
 
     protected function tearDown(): void
     {
-        $this->runner->run(['rm', '-rf', '--', $this->root]);
+        $this->executor->close();
+        Collector::remove($this->root);
     }
 
     private function write(string $path, string $contents): void
@@ -41,7 +41,7 @@ final class BackendStaticCheckTest extends TestCase
     /** @param list<string> $arguments */
     private function git(array $arguments): void
     {
-        $this->runner->run(['git', ...$arguments], cwd: $this->root);
+        $this->executor->run(new ProcessSpec(['git', ...$arguments], cwd: $this->root));
     }
 
     public function testArchiveContainsCurrentCheckoutAndDependenciesWithoutHostSecrets(): void
@@ -74,10 +74,10 @@ final class BackendStaticCheckTest extends TestCase
             require __DIR__ . '/bootstrap.php';
             echo Baander\Tooling\StaticCheckFixture::MARKER;
             PHP);
-        $this->runner->run(['cp', dirname(__DIR__, 2) . '/bootstrap.php', $this->root . '/scripts/bootstrap.php']);
-        $this->runner->run(['cp', '-R', dirname(__DIR__, 2) . '/vendor', $this->root . '/scripts/vendor']);
+        $this->executor->run(new ProcessSpec(['cp', dirname(__DIR__, 2) . '/bootstrap.php', $this->root . '/scripts/bootstrap.php']));
+        $this->executor->run(new ProcessSpec(['cp', '-R', dirname(__DIR__, 2) . '/vendor', $this->root . '/scripts/vendor']));
         $this->write('relay/composer.json', file_get_contents(dirname(__DIR__, 3) . '/relay/composer.json'));
-        $this->runner->run(['cp', '-R', dirname(__DIR__, 3) . '/relay/vendor', $this->root . '/relay/vendor']);
+        $this->executor->run(new ProcessSpec(['cp', '-R', dirname(__DIR__, 3) . '/relay/vendor', $this->root . '/relay/vendor']));
         $this->write('relay/tests/Support/StaticCheckFixture.php', <<<'PHP'
             <?php
             namespace Baander\RegistryTests;
@@ -95,7 +95,7 @@ final class BackendStaticCheckTest extends TestCase
         $this->write('vendor/composer/installed.json', '{"packages":[]}');
         $workspace = $this->root . '/.git/check';
         mkdir($workspace, 0700);
-        [, $revision, $archive] = StaticCheck::prepareCheckout($this->runner, $this->root, $workspace);
+        [, $revision, $archive] = StaticCheck::prepareCheckout($this->executor, $this->root, $workspace);
         self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $revision);
         rename($this->root . '/packages', $workspace . '/original-packages');
         rename($this->root . '/relay', $workspace . '/original-relay');
@@ -107,11 +107,11 @@ final class BackendStaticCheckTest extends TestCase
         self::assertFileExists($extracted . '/scripts/vendor/autoload.php');
         self::assertSame('../../../packages/baander-tooling/', readlink($extracted . '/scripts/vendor/baander/tooling'));
         self::assertDirectoryDoesNotExist($this->root . '/packages');
-        $tooling = $this->runner->run([PHP_BINARY, $extracted . '/scripts/static-check-fixture.php']);
+        $tooling = $this->executor->run(new ProcessSpec([PHP_BINARY, $extracted . '/scripts/static-check-fixture.php']));
         self::assertSame('current tooling', $tooling->stdout);
         self::assertDirectoryDoesNotExist($this->root . '/relay');
         self::assertFileExists($extracted . '/relay/vendor/autoload.php');
-        $registry = $this->runner->run([PHP_BINARY, $extracted . '/relay/static-check-fixture.php']);
+        $registry = $this->executor->run(new ProcessSpec([PHP_BINARY, $extracted . '/relay/static-check-fixture.php']));
         self::assertSame('current registry tooling', $registry->stdout);
         self::assertSame('baked source', file_get_contents($extracted . '/.env'));
         self::assertFileDoesNotExist($extracted . '/.env.local');
@@ -130,28 +130,28 @@ final class BackendStaticCheckTest extends TestCase
             try {
                 StaticCheck::validateDependencies($this->root);
                 self::fail('Expected a dependency mismatch.');
-            } catch (WorkflowError $error) {
+            } catch (RuntimeException $error) {
                 self::assertStringContainsString('composer install', $error->getMessage());
             }
         }
         unlink($this->root . '/vendor/composer/installed.json');
-        $this->expectException(WorkflowError::class);
+        $this->expectException(RuntimeException::class);
         StaticCheck::validateDependencies($this->root);
     }
 
     public function testDependenciesAreRequiredBeforeRunningDocker(): void
     {
         $this->expectExceptionMessage('Install Composer');
-        StaticCheck::prepareCheckout($this->runner, $this->root, $this->root);
+        StaticCheck::prepareCheckout($this->executor, $this->root, $this->root);
     }
 
     public function testToolingDependenciesAreRequiredBeforeCreatingAnArchive(): void
     {
         $this->write('vendor/autoload.php', 'current dependencies');
         try {
-            StaticCheck::prepareCheckout($this->runner, $this->root, $this->root);
+            StaticCheck::prepareCheckout($this->executor, $this->root, $this->root);
             self::fail('Expected the tooling loader prerequisite.');
-        } catch (WorkflowError $error) {
+        } catch (RuntimeException $error) {
             self::assertStringContainsString('composer --working-dir=scripts install --no-dev', $error->getMessage());
         }
         self::assertDirectoryDoesNotExist($this->root . '/source');
@@ -164,9 +164,9 @@ final class BackendStaticCheckTest extends TestCase
         $this->write('scripts/vendor/autoload.php', '<?php');
         $this->write('relay/composer.json', '{"name":"baander/registry-test-tooling"}');
         try {
-            StaticCheck::prepareCheckout($this->runner, $this->root, $this->root);
+            StaticCheck::prepareCheckout($this->executor, $this->root, $this->root);
             self::fail('Expected the registry loader prerequisite.');
-        } catch (WorkflowError $error) {
+        } catch (RuntimeException $error) {
             self::assertStringContainsString('composer --working-dir=relay install --no-dev', $error->getMessage());
         }
         self::assertDirectoryDoesNotExist($this->root . '/source');
@@ -182,7 +182,7 @@ final class BackendStaticCheckTest extends TestCase
         $this->write('vendor/composer/installed.json', '{"packages":[]}');
         $workspace = $this->root . '/.git/check';
         mkdir($workspace, 0700);
-        [, , $archive] = StaticCheck::prepareCheckout($this->runner, $this->root, $workspace);
+        [, , $archive] = StaticCheck::prepareCheckout($this->executor, $this->root, $workspace);
         $extracted = $workspace . '/extracted';
         SafeTar::extract($archive, $extracted);
         self::assertFileExists($extracted . '/vendor/autoload.php');
@@ -193,101 +193,105 @@ final class BackendStaticCheckTest extends TestCase
     public function testEntrypointHelpAndUsageErrorsDoNotReachDocker(): void
     {
         $entrypoint = dirname(__DIR__, 2) . '/check-backend-container.php';
-        $help = $this->runner->run([PHP_BINARY, $entrypoint, '--help']);
+        $help = $this->executor->run(new ProcessSpec([PHP_BINARY, $entrypoint, '--help']));
         self::assertSame(0, $help->exitCode);
         self::assertStringContainsString('Usage: check-backend-container.php', $help->stdout);
         self::assertSame('', $help->stderr);
         foreach ([[], ['--image'], ['--unknown']] as $arguments) {
-            $result = $this->runner->run([PHP_BINARY, $entrypoint, ...$arguments], check: false);
+            $result = $this->executor->run(new ProcessSpec([PHP_BINARY, $entrypoint, ...$arguments]), new CompletionPolicy([2]));
             self::assertSame(2, $result->exitCode);
             self::assertSame('', $result->stdout);
             self::assertNotSame('', $result->stderr);
         }
     }
 
-    private function dockerRunner(bool $failCopy = false): StaticCheckRecordingRunner
+    /** @return array{\Baander\Tooling\Docker\Client,\Baander\Tooling\Resources\ResourceLedger} */
+    private function resourceClient(): array
     {
-        return new StaticCheckRecordingRunner($failCopy);
+        $environment = array_replace(getenv(), ['RESOURCE_TEST_STATE' => $this->root]);
+        $client = new \Baander\Tooling\Docker\Client(
+            new \Baander\Tooling\Process\EngineExecutor(\Baander\Tooling\Process\ExecutionContext::bounded(20, $environment)),
+            new \Baander\Tooling\Docker\Target(__DIR__ . '/Fixtures/static-check-resource-docker.php', 'unix:///baander.app/docker.sock', 'owned-daemon', null, null),
+            $environment,
+        );
+        return [$client, new \Baander\Tooling\Resources\ResourceLedger($this->root . '/receipt.json', $client, $environment)];
     }
 
     public function testCachedRuntimeGetsCurrentArchiveAndUnprivilegedCommandWithExitStatus(): void
     {
-        $runner = $this->dockerRunner();
-        $docker = new Docker($runner, ['executable' => '/usr/bin/docker', 'context' => 'remote']);
-        self::assertSame(7, StaticCheck::runCheck($docker, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php', 'literal $x; space']));
-        $create = $runner->calls[0]['arguments'];
+        [$client, $ledger] = $this->resourceClient();
+        self::assertSame(7, StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php', 'literal $x; space'], \Baander\Tooling\Configuration\ApplicationLayout::load(), $ledger, 10));
+        self::assertFileDoesNotExist($this->root . '/resource.json');
+        self::assertFileDoesNotExist($this->root . '/receipt.json');
+        $calls = array_map(static fn(string $line): array => json_decode($line, true), file($this->root . '/calls.jsonl', FILE_IGNORE_NEW_LINES));
+        $create = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'create'))[0];
         self::assertContains('cached-runtime', $create);
         self::assertSame('none', $create[array_search('--network', $create, true) + 1]);
         self::assertContains('APP_ENV=test', $create);
-        self::assertSame(['cp', '/tmp/current.tar'], array_slice($runner->calls[2]['arguments'], 3, 2));
-        self::assertStringEndsWith(':/tmp/checkout.tar', $runner->calls[2]['arguments'][5]);
-        $provision = $runner->calls[3]['arguments'][array_key_last($runner->calls[3]['arguments'])];
-        foreach (['rm -rf /var/www/html', 'tar -xf /tmp/checkout.tar', 'openssl genrsa', 'openssl rsa'] as $fragment) {
-            self::assertStringContainsString($fragment, $provision);
-        }
-        $execute = $runner->calls[4];
-        self::assertSame(['exec', '--user', 'www-data'], array_slice($execute['arguments'], 3, 3));
-        self::assertSame(['php', 'current.php', 'literal $x; space'], array_slice($execute['arguments'], -3));
-        self::assertFalse($execute['check']);
-        self::assertTrue($execute['interactive']);
-        self::assertNull($execute['timeout']);
-        self::assertSame(['rm', '--force'], array_slice($runner->calls[5]['arguments'], 3, 2));
+        $copy = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'cp'))[0];
+        self::assertSame('/tmp/current.tar', $copy[1]);
+        self::assertStringEndsWith(':/tmp/checkout.tar', $copy[2]);
+        $exec = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'exec'));
+        self::assertStringContainsString('tar -xf /tmp/checkout.tar', end($exec[0]));
+        self::assertSame(['php', 'current.php', 'literal $x; space'], array_slice($exec[1], -3));
     }
 
     public function testContainerIsRemovedWhenProvisioningFails(): void
     {
-        $runner = $this->dockerRunner(true);
+        [$client, $ledger] = $this->resourceClient();
+        touch($this->root . '/fail-copy');
         try {
-            StaticCheck::runCheck(
-                new Docker($runner, ['executable' => '/usr/bin/docker', 'context' => 'remote']),
-                'cached-runtime',
-                '/tmp/current.tar',
-                ['php', 'current.php'],
-            );
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Tooling\Configuration\ApplicationLayout::load(), $ledger, 10);
             self::fail('Expected provisioning failure.');
-        } catch (WorkflowError $error) {
-            self::assertSame('copy failed', $error->getMessage());
+        } catch (\RuntimeException $error) {
+            self::assertSame(19, $error->getCode());
+            self::assertStringContainsString('copy failed', $error->getMessage());
         }
-        self::assertSame(['rm', '--force'], array_slice($runner->calls[array_key_last($runner->calls)]['arguments'], 3, 2));
+        self::assertFileDoesNotExist($this->root . '/resource.json');
+        self::assertFileDoesNotExist($this->root . '/receipt.json');
     }
 
-    public function testDockerContextAndCleanEnvironmentSurviveHostOverrides(): void
+    public function testImageLayoutMismatchIsRejectedBeforeCreatingResource(): void
     {
-        $oldHost = getenv('DOCKER_HOST');
-        $oldEnv = getenv('APP_ENV');
-        putenv('DOCKER_HOST=tcp://baander.app:2375');
-        putenv('APP_ENV=prod');
+        [$client, $ledger] = $this->resourceClient();
+        touch($this->root . '/wrong-layout');
         try {
-            $result = new Docker($this->runner, ['executable' => __DIR__ . '/Fixtures/static-check-docker.php', 'context' => 'isolated'])->run(['info']);
-            self::assertSame(['argv' => ['--context', 'isolated', 'info'], 'docker_host' => false, 'app_env' => false], json_decode($result->stdout, true));
-        } finally {
-            putenv($oldHost === false ? 'DOCKER_HOST' : 'DOCKER_HOST=' . $oldHost);
-            putenv($oldEnv === false ? 'APP_ENV' : 'APP_ENV=' . $oldEnv);
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Tooling\Configuration\ApplicationLayout::load(), $ledger, 10);
+            self::fail('Expected image layout rejection.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('layout', $error->getMessage());
         }
+        self::assertFileDoesNotExist($this->root . '/receipt.json');
+        $calls = file($this->root . '/calls.jsonl', FILE_IGNORE_NEW_LINES);
+        self::assertSame([], array_filter($calls, static fn(string $line): bool => str_starts_with($line, '["create"')));
     }
-}
 
-final class StaticCheckRecordingRunner extends Runner
-{
-    /** @var list<array{arguments: non-empty-list<string>, check: bool, interactive: bool, timeout: ?float}> */
-    public array $calls = [];
-
-    public function __construct(private readonly bool $failCopy) {}
-
-    public function run(
-        array $arguments,
-        ?string $cwd = null,
-        ?array $env = null,
-        ?string $input = null,
-        ?float $timeout = 120,
-        bool $check = true,
-        ?string $logPath = null,
-        bool $interactive = false,
-    ): ProcessResult {
-        $this->calls[] = ['arguments' => $arguments, 'check' => $check, 'interactive' => $interactive, 'timeout' => $timeout];
-        if ($this->failCopy && $arguments[3] === 'cp') {
-            throw new WorkflowError('copy failed');
+    public function testSuccessfulCheckFailsOnRemovalAndPrimaryStatusIsPreserved(): void
+    {
+        [$client, $ledger] = $this->resourceClient();
+        touch($this->root . '/fail-remove');
+        touch($this->root . '/check-success');
+        try {
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Tooling\Configuration\ApplicationLayout::load(), $ledger, 10);
+            self::fail('Expected cleanup failure.');
+        } catch (\RuntimeException $error) {
+            self::assertSame(1, $error->getCode());
+            self::assertStringContainsString('cleanup', $error->getMessage());
         }
-        return new ProcessResult($interactive ? 7 : 0, null, false, false, '', '', 0);
+        self::assertFileExists($this->root . '/resource.json');
+        self::assertFileExists($this->root . '/receipt.json');
+        unlink($this->root . '/fail-remove');
+        self::assertTrue($ledger->cleanup(10)->successful());
+        self::assertFileDoesNotExist($this->root . '/resource.json');
+        self::assertFileDoesNotExist($this->root . '/receipt.json');
+        unlink($this->root . '/check-success');
+        touch($this->root . '/fail-remove');
+        try {
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Tooling\Configuration\ApplicationLayout::load(), $ledger, 10);
+            self::fail('Expected cleanup failure alongside failed check.');
+        } catch (\RuntimeException $error) {
+            self::assertSame(7, $error->getCode());
+            self::assertStringContainsString('cleanup', $error->getMessage());
+        }
     }
 }

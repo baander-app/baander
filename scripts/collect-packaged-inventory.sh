@@ -12,7 +12,12 @@ cleanup() {
         kill -TERM "$collector_pid" 2>/dev/null || true
         wait "$collector_pid" 2>/dev/null || true
     fi
-    php "$script_dir/packaged_inventory.php" cleanup-collection --session "$session" || true
+    if php "$script_dir/packaged_inventory.php" cleanup-collection --session "$session"; then
+        :
+    else
+        cleanup_status=$?
+        if [[ "$status" -eq 0 ]]; then status=$cleanup_status; fi
+    fi
     exit "$status"
 }
 trap cleanup EXIT

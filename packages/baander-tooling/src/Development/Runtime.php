@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development;
 
+use Baander\Tooling\Process\{CommandExecutor, ProcessSpec, CompletionPolicy};
+use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Filesystem\AtomicFile;
 use Baander\Tooling\Filesystem\PrivateDirectory;
+use Baander\Tooling\Resources\DisposableContainer;
 
 class Runtime
 {
-    public function __construct(private readonly StateStore $store, private readonly Runner $runner) {}
+    private readonly Connections $connections;
+
+    public function __construct(private readonly StateStore $store, private readonly CommandExecutor $runner, ?Connections $connections = null)
+    {
+        $this->connections = $connections ?? new Connections($runner, Environment::clean());
+    }
 
     /** @param array<string,mixed> $instance
      * @return array<string,string>
@@ -70,6 +78,7 @@ class Runtime
      */
     public function config(array $instance, array $release): array
     {
+        $home = \Baander\Tooling\Configuration\ApplicationLayout::fromArray($release['layout'])->root;
         $project = $instance['project'];
         if (!preg_match('/\A[a-z0-9][a-z0-9_-]*\z/', $project)) {
             throw new WorkflowError('Invalid Compose project name.');
@@ -84,13 +93,13 @@ class Runtime
             'DISCOVERY_ENABLED' => 'false',
         ]);
         $mounts = [
-            self::volume('var', '/var/www/html/var'),
-            self::volume('secrets', '/var/www/html/config/secrets'),
+            self::volume('var', $home . '/var'),
+            self::volume('secrets', $home . '/config/secrets'),
             self::volume('media', $environment['MEDIA_STORAGE_PATH'] ?? '/storage/media'),
-            self::volume('storage', '/var/www/html/storage'),
+            self::volume('storage', $home . '/storage'),
             self::volume('conversions', $environment['CONVERT_STORAGE_PATH'] ?? '/storage/conversions'),
-            self::volume('transcode_state', '/var/www/html/var/transcode_state'),
-            self::volume('public', '/var/www/html/public'),
+            self::volume('transcode_state', $home . '/var/transcode_state'),
+            self::volume('public', $home . '/public'),
         ];
         foreach ($instance['media'] ?? [] as $media) {
             $source = $media['source'];
@@ -99,8 +108,8 @@ class Runtime
                 throw new WorkflowError('Configure an existing absolute media directory and absolute container path.');
             }
             if (
-                $target === '/var/www/html'
-                || str_starts_with($target, '/var/www/html/')
+                $target === $home
+                || str_starts_with($target, $home . '/')
                 || in_array($target, ['/', '/var/run', '/run', '/etc'], true)
             ) {
                 throw new WorkflowError('Media mount overlaps application or system state.');
@@ -117,7 +126,7 @@ class Runtime
         }
         $services = [
             'app' => [
-                'image' => $release['app_image'],
+                'image' => $release['images']['app_image']['resolvedId'],
                 'environment' => $environment,
                 'volumes' => $mounts,
                 'stop_grace_period' => '35s',
@@ -125,7 +134,7 @@ class Runtime
                 'init' => true,
             ],
             'postgres' => [
-                'image' => $release['postgres_image'],
+                'image' => $release['images']['postgres_image']['resolvedId'],
                 'environment' => [
                     'POSTGRES_USER' => $environment['DB_USERNAME'] ?? 'baander',
                     'POSTGRES_PASSWORD' => $environment['DB_PASSWORD'] ?? 'baander',
@@ -145,7 +154,7 @@ class Runtime
                 ],
             ],
             'redis' => [
-                'image' => $release['redis_image'],
+                'image' => $release['images']['redis_image']['resolvedId'],
                 'environment' => ['REDIS_PASSWORD' => $environment['REDIS_PASSWORD'] ?? ''],
                 'command' => [
                     'sh',
@@ -156,9 +165,10 @@ class Runtime
                 'networks' => ['private' => new \stdClass()],
             ],
             'nginx' => [
-                'image' => $release['nginx_image'],
+                'image' => $release['images']['nginx_image']['resolvedId'],
                 'environment' => [
                     'SERVER_NAME' => $instance['hostname'],
+                    'APP_HOME' => $home,
                     'GATEWAY_ADDRESS' => $instance['gateway']['ipv4_address'] ?? '',
                 ],
                 'volumes' => [
@@ -166,7 +176,7 @@ class Runtime
                         $this->store->directory($instance['id']) . '/frontend.conf.template',
                         '/etc/nginx/templates/default.conf.template',
                     ),
-                    [...self::volume('public', '/var/www/html/public'), 'read_only' => true],
+                    [...self::volume('public', $home . '/public'), 'read_only' => true],
                 ],
                 'networks' => [
                     'private' => new \stdClass(),
@@ -188,35 +198,35 @@ class Runtime
                 ['BAANDER_DEV_ORIGIN' => $origin, 'APP_ENV' => 'dev', 'APP_DEBUG' => '1'],
             );
             $services['app']['environment'] = $environment;
-            $source = Environment::resolvedPath($instance['worktree']);
-            array_unshift($mounts, self::bind($source, '/var/www/html'));
-            $mounts[] = self::volume('vendor', '/var/www/html/vendor');
+            $source = \Baander\Tooling\Filesystem\Paths::resolvedPath($instance['worktree']);
+            array_unshift($mounts, self::bind($source, $home));
+            $mounts[] = self::volume('vendor', $home . '/vendor');
             $services['app']['volumes'] = $mounts;
             $services['vite'] = [
-                'image' => $release['tool_image'],
-                'working_dir' => '/var/www/html/ui/web',
+                'image' => $release['images']['tool_image']['resolvedId'],
+                'working_dir' => $home . '/ui/web',
                 'entrypoint' => ['yarn'],
                 'command' => ['dev', '--host', '0.0.0.0'],
                 'environment' => [
                     'BAANDER_DEV_ORIGIN' => $origin,
-                    'YARN_INSTALL_STATE_PATH' => '/var/www/html/ui/web/node_modules/.yarn-install-state.gz',
+                    'YARN_INSTALL_STATE_PATH' => $home . '/ui/web/node_modules/.yarn-install-state.gz',
                 ],
                 'volumes' => [
-                    self::bind($source, '/var/www/html'),
-                    self::volume('node_modules', '/var/www/html/ui/web/node_modules'),
-                    self::volume('public', '/var/www/html/public'),
+                    self::bind($source, $home),
+                    self::volume('node_modules', $home . '/ui/web/node_modules'),
+                    self::volume('public', $home . '/public'),
                 ],
                 'networks' => ['private' => new \stdClass()],
             ];
         }
         $defaults = [
-            'var' => '/var/www/html/var',
-            'secrets' => '/var/www/html/config/secrets',
+            'var' => $home . '/var',
+            'secrets' => $home . '/config/secrets',
             'media' => $environment['MEDIA_STORAGE_PATH'] ?? '/storage/media',
-            'storage' => '/var/www/html/storage',
+            'storage' => $home . '/storage',
             'conversions' => $environment['CONVERT_STORAGE_PATH'] ?? '/storage/conversions',
             'redis' => '/data',
-            'transcode_state' => '/var/www/html/var/transcode_state',
+            'transcode_state' => $home . '/var/transcode_state',
         ];
         foreach ($instance['state_mounts'] ?? [] as $key => $saved) {
             $service = $key === 'redis' ? 'redis' : 'app';
@@ -281,16 +291,44 @@ class Runtime
 
     /** @param array<string,mixed> $instance
      * @param array<string,mixed> $release
+     * @param list<string> $command
+     * @return array{arguments:list<string>,environment:array<string,string>}
+     */
+    public function applicationContainer(array $instance, array $release, array $command): array
+    {
+        $model = $this->config($instance, $release);
+        $application = $model['services']['app'];
+        $arguments = ['--init', '--network', self::networkName($instance), '--workdir', ApplicationLayout::fromArray($release['layout'])->root];
+        foreach ($application['volumes'] as $mount) {
+            $source = $mount['type'] === 'volume' ? $model['volumes'][$mount['source']]['name'] : str_replace('$$', '$', $mount['source']);
+            $arguments[] = '--mount';
+            $arguments[] = 'type=' . $mount['type'] . ',src=' . $source . ',dst=' . $mount['target'] . (($mount['read_only'] ?? false) ? ',readonly' : '');
+        }
+        $environment = [];
+        foreach ($application['environment'] as $key => $value) {
+            $environment[$key] = str_replace('$$', '$', $value);
+            $arguments[] = '--env';
+            $arguments[] = $key;
+        }
+        return ['arguments' => [...$arguments, $release['images']['app_image']['resolvedId'], ...$command], 'environment' => $environment];
+    }
+
+    /** @param array<string,mixed> $instance
+     * @param array<string,mixed> $release
      * @return array<string,mixed>
      */
     public function ensureNetworks(array $instance, array $release): array
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $network = Gateway::ownedNetwork($docker, self::networkName($instance), $instance['id']);
-        $gateway = new Gateway($this->store, $this->runner)->configure($instance, $release);
+        $instance['network'] = $network;
+        $this->store->save($instance['id'], $instance);
+        $gateway = new Gateway($this->store, $this->runner, $this->connections)->configure($instance, $release);
+        $instance['gateway'] = $gateway;
+        $this->store->save($instance['id'], $instance);
         if ($instance['kind'] === 'preview') {
-            $source = Environment::resolvedPath($instance['worktree']);
+            $source = \Baander\Tooling\Filesystem\Paths::resolvedPath($instance['worktree']);
             $expected = [];
             foreach (['composer.lock', 'ui/web/package.json'] as $name) {
                 $hash = @hash_file('sha256', $source . '/' . $name);
@@ -300,22 +338,20 @@ class Runtime
                 $expected[] = $hash;
             }
             try {
-                $result = $docker->run([
-                    'run',
-                    '--rm',
+                $result = DisposableContainer::run($docker, $this->store->directory($instance['id']) . '/runtime-source-probe.json', [
                     '--network',
                     'none',
                     '--entrypoint',
                     '/bin/sh',
                     '--mount',
                     'type=bind,src=' . $source . ',dst=/probe,readonly',
-                    $release['app_image'],
+                    $release['images']['app_image']['resolvedId'],
                     '-ec',
                     'sha256sum /probe/composer.lock /probe/ui/web/package.json',
-                ]);
-            } catch (WorkflowError $error) {
+                ], $this->connections->environment(), $release['effective']['budgets']['cleanup'] ?? 120);
+            } catch (\RuntimeException $error) {
                 throw new WorkflowError(
-                    'Preview checkout is unavailable to the selected Docker daemon; check daemon path sharing, Unix permissions and SELinux read labels.',
+                    'Preview checkout is unavailable to the selected Docker daemon; check daemon path sharing, Unix permissions and SELinux read labels. ' . $error->getMessage(),
                     previous: $error,
                 );
             }
@@ -340,21 +376,19 @@ class Runtime
             if (!str_starts_with($source, '/') || !is_dir($source)) {
                 throw new WorkflowError('Configure an existing absolute media directory.');
             }
-            $docker->run([
-                'run',
-                '--rm',
+            DisposableContainer::run($docker, $this->store->directory($instance['id']) . '/runtime-media-probe-' . hash('sha256', $media['target']) . '.json', [
                 '--network',
                 'none',
                 '--entrypoint',
                 '/bin/sh',
                 '--mount',
                 'type=bind,src=' . $source . ',dst=/probe,readonly',
-                $release['app_image'],
+                $release['images']['app_image']['resolvedId'],
                 '-ec',
                 'test -d /probe && test -r /probe && test -x /probe',
-            ]);
+            ], $this->connections->environment(), $release['effective']['budgets']['cleanup'] ?? 120);
         }
-        return array_replace($instance, ['network' => $network, 'gateway' => $gateway]);
+        return $instance;
     }
 
     /** @param array<string,mixed> $instance
@@ -366,7 +400,7 @@ class Runtime
         $instance = $this->ensureNetworks($instance, $release);
         $directory = $this->store->directory($instance['id']);
         PrivateDirectory::prepare($directory);
-        $content = file_get_contents(dirname(__DIR__, 4) . '/docker/dev/frontend.conf.template');
+        $content = file_get_contents($release['source'] . '/docker/dev/frontend.conf.template');
         if ($content === false) {
             throw new WorkflowError('Cannot read frontend configuration template.');
         }
@@ -379,14 +413,25 @@ class Runtime
             str_replace('include /etc/nginx/preview.conf;', $preview, $content),
         );
         AtomicFile::writeJson($directory . '/compose.json', $this->config($instance, $release));
-        return array_replace($instance, ['compose_file' => $directory . '/compose.json']);
+        $files = [];
+        foreach ([$directory . '/compose.json', $directory . '/frontend.conf.template'] as $path) {
+            $digest = hash_file('sha256', $path);
+            if ($digest === false) {
+                throw new WorkflowError('Cannot identify generated runtime input: ' . $path);
+            }
+            $files[$path] = $digest;
+        }
+        $instance['compose_file'] = $directory . '/compose.json';
+        $instance['generated_inputs'] = ['release' => $release['sourceDigest'], 'files' => $files];
+        $this->store->save($instance['id'], $instance);
+        return $instance;
     }
 
     /** @param array<string,mixed> $instance */
     public function running(array $instance): bool
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $services = ['app', 'nginx', 'postgres', 'redis'];
         if ($instance['kind'] === 'preview') {
             $services[] = 'vite';
@@ -394,7 +439,7 @@ class Runtime
         sort($services);
         $identifiers = preg_split(
             '/\s+/',
-            ($docker->compose($instance, ['ps', '--all', '--quiet', ...$services])->stdout
+            ($docker->compose($instance['project'], $instance['compose_file'], ['ps', '--all', '--quiet', ...$services])->stdout
                 |> trim(...)),
             flags: PREG_SPLIT_NO_EMPTY,
         ) ?: [];
@@ -429,9 +474,9 @@ class Runtime
     /** @param array<string,mixed> $instance */
     public function dependencies(array $instance): void
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
-        $docker->compose($instance, ['up', '-d', '--wait', 'postgres', 'redis']);
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
+        $docker->compose($instance['project'], $instance['compose_file'], ['up', '-d', '--wait', 'postgres', 'redis']);
     }
 
     /** @param array<string,mixed> $instance
@@ -439,8 +484,9 @@ class Runtime
      */
     public function prepare(array $instance, array $release): void
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $home = \Baander\Tooling\Configuration\ApplicationLayout::fromArray($release['layout'])->root;
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $model = $this->config($instance, $release);
         if ($instance['kind'] === 'preview') {
             $root = realpath($instance['worktree']);
@@ -452,9 +498,9 @@ class Runtime
                 foreach ($service['volumes'] ?? [] as $mount) {
                     if (
                         $mount['type'] === 'volume'
-                        && ($mount['target'] === '/var/www/html' || str_starts_with($mount['target'], '/var/www/html/'))
+                        && ($mount['target'] === $home || str_starts_with($mount['target'], $home . '/'))
                     ) {
-                        $target = substr($mount['target'], strlen('/var/www/html/'));
+                        $target = substr($mount['target'], strlen($home . '/'));
                         if (in_array('..', explode('/', $target), true)) {
                             throw new WorkflowError('Preview volume mountpoints must not contain parent segments.');
                         }
@@ -479,15 +525,15 @@ class Runtime
             }
         }
         $destinations = [
-            'public' => '/var/www/html/public',
-            'var' => '/var/www/html/var',
-            'storage' => '/var/www/html/storage',
+            'public' => $home . '/public',
+            'var' => $home . '/var',
+            'storage' => $home . '/storage',
             'conversions' => '/storage/conversions',
-            'transcode_state' => '/var/www/html/var/transcode_state',
-            'secrets' => '/var/www/html/config/secrets',
+            'transcode_state' => $home . '/var/transcode_state',
+            'secrets' => $home . '/config/secrets',
         ];
         if ($instance['kind'] === 'preview') {
-            $destinations['vendor'] = '/var/www/html/vendor';
+            $destinations['vendor'] = $home . '/vendor';
         }
         foreach ($destinations as $key => $source) {
             $name = $model['volumes'][$key]['name'];
@@ -500,9 +546,7 @@ class Runtime
             $script .= 'chown '
                 . (in_array($key, ['public', 'vendor', 'var', 'secrets'], true) ? '-R ' : '')
                 . 'www-data:www-data /seed';
-            $docker->run([
-                'run',
-                '--rm',
+            DisposableContainer::run($docker, $this->store->directory($instance['id']) . '/runtime-seed-' . $key . '.json', [
                 '--network',
                 'none',
                 '--user',
@@ -511,35 +555,33 @@ class Runtime
                 '/bin/sh',
                 '--mount',
                 'type=volume,src=' . $name . ',dst=/seed',
-                $release['app_image'],
+                $release['images']['app_image']['resolvedId'],
                 '-ec',
                 $script,
-            ]);
+            ], $this->connections->environment(), $release['effective']['budgets']['cleanup'] ?? 120);
         }
         if ($instance['kind'] === 'preview') {
-            $source = Environment::resolvedPath($instance['worktree']);
+            $source = \Baander\Tooling\Filesystem\Paths::resolvedPath($instance['worktree']);
             $modules = $model['volumes']['node_modules']['name'];
-            $docker->run([
-                'run',
-                '--rm',
+            DisposableContainer::run($docker, $this->store->directory($instance['id']) . '/runtime-yarn.json', [
                 '--entrypoint',
                 'yarn',
                 '--workdir',
-                '/var/www/html/ui/web',
+                $home . '/ui/web',
                 '--mount',
-                'type=bind,src=' . $source . ',dst=/var/www/html,readonly',
+                'type=bind,src=' . $source . ',dst=' . $home . ',readonly',
                 '--mount',
-                'type=volume,src=' . $modules . ',dst=/var/www/html/ui/web/node_modules',
+                'type=volume,src=' . $modules . ',dst=' . $home . '/ui/web/node_modules',
                 '--env',
                 'YARN_ENABLE_IMMUTABLE_INSTALLS=true',
                 '--env',
-                'YARN_INSTALL_STATE_PATH=/var/www/html/ui/web/node_modules/.yarn-install-state.gz',
+                'YARN_INSTALL_STATE_PATH=' . $home . '/ui/web/node_modules/.yarn-install-state.gz',
                 '--env',
-                'YARN_CACHE_FOLDER=/var/www/html/ui/web/node_modules/.yarn-cache',
-                $release['tool_image'],
+                'YARN_CACHE_FOLDER=' . $home . '/ui/web/node_modules/.yarn-cache',
+                $release['images']['tool_image']['resolvedId'],
                 'install',
                 '--immutable',
-            ], timeout: 900);
+            ], $this->connections->environment(), $release['effective']['budgets']['cleanup'] ?? 120, timeout: 900);
         }
     }
 
@@ -548,11 +590,11 @@ class Runtime
      */
     public function up(array &$instance, array $release): void
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
         $this->prepare($instance, $release);
-        $docker->compose($instance, ['up', '-d', '--no-deps', 'nginx']);
-        $identifier = ($docker->compose($instance, ['ps', '-q', 'nginx'])->stdout
+        $docker->compose($instance['project'], $instance['compose_file'], ['up', '-d', '--no-deps', 'nginx']);
+        $identifier = ($docker->compose($instance['project'], $instance['compose_file'], ['ps', '-q', 'nginx'])->stdout
             |> trim(...));
         if ($identifier === '') {
             throw new WorkflowError('Frontend did not start; inspect this instance logs.');
@@ -560,11 +602,10 @@ class Runtime
         $networks = ($docker->run(['inspect', '--format', '{{json .NetworkSettings.Networks}}', $identifier])->stdout
             |> (static fn(string $output): mixed => json_decode($output, true, flags: JSON_THROW_ON_ERROR)));
         $proxyIp = $networks[self::networkName($instance)]['IPAddress'];
-        $configured = $this->write(array_replace($instance, ['proxy_ip' => $proxyIp]), $release);
-        $instance['proxy_ip'] = $proxyIp;
-        $instance['compose_file'] = $configured['compose_file'];
+        $instance = $this->write(array_replace($instance, ['proxy_ip' => $proxyIp]), $release);
         $docker->compose(
-            $instance,
+            $instance['project'],
+            $instance['compose_file'],
             ['up', '-d', '--no-deps', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])],
         );
     }
@@ -572,9 +613,9 @@ class Runtime
     /** @param array<string,mixed> $instance */
     public function down(array $instance): void
     {
-        $docker = new Docker($this->runner, $instance['docker']);
-        $docker->validate();
-        $docker->compose($instance, ['down', '--remove-orphans']);
+        $docker = $this->connections->client($instance['docker']);
+        $docker->validateIdentity();
+        $docker->compose($instance['project'], $instance['compose_file'], ['down', '--remove-orphans']);
     }
 
     /** @param array<string,mixed> $instance
@@ -583,10 +624,7 @@ class Runtime
     public function ready(array $instance): array
     {
         $origin = 'https://' . $instance['hostname'];
-        if ($this->runner->run(
-            ['curl', '--fail', '--silent', '--show-error', '--max-time', '15', $origin . '/ready'],
-            check: false,
-        )->exitCode !== 0) {
+        if ($this->runner->run(new ProcessSpec(['curl', '--fail', '--silent', '--show-error', '--max-time', '15', $origin . '/ready'], processGroup: true), new CompletionPolicy(null))->exitCode !== 0) {
             throw new WorkflowError($origin . ' is not ready; inspect instance logs, DNS and certificate trust.');
         }
         return ['url' => $origin, 'web_ready' => true];

@@ -25,6 +25,7 @@ final readonly class DeploymentOperatorManifest
         public string $bootId,
         public string $daemonId,
         public string $imageId,
+        public string $appHome,
         public string $network,
         public string $dockerBinary,
         public string $dockerEndpoint,
@@ -56,7 +57,7 @@ final readonly class DeploymentOperatorManifest
         }
     }
 
-    public static function fromJson(string $json): self
+    public static function fromJson(string $json, string $appHome): self
     {
         if (strlen($json) > 8192) {
             throw new InvalidArgumentException('Operator manifest exceeds 8192 bytes.');
@@ -97,7 +98,7 @@ final readonly class DeploymentOperatorManifest
             $mounts[] = get_object_vars($mount);
         }
         return new self(self::string($fields, 'namespace'), self::string($fields, 'bootId'), self::string($fields, 'daemonId'),
-            self::string($fields, 'imageId'), self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
+            self::string($fields, 'imageId'), $appHome, self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
             $budgets['control'], $budgets['execution'], self::bytes($fields, 'scheduledConsoleMiB'), self::string($fields, 'ipcVolume'), $mounts,
             WorkerAutoscalingProfile::fromJson(json_encode($fields['autoscaling'], JSON_THROW_ON_ERROR)), self::string($fields, 'sourceMountPolicy'));
     }
@@ -106,17 +107,17 @@ final readonly class DeploymentOperatorManifest
     {
         $budget = $unit === DeploymentUnit::Control ? $this->control : $this->execution;
         $recipe = new DeploymentContainerRecipe($this->namespace, $this->bootId, $this->daemonId, $this->imageId,
-            ['/usr/local/bin/php', '-d', 'memory_limit=256M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
+            ['/usr/local/bin/php', '-d', 'memory_limit=256M', $this->appHome . '/bin/console', 'app:worker', '--no-interaction',
                 '--deployment=' . $this->namespace, '--boot-id=' . $this->bootId, '--unit=' . $unit->value,
                 '--memory-mib=' . intdiv($budget->memoryBytes, self::MIB), '--pids-limit=' . $budget->pidsLimit,
                 '--scheduled-console-mib=' . ($unit === DeploymentUnit::Control ? 0 : intdiv($this->scheduledConsoleBytes, self::MIB)),
                 '--autoscaling-profile=' . $this->autoscaling->toJson(),
                 '--lock-dir=/tmp/baander-worker-locks', '--ipc-dir=/run/baander-worker'],
-            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $environment, $this->mediaMounts, $this->sourceMountPolicy);
+            $this->network, $budget->memoryBytes, $budget->nanoCpus, $budget->pidsLimit, $unit, $budget->cpuSet, $this->ipcVolume, $this->appHome, $environment, $this->mediaMounts, $this->sourceMountPolicy);
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source storage.');
         }
-        $paths = [['/var/www/html/storage', 'derived'], ['/var/www/html/var/transcode_state', 'derived']];
+        $paths = [[$this->appHome . '/storage', 'derived'], [$this->appHome . '/var/transcode_state', 'derived']];
         foreach (['CONVERT_STORAGE_PATH' => 'derived', 'MEDIA_STORAGE_PATH' => 'source'] as $key => $role) {
             if (!isset($environment->variables[$key])) {
                 continue;

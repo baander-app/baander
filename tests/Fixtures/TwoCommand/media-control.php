@@ -179,15 +179,25 @@ $seekResponse = twoCommandExchange($auth, '/api/transcode/sessions/' . $state['s
 $seekHandlingSeconds = (hrtime(true) - $seekStart) / 1e9;
 ensure($seekResponse->status() === 200, 'Paused seek failed.');
 $current = acknowledged($db, $state, 'paused', 30);
+$seekAcknowledgedAt = hrtime(true) / 1e9;
 ensure((int) $current['generation'] > (int) $initialRuntime['generation'], 'Seek did not advance generation.');
 await(static fn (): bool => !mediaIdentityAlive($initialAttempt['identity']), 'exact old encoder retirement', 30);
+$oldRetiredAt = hrtime(true) / 1e9;
 $replacement = mediaAttempt($state['job']);
+$replacementObservedAt = hrtime(true) / 1e9;
 ensure($replacement['identity'] !== $initialAttempt['identity'], 'Seek reused old native identity.');
 $remainingSeekSeconds = 30 - (hrtime(true) - $seekStart) / 1e9;
 ensure($remainingSeekSeconds > 0, 'Seek readiness watchdog expired before delivery.');
 $decoded = decodeVideo($auth, $state, $remainingSeekSeconds);
-$seekSeconds = (hrtime(true) - $seekStart) / 1e9;
-ensure($seekSeconds <= 30 && $decoded['status'] === 'paused' && (float) $decoded['position'] === 30.0, 'Paused seek exceeded readiness watchdog or lost intent.');
+$verificationDoneAt = hrtime(true) / 1e9;
+$seekSeconds = $decoded['deliveryReadyAt'] - $seekStart / 1e9;
+$seekConditions = ['withinWatchdog' => $seekSeconds <= 30, 'paused' => $decoded['status'] === 'paused', 'positionRetained' => (float) $decoded['position'] === 30.0];
+ensure(!in_array(false, $seekConditions, true), 'Paused seek exceeded readiness watchdog or lost intent: ' . json_encode([
+    'seekStart' => $seekStart / 1e9, 'ackAt' => $seekAcknowledgedAt, 'oldRetiredAt' => $oldRetiredAt,
+    'replacementObservedAt' => $replacementObservedAt, 'pairedDeliveryAt' => $decoded['deliveryReadyAt'], 'verificationDoneAt' => $verificationDoneAt,
+    'seekSeconds' => $seekSeconds, 'watchdogSeconds' => 30,
+    'generation' => $decoded['generation'], 'status' => $decoded['status'], 'position' => $decoded['position'], 'conditions' => $seekConditions,
+], JSON_THROW_ON_ERROR));
 ensure(is_dir($initialAttempt['outputDirectory']) || mkdir($initialAttempt['outputDirectory'], 0750, true), 'Cannot retain old output directory.');
 foreach ($retainedFiles as $path => $bytes) { ensure(file_put_contents($path, $bytes) === strlen($bytes), 'Cannot retain old output bytes.'); }
 $retained = [];

@@ -16,6 +16,7 @@ final class SignalScope
 {
     /** @var array<int, WeakReference<self>> */
     private static array $scopes = [];
+    private static bool $shutdownRegistered = false;
     private readonly ?Closure $observer;
     private ?int $received = null;
     private ?Throwable $failure = null;
@@ -24,6 +25,16 @@ final class SignalScope
     /** @param (callable(int): void)|null $observer */
     public function __construct(?callable $observer = null)
     {
+        if (!self::$shutdownRegistered) {
+            self::$shutdownRegistered = true;
+            register_shutdown_function(static function (): void {
+                // Release the reactor while PHP shutdown callbacks can still service it.
+                // Exception traces can otherwise retain scopes until object destruction.
+                foreach (array_reverse(self::$scopes) as $reference) {
+                    $reference->get()?->close();
+                }
+            });
+        }
         $this->observer = $observer === null ? null : $observer(...);
         if (self::$scopes === []) {
             // Swoole cannot inspect foreign handlers. This scope composes only

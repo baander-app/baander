@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development\Acceptance;
 
+use Baander\Tooling\Process\ExecutionContext;
+
 final class MediaClient
 {
     private \OpenSSLAsymmetricKey $key;
@@ -13,7 +15,7 @@ final class MediaClient
     private ?string $nonce = null;
     public readonly string $origin;
 
-    public function __construct(string $origin, private readonly string $ca)
+    public function __construct(string $origin, private readonly string $ca, private readonly ExecutionContext $context)
     {
         $this->origin = rtrim($origin, '/');
         $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
@@ -108,7 +110,7 @@ final class MediaClient
                         $payload === [] ? new \stdClass() : $payload,
                         JSON_THROW_ON_ERROR,
                     ),
-                    'timeout' => 180,
+                    'timeout' => min(180, $this->context->remaining() ?? 180),
                     'ignore_errors' => true,
                     'follow_location' => 0,
                 ],
@@ -159,6 +161,10 @@ final class MediaClient
                 $length = 0;
                 try {
                     while (!feof($response)) {
+                        $remaining = $this->context->remaining();
+                        if ($remaining !== null) {
+                            stream_set_timeout($response, (int) $remaining, (int) (($remaining - (int) $remaining) * 1_000_000));
+                        }
                         $chunk = fread($response, 65536);
                         Support::check(
                             $chunk !== false && !stream_get_meta_data($response)['timed_out'],

@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Tooling\Development\Acceptance;
 
-use Baander\Tooling\Development\Environment;
-use Baander\Tooling\Process\ProcessResult;
-use Baander\Tooling\Process\ProcessRunner;
-use Baander\Tooling\Process\ProcessSpec;
+use Baander\Tooling\Filesystem\Paths;
 
 final class Support
 {
@@ -64,36 +61,6 @@ final class Support
         }
     }
 
-    /** @param non-empty-list<string> $argv
-     * @param array<string,string> $environment
-     */
-    public static function run(
-        array $argv,
-        ?string $cwd = null,
-        ?string $input = null,
-        ?float $timeout = null,
-        bool $check = true,
-        array $environment = [],
-        bool $passthrough = false,
-    ): ProcessResult {
-        $result = new ProcessRunner()->run(new ProcessSpec(
-            argv: $argv,
-            cwd: $cwd,
-            environment: array_replace(getenv(), $environment),
-            timeout: $timeout,
-            stdin: $input,
-            passthrough: $passthrough,
-            processGroup: true,
-        ));
-        if ($check && ($result->exitCode !== 0 || $result->timedOut || $result->cancelled)) {
-            throw new CommandFailure(
-                basename($argv[0]) . ' failed with status ' . $result->exitCode . ': ' . substr($result->stderr, -2000),
-                $result->exitCode === 0 ? 1 : $result->exitCode,
-            );
-        }
-        return $result;
-    }
-
     public static function removeTree(string $path): void
     {
         if (is_link($path) || !is_dir($path)) {
@@ -117,7 +84,7 @@ final class Support
 
     public static function path(string $path): string
     {
-        return Environment::resolvedPath($path);
+        return Paths::resolvedPath($path);
     }
     public static function now(): float
     {
