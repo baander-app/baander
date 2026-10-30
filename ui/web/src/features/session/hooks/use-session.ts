@@ -8,18 +8,21 @@ import { PLAYER_ACTIONS } from '@/features/player/player-actions'
 import { getDeviceId, getDeviceName } from '../utils/device-id'
 import { SessionSyncBus } from '../services/SessionSyncBus'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
-import { requestWebSocketTicket, webSocketEndpoint } from '@/shared/auth/websocket-ticket'
+import { authenticatedTransport } from '@/shared/live/transport'
+import { captureOwnership, isCurrentOwnership, assertCurrentOwnership } from '@/shared/live/ownership'
 import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('Session')
 
 async function getSessionQueueSongs(publicIds: string[]): Promise<Record<string, unknown>[]> {
+  const ownership = captureOwnership()
   const ids = [...new Set(publicIds)]
   const batches: string[][] = []
   for (let offset = 0; offset < ids.length; offset += 100) batches.push(ids.slice(offset, offset + 100))
   const responses = await Promise.all(batches.map((batch) => AXIOS_INSTANCE.get<{ data: Record<string, unknown>[] }>('/api/songs/', {
     params: { publicIds: batch.join(','), limit: batch.length },
   })))
+  assertCurrentOwnership(ownership)
   return responses.flatMap((response) => response.data.data ?? [])
 }
 
@@ -82,22 +85,26 @@ export function useSession() {
 
   // Register this device once on mount
   useEffect(() => {
-    if (deviceRegistered.current) return
+    if (deviceRegistered.current || !isAuthenticated) return
+    const ownership = captureOwnership()
     deviceRegistered.current = true
     AXIOS_INSTANCE.post('/api/devices', {
       deviceId,
       name: getDeviceName(),
-    }).then(() => queryClient.invalidateQueries({ queryKey: ['devices'] }))
+    }).then(() => {
+      if (isCurrentOwnership(ownership)) return queryClient.invalidateQueries({ queryKey: ['devices'] })
+    })
       .catch((err) => { logger.warn('Device registration failed:', err) })
-  }, [deviceId, queryClient])
+  }, [deviceId, queryClient, isAuthenticated])
 
   // Auto-create session when playback starts and no session exists
   const [sessionCreated, setSessionCreated] = useState(false)
   useEffect(() => {
-    if (query.data || sessionCreated) return
+    if (query.data || sessionCreated || !isAuthenticated) return
+    const ownership = captureOwnership()
 
     const unsub = usePlayerStore.subscribe((state, prev) => {
-      if (!state.isPlaying || prev.isPlaying) return
+      if (!isCurrentOwnership(ownership) || !state.isPlaying || prev.isPlaying) return
       if (query.data || sessionCreated) return
 
       setSessionCreated(true)
@@ -109,18 +116,22 @@ export function useSession() {
         currentTrackIndex: currentIndex,
         position: currentTime,
       }).then(res => {
+        if (!isCurrentOwnership(ownership)) return
         queryClient.setQueryData(SESSION_KEY, res.data?.data ?? res.data)
       }).catch((err) => {
+        if (!isCurrentOwnership(ownership)) return
         logger.warn('Session creation failed:', err)
         setSessionCreated(false) // retry on next play
       })
     })
     return unsub
-  }, [query.data, sessionCreated, queryClient])
+  }, [query.data, sessionCreated, queryClient, isAuthenticated])
 
   // On session load, either show transfer prompt or hydrate queue
   useEffect(() => {
     const session = query.data
+    const ownership = captureOwnership()
+    let disposed = false
     if (!session) return
     if (session.activeDeviceId && session.activeDeviceId !== devicePublicId) return
 
@@ -128,6 +139,9 @@ export function useSession() {
     const localQueue = usePlayerStore.getState().queue
     if (devicePublicId !== null && session.activeDeviceId === devicePublicId && localQueue.length === 0 && session.queue.length > 0) {
       getSessionQueueSongs(session.queue).then(songs => {
+        if (disposed || !isCurrentOwnership(ownership) || usePlayerStore.getState().queue.length > 0) return
+        const latest = queryClient.getQueryData<SessionData>(SESSION_KEY)
+        if (latest?.publicId !== session.publicId || latest.activeDeviceId !== devicePublicId) return
         const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
         const tracks: Track[] = session.queue
           .filter(Boolean)
@@ -155,7 +169,8 @@ export function useSession() {
         }
       }).catch((err) => { logger.warn('Queue hydration failed:', err) })
     }
-  }, [query.data, devicePublicId])
+    return () => { disposed = true }
+  }, [query.data, devicePublicId, queryClient])
 
   // Initialize SessionSyncBus when the session id changes. Keying on the stable id (not the
   // whole query.data object) avoids disconnecting/reconnecting the socket — and resetting the
@@ -163,10 +178,11 @@ export function useSession() {
   const sessionId = query.data?.publicId ?? null
   useEffect(() => {
     if (!sessionId || !isAuthenticated) return
+    const ownership = captureOwnership()
+    let disposed = false
 
     const bus = new SessionSyncBus({
-      wsEndpoint: webSocketEndpoint(),
-      getConnectionTicket: requestWebSocketTicket,
+      transport: authenticatedTransport,
       deviceId,
       getPosition: getCurrentTime,
       getQueue: () => usePlayerStore.getState().queue.map(t => t.publicId),
@@ -174,6 +190,8 @@ export function useSession() {
       getIsPlaying: () => usePlayerStore.getState().isPlaying,
     }, {
       onStateUpdate: (state) => {
+        const incomingOwnership = captureOwnership()
+        if (disposed || ownership.principal !== incomingOwnership.principal) return
         const local = usePlayerStore.getState()
         const localQueueIds = local.queue.map(t => t.publicId)
 
@@ -195,6 +213,12 @@ export function useSession() {
           const session = queryClient.getQueryData(SESSION_KEY) as SessionData | undefined
           if (session && session.queue.length > 0) {
             getSessionQueueSongs(session.queue).then(songs => {
+              if (disposed || !isCurrentOwnership(incomingOwnership)) return
+              const latest = queryClient.getQueryData<SessionData>(SESSION_KEY)
+              if (latest?.publicId !== session.publicId) return
+              const current = usePlayerStore.getState()
+              if (current.queue.length > 0 && ((devicePublicId !== null && state.activeDeviceId === devicePublicId)
+                || (state.activeDeviceId === null && current.isPlaying))) return
               const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
               const tracks: Track[] = session.queue
                 .filter(Boolean)
@@ -238,11 +262,12 @@ export function useSession() {
     })
 
     sessionSyncBus.current = bus
-    bus.connect(sessionId).catch(() => {
+    bus.connect().catch(() => {
       logger.warn('[useSession] WebSocket connection failed')
     })
 
     return () => {
+      disposed = true
       bus.disconnect()
       if (sessionSyncBus.current === bus) sessionSyncBus.current = null
     }
@@ -257,6 +282,7 @@ export function useSession() {
     // fires and forgets. The try/catch ensures the player store always gets a
     // STATE_RESTORE dispatch even if hydration fails.
     onSuccess: async (data) => {
+      const ownership = captureOwnership()
       queryClient.setQueryData(SESSION_KEY, data)
       setDismissedTransfer(null)
 
@@ -264,6 +290,7 @@ export function useSession() {
         // Hydrate server queue (publicIds) into Track[] via batch lookup
         try {
           const songs = await getSessionQueueSongs(data.queue)
+          if (!isCurrentOwnership(ownership)) return
           const songMap = new Map<string, Record<string, unknown>>(songs.map((s: Record<string, unknown>) => [s.publicId as string, s]))
           const tracks: Track[] = data.queue
             .filter(Boolean)
@@ -288,6 +315,7 @@ export function useSession() {
             currentTime: data.position,
           }, 'session')
         } catch {
+          if (!isCurrentOwnership(ownership)) return
           mediator.dispatch(PLAYER_ACTIONS.STATE_RESTORE, {
             queue: [],
             currentIndex: 0,

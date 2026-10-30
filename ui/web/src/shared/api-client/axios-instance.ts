@@ -5,6 +5,7 @@ import { createDpopProof } from '@/shared/crypto/dpop-proof';
 import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS, outageWaitMs } from '@/shared/auth/refresh-budget';
 import { retryAfterSeconds } from '@/features/auth/lib/retry-after';
 import { coordinateRefresh } from '@/features/auth/services/auth-coordination';
+import { assertCurrentOwnership, captureOwnership, isCurrentOwnership, ownershipForSignal, waitForOwnershipAuthority, type OwnershipStamp } from '@/shared/live/ownership';
 
 const getAuthStore = () => useAuthStore.getState();
 
@@ -14,6 +15,7 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
   _dpopRetryCount?: number;
   _authToken?: string | null;
   _authSession?: number;
+  _ownership?: OwnershipStamp;
 }
 
 const MAX_DPOP_NONCE_RETRIES = 1;
@@ -68,12 +70,39 @@ function isApiRequest(config: AxiosRequestConfig): boolean {
   }
 }
 
+const credentialControlPaths = new Set([
+  '/api/auth/login',
+  '/api/auth/login/passkey',
+  '/api/auth/passkey/authenticate/options',
+  '/api/auth/passkey/authenticate',
+  '/api/auth/register',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/auth/password/reset-request',
+  '/api/auth/password/reset',
+  '/api/auth/email/verify',
+]);
+
+function isAuthorityControlRequest(config: AxiosRequestConfig): boolean {
+  const path = new URL(AXIOS_INSTANCE.getUri(config), apiOrigin()).pathname;
+  const method = config.method?.toUpperCase();
+  return (method === 'GET' && path === '/api/live/recovery')
+    || (method === 'POST' && (path === '/api/ws/tickets' || credentialControlPaths.has(path)));
+}
+
 // --- Request interceptor: attach DPoP proof + sender-constrained token ---
 AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const customConfig = config as CustomAxiosRequestConfig;
   config.headers.delete('Authorization');
   config.headers.delete('DPoP');
   if (!isApiRequest(config)) return config;
+  const signal = config.signal;
+  customConfig._ownership ??= (signal && ownershipForSignal(signal)) || captureOwnership();
+  assertCurrentOwnership(customConfig._ownership);
+  if (!isAuthorityControlRequest(config)) {
+    await waitForOwnershipAuthority(signal);
+    assertCurrentOwnership(customConfig._ownership);
+  }
   const {accessToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
   const session = getAuthSession(keyPair);
@@ -98,6 +127,7 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
     if (getAuthStore().accessToken !== accessToken || getDpopKeyPair() !== keyPair) {
       throw new Axios.CanceledError('Authentication changed while signing');
     }
+    assertCurrentOwnership(customConfig._ownership);
     config.headers.DPoP = proof;
   }
 
@@ -108,6 +138,7 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
 AXIOS_INSTANCE.interceptors.response.use((response) => {
   if (!isApiRequest(response.config)) return response;
   const config = response.config as CustomAxiosRequestConfig;
+  if (config._ownership) assertCurrentOwnership(config._ownership);
   if (config._authSession !== getAuthSession()) {
     throw new Axios.CanceledError('Authentication changed before response received');
   }
@@ -168,19 +199,29 @@ let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
  * completed, which `setTokens` resolves on.
  */
 async function refreshSession(session: number, failedAccessToken: string): Promise<void> {
+  const ownership = captureOwnership();
   const deadline = Date.now() + REFRESH_BUDGET_MS;
   await coordinateRefresh({
     budgetMs: REFRESH_BUDGET_MS,
     // A rotation adopted from a `rotated` event while waiting for the lock also leaves nothing to refresh.
-    adopt: async () => await getAuthStore().adoptStoredAuth() || getAuthStore().accessToken !== failedAccessToken,
-    refresh: () => refreshWithServer(session, deadline),
+    adopt: async () => {
+      assertCurrentOwnership(ownership);
+      const adopted = await getAuthStore().adoptStoredAuth();
+      assertCurrentOwnership(ownership);
+      return adopted || getAuthStore().accessToken !== failedAccessToken;
+    },
+    refresh: () => {
+      assertCurrentOwnership(ownership);
+      return refreshWithServer(session, deadline);
+    },
   });
 }
 
 async function refreshWithServer(session: number, deadline: number): Promise<void> {
+  const ownership = captureOwnership();
   const {accessToken, refreshToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
-  const isCurrentSession = () => getAuthSession() === session && getAuthStore().refreshToken === refreshToken &&
+  const isCurrentSession = () => isCurrentOwnership(ownership) && getAuthSession() === session && getAuthStore().refreshToken === refreshToken &&
     getAuthStore().accessToken === accessToken && getDpopKeyPair() === keyPair;
   try {
     if (!refreshToken || !keyPair) throw new Error('No refresh credentials');
@@ -246,7 +287,9 @@ async function refreshWithServer(session: number, deadline: number): Promise<voi
 
 /** Share one refresh between API requests and native media in this window. */
 export async function ensureFreshAccessToken(expectedSession: number, failedAccessToken: string): Promise<string> {
+  const ownership = captureOwnership();
   const assertCurrent = () => {
+    assertCurrentOwnership(ownership);
     if (expectedSession !== getAuthSession() || !expectedSession) {
       throw new Axios.CanceledError('Authentication changed before refresh');
     }
@@ -277,6 +320,7 @@ export async function ensureFreshAccessToken(expectedSession: number, failedAcce
 AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
   if (!originalRequest || !isApiRequest(originalRequest)) return Promise.reject(error);
+  if (originalRequest._ownership) assertCurrentOwnership(originalRequest._ownership);
   const session = getAuthSession();
   if (originalRequest._authSession !== session) {
     return Promise.reject(new Axios.CanceledError('Authentication changed before response received'));

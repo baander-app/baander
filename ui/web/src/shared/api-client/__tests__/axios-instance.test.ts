@@ -20,6 +20,7 @@ import { buildHtu, customInstance, AXIOS_INSTANCE } from '../axios-instance';
 import MockAdapter from 'axios-mock-adapter';
 import { getDpopKeyPair } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
+import { advanceAuthorization, bindOwnershipToSignal, captureOwnership, setAuthorityPending, synchronizeOwnership } from '@/shared/live/ownership';
 
 describe('DPoP request URI', () => {
   it.each([
@@ -159,5 +160,119 @@ describe('file-based desktop API requests', () => {
       vi.mocked(createDpopProof).mockReset();
       vi.unstubAllGlobals();
     }
+  });
+});
+
+
+describe('API ownership fencing', () => {
+  let mock: MockAdapter;
+
+  beforeEach(() => {
+    mock = new MockAdapter(AXIOS_INSTANCE);
+    synchronizeOwnership('principal-a');
+  });
+
+  afterEach(() => {
+    mock.restore();
+    setAuthorityPending(false);
+    synchronizeOwnership(null);
+  });
+
+  it('holds resource reads until authority recovery while allowing control requests', async () => {
+    setAuthorityPending(true);
+    mock.onGet('/api/protected').reply(200, { data: 'permitted' });
+    mock.onGet('/api/auth/me').reply(200, { data: 'current-account' });
+    mock.onGet('/api/auth/passkey').reply(200, { data: [] });
+    mock.onPost('/api/auth/login/passkey').reply(200, {});
+    mock.onGet('/api/live/recovery').reply(200, { data: 'authority' });
+    mock.onPost('/api/ws/tickets').reply(200, { data: 'ticket' });
+    const resource = AXIOS_INSTANCE.get('/api/protected');
+    const account = AXIOS_INSTANCE.get('/api/auth/me');
+    const passkeys = AXIOS_INSTANCE.get('/api/auth/passkey');
+
+    await expect(AXIOS_INSTANCE.post('/api/auth/login/passkey')).resolves.toHaveProperty('status', 200);
+    await expect(AXIOS_INSTANCE.get('/api/live/recovery')).resolves.toHaveProperty('status', 200);
+    await expect(AXIOS_INSTANCE.post('/api/ws/tickets')).resolves.toHaveProperty('status', 200);
+    expect(mock.history.get.map(config => config.url)).toEqual(['/api/live/recovery']);
+
+    setAuthorityPending(false);
+    await expect(resource).resolves.toHaveProperty('data', { data: 'permitted' });
+    await expect(account).resolves.toHaveProperty('data', { data: 'current-account' });
+    await expect(passkeys).resolves.toHaveProperty('data', { data: [] });
+  });
+
+  it('cancels a queued read when its signal aborts during authority recovery', async () => {
+    setAuthorityPending(true);
+    const controller = new AbortController();
+    mock.onGet('/api/protected').reply(200, {});
+    const result = AXIOS_INSTANCE.get('/api/protected', { signal: controller.signal }).catch(error => error);
+    await Promise.resolve();
+    controller.abort();
+
+    expect(await result).toMatchObject({ code: 'ERR_CANCELED' });
+    expect(mock.history.get).toHaveLength(0);
+  });
+
+  it('rejects a stale query signal before issuing another HTTP attempt', async () => {
+    const controller = new AbortController();
+    bindOwnershipToSignal(controller.signal, captureOwnership());
+    advanceAuthorization();
+    mock.onGet('/api/protected').reply(200, {});
+
+    await expect(AXIOS_INSTANCE.get('/api/protected', { signal: controller.signal }))
+      .rejects.toMatchObject({ code: 'ERR_CANCELED' });
+    expect(mock.history.get).toHaveLength(0);
+  });
+
+  it('rejects a successful old-principal response even when its DPoP key is unchanged', async () => {
+    let finish!: () => void;
+    let started!: () => void;
+    const received = new Promise<void>(resolve => { started = resolve; });
+    mock.onGet('/api/protected').reply(() => new Promise(resolve => {
+      finish = () => resolve([200, { data: 'old-private-data' }]);
+      started();
+    }));
+    const result = AXIOS_INSTANCE.get('/api/protected').then(
+      response => response.data,
+      error => error,
+    );
+    await received;
+    synchronizeOwnership('principal-b');
+    finish();
+    expect(await result).toMatchObject({ code: 'ERR_CANCELED' });
+  });
+
+  it('rejects successful responses started before same-account access loss', async () => {
+    let finish!: () => void;
+    let started!: () => void;
+    const received = new Promise<void>(resolve => { started = resolve; });
+    mock.onGet('/api/protected').reply(() => new Promise(resolve => {
+      finish = () => resolve([200, { data: 'removed-access' }]);
+      started();
+    }));
+    const result = AXIOS_INSTANCE.get('/api/protected').then(
+      response => response.data,
+      error => error,
+    );
+    await received;
+    advanceAuthorization();
+    finish();
+    expect(await result).toMatchObject({ code: 'ERR_CANCELED' });
+  });
+
+  it('fences old errors before nonce retries can issue a replacement request', async () => {
+    let finish!: () => void;
+    let started!: () => void;
+    const received = new Promise<void>(resolve => { started = resolve; });
+    mock.onGet('/api/protected').reply(() => new Promise(resolve => {
+      finish = () => resolve([400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'old-nonce' }]);
+      started();
+    }));
+    const result = AXIOS_INSTANCE.get('/api/protected').catch(error => error);
+    await received;
+    advanceAuthorization();
+    finish();
+    expect(await result).toMatchObject({ code: 'ERR_CANCELED' });
+    expect(mock.history.get).toHaveLength(1);
   });
 });

@@ -1,31 +1,22 @@
 import { createBrowserRouter, createHashRouter, RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthenticatedClientProvider } from './shared/live/provider';
 import { routes } from './features/layout/routes';
 import { PreferenceSyncProvider } from './features/settings/hooks/use-preference-bootstrap';
 import { ThemeProvider } from './shared/theme';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: 1,
-    },
-  },
-});
 
 const createRouter = window.location.protocol === 'file:' ? createHashRouter : createBrowserRouter;
 const router = createRouter(routes);
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <AuthenticatedClientProvider>
       <PreferenceSyncProvider>
         <ThemeProvider>
           <RouterProvider router={router}/>
           {/* Toaster is rendered by AppShell — do NOT add a second one here */}
         </ThemeProvider>
       </PreferenceSyncProvider>
-    </QueryClientProvider>
+    </AuthenticatedClientProvider>
   );
 }
 

@@ -21,6 +21,7 @@ export interface EqProfilesState {
   loaded: boolean
 
   // Actions
+  resetForPrincipal: () => void
   setProfiles: (profiles: EqProfile[]) => void
   addProfile: (profile: EqProfile) => void
   updateProfile: (id: string, updates: Partial<EqProfile>) => void
@@ -33,6 +34,8 @@ export const useEqProfilesStore = create<EqProfilesState>()(withStoreDebug('equa
   profiles: [],
   activeProfileId: null,
   loaded: false,
+
+  resetForPrincipal: () => set({ profiles: [], activeProfileId: null, loaded: false }),
 
   setProfiles: (profiles) => {
     set({ profiles, loaded: true })

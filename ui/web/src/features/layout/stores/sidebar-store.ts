@@ -23,6 +23,7 @@ interface SidebarState {
   // New — per-media-type schemas
   schemas: Record<MediaType, MediaSidebarSchema>
   // Actions
+  resetForPrincipal: () => void
   setItems: (items: SidebarItemData[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
@@ -37,6 +38,13 @@ export const useSidebarStore = create<SidebarState>()(withStoreDebug('layout.sid
   error: null,
   isEditorOpen: false,
   schemas: { ...ALL_SCHEMAS },
+  resetForPrincipal: () => set({
+    items: [],
+    schemas: { ...ALL_SCHEMAS },
+    isLoading: false,
+    error: null,
+    isEditorOpen: false,
+  }),
   setItems: (items) => set({ items }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),

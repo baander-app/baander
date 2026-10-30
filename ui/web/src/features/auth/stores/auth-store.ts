@@ -20,6 +20,7 @@ import { publishAuthEvent, subscribeAuthEvents, withAuthLock, type AuthEvent } f
 import { drainPendingLogouts, recordLogout, sendLogoutOnce } from '@/features/auth/services/pending-logout'
 import { REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget'
 import { createLogger } from '@/shared/lib/logger'
+import { synchronizeOwnership } from '@/shared/live/ownership'
 
 export interface User {
   email: string
@@ -34,6 +35,7 @@ export interface User {
 }
 
 interface AuthState {
+  principalSessionId: string | null
   accessToken: string | null
   refreshToken: string | null
   user: User | null
@@ -65,7 +67,10 @@ interface AuthState {
 const logger = createLogger('AuthStore')
 function isMockAuth() { return import.meta.env.VITE_MOCK_AUTH === 'true' }
 
-const CLEARED_STATE = { accessToken: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false }
+let nextPrincipalSession = 0
+const newPrincipalSession = () => `principal:${++nextPrincipalSession}`
+
+const CLEARED_STATE = { principalSessionId: null, accessToken: null, refreshToken: null, user: null, isAuthenticated: false, isLoading: false }
 
 /** Where a tab goes once another tab ended the session; the server was already told by that tab. */
 function landOnLoginPage() {
@@ -117,7 +122,12 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     }
     if (record.nonce) setDpopNonce(record.nonce)
     heldEpoch = record.epoch
+    const current = get()
+    const principalSessionId = current.isAuthenticated && current.user?.publicId === record.user.publicId
+      ? current.principalSessionId ?? newPrincipalSession()
+      : newPrincipalSession()
     set({
+      principalSessionId,
       accessToken: record.accessToken,
       refreshToken: record.refreshToken,
       user: record.user as User,
@@ -177,7 +187,9 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
 
   const onAuthEvent = async (event: AuthEvent) => {
     if (event.type === 'cleared' && !holdsSession()) return
+    const owner = generation
     const record = await loadStoredAuth()
+    if (owner !== generation) return
     adoptRecord(record, event.type === 'cleared' ? event.epoch : undefined)
   }
   subscribeAuthEvents((event) => {
@@ -197,7 +209,7 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
         if (isMockAuth()) {
           await new Promise((resolve) => setTimeout(resolve, 300))
           if (owner !== generation) return
-          set({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token',
+          set({ principalSessionId: newPrincipalSession(), accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token',
             user: { email, publicId: 'usr_abc123', name: null, roles: ['ROLE_USER'] }, isAuthenticated: true })
           return
         }
@@ -211,7 +223,7 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
         if (owner !== generation) return
         const tokens = response.data?.data
         if (!tokens?.accessToken || !tokens?.refreshToken) throw new Error('Login response missing required token fields')
-        set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: tokens.user as User, isAuthenticated: true })
+        set({ principalSessionId: newPrincipalSession(), accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: tokens.user as User, isAuthenticated: true })
         // A login writes over whatever the origin holds, a tombstone included, at its epoch plus one.
         // Use this request's key rather than relying on a later global key read.
         const accepted = await withAuthLock(REFRESH_BUDGET_MS, async () => {
@@ -269,7 +281,10 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
       if (state.accessToken === accessToken && state.refreshToken === refreshToken && state.isAuthenticated) return Promise.resolve()
       // A rotation within the same session keeps its owners; credentials on a signed-out tab start a new one.
       if (!state.isAuthenticated) generation++
-      set({ accessToken, refreshToken, isAuthenticated: true })
+      set({
+        principalSessionId: state.isAuthenticated ? state.principalSessionId ?? newPrincipalSession() : newPrincipalSession(),
+        accessToken, refreshToken, isAuthenticated: true,
+      })
       pushToken(accessToken)
       return persistCurrent(generation)
     },
@@ -277,7 +292,10 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     updateUser: (updates) => {
       const user = get().user
       if (!user || Object.entries(updates).every(([key, value]) => user[key as keyof User] === value)) return
-      set({ user: { ...user, ...updates } })
+      set({
+        user: { ...user, ...updates },
+        ...(updates.publicId && updates.publicId !== user.publicId ? { principalSessionId: newPrincipalSession() } : {}),
+      })
       const owner = generation
       withAuthLock(REFRESH_BUDGET_MS, () => persistCurrent(owner))
         .catch((error) => {
@@ -291,7 +309,11 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
       tombstoneAndBroadcast()
     },
 
-    adoptStoredAuth: async () => adoptRecord(await loadStoredAuth()),
+    adoptStoredAuth: async () => {
+      const owner = generation
+      const record = await loadStoredAuth()
+      return owner === generation ? adoptRecord(record) : false
+    },
 
     initAuth: async () => {
       if (get().isLoading || get().isAuthenticated) return
@@ -306,6 +328,10 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     },
   }
 })))
+
+useAuthStore.subscribe((state) => {
+  synchronizeOwnership(state.isAuthenticated ? state.principalSessionId : null)
+})
 
 /** Read tokens outside React for interceptors and service worker messaging. */
 export function getAuthSnapshot() { return useAuthStore.getState() }

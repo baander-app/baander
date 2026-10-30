@@ -8,6 +8,7 @@ interface NotificationState {
   unreadCount: number
   isPopoutOpen: boolean
 
+  resetForPrincipal: () => void
   setNotifications: (notifications: NotificationItem[]) => void
   addNotification: (notification: NotificationItem) => void
   markRead: (publicId: string) => void
@@ -24,6 +25,8 @@ export const useNotificationStore = create<NotificationState>()(
       notifications: [],
       unreadCount: 0,
       isPopoutOpen: false,
+
+      resetForPrincipal: () => set({ notifications: [], unreadCount: 0, isPopoutOpen: false }),
 
       setNotifications: (notifications) => set((state) => state.notifications === notifications ? state : { notifications }),
 

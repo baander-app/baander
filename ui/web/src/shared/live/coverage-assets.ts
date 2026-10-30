@@ -21,3 +21,10 @@ export const sharedLiveCoverage = [
     behaviorVerification: "pending-adoption",
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]
+
+/** Protocol controls establish authority and never enter resource refresh scheduling. */
+export const LIVE_PROTOCOL_CONTROLS = [{
+  consumer: 'src/shared/live/recovery.ts#getLiveRecovery:generated',
+  purpose: 'authorization-recovery',
+  reason: 'Reconciles current allowed families and health before protected resource reads resume.',
+}] as const satisfies readonly import('./coverage-types').LiveProtocolControl[]

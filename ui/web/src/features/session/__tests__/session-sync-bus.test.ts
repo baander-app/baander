@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionSyncBus } from '../services/SessionSyncBus'
+import { SharedLiveTransport } from '@/shared/live/transport'
 
 class FakeWebSocket {
   static readonly CONNECTING = 0
@@ -35,8 +36,10 @@ const events = () => ({ onStateUpdate: vi.fn(), onError: vi.fn() })
 
 function createBus(getConnectionTicket = vi.fn<TicketProvider>(async () => ticket()), callbacks = events()) {
   return new SessionSyncBus({
-    wsEndpoint: 'wss://api.baander.app/api/ws',
-    getConnectionTicket,
+    transport: new SharedLiveTransport({
+      wsEndpoint: 'wss://api.baander.app/api/ws',
+      getConnectionTicket,
+    }),
     deviceId: 'device-1',
     getPosition: () => 0,
     getQueue: () => [],
@@ -73,11 +76,59 @@ describe('SessionSyncBus', () => {
     vi.unstubAllGlobals()
   })
 
+  it('shares an authenticated connection without joining until a session subscribes', async () => {
+    const issue = vi.fn<TicketProvider>(async () => ticket())
+    const transport = new SharedLiveTransport({
+      wsEndpoint: 'wss://api.baander.app/api/ws',
+      getConnectionTicket: issue,
+    })
+    const release = transport.retain()
+    await transport.waitForAttempt()
+    const socket = FakeWebSocket.instances[0]
+    socket.readyState = FakeWebSocket.OPEN
+    socket.onopen?.()
+    expect(socket.send).not.toHaveBeenCalled()
+
+    const bus = new SessionSyncBus({
+      transport,
+      deviceId: 'device-1',
+      getPosition: () => 0,
+      getQueue: () => [],
+      getCurrentIndex: () => 0,
+      getIsPlaying: () => false,
+    }, events())
+    await bus.connect()
+    expect(issue).toHaveBeenCalledOnce()
+    expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'session.join', deviceId: 'device-1' }))
+    bus.disconnect()
+    expect(socket.close).not.toHaveBeenCalled()
+    release()
+    expect(socket.close).toHaveBeenCalledOnce()
+  })
+
+  it('ignores unrelated and malformed messages while accepting session state', async () => {
+    const callbacks = events()
+    const bus = createBus(undefined, callbacks)
+    await bus.connect()
+    const socket = FakeWebSocket.instances[0]
+    const state = {
+      queue: ['song-1'], currentTrackIndex: 0, position: 12,
+      playbackState: 'paused', activeDeviceId: null,
+    }
+    socket.onmessage?.({ data: JSON.stringify({ type: 'live.ready', data: state }) })
+    socket.onmessage?.({ data: JSON.stringify({ type: 'session.state', data: { ...state, queue: null } }) })
+    socket.onmessage?.({ data: 'malformed' })
+    expect(callbacks.onStateUpdate).not.toHaveBeenCalled()
+    socket.onmessage?.({ data: JSON.stringify({ type: 'session.state', data: state }) })
+    expect(callbacks.onStateUpdate).toHaveBeenCalledExactlyOnceWith(state)
+    bus.disconnect()
+  })
+
   it('obtains a fresh single-use ticket on each reconnect without putting an access token in the URL', async () => {
     const issue = vi.fn<TicketProvider>(async () => ticket())
       .mockResolvedValueOnce(ticket('a')).mockResolvedValueOnce(ticket('b'))
     const bus = createBus(issue)
-    await bus.connect('session-1')
+    await bus.connect()
     expect(FakeWebSocket.instances[0].url).toBe(`wss://api.baander.app/api/ws?ticket=${ticket('a')}`)
     await measureReconnectDelay()
     expect(issue).toHaveBeenCalledTimes(2)
@@ -90,7 +141,7 @@ describe('SessionSyncBus', () => {
       .mockRejectedValueOnce(new Error('secret access token'))
     const callbacks = events()
     const bus = createBus(issue, callbacks)
-    await bus.connect('session-1')
+    await bus.connect()
     expect(FakeWebSocket.instances).toHaveLength(0)
     expect(callbacks.onError.mock.calls.flat().map(error => error.message).join()).not.toContain('secret')
     await vi.advanceTimersToNextTimerAsync()
@@ -101,7 +152,7 @@ describe('SessionSyncBus', () => {
 
   it('rejects malformed tickets without an anonymous or bearer fallback', async () => {
     const bus = createBus(vi.fn<TicketProvider>(async () => 'raw-access-token'))
-    await bus.connect('session-1')
+    await bus.connect()
     expect(FakeWebSocket.instances).toHaveLength(0)
     bus.disconnect()
     expect(vi.getTimerCount()).toBe(0)
@@ -111,7 +162,7 @@ describe('SessionSyncBus', () => {
     const pending = pendingTicket()
     const issue = vi.fn<TicketProvider>(() => pending.promise)
     const bus = createBus(issue)
-    const connecting = bus.connect('session-1')
+    const connecting = bus.connect()
     bus.disconnect()
     expect(issue.mock.calls[0][0].aborted).toBe(true)
     pending.resolve(ticket())
@@ -124,12 +175,12 @@ describe('SessionSyncBus', () => {
     const pending = pendingTicket()
     const issue = vi.fn<TicketProvider>(() => pending.promise).mockResolvedValueOnce(ticket('a'))
     const bus = createBus(issue)
-    await bus.connect('old-session')
+    await bus.connect()
     const oldSocket = FakeWebSocket.instances[0]
-    const obsolete = bus.connect('middle-session')
+    const obsolete = bus.connect()
     expect(oldSocket.close).toHaveBeenCalledOnce()
     issue.mockResolvedValueOnce(ticket('b'))
-    await bus.connect('new-session')
+    await bus.connect()
     pending.resolve(ticket('c'))
     await obsolete
     expect(FakeWebSocket.instances).toHaveLength(2)
@@ -142,7 +193,7 @@ describe('SessionSyncBus', () => {
     let next = 0
     vi.spyOn(Math, 'random').mockImplementation(() => randoms[next++ % randoms.length])
     const bus = createBus()
-    await bus.connect('session-1')
+    await bus.connect()
     const delays = []
     for (let attempt = 0; attempt < randoms.length; attempt++) delays.push(await measureReconnectDelay())
     expect(delays.every(delay => delay >= 1_000 && delay <= 30_000)).toBe(true)
@@ -154,8 +205,8 @@ describe('SessionSyncBus', () => {
     vi.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValueOnce(0.9)
     const first = createBus()
     const second = createBus()
-    await first.connect('session-1')
-    await second.connect('session-1')
+    await first.connect()
+    await second.connect()
     const droppedAt = Date.now()
     FakeWebSocket.instances[0].drop()
     FakeWebSocket.instances[1].drop()
@@ -171,7 +222,7 @@ describe('SessionSyncBus', () => {
   it('closes a connecting socket and ignores its later events after disconnect', async () => {
     const callbacks = events()
     const bus = createBus(undefined, callbacks)
-    await bus.connect('session-1')
+    await bus.connect()
     const socket = FakeWebSocket.instances[0]
     bus.disconnect()
     socket.onopen?.()
@@ -189,7 +240,7 @@ describe('SessionSyncBus', () => {
 
   it('closes an open socket on disconnect without reconnecting', async () => {
     const bus = createBus()
-    await bus.connect('session-1')
+    await bus.connect()
     const socket = FakeWebSocket.instances[0]
     socket.readyState = FakeWebSocket.OPEN
     socket.onopen?.()
@@ -205,7 +256,7 @@ describe('SessionSyncBus', () => {
   it('starts with a short backoff after a connection opens', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(1)
     const bus = createBus()
-    await bus.connect('session-1')
+    await bus.connect()
     for (let attempt = 0; attempt < 6; attempt++) await measureReconnectDelay()
     expect(await measureReconnectDelay()).toBe(30_000)
     const latest = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]

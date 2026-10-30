@@ -1,4 +1,5 @@
 import captureSources from '../../../../tests/Fixtures/LiveUpdates/capture-sources.json'
+import { LIVE_PROTOCOL_CONTROLS } from '@/shared/live/coverage-assets'
 import { LIVE_COVERAGE } from '@/shared/live/coverage'
 import { LIVE_FAMILIES } from '@/shared/live/protocol'
 import { describe, expect, it } from 'vitest'
@@ -73,13 +74,22 @@ function applicationConsumers() {
 
 describe('registered application coverage', () => {
   it('classifies every current query owner and direct reader exactly once', () => {
-    const registered = LIVE_COVERAGE.flatMap((descriptor) => [...descriptor.consumers])
+    const registered = [...LIVE_COVERAGE.flatMap((descriptor) => [...descriptor.consumers]), ...LIVE_PROTOCOL_CONTROLS.map(control => control.consumer)]
     const actual = applicationConsumers()
     expect(actual.length).toBeGreaterThan(100)
     expect(unclassified(actual, registered)).toEqual([])
     const actualIds = new Set(actual.map(consumerId))
     expect(registered.filter((id) => !actualIds.has(id))).toEqual([])
     expect(new Set(registered).size).toBe(registered.length)
+  })
+
+  it('classifies authorization recovery as a protocol control outside resource refresh coverage', () => {
+    expect(LIVE_PROTOCOL_CONTROLS).toEqual([expect.objectContaining({
+      consumer: 'src/shared/live/recovery.ts#getLiveRecovery:generated',
+      purpose: 'authorization-recovery',
+    })])
+    const resources = LIVE_COVERAGE.flatMap(row => [...row.consumers])
+    expect(resources).not.toContain(LIVE_PROTOCOL_CONTROLS[0].consumer)
   })
 
   it('requires classification for a consuming hook added inside an already covered file', () => {

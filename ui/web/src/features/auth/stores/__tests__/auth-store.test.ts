@@ -853,3 +853,56 @@ describe('auth request ownership', () => {
     expect(locks.requests).toEqual([{ name: AUTH_LOCK_NAME, outcome: 'granted' }])
   })
 })
+
+
+describe('principal ownership', () => {
+  it('keeps the principal session across token and stored-record rotations', async () => {
+    await hydrateFrom(liveRecord(1, 'initial'))
+    const principal = useAuthStore.getState().principalSessionId
+    expect(principal).toEqual(expect.any(String))
+
+    await useAuthStore.getState().setTokens('rotated', 'rotated-refresh')
+    expect(useAuthStore.getState().principalSessionId).toBe(principal)
+    storage.record = liveRecord(3, 'sibling-rotation')
+    await useAuthStore.getState().adoptStoredAuth()
+    expect(useAuthStore.getState().principalSessionId).toBe(principal)
+  })
+
+  it('replaces ownership for a different user even when the DPoP key is retained', async () => {
+    await hydrateFrom(liveRecord(1, 'initial'))
+    const principal = useAuthStore.getState().principalSessionId
+    storage.record = liveRecord(2, 'replacement', {
+      user: { ...VALID_USER, publicId: 'usr_other', email: 'other@baander.app' },
+    })
+    await useAuthStore.getState().adoptStoredAuth()
+    expect(useAuthStore.getState().principalSessionId).toEqual(expect.any(String))
+    expect(useAuthStore.getState().principalSessionId).not.toBe(principal)
+    expect(mockSetDpopKeyPair).not.toHaveBeenCalled()
+  })
+
+  it('clears ownership on logout and creates a new session for a later login', async () => {
+    await hydrateFrom(liveRecord(1, 'initial'))
+    const principal = useAuthStore.getState().principalSessionId
+    useAuthStore.getState().clearAuth()
+    expect(useAuthStore.getState().principalSessionId).toBeNull()
+    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalled())
+    mockAxios.post.mockResolvedValue(validLoginResponse())
+    await useAuthStore.getState().login(VALID_USER.email, 'secret')
+    expect(useAuthStore.getState().principalSessionId).toEqual(expect.any(String))
+    expect(useAuthStore.getState().principalSessionId).not.toBe(principal)
+  })
+})
+
+
+it('does not adopt a stored session that finishes loading after local logout', async () => {
+  await hydrateFrom(liveRecord(1, 'initial'))
+  let finish!: (record: LegacyStoredRecord) => void
+  mockLoadStoredAuth.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const adoption = useAuthStore.getState().adoptStoredAuth()
+  useAuthStore.getState().clearAuth()
+  finish(liveRecord(2, 'late-rotation'))
+
+  await expect(adoption).resolves.toBe(false)
+  expect(useAuthStore.getState().isAuthenticated).toBe(false)
+  expect(useAuthStore.getState().principalSessionId).toBeNull()
+})

@@ -128,6 +128,35 @@ reported even when the revision vector did not change. A backlog older than five
 seconds is also degraded. Clients still need their own expiry and HTTP recovery
 policy when no message arrives.
 
+## Browser ownership
+
+The authenticated application owns one shared transport. Listening-session sync
+receives that transport and subscribes only when a session exists. Establishing a
+connection for freshness does not join a listening session or claim a device.
+
+Each principal session owns its QueryClient and mounted observers. Token rotation
+keeps that identity. Switching accounts replaces it; a same-account access change
+fences pending work and clears protected query results and store mirrors without
+remounting the player. Removing a query from the cache alone is insufficient:
+mounted observers must also stop rendering its old result.
+
+Query functions, mutation callbacks, Axios responses, and session restoration
+carry ownership stamps. Feature code that continues after an `await` must recheck
+its captured stamp before changing a store or dispatching playback work. Use
+`guardMutationCallbacks` for per-call mutation callbacks; an asynchronous callback
+still needs a check after each awaited operation. Clearing a mutation cache does
+not cancel callbacks already running.
+
+A temporary delivery failure retains the last authorized readable data, including
+loaded pages and mirrors, while new protected reads wait for permission recovery.
+An explicit reset, changed authorization fingerprint, or recovery denial purges
+protected state and rejects late work from the prior generation. Recovery with
+the same fingerprint retains the loaded data. Successful permission recovery is
+separate from completing the resource reads needed to establish freshness.
+
+The coverage inventory classifies the recovery endpoint as a protocol control.
+It is excluded from resource-family refresh scheduling to avoid a recovery loop.
+
 ## Inspecting the runtime
 
 The existing server statistics HTTP endpoint and `app:server:stats` command expose

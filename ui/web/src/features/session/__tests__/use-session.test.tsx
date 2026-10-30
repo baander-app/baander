@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import type { SessionSyncConfig, SessionSyncEvents } from '../services/SessionSyncBus'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ apiOrigin: () => 'https://api.baander.app',
   AXIOS_INSTANCE: {
@@ -19,14 +20,14 @@ vi.mock('@/features/player/stores/player-time-tracker', () => ({
 vi.mock('@/features/player/stores/player-store', () => ({
   usePlayerStore: Object.assign(
     (selector: (s: unknown) => unknown) => selector({
-      queue: [{ publicId: 'track-1' }, { publicId: 'track-2' }],
+      queue: [{ publicId: 'track-1', title: 'First track' }, { publicId: 'track-2', title: 'Second track' }],
       currentIndex: 0,
       isPlaying: true,
       audioElement: null,
     }),
     {
       getState: vi.fn(() => ({
-        queue: [{ publicId: 'track-1' }, { publicId: 'track-2' }],
+        queue: [{ publicId: 'track-1', title: 'First track' }, { publicId: 'track-2', title: 'Second track' }],
         currentIndex: 0,
           isPlaying: true,
         audioElement: null,
@@ -55,6 +56,10 @@ vi.mock('@/features/auth/stores/auth-store', () => ({
 
 const { MockSessionSyncBus } = vi.hoisted(() => {
   class MockSessionSyncBus {
+    static events: SessionSyncEvents[] = []
+    constructor(_config: SessionSyncConfig, events: SessionSyncEvents) {
+      MockSessionSyncBus.events.push(events)
+    }
     connect = vi.fn().mockResolvedValue(undefined)
     disconnect = vi.fn().mockResolvedValue(undefined)
     sendSync = vi.fn()
@@ -68,6 +73,9 @@ vi.mock('../services/SessionSyncBus', () => ({
 
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { useSession } from '../hooks/use-session'
+import { usePlayerStore } from '@/features/player/stores/player-store'
+import { mediator } from '@/shared/lib/mediator/bus'
+import { advanceAuthorization } from '@/shared/live/ownership'
 
 const mockAxios = vi.mocked(AXIOS_INSTANCE)
 
@@ -79,9 +87,89 @@ function wrapper({ children }: { children: ReactNode }) {
 describe('useSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    MockSessionSyncBus.events = []
     // Default: all posts resolve safely (device registration, etc.)
     mockAxios.post.mockResolvedValue({ data: {} })
     mockAxios.get.mockResolvedValue({ data: { data: [{ publicId: 'local-device-public-id', deviceId: 'my-device-id' }] } })
+  })
+
+  it('does not restore a queued song lookup after authorization changes', async () => {
+    let finish!: (value: unknown) => void
+    const pending = new Promise(resolve => { finish = resolve })
+    vi.mocked(usePlayerStore.getState).mockReturnValue({
+      ...usePlayerStore.getState(),
+      queue: [],
+    })
+    mockAxios.get.mockImplementation(async url => {
+      if (url === '/api/songs/') return pending
+      if (url === '/api/devices') return { data: { data: [{ publicId: 'local-device-public-id', deviceId: 'my-device-id' }] } }
+      return { data: { data: {
+        publicId: 'session-1',
+        activeDeviceId: 'local-device-public-id',
+        queue: ['track-1'],
+        currentTrackIndex: 0,
+        position: 12,
+      } } }
+    })
+    const hook = renderHook(() => useSession(), { wrapper })
+    await waitFor(() => expect(mockAxios.get).toHaveBeenCalledWith('/api/songs/', expect.any(Object)))
+    act(() => { advanceAuthorization() })
+    await act(async () => {
+      finish({ data: { data: [{ publicId: 'track-1', title: 'Old account song', available: true }] } })
+      await pending
+    })
+    expect(mediator.dispatch).not.toHaveBeenCalled()
+    hook.unmount()
+    vi.mocked(usePlayerStore.getState).mockReturnValue({
+      ...usePlayerStore.getState(),
+      queue: [{ publicId: 'track-1', title: 'First track' }, { publicId: 'track-2', title: 'Second track' }],
+    })
+  })
+
+  it('accepts new session state after access recovery while dropping an earlier hydration', async () => {
+    let finishOld!: (value: unknown) => void
+    const oldSongs = new Promise(resolve => { finishOld = resolve })
+    const originalPlayer = usePlayerStore.getState()
+    vi.mocked(usePlayerStore.getState).mockReturnValue({ ...originalPlayer, queue: [] })
+    let lookups = 0
+    mockAxios.get.mockImplementation(async url => {
+      if (url === '/api/songs/') {
+        if (++lookups === 1) return oldSongs
+        return { data: { data: [{ publicId: 'track-1', title: 'Current song', available: true }] } }
+      }
+      if (url === '/api/devices') return { data: { data: [{ publicId: 'local-device-public-id', deviceId: 'my-device-id' }] } }
+      return { data: { data: {
+        publicId: 'session-1',
+        activeDeviceId: 'other-device',
+        queue: ['track-1'],
+        currentTrackIndex: 0,
+        position: 12,
+      } } }
+    })
+    const hook = renderHook(() => useSession(), { wrapper })
+    await waitFor(() => expect(MockSessionSyncBus.events.length).toBeGreaterThan(0))
+    const socketEvents = MockSessionSyncBus.events.at(-1)!
+    const state = {
+      queue: ['track-1'], currentTrackIndex: 0, position: 12,
+      playbackState: 'paused' as const, activeDeviceId: 'other-device',
+    }
+    act(() => { socketEvents.onStateUpdate(state) })
+    await waitFor(() => expect(lookups).toBe(1))
+    act(() => {
+      advanceAuthorization()
+      socketEvents.onStateUpdate(state)
+    })
+    await waitFor(() => expect(mediator.dispatch).toHaveBeenCalledOnce())
+    await act(async () => {
+      finishOld({ data: { data: [{ publicId: 'track-1', title: 'Old song', available: true }] } })
+      await oldSongs
+    })
+    expect(mediator.dispatch).toHaveBeenCalledOnce()
+    expect(mediator.dispatch).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      queue: [expect.objectContaining({ title: 'Current song' })],
+    }), 'session')
+    hook.unmount()
+    vi.mocked(usePlayerStore.getState).mockReturnValue(originalPlayer)
   })
 
   it('fetches current session on mount', async () => {

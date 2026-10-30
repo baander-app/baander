@@ -55,3 +55,21 @@ describe('sidebar-store (extended)', () => {
     })
   })
 })
+
+
+it('removes account-specific schemas and editor state on ownership reset', () => {
+  useSidebarStore.getState().setSchema('music', { ...ALL_SCHEMAS.music, sections: [] })
+  useSidebarStore.getState().setItems([{ id: 'private', type: 'page_link', label: 'Private', icon: '', config: {} }])
+  useSidebarStore.getState().setEditorOpen(true)
+  useSidebarStore.getState().setError('previous account')
+
+  useSidebarStore.getState().resetForPrincipal()
+
+  expect(useSidebarStore.getState()).toMatchObject({
+    schemas: ALL_SCHEMAS,
+    items: [],
+    isEditorOpen: false,
+    error: null,
+    isLoading: false,
+  })
+})

@@ -22,3 +22,9 @@ export interface LiveCoverageDescriptor {
   coverageVerification: readonly string[]
   behaviorVerification: 'pending-adoption'
 }
+
+export interface LiveProtocolControl {
+  consumer: string
+  purpose: 'authorization-recovery'
+  reason: string
+}

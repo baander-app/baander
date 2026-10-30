@@ -103,6 +103,24 @@ runtime tests with 2,260 assertions; full-project CI PHPStan passes. The native
 lane has no skips. The compiled production pool's concurrent baseline remains
 part of full-system qualification.
 
+U4 delivered locally, 2026-10-30: the authenticated application owns the shared
+socket, and session sync requires that transport. Principal sessions own query
+caches and observers independently of token rotation. Queries, mutations, HTTP
+responses, tickets, and delayed session restores reject obsolete ownership.
+Confirmed access changes clear rendered and inactive query data and account
+mirrors while preserving the mounted player. Transient outages retain readable
+data and loaded pages; recovery must establish authority before new protected
+reads proceed. Recovery controls have an explicit inventory classification
+outside resource refresh scheduling.
+
+U4 verification checkpoint: the full frontend suite passed 2,596 tests across
+208 files. After the final outage-preservation correction, the affected suites
+pass 800 tests across 49 files, including a ten-page recovery case and delayed
+denial responses. Both TypeScript projects pass. Full ESLint reports zero errors
+and the same eight pre-existing warnings; the final recovery changes pass scoped
+ESLint. Prose and whitespace checks pass. Query scheduling, feature adoption,
+general subscription activation, and browser/capacity qualification remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
