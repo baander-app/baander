@@ -40,6 +40,8 @@ const VisualizerBg = styled.div`
 
 const ControlsRow = styled.div`
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
 `

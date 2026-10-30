@@ -118,7 +118,7 @@ const LyricLineContainer = styled.div`
   text-align: center;
   font-size: 1.125rem;
   line-height: 1.625;
-  transition: color 300ms ease;
+  transition: color 60ms ease-out;
 `
 
 const LineText = styled.span<{ $active: boolean; $past: boolean }>`

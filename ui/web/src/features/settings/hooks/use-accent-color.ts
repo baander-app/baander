@@ -1,9 +1,10 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
-export type AccentColor = 'white' | 'blue' | 'violet' | 'rose' | 'amber' | 'emerald' | 'cyan' | 'pink'
+import { VALID_ACCENTS, type AccentColor } from '@/shared/theme/theme.types'
 
-export const VALID_COLORS: AccentColor[] = ['white', 'blue', 'violet', 'rose', 'amber', 'emerald', 'cyan', 'pink']
+export type { AccentColor }
+export const VALID_COLORS = VALID_ACCENTS
 const STORAGE_KEY = 'baander-accent-color'
 const DEFAULT_COLOR: AccentColor = 'violet'
 

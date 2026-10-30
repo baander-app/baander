@@ -36,7 +36,7 @@ const ToggleSwitch = styled.button<{ $checked: boolean }>`
   cursor: pointer;
   border-radius: 9999px;
   border: 2px solid transparent;
-  transition: background-color 200ms ease-in-out, border-color 200ms ease-in-out;
+  transition: background-color 60ms ease-out, border-color 60ms ease-out;
   ${focusVisibleRing}
   padding: 0;
   background: none;
@@ -57,8 +57,7 @@ const ToggleKnob = styled.span<{ $checked: boolean }>`
   transform: ${({ $checked }) => $checked ? 'translateX(1rem)' : 'translateX(0)'};
   border-radius: 50%;
   background-color: var(--color-background);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: transform 200ms ease-in-out;
+  transition: transform 60ms ease-out;
   pointer-events: none;
   ring: 0;
 `

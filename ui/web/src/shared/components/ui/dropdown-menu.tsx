@@ -1,13 +1,12 @@
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 import styled, { css, type DataAttributes } from "styled-components"
-import { darkMode } from "@/shared/theme"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 /* ── Shared menu animation mixin ─────────────────────────────────────── */
 const menuAnimation = css`
   animation-duration: 100ms;
-  animation-timing-function: ease;
+  animation-timing-function: ease-out;
 
   &[data-state="open"] {
     animation-name: fadeIn, zoomIn95;
@@ -32,7 +31,7 @@ const menuAnimation = css`
 
 const subMenuAnimation = css`
   animation-duration: 100ms;
-  animation-timing-function: ease;
+  animation-timing-function: ease-out;
 
   &[data-state="open"] {
     animation-name: fadeIn, zoomIn95;
@@ -81,18 +80,17 @@ const ContentStyled = styled(DropdownMenuPrimitive.Content).attrs<DataAttributes
   max-height: var(--radix-dropdown-menu-content-available-height);
   width: var(--radix-dropdown-menu-trigger-width);
   min-width: 8rem;
+  max-width: calc(100vw - 1rem);
   transform-origin: var(--radix-dropdown-menu-content-transform-origin);
   overflow-x: hidden;
   overflow-y: auto;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background-color: var(--color-popover);
   padding: 0.25rem;
   color: var(--color-popover-foreground);
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   outline: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-foreground) 10%, transparent),
-    0 4px 6px -1px rgb(0 0 0 / 0.1),
-    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--color-border);
 
   ${menuAnimation}
 `
@@ -118,16 +116,16 @@ const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<DataAttributes & {
   user-select: none;
 
   &:focus {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &:focus svg {
-    color: var(--color-accent-foreground);
+    color: var(--color-highlight-foreground);
   }
 
   &:not([data-variant="destructive"]):focus * {
-    color: var(--color-accent-foreground);
+    color: var(--color-highlight-foreground);
   }
 
   &[data-inset] {
@@ -138,16 +136,11 @@ const ItemStyled = styled(DropdownMenuPrimitive.Item).attrs<DataAttributes & {
     color: var(--color-destructive);
   }
   &[data-variant="destructive"]:focus {
-    background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
-    color: var(--color-destructive);
+    background-color: var(--color-destructive);
+    color: var(--color-destructive-foreground);
   }
-  ${darkMode(css`
-    &[data-variant="destructive"]:focus {
-      background-color: color-mix(in srgb, var(--color-destructive) 20%, transparent);
-    }
-  `)}
   &[data-variant="destructive"] svg {
-    color: var(--color-destructive);
+    color: inherit;
   }
 
   ${disabledStyles}
@@ -172,12 +165,12 @@ const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<DataAttr
   user-select: none;
 
   &:focus {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &:not([data-variant="destructive"]):focus * {
-    color: var(--color-accent-foreground);
+    color: var(--color-highlight-foreground);
   }
 
   &[data-inset] {
@@ -185,8 +178,8 @@ const SubTriggerStyled = styled(DropdownMenuPrimitive.SubTrigger).attrs<DataAttr
   }
 
   &[data-state="open"] {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   ${svgDefaults}
@@ -199,15 +192,13 @@ const SubContentStyled = styled(DropdownMenuPrimitive.SubContent).attrs<DataAttr
   min-width: 96px;
   transform-origin: var(--radix-dropdown-menu-content-transform-origin);
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background-color: var(--color-popover);
   padding: 0.25rem;
   color: var(--color-popover-foreground);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   outline: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-foreground) 10%, transparent),
-    0 10px 15px -3px rgb(0 0 0 / 0.1),
-    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--color-border);
 
   ${subMenuAnimation}
 `
@@ -231,12 +222,12 @@ const CheckboxItemStyled = styled(DropdownMenuPrimitive.CheckboxItem).attrs<Data
   user-select: none;
 
   &:focus {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &:focus * {
-    color: var(--color-accent-foreground);
+    color: var(--color-highlight-foreground);
   }
 
   &[data-inset] {
@@ -266,12 +257,12 @@ const RadioItemStyled = styled(DropdownMenuPrimitive.RadioItem).attrs<DataAttrib
   user-select: none;
 
   &:focus {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &:focus * {
-    color: var(--color-accent-foreground);
+    color: var(--color-highlight-foreground);
   }
 
   &[data-inset] {

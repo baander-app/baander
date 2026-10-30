@@ -74,11 +74,11 @@ const Overlay = styled(DialogPrimitive.Overlay).attrs<DataAttributes>({
   }
 
   &[data-state="open"] {
-    animation: ${fadeIn} 150ms ease-out;
+    animation: ${fadeIn} 120ms ease-out;
   }
 
   &[data-state="closed"] {
-    animation: ${fadeOut} 150ms ease-in;
+    animation: ${fadeOut} 120ms ease-out;
   }
 `
 
@@ -92,8 +92,12 @@ const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   left: 50%;
   z-index: 50;
   display: grid;
-  width: 100%;
+  width: calc(100% - 2rem);
   max-width: calc(100% - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  min-width: 0;
   transform: translate(-50%, -50%);
   gap: 1rem;
   border-radius: var(--radius-xl);
@@ -101,7 +105,7 @@ const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   padding: 1rem;
   font-size: 0.875rem;
   color: var(--color-popover-foreground);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   transition-duration: 100ms;
   outline: none;
 
@@ -110,11 +114,11 @@ const StyledContent = styled(DialogPrimitive.Content).attrs<DataAttributes>({
   }
 
   &[data-state="open"] {
-    animation: ${contentShow} 150ms ease-out;
+    animation: ${contentShow} 120ms ease-out;
   }
 
   &[data-state="closed"] {
-    animation: ${contentHide} 150ms ease-in;
+    animation: ${contentHide} 120ms ease-out;
   }
 `
 
@@ -139,6 +143,7 @@ const StyledHeader = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-hea
 const StyledFooter = styled.div.attrs<DataAttributes>({ 'data-slot': 'dialog-footer' })`
   display: flex;
   flex-direction: column-reverse;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-left: -1rem;
   margin-right: -1rem;

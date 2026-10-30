@@ -1,96 +1,68 @@
-import { test, expect } from '../fixtures'
-import { sidebar, main, contextPanel, untilLoaded } from '../selectors'
+import { test, expect, catalogAlbum, catalogSong } from '../styling/fixtures'
+import { spaNavigate } from '../fixtures'
+import { sidebar, main, contextPanel } from '../selectors'
 
 test.describe('Sidebar', () => {
   test('renders sidebar with logo and search', async ({ asAdmin: page }) => {
     await expect(sidebar(page)).toBeVisible()
-
-    const logo = sidebar(page).getByText(/bånder/i)
-    await expect(logo).toBeVisible()
-
-    const searchInput = sidebar(page).locator('input[type="text"]')
-    await expect(searchInput).toBeVisible()
+    await expect(sidebar(page).getByText('Bånder', { exact: true })).toBeVisible()
+    await expect(sidebar(page).getByPlaceholder('Search...')).toBeVisible()
+    await expect(sidebar(page).getByRole('link', { name: 'Home', exact: true })).toHaveAttribute('aria-current', 'page')
   })
 
   test('sidebar search navigates to search page', async ({ asAdmin: page }) => {
-    const searchInput = sidebar(page).locator('input[type="text"]')
-    await searchInput.fill('test query')
-    await searchInput.press('Enter')
-
-    await page.waitForURL(/\/search/, { timeout: 5_000 })
-    await expect(page).toHaveURL(/q=test/)
+    const search = sidebar(page).getByPlaceholder('Search...')
+    await search.fill('test query')
+    await search.press('Enter')
+    await expect(page).toHaveURL((url) => url.pathname === '/search' && url.searchParams.get('q') === 'test query' && url.searchParams.get('scope') === 'music')
+    await expect(main(page).getByRole('heading', { name: 'Search', exact: true, level: 1 })).toBeVisible()
   })
 
   test('sidebar customize button opens editor', async ({ asAdmin: page }) => {
-    const customizeBtn = sidebar(page).getByRole('button', { name: /customize sidebar/i })
-    await expect(customizeBtn).toBeVisible()
-    await customizeBtn.click()
-
-    // Sidebar editor overlay should appear
-    const editor = page.locator('[class*="sidebar-editor"]').or(page.locator('[data-state="open"]'))
-    if (await editor.isVisible().catch(() => false)) {
-      await expect(editor).toBeVisible()
-    }
+    await sidebar(page).getByRole('button', { name: 'Customize', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Customize Sidebar', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeVisible()
   })
 
-  test('sidebar navigation links work', async ({ asAdmin: page }) => {
-    // Click each visible nav link
-    const navLinks = sidebar(page).locator('nav a')
-    const count = await navLinks.count()
-
-    if (count > 0) {
-      await navLinks.first().click()
-      await page.waitForTimeout(300)
-      await expect(main(page)).toBeVisible()
-    }
+  test('sidebar album link reaches the albums page', async ({ asAdmin: page }) => {
+    await sidebar(page).getByRole('link', { name: 'Albums', exact: true }).click()
+    await expect(page).toHaveURL(/\/music\/albums$/)
+    await expect(main(page).getByRole('heading', { name: 'Albums', exact: true, level: 1 })).toBeVisible()
+    await expect(sidebar(page).getByRole('link', { name: 'Albums', exact: true })).toHaveAttribute('aria-current', 'page')
+    await expect(sidebar(page).getByRole('link', { name: 'Home', exact: true })).not.toHaveAttribute('aria-current', 'page')
   })
 
-  test('admin section visible to admin users', async ({ asAdmin: page }) => {
-    const adminSection = sidebar(page).getByText(/admin/i).first()
-    if (await adminSection.isVisible().catch(() => false)) {
-      const adminLinks = sidebar(page).locator('nav a[href^="/admin/"]')
-      expect((await adminLinks.count()) > 0).toBeTruthy()
-    }
+  test('admin destination is available to the admin account', async ({ asAdmin: page }) => {
+    await spaNavigate(page)('/settings')
+    await expect(main(page).getByRole('link', { name: 'Admin', exact: true })).toBeVisible()
   })
 })
 
 test.describe('Context Panel', () => {
-  test('context panel is visible', async ({ asAdmin: page }) => {
+  test('context panel exposes all tabs', async ({ asAdmin: page }) => {
     await expect(contextPanel(page)).toBeVisible()
-  })
-
-  test('context panel has tabs', async ({ asAdmin: page }) => {
-    const tabs = contextPanel(page).getByRole('tab')
-    const tabCount = await tabs.count()
-    expect(tabCount).toBeGreaterThanOrEqual(0)
-  })
-
-  test('selecting an album from home opens details in context panel', async ({ asAdmin: page }) => {
-    // Home page is already loaded
-    await untilLoaded(main(page)).catch(() => {})
-
-    const albumCards = main(page).locator('button[class*="rounded-lg"]').filter({ hasText: /.+/ })
-    if ((await albumCards.count()) > 0) {
-      await albumCards.first().click()
-      await page.waitForTimeout(500)
-
-      // Context panel should update
-      const panelContent = contextPanel(page).locator('h3, [class*="font-medium"]')
-      if ((await panelContent.count()) > 0) {
-        await expect(panelContent.first()).toBeVisible()
-      }
+    await expect(contextPanel(page).getByRole('tab')).toHaveCount(4)
+    for (const name of ['Queue', 'Lyrics', 'Details', 'Edit']) {
+      await expect(contextPanel(page).getByRole('tab', { name, exact: true })).toBeVisible()
     }
+  })
+
+  test('empty catalog shows the empty message', async ({ emptyCatalog: page }) => {
+    await expect(main(page).getByText('Your library is empty', { exact: true })).toBeVisible()
+  })
+
+  test('selecting a populated album opens details and track controls', async ({ populatedCatalog: page }) => {
+    await spaNavigate(page)('/music/albums')
+    await expect(main(page).getByRole('heading', { name: 'Albums', exact: true, level: 1 })).toBeVisible()
+    await main(page).getByRole('button', { name: new RegExp(catalogAlbum.title) }).click()
+    await expect(contextPanel(page).getByText(catalogAlbum.title, { exact: true })).toBeVisible()
+    await expect(contextPanel(page).getByText(catalogSong.title, { exact: true })).toBeVisible()
+    await expect(contextPanel(page).getByRole('button', { name: 'Play', exact: true })).toBeEnabled()
   })
 })
 
-test.describe('Keyboard shortcuts', () => {
-  test('keyboard shortcuts help opens with ? key', async ({ asAdmin: page }) => {
-    // Press ? to open shortcuts overlay
-    await page.keyboard.press('?')
-
-    const shortcutsHelp = page.locator('text=keyboard shortcuts').or(page.locator('[class*="shortcuts"]'))
-    if (await shortcutsHelp.isVisible().catch(() => false)) {
-      await expect(shortcutsHelp).toBeVisible()
-    }
-  })
+test('keyboard shortcuts help opens with ? key', async ({ asAdmin: page }) => {
+  await main(page).getByRole('heading', { name: 'Home', exact: true, level: 1 }).click()
+  await page.keyboard.press('Shift+?')
+  await expect(page.getByRole('dialog', { name: 'Keyboard Shortcuts' })).toBeVisible()
 })

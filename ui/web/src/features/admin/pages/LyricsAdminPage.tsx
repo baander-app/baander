@@ -85,7 +85,7 @@ const IconBox = styled.div`
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  background: var(--color-muted);
 `
 
 const BigValue = styled.div`
@@ -178,7 +178,7 @@ const EmptyText = styled.p`
 
 function CoverageBar({ percentage }: { percentage: number }) {
   const clamped = Math.max(0, Math.min(100, percentage))
-  const color = clamped >= 80 ? '#10b981' : clamped >= 50 ? '#f59e0b' : '#ef4444'
+  const color = clamped >= 80 ? 'var(--color-success)' : clamped >= 50 ? 'var(--color-warning)' : 'var(--color-destructive)'
 
   return (
     <BarTrack>
@@ -247,7 +247,7 @@ export function LyricsAdminPage() {
             <ContentStack>
               <Highlight>
                 <IconBox>
-                  <Music size={18} strokeWidth={1.5} style={{ color: 'var(--color-primary)' }} />
+                  <Music size={18} strokeWidth={1.5} style={{ color: 'var(--color-accent-text)' }} />
                 </IconBox>
                 <div>
                   <BigValue>
@@ -267,7 +267,7 @@ export function LyricsAdminPage() {
                   label="With lyrics"
                   value={
                     <StatIcon>
-                      <CheckCircle2 size={12} style={{ color: '#10b981' }} />
+                      <CheckCircle2 size={12} style={{ color: 'var(--color-success)' }} />
                       {coverage.tracksWithLyrics.toLocaleString()}
                     </StatIcon>
                   }
@@ -276,7 +276,7 @@ export function LyricsAdminPage() {
                   label="Without lyrics"
                   value={
                     <StatIcon>
-                      <XCircle size={12} style={{ color: '#ef4444' }} />
+                      <XCircle size={12} style={{ color: 'var(--color-destructive)' }} />
                       {coverage.tracksWithoutLyrics.toLocaleString()}
                     </StatIcon>
                   }

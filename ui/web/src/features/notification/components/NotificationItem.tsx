@@ -1,3 +1,5 @@
+import { focusVisibleRing } from '@/shared/theme'
+import { notificationCategoryColors } from '@/features/notification/category-colors'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import styled, { css } from 'styled-components'
@@ -5,12 +7,6 @@ import { useNotificationStore } from '../stores/notification-store'
 import { useNotificationActions } from '../hooks/use-notification-actions'
 import type { NotificationItem as NotificationItemType } from '../api/notification-api'
 
-const categoryColorMap: Record<string, string> = {
-  security: '#ef4444',
-  background_jobs: '#3b82f6',
-  media_changes: '#10b981',
-  admin_operations: '#a855f7',
-}
 
 function relativeTime(dateStr: string): string {
   const now = Date.now()
@@ -42,6 +38,10 @@ function navigateForEvent(eventType: string): string | null {
 }
 
 const ItemButton = styled.button<{ $unread: boolean }>`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   display: flex;
   width: 100%;
   align-items: flex-start;
@@ -92,7 +92,7 @@ const Time = styled.p`
 export function NotificationItem({ notification }: { notification: NotificationItemType }) {
   const navigate = useNavigate()
   const { markRead } = useNotificationActions()
-  const barColor = categoryColorMap[notification.category] ?? 'var(--color-muted-foreground)'
+  const barColor = notificationCategoryColors[notification.category] ?? 'var(--color-muted-foreground)'
 
   const handleClick = async () => {
     if (!notification.isRead) {

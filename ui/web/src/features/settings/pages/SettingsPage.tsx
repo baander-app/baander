@@ -1,3 +1,4 @@
+import { Switch } from '@/shared/components/ui/switch';
 import { type LufsTarget, useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store';
 import styled from 'styled-components';
 import { Button } from '@/shared/components/ui/button';
@@ -58,6 +59,9 @@ const SectionTitle = styled.h2`
 `
 
 const CardRow = styled(CardContent)`
+  gap: 1rem;
+  flex-wrap: wrap;
+  & > div { min-width: 0; flex: 1 1 12rem; }
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -77,30 +81,6 @@ const FieldHeading = styled.p`
 const FieldDescription = styled.p`
   font-size: 0.75rem;
   color: var(--color-muted-foreground);
-`
-
-const ToggleTrack = styled.button<{ $enabled: boolean }>`
-  position: relative;
-  height: 1.5rem;
-  width: 2.75rem;
-  border-radius: 9999px;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  background-color: ${props => props.$enabled ? 'var(--color-white)' : 'var(--color-muted)'};
-`
-
-const ToggleThumb = styled.span<{ $enabled: boolean }>`
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  height: 1.25rem;
-  width: 1.25rem;
-  border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
-  transform: ${props => props.$enabled ? 'translateX(1.25rem)' : 'translateX(0)'};
-  background-color: ${props => props.$enabled ? 'var(--color-primary-foreground)' : 'var(--color-muted-foreground)'};
 `
 
 const FieldLabel = styled.label`
@@ -150,15 +130,11 @@ export function SettingsPage() {
                     Automatically adjust volume to maintain consistent loudness
                   </FieldDescription>
                 </div>
-                <ToggleTrack
-                  $enabled={normalizationEnabled}
-                  onClick={() => setNormalizationEnabled(!normalizationEnabled)}
-                  role="switch"
-                  aria-checked={normalizationEnabled}
+                <Switch
+                  checked={normalizationEnabled}
+                  onCheckedChange={setNormalizationEnabled}
                   aria-label="Volume normalization"
-                >
-                  <ToggleThumb $enabled={normalizationEnabled} />
-                </ToggleTrack>
+                />
               </CardRow>
             </Card>
 

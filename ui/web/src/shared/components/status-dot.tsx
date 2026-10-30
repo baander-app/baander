@@ -12,11 +12,11 @@ const pulse = keyframes`
 `
 
 const COLOR_MAP: Record<StatusDotProps['color'], string> = {
-  green: '#10b981',
-  red: '#ef4444',
-  amber: '#f59e0b',
-  blue: '#3b82f6',
-  gray: '#9ca3af',
+  green: 'var(--color-success)',
+  red: 'var(--color-destructive)',
+  amber: 'var(--color-warning)',
+  blue: 'var(--color-info)',
+  gray: 'var(--color-muted-foreground)',
 }
 
 const Container = styled.span`
@@ -31,6 +31,7 @@ const Dot = styled.span<{ $color: string; $pulse: boolean }>`
   width: 0.375rem;
   border-radius: 9999px;
   background-color: ${props => props.$color};
+  @media (prefers-reduced-motion: reduce) { animation: none !important; }
   ${props => props.$pulse && css`animation: ${pulse} 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;`}
 `
 

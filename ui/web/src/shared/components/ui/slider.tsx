@@ -19,14 +19,14 @@ const StyledTrack = styled(SliderPrimitive.Track)`
   flex-grow: 1;
   overflow: hidden;
   border-radius: 9999px;
-  background-color: var(--color-muted);
+  background-color: var(--color-input-boundary);
   &[data-orientation="horizontal"] { height: 0.25rem; width: 100%; }
   &[data-orientation="vertical"] { height: 100%; width: 0.25rem; }
 `;
 
 const StyledRange = styled(SliderPrimitive.Range)`
   position: absolute;
-  background-color: var(--color-primary);
+  background-color: var(--color-accent-text);
   user-select: none;
   &[data-orientation="horizontal"] { height: 100%; }
   &[data-orientation="vertical"] { width: 100%; }
@@ -40,7 +40,7 @@ const StyledThumb = styled(SliderPrimitive.Thumb)`
   flex-shrink: 0;
   border-radius: 9999px;
   border: 1px solid var(--color-ring);
-  background-color: white;
+  background-color: var(--color-foreground);
   ${focusVisibleRing}
   transition: color var(--duration-hover) ease-out, box-shadow var(--duration-hover) ease-out;
   user-select: none;

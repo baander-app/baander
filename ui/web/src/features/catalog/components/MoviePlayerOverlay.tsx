@@ -22,7 +22,7 @@ const HeaderBar = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+  background-color: var(--color-background);
   padding: 0.75rem 1rem;
 `
 
@@ -35,7 +35,7 @@ const SourceSeek = styled(Input)`
   height: 2rem;
   border: 0;
   padding: 0;
-  accent-color: var(--color-primary);
+  accent-color: var(--color-accent-text);
 `
 
 const VideoContainer = styled.div`
@@ -80,12 +80,12 @@ export function MoviePlayerOverlay({ title, videoId, onClose }: MoviePlayerOverl
     <Overlay>
       {/* Header */}
       <HeaderBar>
-        <Button variant="ghost" size="sm" onClick={onClose} style={{ gap: '0.5rem', color: 'white' }}>
+        <Button variant="ghost" size="sm" onClick={onClose} style={{ gap: '0.5rem', color: 'var(--color-foreground)' }}>
           <X size={16} />
           Back
         </Button>
-        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'white' }}>{title}</span>
-        <span style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-foreground)' }}>{title}</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--color-muted-foreground)' }}>
           {formatTime(displayedTime)} / {formatTime(duration)}
         </span>
       </HeaderBar>

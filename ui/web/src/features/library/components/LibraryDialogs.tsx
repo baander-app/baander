@@ -55,8 +55,8 @@ const PathHint = styled.p<{ $valid: boolean }>`
   margin-top: 0.25rem;
   font-size: 0.75rem;
   ${(p) => p.$valid
-    ? css`color: #10b981;`
-    : css`color: #ef4444;`
+    ? css`color: var(--color-success);`
+    : css`color: var(--color-destructive);`
   }
 `
 
@@ -95,7 +95,7 @@ const CheckboxLabel = styled.label`
   cursor: pointer;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background-color: rgba(var(--color-secondary-rgb, 0 0 0), 0.5);
+  background-color: color-mix(in srgb, var(--color-secondary) 50%, transparent);
   padding: 0.75rem;
   transition: background-color 0.15s;
 
@@ -109,7 +109,7 @@ const CheckboxLabel = styled.label`
     width: 1rem;
     flex-shrink: 0;
     border-radius: var(--radius-sm);
-    accent-color: var(--color-primary);
+    accent-color: var(--color-accent-text);
   }
 
   p:first-of-type {
@@ -181,7 +181,7 @@ function CreateLibraryForm({ open, onClose, onSubmit, isPending }: CreateLibrary
                 }}
                 placeholder="/mnt/media/music"
                 required
-                style={pathResult ? (pathResult.valid ? { borderColor: '#10b981' } : { borderColor: '#ef4444' }) : {}}
+                style={pathResult ? (pathResult.valid ? { borderColor: 'var(--color-success)' } : { borderColor: 'var(--color-destructive)' }) : {}}
               />
               {isValidating && (
                 <ValidatingHint>Checking...</ValidatingHint>

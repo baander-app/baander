@@ -107,7 +107,7 @@ const SongItem = styled.li`
   cursor: pointer;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
   }
 `
 

@@ -18,7 +18,7 @@ const CardContainer = styled.div<{ $active: boolean }>`
   }
 
   background-color: ${({ $active }) =>
-    $active ? 'color-mix(in srgb, var(--color-accent) 50%, transparent)' : 'transparent'};
+    $active ? 'color-mix(in srgb, var(--color-highlight) 50%, transparent)' : 'transparent'};
 `
 
 const LogoContainer = styled.div`
@@ -157,7 +157,7 @@ export function StationCard({ station, isStarred, onStar, onUnstar }: StationCar
           onClick={handleStar}
           aria-label={isStarred ? 'Unstar station' : 'Star station'}
         >
-          <Star size={16} style={isStarred ? { fill: '#facc15', color: '#facc15' } : undefined} />
+          <Star size={16} style={isStarred ? { fill: 'var(--color-accent-text)', color: 'var(--color-accent-text)' } : undefined} />
         </Button>
         <Button
           variant={isActive && isPlaying ? 'secondary' : 'ghost'}

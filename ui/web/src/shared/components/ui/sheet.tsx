@@ -99,11 +99,11 @@ const Overlay = styled(SheetPrimitive.Overlay).attrs<DataAttributes>({
   }
 
   &[data-state="open"] {
-    animation: ${fadeIn} 150ms ease-out;
+    animation: ${fadeIn} 120ms ease-out;
   }
 
   &[data-state="closed"] {
-    animation: ${fadeOut} 150ms ease-in;
+    animation: ${fadeOut} 120ms ease-out;
   }
 `
 
@@ -116,14 +116,17 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
   z-index: 50;
   display: flex;
   flex-direction: column;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   gap: 1rem;
   background: var(--color-popover);
   background-clip: padding-box;
   font-size: 0.875rem;
   line-height: 1.6;
   color: var(--color-popover-foreground);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  transition: all 200ms ease-in-out;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
 
   /* ── Side variants ── */
   &[data-side="top"] {
@@ -132,10 +135,10 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
     height: auto;
 
     &[data-state="open"] {
-      animation: ${fadeIn} 150ms ease-out, ${slideInFromTop} 200ms ease-out;
+      animation: ${fadeIn} 120ms ease-out, ${slideInFromTop} 120ms ease-out;
     }
     &[data-state="closed"] {
-      animation: ${fadeOut} 150ms ease-in, ${slideOutToTop} 200ms ease-in;
+      animation: ${fadeOut} 120ms ease-out, ${slideOutToTop} 120ms ease-out;
     }
   }
 
@@ -145,10 +148,10 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
     height: auto;
 
     &[data-state="open"] {
-      animation: ${fadeIn} 150ms ease-out, ${slideInFromBottom} 200ms ease-out;
+      animation: ${fadeIn} 120ms ease-out, ${slideInFromBottom} 120ms ease-out;
     }
     &[data-state="closed"] {
-      animation: ${fadeOut} 150ms ease-in, ${slideOutToBottom} 200ms ease-in;
+      animation: ${fadeOut} 120ms ease-out, ${slideOutToBottom} 120ms ease-out;
     }
   }
 
@@ -164,10 +167,10 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
     }
 
     &[data-state="open"] {
-      animation: ${fadeIn} 150ms ease-out, ${slideInFromLeft} 200ms ease-out;
+      animation: ${fadeIn} 120ms ease-out, ${slideInFromLeft} 120ms ease-out;
     }
     &[data-state="closed"] {
-      animation: ${fadeOut} 150ms ease-in, ${slideOutToLeft} 200ms ease-in;
+      animation: ${fadeOut} 120ms ease-out, ${slideOutToLeft} 120ms ease-out;
     }
   }
 
@@ -183,10 +186,10 @@ const StyledContent = styled(SheetPrimitive.Content).attrs<DataAttributes>({
     }
 
     &[data-state="open"] {
-      animation: ${fadeIn} 150ms ease-out, ${slideInFromRight} 200ms ease-out;
+      animation: ${fadeIn} 120ms ease-out, ${slideInFromRight} 120ms ease-out;
     }
     &[data-state="closed"] {
-      animation: ${fadeOut} 150ms ease-in, ${slideOutToRight} 200ms ease-in;
+      animation: ${fadeOut} 120ms ease-out, ${slideOutToRight} 120ms ease-out;
     }
   }
 `

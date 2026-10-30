@@ -14,9 +14,9 @@ const Badge = styled.span<{ $bg: string; $text: string }>`
 
 export function RoleBadge({ role }: { role: string }) {
   const variant = role === 'ROLE_SUPER_ADMIN'
-    ? { bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24' }
+    ? { bg: 'var(--color-muted)', text: 'var(--color-warning)' }
     : role === 'ROLE_ADMIN'
-      ? { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa' }
+      ? { bg: 'var(--color-muted)', text: 'var(--color-info)' }
       : { bg: 'var(--color-secondary)', text: 'var(--color-muted-foreground)' }
 
   const label = role.replace('ROLE_', '')

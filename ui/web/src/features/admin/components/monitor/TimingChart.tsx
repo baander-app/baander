@@ -18,7 +18,7 @@ function formatMs(ms: number): string {
 }
 
 const Card = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -89,9 +89,9 @@ const BarValue = styled.span`
 `
 
 const STAT_CONFIG = [
-  { key: 'p95' as const, label: 'P95', color: '#f59e0b' },
+  { key: 'p95' as const, label: 'P95', color: 'var(--color-warning)' },
   { key: 'median' as const, label: 'Median', color: 'var(--color-primary)' },
-  { key: 'avg' as const, label: 'Average', color: '#10b981' },
+  { key: 'avg' as const, label: 'Average', color: 'var(--color-success)' },
 ] as const
 
 function HorizontalBar({

@@ -99,7 +99,7 @@ const ContextMenu = styled.div`
   background-color: var(--color-popover);
   padding: 0.25rem;
   color: var(--color-popover-foreground);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 `
 
 const MenuLabel = styled.label`
@@ -113,7 +113,7 @@ const MenuLabel = styled.label`
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

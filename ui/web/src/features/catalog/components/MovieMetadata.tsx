@@ -61,7 +61,7 @@ const ExternalLinkStyled = styled.a`
   align-items: center;
   gap: 0.25rem;
   font-weight: 500;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
 
   &:hover {
     text-decoration: underline;

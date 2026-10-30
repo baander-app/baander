@@ -7,7 +7,8 @@ import { AlbumContextMenu } from './menus/AlbumContextMenu'
 
 const HeaderBar = styled.div`
   display: flex;
-  height: 3rem;
+  min-height: 3rem;
+  flex-wrap: wrap;
   flex-shrink: 0;
   align-items: center;
   gap: 0.75rem;
@@ -37,6 +38,8 @@ const PlaceholderIcon = styled.svg`
 `
 
 const Title = styled.span`
+  min-width: 0;
+  flex: 1 1 8rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -45,7 +48,11 @@ const Title = styled.span`
 `
 
 const ArtistName = styled.span`
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.875rem;
   color: var(--color-muted-foreground);
 `

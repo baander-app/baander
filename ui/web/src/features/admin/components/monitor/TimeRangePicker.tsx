@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import styled, { css } from 'styled-components'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 interface TimeRangePickerProps {
   from: string
@@ -31,6 +31,7 @@ function isActivePreset(from: string, to: string, durationMs: number): boolean {
 
 const Wrapper = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
   border-radius: var(--radius-lg, 0.5rem);
@@ -39,7 +40,11 @@ const Wrapper = styled.div`
 `
 
 const PresetButton = styled.button<{ $active: boolean }>`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
@@ -49,7 +54,6 @@ const PresetButton = styled.button<{ $active: boolean }>`
     ? css`
         background-color: var(--color-background);
         color: var(--color-foreground);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       `
     : css`
         color: var(--color-muted-foreground);

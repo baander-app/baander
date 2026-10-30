@@ -1,28 +1,26 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { useNavigate } from 'react-router-dom'
-import { focusVisibleRing } from '@/shared/theme'
 
-const CardButton = styled.button`
+const CardButton = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  display: block;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   position: relative;
   aspect-ratio: 2/3;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background-color: var(--color-surface-2);
-  transition: all 150ms;
-  ${focusVisibleRing}
+  background-color: var(--color-card);
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
   text-align: left;
   width: 100%;
   border: none;
   cursor: pointer;
   padding: 0;
 
-  &:hover {
-    transform: scale(1.02);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  }
 
   &:focus {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--color-ring);
   }
 `
 
@@ -37,7 +35,7 @@ const PosterPlaceholder = styled.div`
   height: 100%;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-surface-3);
+  background-color: var(--color-muted);
 `
 
 const PlaceholderIcon = styled.svg`
@@ -46,19 +44,18 @@ const PlaceholderIcon = styled.svg`
   color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);
 `
 
-const GradientOverlay = styled.div`
+const CaptionPanel = styled.div`
   position: absolute;
   inset-inline: 0;
   bottom: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  background-color: var(--color-card);
   padding: 0.75rem;
-  padding-top: 2rem;
 `
 
 const MovieTitle = styled.h3`
   font-size: 0.875rem;
   font-weight: 500;
-  color: white;
+  color: var(--color-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -69,7 +66,7 @@ const MetaRow = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-muted-foreground);
 `
 
 const StarIcon = styled.svg`
@@ -110,7 +107,7 @@ export function MovieGridItem({ movie }: MovieGridItemProps) {
           </PlaceholderIcon>
         </PosterPlaceholder>
       )}
-      <GradientOverlay>
+      <CaptionPanel>
         <MovieTitle>{movie.title}</MovieTitle>
         <MetaRow>
           {movie.year && <span>{movie.year}</span>}
@@ -123,7 +120,7 @@ export function MovieGridItem({ movie }: MovieGridItemProps) {
             </StarSpan>
           )}
         </MetaRow>
-      </GradientOverlay>
+      </CaptionPanel>
     </CardButton>
   )
 }

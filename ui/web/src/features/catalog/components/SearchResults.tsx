@@ -59,7 +59,7 @@ const ArtistAvatar = styled.div`
   border-radius: 50%;
   background-color: var(--color-secondary);
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-muted-foreground);
 `
 
@@ -129,7 +129,7 @@ const SongButton = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
   }
 `
 

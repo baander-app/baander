@@ -5,15 +5,12 @@ const Card = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
   ${interactiveTransition(['color', 'background-color'])}
 
-  &:hover {
-    background-color: var(--color-accent);
-  }
 `
 
 const CenterContent = styled.div`

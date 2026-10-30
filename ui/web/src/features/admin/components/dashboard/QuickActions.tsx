@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Activity, Loader, Music, RefreshCw, Stethoscope } from 'lucide-react'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 import { useBulkFetchLyrics } from '../../hooks/use-lyrics-admin'
 import { useFlushFailedQueue } from '../../hooks/use-job-monitor'
 
@@ -40,17 +40,21 @@ const spin = keyframes`
 `
 
 const ActionButtonWrapper = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-md);
   padding: 0.375rem 0.75rem;
   font-size: 13px;
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent);
     color: var(--color-foreground);
   }
 
@@ -62,12 +66,12 @@ const SpinIcon = styled(Loader)`
 `
 
 const SuccessIcon = styled.span`
-  color: #10b981;
+  color: var(--color-success);
   font-size: 11px;
 `
 
 const ErrorIcon = styled.span`
-  color: #ef4444;
+  color: var(--color-destructive);
   font-size: 11px;
 `
 

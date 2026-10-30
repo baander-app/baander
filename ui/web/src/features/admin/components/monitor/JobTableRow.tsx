@@ -8,11 +8,11 @@ interface JobTableRowProps {
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  queued: { bg: '#dbeafe', text: '#1d4ed8' },
-  running: { bg: '#fef9c3', text: '#a16207' },
-  finished: { bg: '#dcfce7', text: '#15803d' },
-  failed: { bg: '#fee2e2', text: '#b91c1c' },
-  cancelled: { bg: '#f3f4f6', text: '#374151' },
+  queued: { bg: 'var(--color-muted)', text: 'var(--color-info)' },
+  running: { bg: 'var(--color-muted)', text: 'var(--color-warning)' },
+  finished: { bg: 'var(--color-muted)', text: 'var(--color-success)' },
+  failed: { bg: 'var(--color-muted)', text: 'var(--color-destructive)' },
+  cancelled: { bg: 'var(--color-muted)', text: 'var(--color-muted-foreground)' },
 }
 
 function formatDuration(startedAt: string | null, finishedAt: string | null): string {
@@ -55,7 +55,7 @@ const Row = styled.div`
   cursor: pointer;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: color-mix(in srgb, var(--color-accent) 50%, transparent); }
+  &:hover { background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent); }
 `
 
 const Name = styled.span`

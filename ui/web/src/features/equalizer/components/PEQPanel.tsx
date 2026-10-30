@@ -68,8 +68,8 @@ const Wrapper = styled.div`
 const Canvas = styled.div`
   position: relative;
   border-radius: var(--radius-md);
-  background-color: rgba(var(--color-muted-rgb, 128 128 128), 0.3);
-  border: 1px solid rgba(var(--color-border-rgb, 128 128 128), 0.5);
+  background-color: var(--color-muted);
+  border: 1px solid var(--color-border);
   user-select: none;
   touch-action: none;
 `
@@ -86,15 +86,18 @@ const DraggablePoint = styled.div<{ $selected: boolean }>`
   border-radius: 9999px;
   transform: translate(-50%, -50%);
   cursor: grab;
-  background-color: var(--color-primary);
+  background-color: var(--color-accent-text);
   border: 2px solid var(--color-background);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  transition: box-shadow 0.15s;
+  &:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
 
   &:active { cursor: grabbing; }
 
   ${(p) => p.$selected && css`
-    box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb, 0 0 0), 0.5);
+    outline: 2px solid var(--color-accent-text);
+    outline-offset: 2px;
   `}
 `
 
@@ -111,7 +114,7 @@ const InfoLabel = styled.span`
 
 const GainLabel = styled.span<{ $positive: boolean | null }>`
   ${(p) => {
-    if (p.$positive === true) return css`color: var(--color-primary);`
+    if (p.$positive === true) return css`color: var(--color-accent-text);`
     if (p.$positive === false) return css`color: var(--color-muted-foreground);`
     return css`color: var(--color-foreground);`
   }}
@@ -208,11 +211,11 @@ export function PEQGraph() {
             return <line key={f} x1={x} y1="0" x2={x} y2={height} stroke="currentColor" strokeWidth="0.5" opacity={0.1} />
           })}
           {/* Response curve */}
-          <path d={curvePath} stroke="hsl(var(--primary))" strokeWidth="2" fill="none" opacity={0.7} vectorEffect="non-scaling-stroke" />
+          <path d={curvePath} stroke="var(--color-accent-text)" strokeWidth="2" fill="none" opacity={0.7} vectorEffect="non-scaling-stroke" />
           {/* Fill under curve */}
           <path
             d={`${curvePath} L ${width},${height / 2} L 0,${height / 2} Z`}
-            fill="hsl(var(--primary))"
+            fill="var(--color-accent-text)"
             opacity={0.08}
           />
         </SvgOverlay>

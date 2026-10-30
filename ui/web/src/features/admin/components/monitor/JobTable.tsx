@@ -5,7 +5,7 @@ import { JobFilters } from './JobFilters'
 import { JobTableRow } from './JobTableRow'
 import type { JobFilters as JobFilterType } from '../../api/job-monitor-api'
 import { EmptyState } from '@/features/catalog/components/EmptyState'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
@@ -35,12 +35,15 @@ const Count = styled.span`
 `
 
 const TableCard = styled.div`
-  border-radius: 0.375rem;
+  min-width: 0;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
 `
 
 const TableHeader = styled.div`
+  min-width: 44rem;
   display: grid;
   grid-template-columns: 1fr 100px 100px 60px 120px 100px;
   gap: 0.5rem;
@@ -56,6 +59,7 @@ const CenterSpan = styled.span`
 `
 
 const Divider = styled.div`
+  min-width: 44rem;
   & > div { border-bottom: 1px solid var(--color-border); }
   & > div:last-child { border-bottom: none; }
 `
@@ -74,13 +78,17 @@ const ErrorText = styled.p`
 `
 
 const RetryBtn = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: var(--color-accent); }
+  &:hover { background-color: var(--color-highlight); }
 `
 
 const PaginationArea = styled.div`
@@ -89,14 +97,18 @@ const PaginationArea = styled.div`
 `
 
 const LoadMoreBtn = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   width: 100%;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: var(--color-accent); }
+  &:hover { background-color: var(--color-highlight); }
   &:disabled { opacity: 0.5; }
 `
 

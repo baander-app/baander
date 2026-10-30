@@ -40,7 +40,7 @@ const TrackRow = styled.div<{ $isPlaying: boolean }>`
       : css`
         color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
         &:hover {
-          background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+          background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
         }
       `}
 `
@@ -96,12 +96,13 @@ const TrackDuration = styled.span`
 `
 
 const EqualizerSvg = styled.svg`
+  fill: currentColor;
   display: inline-block;
-  color: var(--accent-derived, var(--color-primary));
+  color: var(--accent-derived-foreground, var(--color-accent-text));
 `
 
 const EqualizerBar = styled.rect`
-  animation: equalizer-bar 0.6s ease-in-out infinite;
+  animation: equalizer-bar 0.6s ease-out infinite;
 `
 
 interface AlbumTrackListProps {

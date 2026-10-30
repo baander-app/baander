@@ -103,9 +103,9 @@ const FeedbackCard = styled.div<{ $variant: 'success' | 'warning' | 'error' }>`
   border-radius: var(--radius-lg);
   border: 1px solid ${({ $variant }) => {
     switch ($variant) {
-      case 'success': return 'color-mix(in srgb, #10b981 30%, transparent)'
-      case 'warning': return 'color-mix(in srgb, #f59e0b 30%, transparent)'
-      case 'error': return 'color-mix(in srgb, var(--color-destructive) 30%, transparent)'
+      case 'success': return 'var(--color-muted)'
+      case 'warning': return 'var(--color-muted)'
+      case 'error': return 'var(--color-muted)'
     }
   }};
   background: var(--color-card);
@@ -257,7 +257,7 @@ export function MediaPage() {
       {pruneMissing.isSuccess && pruneMissing.data && (
         <FeedbackCard $variant="success">
           <FeedbackHeader>
-            <CheckCircle2 size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
+            <CheckCircle2 size={16} strokeWidth={1.5} style={{ color: 'var(--color-success)' }} />
             <FeedbackTitle>Prune job dispatched</FeedbackTitle>
           </FeedbackHeader>
           <FeedbackDesc>
@@ -272,14 +272,14 @@ export function MediaPage() {
           <FeedbackHeader>
             {missingCount > 0 ? (
               <>
-                <AlertTriangle size={16} strokeWidth={1.5} style={{ color: '#f59e0b' }} />
+                <AlertTriangle size={16} strokeWidth={1.5} style={{ color: 'var(--color-warning)' }} />
                 <FeedbackTitle>
                   {missingCount.toLocaleString()} of {missingData.totalImages.toLocaleString()} images have missing files
                 </FeedbackTitle>
               </>
             ) : (
               <>
-                <CheckCircle2 size={16} strokeWidth={1.5} style={{ color: '#10b981' }} />
+                <CheckCircle2 size={16} strokeWidth={1.5} style={{ color: 'var(--color-success)' }} />
                 <FeedbackTitle>All image files are present</FeedbackTitle>
               </>
             )}

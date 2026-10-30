@@ -16,6 +16,8 @@ import styled from 'styled-components'
 // --- Main Panel Styled Components ---
 
 const Root = styled.div`
+  container-type: inline-size;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -23,14 +25,28 @@ const Root = styled.div`
 
 const TopGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 280px 200px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
+
+  > * { min-width: 0; }
+
+  @container (min-width: 40rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    > :first-child { grid-column: 1 / -1; }
+  }
+
+  @container (min-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr) 280px 200px;
+    > :first-child { grid-column: auto; }
+  }
 `
 
 const HeaderRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
 `
 
 const ModeButtons = styled.div`
@@ -48,10 +64,12 @@ const PresetGrid = styled.div`
 const EqBandRow = styled.div`
   display: flex;
   gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
 `
 
 const EqBandCol = styled.div`
-  flex: 1;
+  flex: 1 0 2rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -76,7 +94,7 @@ const BandGain = styled.span<{ $gain: number }>`
   font-variant-numeric: tabular-nums;
   font-size: 11px;
   color: ${(p) => {
-    if (p.$gain > 0) return 'var(--color-primary)'
+    if (p.$gain > 0) return 'var(--color-accent-text)'
     if (p.$gain < 0) return 'var(--color-muted-foreground)'
     return 'var(--color-foreground)'
   }};
@@ -84,8 +102,10 @@ const BandGain = styled.span<{ $gain: number }>`
 
 const BottomGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: 1.5rem;
+
+  > * { min-width: 0; }
 `
 
 const VolumeLabel = styled.span`

@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useRateLimiters, useClearRateLimiters } from '../hooks/use-rate-limiter'
@@ -21,6 +22,10 @@ const HeaderRow = styled.div`
 `
 
 const DangerButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   border-radius: var(--radius-md);
   background: var(--color-destructive);
   padding: 0.375rem 0.75rem;
@@ -31,7 +36,7 @@ const DangerButton = styled.button`
 const ConfirmBox = styled.div`
   border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--color-destructive) 50%, transparent);
-  background: color-mix(in srgb, var(--color-destructive) 5%, transparent);
+  background: var(--color-muted);
   padding: 1rem;
 `
 
@@ -46,6 +51,10 @@ const ButtonRow = styled.div`
 `
 
 const ConfirmDanger = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   border-radius: var(--radius-md);
   background: var(--color-destructive);
   padding: 0.375rem 0.75rem;
@@ -58,6 +67,10 @@ const ConfirmDanger = styled.button`
 `
 
 const CancelButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
@@ -161,7 +174,11 @@ const PageError = styled.p`
 `
 
 const RetryLink = styled.button`
-  color: var(--color-primary);
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  color: var(--color-accent-text);
 
   &:hover {
     text-decoration: underline;

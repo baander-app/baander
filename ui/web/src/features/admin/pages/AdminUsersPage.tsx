@@ -42,12 +42,14 @@ const HeaderRow = styled.div`
 `
 
 const FilterRow = styled.div`
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 1rem;
 `
 
 const PaginationRow = styled.nav`
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -61,6 +63,8 @@ const UserCount = styled.span`
 `
 
 const DividerStack = styled.div`
+  overflow-x: auto;
+  & > div { min-width: 42rem; }
   & > div + div {
     border-top: 1px solid var(--color-border);
   }

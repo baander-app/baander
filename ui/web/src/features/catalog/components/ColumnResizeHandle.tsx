@@ -22,17 +22,17 @@ const HandleBar = styled.div<{ $isResizing: boolean }>`
   transform: translateX(-50%);
   width: 2px;
   border-radius: 9999px;
-  transition: background-color 150ms;
+  transition: background-color 60ms ease-out;
   background-color: ${({ $isResizing }) =>
     $isResizing
       ? 'var(--color-primary)'
-      : 'rgba(255, 255, 255, 0.2)'};
+      : 'var(--color-input-boundary)'};
 
   ${HandleContainer}:hover & {
     background-color: ${({ $isResizing }) =>
       $isResizing
         ? 'var(--color-primary)'
-        : 'rgba(255, 255, 255, 0.5)'};
+        : 'var(--color-ring)'};
   }
 `
 

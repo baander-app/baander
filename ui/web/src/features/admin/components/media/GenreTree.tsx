@@ -3,7 +3,7 @@ import styled, { css } from 'styled-components'
 import { type Genre } from '../../api/genre-admin-api'
 import { ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { useDeleteGenre } from '../../hooks/use-genre-admin'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 interface GenreTreeNode extends Genre {
   children: GenreTreeNode[]
@@ -56,17 +56,21 @@ const NodeRow = styled.div`
   padding: 0.375rem 0.5rem;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+  &:hover { background-color: color-mix(in srgb, var(--color-highlight) 30%, transparent); }
 `
 
 const ExpandButton = styled.button<{ $hasChildren: boolean }>`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   display: flex;
   height: 1.25rem;
   width: 1.25rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-md);
 
   ${({ $hasChildren }) => $hasChildren
     ? css`
@@ -105,7 +109,11 @@ const Actions = styled.div`
 `
 
 const ActionButton = styled.button`
-  border-radius: 0.25rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   padding: 0.25rem;
   color: var(--color-muted-foreground);
 
@@ -113,7 +121,11 @@ const ActionButton = styled.button`
 `
 
 const DeleteActionButton = styled.button`
-  border-radius: 0.25rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   padding: 0.25rem;
   color: var(--color-muted-foreground);
 

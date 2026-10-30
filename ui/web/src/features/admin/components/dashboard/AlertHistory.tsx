@@ -1,14 +1,9 @@
+import { notificationCategoryColors } from '@/features/notification/category-colors'
 import styled from 'styled-components'
 import { useQuery } from '@tanstack/react-query'
 import { notificationApi, type NotificationItem } from '@/features/notification/api/notification-api'
 import { formatRelativeTime } from '@/shared/utils/format-relative-time'
 
-const categoryBorderColors: Record<string, string> = {
-  security: '#3b82f6',
-  background_jobs: '#f59e0b',
-  media_changes: '#10b981',
-  admin_operations: '#ef4444',
-}
 
 const EmptyText = styled.p`
   font-size: 13px;
@@ -61,7 +56,7 @@ export function AlertHistory() {
 }
 
 function AlertRow({ alert }: { alert: NotificationItem }) {
-  const borderColor = categoryBorderColors[alert.category] ?? 'var(--color-muted-foreground)'
+  const borderColor = notificationCategoryColors[alert.category] ?? 'var(--color-muted-foreground)'
 
   return (
     <Row $borderColor={borderColor}>

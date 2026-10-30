@@ -7,9 +7,9 @@ interface HealthIndicatorProps {
 }
 
 const statusColors: Record<string, string> = {
-  healthy: '#10b981',
-  unhealthy: '#ef4444',
-  not_available: '#f59e0b',
+  healthy: 'var(--color-success)',
+  unhealthy: 'var(--color-destructive)',
+  not_available: 'var(--color-warning)',
 }
 
 const componentLabels: Record<string, string> = {

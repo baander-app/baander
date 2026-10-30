@@ -1,3 +1,4 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { usePlayerStore } from '@/features/player/stores/player-store'
@@ -32,6 +33,7 @@ const PlayerContainer = styled.div`
 
 const PlayerContent = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
@@ -46,7 +48,7 @@ const CoverThumbnail = styled.div`
 `
 
 const TrackInfo = styled.div`
-  min-width: 0;
+  min-width: 8rem;
   flex: 1;
 `
 
@@ -90,7 +92,8 @@ const VolumeGroup = styled.div`
   gap: 0.25rem;
 `
 
-const VolumeButton = styled.button`
+const VolumeButton = styled(Button).attrs({ variant: 'ghost' })`
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -101,10 +104,10 @@ const VolumeButton = styled.button`
   border: none;
   cursor: pointer;
   color: inherit;
-  transition: background-color 0.15s;
+  transition: background-color 60ms ease-out;
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 
@@ -198,7 +201,8 @@ function MusicPlayerBar() {
   )
 }
 
-const StyledTransportButton = styled.button<{ $large?: boolean }>`
+const StyledTransportButton = styled(Button).attrs({ variant: 'ghost' })<{ $large?: boolean }>`
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -207,13 +211,13 @@ const StyledTransportButton = styled.button<{ $large?: boolean }>`
   border: none;
   cursor: pointer;
   color: inherit;
-  transition: background-color 0.15s;
+  transition: background-color 60ms ease-out;
 
   height: ${({ $large }) => ($large ? '2.5rem' : '2rem')};
   width: ${({ $large }) => ($large ? '2.5rem' : '2rem')};
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

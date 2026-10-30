@@ -19,17 +19,17 @@ const Row = styled.div<{ $isPlaying: boolean; $isFocused: boolean }>`
     $isPlaying
       ? css`
         background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-        color: var(--color-primary);
+        color: var(--color-accent-text);
       `
       : $isFocused
         ? css`
-          background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+          background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent);
           color: var(--color-foreground);
         `
         : css`
           color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
           &:hover {
-            background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+            background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
           }
         `}
 `
@@ -74,7 +74,7 @@ const HoverPlayButton = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

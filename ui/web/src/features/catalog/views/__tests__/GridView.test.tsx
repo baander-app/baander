@@ -68,7 +68,8 @@ vi.mock('@/shared/hooks/use-image-blob', () => ({
   useImageBlob: () => ({ src: '/blob/cover.jpg', isLoading: false }),
 }))
 
-vi.mock('@/shared/utils/blurhash', () => ({
+vi.mock('@/shared/utils/blurhash', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/shared/utils/blurhash')>(),
   extractDominantColor: () => '#4a7c59',
 }))
 

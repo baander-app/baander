@@ -1,3 +1,4 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import {
   Music,
@@ -40,12 +41,11 @@ const SelectorBar = styled.div`
   gap: 0.125rem;
   border-radius: var(--radius-lg);
   border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
-  background-color: color-mix(in srgb, #000 20%, transparent);
+  background-color: var(--color-secondary);
   padding: 0.25rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 `
 
-const MediaButton = styled.button<{ $isActive: boolean }>`
+const MediaButton = styled(Button).attrs({ variant: 'ghost' })<{ $isActive: boolean }>`
   display: flex;
   height: 1.75rem;
   width: 1.75rem;
@@ -63,8 +63,8 @@ const MediaButton = styled.button<{ $isActive: boolean }>`
 
   ${({ $isActive }) =>
     $isActive
-      ? `background-color: var(--color-accent); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);`
-      : `&:hover { background-color: color-mix(in srgb, var(--color-accent) 50%, transparent); color: var(--color-foreground); }`}
+      ? `background-color: var(--color-highlight);`
+      : `&:hover { background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent); color: var(--color-foreground); }`}
 `
 
 const IconWrapper = styled.span`

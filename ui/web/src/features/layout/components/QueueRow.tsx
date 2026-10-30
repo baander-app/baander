@@ -14,10 +14,10 @@ const Row = styled.div`
   border-radius: var(--radius-md);
   padding: 0.375rem 0.25rem;
   font-size: 0.875rem;
-  transition: background-color 150ms ease;
+  transition: background-color 60ms ease-out;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
   }
 `
 

@@ -22,7 +22,7 @@ const Grid = styled.div`
 `
 
 const SkeletonCard = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -46,7 +46,7 @@ const SkeletonLine2 = styled.div`
 `
 
 const StatCard = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -116,19 +116,19 @@ export function StatusOverview() {
     <Grid>
       <StatCard>
         <StatLabel>Queued</StatLabel>
-        <StatValue $color="#3b82f5">{queued}</StatValue>
+        <StatValue $color="var(--color-info)">{queued}</StatValue>
       </StatCard>
       <StatCard>
         <StatLabel>Running</StatLabel>
-        <StatValue $color="#f59e0b">{running}</StatValue>
+        <StatValue $color="var(--color-warning)">{running}</StatValue>
       </StatCard>
       <StatCard>
         <StatLabel>Finished</StatLabel>
-        <StatValue $color="#22c55e">{finished}</StatValue>
+        <StatValue $color="var(--color-success)">{finished}</StatValue>
       </StatCard>
       <StatCard>
         <StatLabel>Failed</StatLabel>
-        <StatValue $color="#ef4444">{failed}</StatValue>
+        <StatValue $color="var(--color-destructive)">{failed}</StatValue>
       </StatCard>
       <StatCard>
         <StatLabel>Cancelled</StatLabel>
@@ -136,7 +136,7 @@ export function StatusOverview() {
       </StatCard>
       <StatCard>
         <StatLabel>Active</StatLabel>
-        <StatValue $color="#2563eb">{active}</StatValue>
+        <StatValue $color="var(--color-info)">{active}</StatValue>
       </StatCard>
       <StatCard>
         <StatLabel>Success rate</StatLabel>

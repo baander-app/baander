@@ -100,7 +100,7 @@ const ConfigLabel = styled.span<{ $ok?: boolean }>`
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  ${({ $ok }) => $ok ? 'color: #10b981;' : 'color: var(--color-muted-foreground);'}
+  ${({ $ok }) => $ok ? 'color: var(--color-success);' : 'color: var(--color-muted-foreground);'}
 `
 
 const ConfigDot = styled.span<{ $active?: boolean }>`
@@ -108,7 +108,7 @@ const ConfigDot = styled.span<{ $active?: boolean }>`
   height: 0.375rem;
   width: 0.375rem;
   border-radius: 50%;
-  ${({ $active }) => $active ? 'background: #10b981;' : 'background: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);'}
+  ${({ $active }) => $active ? 'background: var(--color-success);' : 'background: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);'}
 `
 
 const LoadingCard = styled.div`
@@ -126,7 +126,7 @@ const LoadingCard = styled.div`
 
 const ErrorCard = styled.div`
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--color-destructive) 30%, transparent);
+  border: 1px solid var(--color-muted);
   background: var(--color-card);
   padding: 1rem;
 `
@@ -255,12 +255,12 @@ export function MetadataPage() {
               <ProviderRow key={source.name}>
                 <ProviderName>{source.name}</ProviderName>
                 <StatIcon>
-                  <CheckCircle2 size={12} strokeWidth={1.5} style={{ color: '#10b981' }} />
+                  <CheckCircle2 size={12} strokeWidth={1.5} style={{ color: 'var(--color-success)' }} />
                   <StatNum>{source.synced.toLocaleString()}</StatNum>
                 </StatIcon>
                 {source.failed > 0 && (
                   <StatIcon>
-                    <AlertTriangle size={12} strokeWidth={1.5} style={{ color: '#f59e0b' }} />
+                    <AlertTriangle size={12} strokeWidth={1.5} style={{ color: 'var(--color-warning)' }} />
                     <StatNum>{source.failed.toLocaleString()}</StatNum>
                   </StatIcon>
                 )}

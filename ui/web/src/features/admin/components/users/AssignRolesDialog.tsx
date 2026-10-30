@@ -40,7 +40,7 @@ const RoleName = styled.span`
 
 const WarningText = styled.span`
   font-size: 11px;
-  color: #fbbf24;
+  color: var(--color-warning);
   display: flex;
   align-items: center;
   gap: 0.25rem;

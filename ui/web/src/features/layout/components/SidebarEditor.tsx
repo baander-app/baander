@@ -70,7 +70,7 @@ const Sheet = styled.div`
   width: 20rem;
   flex-direction: column;
   background-color: var(--color-card);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 `
 
 const SheetHeader = styled.div`
@@ -104,8 +104,8 @@ const CloseButton = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-    color: var(--color-accent-foreground);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
+    color: var(--color-highlight-foreground);
   }
 `
 

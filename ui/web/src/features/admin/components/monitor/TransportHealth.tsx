@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { useTransportStatus, useFlushFailedQueue } from '../../hooks/use-job-monitor'
@@ -29,7 +30,7 @@ const CardsGrid = styled.div`
 `
 
 const Card = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -58,7 +59,7 @@ const ConsumerDot = styled.div<{ $running: boolean }>`
   height: 0.625rem;
   width: 0.625rem;
   border-radius: 50%;
-  background-color: ${({ $running }) => $running ? '#22c55e' : 'var(--color-destructive)'};
+  background-color: ${({ $running }) => $running ? 'var(--color-success)' : 'var(--color-destructive)'};
 `
 
 const ConsumerName = styled.span`
@@ -67,7 +68,7 @@ const ConsumerName = styled.span`
 `
 
 const FlushCard = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -89,7 +90,11 @@ const FlushActions = styled.div`
 `
 
 const DestructiveButton = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
@@ -99,7 +104,11 @@ const DestructiveButton = styled.button`
 `
 
 const OutlineButton = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
@@ -127,6 +136,10 @@ const NoFailedText = styled.p`
 `
 
 const RetryButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   font-size: 0.875rem;
 `
 
@@ -175,7 +188,7 @@ export function TransportHealth() {
       <CardsGrid>
         <Card>
           <CardLabel>Async Queue</CardLabel>
-          <CardValue $color={data.asyncQueueDepth > 0 ? '#ca8a04' : undefined}>
+          <CardValue $color={data.asyncQueueDepth > 0 ? 'var(--color-warning)' : undefined}>
             {data.asyncQueueDepth}
           </CardValue>
         </Card>

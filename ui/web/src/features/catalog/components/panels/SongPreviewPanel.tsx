@@ -66,8 +66,9 @@ const MetadataGrid = styled.div`
 `
 
 const MetadataRow = styled.div`
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
 `
 
 const MetadataLabel = styled.span`
@@ -75,11 +76,14 @@ const MetadataLabel = styled.span`
 `
 
 const MetadataValue = styled.span`
+  overflow-wrap: anywhere;
+  text-align: right;
   font-size: 0.75rem;
   color: var(--color-foreground);
 `
 
 const MonoValue = styled.span`
+  text-align: right;
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;

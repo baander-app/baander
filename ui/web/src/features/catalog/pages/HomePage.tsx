@@ -1,3 +1,4 @@
+import { Button } from '@/shared/components/ui/button'
 import { useMemo } from 'react'
 import styled from 'styled-components'
 import { useGetAlbumIndex, useGetActivityHistory, useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
@@ -20,22 +21,21 @@ import { useImageBlob } from '@/shared/hooks/use-image-blob'
 
 // ── Shared card styles ──────────────────────────────────
 
-const CoverCard = styled.button`
+const CoverCard = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  display: block;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   width: 9rem;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background-color: var(--color-card);
   text-align: left;
-  transition: all 150ms ease-out;
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
   border: none;
   cursor: pointer;
   padding: 0;
 
-  &:hover {
-    transform: translateY(-0.125rem);
-    box-shadow: var(--shadow-lg);
-  }
 `
 
 const CoverImageArea = styled.div`
@@ -83,13 +83,15 @@ const CoverCardWithRing = styled(CoverCard)<{ $active: boolean }>`
   ${({ $active }) =>
     $active &&
     `
-    box-shadow: 0 0 0 1px var(--color-primary);
+    outline: 1px solid var(--color-ring);
   `}
 `
 
 // ── Playlist card styles ────────────────────────────────
 
-const PlaylistCardButton = styled.button`
+const PlaylistCardButton = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   display: flex;
   width: 10rem;
   flex-shrink: 0;
@@ -99,14 +101,10 @@ const PlaylistCardButton = styled.button`
   background-color: var(--color-card);
   padding: 0.75rem;
   text-align: left;
-  transition: all 150ms ease-out;
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
   border: none;
   cursor: pointer;
 
-  &:hover {
-    transform: translateY(-0.125rem);
-    box-shadow: var(--shadow-lg);
-  }
 `
 
 const PlaylistIconBox = styled.div`

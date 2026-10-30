@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 import styled from 'styled-components'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
@@ -16,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/shared/components/ui/dialog'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Loader2 } from 'lucide-react'
@@ -95,7 +96,7 @@ const Form = styled.form`
 
 const ErrorBox = styled.div`
   border-radius: var(--radius-md);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--color-destructive);
@@ -165,9 +166,9 @@ export function AccountManagement() {
                 <Value>{user?.email}</Value>
               </RowText>
             </RowContent>
-            <Button size="xs" variant="outline" onClick={() => setEmailDialogOpen(true)}>
-              Change
-            </Button>
+            <ChangeEmailDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+              <Button size="xs" variant="outline">Change</Button>
+            </ChangeEmailDialog>
           </Row>
 
           {user?.emailVerifiedAt === null && <EmailVerificationNotice />}
@@ -180,9 +181,9 @@ export function AccountManagement() {
                 <ValueMuted>••••••••</ValueMuted>
               </RowText>
             </RowContent>
-            <Button size="xs" variant="outline" onClick={() => setPasswordDialogOpen(true)}>
-              Change
-            </Button>
+            <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+              <Button size="xs" variant="outline">Change</Button>
+            </ChangePasswordDialog>
           </Row>
 
           {/* Logout */}
@@ -200,13 +201,11 @@ export function AccountManagement() {
         </CardContentStyled>
       </Card>
 
-      <ChangeEmailDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen} />
-      <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen} />
     </>
   )
 }
 
-function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const [email, setEmail] = useState(user?.email ?? '')
@@ -232,6 +231,7 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change email</DialogTitle>
@@ -272,7 +272,7 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   )
 }
 
-function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function ChangePasswordDialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -313,6 +313,7 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Change password</DialogTitle>

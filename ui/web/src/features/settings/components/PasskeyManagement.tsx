@@ -46,7 +46,7 @@ const ErrorText = styled.p`
 
 const SuccessText = styled.p`
   font-size: 0.75rem;
-  color: #16a34a;
+  color: var(--color-success);
 `
 
 const SpinningIcon = styled(Loader2)`

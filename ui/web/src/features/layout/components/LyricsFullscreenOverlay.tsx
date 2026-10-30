@@ -200,7 +200,7 @@ const ProgressBarFill = styled.div`
   height: 100%;
   border-radius: 9999px;
   background-color: color-mix(in srgb, var(--color-foreground) 60%, transparent);
-  transition: width 200ms linear;
+  transition: width 80ms ease-out;
 `
 
 const PlaybackButtons = styled.div`
@@ -225,7 +225,7 @@ const FullscreenLineText = styled.span<{ $active: boolean; $past: boolean }>`
   display: inline-block;
   font-size: 1.5rem;
   line-height: 1.625;
-  transition: all 500ms ease;
+  transition: color 60ms ease-out, opacity 60ms ease-out, transform 120ms ease-out;
 
   @media (min-width: 640px) {
     font-size: 1.875rem;
@@ -237,7 +237,7 @@ const FullscreenLineText = styled.span<{ $active: boolean; $past: boolean }>`
 
   ${({ $active, $past }) =>
     $active
-      ? css`color: var(--color-foreground); font-weight: 700; opacity: 1; transform: scale(1);`
+      ? css`color: var(--color-foreground); font-weight: 600; opacity: 1; transform: scale(1);`
       : $past
         ? css`color: color-mix(in srgb, var(--color-muted-foreground) 50%, transparent); opacity: 0.5; transform: scale(1);`
         : css`color: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent); opacity: 0.3; transform: scale(1);`}

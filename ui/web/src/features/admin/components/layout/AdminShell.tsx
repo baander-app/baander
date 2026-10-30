@@ -7,10 +7,13 @@ import { ErrorBoundary } from '@/shared/components/ErrorBoundary'
 const ShellLayout = styled.div`
   display: flex;
   height: 100vh;
+  @media (max-width: 640px) { flex-direction: column; }
   background-color: var(--color-background);
 `
 
 const MainColumn = styled.div`
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex: 1;
   flex-direction: column;

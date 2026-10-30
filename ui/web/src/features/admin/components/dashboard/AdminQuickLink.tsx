@@ -13,7 +13,7 @@ const Card = styled(Link)`
 
   &:hover {
     border-color: color-mix(in srgb, var(--color-border) 80%, transparent);
-    background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent);
   }
 `
 

@@ -63,11 +63,11 @@ const StationName = styled.p`
 const LiveBadge = styled.span`
   flex-shrink: 0;
   border-radius: 9999px;
-  background-color: color-mix(in srgb, #ef4444 10%, transparent);
+  background-color: var(--color-secondary);
   padding: 0.125rem 0.375rem;
   font-size: 10px;
   font-weight: 500;
-  color: #ef4444;
+  color: var(--color-destructive);
 `
 
 const StationMeta = styled.p`
@@ -104,7 +104,7 @@ const StopButton = styled.button`
   transition: background-color 0.15s;
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 
@@ -127,7 +127,7 @@ const MuteButton = styled.button`
   transition: background-color 0.15s;
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

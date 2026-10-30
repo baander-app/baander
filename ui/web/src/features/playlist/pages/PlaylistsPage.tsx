@@ -62,13 +62,13 @@ const SmartToggle = styled.button<{ $active: boolean }>`
   background: ${({ $active }) =>
     $active ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent'};
   color: ${({ $active }) =>
-    $active ? 'var(--color-primary)' : 'var(--color-muted-foreground)'};
+    $active ? 'var(--color-accent-text)' : 'var(--color-muted-foreground)'};
 
   &:hover {
     background-color: ${({ $active }) =>
       $active
         ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)'
-        : 'color-mix(in srgb, var(--color-accent) 50%, transparent)'};
+        : 'color-mix(in srgb, var(--color-highlight) 50%, transparent)'};
   }
 `
 
@@ -119,8 +119,8 @@ const PlaylistItem = styled.div`
   ${interactiveTransition(['background-color', 'color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-    color: var(--color-accent-foreground);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
+    color: var(--color-highlight-foreground);
   }
 `
 

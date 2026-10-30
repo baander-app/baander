@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
 import styled, { css, keyframes, type DataAttributes } from "styled-components"
-import { focusVisibleRing, interactiveTransition, ariaInvalidRing, darkMode } from "@/shared/theme"
+import { focusVisibleRing, interactiveTransition, ariaInvalidRing } from "@/shared/theme"
 
 const Select = SelectPrimitive.Root
 const SelectValue = SelectPrimitive.Value
@@ -61,13 +61,16 @@ const StyledTrigger = styled(SelectPrimitive.Trigger).attrs<DataAttributes>({ 'd
   display: flex;
   height: 2rem;
   width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
-  border-radius: ${({ theme }) => theme.radii.lg};
+  border-radius: ${({ theme }) => theme.radii.md};
   border: 1px solid var(--color-input);
   background: transparent;
-  padding: 0.375rem 0.625rem;
+  color: var(--color-foreground);
+  padding: 0.25rem 0.625rem;
   font-size: 0.875rem;
+  line-height: 1.4;
   outline: none;
   ${interactiveTransition(['color', 'border-color', 'background-color', 'box-shadow'])}
 
@@ -85,13 +88,6 @@ const StyledTrigger = styled(SelectPrimitive.Trigger).attrs<DataAttributes>({ 'd
 
   ${ariaInvalidRing}
 
-  ${darkMode(`
-    background: color-mix(in srgb, var(--color-input) 30%, transparent);
-    &:disabled {
-      background: color-mix(in srgb, var(--color-input) 80%, transparent);
-    }
-  `)}
-
   ${svgStyles}
 `
 
@@ -102,7 +98,7 @@ const SelectTrigger = React.forwardRef<
   <StyledTrigger ref={ref} {...props}>
     {props.children}
     <SelectPrimitive.Icon asChild>
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}><path d="m6 9 6 6 6-6"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </SelectPrimitive.Icon>
   </StyledTrigger>
 ))
@@ -119,34 +115,34 @@ const StyledContent = styled(SelectPrimitive.Content).attrs<DataAttributes>({ 'd
 }>`
   position: relative;
   z-index: 50;
-  max-height: 24rem;
+  max-height: min(24rem, var(--radix-select-content-available-height));
+  max-width: calc(100vw - 2rem);
   min-width: 8rem;
   overflow: hidden;
-  border-radius: ${({ theme }) => theme.radii.lg};
+  border-radius: ${({ theme }) => theme.radii.xl};
   background: var(--color-popover);
   color: var(--color-popover-foreground);
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  ring: 1px solid color-mix(in srgb, var(--color-foreground) 10%, transparent);
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
   outline: 1px solid color-mix(in srgb, var(--color-foreground) 10%, transparent);
   transform-origin: var(--radix-select-content-transform-origin);
-  transition: all 100ms;
+  transition: opacity 100ms ease-out;
 
   &[data-state="open"] {
     animation:
-      ${contentFadeIn} 150ms ease-out,
-      ${contentZoomIn} 150ms ease-out;
+      ${contentFadeIn} 120ms ease-out,
+      ${contentZoomIn} 120ms ease-out;
   }
 
   &[data-state="closed"] {
     animation:
-      ${contentFadeOut} 150ms ease-out,
-      ${contentZoomOut} 150ms ease-out;
+      ${contentFadeOut} 120ms ease-out,
+      ${contentZoomOut} 120ms ease-out;
   }
 
-  &[data-side="bottom"] { animation: ${slideInFromTop} 150ms ease-out; }
-  &[data-side="left"] { animation: ${slideInFromRight} 150ms ease-out; }
-  &[data-side="right"] { animation: ${slideInFromLeft} 150ms ease-out; }
-  &[data-side="top"] { animation: ${slideInFromBottom} 150ms ease-out; }
+  &[data-side="bottom"] { animation: ${slideInFromTop} 120ms ease-out; }
+  &[data-side="left"] { animation: ${slideInFromRight} 120ms ease-out; }
+  &[data-side="right"] { animation: ${slideInFromLeft} 120ms ease-out; }
+  &[data-side="top"] { animation: ${slideInFromBottom} 120ms ease-out; }
 
   ${(p) => p.$position === "popper" && popperOffsets}
 `
@@ -190,8 +186,8 @@ const StyledItem = styled(SelectPrimitive.Item).attrs<DataAttributes>({ 'data-sl
   outline: none;
 
   &:focus {
-    background: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &[data-disabled] {

@@ -1,3 +1,4 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +11,8 @@ import { SidebarContent } from './SidebarContent'
 import { SidebarPinnedFooter } from './SidebarPinnedFooter'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { Search, Settings2 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip'
+import { Search, Settings2, Menu, X } from 'lucide-react'
 
 const SearchInput = styled(Input)`
   height: 1.75rem;
@@ -24,10 +26,16 @@ const NavSkeleton = styled(Skeleton)`
   border-radius: var(--radius-md);
 `
 
-const SidebarAside = styled.aside`
+const SidebarAside = styled.aside<{ $expanded: boolean }>`
+  width: 14rem;
+  z-index: 30;
+  @media (max-width: 767px) {
+    width: ${({ $expanded }) => $expanded ? '14rem' : '3.5rem'};
+    ${({ $expanded }) => $expanded && 'position: absolute; inset: 0 auto 0 0;'}
+    &[data-collapsed="true"] > :not([data-navigation-toggle]) { display: none; }
+  }
   display: flex;
   height: 100%;
-  width: 14rem;
   flex-shrink: 0;
   flex-direction: column;
   background-color: var(--color-sidebar);
@@ -98,7 +106,7 @@ const ConfigureWrapper = styled.div`
   padding: 0.5rem;
 `
 
-const ConfigureButton = styled.button`
+const ConfigureButton = styled(Button).attrs({ variant: 'ghost' })`
   display: flex;
   width: 100%;
   align-items: center;
@@ -110,12 +118,18 @@ const ConfigureButton = styled.button`
   background: none;
   border: none;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 60ms ease-out, color 60ms ease-out;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-    color: var(--color-accent-foreground);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
+    color: var(--color-highlight-foreground);
   }
+`
+
+const NavigationToggle = styled.div`
+  display: none;
+  padding: 0.5rem;
+  @media (max-width: 767px) { display: block; }
 `
 
 // Admin navigation lives at /admin with its own AdminSidebar.
@@ -123,6 +137,7 @@ const ConfigureButton = styled.button`
 
 export function Sidebar() {
   const [query, setQuery] = useState('')
+  const [navigationExpanded, setNavigationExpanded] = useState(false)
   const navigate = useNavigate()
   const { isLoading } = useSidebarConfig()
   const activeMedia = useMediaModeStore((s) => s.activeMedia)
@@ -147,7 +162,31 @@ export function Sidebar() {
   }
 
   return (
-    <SidebarAside>
+    <SidebarAside
+      $expanded={navigationExpanded}
+      data-collapsed={!navigationExpanded}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          setNavigationExpanded(false)
+          event.currentTarget.querySelector<HTMLButtonElement>('[data-navigation-toggle] button')?.focus()
+        }
+      }}
+      onClickCapture={(event) => {
+        if ((event.target as HTMLElement).closest('a')) setNavigationExpanded(false)
+      }}
+    >
+      <NavigationToggle data-navigation-toggle>
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label={navigationExpanded ? 'Collapse navigation' : 'Expand navigation'} onClick={() => setNavigationExpanded((expanded) => !expanded)}>
+                {navigationExpanded ? <X size={16} /> : <Menu size={16} />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">{navigationExpanded ? 'Collapse navigation' : 'Expand navigation'}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </NavigationToggle>
       {/* Logo */}
       <LogoRow>
         <LogoLink href="/">

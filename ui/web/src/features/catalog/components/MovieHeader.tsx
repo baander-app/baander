@@ -20,16 +20,18 @@ const BackdropImage = styled.img`
   object-fit: cover;
 `
 
-const BackdropGradient = styled.div`
+const BackdropScrim = styled.div`
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, var(--color-background), color-mix(in srgb, var(--color-background) 60%, transparent), transparent);
+  background-color: var(--color-background);
+  opacity: 0.95;
 `
 
 const Content = styled.div`
   position: relative;
   display: flex;
   gap: 1.5rem;
+  flex-wrap: wrap;
   padding: 2rem 1.5rem 1.5rem;
 `
 
@@ -41,7 +43,6 @@ const PosterImage = styled.img`
   aspect-ratio: 2/3;
   width: 12rem;
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 `
 
 const PosterPlaceholder = styled.div`
@@ -51,7 +52,7 @@ const PosterPlaceholder = styled.div`
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
-  background-color: var(--color-surface-3);
+  background-color: var(--color-muted);
 `
 
 const PlaceholderIcon = styled.svg`
@@ -61,6 +62,8 @@ const PlaceholderIcon = styled.svg`
 `
 
 const MetaArea = styled.div`
+  min-width: 0;
+  flex: 1 1 12rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -83,12 +86,12 @@ const Dot = styled.span`
 const StarIcon = styled.svg`
   height: 0.875rem;
   width: 0.875rem;
-  color: #fbbf24;
+  color: var(--color-warning);
 `
 
 const MovieTitle = styled.h1`
   font-size: 1.875rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.025em;
 `
 
@@ -115,7 +118,7 @@ export function MovieHeader({ movie, onPlay }: MovieHeaderProps) {
       {movie.backdropUrl && (
         <BackdropArea>
           <BackdropImage src={movie.backdropUrl} alt="" />
-          <BackdropGradient />
+          <BackdropScrim />
         </BackdropArea>
       )}
 

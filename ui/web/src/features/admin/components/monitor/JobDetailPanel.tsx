@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
 import { toast } from 'sonner'
@@ -84,26 +85,16 @@ const BadgeWrapper = styled.div`
   margin-top: 0.25rem;
 `
 
-// Status color tokens. No --color-success token exists in the theme, so green is
-// expressed via color-mix of a defined local palette value against transparent,
-// mirroring the ExceptionBox pattern. The destructive/amber/blue/purple/muted
-// shades map to existing design tokens where a semantic one exists; the remainder
-// are kept as palette-driven color-mix values rather than raw hex literals.
 const colorMap: Record<string, { bg: string; text: string }> = {
   pending: { bg: 'color-mix(in srgb, var(--color-highlight) 20%, transparent)', text: 'var(--color-highlight-foreground)' },
-  queued: { bg: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', text: 'var(--color-primary)' },
+  queued: { bg: 'var(--color-muted)', text: 'var(--color-accent-text)' },
   running: { bg: 'color-mix(in srgb, var(--color-secondary) 30%, transparent)', text: 'var(--color-secondary-foreground)' },
-  finished: { bg: 'color-mix(in srgb, var(--color-success) 20%, transparent)', text: 'var(--color-success)' },
-  failed: { bg: 'color-mix(in srgb, var(--color-destructive) 20%, transparent)', text: 'var(--color-destructive)' },
+  finished: { bg: 'var(--color-muted)', text: 'var(--color-success)' },
+  failed: { bg: 'var(--color-muted)', text: 'var(--color-destructive)' },
   cancelled: { bg: 'color-mix(in srgb, var(--color-muted-foreground) 20%, transparent)', text: 'var(--color-muted-foreground)' },
 }
 
-// The theme has no --color-success token, so a "success" semantic token is
-// declared here from the established admin palette green (#22c55e, matching the
-// StatusOverview "finished" shade) and exposed as a CSS custom property on the
-// Badge scope. Downstream colorMap references read var(--color-success).
 const Badge = styled.span<{ $bg: string; $text: string }>`
-  --color-success: #22c55e;
   display: inline-flex;
   align-items: center;
   border-radius: 50px;
@@ -122,13 +113,17 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 const CloseButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   margin-left: 1rem;
   display: flex;
   height: 2rem;
   width: 2rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   color: var(--color-muted-foreground);
   transition: background-color 0.15s, color 0.15s;
 
@@ -184,7 +179,7 @@ const ExceptionBox = styled.div`
   margin-top: 1.5rem;
   border-radius: 0.375rem;
   border: 1px solid var(--color-destructive);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 0.75rem;
 `
 
@@ -201,9 +196,13 @@ const ExceptionMessage = styled.p`
 `
 
 const RetryButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   margin-top: 1.5rem;
   width: 100%;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -216,9 +215,13 @@ const RetryButton = styled.button`
 `
 
 const CancelJobButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   margin-top: 1.5rem;
   width: 100%;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
@@ -243,7 +246,11 @@ const ConfirmActions = styled.div`
 `
 
 const CancelBtn = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
@@ -254,7 +261,11 @@ const CancelBtn = styled.button`
 `
 
 const DestructiveBtn = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   background-color: var(--color-destructive);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
@@ -281,7 +292,7 @@ const SkeletonLine = styled.div`
 const ErrorBox = styled.div`
   border-radius: 0.375rem;
   border: 1px solid var(--color-destructive);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 1rem;
 `
 
@@ -298,8 +309,12 @@ const ErrorDetail = styled.p`
 `
 
 const ErrorCloseBtn = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   margin-top: 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;

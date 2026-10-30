@@ -33,7 +33,7 @@ const ViewButton = styled(Button)<{ $isActive: boolean }>`
 
   ${({ $isActive }) =>
     $isActive
-      ? css`color: var(--color-primary);`
+      ? css`color: var(--color-accent-text);`
       : css`color: var(--color-muted-foreground);`}
 `
 

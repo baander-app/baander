@@ -29,7 +29,7 @@ const ProgressTrack = styled.div`
   width: 100%;
   border-radius: 9999px;
   background-color: var(--color-muted);
-  transition: height 150ms ease;
+  transition: height 60ms ease-out;
 `
 
 const ProgressFill = styled.div`
@@ -39,7 +39,7 @@ const ProgressFill = styled.div`
   left: 0;
   border-radius: 9999px;
   background-color: color-mix(in srgb, var(--color-foreground) 60%, transparent);
-  transition: background-color 150ms ease;
+  transition: background-color 60ms ease-out;
 `
 
 const ProgressThumb = styled.div`
@@ -51,7 +51,7 @@ const ProgressThumb = styled.div`
   border-radius: 9999px;
   background-color: var(--color-foreground);
   opacity: 0;
-  transition: opacity 150ms ease;
+  transition: opacity 60ms ease-out;
 `
 
 export function PlayerProgress() {

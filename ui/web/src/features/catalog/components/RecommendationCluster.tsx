@@ -16,7 +16,7 @@ const RecCard = styled.div<{ $isSelected: boolean }>`
   ${({ $isSelected }) =>
     $isSelected &&
     css`
-      outline: 2px solid var(--color-primary);
+      outline: 2px solid var(--color-ring);
       outline-offset: -2px;
     `}
 `

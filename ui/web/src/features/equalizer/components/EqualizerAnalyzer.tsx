@@ -47,7 +47,7 @@ const SpectrumBar = styled.div`
   flex: 1;
   border-top-left-radius: 2px;
   border-top-right-radius: 2px;
-  background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.6);
+  background-color: color-mix(in srgb, var(--color-accent-text) 60%, transparent);
   transition: height 100ms ease-out;
 `
 
@@ -95,7 +95,7 @@ function SpectrumVisualizer({ bars, bands, showCurve }: { bars: number[]; bands:
         >
           <path
             d={curvePath}
-            stroke="hsl(var(--primary))"
+            stroke="var(--color-accent-text)"
             strokeWidth="1.5"
             fill="none"
             opacity={0.8}
@@ -140,8 +140,8 @@ const MeterFill = styled.div<{ $level: number }>`
   transition: width 100ms ease-out;
   background-color: ${(p) => {
     if (p.$level > 80) return 'var(--color-destructive)'
-    if (p.$level > 60) return 'rgba(var(--color-primary-rgb, 0 0 0), 0.8)'
-    return 'rgba(var(--color-primary-rgb, 0 0 0), 0.5)'
+    if (p.$level > 60) return 'color-mix(in srgb, var(--color-accent-text) 80%, transparent)'
+    return 'color-mix(in srgb, var(--color-accent-text) 50%, transparent)'
   }};
 `
 
@@ -179,11 +179,11 @@ const PhaseCanvas = styled.div`
   flex: 1;
   min-height: 0;
   border-radius: var(--radius-md);
-  background-color: rgba(var(--color-muted-rgb, 128 128 128), 0.5);
+  background-color: var(--color-muted);
   overflow: hidden;
 
   svg {
-    color: var(--color-primary);
+    color: var(--color-accent-text);
   }
 `
 
@@ -227,19 +227,22 @@ const HeaderRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
 `
 
 const ModeButtons = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  flex-wrap: wrap;
 `
 
 const VisualizerArea = styled.div`
   position: relative;
   height: 12rem;
   border-radius: var(--radius-lg);
-  background-color: rgba(var(--color-muted-rgb, 128 128 128), 0.3);
+  background-color: var(--color-muted);
   overflow: hidden;
 `
 

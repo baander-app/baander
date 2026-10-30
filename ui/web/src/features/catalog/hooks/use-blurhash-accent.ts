@@ -1,24 +1,26 @@
 import { useEffect } from 'react'
-import { extractDominantColor } from '@/shared/utils/blurhash'
+import { useTheme } from 'styled-components'
+import { extractDominantColor, readableArtworkAccent } from '@/shared/utils/blurhash'
 
-/**
- * Decode a blurhash string and set `--accent-derived` CSS variable on the
- * container ref. Falls back to `--color-primary` when the blurhash is absent
- * or the extracted color is too dark/light/unsaturated.
- */
 export function useBlurhashAccent(
   blurhash: string | null | undefined,
   containerRef: React.RefObject<HTMLElement | null>,
 ): void {
+  const theme = useTheme()
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
 
     const color = extractDominantColor(blurhash)
-    el.style.setProperty('--accent-derived', color ?? 'var(--color-primary)')
+    const colors = theme.colors
+    el.style.setProperty('--accent-derived', color ?? colors.primary)
+    el.style.setProperty('--accent-derived-foreground', color
+      ? readableArtworkAccent(color, [colors.background, colors.card, colors.highlight], colors.accentText)
+      : colors.accentText)
 
     return () => {
       el.style.removeProperty('--accent-derived')
+      el.style.removeProperty('--accent-derived-foreground')
     }
-  }, [blurhash, containerRef])
+  }, [blurhash, containerRef, theme])
 }

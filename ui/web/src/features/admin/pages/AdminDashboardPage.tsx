@@ -70,11 +70,11 @@ const AnomalyCard = styled(Link)<{ $warning?: boolean }>`
   }
 
   ${({ $warning }) => $warning && css`
-    border-color: color-mix(in srgb, #f59e0b 50%, transparent);
-    background: color-mix(in srgb, #f59e0b 5%, transparent);
+    border-color: color-mix(in srgb, var(--color-warning) 50%, transparent);
+    background: var(--color-muted);
 
     &:hover {
-      background: color-mix(in srgb, #f59e0b 15%, transparent);
+      background: var(--color-muted);
     }
   `}
 
@@ -189,7 +189,7 @@ export function AdminDashboardPage() {
         <AnomalyGrid>
           <AnomalyCard to="/admin/media?tab=transcode" $warning={failedCount > 0}>
             <CardHeader>
-              <Activity size={15} strokeWidth={1.5} style={{ color: failedCount > 0 ? '#f59e0b' : 'var(--color-muted-foreground)' }} />
+              <Activity size={15} strokeWidth={1.5} style={{ color: failedCount > 0 ? 'var(--color-warning)' : 'var(--color-muted-foreground)' }} />
               <CardTitle>Failed Transcodes</CardTitle>
               <CardArrow size={14} />
             </CardHeader>
@@ -199,7 +199,7 @@ export function AdminDashboardPage() {
 
           <AnomalyCard to="/admin/analytics?tab=recommendations" $warning={staleRecs}>
             <CardHeader>
-              <AlertTriangle size={15} strokeWidth={1.5} style={{ color: staleRecs ? '#f59e0b' : 'var(--color-muted-foreground)' }} />
+              <AlertTriangle size={15} strokeWidth={1.5} style={{ color: staleRecs ? 'var(--color-warning)' : 'var(--color-muted-foreground)' }} />
               <CardTitle>Recommendations</CardTitle>
               <CardArrow size={14} />
             </CardHeader>
@@ -242,8 +242,8 @@ export function AdminDashboardPage() {
         <SectionTitle>Trends (24h)</SectionTitle>
         <TrendGrid>
           <div><TrendLabel>Jobs Completed</TrendLabel><TrendChart><TrendSparkline data={[]} /></TrendChart></div>
-          <div><TrendLabel>Memory Usage</TrendLabel><TrendChart><TrendSparkline data={[]} color="#f59e0b" /></TrendChart></div>
-          <div><TrendLabel>Play Count</TrendLabel><TrendChart><TrendSparkline data={[]} color="#8b5cf6" /></TrendChart></div>
+          <div><TrendLabel>Memory Usage</TrendLabel><TrendChart><TrendSparkline data={[]} color="var(--color-warning)" /></TrendChart></div>
+          <div><TrendLabel>Play Count</TrendLabel><TrendChart><TrendSparkline data={[]} color="var(--color-accent-text)" /></TrendChart></div>
         </TrendGrid>
       </section>
     </Container>

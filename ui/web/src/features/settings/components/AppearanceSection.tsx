@@ -1,7 +1,9 @@
 import styled from 'styled-components'
+import { Button } from '@/shared/components/ui/button'
+import { MOOD_OPTIONS, ACCENT_OPTIONS } from '@/shared/theme/theme.types'
 import { Card, CardContent } from '@/shared/components/ui/card'
-import { useThemeMood, type ThemeMood } from '../hooks/use-theme-mood'
-import { useAccentColor, type AccentColor } from '../hooks/use-accent-color'
+import { useThemeMood } from '../hooks/use-theme-mood'
+import { useAccentColor } from '../hooks/use-accent-color'
 
 const Section = styled.section`
   display: flex;
@@ -35,23 +37,25 @@ const FieldDescription = styled.p`
 
 const MoodGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
   gap: 0.5rem;
 `
 
-const MoodButton = styled.button<{ $active: boolean }>`
+const MoodButton = styled(Button).attrs({ variant: 'ghost' })<{ $active: boolean }>`
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.375rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid ${props => props.$active ? 'var(--color-primary)' : 'var(--color-border)'};
+  border-radius: var(--radius-md);
+  border: 1px solid ${props => props.$active ? 'var(--color-ring)' : 'var(--color-input-boundary)'};
   padding: 0.5rem;
-  background-color: ${props => props.$active ? 'color-mix(in srgb, var(--color-primary) 10%, transparent)' : 'transparent'};
-  transition: border-color 0.15s, background-color 0.15s;
+  background-color: ${props => props.$active ? 'var(--color-muted)' : 'transparent'};
+  color: var(--color-foreground);
+  min-width: 0;
 
   &:hover {
-    border-color: ${props => props.$active ? 'var(--color-primary)' : 'color-mix(in srgb, var(--color-muted-foreground) 50%, transparent)'};
+    border-color: ${props => props.$active ? 'var(--color-ring)' : 'var(--color-accent-text)'};
   }
 `
 
@@ -81,52 +85,14 @@ const AccentRow = styled.div`
   gap: 0.5rem;
 `
 
-const AccentSwatch = styled.button<{ $active: boolean }>`
+const AccentSwatch = styled(Button).attrs({ variant: 'ghost', size: 'icon' })<{ $active: boolean }>`
+  padding: 0;
   height: 2rem;
   width: 2rem;
   border-radius: 50%;
   border: 2px solid ${props => props.$active ? 'var(--color-foreground)' : 'transparent'};
-  transition: transform 0.15s;
-  transform: ${props => props.$active ? 'scale(1.1)' : 'scale(1)'};
-
-  &:hover {
-    transform: ${props => props.$active ? 'scale(1.1)' : 'scale(1.05)'};
-  }
+  flex-shrink: 0;
 `
-
-const MOOD_OPTIONS: { value: ThemeMood; label: string; preview: { bg: string; fg: string; card: string } }[] = [
-  {
-    value: 'dark',
-    label: 'Dark',
-    preview: { bg: '#000000', fg: '#f0f0f2', card: '#0a0a0b' },
-  },
-  {
-    value: 'warm',
-    label: 'Warm',
-    preview: { bg: '#faf5ee', fg: '#3d3225', card: '#f5ede0' },
-  },
-  {
-    value: 'cool',
-    label: 'Cool',
-    preview: { bg: '#f0f4f8', fg: '#2d3748', card: '#e8edf3' },
-  },
-  {
-    value: 'balanced',
-    label: 'Balanced',
-    preview: { bg: '#f5f5f5', fg: '#2d2d2d', card: '#ebebeb' },
-  },
-]
-
-const ACCENT_COLORS: { value: AccentColor; hex: string }[] = [
-  { value: 'white', hex: '#e4e4e7' },
-  { value: 'blue', hex: '#60a5fa' },
-  { value: 'violet', hex: '#a78bfa' },
-  { value: 'rose', hex: '#fb7185' },
-  { value: 'amber', hex: '#fbbf24' },
-  { value: 'emerald', hex: '#34d399' },
-  { value: 'cyan', hex: '#22d3ee' },
-  { value: 'pink', hex: '#f0abfc' },
-]
 
 export function AppearanceSection() {
   const { mood, setMood } = useThemeMood()
@@ -176,7 +142,7 @@ export function AppearanceSection() {
             </FieldDescription>
           </div>
           <AccentRow>
-            {ACCENT_COLORS.map((accent) => (
+            {ACCENT_OPTIONS.map((accent) => (
               <AccentSwatch
                 key={accent.value}
                 $active={color === accent.value}

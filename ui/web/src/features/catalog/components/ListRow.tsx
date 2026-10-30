@@ -27,12 +27,12 @@ const RowContainer = styled.div<{ $isSelected: boolean; $isPlaying: boolean }>`
       : $isPlaying
         ? css`
           background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-          color: var(--color-primary);
+          color: var(--color-accent-text);
         `
         : css`
           color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
           &:hover {
-            background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+            background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
           }
         `}
 `
@@ -76,7 +76,7 @@ const TitleCell = styled.span<{ $isPlaying: boolean }>`
 
   ${({ $isPlaying }) =>
     $isPlaying &&
-    css`color: var(--color-primary);`}
+    css`color: var(--color-accent-text);`}
 `
 
 const MutedCell = styled.span`
@@ -228,7 +228,7 @@ export function ListRow({song, allSongs, style}: ListRowProps) {
         return (
           <IndexCell key={colId} style={{width}}>
             {isPlaying ? (
-              <Play size={10} fill="currentColor" style={{ marginLeft: 'auto', display: 'inline-block', color: 'var(--color-primary)' }} />
+              <Play size={10} fill="currentColor" style={{ marginLeft: 'auto', display: 'inline-block', color: 'var(--color-accent-text)' }} />
             ) : (
               <>
                 <IndexText>{song.index}</IndexText>

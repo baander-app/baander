@@ -41,7 +41,7 @@ const PageButton = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 
   &:disabled {

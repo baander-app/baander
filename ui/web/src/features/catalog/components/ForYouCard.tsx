@@ -1,25 +1,25 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import type { ForYouSong } from '../hooks/use-for-you-view-model'
 
 // ── Shared card styles (mirror HomePage cover-card primitives) ──
 
-const CoverCard = styled.button`
+const CoverCard = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  display: block;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   width: 9rem;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background-color: var(--color-card);
   text-align: left;
-  transition: all 150ms ease-out;
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
   border: none;
   cursor: pointer;
   padding: 0;
 
-  &:hover {
-    transform: translateY(-0.125rem);
-    box-shadow: var(--shadow-lg);
-  }
 `
 
 const CoverImageArea = styled.div`

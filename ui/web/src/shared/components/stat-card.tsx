@@ -11,6 +11,8 @@ interface StatCardProps {
 }
 
 const Card = styled.div<{ $interactive: boolean }>`
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -21,7 +23,7 @@ const Card = styled.div<{ $interactive: boolean }>`
 
   ${props => props.$interactive && css`
     transition: background-color 0.15s ease;
-    &:hover { background-color: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+    &:hover { background-color: color-mix(in srgb, var(--color-highlight) 30%, transparent); }
   `}
 `
 
@@ -58,7 +60,7 @@ const Value = styled.span`
 `
 
 const dotColors = css<{ $ok: boolean }>`
-  background-color: ${props => props.$ok ? '#10b981' : '#ef4444'};
+  background-color: ${props => props.$ok ? 'var(--color-success)' : 'var(--color-destructive)'};
 `
 
 const StatusDot = styled.span<{ $ok: boolean }>`
@@ -90,7 +92,7 @@ export function StatCard({ label, value, sub, icon: Icon, to, ok }: StatCardProp
       </CardHeader>
       <ValueGroup>
         <Value>{value}</Value>
-        {ok !== undefined && <StatusDot $ok={ok} />}
+        {ok !== undefined && <StatusDot $ok={ok} role="img" aria-label={ok ? "Healthy" : "Unhealthy"} />}
       </ValueGroup>
       {sub && <Sub>{sub}</Sub>}
     </Card>

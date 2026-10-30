@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqProfilesStore, type EqProfile, type EqProfileIcon } from '../stores/eq-profiles-store'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
 import styled, { css } from 'styled-components'
@@ -64,16 +65,15 @@ const CreateForm = styled.div`
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid rgba(var(--color-border-rgb, 128 128 128), 0.5);
+  border-bottom: 1px solid var(--color-border);
 `
 
-const NameInput = styled.input`
+const NameInput = styled(Input)`
   border-radius: var(--radius-md);
   background-color: var(--color-secondary);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
-  border: none;
-  outline: none;
+  border: 1px solid var(--color-input-boundary);
   width: 100%;
 
   &::placeholder {
@@ -84,19 +84,24 @@ const NameInput = styled.input`
 const IconRow = styled.div`
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.375rem;
 `
 
-const IconButton = styled.button<{ $active: boolean }>`
+const IconButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
   padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: none;
 
   ${(p) => p.$active
-    ? css`background-color: var(--color-primary); color: var(--color-primary-foreground);`
+    ? css`
+      background-color: var(--color-primary);
+      color: var(--color-primary-foreground);
+      &:hover { background-color: var(--color-primary-hover); color: var(--color-primary-foreground); }
+    `
     : css`background-color: transparent; &:hover { background-color: var(--color-muted); }`
   }
 `
@@ -124,16 +129,17 @@ const ProfileItem = styled.div<{ $active: boolean }>`
   padding: 0.375rem 0.5rem;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: none;
 
   ${(p) => p.$active
     ? css`
-      background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.1);
-      border: 1px solid rgba(var(--color-primary-rgb, 0 0 0), 0.2);
+      background-color: var(--color-highlight);
+      color: var(--color-highlight-foreground);
+      border: 1px solid var(--color-accent-text);
     `
     : css`
       border: 1px solid transparent;
-      &:hover { background-color: rgba(var(--color-muted-rgb, 128 128 128), 0.5); }
+      &:hover { background-color: var(--color-muted); }
     `
   }
 `
@@ -143,6 +149,7 @@ const ProfileIcon = styled.span`
 `
 
 const ProfileName = styled.span`
+  min-width: 0;
   font-size: 11px;
   font-weight: 500;
   flex: 1;

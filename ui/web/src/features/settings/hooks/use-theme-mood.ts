@@ -1,9 +1,10 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
-export type ThemeMood = 'dark' | 'warm' | 'cool' | 'balanced'
+import { VALID_MOODS, type ThemeMood } from '@/shared/theme/theme.types'
 
-export const VALID_MOODS: ThemeMood[] = ['dark', 'warm', 'cool', 'balanced']
+export { VALID_MOODS }
+export type { ThemeMood }
 const STORAGE_KEY = 'baander-theme-mood'
 
 function getDefaultMood(): ThemeMood {

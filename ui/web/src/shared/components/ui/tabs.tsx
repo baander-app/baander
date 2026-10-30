@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Tabs as TabsPrimitive } from "radix-ui"
 import styled, { css, type DataAttributes } from "styled-components"
-import { focusVisibleRing, interactiveTransition, darkMode } from "@/shared/theme"
+import { focusVisibleRing, interactiveTransition } from "@/shared/theme"
 
 const StyledTabs = styled(TabsPrimitive.Root).attrs<DataAttributes>((p) => ({
   'data-slot': 'tabs',
@@ -25,9 +25,11 @@ const Tabs = React.forwardRef<
 const tabsListBase = css`
   display: inline-flex;
   width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
   align-items: center;
-  justify-content: center;
-  border-radius: ${({ theme }) => theme.radii.lg};
+  justify-content: flex-start;
+  border-radius: ${({ theme }) => theme.radii.md};
   padding: 3px;
   color: var(--color-muted-foreground);
 `
@@ -97,7 +99,7 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
-  color: color-mix(in srgb, var(--color-foreground) 60%, transparent);
+  color: var(--color-muted-foreground);
   outline: none;
   ${interactiveTransition(['color', 'background-color', 'border-color', 'opacity'])}
 
@@ -106,18 +108,12 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   }
 
   ${focusVisibleRing}
+  &:focus-visible { outline-offset: -2px; }
 
   &:disabled {
     pointer-events: none;
     opacity: 0.5;
   }
-
-  ${darkMode(`
-    color: var(--color-muted-foreground);
-    &:hover {
-      color: var(--color-foreground);
-    }
-  `)}
 
   /* Vertical tabs: triggers fill width, left-aligned */
   ${StyledTabs}[data-orientation="vertical"] & {
@@ -126,35 +122,17 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   }
 
   /* Active state within default variant tabs-list */
-  &[data-active] {
+  &[data-state="active"] {
+    transition: none;
     background: var(--color-background);
     color: var(--color-foreground);
   }
 
-  /* Active state within default variant list: shadow */
-  ${StyledTabsList}[data-variant="default"] &[data-active] {
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  }
-
   /* Active state within line variant list: no shadow */
-  ${StyledTabsList}[data-variant="line"] &[data-active] {
+  ${StyledTabsList}[data-variant="line"] &[data-state="active"] {
     box-shadow: none;
     background: transparent;
   }
-
-  ${darkMode(`
-    /* Dark mode active overrides */
-    &[data-active] {
-      border-color: var(--color-input);
-      background: color-mix(in srgb, var(--color-input) 30%, transparent);
-      color: var(--color-foreground);
-    }
-
-    ${StyledTabsList}[data-variant="line"] &[data-active] {
-      border-color: transparent;
-      background: transparent;
-    }
-  `)}
 
   /* After pseudo-element: the underline/indicator bar */
   &::after {
@@ -162,14 +140,14 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
     position: absolute;
     background: var(--color-foreground);
     opacity: 0;
-    transition: opacity var(--duration-hover) ease-out;
+    transition: none;
   }
 
   /* Horizontal indicator: bottom bar */
   ${StyledTabs}[data-orientation="horizontal"] &::after {
     left: 0;
     right: 0;
-    bottom: -5px;
+    bottom: 0;
     height: 2px;
   }
 
@@ -177,12 +155,12 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   ${StyledTabs}[data-orientation="vertical"] &::after {
     top: 0;
     bottom: 0;
-    right: -0.25rem;
+    right: 0;
     width: 2px;
   }
 
   /* Line variant: show indicator when active */
-  ${StyledTabsList}[data-variant="line"] &[data-active]::after {
+  ${StyledTabsList}[data-variant="line"] &[data-state="active"]::after {
     opacity: 1;
   }
 

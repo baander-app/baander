@@ -23,7 +23,7 @@ const stateColor: Record<SessionState, string> = {
   preparing: 'var(--color-highlight)',
   active: 'var(--color-highlight)',
   paused: 'var(--color-muted-foreground)',
-  completed: '#10b981',
+  completed: 'var(--color-success)',
   failed: 'var(--color-destructive)',
   cancelled: 'var(--color-muted-foreground)',
 }

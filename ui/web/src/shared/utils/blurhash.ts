@@ -10,13 +10,21 @@ export function decodeBlurhash(
     if (!blurhash || blurhash.length < 6) return null
     const pixels = decode(blurhash, width, height)
 
-    // Sample the center pixel as representative color
-    const centerIndex = (Math.floor(height / 2) * width + Math.floor(width / 2)) * 4
-    const r = Math.round(pixels[centerIndex])
-    const g = Math.round(pixels[centerIndex + 1])
-    const b = Math.round(pixels[centerIndex + 2])
-
-    return { r, g, b }
+    let selected = { r: pixels[0], g: pixels[1], b: pixels[2] }
+    let highestSaturation = -1
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i]
+      const g = pixels[i + 1]
+      const b = pixels[i + 2]
+      const max = Math.max(r, g, b) / 255
+      const min = Math.min(r, g, b) / 255
+      const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(max + min - 1))
+      if (saturation > highestSaturation) {
+        highestSaturation = saturation
+        selected = { r, g, b }
+      }
+    }
+    return selected
   } catch {
     return null
   }
@@ -54,4 +62,37 @@ export function extractDominantColor(blurhash: string | null | undefined): strin
   if (l < 0.1 || l > 0.9 || s < 0.1) return null
 
   return rgbToHex(r, g, b)
+}
+
+
+function channels(hex: string): number[] {
+  return [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16))
+}
+
+/** WCAG contrast for opaque sRGB colors. */
+export function colorContrast(first: string, second: string): number {
+  const luminance = (hex: string) => {
+    const rgb = channels(hex).map((value) => {
+      const channel = value / 255
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    })
+    return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+  }
+  const a = luminance(first)
+  const b = luminance(second)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
+/** Preserve the artwork hue while finding readable text on the supplied surfaces. */
+export function readableArtworkAccent(color: string, backgrounds: string[], fallback: string): string {
+  if (backgrounds.every((background) => colorContrast(color, background) >= 4.5)) return color
+  const rgb = channels(color)
+  for (let step = 1; step <= 100; step++) {
+    for (const target of [255, 0]) {
+      const mixed = rgb.map((value) => Math.round(value + (target - value) * step / 100))
+      const candidate = rgbToHex(mixed[0], mixed[1], mixed[2])
+      if (backgrounds.every((background) => colorContrast(candidate, background) >= 4.5)) return candidate
+    }
+  }
+  return fallback
 }

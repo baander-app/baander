@@ -16,7 +16,7 @@ const Form = styled.form`
 
 const ErrorAlert = styled.div`
   border-radius: var(--radius-md);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--color-destructive);
@@ -49,7 +49,7 @@ const ForgotLink = styled(Link)`
   display: inline-block;
   margin-top: 0.375rem;
   font-size: 0.75rem;
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   text-decoration: none;
 
   &:hover {

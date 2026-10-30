@@ -7,7 +7,7 @@ interface SuccessFailureChartProps {
 function getSegmentColor(status: string): string {
   switch (status) {
     case 'finished':
-      return '#10b981'
+      return 'var(--color-success)'
     case 'failed':
       return 'var(--color-destructive)'
     case 'cancelled':
@@ -31,7 +31,7 @@ function getSegmentLabel(status: string): string {
 }
 
 const Card = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;

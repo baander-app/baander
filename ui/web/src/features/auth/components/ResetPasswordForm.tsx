@@ -89,7 +89,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   return (
     <Form onSubmit={handleSubmit}>
       {error && (
-        <ErrorAlert role="alert">
+        <ErrorAlert role="alert" id="reset-error">
           {error}
         </ErrorAlert>
       )}
@@ -127,6 +127,8 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         </Label>
         <Input
           id="reset-confirm-password"
+          aria-invalid={error !== null && password !== confirmPassword}
+          aria-describedby={error ? "reset-error" : undefined}
           type="password"
           required
           maxLength={PASSWORD_MAX_LENGTH}

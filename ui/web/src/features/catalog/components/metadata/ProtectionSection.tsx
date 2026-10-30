@@ -49,13 +49,13 @@ const LockButton = styled.button<{ $isLocked: boolean }>`
   text-align: left;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
   }
 
   ${({ $isLocked }) =>
     $isLocked &&
     css`
-      background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+      background-color: color-mix(in srgb, var(--color-highlight) 30%, transparent);
     `}
 `
 
@@ -70,7 +70,7 @@ const LockStatus = styled.span<{ $isLocked: boolean }>`
   ${({ $isLocked }) =>
     $isLocked
       ? css`
-        color: var(--color-primary);
+        color: var(--color-accent-text);
         font-weight: 500;
       `
       : css`

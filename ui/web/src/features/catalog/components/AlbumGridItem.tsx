@@ -1,26 +1,23 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { useCallback } from 'react'
-import { Play } from 'lucide-react'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { AlbumContextMenu } from './menus/AlbumContextMenu'
 import { usePlayAlbum } from '../hooks/use-play-album'
-import { focusVisibleRing } from '@/shared/theme'
 
-const CardButton = styled.button`
+const CardButton = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  padding: 0;
+  border: none;
+  display: block;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background-color: var(--color-card);
   text-align: left;
-  transition: all 150ms;
-  ${focusVisibleRing}
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-  }
 `
 
 const CoverArea = styled.div`
@@ -44,34 +41,6 @@ const CoverPlaceholder = styled.div`
 
 const PlaceholderIcon = styled.svg`
   color: color-mix(in srgb, var(--color-muted-foreground) 20%, transparent);
-`
-
-const HoverOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: transparent;
-  opacity: 0;
-  transition: all 150ms;
-
-  ${CardButton}:hover & {
-    background-color: rgba(0, 0, 0, 0.3);
-    opacity: 1;
-  }
-`
-
-const PlayButton = styled.div`
-  display: flex;
-  height: 2.5rem;
-  width: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background-color: var(--color-primary);
-  color: var(--color-primary-foreground);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 `
 
 const InfoArea = styled.div`
@@ -134,12 +103,6 @@ export function AlbumGridItem({ publicId, title, artistName, imageUrl }: AlbumGr
             </PlaceholderIcon>
           </CoverPlaceholder>
         )}
-        {/* Hover play button */}
-        <HoverOverlay>
-          <PlayButton>
-            <Play size={18} fill="currentColor" />
-          </PlayButton>
-        </HoverOverlay>
       </CoverArea>
 
       {/* Info */}

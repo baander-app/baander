@@ -1,6 +1,8 @@
+import { Button } from '@/shared/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip'
 import styled, { css } from 'styled-components'
-import { useEffect, useState } from 'react'
-import { ListMusic, FileText, Info, Pencil } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { ListMusic, FileText, Info, Pencil, X } from 'lucide-react'
 import { useContextPanelStore } from '../stores/context-panel-store'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/shared/components/ui/tabs'
 import { Separator } from '@/shared/components/ui/separator'
@@ -30,7 +32,7 @@ const PanelTabTrigger = styled(TabsTrigger)`
   font-size: 0.75rem;
   background: transparent !important;
 
-  &[data-active] {
+  &[data-state="active"] {
     background: transparent !important;
   }
 
@@ -56,6 +58,13 @@ const PanelTabsContent = styled(TabsContent)<{ $scrollable?: boolean }>`
 
 const PanelAside = styled.aside`
   position: relative;
+  @media (max-width: 1023px) {
+    position: absolute;
+    inset: 0 0 0 auto;
+    z-index: 20;
+    max-width: calc(100% - 3.5rem);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  }
   display: flex;
   height: 100%;
   flex-shrink: 0;
@@ -186,15 +195,34 @@ function ResizeHandle({ width, onWidthChange }: { width: number; onWidthChange: 
 }
 
 export function ContextPanel() {
+  const closeRef = useRef<HTMLButtonElement>(null)
   const mode = useContextPanelStore((s) => s.mode)
   const activeTab = useContextPanelStore((s) => s.activeTab)
   const isOpen = useContextPanelStore((s) => s.isOpen)
+  const setOpen = useContextPanelStore((s) => s.setOpen)
   const width = useContextPanelStore((s) => s.width)
   const setActiveTab = useContextPanelStore((s) => s.setActiveTab)
   const setWidth = useContextPanelStore((s) => s.setWidth)
 
   // Initialize notification fetching
   useNotifications()
+
+  useEffect(() => {
+    const narrow = window.matchMedia('(max-width: 1023px)')
+    const closeWhenConstrained = () => { if (narrow.matches) setOpen(false) }
+    closeWhenConstrained()
+    narrow.addEventListener('change', closeWhenConstrained)
+    return () => narrow.removeEventListener('change', closeWhenConstrained)
+  }, [setOpen])
+
+  useEffect(() => {
+    if (!isOpen || !window.matchMedia('(max-width: 1023px)').matches) return
+    const previousFocus = document.activeElement
+    closeRef.current?.focus()
+    return () => {
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus()
+    }
+  }, [isOpen])
 
   const maxAvailable = useMaxAvailableWidth()
   const effectiveMax = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, maxAvailable))
@@ -205,7 +233,9 @@ export function ContextPanel() {
   const panelWidth = mode === 'compact' ? 280 : Math.min(width, effectiveMax)
 
   return (
-    <PanelAside style={{ width: panelWidth }}>
+    <PanelAside style={{ width: panelWidth }} onKeyDown={(event) => {
+      if (event.key === 'Escape') { event.stopPropagation(); setOpen(false) }
+    }}>
       {mode !== 'compact' && <ResizeHandle width={width} onWidthChange={(w) => setWidth(Math.min(w, effectiveMax))} />}
 
       {/* Panel header — notification bell replaces "Now Playing" text */}
@@ -216,6 +246,16 @@ export function ContextPanel() {
           <div />
         )}
         <HeaderActions>
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button ref={closeRef} variant="ghost" size="icon-xs" aria-label="Close context panel" onClick={() => setOpen(false)}>
+                  <X size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Close context panel</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <DevicePicker />
           <NotificationBell />
           <NotificationPopout />
@@ -227,19 +267,19 @@ export function ContextPanel() {
       <ExpandedTabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabBarWrapper>
           <FullWidthTabsList variant="line">
-            <PanelTabTrigger value="queue">
+            <PanelTabTrigger value="queue" aria-label="Queue">
               <ListMusic size={12} />
               <TabLabel>Queue</TabLabel>
             </PanelTabTrigger>
-            <PanelTabTrigger value="lyrics">
+            <PanelTabTrigger value="lyrics" aria-label="Lyrics">
               <FileText size={12} />
               <TabLabel>Lyrics</TabLabel>
             </PanelTabTrigger>
-            <PanelTabTrigger value="details">
+            <PanelTabTrigger value="details" aria-label="Details">
               <Info size={12} />
               <TabLabel>Details</TabLabel>
             </PanelTabTrigger>
-            <PanelTabTrigger value="info">
+            <PanelTabTrigger value="info" aria-label="Edit">
               <Pencil size={12} />
               <TabLabel>Edit</TabLabel>
             </PanelTabTrigger>

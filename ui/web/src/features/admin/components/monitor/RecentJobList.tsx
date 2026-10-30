@@ -30,7 +30,7 @@ const Row = styled.div`
   font-size: 13px;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: color-mix(in srgb, var(--color-accent) 20%, transparent); }
+  &:hover { background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent); }
 `
 
 const LeftGroup = styled.div`

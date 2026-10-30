@@ -75,7 +75,7 @@ const SectionsGrid = styled.div`
 `
 
 const SectionSkeleton = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
 `

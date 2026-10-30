@@ -1,6 +1,7 @@
 import * as React from 'react';
 import styled from 'styled-components';
 import { Switch as SwitchPrimitive } from 'radix-ui';
+import { focusVisibleRing } from '@/shared/theme';
 
 const StyledSwitch = styled(SwitchPrimitive.Root)`
   display: inline-flex;
@@ -12,7 +13,7 @@ const StyledSwitch = styled(SwitchPrimitive.Root)`
   border-radius: 9999px;
   border: 2px solid transparent;
   transition: background-color 60ms ease-out;
-  &:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-ring), 0 0 0 4px var(--color-background); }
+  ${focusVisibleRing}
   &:disabled { cursor: not-allowed; opacity: 0.5; }
   &[data-state="checked"] { background-color: var(--color-primary); }
   &[data-state="unchecked"] { background-color: var(--color-input); }
@@ -20,14 +21,13 @@ const StyledSwitch = styled(SwitchPrimitive.Root)`
 
 const StyledThumb = styled(SwitchPrimitive.Thumb)`
   display: block;
-  height: 1rem;
-  width: 1rem;
+  height: 0.875rem;
+  width: 0.875rem;
   border-radius: 9999px;
   background-color: var(--color-background);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   pointer-events: none;
   transition: transform 60ms ease-out;
-  &[data-state="checked"] { transform: translateX(1rem); }
+  &[data-state="checked"] { transform: translateX(1.125rem); background-color: var(--color-primary-foreground); }
   &[data-state="unchecked"] { transform: translateX(0); }
 `;
 

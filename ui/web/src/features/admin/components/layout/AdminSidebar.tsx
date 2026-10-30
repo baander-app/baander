@@ -2,7 +2,7 @@ import styled, { css } from 'styled-components'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { ArrowLeft } from 'lucide-react'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 interface NavItem {
   to: string
@@ -29,6 +29,13 @@ const Sidebar = styled.aside`
   flex-direction: column;
   border-right: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   background-color: var(--color-sidebar);
+
+  @media (max-width: 640px) {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    border-right: 0;
+  }
 `
 
 const BrandBar = styled.div`
@@ -53,6 +60,11 @@ const BrandText = styled.span`
 `
 
 const Nav = styled.nav`
+  @media (max-width: 640px) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
   flex: 1;
   padding: 0.5rem 0.25rem;
   overflow-y: auto;
@@ -64,22 +76,24 @@ const Nav = styled.nav`
 `
 
 const NavLinkStyled = styled(NavLink)<{ $active: boolean }>`
+  text-decoration: none;
   display: block;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
   font-size: 13px;
+  ${focusVisibleRing}
   ${interactiveTransition(['color', 'background-color'])}
 
   ${({ $active }) => $active
     ? css`
-        background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-        color: var(--color-primary);
+        background-color: var(--color-muted);
+        color: var(--color-accent-text);
         font-weight: 500;
       `
     : css`
         color: var(--color-muted-foreground);
         &:hover {
-          background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
+          background-color: var(--color-muted);
           color: var(--color-foreground);
         }
       `
@@ -92,18 +106,20 @@ const BottomSection = styled.div`
 `
 
 const BackLink = styled(NavLink)`
+  text-decoration: none;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   padding: 0.375rem 0.625rem;
   font-size: 13px;
   color: var(--color-muted-foreground);
+  ${focusVisibleRing}
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-    color: var(--color-accent-foreground);
+    background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
+    color: var(--color-highlight-foreground);
   }
 `
 

@@ -45,23 +45,19 @@ const ResponsiveGrid = styled.div`
   @media (min-width: 1280px) { grid-template-columns: repeat(6, 1fr); }
 `
 
-const GenreButton = styled.button`
+const GenreButton = styled(Button).attrs({ variant: 'ghost' })`
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   display: flex;
   height: 5rem;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-lg);
   background-color: var(--color-card);
-  transition: all 150ms;
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
   ${focusVisibleRing}
   border: none;
   cursor: pointer;
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-  }
 `
 
 const GenreName = styled.p`

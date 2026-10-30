@@ -1,106 +1,118 @@
-import { test, expect, spaNavigate } from '../fixtures'
-import { main, untilLoaded } from '../selectors'
+import { test, expect, spaNavigate, authenticate } from '../fixtures'
+import { main } from '../selectors'
 
 test.describe('Settings page', () => {
-  test('renders settings heading and content', async ({ asAdmin: page }) => {
+  test.beforeEach(async ({ asAdmin: page }) => {
     await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    await expect(main(page).getByRole('heading', { name: /settings/i })).toBeVisible()
+    await expect(main(page).getByRole('heading', { name: 'Settings', exact: true, level: 1 })).toBeVisible()
   })
 
-  test('shows audio section', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    await expect(main(page).getByText(/audio/i)).toBeVisible()
-  })
-
-  test('shows security section', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    await expect(main(page).getByText(/security/i)).toBeVisible()
-  })
-
-  test('shows about section', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    await expect(main(page).getByText(/about/i)).toBeVisible()
-  })
-
-  test('volume normalization toggle works', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    const toggle = main(page).getByRole('switch', { name: /volume normalization/i })
-    await expect(toggle).toBeVisible()
-
-    await toggle.click()
-    await page.waitForTimeout(200)
-
-    // Toggle should flip state
-    await expect(toggle).toBeVisible()
-  })
-
-  test('LUFS target select is visible', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    const lufsSelect = main(page).locator('select[aria-label="LUFS Target"]')
-      .or(main(page).locator('select').filter({ has: page.locator('option[value="-14"]') }))
-    if (await lufsSelect.isVisible().catch(() => false)) {
-      await lufsSelect.selectOption('-16')
-      await page.waitForTimeout(200)
-      await expect(main(page)).toBeVisible()
+  test('shows audio, appearance, account, security, devices and about sections', async ({ asAdmin: page }) => {
+    for (const name of ['Audio', 'Appearance', 'Account', 'Security', 'Devices', 'About']) {
+      await expect(main(page).getByRole('heading', { name, exact: true })).toBeVisible()
     }
   })
 
-  test('open EQ button links to equalizer page', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    const eqLink = main(page).getByRole('link', { name: /open eq/i })
-      .or(main(page).getByRole('button', { name: /open eq/i }))
-    if (await eqLink.isVisible().catch(() => false)) {
-      await eqLink.click()
-      await page.waitForTimeout(500)
-      await expect(page).toHaveURL(/\/equalizer/, { timeout: 5_000 })
+  test('volume normalization toggles its checked state', async ({ asAdmin: page }) => {
+    const toggle = main(page).getByRole('switch', { name: 'Volume normalization' })
+    const initial = await toggle.getAttribute('aria-checked')
+    expect(['true', 'false']).toContain(initial)
+    try {
+      await toggle.click()
+      await expect(toggle).toHaveAttribute('aria-checked', initial === 'true' ? 'false' : 'true')
+    } finally {
+      if (await toggle.getAttribute('aria-checked') !== initial) await toggle.click()
     }
   })
 
-  test('passkey management section is visible', async ({ asAdmin: page }) => {
-    await spaNavigate(page)('/settings')
-    await untilLoaded(main(page)).catch(() => {})
-
-    const passkeySection = main(page).getByText(/passkey/i)
-    if (await passkeySection.isVisible().catch(() => false)) {
-      await expect(passkeySection).toBeVisible()
+  test('LUFS target uses the current select control', async ({ asAdmin: page }) => {
+    const toggle = main(page).getByRole('switch', { name: 'Volume normalization' })
+    const enabled = await toggle.getAttribute('aria-checked') === 'true'
+    if (!enabled) await toggle.click()
+    const select = main(page).getByRole('combobox').filter({ hasText: /LUFS/ })
+    const original = await select.innerText()
+    try {
+      await select.click()
+      await page.getByRole('option', { name: '-16 LUFS (Apple Music)', exact: true }).click()
+      await expect(select).toHaveText('-16 LUFS (Apple Music)')
+    } finally {
+      await select.click()
+      await page.getByRole('option', { name: original, exact: true }).click()
+      if (!enabled) await toggle.click()
     }
+  })
+
+  test('open EQ reaches the equalizer', async ({ asAdmin: page }) => {
+    await main(page).getByRole('link', { name: 'Open EQ', exact: true }).click()
+    await expect(page).toHaveURL(/\/equalizer$/)
+    await expect(main(page).getByRole('button', { name: 'Toggle audio system info', exact: true })).toBeVisible()
+  })
+
+  test('passkey management controls are available', async ({ asAdmin: page }) => {
+    await expect(main(page).getByText('Passkeys', { exact: true })).toBeVisible()
+    await expect(main(page).getByRole('button', { name: 'Add', exact: true })).toBeVisible()
   })
 })
 
-test.describe('Layout preferences API', () => {
-  test('PUT /api/user/layout-preferences does not return 404', async ({ asAdmin: page }) => {
-    const result = await page.evaluate(async () => {
-      const res = await fetch('/api/user/layout-preferences/', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload: { mode: 'compact', activeTab: 'details' }, version: 1 }),
-      })
-      return res.status
-    })
+test('appearance choices persist through navigation and reload', async ({ page }) => {
+  const reads = Promise.all(['theme-mood', 'accent-color'].map((endpoint) =>
+    page.waitForResponse((response) => response.url().includes(`/api/user/${endpoint}/`) && response.request().method() === 'GET')))
+  await authenticate(page)
+  await reads
+  await spaNavigate(page)('/settings')
+  const original = await page.locator('html').evaluate((root) => ({
+    mood: root.getAttribute('data-theme')!, accent: root.getAttribute('data-accent')!,
+  }))
+  const choose = async (kind: 'theme' | 'accent', value: string) => {
+    const endpoint = kind === 'theme' ? 'theme-mood' : 'accent-color'
+    const response = page.waitForResponse((result) => result.url().includes(`/api/user/${endpoint}/`) && result.request().method() === 'PUT')
+    const label = kind === 'theme'
+      ? `Select ${value[0].toUpperCase()}${value.slice(1)} theme`
+      : `Select ${value} accent color`
+    await page.getByRole('button', { name: label, exact: true }).click()
+    expect((await response).ok()).toBe(true)
+    await expect(page.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
+  }
+  try {
+    for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
+      await choose('theme', mood)
+      await expect(page.locator('html')).toHaveAttribute('data-theme', mood)
+    }
+    for (const accent of ['white', 'violet', 'amber']) {
+      await choose('accent', accent)
+      await expect(page.locator('html')).toHaveAttribute('data-accent', accent)
+    }
+    await spaNavigate(page)('/music')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'balanced')
+    await expect(page.locator('html')).toHaveAttribute('data-accent', 'amber')
+    await page.reload()
+    await expect(page.locator('main').getByRole('heading', { name: 'Home', exact: true, level: 1 })).toBeVisible()
+    await spaNavigate(page)('/settings')
+    await expect(page.getByRole('button', { name: 'Select Balanced theme' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Select amber accent color' })).toHaveAttribute('aria-pressed', 'true')
+  } finally {
+    await spaNavigate(page)('/settings')
+    await choose('theme', original.mood)
+    await choose('accent', original.accent)
+  }
+})
 
-    expect(result).not.toBe(404)
-  })
-
-  test('GET /api/user/layout-preferences does not return 404', async ({ asAdmin: page }) => {
-    const status = await page.evaluate(async () => {
-      const res = await fetch('/api/user/layout-preferences/')
-      return res.status
-    })
-
-    expect(status).not.toBe(404)
-  })
+test('failed appearance save retains local selection', async ({ asAdmin: page }) => {
+  await spaNavigate(page)('/settings')
+  const original = await page.locator('html').getAttribute('data-theme')
+  const target = original === 'warm' ? 'cool' : 'warm'
+  await page.route('**/api/user/theme-mood/', async (route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, json: { error: { message: 'Fixture unavailable' } } })
+    : route.continue())
+  try {
+    await page.getByRole('button', { name: `Select ${target[0].toUpperCase()}${target.slice(1)} theme` }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', target)
+    await spaNavigate(page)('/music')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', target)
+  } finally {
+    await spaNavigate(page)('/settings')
+    await page.getByRole('button', { name: `Select ${original![0].toUpperCase()}${original!.slice(1)} theme` }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', original!)
+    await page.unroute('**/api/user/theme-mood/')
+  }
 })

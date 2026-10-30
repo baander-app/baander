@@ -60,7 +60,7 @@ const LoadingCard = styled.div`
 
 const ErrorCard = styled.div`
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--color-destructive) 30%, transparent);
+  border: 1px solid var(--color-muted);
   background: var(--color-card);
   padding: 1rem;
 `

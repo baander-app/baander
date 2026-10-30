@@ -15,7 +15,7 @@ import {
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { toast } from 'sonner'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 interface DuplicateGroupCardProps {
   group: DuplicateGroupType
@@ -34,10 +34,10 @@ function getConfidenceLabel(confidence: number): string {
 }
 
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.95) return '#10b981'
-  if (confidence >= 0.85) return '#3b82f6'
-  if (confidence >= 0.75) return '#f59e0b'
-  return '#f97316'
+  if (confidence >= 0.95) return 'var(--color-success)'
+  if (confidence >= 0.85) return 'var(--color-info)'
+  if (confidence >= 0.75) return 'var(--color-warning)'
+  return 'var(--color-warning)'
 }
 
 const Card = styled.div`
@@ -153,11 +153,15 @@ const TargetHint = styled.p`
 `
 
 const TargetButton = styled.button<{ $selected: boolean }>`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   width: 100%;
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  border-radius: var(--radius-lg, 0.5rem);
+  border-radius: var(--radius-md);
   border: 1px solid;
   padding: 0.75rem;
   text-align: left;
@@ -166,7 +170,7 @@ const TargetButton = styled.button<{ $selected: boolean }>`
   ${({ $selected }) => $selected
     ? css`
         border-color: var(--color-primary);
-        background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
+        background-color: var(--color-muted);
       `
     : css`
         border-color: var(--color-border);

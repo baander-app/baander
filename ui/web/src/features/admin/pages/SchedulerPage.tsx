@@ -28,6 +28,8 @@ const HeaderRow = styled.div`
 `
 
 const DividerStack = styled.div`
+  overflow-x: auto;
+  & > div { min-width: 48rem; }
   & > div + div {
     border-top: 1px solid var(--color-border);
   }

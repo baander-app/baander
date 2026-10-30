@@ -12,7 +12,7 @@ const Row = styled.div`
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

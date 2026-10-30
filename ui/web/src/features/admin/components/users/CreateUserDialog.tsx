@@ -75,16 +75,16 @@ export function CreateUserDialog({ open, onOpenChange, canAssignRoles }: CreateU
         </DialogHeader>
         <Form onSubmit={handleSubmit}>
           <FieldGroup>
-            <Label>Email</Label>
-            <StyledInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Label htmlFor="createuserdialog-email">Email</Label>
+            <StyledInput id="createuserdialog-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </FieldGroup>
           <FieldGroup>
-            <Label>Name</Label>
-            <StyledInput value={name} onChange={(e) => setName(e.target.value)} required />
+            <Label htmlFor="createuserdialog-name">Name</Label>
+            <StyledInput id="createuserdialog-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </FieldGroup>
           <FieldGroup>
-            <Label>Password</Label>
-            <StyledInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+            <Label htmlFor="createuserdialog-password">Password</Label>
+            <StyledInput id="createuserdialog-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
           </FieldGroup>
           {canAssignRoles && (
             <FieldGroup>

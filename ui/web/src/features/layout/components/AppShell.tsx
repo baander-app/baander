@@ -30,12 +30,14 @@ const Shell = styled.div`
 `
 
 const ShellRow = styled.div`
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
 `
 
 const MainContent = styled.main`
+  min-width: 0;
   flex: 1;
   overflow-y: auto;
 `

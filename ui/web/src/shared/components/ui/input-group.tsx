@@ -3,7 +3,6 @@ import styled, { css } from 'styled-components';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { darkMode } from '@/shared/theme';
 
 const StyledInputGroup = styled.div`
   position: relative;
@@ -12,32 +11,27 @@ const StyledInputGroup = styled.div`
   width: 100%;
   min-width: 0;
   align-items: center;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-input);
   transition: background-color var(--duration-hover) ease-out, border-color var(--duration-hover) ease-out;
   outline: none;
   &:has(:disabled) { background-color: color-mix(in srgb, var(--color-input) 50%, transparent); opacity: 0.5; }
   &:has([data-slot="input-group-control"]:focus-visible) {
     border-color: var(--color-ring);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 50%, transparent);
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
   }
   &:has([data-slot][aria-invalid="true"]) {
     border-color: var(--color-destructive);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive) 20%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-destructive);
   }
   &:has(> [data-align="block-end"]) { height: auto; flex-direction: column; }
   &:has(> [data-align="block-start"]) { height: auto; flex-direction: column; }
+  &:has(textarea) { height: auto; }
   &:has(> [data-align="block-end"]) > input { padding-top: 0.75rem; }
   &:has(> [data-align="block-start"]) > input { padding-bottom: 0.75rem; }
   &:has(> [data-align="inline-end"]) > input { padding-right: 0.375rem; }
   &:has(> [data-align="inline-start"]) > input { padding-left: 0.375rem; }
-  ${darkMode(`
-    background-color: color-mix(in srgb, var(--color-input) 30%, transparent);
-    &:has(:disabled) { background-color: color-mix(in srgb, var(--color-input) 80%, transparent); }
-    &:has([data-slot][aria-invalid="true"]) {
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive) 40%, transparent);
-    }
-  `)}
 `;
 
 function InputGroup({ ...props }: React.ComponentProps<'div'>) {
@@ -135,17 +129,14 @@ const controlOverride = css`
   border: none;
   background: transparent;
   box-shadow: none;
-  &:focus-visible { box-shadow: none; }
+  &:focus-visible { box-shadow: none; outline: none; }
   &:disabled { background: transparent; }
   &[aria-invalid] { box-shadow: none; }
-  ${darkMode(`
-    background: transparent;
-    &:disabled { background: transparent; }
-  `)}
 `;
 
 const StyledInput = styled(Input)`
   ${controlOverride}
+  height: 100%;
 `;
 
 function InputGroupInput({ ...props }: React.ComponentProps<'input'>) {

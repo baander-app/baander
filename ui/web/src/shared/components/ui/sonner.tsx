@@ -9,7 +9,8 @@ export function Toaster() {
           background: 'var(--color-card)',
           color: 'var(--color-card-foreground)',
           border: '1px solid var(--color-border)',
-          boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+          borderRadius: 'var(--radius-xl)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
         },
       }}
       style={{

@@ -1,23 +1,22 @@
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { useCallback } from 'react'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { ArtistContextMenu } from './menus/ArtistContextMenu'
 import { usePlayArtist } from '../hooks/use-play-artist'
-import { focusVisibleRing } from '@/shared/theme'
 
-const CardButton = styled.button`
+const CardButton = styled(Button).attrs({ variant: 'ghost' })`
+  height: auto;
+  padding: 0;
+  border: none;
+  display: block;
+  &:hover, &:active { background-color: var(--color-card); transform: none; }
   overflow: hidden;
   border-radius: var(--radius-lg);
   background-color: var(--color-card);
   text-align: left;
-  transition: all 150ms;
-  ${focusVisibleRing}
+  transition: opacity 60ms ease-out, transform 60ms ease-out;
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-  }
 `
 
 const CoverArea = styled.div`

@@ -72,10 +72,10 @@ const QueueItemLi = styled.li<{ $isCurrent?: boolean }>`
   transition: background-color 0.15s;
 
   background-color: ${({ $isCurrent }) =>
-    $isCurrent ? 'var(--color-accent)' : 'transparent'};
+    $isCurrent ? 'var(--color-highlight)' : 'transparent'};
 
   &:hover {
-    background-color: var(--color-accent);
+    background-color: var(--color-highlight);
   }
 `
 

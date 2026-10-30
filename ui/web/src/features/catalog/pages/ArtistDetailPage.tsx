@@ -19,10 +19,11 @@ const PageContainer = styled.div`
 
 const CompactHeader = styled.div`
   display: flex;
-  height: 3rem;
+  min-height: 3rem;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--accent-derived, var(--color-primary));
   padding: 0 1.5rem;
 `
 
@@ -41,12 +42,14 @@ const Avatar = styled.div`
 `
 
 const ArtistName = styled.h1`
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.875rem;
   font-weight: 600;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.01em;
 `
 
 const AlbumCount = styled.span`
@@ -62,6 +65,7 @@ const Spacer = styled.div`
 `
 
 const ActionButtons = styled.div`
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.25rem;

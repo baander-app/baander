@@ -14,7 +14,7 @@ export function PlayerTransport() {
   const toggleRepeat = usePlayerStore((s) => s.toggleRepeat)
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.125rem' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', minWidth: 0, flex: 1, alignItems: 'center', gap: '0.125rem' }}>
       <Button variant={shuffle ? 'secondary' : 'ghost'} size="icon-xs" onClick={toggleShuffle} aria-label="Shuffle">
         <Shuffle size={12} />
       </Button>

@@ -22,11 +22,11 @@ const ItemContainer = styled.div<{ $isSelected: boolean; $isPlaying: boolean }>`
       : $isPlaying
         ? css`
           background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-          color: var(--color-primary);
+          color: var(--color-accent-text);
         `
         : css`
           &:hover {
-            background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+            background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
           }
         `}
 `

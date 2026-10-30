@@ -1,15 +1,20 @@
+import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useNotificationStore } from '../stores/notification-store'
 
 const BellButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   position: relative;
   display: flex;
   height: 1.5rem;
   width: 1.5rem;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: none;
   border: none;
   padding: 0;

@@ -22,6 +22,16 @@ function isInputFocused() {
   return (el as HTMLElement).isContentEditable
 }
 
+function isFocusedControlKey(event: KeyboardEvent) {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false
+  if (![' ', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+    return false
+  }
+  return document.activeElement?.matches(
+    'button, a[href], summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"], [role="slider"], [role="combobox"], [role="listbox"], [role^="menuitem"], [role="option"]',
+  ) ?? false
+}
+
 interface KeyboardShortcutsOptions {
   /** Called when ? is pressed to toggle shortcuts help */
   onToggleHelp?: () => void
@@ -85,7 +95,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (isInputFocused()) return
+      if (e.defaultPrevented || isInputFocused() || isFocusedControlKey(e)) return
 
       // Special case: ? toggle help (shift+/)
       if (e.key === '?' && e.shiftKey) {

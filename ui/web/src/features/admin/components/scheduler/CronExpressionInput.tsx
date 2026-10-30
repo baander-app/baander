@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import styled, { css } from 'styled-components'
 import { Input } from '@/shared/components/ui/input'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 // --- Presets ---
 
@@ -89,7 +89,11 @@ const ModeToggle = styled.div`
 `
 
 const ModeButton = styled.button<{ $active: boolean }>`
-  border-radius: 0.25rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   padding: 0.125rem 0.5rem;
   font-size: 11px;
   font-weight: 500;
@@ -97,8 +101,8 @@ const ModeButton = styled.button<{ $active: boolean }>`
 
   ${({ $active }) => $active
     ? css`
-        background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-        color: var(--color-primary);
+        background-color: var(--color-muted);
+        color: var(--color-accent-text);
       `
     : css`
         color: var(--color-muted-foreground);
@@ -114,7 +118,11 @@ const PresetGrid = styled.div`
 `
 
 const PresetButton = styled.button<{ $active: boolean }>`
-  border-radius: 0.25rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   border: 1px solid;
   padding: 0.25rem 0.5rem;
   font-size: 11px;
@@ -124,15 +132,15 @@ const PresetButton = styled.button<{ $active: boolean }>`
   ${({ $active }) => $active
     ? css`
         border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-        background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-        color: var(--color-primary);
+        background-color: var(--color-muted);
+        color: var(--color-accent-text);
       `
     : css`
         border-color: var(--color-border);
         background-color: var(--color-card);
         color: var(--color-muted-foreground);
         &:hover {
-          border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+          border-color: var(--color-muted);
           color: var(--color-foreground);
         }
       `

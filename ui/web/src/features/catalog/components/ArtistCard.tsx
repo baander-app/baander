@@ -6,14 +6,11 @@ import { interactiveTransition } from '@/shared/theme'
 const CardLink = styled(Link)`
   display: block;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   ${interactiveTransition(['color', 'background-color'])}
 
-  &:hover {
-    background-color: var(--color-accent);
-  }
 `
 
 const ImageArea = styled.div`

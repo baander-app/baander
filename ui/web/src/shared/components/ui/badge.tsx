@@ -1,10 +1,11 @@
 import * as React from 'react';
 import { styled, css } from 'styled-components';
 import { Slot } from 'radix-ui';
-import { focusVisibleRing, ariaInvalidRing, darkMode } from '@/shared/theme';
+import { focusVisibleRing, ariaInvalidRing } from '@/shared/theme';
 
 const baseStyles = css`
   display: inline-flex;
+  color: var(--color-foreground);
   height: 1.25rem;
   width: fit-content;
   flex-shrink: 0;
@@ -28,9 +29,9 @@ const baseStyles = css`
 
 const variantStyles: Record<string, ReturnType<typeof css>> = {
   default: css`
-    background-color: var(--color-primary);
+    background-color: var(--color-accent-text);
     color: var(--color-primary-foreground);
-    a&:hover { background-color: color-mix(in srgb, var(--color-primary) 80%, transparent); }
+    a&:hover { background-color: var(--color-primary-hover); }
   `,
   secondary: css`
     background-color: var(--color-secondary);
@@ -38,14 +39,9 @@ const variantStyles: Record<string, ReturnType<typeof css>> = {
     a&:hover { background-color: color-mix(in srgb, var(--color-secondary) 80%, transparent); }
   `,
   destructive: css`
-    background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
-    color: var(--color-destructive);
-    &:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive) 20%, transparent); }
-    a&:hover { background-color: color-mix(in srgb, var(--color-destructive) 20%, transparent); }
-    ${darkMode(`
-      background-color: color-mix(in srgb, var(--color-destructive) 20%, transparent);
-      &:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-destructive) 40%, transparent); }
-    `)}
+    background-color: var(--color-destructive);
+    color: var(--color-destructive-foreground);
+    a&:hover { background-color: var(--color-destructive-hover); }
   `,
   outline: css`
     border-color: var(--color-border);
@@ -54,9 +50,6 @@ const variantStyles: Record<string, ReturnType<typeof css>> = {
   `,
   ghost: css`
     &:hover { background-color: var(--color-muted); color: var(--color-muted-foreground); }
-    ${darkMode(`
-      &:hover { background-color: color-mix(in srgb, var(--color-muted) 50%, transparent); }
-    `)}
   `,
   link: css`
     color: var(--color-primary);

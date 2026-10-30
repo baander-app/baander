@@ -18,10 +18,10 @@ const StyledTooltipContent = styled(TooltipPrimitive.Content)`
   z-index: 50;
   display: inline-flex;
   width: fit-content;
-  max-width: 20rem;
+  max-width: min(20rem, calc(100vw - 1rem));
   align-items: center;
   gap: 0.375rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   background-color: var(--color-foreground);
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
@@ -29,12 +29,12 @@ const StyledTooltipContent = styled(TooltipPrimitive.Content)`
   transform-origin: var(--radix-tooltip-content-transform-origin);
   &:has([data-slot="kbd"]) { padding-right: 0.375rem; }
   & [data-slot="kbd"] { position: relative; isolation: isolate; z-index: 50; border-radius: var(--radius-sm); }
-  &[data-state="delayed-open"], &[data-open] { animation: fadeIn 150ms ease-out, zoomIn95 150ms ease-out; }
-  &[data-state="closed"] { animation: fadeOut 150ms ease-out, zoomOut95 150ms ease-out; }
-  &[data-side="bottom"] { animation: slideInFromTop 150ms ease-out; }
-  &[data-side="left"] { animation: slideInFromRight 150ms ease-out; }
-  &[data-side="right"] { animation: slideInFromLeft 150ms ease-out; }
-  &[data-side="top"] { animation: slideInFromBottom 150ms ease-out; }
+  &[data-state="delayed-open"], &[data-open] { animation: fadeIn 120ms ease-out, zoomIn95 120ms ease-out; }
+  &[data-state="closed"] { animation: fadeOut 120ms ease-out, zoomOut95 120ms ease-out; }
+  &[data-side="bottom"] { animation: slideInFromTop 120ms ease-out; }
+  &[data-side="left"] { animation: slideInFromRight 120ms ease-out; }
+  &[data-side="right"] { animation: slideInFromLeft 120ms ease-out; }
+  &[data-side="top"] { animation: slideInFromBottom 120ms ease-out; }
 `;
 
 const StyledArrow = styled(TooltipPrimitive.Arrow)`

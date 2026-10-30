@@ -11,8 +11,8 @@ const Banner = styled.div`
   align-items: center;
   justify-content: space-between;
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
-  background-color: color-mix(in srgb, #f59e0b 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  background-color: var(--color-secondary);
   padding: 0.75rem 1rem;
 `
 
@@ -23,7 +23,7 @@ const InfoArea = styled.div`
 `
 
 const AlertIcon = styled(AlertTriangle)`
-  color: #f59e0b;
+  color: var(--color-warning);
   flex-shrink: 0;
 `
 
@@ -33,7 +33,7 @@ const BannerText = styled.div`
 
 const Highlight = styled.span`
   font-weight: 500;
-  color: #f59e0b;
+  color: var(--color-warning);
 `
 
 const Muted = styled.span`

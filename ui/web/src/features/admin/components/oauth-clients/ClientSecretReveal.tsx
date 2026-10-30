@@ -16,7 +16,7 @@ const Stack = styled.div`
 
 const Warning = styled.p`
   border-radius: var(--radius-md);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 0.75rem;
   font-size: 0.8125rem;
   color: var(--color-destructive);

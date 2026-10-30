@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { useState } from 'react'
 import { useLoginBlocks, useDeleteLoginBlock, useDeleteAllLoginBlocks } from '../hooks/use-login-blocks'
@@ -81,7 +82,7 @@ const TdWarn = styled.td`
   padding: 0.5rem 0.75rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: #fbbf24;
+  color: var(--color-warning);
 `
 
 const TdMutedSmall = styled.td`
@@ -102,6 +103,10 @@ const TdAction = styled.td`
 `
 
 const ActionButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   border-radius: var(--radius-md);
   padding: 0.25rem;
 

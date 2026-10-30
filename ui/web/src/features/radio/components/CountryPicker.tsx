@@ -182,14 +182,14 @@ export function CountryPicker() {
               disabled={isToggling}
               $subscribed={isSubscribed}
             >
-              <Globe size={16} style={{ color: isSubscribed ? 'var(--color-primary)' : 'var(--color-muted-foreground)' }} />
+              <Globe size={16} style={{ color: isSubscribed ? 'var(--color-accent-text)' : 'var(--color-muted-foreground)' }} />
               <CountryInfo>
                 <CountryName>{country.name}</CountryName>
                 <StationCount>
                   {country.station_count} station{country.station_count !== 1 ? 's' : ''}
                 </StationCount>
               </CountryInfo>
-              {isSubscribed && <Check size={14} style={{ flexShrink: 0, color: 'var(--color-primary)' }} />}
+              {isSubscribed && <Check size={14} style={{ flexShrink: 0, color: 'var(--color-accent-text)' }} />}
             </CountryButton>
           )
         })}

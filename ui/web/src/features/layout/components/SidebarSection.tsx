@@ -30,16 +30,16 @@ const navLinkStyles = css`
   font-size: 0.875rem;
   color: var(--color-muted-foreground);
   text-decoration: none;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 60ms ease-out, color 60ms ease-out;
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-    color: var(--color-accent-foreground);
+    background-color: color-mix(in srgb, var(--color-highlight) 50%, transparent);
+    color: var(--color-highlight-foreground);
   }
 
   &.active {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 `
 
@@ -102,7 +102,7 @@ export function SidebarSection({ id, label, items, isFirst = false, onItemClick 
               <StyledNavLink
                 key={item.id}
                 to={route}
-                end={route === '/'}
+                end={route === '/' || route === '/music'}
               >
                 <NavIcon><Icon /></NavIcon>
                 <NavLinkLabel>{item.label}</NavLinkLabel>

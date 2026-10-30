@@ -39,8 +39,8 @@ const BackButton = styled.button`
   transition: background-color 0.15s, color 0.15s;
 
   &:hover {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 `
 
@@ -73,11 +73,11 @@ const StatusBadge = styled.span<{ $status?: string }>`
   ${(p) => {
     switch (p.$status) {
       case 'scanning':
-        return css`background-color: rgba(59, 130, 246, 0.15); color: #3b82f6;`
+        return css`background-color: var(--color-secondary); color: var(--color-info);`
       case 'completed':
-        return css`background-color: rgba(16, 185, 129, 0.15); color: #10b981;`
+        return css`background-color: var(--color-secondary); color: var(--color-success);`
       case 'failed':
-        return css`background-color: rgba(239, 68, 68, 0.15); color: #ef4444;`
+        return css`background-color: var(--color-secondary); color: var(--color-destructive);`
       default:
         return css`background-color: var(--color-muted); color: var(--color-muted-foreground);`
     }

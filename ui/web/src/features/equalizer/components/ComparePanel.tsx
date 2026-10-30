@@ -32,7 +32,7 @@ const Timestamp = styled.span`
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   gap: 0.75rem;
 `
 
@@ -79,7 +79,7 @@ function SlotButton({ slot, label }: { slot: 'A' | 'B'; label: string }) {
           variant={isActive ? 'secondary' : snapshot ? 'outline' : 'ghost'}
           size="xs"
           onClick={snapshot ? handleActivate : handleCapture}
-          style={{ flex: 1, justifyContent: 'center', ...(isActive ? { boxShadow: '0 0 0 1px var(--color-primary)' } : {}) }}
+          style={{ flex: 1, justifyContent: 'center', ...(isActive ? { borderColor: 'var(--color-accent-text)' } : {}) }}
         >
           {label}
         </Button>

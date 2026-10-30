@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import styled, { css } from 'styled-components'
 import { useState } from 'react'
 import { useGenres } from '../hooks/use-genre-admin'
@@ -40,6 +41,10 @@ const ViewToggle = styled.div`
 `
 
 const ViewButton = styled.button<{ $active: boolean }>`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   transition: background-color var(--duration-hover) ease-out;

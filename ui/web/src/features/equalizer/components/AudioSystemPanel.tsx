@@ -11,7 +11,7 @@ interface LiveState {
 
 const TwoColGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   column-gap: 1.5rem;
   row-gap: 0.75rem;
 `
@@ -45,8 +45,8 @@ const Dot = styled.div<{ $on: boolean }>`
   flex-shrink: 0;
 
   ${(p) => p.$on
-    ? css`background-color: #34d399; box-shadow: 0 0 4px rgba(52, 211, 153, 0.5);`
-    : css`background-color: rgba(var(--color-muted-foreground-rgb, 128 128 128), 0.3);`
+    ? css`background-color: var(--color-success);`
+    : css`background-color: var(--color-muted-foreground);`
   }
 `
 
@@ -87,7 +87,7 @@ const MiniBarTrack = styled.div`
 const MiniBarFill = styled.div<{ $color: string }>`
   height: 100%;
   border-radius: 9999px;
-  transition: width 150ms;
+  transition: width 100ms ease-out;
   background-color: ${(p) => p.$color};
 `
 
@@ -169,8 +169,8 @@ function MiniBarComponent({ value, max, color }: { value: number; max: number; c
 }
 
 const stateColors: Record<string, string> = {
-  running: '#34d399',
-  suspended: '#fbbf24',
+  running: 'var(--color-success)',
+  suspended: 'var(--color-warning)',
   closed: 'var(--color-destructive)',
 }
 
@@ -283,21 +283,21 @@ export function AudioSystemPanel({ className }: { className?: string }) {
                     <KvLabel>Flux</KvLabel>
                     <KvValue $mono>{live.analysis ? flux.toFixed(2) : '—'}</KvValue>
                   </MetricWithBar>
-                  {live.analysis && <MiniBarComponent value={flux} max={50} color="rgba(var(--color-primary-rgb, 0 0 0), 0.6)" />}
+                  {live.analysis && <MiniBarComponent value={flux} max={50} color="color-mix(in srgb, var(--color-accent-text) 60%, transparent)" />}
                 </div>
                 <div>
                   <MetricWithBar>
                     <KvLabel>Flatness</KvLabel>
                     <KvValue $mono>{live.analysis ? flatness.toFixed(3) : '—'}</KvValue>
                   </MetricWithBar>
-                  {live.analysis && <MiniBarComponent value={flatness} max={1} color="rgba(var(--color-primary-rgb, 0 0 0), 0.4)" />}
+                  {live.analysis && <MiniBarComponent value={flatness} max={1} color="color-mix(in srgb, var(--color-accent-text) 40%, transparent)" />}
                 </div>
                 <div>
                   <MetricWithBar>
                     <KvLabel>RMS</KvLabel>
                     <KvValue $mono>{live.analysis ? `${(rms * 100).toFixed(1)}%` : '—'}</KvValue>
                   </MetricWithBar>
-                  {live.analysis && <MiniBarComponent value={rms} max={0.5} color="rgba(var(--color-primary-rgb, 0 0 0), 0.5)" />}
+                  {live.analysis && <MiniBarComponent value={rms} max={0.5} color="color-mix(in srgb, var(--color-accent-text) 50%, transparent)" />}
                 </div>
               </MetricList>
             </MetricGroup>

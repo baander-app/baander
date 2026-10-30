@@ -22,9 +22,9 @@ const Label = styled.span<{ $color: string }>`
 
 export function StatusBadge({ status }: { status: ScheduledJob['status'] }) {
   const config = {
-    active: { dot: '#10b981', label: 'Active', text: '#34d399' },
-    paused: { dot: '#eab308', label: 'Paused', text: '#facc15' },
-    disabled: { dot: '#ef4444', label: 'Disabled', text: '#f87171' },
+    active: { dot: 'var(--color-success)', label: 'Active', text: 'var(--color-success)' },
+    paused: { dot: 'var(--color-warning)', label: 'Paused', text: 'var(--color-warning)' },
+    disabled: { dot: 'var(--color-destructive)', label: 'Disabled', text: 'var(--color-destructive)' },
   }[status]
 
   return (

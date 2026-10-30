@@ -71,7 +71,7 @@ const CountryButton = styled.button<{ $active: boolean }>`
           color: var(--color-muted-foreground);
 
           &:hover {
-            background-color: var(--color-accent);
+            background-color: var(--color-highlight);
           }
         `}
 `

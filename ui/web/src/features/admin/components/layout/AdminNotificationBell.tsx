@@ -1,9 +1,10 @@
+import { notificationCategoryColors } from '@/features/notification/category-colors'
 import { useState, useRef, useEffect } from 'react'
 import styled, { css } from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useAdminNotifications } from '../../hooks/use-admin-notifications'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 function relativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -17,30 +18,28 @@ function relativeTime(dateStr: string): string {
   return `${days}d ago`
 }
 
-const categoryBorderColors: Record<string, string> = {
-  admin_operations: '#3b82f6',
-  security: '#ef4444',
-  background_jobs: '#f59e0b',
-  media_changes: '#10b981',
-}
 
 const Container = styled.div`
   position: relative;
 `
 
 const BellButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   position: relative;
   display: flex;
   height: 2rem;
   width: 2rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-md);
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 40%, transparent);
     color: var(--color-foreground);
   }
 `
@@ -55,11 +54,11 @@ const Badge = styled.span`
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background-color: #ef4444;
+  background-color: var(--color-destructive);
   padding: 0 0.25rem;
   font-size: 10px;
   font-weight: 500;
-  color: white;
+  color: var(--color-destructive-foreground);
 `
 
 const Popout = styled.div`
@@ -68,8 +67,8 @@ const Popout = styled.div`
   top: 100%;
   z-index: 50;
   margin-top: 0.25rem;
-  width: 20rem;
-  border-radius: 0.375rem;
+  width: min(20rem, calc(100vw - 2rem));
+  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -92,6 +91,10 @@ const PopoutTitle = styled.span`
 `
 
 const MarkAllButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   font-size: 11px;
   color: var(--color-muted-foreground);
   ${interactiveTransition(['color'])}
@@ -113,6 +116,10 @@ const EmptyState = styled.div`
 `
 
 const NotificationItem = styled.button<{ $borderColor: string; $isRead: boolean }>`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   display: flex;
   width: 100%;
   gap: 0.5rem;
@@ -121,8 +128,8 @@ const NotificationItem = styled.button<{ $borderColor: string; $isRead: boolean 
   text-align: left;
   ${interactiveTransition(['background-color', 'opacity'])}
 
-  &:hover { background-color: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-  ${({ $isRead }) => $isRead && css`opacity: 0.6;`}
+  &:hover { background-color: color-mix(in srgb, var(--color-highlight) 10%, transparent); }
+  ${({ $isRead }) => !$isRead && css`font-weight: 500;`}
 `
 
 const NotificationContent = styled.div`
@@ -148,7 +155,7 @@ const UnreadDot = styled.span`
   width: 0.375rem;
   flex-shrink: 0;
   border-radius: 50%;
-  background-color: #3b82f6;
+  background-color: var(--color-info);
 `
 
 export function AdminNotificationBell() {
@@ -202,7 +209,7 @@ export function AdminNotificationBell() {
                 <NotificationItem
                   key={n.publicId}
                   type="button"
-                  $borderColor={categoryBorderColors[n.category] ?? 'var(--color-muted)'}
+                  $borderColor={notificationCategoryColors[n.category] ?? 'var(--color-muted)'}
                   $isRead={n.isRead}
                   onClick={() => { markRead(n.publicId); setOpen(false) }}
                 >

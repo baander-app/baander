@@ -47,11 +47,11 @@ function CommandDialog({
 }) {
   return (
     <Dialog {...props}>
-      <ScreenReaderOnly>
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </ScreenReaderOnly>
-      <DialogContent showCloseButton={showCloseButton} style={{ top: '33%', transform: 'translateY(0)', overflow: 'hidden', borderRadius: 'var(--radius-xl)', padding: 0 }}>
+      <DialogContent showCloseButton={showCloseButton} style={{ overflow: 'hidden', padding: 0 }}>
+        <ScreenReaderOnly>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </ScreenReaderOnly>
         {children}
       </DialogContent>
     </Dialog>
@@ -64,18 +64,25 @@ const InputWrapper = styled.div`
 
 const StyledInput = styled(CommandPrimitive.Input)`
   width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  padding: 0.25rem 0.625rem;
+  background: transparent;
+  color: var(--color-foreground);
   font-size: 0.875rem;
   outline: none;
+  &::placeholder { color: var(--color-muted-foreground); opacity: 1; }
   &:disabled { cursor: not-allowed; opacity: 0.5; }
 `;
 
 function CommandInput({ ...props }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <InputWrapper data-slot="command-input-wrapper">
-      <InputGroup style={{ height: '2rem', borderRadius: 'var(--radius-lg)', borderColor: 'color-mix(in srgb, var(--color-input) 30%, transparent)', backgroundColor: 'color-mix(in srgb, var(--color-input) 30%, transparent)', boxShadow: 'none' }}>
-        <StyledInput data-slot="command-input" {...props} />
+      <InputGroup>
+        <StyledInput data-slot="input-group-control" {...props} />
         <InputGroupAddon>
-          <SearchIcon style={{ width: '1rem', height: '1rem', flexShrink: 0, opacity: 0.5 }} />
+          <SearchIcon style={{ width: '1rem', height: '1rem', flexShrink: 0 }} />
         </InputGroupAddon>
       </InputGroup>
     </InputWrapper>
@@ -83,14 +90,11 @@ function CommandInput({ ...props }: React.ComponentProps<typeof CommandPrimitive
 }
 
 const StyledList = styled(CommandPrimitive.List)`
-  max-height: 18rem;
+  max-height: min(18rem, calc(100dvh - 6rem));
   overflow-x: hidden;
   overflow-y: auto;
   scroll-padding: 0.25rem;
   outline: none;
-  /* hide scrollbar */
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
 `;
 
 function CommandList({ ...props }: React.ComponentProps<typeof CommandPrimitive.List>) {
@@ -146,7 +150,10 @@ const StyledItem = styled(CommandPrimitive.Item)`
   user-select: none;
   color: var(--color-foreground);
   &[data-disabled="true"] { pointer-events: none; opacity: 0.5; }
-  &[data-selected] { background-color: var(--color-muted); }
+  &[data-selected="true"] {
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
+  }
   & svg { pointer-events: none; flex-shrink: 0; }
   & svg:not([class*='size-']) { width: 1rem; height: 1rem; }
 `;

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@/shared/components/ui/button'
 import { useEqProcessingStore, type ProcessingModule, DEFAULT_CHAIN_ORDER } from '../stores/eq-processing-store'
 import styled, { css } from 'styled-components'
 import {
@@ -29,14 +30,14 @@ const MODULE_META: Record<ProcessingModule, { label: string; abbr: string }> = {
 }
 
 const SlotWrapper = styled.div<{ $isDragging: boolean; $expanded: boolean }>`
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border-left: 2px solid;
   background-color: var(--color-card);
-  transition: background-color 0.15s;
+  transition: none;
 
-  ${(p) => p.$isDragging && css`opacity: 0.6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);`}
+  ${(p) => p.$isDragging && css`opacity: 0.6;`}
   ${(p) => p.$expanded
-    ? css`border-left-color: var(--color-primary);`
+    ? css`border-left-color: var(--color-accent-text);`
     : css`border-left-color: var(--color-border);`
   }
 `
@@ -49,20 +50,23 @@ const SlotHeader = styled.div`
   gap: 0.5rem;
 `
 
-const DragHandle = styled.button`
+const DragHandle = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
   cursor: grab;
   flex-shrink: 0;
   color: var(--color-muted-foreground);
   border: none;
   background: none;
   padding: 0;
+  height: auto;
 
   &:hover { color: var(--color-foreground); }
   &:active { cursor: grabbing; }
 `
 
-const SlotName = styled.button`
+const SlotName = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
   flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
   text-align: left;
   font-size: 11px;
   font-weight: 500;
@@ -80,10 +84,10 @@ const SlotName = styled.button`
 const ExpandedContent = styled.div`
   padding: 0 0.5rem 0.5rem;
   padding-top: 0.25rem;
-  border-top: 1px solid rgba(var(--color-border-rgb, 128 128 128), 0.3);
+  border-top: 1px solid var(--color-border);
 `
 
-const BypassButton = styled.button<{ $enabled: boolean }>`
+const BypassButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $enabled: boolean }>`
   width: 1rem;
   height: 1rem;
   border-radius: 9999px;
@@ -95,10 +99,14 @@ const BypassButton = styled.button<{ $enabled: boolean }>`
   font-weight: 700;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: none;
 
   ${(p) => p.$enabled
-    ? css`background-color: var(--color-primary); color: var(--color-primary-foreground);`
+    ? css`
+      background-color: var(--color-primary);
+      color: var(--color-primary-foreground);
+      &:hover { background-color: var(--color-primary-hover); color: var(--color-primary-foreground); }
+    `
     : css`background-color: var(--color-muted); color: var(--color-muted-foreground);`
   }
 `
@@ -140,17 +148,21 @@ const ModeRow = styled.div`
   gap: 0.25rem;
 `
 
-const ModeButton = styled.button<{ $active: boolean }>`
+const ModeButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
   padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 10px;
   font-weight: 500;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: none;
 
   ${(p) => p.$active
-    ? css`background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.2); color: var(--color-primary);`
+    ? css`
+      background-color: var(--color-highlight);
+      color: var(--color-highlight-foreground);
+      &:hover { background-color: var(--color-highlight); color: var(--color-highlight-foreground); }
+    `
     : css`color: var(--color-muted-foreground); &:hover { color: var(--color-foreground); }`
   }
 `
@@ -173,17 +185,21 @@ const TargetRow = styled.div`
   gap: 0.125rem;
 `
 
-const TargetButton = styled.button<{ $active: boolean }>`
+const TargetButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })<{ $active: boolean }>`
   padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   border: none;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: none;
 
   ${(p) => p.$active
-    ? css`background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.2); color: var(--color-primary);`
+    ? css`
+      background-color: var(--color-highlight);
+      color: var(--color-highlight-foreground);
+      &:hover { background-color: var(--color-highlight); color: var(--color-highlight-foreground); }
+    `
     : css`color: var(--color-muted-foreground); &:hover { color: var(--color-foreground); }`
   }
 `
@@ -192,8 +208,8 @@ const ChainList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background-color: rgba(var(--color-border-rgb, 128 128 128), 0.3);
-  border-radius: var(--radius-sm);
+  background-color: var(--color-border);
+  border-radius: var(--radius-md);
   overflow: hidden;
 `
 
@@ -215,13 +231,13 @@ const FooterHint = styled.span`
   color: var(--color-muted-foreground);
 `
 
-const ResetButton = styled.button`
+const ResetButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
   font-size: 10px;
   color: var(--color-muted-foreground);
   border: none;
   background: none;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color 60ms ease-out;
 
   &:hover { color: var(--color-foreground); }
 `
@@ -231,7 +247,10 @@ function SortableSlot({ module, expanded, onToggle }: {
   expanded: boolean
   onToggle: () => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: module })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: module,
+    transition: { duration: 120, easing: 'ease-out' },
+  })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,

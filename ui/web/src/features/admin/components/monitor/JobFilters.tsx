@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { Input } from '@/shared/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 interface JobFilterValues {
   status?: string
@@ -31,13 +31,17 @@ const Wrapper = styled.div`
 `
 
 const ClearButton = styled.button`
-  border-radius: 0.375rem;
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
   ${interactiveTransition(['background-color'])}
 
-  &:hover { background-color: var(--color-accent); }
+  &:hover { background-color: var(--color-highlight); }
 `
 
 export type { JobFilterValues }

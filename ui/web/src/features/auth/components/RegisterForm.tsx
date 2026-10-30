@@ -15,7 +15,7 @@ const Form = styled.form`
 
 const ErrorAlert = styled.div`
   border-radius: var(--radius-md);
-  background-color: color-mix(in srgb, var(--color-destructive) 10%, transparent);
+  background-color: var(--color-muted);
   padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--color-destructive);
@@ -42,7 +42,7 @@ const FooterText = styled.p`
 `;
 
 const StyledLink = styled(Link)`
-  color: var(--color-primary);
+  color: var(--color-accent-text);
   text-decoration: none;
 
   &:hover {
@@ -83,7 +83,7 @@ export function RegisterForm() {
   return (
     <Form onSubmit={handleSubmit}>
       {error && (
-        <ErrorAlert>
+        <ErrorAlert role="alert" id="register-error">
           {error}
         </ErrorAlert>
       )}
@@ -121,6 +121,8 @@ export function RegisterForm() {
         </Label>
         <Input
           id="reg-password"
+          aria-invalid={error !== null && password !== confirmPassword}
+          aria-describedby={error ? "register-error" : undefined}
           type="password"
           required
           value={password}
@@ -135,6 +137,8 @@ export function RegisterForm() {
         </Label>
         <Input
           id="reg-confirm-password"
+          aria-invalid={error !== null && password !== confirmPassword}
+          aria-describedby={error ? "register-error" : undefined}
           type="password"
           required
           value={confirmPassword}

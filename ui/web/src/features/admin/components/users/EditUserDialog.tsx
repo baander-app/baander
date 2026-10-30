@@ -118,12 +118,12 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
   return (
     <Form onSubmit={handleSubmit}>
       <FieldGroup>
-        <Label>Email</Label>
-        <StyledInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required readOnly={!isSuperAdmin} />
+        <Label htmlFor="edituserdialog-email">Email</Label>
+        <StyledInput id="edituserdialog-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required readOnly={!isSuperAdmin} />
       </FieldGroup>
       <FieldGroup>
-        <Label>Name</Label>
-        <StyledInput value={name} onChange={(e) => setName(e.target.value)} required readOnly={!isSuperAdmin} />
+        <Label htmlFor="edituserdialog-name">Name</Label>
+        <StyledInput id="edituserdialog-name" value={name} onChange={(e) => setName(e.target.value)} required readOnly={!isSuperAdmin} />
       </FieldGroup>
       <UserLanguageField
         setting={language}

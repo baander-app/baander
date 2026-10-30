@@ -66,7 +66,8 @@ const ScrollArea = styled.div<{ $isFocused: boolean }>`
   ${({ $isFocused }) =>
     $isFocused &&
     css`
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
+      outline: 1px solid var(--color-ring);
+      outline-offset: -1px;
     `}
 `
 
@@ -86,13 +87,13 @@ const OptionButton = styled.button<{ $isSelected: boolean; $hasCover: boolean }>
   ${({ $isSelected }) =>
     $isSelected
       ? css`
-        background-color: var(--color-accent);
-        color: var(--color-accent-foreground);
+        background-color: var(--color-highlight);
+        color: var(--color-highlight-foreground);
       `
       : css`
         color: color-mix(in srgb, var(--color-foreground) 80%, transparent);
         &:hover {
-          background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+          background-color: color-mix(in srgb, var(--color-highlight) 30%, transparent);
         }
       `}
 `

@@ -4,6 +4,7 @@ import { Monitor, Smartphone } from 'lucide-react'
 import { getDeviceId } from '../utils/device-id'
 import styled from 'styled-components'
 import { interactiveTransition } from '@/shared/theme'
+import { Button } from '@/shared/components/ui/button'
 
 const DEVICES_KEY = ['devices']
 const SESSION_KEY = ['session', 'current']
@@ -34,11 +35,10 @@ const DeviceLabel = styled.span`
   white-space: nowrap;
 `;
 
-const TransferButton = styled.button`
+const TransferButton = styled(Button).attrs({ variant: 'ghost', size: 'xs' })`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  border-radius: var(--radius);
   padding: 0 0.25rem;
   border: none;
   background: none;
@@ -46,7 +46,7 @@ const TransferButton = styled.button`
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+    background-color: var(--color-highlight);
   }
 
   &:disabled {

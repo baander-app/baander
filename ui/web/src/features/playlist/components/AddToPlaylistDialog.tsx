@@ -51,8 +51,8 @@ const PlaylistButton = styled.button`
   transition: background-color 0.15s, color 0.15s;
 
   &:hover {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 `
 

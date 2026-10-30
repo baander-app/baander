@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import { useEffect, useRef } from 'react'
 import styled from 'styled-components'
 import { useNotificationStore } from '../stores/notification-store'
@@ -12,12 +13,12 @@ const Popover = styled.div`
   top: 100%;
   z-index: 50;
   margin-top: 0.25rem;
-  width: 20rem;
+  width: min(20rem, calc(100vw - 2rem));
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   background-color: var(--color-popover);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 `
 
 const Header = styled.div`
@@ -38,6 +39,10 @@ const HeaderLabel = styled.span`
 `
 
 const MarkAllButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   font-size: 11px;
   color: var(--color-muted-foreground);
   transition: color var(--duration-hover) ease-out;

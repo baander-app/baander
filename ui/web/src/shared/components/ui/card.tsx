@@ -4,9 +4,10 @@ import styled, { css } from 'styled-components';
 const StyledCard = styled.div<{ $size?: string }>`
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: 1rem;
   overflow: hidden;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background-color: var(--color-card);
   padding-top: 1rem;
   padding-bottom: 1rem;
@@ -14,8 +15,8 @@ const StyledCard = styled.div<{ $size?: string }>`
   color: var(--color-card-foreground);
   &:has([data-slot="card-footer"]) { padding-bottom: 0; }
   &:has(> img:first-child) { padding-top: 0; }
-  & img:first-child { border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
-  & img:last-child { border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
+  & img:first-child { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  & img:last-child { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
   ${({ $size }) => $size === 'sm' && css`
     gap: 0.75rem; padding-top: 0.75rem; padding-bottom: 0.75rem;
     &:has([data-slot="card-footer"]) { padding-bottom: 0; }
@@ -31,11 +32,11 @@ const StyledCardHeader = styled.div`
   grid-auto-rows: min-content;
   align-items: start;
   gap: 0.25rem;
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: 0 1rem;
   container-type: inline-size;
   container-name: card-header;
-  &:has([data-slot="card-action"]) { grid-template-columns: 1fr auto; }
+  &:has([data-slot="card-action"]) { grid-template-columns: minmax(0, 1fr) auto; }
   &:has([data-slot="card-description"]) { grid-template-rows: auto auto; }
   &[class*="border-b"] { padding-bottom: 1rem; }
   [data-size="sm"] & { padding: 0 0.75rem; }
@@ -90,7 +91,7 @@ function CardContent({ ...props }: React.ComponentProps<'div'>) {
 const StyledCardFooter = styled.div`
   display: flex;
   align-items: center;
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   border-top: 1px solid var(--color-border);
   background-color: color-mix(in srgb, var(--color-muted) 50%, transparent);
   padding: 1rem;

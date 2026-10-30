@@ -10,7 +10,7 @@ import { ThroughputChart } from './ThroughputChart'
 import { SuccessFailureChart } from './SuccessFailureChart'
 import { TimingChart } from './TimingChart'
 import { FailureBreakdownChart } from './FailureBreakdownChart'
-import { interactiveTransition } from '@/shared/theme'
+import { interactiveTransition, focusVisibleRing } from '@/shared/theme'
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
@@ -45,7 +45,7 @@ const ChartGrid = styled.div`
 `
 
 const SkeletonCard = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 1rem;
@@ -67,7 +67,7 @@ const SkeletonRow = styled.div`
 `
 
 const ErrorCard = styled.div`
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid color-mix(in srgb, var(--color-destructive) 50%, transparent);
   background-color: var(--color-card);
   padding: 1rem;
@@ -79,6 +79,10 @@ const ErrorText = styled.p`
 `
 
 const RetryLink = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   margin-top: 0.5rem;
   font-size: 0.875rem;
   color: var(--color-muted-foreground);
@@ -92,7 +96,7 @@ const EmptyCard = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background-color: var(--color-card);
   padding: 2rem;

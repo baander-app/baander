@@ -8,7 +8,7 @@ const Row = styled.tr`
   ${interactiveTransition(['color', 'background-color'])}
 
   &:hover {
-    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+    background-color: color-mix(in srgb, var(--color-highlight) 30%, transparent);
   }
 `
 
@@ -28,7 +28,7 @@ const PosterPlaceholder = styled.div`
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  background-color: var(--color-surface-3);
+  background-color: var(--color-muted);
 `
 
 const PlaceholderIcon = styled.svg`
@@ -65,7 +65,7 @@ const RatingCell = styled.td`
 const StarIcon = styled.svg`
   height: 0.875rem;
   width: 0.875rem;
-  color: #fbbf24;
+  color: var(--color-warning);
 `
 
 const StarSpan = styled.span`

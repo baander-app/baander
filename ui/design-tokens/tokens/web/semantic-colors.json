@@ -1,0 +1,9 @@
+{
+  "moods": { "dark": "Dark", "warm": "Warm", "cool": "Cool", "balanced": "Balanced" },
+  "status": { "destructive": "#ef4444", "success": "#34d399", "warning": "#fbbf24", "info": "#60a5fa" },
+  "normalTextContrast": 4.5,
+  "actionContrast": 4.7,
+  "indicatorContrast": 3,
+  "hoverMix": 0.08,
+  "pressedMix": 0.16
+}

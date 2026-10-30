@@ -1,3 +1,4 @@
+import { focusVisibleRing } from '@/shared/theme'
 import styled from 'styled-components'
 import { useConfigCheck } from '../hooks/use-config-check'
 import type { ConfigCheckResult } from '../api/config-check-api'
@@ -13,11 +14,15 @@ const CheckRowWrapper = styled.div`
 
 const CheckHeader = styled.div`
   display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   align-items: center;
   justify-content: space-between;
 `
 
 const ComponentName = styled.span`
+  overflow-wrap: anywhere;
+  min-width: 0;
   font-family: var(--font-mono);
   font-size: 0.75rem;
 `
@@ -34,27 +39,23 @@ const StatusBadge = styled.span<{ $variant: 'ok' | 'fail' | 'warn' | 'na' }>`
     switch ($variant) {
       case 'ok':
         return `
-          background: #dcfce7;
-          color: #166534;
-          [data-theme="dark"] & { background: #14532d; color: #bbf7d0; }
+          background: var(--color-muted);
+          color: var(--color-success);
         `
       case 'fail':
         return `
-          background: #fef2f2;
-          color: #991b1b;
-          [data-theme="dark"] & { background: #450a0a; color: #fca5a5; }
+          background: var(--color-muted);
+          color: var(--color-destructive);
         `
       case 'warn':
         return `
-          background: #fefce8;
-          color: #854d0e;
-          [data-theme="dark"] & { background: #422006; color: #fde047; }
+          background: var(--color-muted);
+          color: var(--color-warning);
         `
       case 'na':
         return `
-          background: #f3f4f6;
-          color: #4b5563;
-          [data-theme="dark"] & { background: #1f2937; color: #9ca3af; }
+          background: var(--color-muted);
+          color: var(--color-muted-foreground);
         `
     }
   }}
@@ -69,8 +70,7 @@ const Message = styled.p<{ $variant: 'error' | 'warning' | 'default' }>`
         return 'color: var(--color-destructive);'
       case 'warning':
         return `
-          color: #ca8a04;
-          [data-theme="dark"] & { color: #facc15; }
+          color: var(--color-warning);
         `
       default:
         return 'color: var(--color-muted-foreground);'
@@ -132,6 +132,8 @@ const Container = styled.div`
 
 const HeaderRow = styled.div`
   display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   align-items: center;
   justify-content: space-between;
 `
@@ -149,6 +151,10 @@ const Title = styled.h1`
 `
 
 const RefetchButton = styled.button`
+  ${focusVisibleRing}
+  border: 0;
+  background-color: transparent;
+  color: var(--color-foreground);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-input);
   background: var(--color-background);
@@ -168,52 +174,35 @@ const RefetchButton = styled.button`
 
 const SuccessBanner = styled.div`
   border-radius: var(--radius-md);
-  border: 1px solid #bbf7d0;
-  background: #f0fdf4;
+  border: 1px solid var(--color-success);
+  background: var(--color-muted);
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
-  color: #166534;
-
-  [data-theme="dark"] & {
-    border-color: #166534;
-    background: #052e16;
-    color: #bbf7d0;
-  }
+  color: var(--color-success);
 `
 
 const SummaryRow = styled.div`
+  flex-wrap: wrap;
   display: flex;
   gap: 1rem;
 `
 
 const ErrorBanner = styled.div`
   border-radius: var(--radius-md);
-  border: 1px solid #fecaca;
-  background: #fef2f2;
+  border: 1px solid var(--color-destructive);
+  background: var(--color-muted);
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
-  color: #991b1b;
-
-  [data-theme="dark"] & {
-    border-color: #7f1d1d;
-    background: #450a0a;
-    color: #fca5a5;
-  }
+  color: var(--color-destructive);
 `
 
 const WarnBanner = styled.div`
   border-radius: var(--radius-md);
-  border: 1px solid #fde68a;
-  background: #fefce8;
+  border: 1px solid var(--color-warning);
+  background: var(--color-muted);
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
-  color: #854d0e;
-
-  [data-theme="dark"] & {
-    border-color: #854d0e;
-    background: #422006;
-    color: #fde047;
-  }
+  color: var(--color-warning);
 `
 
 const CategoryGrid = styled.div`

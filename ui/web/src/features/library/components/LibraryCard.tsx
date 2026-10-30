@@ -14,16 +14,16 @@ interface LibraryCardProps {
 
 const ScanStatusStyles = {
   scanning: css`
-    background-color: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
+    background-color: var(--color-secondary);
+    color: var(--color-info);
   `,
   completed: css`
-    background-color: rgba(16, 185, 129, 0.15);
-    color: #10b981;
+    background-color: var(--color-secondary);
+    color: var(--color-success);
   `,
   failed: css`
-    background-color: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background-color: var(--color-secondary);
+    color: var(--color-destructive);
   `,
 }
 
@@ -138,15 +138,15 @@ const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' | 'destr
     switch (p.$variant) {
       case 'primary':
         return css`
-          background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.1);
-          color: var(--color-primary);
-          &:hover { background-color: rgba(var(--color-primary-rgb, 0 0 0), 0.2); }
+          background-color: color-mix(in srgb, var(--color-highlight) 10%, transparent);
+          color: var(--color-accent-text);
+          &:hover { background-color: color-mix(in srgb, var(--color-highlight) 20%, transparent); }
         `
       case 'destructive':
         return css`
           background-color: transparent;
           color: var(--color-destructive);
-          &:hover { background-color: rgba(239, 68, 68, 0.1); }
+          &:hover { background-color: var(--color-secondary); }
         `
       default:
         return css`

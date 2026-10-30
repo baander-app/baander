@@ -20,6 +20,9 @@ const ButtonColumn = styled(DialogFooter)`
 
 const FullButton = styled(Button)`
   width: 100%;
+  height: auto;
+  min-height: 2.25rem;
+  white-space: normal;
 `
 
 interface PreferenceConflictDialogProps {

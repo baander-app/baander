@@ -94,8 +94,8 @@ const SearchResultButton = styled.button`
   cursor: pointer;
 
   &:hover {
-    background-color: var(--color-accent);
-    color: var(--color-accent-foreground);
+    background-color: var(--color-highlight);
+    color: var(--color-highlight-foreground);
   }
 
   &:disabled {

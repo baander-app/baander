@@ -1,3 +1,4 @@
+import { ThemeProvider } from '@/shared/theme'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -33,11 +34,13 @@ import { ArtistDetailPage } from '@/features/catalog/pages/ArtistDetailPage'
 describe('ArtistDetailPage', () => {
   it('renders artist name', () => {
     render(
+      <ThemeProvider>
       <MemoryRouter initialEntries={['/artists/artist_1']}>
         <Routes>
           <Route path="/artists/:publicId" element={<ArtistDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </ThemeProvider>,
     )
 
     expect(screen.getByText('Test Artist')).toBeInTheDocument()
@@ -45,11 +48,13 @@ describe('ArtistDetailPage', () => {
 
   it('renders discography section with album cards', () => {
     render(
+      <ThemeProvider>
       <MemoryRouter initialEntries={['/artists/artist_1']}>
         <Routes>
           <Route path="/artists/:publicId" element={<ArtistDetailPage />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter>
+      </ThemeProvider>,
     )
 
     // Album grid cards should render with titles
