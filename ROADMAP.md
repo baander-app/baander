@@ -948,12 +948,22 @@ differ) and 136 dB without; raw access units at 44.6, 60.3, 92.9 and
 `ebur128`; a four-second stereo programme at 96 kbit/s carrying the
 loudness set decodes in all four decoders at 20.8 dB against the source,
 and FFmpeg normalises it by the set (`-target_level -24`) with the same
--9.0 dB gain as our decoder. SBR at 2:1: pending (the lead fills the
-figures). MPS 212: pending (the lead fills the figures). CTest N/N
-(`test_loudness`, `test_usac_enc` and `test_encoder_loudness` among them)
-and the binding's smoke test (13 tests); the Electron service test (7
-tests) passes under Node's type stripping with a local build.
-[PLACEHOLDER FOR THE LEAD: final CTest count and the SBR/MPS 212 rows.]
+-9.0 dB gain as our decoder. SBR at 2:1: the committed mono 32 and
+stereo 64 kbit/s streams decode in all four decoders at 17.5 and
+19.4 dB against the source, FDK and libxaac agreeing with ours at 58 to
+80 dB and FFmpeg at 26 to 27 dB; on a six-second music excerpt the
+ladder gives 11.4 to 17.3 kHz of bandwidth at 16 to 48 kbit/s mono and
+15.6 to 21.6 kHz at 48 to 96 kbit/s stereo, within 1 kbit/s of the
+asked rate. MPS 212: the committed stereo 32 kbit/s stream decodes in
+the FDK decoder and libxaac at 77 and 79 dB against ours and 20.5 dB on
+the channels' sum against the source; FFmpeg rejects every
+stereoConfigIndex 1 stream, the FDK encoder's included, which is why the
+tool is opt-in. CTest 41/41 (`test_loudness`, `test_usac_enc`,
+`test_usac_enc_sbr` and `test_encoder_loudness` among them), the
+sanitizer build with the release flags on the encoder, loudness, SBR,
+transport, round-trip, interop and allocation suites clean, and the
+binding's smoke test (13 tests); the Electron service test (7 tests)
+passes under Node's type stripping with a local build.
 Open: the LPD core, the live loudness leveler and DRC gain sets, the 8:3
 and 4:1 SBR ratios, residual and phase coding in MPS 212 and surround
 input to the USAC encoder are out of scope as planned; the one-pass

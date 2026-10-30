@@ -1,7 +1,7 @@
 ---
 title: AAC codec xHE-AAC encoder: USAC streams in compatible mode, loudness metadata, client builds
 date: 2026-10-30
-status: draft
+status: delivered
 execution: code
 ---
 
@@ -65,7 +65,10 @@ In scope:
    harmonic transposer, PVC and inter-TES off; the 8:3 and 4:1 ratios
    with the 768-line core later, when the decoder's LPD-era streams give
    them a reference.
-5. MPS 212 encoder for stereo at low bitrates: the OTT parameter
+5. MPS 212 encoder for stereo at low bitrates, opted into by the caller
+   (delivered as opt-in rather than by bitrate: FFmpeg's USAC decoder
+   rejects every stereoConfigIndex 1 stream, so the compatible-mode gate
+   forbids choosing it by default): the OTT parameter
    extraction of the test tool (`tools/mps-enc.cpp`: CLD and ICC per
    band from the hybrid-domain analysis) written as `Mps212Data` with
    stereoConfigIndex 1 (no residual, no phase coding), the downmix fed to
@@ -84,6 +87,8 @@ In scope:
    FDK decoder binary, libxaac and our decoder, with SNR against the
    input and bitrate bounds recorded in the reference comparison, and
    the loudness measurement checked against FFmpeg's `ebur128` filter.
+   (Delivered: FFmpeg master's LATM demuxer refuses USAC, so its gate runs
+   on the MP4 form of every stream.)
 8. Client builds: a GitHub Actions workflow that builds the native addon
    for Electron on Linux x64, Windows x64 and macOS x64/arm64, runs the
    smoke test, and publishes the prebuilt binaries as release assets;
