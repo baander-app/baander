@@ -192,8 +192,13 @@ test('conceals damaged frames and limits the output', () => {
   const pcm = tones(sampleRate, sampleRate, 2);
   const encoder = new AacEncoder({ sampleRate, channels: 2, bitrate: 128000 });
   const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+  /* Damage the side information at the start of the fourth frame's raw
+   * data block, where a decoder can detect it; damaged spectral data can
+   * still parse, so a fixed byte offset depends on the encoder's choices. */
+  let frame = 0;
+  for (let k = 0; k < 3; k++) frame += ((stream[frame + 3] & 3) << 11) | (stream[frame + 4] << 3) | (stream[frame + 5] >> 5);
   const damaged = Buffer.from(stream);
-  for (let i = 400; i < 420; i++) damaged[i] ^= 0x5a;
+  for (let i = frame + 7; i < frame + 27; i++) damaged[i] ^= 0x5a;
 
   const concealing = new AacDecoder({ channels: 2 });
   const out = decodeAll(concealing, damaged, damaged.length);
