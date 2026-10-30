@@ -1,6 +1,7 @@
 #include "encoder_tools.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 

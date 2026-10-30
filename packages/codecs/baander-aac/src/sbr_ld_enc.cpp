@@ -1,6 +1,7 @@
 #include "sbr_ld_enc.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 #include <mutex>

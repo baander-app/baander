@@ -4,6 +4,7 @@
  * and the inverse filterbank with the USAC window sequences. */
 #include "usac_fd.h"
 
+#include <cstdlib>
 #include <cmath>
 #include <cstring>
 
