@@ -370,6 +370,25 @@ export interface AacEncoderOptions {
   /** A second quantisation pass for better quality at more CPU. Default false. */
   afterburner?: boolean;
   /**
+   * A hard cap in bit/s on any single frame: no frame takes more than its
+   * share of it, and the bit reservoir never lends past it. In 'cbr' and
+   * 'abr' it may not be below `bitrate`. Default 0 (none).
+   */
+  peakBitrate?: number;
+  /**
+   * The core's lowpass in Hz (1000 or more, clamped to half the core
+   * rate) instead of the bitrate's tuning table. No effect on a core with
+   * SBR, which is coded up to the SBR crossover. Default 0 (the table).
+   */
+  bandwidth?: number;
+  /**
+   * One of the VBR modes as the FDK encoder names them, 1 to 5: about 32,
+   * 72, 112, 148 or 228 kbit/s for stereo (scaled per channel). The
+   * mode's target replaces `bitrate` and `mode`; a `peakBitrate` below it
+   * lowers the mode, and a `quality` given with it overrides the mode's.
+   */
+  vbrMode?: 1 | 2 | 3 | 4 | 5;
+  /**
    * Dynamic range control metadata written into the stream.  Not available
    * for the 'ld', 'eld' and 'xhe' profiles, whose frames carry no fill
    * elements: the constructor throws when a profile other than 'none' is

@@ -422,6 +422,29 @@ move within the scalefactor limits. It raises the segmental SNR by about
 0.6 to 1.0 dB between 32 and 96 kbit/s for roughly twice the encoding
 time; with it off the output is unchanged byte for byte.
 
+Three tuning controls apply to every profile and leave the stream
+unchanged byte for byte while they are unset.
+`aac_encoder_set_peak_bitrate` caps every frame at its share of a peak
+bitrate: the rate loop's per-frame limit becomes the smaller of the AAC
+limit and that share (rounded down to whole bytes), and the bit
+reservoir shrinks so that it never lends a frame more than the cap
+allows. In CBR and ABR the cap may not lie below the bitrate.
+`aac_encoder_set_bandwidth` replaces the tuning table's lowpass of the
+core; an SBR core is always coded up to its crossover, so the override
+leaves HE-AAC streams and xHE-AAC streams running SBR as they are. The
+decoded output's -50 dB bandwidth lands within one scalefactor band
+above the asked value, because a band that holds the cutoff is coded
+whole. `aac_encoder_set_vbr_mode` takes the five VBR modes the FDK
+encoder names, as stereo targets of 32, 72, 112, 148 and 228 kbit/s
+(scaled per channel): the target becomes the nominal bitrate, whose
+rate loop and reservoir bound every frame as in ABR (so a hard passage
+cannot overshoot it), each frame's thresholds come from the mode's
+quality (no surplus is spent on easy frames), and every frame carries
+the VBR marker. A peak bitrate below
+the mode's target lowers the mode to the highest one that fits. The
+qualities were chosen on a 48 kHz stereo music excerpt; the reference
+comparison has the figures per mode against the FDK encoder.
+
 ### Loudness
 
 The loudness meter (`include/loudness.h`, `src/loudness.cpp`) measures
@@ -640,6 +663,11 @@ int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
 int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate);
 int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int prog_ref_level);
+/* tuning: a per-frame cap, the core's lowpass, the FDK-named VBR modes */
+int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps);
+int aac_encoder_set_bandwidth(AacEncoderHandle ctx, int hz);
+int aac_encoder_bandwidth(AacEncoderHandle ctx);
+int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode);
 ```
 
 - `sample_rate` is one of the twelve AAC rates (8000 to 96000 Hz);
@@ -682,6 +710,20 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
   masking threshold, 100 nine dB below it. In the VBR modes the quality
   also selects the lowpass (13 kHz at 1 to 19.3 kHz at 100), and a quality
   set after creation re-derives every setting that depends on it.
+- `aac_encoder_set_peak_bitrate` (bits per second, 0 for none) and
+  `aac_encoder_set_vbr_mode` (1 to 5, 0 restores the bitrate and rate
+  control given at creation) are taken before the first frame only
+  (`AAC_ERR_STATE` after it); a peak below the bitrate in CBR or ABR, a
+  negative peak and a mode outside 0 to 5 are refused with
+  `AAC_ERR_INVALID_ARG`. The cap counts a frame as the rate control does,
+  the raw data block plus an ADTS header's bits: ADTS frames and raw
+  access units stay within it, LOAS and LATM add their header bytes,
+  and the pre-roll an xHE-AAC immediate playout frame carries stays
+  outside it. A frame whose side information alone exceeds the cap
+  cannot honour it. A quality set after a VBR mode overrides the mode's.
+- `aac_encoder_set_bandwidth` takes 1000 Hz or more (0 returns to the
+  tuning table) at any time and clamps to half the core rate;
+  `aac_encoder_bandwidth` reads the lowpass in force.
 - `aac_encoder_set_loudness_info` takes the figures of a whole programme
   (`AacLoudnessInfo`: the integrated loudness and the sample peak, the
   true peak, range, anchor loudness and the momentary and short-term
@@ -899,6 +941,11 @@ baac loudness <in.wav> | <in.f32le> <rate> <channels>
 baac bench [--seconds N] [--dump DIR] [--only NAME]
 ```
 
+For every profile `--peak-bitrate N`, `--bandwidth HZ` and
+`--vbr-mode 1..5` set the tuning controls (with a VBR mode the bitrate
+and mode arguments are replaced by the mode's, and a quality argument
+overrides the mode's quality).
+
 With the `xhe` profile, `--loudness` measures the whole input first and
 writes the loudness info set into the stream (the figures go to stderr),
 `--sbr on|off|auto` and `--mps on|off|auto` choose enhanced SBR and
@@ -956,8 +1003,9 @@ decoder still holds at the end of the stream (`delay` per channel, an
 empty `Float32Array` when it holds none) and starts over;
 `decoder.clearHistory()` prepares a seek as `aac_decoder_clear_history`
 does; the encoder options add
-`transport`, `signaling`, `frameLength`, `crc`, `mpeg2` and `channelMode`
-(`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`), and the encoder exposes
+`transport`, `signaling`, `frameLength`, `crc`, `mpeg2`, `channelMode`
+(`7.1`, `7.1-front`, `7.1-top`, `7.1-rear`) and the tuning controls
+`peakBitrate`, `bandwidth` and `vbrMode`, and the encoder exposes
 `config` and the `unitSizes` of its last result, which a packetiser needs
 with the LATM and raw transports. For USAC streams (`objectType`
 `usac`) the decoder options add `loudness` (`false`, or
@@ -1061,7 +1109,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-seven suites, and the transform, filterbank and
+`ctest` runs thirty-eight suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -1177,7 +1225,17 @@ with its normalisation gain, the set's removal and replacement and its
 place next to the stream id, the refusals by object type and state, the
 one-pass meter against the standalone one and EBU Tech 3341's first
 case across a flush, and byte identity of the AAC-LC, HE-AAC and USAC
-output with the meter on and of the raw access units with the set). The
+output with the meter on and of the raw access units with the set), and
+the tuning controls and encoder correctness checks in
+`test_encoder_tuning` (no frame above the peak bitrate's share on clicks
+and noise in every profile and rate control mode, the decoded -50 dB
+bandwidth against the override and the SBR core left alone, the VBR
+modes' bitrate order and ceilings, a peak lowering the mode in either
+order, a cleared mode reproducing the plain stream, the element order
+SCE FIL CPE FIL CPE FIL LFE END of 5.1 HE-AAC with each SBR payload in
+the fill element after its own element, FFmpeg decoding that stream
+channel for channel, and HE-AAC v2 draining a short last block and a
+one-sample input). The
 other USAC
 data under `tests/data` is the FDK xHE-AAC encoder's output
 (`usac_*.loas`, 48 access units each, mono and stereo at 12 to

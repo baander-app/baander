@@ -40,6 +40,7 @@ set(TEST_SOURCES
     test_usac_enc_sbr.cpp
     test_usac_rap.cpp
     test_playback.cpp
+    test_encoder_tuning.cpp
 )
 
 foreach(test_src ${TEST_SOURCES})

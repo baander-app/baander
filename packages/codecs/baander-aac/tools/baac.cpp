@@ -7,7 +7,11 @@
  *
  * Raw PCM is interleaved 32-bit float; the AAC side is an ADTS stream
  * (a LOAS stream for the xhe profile, which ADTS cannot carry).
- * mode: cbr (default), abr, cvbr, tvbr.  The xhe options: --loudness
+ * mode: cbr (default), abr, cvbr, tvbr.  For every profile,
+ * --peak-bitrate N caps the bits of any frame at its share of N bit/s,
+ * --bandwidth HZ sets the core's lowpass (no effect on an SBR core) and
+ * --vbr-mode 1..5 picks one of the FDK-named VBR modes, whose target
+ * replaces the bitrate.  The xhe options: --loudness
  * measures the whole input first and writes the loudness info set into
  * the stream; --sbr and --mps (on, off, auto), --no-noise-filling,
  * --preroll off and --stream-id N set the USAC encoder options;
@@ -61,6 +65,7 @@ static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
           "[quality] [lc|he|hev2|xhe] [options]\n"
+          "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5\n"
           "         xhe options: --loudness (two-pass: measure the input, write the loudness "
           "info set)\n"
           "                      --sbr on|off|auto  --mps on|off|auto  --no-noise-filling\n"
@@ -238,6 +243,9 @@ static int loudness(int argc, char** argv) {
 struct EncodeOptions {
   bool loudness = false;
   bool usac = false; /* any USAC option given */
+  int peak_bitrate = 0;
+  int bandwidth = 0;
+  int vbr_mode = 0;
   AacUsacEncoderOptions opt{-1, -1, 0, 0, 0, 0, 0, -1, -1, -1};
 };
 
@@ -273,6 +281,16 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     const bool has_value = i + 1 < *argc;
     if (arg == "--loudness") {
       o->loudness = true;
+    } else if ((arg == "--peak-bitrate" || arg == "--bandwidth" || arg == "--vbr-mode") &&
+               has_value) {
+      const int v = atoi(argv[i + 1]);
+      if (v < 0) {
+        fprintf(stderr, "baac: %s takes a positive number\n", argv[i]);
+        return false;
+      }
+      (arg == "--peak-bitrate" ? o->peak_bitrate : arg == "--bandwidth" ? o->bandwidth : o->vbr_mode) =
+          v;
+      i++;
     } else if (arg == "--sbr" && has_value && on_off_auto(argv[i + 1], &o->opt.sbr)) {
       o->usac = true;
       i++;
@@ -372,6 +390,23 @@ static int encode(int argc, char** argv) {
   }
   if (options.usac && aac_encoder_set_usac(enc, &options.opt) != AAC_OK) {
     fprintf(stderr, "baac: the USAC options were refused\n");
+    return 1;
+  }
+  /* the peak first, so that it can lower the VBR mode; a quality given
+   * on the command line overrides the mode's */
+  if (options.peak_bitrate && aac_encoder_set_peak_bitrate(enc, options.peak_bitrate) != AAC_OK) {
+    fprintf(stderr, "baac: --peak-bitrate was refused (below the bitrate in cbr or abr?)\n");
+    return 1;
+  }
+  if (options.vbr_mode && aac_encoder_set_vbr_mode(enc, options.vbr_mode) != AAC_OK) {
+    fprintf(stderr, "baac: --vbr-mode takes 1 to 5\n");
+    return 1;
+  }
+  if (options.vbr_mode && argc > 8 && atoi(argv[8]) > 0) {
+    aac_encoder_set_quality(enc, atoi(argv[8]));
+  }
+  if (options.bandwidth && aac_encoder_set_bandwidth(enc, options.bandwidth) != AAC_OK) {
+    fprintf(stderr, "baac: --bandwidth takes 1000 Hz or more\n");
     return 1;
   }
   const std::vector<uint8_t> in = read_all(argv[2]);

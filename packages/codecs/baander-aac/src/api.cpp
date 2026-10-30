@@ -337,6 +337,53 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
   return AAC_OK;
 }
 
+int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps) {
+  if (!ctx || bps < 0) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  /* a VBR mode may be lowered by the cap; a constant rate cannot */
+  if (bps > 0 && !s->vbr_mode && (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) &&
+      bps < s->bitrate) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  return aac_encoder_state_set_peak_bitrate(s, bps);
+}
+
+int aac_encoder_set_bandwidth(AacEncoderHandle ctx, int hz) {
+  if (!ctx || hz < 0 || (hz > 0 && hz < 1000)) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  s->bandwidth_override = hz;
+  aac_encoder_state_configure(s);
+  return AAC_OK;
+}
+
+int aac_encoder_bandwidth(AacEncoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacEncoderState*>(ctx)->bandwidth;
+}
+
+int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (mode < 0 || mode > 5) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  return aac_encoder_state_set_vbr_mode(s, mode);
+}
+
 int aac_encoder_frame_size(AacEncoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;

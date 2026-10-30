@@ -188,6 +188,46 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
  * same bounds as any other. */
 int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data, int nbits);
 
+/* ── Encoder: tuning ─────────────────────────────────────────────── */
+
+/* A hard cap on the bitrate of any single frame, in bits per second:
+ * no frame takes more than its share of `bps` (the frame's bits as the
+ * rate control counts them, the raw data block with an ADTS header's
+ * bits, rounded down to whole bytes; LOAS and LATM add their few header
+ * bytes on top, and the pre-roll of an xHE-AAC immediate playout frame
+ * stays outside it), and the bit reservoir never lends a frame more
+ * than the cap allows.  Holds for every profile and rate control mode
+ * whenever the frame's side information fits the cap.  0 removes the
+ * cap (default).  Before the first frame only; AAC_ERR_INVALID_ARG for
+ * a negative value or, in CBR and ABR outside a VBR mode, a cap below
+ * the bitrate. */
+int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps);
+/* The lowpass of the core coder in Hz instead of the bitrate's tuning
+ * table entry (0, the default): the bands above it are not coded.  The
+ * value is clamped to half the core rate (half the input rate with
+ * SBR).  The channels of an SBR element are coded up to the element's
+ * crossover whatever the override says, since the bands below the
+ * crossover are what the decoder copies upwards; an LFE keeps its
+ * fixed range.  May be set at any time; AAC_ERR_INVALID_ARG below
+ * 1000 Hz. */
+int aac_encoder_set_bandwidth(AacEncoderHandle ctx, int hz);
+/* The lowpass in force, in Hz: the override, the tuning table's entry,
+ * or the SBR crossover. */
+int aac_encoder_bandwidth(AacEncoderHandle ctx);
+/* A VBR mode as the FDK encoder names them, 1 (lowest) to 5 (highest):
+ * the mode's bitrate target for a stereo stream is 32, 72, 112, 148 or
+ * 228 kbit/s, scaled per channel for other layouts, and it becomes the
+ * nominal bitrate.  Each frame is coded at the noise level of a quality
+ * chosen to bring music close to the target, spends no surplus on easy
+ * frames, and is bounded by the bitrate's rate loop and reservoir as in
+ * ABR; every frame carries the VBR marker.  A later
+ * aac_encoder_set_quality overrides the mode's quality.  A peak bitrate
+ * below the target lowers the mode to the highest one that fits.  0
+ * clears the mode and restores the bitrate and rate control given at
+ * creation.  Before the first frame only; AAC_ERR_INVALID_ARG for
+ * another mode. */
+int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode);
+
 /* ── Encoder: USAC (xHE-AAC) ─────────────────────────────────────── */
 
 /* aac_encoder_create with AAC_AOT_USAC makes an xHE-AAC encoder

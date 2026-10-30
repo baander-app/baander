@@ -1222,16 +1222,19 @@ int quantize_frame(AacEncoderState* s) {
   return bits + frame_overhead_bits(s);
 }
 
-/* Quality 1..100 of the VBR modes as a noise-to-mask ratio: 70 sits at the
- * masking threshold, 100 nine dB below it. */
+/* Quality of the VBR modes as a noise-to-mask ratio: 70 sits at the
+ * masking threshold, 100 nine dB below it (the API takes 1..100; the
+ * FDK-named VBR modes go up to 130, 18 dB below). */
 float quality_factor(int quality) { return exp2f((70.0f - (float)quality) / 10.0f); }
 
 /* Finds the working point whose frame fits in target_bits: first the
  * smallest threshold reduction, then, if the minimum-SNR floors still
  * overshoot, the fewest released bands.  With room to spare and a full
- * reservoir the thresholds are lowered instead.  Returns the frame's bits
- * at the chosen working point. */
-int rate_control(AacEncoderState* s, int target_bits, float base_improve) {
+ * reservoir the thresholds are lowered instead, when `spend_surplus`
+ * allows it (not in a VBR mode, whose quality alone sets the
+ * thresholds of a frame that fits).  Returns the frame's bits at the
+ * chosen working point. */
+int rate_control(AacEncoderState* s, int target_bits, float base_improve, bool spend_surplus) {
   ReleaseEntry release[2 * AAC_MAX_BANDS];
   const int n_release = prepare_bands(s, release);
 
@@ -1249,7 +1252,8 @@ int rate_control(AacEncoderState* s, int target_bits, float base_improve) {
   int bits = quantize_frame(s);
   if (bits <= target_bits) {
     const bool reservoir_full = s->reservoir >= s->reservoir_max - s->reservoir_max / 10;
-    if (base_improve < 1.0f || !reservoir_full || bits > target_bits - target_bits / 8) {
+    if (!spend_surplus || base_improve < 1.0f || !reservoir_full ||
+        bits > target_bits - target_bits / 8) {
       return bits;
     }
     /* Spend the surplus on lower noise. */
@@ -1404,6 +1408,7 @@ int create_sbr_encoders(AacEncoderState* s) {
       return AAC_ERR_INIT;
     }
   }
+  s->tools_bitrate = s->bitrate;
   return AAC_OK;
 }
 
@@ -1426,6 +1431,7 @@ int create_usac_sbr_encoders(AacEncoderState* s) {
       return AAC_ERR_INIT;
     }
   }
+  s->tools_bitrate = s->bitrate;
   return AAC_OK;
 }
 
@@ -1444,6 +1450,14 @@ int lfe_lines(int frame_length) { return 12 * frame_length / AAC_FRAME_SIZE_LONG
  * targets are chosen. */
 constexpr int kSbrBitrateEstimate = 1500;
 constexpr int kMpsBitrateEstimate = 2500;
+
+/* The peak bitrate's share of one frame in bits, rounded down to whole
+ * bytes: the frame covers frame_length core samples at the core rate
+ * (one input block at the input rate with any kind of SBR). */
+int peak_frame_bits(const AacEncoderState* s) {
+  const long long bits = (long long)s->peak_bitrate * s->frame_length / s->sample_rate;
+  return (int)std::min<long long>(bits / 8 * 8, 1 << 28);
+}
 
 /* Everything that follows from the frame length: the input block size,
  * the delay, the transforms, the LFE downsamplers and the bit budget per
@@ -1475,9 +1489,15 @@ void apply_frame_length(AacEncoderState* s) {
   }
   s->avg_frame_bits = (int)((long long)s->bitrate * fl / s->sample_rate);
   /* The reservoir of a parametric stereo stream keeps the input's channel
-   * count; the hard limit per frame still counts the coded channels. */
-  s->reservoir_max =
-      std::max(0, aac_max_bits_per_channel(fl) * s->input_channels - s->avg_frame_bits);
+   * count; the hard limit per frame still counts the coded channels.  A
+   * peak bitrate bounds what the reservoir may lend a frame on top of
+   * its average. */
+  int reservoir_max = aac_max_bits_per_channel(fl) * s->input_channels - s->avg_frame_bits;
+  if (s->peak_bitrate > 0) {
+    reservoir_max = std::min(reservoir_max, peak_frame_bits(s) - s->avg_frame_bits);
+  }
+  s->reservoir_max = std::max(0, reservoir_max);
+  s->reservoir = std::min(s->reservoir, s->reservoir_max);
 }
 
 /* xHE-AAC: the SBR and MPS 212 choice of the options and the bitrate,
@@ -1491,7 +1511,7 @@ void apply_usac_tools(AacEncoderState* s) {
   int sbr = 0;
   int mps = 0;
   aac_usac_enc_choose_tools(u, s->input_rate, s->input_channels, s->bitrate, &sbr, &mps);
-  if (sbr == u->sbr_active && mps == u->mps_active) {
+  if (sbr == u->sbr_active && mps == u->mps_active && (!sbr || s->tools_bitrate == s->bitrate)) {
     return;
   }
   for (int attempt = 0; attempt < 2; attempt++) {
@@ -1541,8 +1561,10 @@ AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType 
   s->sample_rate = sbr ? sr / 2 : sr;
   s->channels = coded_channels;
   s->bitrate = br;
+  s->base_bitrate = br;
   s->aot = aot;
   s->rc_mode = rc;
+  s->base_rc = rc;
   s->quality = 70;
   s->frame_length = low_delay ? AAC_FRAME_SIZE_LD : AAC_FRAME_SIZE_LONG;
   s->dsp = dsp;
@@ -1663,7 +1685,13 @@ void aac_encoder_state_configure(AacEncoderState* s) {
   }
   const int channel_bitrate = std::max(core_bitrate, 8000) / s->channels;
   const int fl = s->frame_length;
-  s->bandwidth = bandwidth_for(channel_bitrate, s->channels, s->sample_rate, s->rc_mode, s->quality);
+  /* The override sets the lowpass of a core without SBR; the core of an
+   * SBR element is coded up to the crossover (below). */
+  const bool sbr_core = state_has_sbr(s) || s->ld_sbr;
+  s->bandwidth = s->bandwidth_override > 0 && !sbr_core
+                     ? std::min(s->bandwidth_override, s->sample_rate / 2)
+                     : bandwidth_for(channel_bitrate, s->channels, s->sample_rate, s->rc_mode,
+                                     s->quality);
   const int* lo = aac_sfb_offset(fl, s->rate_index, 0);
   const int* so = aac_sfb_offset(fl, s->rate_index, 1);
   active_bands(s->rate_index, fl, s->sample_rate, s->bandwidth, &s->active_bands_long,
@@ -1786,6 +1814,95 @@ int aac_encoder_state_max_frame_bytes(const AacEncoderState* s) {
     }
   }
   return bytes;
+}
+
+int aac_encoder_state_max_frame_bits(const AacEncoderState* s) {
+  const int limit = aac_max_bits_per_channel(s->frame_length) * s->channels + kAdtsBits;
+  return s->peak_bitrate > 0 ? std::min(limit, peak_frame_bits(s)) : limit;
+}
+
+int aac_encoder_state_set_peak_bitrate(AacEncoderState* s, int bps) {
+  s->peak_bitrate = bps;
+  if (s->vbr_mode) {
+    /* the cap may lower the mode in force */
+    return aac_encoder_state_set_vbr_mode(s, s->vbr_mode);
+  }
+  apply_frame_length(s); /* the reservoir's size follows the cap */
+  aac_encoder_state_configure(s);
+  aac_encoder_state_reset(s);
+  return AAC_OK;
+}
+
+int aac_encoder_state_set_bitrate(AacEncoderState* s, int bitrate) {
+  s->bitrate = bitrate;
+  if (aac_encoder_aot_has_sbr(s->aot)) {
+    /* the SBR tuning (crossover, noise bands) follows the bitrate */
+    destroy_sbr_encoders(s);
+    if (create_sbr_encoders(s) != AAC_OK) {
+      return AAC_ERR_INIT;
+    }
+  }
+  if (s->ld_sbr && create_ld_sbr_encoders(s) != AAC_OK) {
+    s->ld_sbr = 0;
+    return AAC_ERR_INIT;
+  }
+  apply_frame_length(s);
+  aac_encoder_state_configure(s);
+  aac_encoder_state_reset(s); /* xHE-AAC chooses its tools again here */
+  return AAC_OK;
+}
+
+namespace {
+
+/* The VBR modes as the FDK encoder names them: the approximate bitrate
+ * of a stereo stream per mode (HE-AAC v2 at the first, HE-AAC v1 at the
+ * second, AAC-LC above), scaled per channel for other layouts, and the
+ * quality whose thresholds bring a stereo music excerpt at 48 kHz close
+ * to the target under the bitrate's rate loop.  The upper modes go past
+ * quality 100 (12 and 18 dB below the masking threshold), since sparse
+ * music needs that to approach their targets; the rate loop bounds every
+ * mode as it bounds CBR, so a hard excerpt cannot overshoot.  HE-AAC v2
+ * codes one channel and needs a finer quality for the same bitrate. */
+constexpr int kVbrModeStereoBitrate[5] = {32000, 72000, 112000, 148000, 228000};
+constexpr int kVbrModeQuality[5] = {20, 70, 100, 120, 130};
+constexpr int kVbrModeQualityPs[5] = {50, 90, 100, 100, 100};
+
+}  // namespace
+
+int aac_encoder_vbr_mode_bitrate(int mode, int channels) {
+  if (mode < 1 || mode > 5) {
+    return 0;
+  }
+  return (int)((long long)kVbrModeStereoBitrate[mode - 1] * channels / 2);
+}
+
+int aac_encoder_state_set_vbr_mode(AacEncoderState* s, int mode) {
+  if (mode < 0 || mode > 5) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  if (mode == 0) {
+    if (s->vbr_mode) {
+      s->quality = s->base_quality;
+    }
+    s->vbr_mode = 0;
+    s->rc_mode = s->base_rc;
+    return aac_encoder_state_set_bitrate(s, s->base_bitrate);
+  }
+  if (!s->vbr_mode) {
+    s->base_quality = s->quality;
+  }
+  s->vbr_mode = mode;
+  /* a peak bitrate below the mode's target lowers the mode */
+  int in_force = mode;
+  while (in_force > 1 && s->peak_bitrate > 0 &&
+         aac_encoder_vbr_mode_bitrate(in_force, s->input_channels) > s->peak_bitrate) {
+    in_force--;
+  }
+  const int* quality = s->aot == AAC_AOT_PS ? kVbrModeQualityPs : kVbrModeQuality;
+  s->rc_mode = AAC_RC_ABR;
+  s->quality = quality[in_force - 1];
+  return aac_encoder_state_set_bitrate(
+      s, aac_encoder_vbr_mode_bitrate(in_force, s->input_channels));
 }
 
 void aac_encoder_state_destroy(AacEncoderState* s) {
@@ -2002,7 +2119,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
    * (5760 with 960-sample frames); the budget counts the ADTS header as
    * well. */
   const int avg = s->avg_frame_bits;
-  const int hard_max = aac_max_bits_per_channel(fl) * s->channels + kAdtsBits;
+  const int hard_max = aac_encoder_state_max_frame_bits(s);
   int target = hard_max;
   int max_bits = hard_max;
   float improve = 1.0f;
@@ -2013,6 +2130,12 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       const int dyn = bit_demand(s, frame_pe(s), std::max(avg - overhead, 1));
       max_bits = std::min(hard_max, avg + s->reservoir);
       target = std::clamp(overhead + dyn, avg / 4, max_bits);
+      if (s->vbr_mode) {
+        /* A VBR mode spends what its quality asks for and never more
+         * than the bitrate's rate loop allows: easy frames stay small,
+         * hard ones are bounded as in CBR. */
+        improve = quality_factor(s->quality);
+      }
       break;
     }
     case AAC_RC_CVBR:
@@ -2034,7 +2157,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       target = std::min(target, max_bits);
     }
   }
-  const int bits = rate_control(s, target, improve);
+  const int bits = rate_control(s, target, improve, !s->vbr_mode);
   if (s->afterburner && !s->usac) {
     /* The constant-rate modes may fill the frame's budget; the quality
      * modes only redistribute the bits the frame already has. */
@@ -2043,7 +2166,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   }
 
   int fullness = 0x7FF; /* variable bitrate marker */
-  if (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) {
+  if ((s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) && !s->vbr_mode) {
     fullness = std::min(0x7FE, s->reservoir / (32 * s->channels));
   }
   const int len = write_frame(s, fullness);

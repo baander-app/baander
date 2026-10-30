@@ -52,6 +52,136 @@ matches our own decoder to 135 dB in every case.
 | trans44 | 96 k | 44.8, 4.9 / 4.9 dB | 71.0, 5.9 / 5.8 dB |
 | noise44 | 64 k | 63.6, 0.0 / 0.0 dB | 66.9, 0.3 / 0.4 dB |
 
+### Encoder tuning
+
+Measured on 2026-10-30 on three excerpts at 48 kHz: `music` (6 s
+stereo), `speech` (6 s mono) and `clicks` (6 s stereo of the test
+suite's decaying noise bursts every 180 ms). Every stream is decoded by
+FFmpeg 6.1.1; the delay is found by cross-correlation, and the
+segmental SNR is the mean over 1024-sample segments, each clamped to
+-10..50 dB. The FDK figures are its encoder (`aac-enc -t 2|5|29
+-v 1..5`) on the same input.
+
+VBR modes (`aac_encoder_set_vbr_mode`), kbit/s and segmental SNR per
+mode 1 to 5 (stereo targets 32, 72, 112, 148, 228 kbit/s; mono half
+that):
+
+| Excerpt, profile | Ours | FDK |
+|------------------|------|-----|
+| music, AAC-LC | 31.4 (14.3), 72.0 (25.6), 109.6 (30.1), 137.6 (32.2), 189.0 (34.3) | 87.6 (35.9), 85.3 (35.5), 92.2 (35.4), 110.6 (37.3), 148.9 (39.6) |
+| music, HE-AAC | 31.6 (19.7), 71.1 (27.9), 106.6 (30.2), 132.4 (31.6), 176.3 (33.6) | 57.0 (32.2), 73.3 (32.0), 71.0 (31.8), 81.5 (32.5), 95.4 (33.1) |
+| music, HE-AAC v2 | 31.7, 72.1, 98.8, 103.6, 103.6 (3.8 dB each) | 37.9, 39.9, 42.5, 48.1, 55.0 (3.4 dB each) |
+| speech, AAC-LC | 14.8 (6.8), 31.5 (15.8), 48.3 (18.6), 62.9 (20.9), 94.9 (22.8) | 53.8 (21.8), 52.3 (21.4), 60.0 (22.0), 74.3 (24.1), 110.1 (27.0) |
+| speech, HE-AAC | 15.3 (4.5), 32.5 (6.0), 49.3 (6.2), 64.2 (6.3), 94.8 (6.3) | 31.7 (6.3), 33.1 (6.3), 37.6 (6.3), 46.1 (6.4), 57.2 (6.5) |
+| clicks, AAC-LC | 16.3 (1.1), 33.5 (2.0), 53.0 (5.1), 67.8 (5.4), 94.6 (5.7) | 36.2 (2.9), 36.0 (2.9), 43.1 (4.1), 48.9 (4.7), 61.5 (6.4) |
+| clicks, HE-AAC | 19.6, 41.4, 64.3, 75.1, 83.7 (-1.5 to -1.1 dB) | 27.4, 37.3, 38.0, 48.9, 51.4 (-1.8 to -1.6 dB) |
+| clicks, HE-AAC v2 | 21.1, 45.0, 54.5, 54.5, 54.5 (-1.5 to -1.0 dB) | 27.8, 31.1, 35.7, 37.1, 38.7 (-2.1 to -1.9 dB) |
+
+On the music excerpt our AAC-LC modes land 1.9 % below, on, 2.1 %
+below, 7.0 % below and 17.1 % below their targets; the test suite's
+wideband signal lands within 2.2 % of all five (31.3, 72.1, 113.0,
+149.7, 230.8 kbit/s). Mode 5 cannot reach 228 kbit/s on this excerpt:
+the encoder stops spending once every band sits far enough below its
+masking threshold, and CBR at 228 kbit/s itself gives 196.4 kbit/s;
+qualities past the mode's 130 reach 193.5 kbit/s at 160 and 200.0 at
+200 while the segmental SNR stops rising (34.0 and 33.0 dB against
+34.3). Speech, being mono,
+lands 7 to 17 % under its halved targets, and the sparse clicks well
+under. The FDK encoder treats the modes as quality points of each
+profile rather than bitrates: its AAC-LC mode 1 is 88 kbit/s on music,
+and its modes span 88 to 149 kbit/s there against our 31 to 189.
+HE-AAC v2 waveform SNR stays at 3 to 4 dB in both encoders, since the
+parametric stereo rebuilds the pair from a downmix. A peak bitrate of
+120 kbit/s turns mode 5 into the stream of mode 3 byte for byte.
+
+Peak bitrate (`aac_encoder_set_peak_bitrate`), largest frame against
+the cap on two seconds of clicks and of noise (ADTS frames; raw access
+units for xHE-AAC without the pre-roll and for AAC-LD):
+
+| Profile, mode, bitrate / peak | Clicks: kbit/s, largest | Noise: kbit/s, largest | Cap |
+|-------------------------------|------------------------:|-----------------------:|----:|
+| AAC-LC CBR 64 / 80 | 13.6, 212 B | 64.3, 212 B | 213 B |
+| AAC-LC ABR 64 / 96 | 14.3, 244 B | 65.0, 245 B | 256 B |
+| AAC-LC CVBR 64 / 72 | 13.4, 191 B | 71.9, 191 B | 192 B |
+| AAC-LC TVBR 64 / 96 | 16.6, 255 B | 96.7, 256 B | 256 B |
+| HE-AAC CBR 48 / 64 | 18.1, 340 B | 50.3, 340 B | 341 B |
+| HE-AAC TVBR 48 / 80 | 22.5, 425 B | 83.2, 426 B | 426 B |
+| HE-AAC v2 TVBR 32 / 48 | 17.4, 256 B | 50.0, 256 B | 256 B |
+| xHE-AAC CBR 64 / 80 | 22.7, 418 B | 65.2, 418 B | 426 B |
+| xHE-AAC TVBR 64 / 96 | 27.2, 504 B | 98.8, 505 B | 512 B |
+| AAC-LD TVBR 64 / 96 | 12.8, 119 B | 88.6, 120 B | 128 B |
+
+Without the cap the AAC-LC TVBR noise stream at quality 100 runs at
+454 kbit/s with frames of up to 1222 bytes.
+
+Bandwidth (`aac_encoder_set_bandwidth`) on one second of stereo noise at
+128 kbit/s CBR, the highest 375 Hz band of the decode within 50 dB of
+the loudest: the table's 15.5 kHz gives 16.1 kHz, an override of 6, 11
+and 16 kHz gives 6.4, 11.6 and 16.9 kHz (the band holding the cutoff
+is coded whole). With HE-AAC the override leaves the stream unchanged.
+
+Low bit reservoir, AAC-LC stereo CBR, segmental SNR per 1024-sample
+frame as mean / 10th percentile / minimum. Without a peak bitrate the
+reservoir is never short on the clicks: it fills during the silence
+between bursts, and the perceptual entropy's spending curve holds a
+burst frame to 1.4 times the average frame (1.5 for short windows), so
+the streams use 17.5 and 25.3 kbit/s at 32 and 48 kbit/s with 1.07 /
+0.63 / 0.32 dB and 2.08 / 1.50 / 0.97 dB. Letting a frame spend up to
+the whole reservoir once it is over 90 % full gave 1.24 / 0.89 /
+0.47 dB at 21.0 kbit/s and 2.19 / 1.51 / 0.93 dB at 29.2 kbit/s and
+left the music excerpt and a tones-with-bursts signal unchanged. A
+peak bitrate of 1.25 times the bitrate makes the reservoir small (166
+bits at 32 kbit/s, under a third of a frame): the curve then gives the
+second frame of a burst only 0.9 of the average, because the first one
+emptied the reservoir, and the clicks fall to 0.77 / -0.06 / -0.27 dB
+at 15.6 kbit/s and 1.70 / 0.70 / 0.32 dB at 21.7 kbit/s, while the
+music excerpt rises (14.59 to 15.06 dB mean at 32 kbit/s) from the
+evener spending. Two changes were measured in that state: scaling the
+curve's deviation from the average by the reservoir's size against a
+frame (0.75 / 0.10 / -0.60 dB and 1.76 / 1.11 / 0.21 dB on the clicks,
+but the music down to 14.61 and 19.71 dB and the tones-with-bursts
+down 0.5 to 0.8 dB) and a floor of the average frame for every frame
+(0.78 / -0.02 / -0.33 dB and 1.78 / 0.99 / -0.60 dB, the music down
+0.2 dB). Neither improves all three signals, and the gains on the
+clicks are under 0.2 dB on the mean, so the rate loop is unchanged.
+
+Correctness checks: a 5.1 HE-AAC frame is SCE FIL CPE FIL CPE FIL LFE
+END, each SBR payload in the fill element right after its own element.
+At 192 kbit/s (201 kbit/s achieved) the six channels decode at 21.9,
+22.0, 22.3, 8.5, 22.0 and 22.0 dB against their own inputs in ours,
+FFmpeg 6.1.1 and FFmpeg master (the LFE keeps only its lowest lines, so
+the 200 Hz partial of its test signal is gone), 21.7 to 22.1 dB in the
+FDK decoder and 21.9 to 22.3 dB in libxaac, with no channel swapped. An
+HE-AAC v2 stream whose last block holds 700 of 2048 samples returns
+them at 32.7 dB in ours and in FFmpeg, and a one-sample HE-AAC v2 input
+gives one frame and three of drain that both decode without error.
+
+The tuned streams in the four decoders (SNR against the input):
+
+| Stream | kbit/s | Ours | FFmpeg 6.1.1 / master | FDK | libxaac |
+|--------|-------:|-----:|----------------------:|----:|--------:|
+| music, AAC-LC mode 3 | 109.6 | 27.12 | 27.12 / 27.12 | 27.12 | 27.12 |
+| music, HE-AAC mode 2 | 71.1 | 24.89 | 24.89 / 24.89 | 24.97 | 24.90 |
+| music, HE-AAC v2 mode 1 | 31.7 | 2.25 | 2.25 / 2.25 | 2.24 | 2.25 |
+| music, xHE-AAC mode 2 (LOAS) | 79.7 | 23.65 | - / 23.65 | 23.65 | 23.65 |
+| clicks, xHE-AAC TVBR 90, peak 96 (LOAS) | 55.4 | -0.39 | - / -0.39 | -0.08 | -0.45 |
+| clicks, AAC-LC TVBR 100, peak 96 | 37.9 | 7.44 | 7.44 / 7.44 | 7.44 | 7.44 |
+| music, AAC-LC 128 kbit/s, 11 kHz | 127.4 | 27.44 | 27.44 / 27.44 | 27.44 | 27.44 |
+| speech, AAC-LC mode 2 (mono) | 31.5 | 11.21 | 11.21 / 11.21 | 11.19 | 11.20 |
+| 5.1, HE-AAC 192 kbit/s | 201.1 | 15.40 | 15.40 / 15.40 | 15.37 | 15.40 |
+
+FFmpeg master agrees with our decode to 131.6 to 136.1 dB on the AAC
+streams and to 27 to 39 dB on the xHE-AAC ones (its noise filling and
+SBR noise draw other random values). The xHE-AAC mode 2 stream is
+79.7 kbit/s in LOAS with the pre-roll and 70.8 kbit/s as raw access
+units without it.
+
+One finding left as it is: in TVBR the rate loop still spends a full
+reservoir's surplus on frames that fit, so the bitrate of a true VBR
+stream grows with the nominal bitrate (quality 30 on the music excerpt
+gives 117.3 kbit/s at 64 or 128 kbit/s nominal and 215.2 kbit/s at
+256 kbit/s). The VBR modes do not spend the surplus.
+
 ## HE-AAC
 
 Measured on 2026-10-23 against the Fraunhofer FDK encoder (`aacenc`,

@@ -168,6 +168,17 @@ using AacEncoderState = struct AacEncoderState_ {
   int avg_frame_bits; /* bits per frame at the nominal bitrate, ADTS included */
   int reservoir;      /* unspent bits available to later frames */
   int reservoir_max;
+  /* Tuning overrides (aac_encoder_set_peak_bitrate, aac_encoder_set_bandwidth,
+   * aac_encoder_set_vbr_mode): a hard cap on any frame's bits in bits per
+   * second (0: none), the lowpass asked for in Hz (0: the tuning table),
+   * and the VBR mode in force (0: none).  The bitrate and rate control
+   * given at creation come back when the VBR mode is cleared. */
+  int peak_bitrate;
+  int bandwidth_override;
+  int vbr_mode;
+  int base_bitrate, base_quality;
+  AacRateControl base_rc;
+  int tools_bitrate; /* the bitrate the SBR encoders were tuned for */
   float pe_min, pe_max; /* running range of the frames' perceptual entropy */
   int pending_flush;    /* frames the flush still has to emit */
   /* HE-AAC, and xHE-AAC with SBR: the SBR encoder of each SCE or CPE,
@@ -241,6 +252,35 @@ int aac_encoder_ld_sbr_header_count(const AacEncoderState* s);
 
 /* Largest ADTS frame the encoder can emit for its channel count. */
 int aac_encoder_state_max_frame_bytes(const AacEncoderState* s);
+
+/* Most bits one frame may take as the rate control counts them (the raw
+ * data block with the ADTS header's bits): the AAC limit per channel, or
+ * the share of the peak bitrate per frame when one is set, whichever is
+ * smaller.  Rounded down to whole bytes, so the written frame never
+ * exceeds the share. */
+int aac_encoder_state_max_frame_bits(const AacEncoderState* s);
+
+/* Sets the peak bitrate (0: none) before any frame is encoded: the
+ * per-frame limit and the reservoir's size follow it, and a VBR mode in
+ * force is chosen again under it.  The encoder is reset. */
+int aac_encoder_state_set_peak_bitrate(AacEncoderState* s, int bps);
+
+/* Changes the nominal bitrate before any frame is encoded and tunes the
+ * SBR encoders, the budget and every bitrate-dependent setting to it;
+ * the encoder is reset.  AAC_ERR_INIT when the SBR tuning table has no
+ * row for it. */
+int aac_encoder_state_set_bitrate(AacEncoderState* s, int bitrate);
+
+/* Puts a VBR mode 1..5 in force (0 clears it): the mode's bitrate target
+ * for the input's channel count becomes the nominal bitrate, whose rate
+ * loop bounds frames coded at the mode's quality, and a peak bitrate
+ * below the target lowers the mode.  Before any frame is encoded;
+ * AAC_ERR_INVALID_ARG for another mode. */
+int aac_encoder_state_set_vbr_mode(AacEncoderState* s, int mode);
+
+/* The bitrate target of a VBR mode for a channel count, in bits per
+ * second: the stereo target scaled per channel. */
+int aac_encoder_vbr_mode_bitrate(int mode, int channels);
 
 /* Bits an AAC-ELD frame can give an extension payload next to its
  * channels: the frame's bit budget less what the core keeps. */

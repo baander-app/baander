@@ -751,8 +751,9 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
  private:
   /* Stream format options: transport, signalling, frame length, CRC, the
    * MPEG-2 header, the 7.1 channel mode, LD-SBR, the afterburner, the
-   * DRC metadata, the USAC options, the loudness info set and the
-   * loudness meter.  Throws and returns false on an invalid one. */
+   * DRC metadata, the USAC options, the loudness info set, the loudness
+   * meter, and the tuning (peak bitrate, VBR mode, bandwidth).  Throws
+   * and returns false on an invalid one. */
   bool apply_stream_options(const Napi::Env& env, const Napi::CallbackInfo& info) {
     if (info.Length() == 0 || !info[0].IsObject()) {
       return true;
@@ -913,6 +914,25 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         (have_loudness_info && (ret = aac_encoder_set_loudness_info(handle_, &loudness_info)) < 0) ||
         (measure && (ret = aac_encoder_set_loudness_measurement(handle_, 1)) < 0)) {
       throw_error(env, std::string("AacEncoder: ") + error_name(ret));
+      return false;
+    }
+    /* Tuning: the peak first, so that it can lower the VBR mode; a
+     * quality given with a VBR mode overrides the mode's own. */
+    int peak_bitrate = 0;
+    int bandwidth = 0;
+    int vbr_mode = 0;
+    if (!option_number(env, o, "peakBitrate", "peakBitrate", &peak_bitrate) ||
+        !option_number(env, o, "bandwidth", "bandwidth", &bandwidth) ||
+        !option_number(env, o, "vbrMode", "vbrMode", &vbr_mode)) {
+      return false;
+    }
+    if ((peak_bitrate && (ret = aac_encoder_set_peak_bitrate(handle_, peak_bitrate)) < 0) ||
+        (vbr_mode && (ret = aac_encoder_set_vbr_mode(handle_, vbr_mode)) < 0) ||
+        (vbr_mode && option_given(o, "quality") &&
+         (ret = aac_encoder_set_quality(handle_, option_int(o, "quality", 0))) < 0) ||
+        (bandwidth && (ret = aac_encoder_set_bandwidth(handle_, bandwidth)) < 0)) {
+      throw_error(env, std::string("AacEncoder: peakBitrate, vbrMode or bandwidth: ") +
+                           error_name(ret));
       return false;
     }
     return true;
