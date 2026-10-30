@@ -23,6 +23,34 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Cohesive operator manual
+
+Requirements checkpoint, 2026-10-30: the user confirmed an easy-to-follow manual
+built from the existing operator book, covering understanding Baander, setup,
+daily operation, maintenance and recovery. The
+[implementation plan](docs/plans/2026-10-30-1817-docs-cohesive-operator-manual-plan.md)
+defines 11 requirements and five acceptance examples. Operational facts and command
+examples must be verified against source before prose is revised with `prose-fix`.
+
+Independent grounding verified four repository claims with no refutations. All
+four Ready for Planning checks pass: complete, consistent, focused and usable.
+Source paths, sequential IDs, prose preservation and whitespace checks pass.
+That checkpoint delivered requirements only.
+
+Planning checkpoint, 2026-10-30: the knowledge-work plan now defines seven
+implementation units and six technical decisions. All 11 requirements and five
+acceptance examples are preserved, and both deferred planning questions are
+resolved. Research identified corrections to command execution contexts, supported
+ingestion and watcher behavior, and health/recovery limits for source verification
+during the rewrite.
+
+Confidence checks pass. Six document reviewers covered coherence, feasibility,
+scope, design, security and adversarial review, with zero findings, fixes or open
+decisions; cross-model review was disabled by checkout configuration. Plan prose
+preservation, requirement/example preservation and whitespace checks pass. Manual
+implementation remains open. Planning ran source and document checks only, with
+no tests or runtime commands.
+
 ## Configurable development libraries
 
 Delivered, 2026-10-29: the managed preview has one Movies library backed by the
