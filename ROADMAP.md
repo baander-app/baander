@@ -303,6 +303,25 @@ first failed on the missing initialization; all 12 runtime tests now pass with
 `/tmp/live-u9-media-volume-phpstan.log`. The failed fixture left no database rows
 or media files; its owned manifest was removed by scoped cleanup.
 
+U9 browser qualification exposed an OAuth capture defect after repeated logins:
+the generic SQL plan could cast an opaque token string on an unrelated route.
+Capture now resolves UUID references inside explicit route checks before the
+indexed lookup. Tests cover automatic, generic and custom plans, token CRUD,
+metadata references, deletion cascades and tokens without users. The old function
+failed two cases; the corrected integration group passes 42 tests with 961
+assertions, with scoped PHPStan, formatting and syntax checks also passing.
+Receipts are `/tmp/live-u9-token-capture-red.log` and
+`/tmp/live-u9-token-capture-green.log`; the final artifact is
+`var/test-runs/20261030-220059-822fe3fa`.
+
+The preview received the corrected function in a bounded transaction, preserving
+its identity and existing user/library counts. Its saved migration hash was
+reconciled after verifying the installed body. Scoped cleanup then removed the
+failed qualification run with zero surviving owned resources. The fixture also
+now uses normal user creation's empty TOTP secret; its previous null value caused
+a separate login failure. Real logins and the integration group above verify
+that correction. Capacity targets remain unmeasured while the browser run resumes.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

@@ -9,6 +9,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\DBAL\Schema\Schema;
 use Psr\Log\NullLogger;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class CommittedCaptureTest extends TestCase
@@ -166,6 +167,101 @@ final class CommittedCaptureTest extends TestCase
         $this->writer->executeStatement('UPDATE users SET totp_secret = NULL WHERE id = ?', [$user]);
         self::assertSame([['family' => 'account', 'scope_kind' => 'user', 'scope_id' => $user]], $this->scopes());
         self::assertStringNotContainsString('secret', json_encode($this->observer->fetchAllAssociative('SELECT * FROM query_change_inbox'), JSON_THROW_ON_ERROR));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function tokenPlanModes(): iterable
+    {
+        yield 'automatic plans after warmup' => ['auto'];
+        yield 'generic plans' => ['force_generic_plan'];
+        yield 'custom plans' => ['force_custom_plan'];
+    }
+
+    #[DataProvider('tokenPlanModes')]
+    public function testOAuthCaptureUsesOnlyTheCurrentRoutesUuidReferences(string $planMode): void
+    {
+        $user = $this->user();
+        $client = $this->id();
+        $this->writer->insert('oauth_clients', [
+            'id' => $client, 'public_id' => bin2hex(random_bytes(8)), 'name' => 'Capture fixture',
+            'redirect' => 'https://baander.app/auth/callback',
+            'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+        ]);
+        $this->writer->executeStatement("SELECT set_config('plan_cache_mode', ?, false)", [$planMode]);
+        for ($iteration = 0; $iteration < 12; ++$iteration) {
+            $access = $this->id();
+            $metadata = $this->id();
+            $refresh = $this->id();
+            $this->clearInbox();
+            $this->writer->insert('oauth_access_tokens', [
+                'id' => $access, 'token_id' => 'opaque-access-' . bin2hex(random_bytes(24)),
+                'user_id' => $user, 'client_id' => $client,
+                'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+            ]);
+            $this->assertTokenScopes($user);
+            $this->clearInbox();
+            $this->writer->executeStatement("UPDATE oauth_access_tokens SET name = 'Renamed' WHERE id = ?", [$access]);
+            $this->assertTokenScopes($user);
+            $this->clearInbox();
+            $this->writer->insert('oauth_token_metadata', [
+                'id' => $metadata, 'token_id' => $access, 'device_name' => 'Original device',
+                'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+            ]);
+            $this->assertTokenScopes($user, false);
+            $this->clearInbox();
+            $this->writer->executeStatement("UPDATE oauth_token_metadata SET device_name = 'Renamed device' WHERE id = ?", [$metadata]);
+            $this->assertTokenScopes($user, false);
+            $this->clearInbox();
+            $this->writer->insert('oauth_refresh_tokens', [
+                'id' => $refresh, 'token_id' => 'opaque-refresh-' . bin2hex(random_bytes(24)), 'access_token_id' => $access,
+                'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+            ]);
+            $this->assertTokenScopes($user);
+            $this->clearInbox();
+            $this->writer->executeStatement('UPDATE oauth_refresh_tokens SET revoked = true WHERE id = ?', [$refresh]);
+            $this->assertTokenScopes($user);
+            foreach (['oauth_token_metadata' => $metadata, 'oauth_refresh_tokens' => $refresh] as $table => $id) {
+                if ($iteration === 11) {
+                    continue;
+                }
+                $this->clearInbox();
+                $this->writer->delete($table, ['id' => $id]);
+                $this->assertTokenScopes($user, $table === 'oauth_refresh_tokens');
+            }
+            $this->clearInbox();
+            if ($iteration === 11) {
+                $this->writer->delete('users', ['id' => $user]);
+                foreach (['oauth_access_tokens' => $access, 'oauth_token_metadata' => $metadata, 'oauth_refresh_tokens' => $refresh] as $table => $id) {
+                    self::assertSame(0, (int) $this->observer->fetchOne("SELECT count(*) FROM $table WHERE id = ?", [$id]));
+                }
+                self::assertContains(['family' => 'devices', 'scope_kind' => 'user', 'scope_id' => $user], $this->scopes());
+            } else {
+                $this->writer->delete('oauth_access_tokens', ['id' => $access]);
+                $this->assertTokenScopes($user);
+            }
+        }
+        $this->clearInbox();
+        $this->writer->insert('oauth_access_tokens', [
+            'id' => $access = $this->id(), 'token_id' => 'opaque-client-credentials-' . bin2hex(random_bytes(24)), 'client_id' => $client,
+            'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+        ]);
+        $adminScope = [['family' => 'admin-security', 'scope_kind' => 'admin', 'scope_id' => '*']];
+        self::assertSame($adminScope, $this->scopes());
+        $this->clearInbox();
+        $this->writer->delete('oauth_access_tokens', ['id' => $access]);
+        self::assertSame($adminScope, $this->scopes());
+    }
+
+    private function assertTokenScopes(string $user, bool $account = true): void
+    {
+        $expected = [
+            ['family' => 'admin-security', 'scope_kind' => 'admin', 'scope_id' => '*'],
+            ['family' => 'devices', 'scope_kind' => 'user', 'scope_id' => $user],
+        ];
+        if ($account) {
+            array_unshift($expected, ['family' => 'account', 'scope_kind' => 'user', 'scope_id' => $user]);
+        }
+        self::assertSame($expected, $this->scopes());
     }
 
     public function testOwnershipMoveAndCollaboratorRemovalCaptureOldAndNewRecipients(): void

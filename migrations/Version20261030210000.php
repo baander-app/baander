@@ -92,12 +92,19 @@ final class Version20261030210000 extends AbstractMigration
                 library_ids text[];
                 playlist_ids text[];
                 user_ids text[];
+                access_token_ids uuid[] := ARRAY[]::uuid[];
                 song_ids text[];
                 album_ids text[];
                 artist_ids text[];
                 movie_ids text[];
                 family_name text;
             BEGIN
+                IF 'token'=ANY(routes) THEN
+                    access_token_ids:=array_append(access_token_ids,nullif(row_data->>'token_id','')::uuid);
+                END IF;
+                IF 'refresh-token'=ANY(routes) THEN
+                    access_token_ids:=array_append(access_token_ids,nullif(row_data->>'access_token_id','')::uuid);
+                END IF;
                 SELECT coalesce(array_agg(DISTINCT q.scope_id) FILTER (WHERE q.scope_id IS NOT NULL), ARRAY[]::text[])
                 INTO library_ids FROM unnest(routes) r CROSS JOIN LATERAL query_live_libraries(r,row_data) q;
                 SELECT coalesce(array_agg(DISTINCT q.id) FILTER (WHERE q.id IS NOT NULL), ARRAY[]::text[]) INTO playlist_ids
@@ -110,7 +117,7 @@ final class Version20261030210000 extends AbstractMigration
                     SELECT row_data->>'user_id' id WHERE 'user'=ANY(routes) OR 'recommendation'=ANY(routes)
                     UNION SELECT row_data->>'id' WHERE 'self'=ANY(routes)
                     UNION SELECT row_data->>'owner_user_id' WHERE 'transcode-owner'=ANY(routes)
-                    UNION SELECT t.user_id::text FROM oauth_access_tokens t WHERE ('token'=ANY(routes) AND t.id = nullif(row_data->>'token_id','')::uuid) OR ('refresh-token'=ANY(routes) AND t.id = nullif(row_data->>'access_token_id','')::uuid)
+                    UNION SELECT t.user_id::text FROM oauth_access_tokens t WHERE t.id=ANY(access_token_ids)
                     UNION SELECT p.user_id::text FROM playlists p WHERE p.id=ANY(playlist_ids::uuid[])
                     UNION SELECT c.user_id::text FROM playlist_collaborators c WHERE c.playlist_id=ANY(playlist_ids::uuid[])
                     UNION SELECT row_data->>'user_id' WHERE source_table='playlists'
