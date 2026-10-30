@@ -1,5 +1,9 @@
 # Baander registry
 
+Operators can start with the book's [Registry chapter](../docs-book/part-1-operator-guide/registry.md)
+for component roles, readiness, maintenance and recovery. This page retains the
+service contract, deployment inventory and qualification evidence.
+
 The registry is a C++20 service backed exclusively by rqlite's HTTP API. Its
 container deployment path replaces the obsolete PHP service. Existing SQLite
 data and legacy volumes are left untouched; they are never opened or migrated.

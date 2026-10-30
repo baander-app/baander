@@ -1,5 +1,10 @@
 # Upgrading
 
+An upgrade changes three things independently: the web image and checkout, the
+database schema, and the admitted worker pair. Plan an outage for writers when
+the schema or message contract changes. A healthy web response alone does not
+show that the new workers can process the old pending work.
+
 ## Standard Update
 
 Before pulling this update, retire any singleton worker deployment with the old
@@ -25,21 +30,55 @@ Use the `dc` function and private environment file defined in
 The development Make lifecycle commands target isolated development instances;
 they do not operate this source installation.
 
-Then run these commands in order:
+Before changing code, record the current revision, image IDs, private configuration,
+worker manifest and credentials. Stop incoming writes and retire the old worker
+pair while its controller and schema still agree. Follow
+[Backup and recovery](backup-and-recovery.md) to preserve a consistent recovery
+set; a code checkout is not a database backup. Keep the old controller available
+until both units are confirmed retired. Stop if retirement is unconfirmed.
+
+On the installation host, select the reviewed target revision. Preserve local
+Compose and private configuration changes when updating the checkout. Then build
+the application with the same builder used for installation:
 
 ```bash
-git pull
-dc build
-dc up -d
-dc exec app composer install --optimize-autoloader
-dc exec app php bin/console doctrine:migrations:migrate --no-interaction
+php scripts/build-application.php --target dev --tag baander:local --compose-env .env.compose.local
+dc build nginx database
 ```
 
-1. **`git pull`** fetches the latest code.
-2. **`dc build`** rebuilds the Docker images if the Dockerfile or installed packages changed.
-3. **`dc up -d`** recreates containers with the new images.
-4. **`dc exec app composer install --optimize-autoloader`** updates PHP dependencies inside the app container.
-5. **`dc exec app php bin/console doctrine:migrations:migrate --no-interaction`** runs pending database migrations.
+The generated `.env.compose.local` selects the immutable application image and its
+`APP_HOME`. `dc build` alone cannot build the application. The `dev` target here
+belongs to the source-installation recipe; it does not turn this checkout into a
+managed preview. Preserve the installation's volumes and network.
+
+Keep the web service stopped while applying a schema change. With PostgreSQL and
+Redis available, update dependencies in the mounted checkout and migrate through
+one-off application containers:
+
+```bash
+dc stop app
+dc run --rm --no-deps app composer install --no-interaction --no-progress --no-scripts
+dc run --rm --no-deps app composer dump-autoload --optimize --no-interaction
+dc run --rm --no-deps app php bin/console doctrine:migrations:migrate --no-interaction
+dc run --rm --no-deps app sh -c 'cd "$APP_HOME/ui/web" && corepack yarn install --immutable'
+dc run --rm --no-deps app sh -c 'cd "$APP_HOME/ui/web" && corepack yarn build'
+```
+
+The source recipe mounts the checkout over the image, so its frontend assets also
+need rebuilding before web starts. Stop on a failed install, migration or frontend
+build and inspect its error. Do not
+start old code against a partially changed schema. Replacing or upgrading the
+database service itself requires a database-version-specific procedure; the
+commands here do not perform a PostgreSQL major-version upgrade.
+
+Start web only after migrations succeed:
+
+```bash
+dc up -d --no-deps app
+dc exec nginx nginx -s reload
+dc exec app php bin/console app:config:validate
+dc exec app php bin/console app:health:check
+```
 
 These commands update the web/dependency stack. The separately admitted worker
 uses an immutable image and boot identity. Before changing its image or storage
@@ -48,6 +87,11 @@ to recover and retire the old deployment, then create/start a new boot with the
 updated image and manifest. Never enable automatic worker restart or place its
 children under another supervisor. Prepare shared media volumes before starting
 either role, and preserve pending work and existing media.
+
+Start and observe the fresh worker pair before allowing new work. Check its
+explicit readiness observation, inspect transport state, sign in, and test the
+media path needed by your users. [Monitoring](monitoring.md) distinguishes these
+checks and their limits. Reopen access only after the relevant checks pass.
 
 Check the commit log for notable changes between your current version and the one you are upgrading to:
 
@@ -61,8 +105,10 @@ Before upgrading an instance with older queued messages:
 
 1. Stop producers and preserve queued and retrying Redis work while retiring the
    old worker deployment through the [deployment controller](commands/README.md#worker-deployment).
-2. Resolve or export failed messages, and back up the Redis streams and job
-   history before changing code.
+2. Preserve Redis streams and the PostgreSQL database, which contains failed
+   messages, outbox rows and job history. See the
+   [recovery inventory](backup-and-recovery.md#choose-the-recovery-set). Removing
+   failed messages discards work; it is not a backup operation.
 3. Upgrade producers and workers together, following the worker retirement and
    fresh-boot procedure above.
 
@@ -80,7 +126,7 @@ migrations may contain data transformations or index additions. Test databases
 belong to the separate disposable test coordinator.
 
 Fresh databases start with the transactional migration `Version20261017000000`,
-then apply forward migrations through `Version20261018130000`. The initial
+then apply forward migrations through `Version20261021120000`. The initial
 migration creates the schema, including microsecond `timestamptz` columns, and
 cannot be downgraded. Forward migrations add playlist persistence versions and
 video/audio execution authority. `Version20261017160000` preserves durable
@@ -88,6 +134,8 @@ session/request control receipts; `Version20261017170000` scopes video jobs to
 playback owners without rewriting the initial migration or existing histories.
 `Version20261018130000` imports confirmed singleton retirement history and adds
 the control/execution journals and joint retirement barrier. It is irreversible.
+`Version20261021120000` retains the last observed availability of indexed source
+files and is also irreversible.
 New deployments require a version 5 manifest with separate budgets, disjoint CPU
 sets, a private IPC volume and a complete autoscaling profile; earlier manifest
 versions are refused. Every profile field is fingerprinted in both recipes, so
@@ -138,24 +186,28 @@ specific target and a separate manual operation outside Doctrine migrations.
 
 ## When to Rebuild Docker Images
 
-`dc build` is necessary when any of the following have changed:
+Rebuild the affected image when any of the following have changed:
 
 - The `Dockerfile` or `.dockerignore`
 - PHP extensions (added or removed in the Dockerfile)
 - System packages in the Dockerfile (e.g., `apt-get install`)
 - The base image tag
 
-`dc build` uses Docker layer caching, so it is safe to run on every update. It only rebuilds layers that have actually changed.
+Use `scripts/build-application.php` for the application image, then the worker
+recipe for its immutable image. Use `dc build nginx database` for the Compose
+services with build definitions. A successful build does not replace running
+services or migrate their data. Build inputs and cache settings are described in
+the [development environment guide](../part-2-developer-guide/development-environment.md).
 
 ## Docker Compose Changes
 
 When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), a simple `dc restart` is not enough -- Docker Compose needs to recreate the affected containers from scratch.
 
-```bash
-dc down && dc up -d
-```
-
-This stops all containers, removes their network configuration, and starts them fresh with the updated compose file.
+Recreate only the affected services after checking their volumes, ports and
+credentials with the installation's Compose context. Use `dc up -d --no-deps app`
+for an application-only change. A dependency recreation can interrupt work or
+lose unpersisted Redis state; preserve that state before the change. Never use
+`down -v` as an upgrade step.
 
 ## Stopping and Restarting the Web Server
 
@@ -200,10 +252,10 @@ A token refresh that fails because the server is restarting, with a network erro
 
 ### nginx and a replaced app container
 
-The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container, for example after `dc build` and `dc up -d`, can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
+The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
 
 ```bash
-docker exec baander-nginx nginx -s reload
+dc exec nginx nginx -s reload
 ```
 
 ### A proxy in front of nginx
@@ -214,42 +266,33 @@ To check your proxy, copy a stream request from the browser's network tab as a c
 
 ## FFmpeg Updates
 
-FFmpeg is installed via apt inside the app image (the static-build step is currently disabled). To pick up a new FFmpeg version, rebuild the app image:
-
-```bash
-dc build --no-cache
-dc up -d
-```
-
-Verify the version after rebuilding:
-
-```bash
-dc exec app ffmpeg -version
-```
+FFmpeg runs in the worker deployment for media jobs. Rebuild the worker's immutable
+image from the reviewed dependency inputs, then retire the old pair and admit a
+fresh boot as above. Installing a binary in web does not update the encoders
+already owned by workers. Verify the binary in the selected worker image and
+observe a representative playback after replacement; an image version alone
+does not establish codec or resource compatibility.
 
 ## Version Compatibility
 
-Baander does not have a formal breaking change policy yet. The current approach is migration-first: always run migrations after pulling, and check the commit log for any notable changes between versions.
+Baander is pre-release and has no production deployment qualification or stable
+upgrade compatibility promise. Review migrations, configuration changes and
+pending-message compatibility before switching revisions.
 
 When environment variables are added or changed between versions, see [Configuration](configuration.md) for the current list and descriptions.
 
 ## Rollback
 
-To revert to a previous version:
+First establish whether the previous code can read the current schema, queued
+messages and worker history. If it cannot, stop writers and recover a compatible
+set using [Backup and recovery](backup-and-recovery.md). Retain the failed
+deployment's data for diagnosis. Do not try successive old images against the
+only copy of a changed database.
 
-1. Check out the previous tag or commit:
-
-   ```bash
-   git checkout <previous-tag>
-   ```
-
-2. Rebuild and restart:
-
-   ```bash
-   dc build
-   dc up -d
-   dc exec app composer install --optimize-autoloader
-   ```
+For a code-only rollback with verified compatibility, retire the current worker
+pair using its matching controller, restore the reviewed previous checkout and
+configuration, and rebuild/select the previous images. Follow the same web start,
+fresh worker boot and observation sequence as an update.
 
 Changing the code does not revert the database schema. The initial migration is
 irreversible, and older code with the former migration chain cannot migrate a

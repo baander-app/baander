@@ -1,290 +1,279 @@
 # Troubleshooting
 
-Common issues, diagnostic commands, and log locations for Baander operators.
+Start with the failed operation and its time: a login, a scan submission, a queued
+job or playback. Then check the component that owns that stage. Restarting the web
+server can restore a web process, but it does not restart the separate worker
+deployment or deliver work waiting in the outbox.
+
+These examples run on the installed Docker host, from the installation checkout,
+using the `dc` shell function and private environment files in
+[Getting Started](getting-started.md#installation). They target that installation's
+Compose services. Worker inspection runs separately on the trusted host with the
+exact manifest and credentials file described in
+[Background Work](background-work.md#observe-background-work).
 
 ## Diagnostic Commands
 
-Start here. These commands help you understand the current state of the system.
+First collect service state and recent logs, then ask the application to check its
+connections and configuration:
 
 ```bash
-# Check PHP and Symfony versions
-make info
-
-# Verify all components are healthy (database, Redis, FFmpeg, Swoole)
-make exec cmd="php bin/console app:health:check"
-
-# Validate configuration for common mistakes
-make exec cmd="php bin/console app:config:validate"
+dc ps
+dc logs --since=1h --tail=200 app nginx database redis
+dc exec -T app php bin/console app:health:check
+dc exec -T app php bin/console app:config:validate
 ```
 
-See the full documentation for these commands:
+Read individual rows, including warnings. `app:health:check` can exit successfully
+while the consumer or memory row is unhealthy. Its CLI memory row describes the
+checking process; Swoole can read `N/A` outside a web worker. It does not check
+FFmpeg, outbox delivery or provider access. Configuration validation detects missing
+or malformed settings but does not prove that every integration works. See
+[Monitoring](monitoring.md#health-checks) for the response and exit-code rules.
 
-- [app:health:check](commands/app-health-check.md)
-- [app:config:validate](commands/app-config-validate.md)
+| Symptom | Start with | Next evidence |
+|---------|------------|---------------|
+| Pages return 502 or the web container restarts | [Swoole crashes](#swoole-crashes) | Proxy and application logs; web worker statistics |
+| Requests return 503 and jobs stop | [Redis unreachable](#redis-unreachable) | Redis health row, service logs and effective credentials |
+| All pages fail with connection errors | [Database connection refused](#database-connection-refused) | PostgreSQL health row and database logs |
+| Scan submitted but catalog unchanged | [Media not appearing after scan](#media-not-appearing-after-scan) | Discovery, outbox, consumer and ingestion evidence |
+| Stream fails or a quality tier is absent | [Transcoding failures](#transcoding-failures) | Selected media job, FFmpeg and source permissions |
+| Login or token renewal fails | [OAuth token issues](#oauth-token-issues) | Configuration, key readability, clock and DPoP error |
+| Upload or source access says permission denied | [Permission errors](#permission-errors) | Exact mount, process identity and path permissions |
+| Registry registration or recovery fails | [Registry operations](registry.md) | Registry and relay service evidence |
 
 ## Log Locations
 
-### Makefile shortcuts
-
-| Command | Description |
-|---------|-------------|
-| `make logs` | Follow app container logs (Ctrl+C to exit) |
-| `make logs-nginx` | Follow Nginx container logs |
-| `make hl-logs` | Last 1 hour of app logs, highlighted (requires [hl](https://github.com/pamburus/hl)) |
-| `make hl-logs-f` | Follow app logs, highlighted |
-| `make hl-logs-nginx` | Last 1 hour of Nginx logs, highlighted |
-| `make hl-logs-all` | Last 1 hour of all containers, highlighted |
-| `make hl-logs-error` | Last 1 hour of app error-level logs only |
-| `make hl-logs-warn` | Last 1 hour of app warnings and above |
-
-### Container names
-
-| Container | Name |
-|-----------|------|
-| Application (Swoole) | `baander-app` |
-| Reverse proxy | `baander-nginx` |
-| Database | `baander-postgres` |
-| Cache / sessions / jobs | `baander-redis` |
-| Profiler (dev only) | `baander-profiler` |
-
-### Docker commands
+Use service names through `dc` so the selected checkout and environment files stay
+attached to the command:
 
 ```bash
-# Follow logs for a specific container
-docker logs -f baander-app
+# Follow this installation's web logs; Ctrl+C stops following
+dc logs -f app nginx
 
-# Last 100 lines
-docker logs --tail 100 baander-app
-
-# Logs since a specific time
-docker logs --since 2026-04-25T10:00:00 baander-app
-
-# All containers at once
-docker compose logs --tail 50
-
-# Check if all containers are running
-docker compose ps
+# Bounded logs for a particular service
+dc logs --since=1h --tail=100 redis
 ```
+
+Application and proxy output is available through Docker logs. The supplied
+PostgreSQL configuration also collects server logs inside `database` at
+`/var/log/postgresql`; inspect the files matching the incident time if Docker logs
+only show collector startup. Swoole's configured log is under the application's
+`var/log` directory. See [Monitoring: Logs](monitoring.md#logs) for commands and
+worker-log boundaries.
 
 ## Common Issues
 
 ### Redis unreachable
 
-**Symptoms:** Sessions fail, rate limiting stops working, messenger jobs do not process, cache misses on every request.
+Sessions, rate-limit checks, DPoP replay protection and background processing can
+fail together because they use Redis. Protected requests may return `503` with a
+retry delay. This is different from an exhausted rate limit or an invalid token;
+see [Redis outage behavior](security.md#sessions-logout-and-a-redis-outage).
 
-**Cause:** The `REDIS_PASSWORD` in `.env` does not match the password configured in `docker-compose.yml` for the Redis container.
+1. Inspect `dc ps`, `dc logs --tail=100 redis` and the Redis row in
+   `app:health:check`. A stopped service, failed authentication and exhausted Redis
+   memory require different corrections.
+2. Privately compare the effective `REDIS_URL` used by the application and worker
+   credentials with the Redis service password. In the supplied stack, Compose
+   takes its password from `REDIS_PASSWORD`. Check the host and port too: the
+   container-side service address differs from a host-controller address. Do not
+   paste connection URLs or environment-file contents into an incident report.
+3. If the service is stopped, establish why before starting that service with
+   `dc up -d redis`. For a credential mismatch, use the coordinated
+   [Redis password rotation procedure](security.md#rotating-redis-password).
+   Recreating a service to apply environment changes is different from restarting
+   an existing process; keep the application and worker credentials consistent.
+4. Run `app:health:check` again, observe worker readiness and follow a pending job
+   to progress. Restored connectivity alone does not show that delayed work has
+   completed.
 
-**Fix:**
-
-1. Verify the password in `.env`:
-   ```bash
-   grep REDIS_PASSWORD .env
-   ```
-
-2. Verify the password in `docker-compose.yml` (check the Redis service `command` and `environment` sections):
-   ```bash
-   grep -A2 'requirepass\|REDIS_PASSWORD' docker-compose.yml
-   ```
-
-3. Ensure both match, then restart:
-   ```bash
-   make restart
-   ```
-
-4. Confirm Redis is reachable from the app container:
-   ```bash
-   make exec cmd="php bin/console app:health:check"
-   ```
-
-5. Verify the internal Docker network exists:
-   ```bash
-   docker network ls | grep baander-backtier
-   ```
-
-   If missing, recreate it by running `make down && make start`.
+If the service is running but unreachable, inspect the selected Compose network
+and service attachments. Correct the installation's network configuration before
+recreating an affected service. Keep Redis data and queued messages intact; use
+[Backup and Recovery](backup-and-recovery.md) if state recovery is required.
 
 ### Transcoding failures
 
-**Symptoms:** Video playback fails, transcode jobs stuck in pending or failed state, missing quality tiers.
+A failed stream or missing quality tier can come from an unreadable source, an
+unsupported codec, FFmpeg, worker execution or resource exhaustion.
 
-**Fix:**
-
-1. Verify FFmpeg is available in the container:
-   ```bash
-   make exec cmd="ffmpeg -version"
-   ```
-
-   If FFmpeg is not found, rebuild the app image (FFmpeg is installed via apt during the image build):
-   ```bash
-   make build-clean
-   make start
-   ```
-
-2. Check the job monitor for failed transcode jobs:
-   ```bash
-   make exec cmd="php bin/console app:health:check"
-   ```
-
-3. Review app logs for transcode errors:
-   ```bash
-   make hl-logs-error
-   ```
-
-4. If the CPU process pool is failing, check for memory issues or worker crashes in the logs:
-   ```bash
-   docker logs --tail 200 baander-app | grep -i "process\|pool\|transcode"
-   ```
+1. Identify the media item and failed operation in the admin interface. Inspect
+   the associated job, when present, with the job-monitor commands in
+   [Monitoring](monitoring.md#job-monitoring). A health check is not a list of failed
+   transcodes.
+2. Identify the execution container and immutable image from the exact worker
+   deployment's controller status. Inspect that unit's logs for probe or encoder
+   errors. FFmpeg runs in this worker image; checking it in `app` only checks web.
+   If the worker image is missing the binary, correct and rebuild the
+   [worker image](commands/README.md#worker-deployment), then follow the confirmed
+   retirement and fresh-boot procedure in [Upgrading](upgrading.md).
+   Repeatedly retrying the job will not add the binary.
+3. Inspect the source path and permissions in the container executing the work.
+   The same source mount must be available to the admitted worker when it handles
+   queued work. See [Storage and Data](storage-and-data.md).
+4. Read app and worker logs around the failure. Check memory, disk space and codec
+   errors before changing resource settings. The admitted worker recipe does not
+   support GPU passthrough; see [Hardware acceleration](transcoding.md#hardware-acceleration).
+   Use [server statistics](monitoring.md#server-stats) for the web process; they do
+   not describe worker container limits.
+5. Once the cause is corrected, choose a single retry path from
+   [failed-message handling](monitoring.md#failed-messages). Verify playback of the
+   affected item and the expected tier, rather than relying on a healthy probe.
 
 ### Permission errors
 
-**Symptoms:** File upload failures, media files not accessible, "permission denied" errors in logs.
+A path can be readable on the host and inaccessible to the user running the
+application or worker. Check the exact failing path and its parent directories.
+Replace `/media/music` below with the configured container-side library path:
 
-**Cause:** File ownership mismatch between the host user and the container process.
+```bash
+dc exec -T app id
+dc exec -T app ls -ld /media /media/music
+```
 
-**Fix:**
+Compare the effective process UID and GID with the mounted host path's owner, group,
+mode and ACL. Check whether the mount is read-only. `HOST_UID` and `HOST_GID` are
+image build inputs in the supplied workflow; changing a host shell variable does
+not change an already built image's user. The worker has a separate mount
+specification and must be checked separately.
 
-1. Check volume mount permissions inside the container:
-   ```bash
-   make exec cmd="ls -la /storage"
-   ```
-
-2. The Makefile passes `HOST_UID` and `HOST_GID` to the container. Verify these match the host user:
-   ```bash
-   id -u
-   id -g
-   ```
-
-3. If ownership is wrong, fix it on the host (adjust paths as needed):
-   ```bash
-   sudo chown -R $(id -u):$(id -g) ./storage ./config
-   ```
-
-4. Restart the app to pick up corrected ownership:
-   ```bash
-   make restart
-   ```
+For source media, grant the required read and directory traversal access. Writable
+application data needs access at its own destination. Change only the intended
+path's permissions after confirming ownership; a recursive ownership change over
+all media or configuration can damage shared access. See
+[Storage and Data](storage-and-data.md) for source and generated-data boundaries and
+[File permissions](security.md#file-permissions) for secret-file protection.
+Verify the same operation with the actual application or worker identity afterward.
 
 ### Swoole crashes
 
-**Symptoms:** The application becomes unresponsive, returns 502 errors, or the container restarts repeatedly.
+A 502 response can mean that Nginx cannot reach the web server; repeated container
+restarts can mean the process exits or is killed.
 
-**Fix:**
+```bash
+dc ps
+dc logs --tail=200 nginx app
+```
 
-1. Check container restart count and status:
-   ```bash
-   docker compose ps
-   docker inspect baander-app --format='{{.RestartCount}}'
-   ```
+Inspect the installed app container without assuming its Docker name:
 
-2. Check logs for crash details:
-   ```bash
-   docker logs --tail 500 baander-app
-   ```
+```bash
+docker inspect --format '{{.RestartCount}} {{.State.Status}} {{.State.OOMKilled}}' "$(dc ps -q app)"
+```
 
-3. If workers are running out of memory, increase the memory limit or reduce `SWOOLE_WORKER_NUM` in your Swoole configuration.
+Read the timestamps and error preceding an exit. If the process still responds,
+collect `dc exec -T app php bin/console app:server:stats` to see web worker memory,
+missing responses and connection pools. An OOM kill or increasing memory use
+requires checking the container limit and workload before adjusting worker counts
+or PHP's memory limit. Use the effective Swoole settings in
+`config/packages/swoole.yaml`; do not assume a shell variable changes them.
 
-4. If crashes happen under load, check the Swoole configuration in `config/packages/swoole.yaml` and consider reducing worker count or enabling coroutine hooks more selectively.
+After correcting the cause, use the [web stop and restart procedure](upgrading.md#stopping-and-restarting-the-web-server),
+then verify `/live`, `/ready` and the failed user operation. A planned web restart
+leaves the admitted background worker deployment running.
 
 ### Database connection refused
 
-**Symptoms:** All page loads fail, "connection refused" or "could not connect to server" errors.
+A refused connection means the client could not establish a database connection;
+authentication, database-name and schema errors occur later and need their own fix.
 
-**Fix:**
-
-1. Verify the database container is running:
-   ```bash
-   docker compose ps
-   ```
-
-   If it is not running:
-   ```bash
-   make start
-   ```
-
-2. Check `DATABASE_URL` in `.env`:
-   ```bash
-   grep DATABASE_URL .env
-   ```
-
-   Ensure the host is `database` (the Docker service name, not `localhost`):
-   ```env
-   DATABASE_URL="postgresql://baander:your_password@database:5432/baander?serverVersion=18&charset=utf8"
-   ```
-
-3. Test connectivity from the app container:
-   ```bash
-   make exec cmd="php bin/console dbal:run-sql 'SELECT 1'"
-   ```
-
-4. Check PostgreSQL logs if the connection is refused:
-   ```bash
-   docker logs --tail 100 baander-postgres
-   ```
+1. Check `dc ps` and `dc logs --tail=100 database`. If the logging collector is
+   active, also inspect `/var/log/postgresql` inside `database` for the incident.
+2. Privately check the effective `DATABASE_URL` and selected environment files.
+   Inside the supplied Compose network the hostname is `database`, not
+   `localhost`. The host controller uses its own reachable address. Compare the
+   database name and credentials without printing the URL.
+3. If PostgreSQL is stopped, identify the cause and preserve its volume before
+   starting it with `dc up -d database`. Storage corruption or missing data calls
+   for [Backup and Recovery](backup-and-recovery.md), not a new empty volume.
+4. Run `app:health:check` from the app container. Its PostgreSQL row executes
+   `SELECT 1`. Then verify the failed operation and worker readiness. A successful
+   connection does not establish that the schema is compatible with the running
+   code; check [Upgrading](upgrading.md) if failures began after a release change.
 
 ### OAuth token issues
 
-**Symptoms:** Users cannot authenticate, access tokens rejected, refresh token flow fails.
+First distinguish a login rejection, an expired token, a DPoP proof rejection and
+a dependency outage. Preserve the HTTP status and error from the client, and the
+server timestamp. A Redis outage can produce a retryable `503` during an otherwise
+valid request.
 
-**Fix:**
-
-1. Verify `APP_SECRET` is set to a strong value (not the default):
-   ```bash
-   grep APP_SECRET .env
-   ```
-
-2. Check that OAuth encryption keys exist and are readable:
-   ```bash
-   make exec cmd="ls -la config/secrets/oauth/"
-   ```
-
-3. If keys were rotated recently, ensure the encryption key in `.env` matches the new key pair. See [security.md](security.md#rotating-oauth-20-keys) for the rotation procedure.
-
-4. If tokens are failing after a deployment, the encryption key may have changed between workers. Ensure `APP_ENV=prod` and that the encryption key is consistent across all workers.
-
-5. Rotate keys if you suspect compromise:
-   ```bash
-   make exec cmd="php bin/console app:auth:rotate-secrets"
-   ```
+1. Run `app:config:validate` and inspect its key-file and secret-strength results.
+   Privately confirm that the intended environment and OAuth keys are loaded by
+   every participating process. Do not print `APP_SECRET`, encryption keys or
+   private key contents.
+2. Confirm that clients use the expected HTTPS origin and correct time. A bound
+   access token needs the matching DPoP key and a fresh proof for the request; a
+   token-only curl command does not reproduce an authenticated application request.
+3. If the problem began after a configuration change, compare the effective
+   settings and key files with the preserved deployment record. An application
+   secret, OAuth signing keys and the OAuth encryption key serve different roles.
+4. Follow [Security](security.md) for the particular secret involved. OAuth key
+   rotation is an offline coordinated procedure, not a routine diagnostic step.
+   Verify login, token refresh and a protected request with a supported client
+   after the repair. If exposure is suspected, use
+   [Breach Recovery](security.md#breach-recovery).
 
 ### Media not appearing after scan
 
-**Symptoms:** Library scan completes but songs, movies, or other media do not show up in the catalog.
+Discovery and ingestion are separate. A scan can find files and queue ingestion
+without immediately creating catalog entries. Current catalog ingestion supports
+music and movie libraries; selecting another media type does not establish an
+implemented ingestion path. See [Library Management](library-management.md).
 
-**Fix:**
+1. Confirm the library's configured path and media type. Inspect that path inside
+   `app`, and confirm the admitted worker has the matching mount and read access.
+   A host directory alone does not make files visible inside either container.
+2. Inspect the scan result and logs. Distinguish a scan that has only been
+   submitted from one that has finished discovering files. If paths or filters
+   explain zero discovered files, correct those before submitting another scan.
+3. For files queued for ingestion, follow the worker observations in
+   [Background Work](background-work.md#observe-background-work). Check the outbox
+   relay as well as the consumer. `/ready` checks only PostgreSQL and Redis; a fresh
+   consumer heartbeat does not prove that the outbox relay has delivered a message.
+4. Inspect current and failed jobs:
 
-1. Verify the library path is accessible inside the container:
    ```bash
-   make exec cmd="ls -la /path/to/your/media"
+   dc exec -T app php bin/console app:monitor:status
+   dc exec -T app php bin/console app:monitor:jobs --status=failed --limit=20
+   dc exec -T app php bin/console app:monitor:transport
+   dc exec -T app php bin/console app:failed-message:list
    ```
 
-   Replace `/path/to/your/media` with the library path configured in your library settings. If the path does not exist or is empty inside the container, the volume mount in `docker-compose.yml` is incorrect.
+   Match the operation and timestamps. Redis stream length and consumer
+   registration are not proof of live consumption, and an empty Redis stream does
+   not rule out undelivered outbox work. Inspect worker logs and job details before
+   retrying. If termination of a worker is uncertain, follow the explicit recovery
+   rules in Background Work before starting any replacement.
+5. Once ingestion completes, check the catalog item. Covers, artist information
+   and other enrichment may follow through separate provider work. Diagnose missing
+   enrichment after confirming the item exists; provider-key configuration and
+   outbound access are separate from local file discovery.
 
-2. Re-run the scan:
-   ```bash
-   make exec cmd="php bin/console app:library:scan my-music"
-   ```
-
-3. Check scan logs for errors:
-   ```bash
-   make hl-logs-error | grep -i "scan\|library"
-   ```
-
-4. If metadata enrichment is failing (covers, artist info), check that external API keys are configured in `.env` and that the container has outbound internet access:
-   ```bash
-   make exec cmd="curl -s -o /dev/null -w '%{http_code}' https://api.discogs.com"
-   ```
+If a rescan is needed after correcting the source or configuration, use the
+[scan procedure](library-management.md#scanning), then observe it through
+ingestion. Repeated scan submissions are not a substitute for restoring a stopped
+relay or consumer.
 
 ## Getting Help
 
-If you encounter an issue not covered here:
+Collect the failed operation, timestamps, affected component, service state and
+relevant job IDs. Include the diagnostic rows and a bounded log excerpt after
+redacting credentials, tokens, private paths and personal data. Record whether the
+failure affects web requests, background work or both, and what changed before it
+started.
 
-1. Run the diagnostic commands above and collect the relevant logs.
-2. Search existing issues on [GitHub](https://github.com/martinjuul/baander/issues).
-3. Open a new issue with the diagnostic output, logs, and steps to reproduce.
+Report the issue through the tracker for the repository used by your installation.
+Include reproduction steps and expected behavior. Use your project's private
+reporting channel for exposed credentials or a suspected security vulnerability.
 
 ## See Also
 
-- [monitoring.md](monitoring.md) -- ongoing observability and alerting
-- [security.md](security.md) -- secret rotation and breach recovery
-- [app:health:check](commands/app-health-check.md) -- component health verification
-- [app:config:validate](commands/app-config-validate.md) -- configuration audit
+- [Monitoring](monitoring.md) — component signals, endpoints and job handling
+- [Background Work](background-work.md) — worker ownership, observation and recovery
+- [Storage and Data](storage-and-data.md) — mounts and data ownership
+- [Backup and Recovery](backup-and-recovery.md) — preserve and restore state
+- [Security](security.md) — secret rotation and incident recovery
+- [app:health:check](commands/app-health-check.md) — health-check result rules
+- [app:config:validate](commands/app-config-validate.md) — configuration checks
