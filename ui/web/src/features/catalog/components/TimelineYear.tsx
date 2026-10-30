@@ -111,46 +111,46 @@ function AlbumThumbnail({ album }: { album: AlbumSummary }) {
   )
 
   const thumbnail = (
-    <AlbumContextMenu album={contextMenuData}>
-      <ThumbnailButton
-        role="button"
-        tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={handleKeyDown}
-        $isSelected={isSelected}
-        style={{
-          backgroundColor: dominantColor ?? 'var(--color-secondary)',
-        }}
-      >
-        {src ? (
-          <CoverImage src={src} alt={album.title} loading="lazy" />
-        ) : (
-          <Placeholder
-            style={{ backgroundColor: dominantColor ?? 'var(--color-secondary)' }}
-          >
-            {!dominantColor && (
-              <PlaceholderIcon
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="3" />
-              </PlaceholderIcon>
-            )}
-          </Placeholder>
-        )}
-      </ThumbnailButton>
-    </AlbumContextMenu>
+    <ThumbnailButton
+      role="button"
+      tabIndex={0}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      $isSelected={isSelected}
+      style={{
+        backgroundColor: dominantColor ?? 'var(--color-secondary)',
+      }}
+    >
+      {src ? (
+        <CoverImage src={src} alt={album.title} loading="lazy" />
+      ) : (
+        <Placeholder
+          style={{ backgroundColor: dominantColor ?? 'var(--color-secondary)' }}
+        >
+          {!dominantColor && (
+            <PlaceholderIcon
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+            </PlaceholderIcon>
+          )}
+        </Placeholder>
+      )}
+    </ThumbnailButton>
   )
 
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>
-        <TooltipTrigger asChild>{thumbnail}</TooltipTrigger>
+        <AlbumContextMenu album={contextMenuData}>
+          <TooltipTrigger asChild>{thumbnail}</TooltipTrigger>
+        </AlbumContextMenu>
         <TooltipContent side="top">
           {album.title}
         </TooltipContent>

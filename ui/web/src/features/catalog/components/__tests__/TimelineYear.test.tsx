@@ -89,6 +89,20 @@ describe('TimelineYear', () => {
     expect(items).toHaveLength(2)
   })
 
+  it('shows the refreshed album title on hover and keeps its context menu usable', async () => {
+    const user = userEvent.setup()
+    const view = render(<TimelineYear label="2024" albums={[makeAlbum('a1', 'Original title')]} />)
+    const thumbnail = screen.getByRole('button')
+    await user.hover(thumbnail)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Original title')
+
+    view.rerender(<TimelineYear label="2024" albums={[makeAlbum('a1', 'Refreshed title')]} />)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Refreshed title')
+    await user.unhover(thumbnail)
+    await user.pointer({ keys: '[MouseRight]', target: thumbnail })
+    expect(screen.getByRole('menuitem', { name: /Get Info/ })).toBeInTheDocument()
+  })
+
   it('selects album on click', async () => {
     const user = userEvent.setup()
     render(<TimelineYear label="2024" albums={[makeAlbum('a1')]} />)

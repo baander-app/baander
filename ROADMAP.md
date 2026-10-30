@@ -467,6 +467,23 @@ Receipts are `/tmp/live-u9-frontend-canonical-health-full.log`,
 `/tmp/live-u9-build-canonical-health.log`, `/tmp/live-u9-lint-canonical-health.log`
 and `/tmp/live-u9-fixture-ci-observer-integration.log`.
 
+U9 lifecycle and scan browser checkpoint: worker reload, managed preview restart
+and real console scan all pass. Each owned fixture reports complete cleanup with
+zero survivors. The scan's asynchronous ingestion adds the tagged song to an
+already-mounted album. The restart includes rebuilding and activating the preview;
+its measured 4.8 minutes is not a process-only restart time. Results are retained
+in `/tmp/live-u9-lifecycle-scan-after-health.log` and
+`/tmp/live-u9-lifecycle-scan-accepted-results/`.
+
+The populated Timeline now completes two serial 100-page reads and renders all
+10,000 albums. Its final visible-title assertion exposed tooltip handlers lost
+through a custom context-menu component. The corrected trigger composition passes
+six interaction tests, including a refreshed title and the retained context menu;
+both TypeScript projects and build pass. The final Timeline browser assertion
+still needs its rerun. The preceding failed browser result remains in
+`/tmp/live-u9-timeline-tooltip-failure-results/`; focused regression evidence is in
+`/tmp/live-u9-timeline-tooltip-red.log` and `/tmp/live-u9-timeline-tooltip-green.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
