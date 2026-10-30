@@ -48,5 +48,6 @@ const binding = load();
 
 export const AacDecoder = binding.AacDecoder;
 export const AacEncoder = binding.AacEncoder;
+export const measureLoudness = binding.measureLoudness;
 export const version = binding.version;
 export default binding;

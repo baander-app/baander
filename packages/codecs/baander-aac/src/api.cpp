@@ -10,6 +10,8 @@
 #endif
 #if defined(BAAC_AAC_HAVE_ENCODER)
 #include "encoder.h"
+#include "loudness.h"
+#include "usac.h"
 #include "usac_enc.h"
 #endif
 
@@ -49,6 +51,7 @@ void aac_encoder_destroy(AacEncoderHandle ctx) {
     return;
   }
   auto* s = static_cast<AacEncoderState*>(ctx);
+  aac_loudness_destroy(s->loudness);
   aac_encoder_transport_destroy(s->transport);
   aac_encoder_state_destroy(s);
 }
@@ -76,8 +79,19 @@ int aac_encoder_encode(AacEncoderHandle ctx, const float* pcm, int n_samples, ui
   if (n_samples != s->frame_size) {
     return AAC_ERR_INVALID_ARG;
   }
+  /* The meter measures one stream: the first frame after creation or a
+   * flush starts it over, and a refused frame (the output too small)
+   * consumed no input, so nothing is fed for it. */
+  const int first_frame = !s->started;
   s->pending_flush = (s->delay + s->frame_size - 1) / s->frame_size;
-  return encode_block(s, pcm, out, out_size);
+  const int len = encode_block(s, pcm, out, out_size);
+  if (len >= 0 && s->loudness) {
+    if (first_frame) {
+      aac_loudness_reset(s->loudness);
+    }
+    aac_loudness_feed(s->loudness, pcm, s->frame_size);
+  }
+  return len;
 }
 
 static int encoder_started(const AacEncoderState* s) { return s->started; }
@@ -149,6 +163,84 @@ int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* opti
   aac_usac_enc_set_options(s->usac, options, s->sample_rate);
   aac_encoder_state_reset(s);
   return AAC_OK;
+}
+
+/* Drops the configuration extension of one type from the USAC encoder's
+ * list; the list keeps its order. */
+static void usac_remove_config_ext(AacUsacEncoder* u, int type) {
+  int kept = 0;
+  for (int i = 0; i < u->num_config_exts; i++) {
+    if (u->config_ext[i].type != type) {
+      if (kept != i) {
+        u->config_ext[kept] = u->config_ext[i];
+      }
+      kept++;
+    }
+  }
+  u->num_config_exts = kept;
+}
+
+int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* info) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (s->aot != AAC_AOT_USAC || !s->usac) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  if (!info) {
+    usac_remove_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO);
+    return AAC_OK;
+  }
+  /* loudnessInfoSet() ends at its last bit; the configuration extension
+   * carries whole bytes, so the writer's buffer is zero behind it. */
+  uint8_t payload[AAC_USAC_MAX_CONFIG_EXT_BYTES];
+  memset(payload, 0, sizeof(payload));
+  AacBitWriter w;
+  aac_bitwriter_init(&w, payload, (int)sizeof(payload));
+  const int bits = aac_loudness_info_write(&w, info);
+  if (bits < 0) {
+    return bits;
+  }
+  return aac_usac_enc_set_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO, payload,
+                                     (bits + 7) / 8);
+}
+
+int aac_encoder_set_loudness_measurement(AacEncoderHandle ctx, int enabled) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (!enabled) {
+    aac_loudness_destroy(s->loudness);
+    s->loudness = nullptr;
+    return AAC_OK;
+  }
+  if (s->loudness) {
+    return AAC_OK;
+  }
+  if (encoder_started(s)) {
+    return AAC_ERR_STATE;
+  }
+  /* The meter takes the input as the encoder does: interleaved in the
+   * canonical order at the input rate (twice the core rate with SBR),
+   * with the input's channel count (two for HE-AAC v2). */
+  s->loudness = aac_loudness_create(s->input_rate, s->input_channels);
+  return s->loudness ? AAC_OK : AAC_ERR_UNSUPPORTED;
+}
+
+int aac_encoder_loudness(AacEncoderHandle ctx, AacLoudnessInfo* out) {
+  if (!ctx || !out) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  auto* s = static_cast<AacEncoderState*>(ctx);
+  if (!s->loudness) {
+    return AAC_ERR_STATE;
+  }
+  return aac_loudness_result(s->loudness, out);
 }
 
 int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length) {

@@ -468,6 +468,30 @@ synthetic cases against the standards' figures, the derived K-weighting
 against the 48 kHz table, the feed chunking, the writer's bit layout
 against hand-computed fields and the FDK encoder's own set, and the
 round trip through the decoder's parser.
+
+The encoder carries the figures in two forms. `aac_encoder_set_loudness_info`
+takes an `AacLoudnessInfo` before the first frame of an xHE-AAC stream and
+writes the loudnessInfoSet() into the UsacConfig as the
+ID_CONFIG_EXT_LOUDNESS_INFO extension, so that every StreamMuxConfig, the
+AudioSpecificConfig of `aac_encoder_config` and the copy inside each audio
+pre-roll declare it; NULL removes the set, and a second call replaces it.
+That is the two-pass form: the whole programme through the meter first,
+then the encode (`baac enc --loudness` does both). The one-pass form,
+`aac_encoder_set_loudness_measurement`, makes the encoder feed every frame
+it codes to a meter of its own, which `aac_encoder_loudness` reads at any
+time after 400 ms of input; the meter starts over with each stream after
+a flush and keeps the last stream's figures until then. A stream's
+configuration cannot change once it has begun, so the one-pass figures
+are for an MP4 header or for a second encode, not for the stream they
+were measured from. The meter (`aac_loudness_create`, `_feed`, `_result`)
+and `AacLoudnessInfo` are public API in `aac.h`; `loudness.h` keeps the
+writer. The meter changes no output byte, and the set changes the
+configuration alone: the raw access units of a stream without pre-roll
+are byte-identical with and without it. On a stream carrying the set,
+FFmpeg master (from the MP4 form, `-target_level`) and our decoder apply
+the same normalisation gain, and the FDK decoder and libxaac decode it
+unchanged. The suite `test_encoder_loudness` covers both forms.
+
 With `AAC_AOT_USAC` the same analysis, psychoacoustics, TNS, M/S decision
 and rate loop feed an xHE-AAC (ISO/IEC 23003-3) writer instead of the
 AAC-LC one: 1024-line frames of the frequency-domain core, mono as a
@@ -488,8 +512,10 @@ step. The output is LOAS/LATM by default, raw access units with the
 USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
 AAC DRC metadata are refused, as the USAC frame has no place for them;
 `aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
-frame interval and a stream identifier. The AAC-LC output is unchanged
-byte for byte.
+frame interval, a stream identifier, and whether enhanced SBR and MPS 212
+are on, off or chosen by bitrate; `aac_encoder_set_loudness_info` adds the
+loudness info set (see Loudness). The AAC-LC output is unchanged byte for
+byte.
 
 ## API
 
@@ -516,8 +542,19 @@ int aac_encoder_set_frame_length(AacEncoderHandle ctx, int frame_length);
 int aac_encoder_set_crc(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_mpeg2(AacEncoderHandle ctx, int enabled);
 int aac_encoder_set_channel_mode(AacEncoderHandle ctx, AacChannelMode mode);
-/* xHE-AAC: noise filling, pre-roll, independent frame interval, stream id */
+/* xHE-AAC: noise filling, pre-roll, independent frame interval, stream id, SBR, MPS 212 */
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
+/* xHE-AAC loudness metadata: the set of a measured programme (two-pass),
+ * or a meter inside the encoder (one-pass) */
+int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* info);
+int aac_encoder_set_loudness_measurement(AacEncoderHandle ctx, int enabled);
+int aac_encoder_loudness(AacEncoderHandle ctx, AacLoudnessInfo* out);
+/* the loudness meter (ITU-R BS.1770-4, EBU Tech 3341/3342), 1 to 6 channels */
+AacLoudnessMeter* aac_loudness_create(int sample_rate, int channels);
+void aac_loudness_feed(AacLoudnessMeter* m, const float* interleaved, int frames);
+int aac_loudness_result(const AacLoudnessMeter* m, AacLoudnessInfo* out);
+void aac_loudness_reset(AacLoudnessMeter* m);
+void aac_loudness_destroy(AacLoudnessMeter* m);
 int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
 int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate);
 int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
@@ -561,6 +598,18 @@ int aac_encoder_set_metadata(AacEncoderHandle ctx, AacDrcProfile profile, int pr
   masking threshold, 100 nine dB below it. In the VBR modes the quality
   also selects the lowpass (13 kHz at 1 to 19.3 kHz at 100), and a quality
   set after creation re-derives every setting that depends on it.
+- `aac_encoder_set_loudness_info` takes the figures of a whole programme
+  (`AacLoudnessInfo`: the integrated loudness and the sample peak, the
+  true peak, range, anchor loudness and the momentary and short-term
+  maxima each with its `has_*` flag) before the first frame of an
+  xHE-AAC stream (`AAC_ERR_STATE` after it, `AAC_ERR_UNSUPPORTED` for
+  another object type); NULL removes the set.
+  `aac_encoder_set_loudness_measurement` runs a meter on the input the
+  encoder codes (before the first frame; up to six channels, else
+  `AAC_ERR_UNSUPPORTED`), and `aac_encoder_loudness` reads it
+  (`AAC_ERR_STATE` under 400 ms of input or without a meter). The meter
+  itself takes interleaved input at full scale 1.0 in the canonical
+  channel order and any chunking.
 
 ### Decoder
 
@@ -701,10 +750,22 @@ sums. Neither the encoder nor the decoder allocates once it is running
 ### Command-line tool
 
 ```sh
-baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality] [lc|he|hev2|xhe]
+baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality] [lc|he|hev2|xhe] [options]
 baac dec <in.aac> <out.f32le> [rate] [channels]
+baac loudness <in.wav> | <in.f32le> <rate> <channels>
 baac bench [--seconds N] [--dump DIR] [--only NAME]
 ```
+
+With the `xhe` profile, `--loudness` measures the whole input first and
+writes the loudness info set into the stream (the figures go to stderr),
+`--sbr on|off|auto` and `--mps on|off|auto` choose enhanced SBR and
+MPS 212 (`auto`, the default, by bitrate), and `--no-noise-filling`,
+`--preroll off` and `--stream-id N` set the other USAC options; the
+options are refused with another profile. `loudness` prints the meter's
+figures (integrated loudness, loudness range, true peak, sample peak,
+momentary and short-term maxima) of a WAV file (integer PCM of 8 to 32
+bits or 32-bit float, up to six channels in the canonical order) or of
+raw float input with its rate and channel count.
 
 `bench` encodes and decodes a synthetic 60 s stereo signal at 48 kHz
 through AAC-LC (1024 and 960 frames, and with the afterburner), HE-AAC
@@ -756,11 +817,22 @@ default at -24), `drcEffect` (`off`, `none`, `night`, `noisy`, `limited`,
 `lowlevel`, `dialog`, `general`), `albumMode`, `drcBoost` and `drcCut`
 (percent), and `decoder.loudness()` reads back the declared program
 loudness in LUFS (`null` when the stream declares none) and the
-normalisation gain in dB after each decode call. `npm test` runs the
-binding's smoke test. In the Electron app the main-process `AacService`
-wraps the binding behind the `window.electron.aac` bridge (one-shot
-`decode`/`encode` and chunked decoder/encoder sessions); every decode
-result carries the `loudness` readback.
+normalisation gain in dB after each decode call. The encoder's
+`profile: 'xhe'` writes xHE-AAC (LOAS by default, `raw` with `config` for
+MP4) and takes `usac: { noiseFilling, preroll, independentIntervalFrames,
+streamId, sbr, mps212 }` (the tools `'on'`, `'off'` or `'auto'`),
+`loudnessInfo` (the figures the loudness info set carries;
+`integratedLkfs` and `samplePeakDbfs` at least) and `measureLoudness:
+true`, after which `encoder.loudness` holds the figures of the input
+encoded so far (`null` under 400 ms); the exported
+`measureLoudness(pcm, sampleRate, channels)` meters a whole signal for
+the two-pass flow and returns the object `loudnessInfo` accepts. `npm
+test` runs the binding's smoke test. In the Electron app the
+main-process `AacService` wraps the binding behind the
+`window.electron.aac` bridge (one-shot `decode`, `encode` and
+`measureLoudness`, and chunked decoder/encoder sessions with
+`encoderLoudness` for a session opened with `measureLoudness`); every
+decode result carries the `loudness` readback.
 
 ### Building for Electron and prebuilds
 
@@ -828,7 +900,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-nine suites, and the transform, filterbank and
+`ctest` runs forty suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;
@@ -907,7 +979,15 @@ through the public API against AAC-LC at the same bitrate, noise
 filling, the raw access unit bitrates at 48 to 128 kbit/s, the API's
 refusals, and the two committed streams `usac_enc_*.loas`, which a fresh
 encode reproduces byte for byte; `test_usac_enc --write-streams
-tests/data` regenerates them). The other USAC
+tests/data` regenerates them) and its loudness metadata in another
+(`test_encoder_loudness`: the two-pass set in the configuration as the
+writer's bytes and read back by the decoder as the declared loudness
+with its normalisation gain, the set's removal and replacement and its
+place next to the stream id, the refusals by object type and state, the
+one-pass meter against the standalone one and EBU Tech 3341's first
+case across a flush, and byte identity of the AAC-LC, HE-AAC and USAC
+output with the meter on and of the raw access units with the set). The
+other USAC
 data under `tests/data` is the FDK xHE-AAC encoder's output
 (`usac_*.loas`, 48 access units each, mono and stereo at 12 to
 96 kbit/s), the FDK decoder's 16-bit decodes with loudness

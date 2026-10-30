@@ -224,6 +224,81 @@ typedef struct AacUsacEncoderOptions_ {
  * range takes the default. */
 int aac_encoder_set_usac(AacEncoderHandle ctx, const AacUsacEncoderOptions* options);
 
+/* ── Loudness measurement ────────────────────────────────────────── */
+
+/* A loudness meter per ITU-R BS.1770-4 and EBU Tech 3341/3342 over
+ * interleaved float input at full scale 1.0 in the canonical channel
+ * order L, R, C, LFE, Ls, Rs (a channel count of 1 to 6 takes that
+ * order's prefix): the K-weighted mean square over 400 ms blocks every
+ * 100 ms, gated absolutely at -70 LKFS and relatively 10 LU below the
+ * mean of the blocks above it; the loudness range of EBU Tech 3342, the
+ * ungated maximum momentary and short-term loudness of EBU Tech 3341,
+ * the sample peak and the true peak of BS.1770-4 Annex 2. */
+typedef struct AacLoudnessMeter_ AacLoudnessMeter;
+
+/* sample_rate 8000 to 384000, channels 1 to 6; NULL otherwise or out of
+ * memory. */
+AacLoudnessMeter* aac_loudness_create(int sample_rate, int channels);
+void aac_loudness_destroy(AacLoudnessMeter* m);
+/* Forgets every block, for a new programme. */
+void aac_loudness_reset(AacLoudnessMeter* m);
+/* Interleaved frames at full scale 1.0, in any chunking. */
+void aac_loudness_feed(AacLoudnessMeter* m, const float* interleaved, int frames);
+
+/* No level or peak is reported below this: digital silence, and a
+ * loudness with no block above the absolute gate, read exactly it. */
+#define AAC_LOUDNESS_SILENCE (-150.0f)
+
+/* A programme's loudness figures: what the meter measures, and what
+ * aac_encoder_set_loudness_info writes into an xHE-AAC stream.  The
+ * has_* flags say which optional figures are present. */
+typedef struct AacLoudnessInfo_ {
+  float sample_peak_dbfs;
+  float true_peak_dbtp;  /* never below the sample peak */
+  float integrated_lkfs; /* AAC_LOUDNESS_SILENCE when no block passes the absolute gate */
+  float range_lu;        /* 0 when fewer than two windows pass the gates */
+  float anchor_lkfs;     /* caller-supplied (dialogue level); the meter leaves it 0 with has_anchor 0 */
+  int has_anchor, has_range, has_true_peak;
+  float max_momentary_lkfs, max_short_term_lkfs; /* EBU Tech 3341, ungated */
+  int has_momentary, has_short_term;             /* a window of 400 ms / 3 s exists */
+} AacLoudnessInfo;
+
+/* AAC_OK, or AAC_ERR_STATE when fewer than 400 ms were fed (the result
+ * needs one block).  The range and the short-term maximum need 3 s;
+ * before that has_range and has_short_term are 0. */
+int aac_loudness_result(const AacLoudnessMeter* m, AacLoudnessInfo* out);
+
+/* ── Encoder: xHE-AAC loudness metadata ─────────────────────────── */
+
+/* Two-pass form: writes the loudnessInfoSet() of ISO/IEC 23003-4 (one
+ * loudnessInfo() for the programme as coded: the sample peak, the true
+ * peak with has_true_peak, the program loudness, the anchor loudness
+ * with has_anchor, the loudness range with has_range, the momentary and
+ * short-term maxima with their flags; every level at 0.25 dB
+ * resolution) into the UsacConfig of the stream as the
+ * ID_CONFIG_EXT_LOUDNESS_INFO configuration extension, which every
+ * StreamMuxConfig, the AudioSpecificConfig of aac_encoder_config and
+ * the configuration inside each audio pre-roll then carry, so that a
+ * player normalises the programme by it.  Measure the whole input with
+ * the meter first, then set the result before the first frame
+ * (AAC_ERR_STATE after it, until a flush); NULL removes the set.
+ * AAC_ERR_UNSUPPORTED for an object type other than AAC_AOT_USAC. */
+int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* info);
+/* One-pass form: with `enabled` the encoder feeds every input frame it
+ * codes to a meter of its own, whose figures aac_encoder_loudness reads
+ * at any time (AAC_ERR_STATE before 400 ms of input, and while no meter
+ * runs).  The meter starts over with the stream at the first frame
+ * after a flush, and the figures of a finished stream stay readable
+ * until then.  A stream's configuration cannot change once it has
+ * begun, so the one-pass result cannot land in the stream it was
+ * measured from: it is for the caller to write into an MP4 header, or
+ * to encode the programme again with aac_encoder_set_loudness_info.
+ * Enabling is for before the first frame (AAC_ERR_STATE after it);
+ * disabling frees the meter at any time.  AAC_ERR_UNSUPPORTED for more
+ * than six channels, the layouts the meter has no weights for. */
+int aac_encoder_set_loudness_measurement(AacEncoderHandle ctx, int enabled);
+int aac_encoder_loudness(AacEncoderHandle ctx, AacLoudnessInfo* out);
+
 /* ── Decoder API ─────────────────────────────────────────────────── */
 
 /* Samples per channel one call to aac_decoder_decode can produce: up to

@@ -82,6 +82,50 @@ test('a USAC stream decodes and reports its MPEG-D loudness', { skip: !available
   await assert.rejects(() => service.openDecoder({ loudness: { targetLufs: -5 } }));
 });
 
+// The xHE-AAC profile: a USAC stream the decoder reads back with the
+// loudness info set the two-pass flow writes, the meter inside a session,
+// and the standalone meter on EBU Tech 3341's first case.
+test('xHE-AAC encodes with loudness metadata and the meter reads the input', { skip: !available && 'native binding not built' }, async () => {
+  const service = new AacService();
+  const sampleRate = 48000;
+  const pcm = tones(188 * 1024, sampleRate, 2);
+  const measured = await service.measureLoudness(pcm, sampleRate, 2);
+  assert.ok(Number.isFinite(measured.integratedLkfs) && measured.rangeLu !== null);
+  const stream = await service.encode(pcm, { sampleRate, channels: 2, bitrate: 96000, profile: 'xhe', loudnessInfo: measured, usac: { streamId: 3 } });
+  assert.equal(stream[0], 0x56, 'LOAS by default');
+  const result = await service.decode(stream, { channels: 0 });
+  assert.equal(result.objectType, 'usac');
+  assert.equal(result.errors, 0);
+  assert.equal(result.sampleRate, sampleRate);
+  assert.equal(result.streamChannels, 2);
+  const declared = Math.round(measured.integratedLkfs * 4) / 4;
+  assert.deepEqual(result.loudness, { programLoudness: declared, normalizationGain: -24 - declared });
+  const gain = 10 ** (result.loudness.normalizationGain / 20);
+  assert.ok(snrDb(pcm.map(x => x * gain), result.pcm, 2048 * 2) > 15, 'the programme decodes through the normalisation gain');
+
+  const session = await service.openEncoder({ sampleRate, channels: 2, bitrate: 96000, profile: 'xhe', measureLoudness: true });
+  assert.equal(session.profile, 'xhe');
+  assert.equal(await service.encoderLoudness(session.id), null, 'no figures before any input');
+  await service.encodeChunk(session.id, pcm);
+  await service.flushEncoder(session.id);
+  assert.deepEqual(await service.encoderLoudness(session.id), measured, 'the session meters the same frames');
+  await service.closeEncoder(session.id);
+  const plain = await service.openEncoder({ sampleRate, channels: 2, bitrate: 96000, profile: 'xhe' });
+  assert.equal(await service.encoderLoudness(plain.id), null, 'no meter without the option');
+  await service.closeEncoder(plain.id);
+
+  const sine = new Float32Array(sampleRate * 2 * 2);
+  for (let i = 0; i < sampleRate * 2; i++) {
+    const v = 10 ** (-23 / 20) * Math.sin((2 * Math.PI * 997 * i) / sampleRate);
+    sine[i * 2] = v;
+    sine[i * 2 + 1] = v;
+  }
+  const ebu = await service.measureLoudness(sine, sampleRate, 2);
+  assert.ok(Math.abs(ebu.integratedLkfs + 23) < 0.1, `-23 dBFS sine reads ${ebu.integratedLkfs} LKFS`);
+  await assert.rejects(() => service.measureLoudness(sine, sampleRate, 7), /1 to 6 channels/);
+  await assert.rejects(() => service.encode(pcm, { sampleRate, channels: 2, profile: 'lc', usac: { streamId: 1 } }), /usac options need the xhe profile/);
+});
+
 test('HE-AAC v2 codes a stereo signal as one channel and decodes it as two', { skip: !available && 'native binding not built' }, async () => {
   const service = new AacService();
   const pcm = tones(44100 * 2, 44100, 2);

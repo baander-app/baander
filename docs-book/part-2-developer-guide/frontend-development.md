@@ -248,11 +248,15 @@ ABI-stable, so one binding serves both runtimes. The application icon is
 The main process loads the binding lazily in `AacService`
 (`src/main/services/aac.service.ts`); when the binding is missing the service
 reports itself unavailable instead of failing startup. The renderer reaches it
-through `window.electron.aac`: one-shot `decode(adts)` and `encode(pcm, options)`
-calls, and chunked decoder and encoder sessions (`openDecoder`, `decodeChunk`,
-`closeDecoder`, `openEncoder`, `encodeChunk`, `flushEncoder`, `closeEncoder`).
-PCM is interleaved `Float32Array` at full scale; AAC data is an ADTS stream. The
-IPC module validates every payload before the service runs. See the codec's
+through `window.electron.aac`: one-shot `decode(adts)`, `encode(pcm, options)`
+and `measureLoudness(pcm, sampleRate, channels)` calls, and chunked decoder and
+encoder sessions (`openDecoder`, `decodeChunk`, `closeDecoder`, `openEncoder`,
+`encodeChunk`, `flushEncoder`, `encoderLoudness`, `closeEncoder`). PCM is
+interleaved `Float32Array` at full scale; AAC data is an ADTS stream, or LOAS
+for the low-delay and xHE-AAC (`profile: 'xhe'`) profiles, whose encoder
+options add the USAC settings (`usac`), a `loudnessInfo` set written into the
+stream and `measureLoudness` for the meter inside a session. The IPC module
+validates every payload before the service runs. See the codec's
 [README](../../packages/codecs/baander-aac/docs/README.md) for the C API, the
 command-line tool and the measured interoperability with FFmpeg.
 

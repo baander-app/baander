@@ -1,6 +1,7 @@
 /**
- * Native binding of the baander-aac codec (AAC-LC, HE-AAC v1/v2, AAC-LD
- * and AAC-ELD encoder and decoder; USAC / xHE-AAC decoder).
+ * Native binding of the baander-aac codec (AAC-LC, HE-AAC v1/v2, AAC-LD,
+ * AAC-ELD and USAC / xHE-AAC encoder and decoder, and the BS.1770-4
+ * loudness meter).
  *
  * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS
  * or LOAS stream, LATM elements or raw access units.  Both classes accept
@@ -199,9 +200,67 @@ export type AacRateControlMode = 'cbr' | 'abr' | 'cvbr' | 'tvbr';
 /**
  * AAC-LC, HE-AAC v1 (SBR), HE-AAC v2 (SBR and parametric stereo), AAC-LD
  * or AAC-ELD (the low-delay profiles, 512 or 480 samples per frame, LOAS
- * by default; ADTS cannot carry them).
+ * by default; ADTS cannot carry them), or xHE-AAC (USAC, ISO/IEC 23003-3,
+ * mono or stereo, LOAS by default, raw access units with `config` for
+ * MP4; ADTS cannot carry it).
  */
-export type AacProfile = 'lc' | 'he' | 'hev2' | 'ld' | 'eld';
+export type AacProfile = 'lc' | 'he' | 'hev2' | 'ld' | 'eld' | 'xhe';
+/** A USAC tool switched on, off, or left to the encoder's choice by bitrate. */
+export type AacUsacTool = 'on' | 'off' | 'auto';
+
+/** The xHE-AAC encoder's options ('xhe' only). */
+export interface AacUsacOptions {
+  /** Noise filling of the lines quantised to zero. Default true. */
+  noiseFilling?: boolean;
+  /**
+   * The audio pre-roll extension at every independent frame, which lets
+   * a decoder start there. Default true.
+   */
+  preroll?: boolean;
+  /** Frames between independent frames; 0 keeps the default of one second. */
+  independentIntervalFrames?: number;
+  /** The stream identifier written into the configuration, 0..65535. Default none. */
+  streamId?: number;
+  /** Enhanced SBR at 2:1; 'auto' (default) uses it below 64 kbit/s per channel. */
+  sbr?: AacUsacTool;
+  /** MPEG Surround 2-1-2 for stereo input; 'auto' (default) uses it below 48 kbit/s. */
+  mps212?: AacUsacTool;
+}
+
+/**
+ * A programme's loudness figures as the xHE-AAC encoder writes them into
+ * the stream's loudness info set (ISO/IEC 23003-4): the integrated
+ * loudness and the sample peak are needed, the rest is written when
+ * given. Levels in LKFS / dBTP / dBFS, the range in LU; every level is
+ * coded at 0.25 dB resolution.
+ */
+export interface AacLoudnessInfo {
+  integratedLkfs: number;
+  samplePeakDbfs: number;
+  truePeakDbtp?: number;
+  /** EBU Tech 3342 loudness range. */
+  rangeLu?: number;
+  /** Anchor (dialogue) loudness, which the meter does not measure. */
+  anchorLkfs?: number;
+  /** EBU Tech 3341 maxima, ungated. */
+  maxMomentaryLkfs?: number;
+  maxShortTermLkfs?: number;
+}
+
+/**
+ * What the loudness meter measures (ITU-R BS.1770-4, EBU Tech 3341/3342):
+ * the range and the short-term maximum need 3 s of input and are null
+ * before that; the momentary maximum and the true peak are always
+ * present. The object is accepted as `loudnessInfo` for a second encode.
+ */
+export interface AacLoudnessMeasurement {
+  integratedLkfs: number;
+  samplePeakDbfs: number;
+  truePeakDbtp: number | null;
+  rangeLu: number | null;
+  maxMomentaryLkfs: number | null;
+  maxShortTermLkfs: number | null;
+}
 
 export interface AacLdSbrOptions {
   /**
@@ -245,10 +304,27 @@ export interface AacEncoderOptions {
   afterburner?: boolean;
   /**
    * Dynamic range control metadata written into the stream.  Not available
-   * for the 'ld' and 'eld' profiles, whose frames carry no fill elements:
-   * the constructor throws when a profile other than 'none' is given.
+   * for the 'ld', 'eld' and 'xhe' profiles, whose frames carry no fill
+   * elements: the constructor throws when a profile other than 'none' is
+   * given.
    */
   metadata?: AacMetadataOptions;
+  /** 'xhe' only: the USAC encoder's options. */
+  usac?: AacUsacOptions;
+  /**
+   * 'xhe' only: the loudness info set written into the stream's
+   * configuration, which players normalise by (two-pass: measure the
+   * whole programme with `measureLoudness()` first).
+   */
+  loudnessInfo?: AacLoudnessInfo;
+  /**
+   * Meter the input as it is encoded and expose the figures as
+   * `loudness` (one-pass). A stream's configuration cannot change once it
+   * has begun, so the result is for an MP4 header or a second encode with
+   * `loudnessInfo`, not for the stream it was measured from. Available
+   * for up to six channels. Default false.
+   */
+  measureLoudness?: boolean;
 }
 
 export declare class AacEncoder {
@@ -278,13 +354,32 @@ export declare class AacEncoder {
   readonly frameSize: number;
   /** Samples of silence before the first input sample in the decoded output (2048 for AAC-LC at 1024). */
   readonly delay: number;
+  /**
+   * With `measureLoudness`: the figures of the input encoded so far, or
+   * null before 400 ms of input (and without the option). They stay after
+   * `flush()` until the next stream begins.
+   */
+  readonly loudness: AacLoudnessMeasurement | null;
 }
+
+/**
+ * Measures a whole interleaved signal with the loudness meter (1 to 6
+ * channels in the canonical order L, R, C, LFE, Ls, Rs; 8000 to
+ * 384000 Hz), for the two-pass flow: the result is the `loudnessInfo` of
+ * the encode that follows. Throws for fewer than 400 ms of input.
+ */
+export declare function measureLoudness(
+  pcm: Float32Array,
+  sampleRate: number,
+  channels: number,
+): AacLoudnessMeasurement;
 
 export declare const version: string;
 
 declare const binding: {
   AacDecoder: typeof AacDecoder;
   AacEncoder: typeof AacEncoder;
+  measureLoudness: typeof measureLoudness;
   version: string;
 };
 export default binding;

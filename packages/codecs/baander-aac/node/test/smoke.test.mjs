@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { AacDecoder, AacEncoder, version } from '../index.js';
+import { AacDecoder, AacEncoder, measureLoudness, version } from '../index.js';
 
 function tones(samples, sampleRate, channels) {
   const pcm = new Float32Array(samples * channels);
@@ -274,7 +274,7 @@ test('encodes and decodes the low-delay profiles', () => {
   for (const profile of ['ld', 'eld']) {
     assert.throws(
       () => new AacEncoder({ profile, metadata: { drcProfile: 'film-standard' } }),
-      /metadata is not available for the ld and eld profiles/,
+      /metadata is not available for the ld, eld and xhe profiles/,
     );
   }
 });
@@ -396,4 +396,80 @@ test('decodes a USAC stream and reads its loudness', () => {
   assert.throws(() => new AacDecoder({ drcCut: true }), /drcCut must be a number/);
   assert.throws(() => new AacDecoder({ loudness: { targetLufs: -5 } }));
   assert.throws(() => new AacDecoder({ loudness: { targetLufs: '-20' } }), /targetLufs must be a number/);
+});
+
+/* The xHE-AAC encoder: a LOAS stream by default that the decoder reads
+ * as USAC, the meter inside the encoder, the two-pass loudness info set
+ * read back as the declared program loudness, and the standalone meter
+ * on EBU Tech 3341's first case. */
+test('encodes xHE-AAC with loudness metadata and meters the input', () => {
+  const sampleRate = 48000;
+  const channels = 2;
+  const pcm = tones(188 * 1024, sampleRate, channels);
+  const encoder = new AacEncoder({ sampleRate, channels, bitrate: 96000, profile: 'xhe', measureLoudness: true });
+  assert.equal(encoder.profile, 'xhe');
+  assert.equal(encoder.frameSize, 1024);
+  assert.equal(encoder.delay, 2048);
+  assert.equal(encoder.loudness, null, 'no figures before any input');
+  const stream = Buffer.concat([encoder.encode(pcm), encoder.flush()]);
+  assert.equal(stream[0], 0x56, 'LOAS by default');
+  const measured = encoder.loudness;
+  assert.ok(measured && Number.isFinite(measured.integratedLkfs), 'the meter has figures after the stream');
+  assert.ok(measured.rangeLu !== null && measured.maxShortTermLkfs !== null, 'four seconds give every figure');
+
+  const plain = new AacDecoder({ channels: 0 });
+  const out = decodeAll(plain, stream, 1000);
+  assert.equal(plain.errors, 0);
+  assert.equal(plain.objectType, 'usac');
+  assert.equal(plain.streamChannels, 2);
+  assert.equal(plain.sampleRate, sampleRate);
+  assert.deepEqual(plain.loudness(), { programLoudness: null, normalizationGain: 0 }, 'no set written');
+  const snr = snrDb(pcm, out, encoder.delay * channels);
+  assert.ok(snr > 15, `xhe reconstruction SNR ${snr.toFixed(1)} dB`);
+
+  /* Two-pass: the standalone meter reads as the encoder's on the same
+   * frames, and its result goes into the next stream's configuration. */
+  const info = measureLoudness(pcm, sampleRate, channels);
+  assert.deepEqual(info, measured);
+  const second = new AacEncoder({
+    sampleRate, channels, bitrate: 96000, profile: 'xhe',
+    loudnessInfo: info, usac: { streamId: 7, noiseFilling: false, sbr: 'off', mps212: 'off' },
+  });
+  assert.ok(second.config.length > 4, 'the USAC AudioSpecificConfig carries the set');
+  const withSet = Buffer.concat([second.encode(pcm), second.flush()]);
+  const decoder = new AacDecoder({ channels: 0 });
+  decodeAll(decoder, withSet, 777);
+  assert.equal(decoder.errors, 0);
+  const declared = Math.round(info.integratedLkfs * 4) / 4;
+  assert.deepEqual(decoder.loudness(), { programLoudness: declared, normalizationGain: -24 - declared });
+  assert.equal(second.loudness, null, 'no meter without measureLoudness');
+
+  /* EBU Tech 3341 case 1: a stereo 997 Hz sine at -23 dBFS reads -23 LUFS. */
+  const sine = new Float32Array(sampleRate * 2 * channels);
+  for (let i = 0; i < sampleRate * 2; i++) {
+    const v = 10 ** (-23 / 20) * Math.sin((2 * Math.PI * 997 * i) / sampleRate);
+    sine[i * channels] = v;
+    sine[i * channels + 1] = v;
+  }
+  const ebu = measureLoudness(sine, sampleRate, channels);
+  assert.ok(Math.abs(ebu.integratedLkfs + 23) < 0.1, `-23 dBFS sine reads ${ebu.integratedLkfs.toFixed(2)} LKFS`);
+  assert.ok(Math.abs(ebu.truePeakDbtp + 23) < 0.1 && Math.abs(ebu.samplePeakDbfs + 23) < 0.05);
+  assert.equal(ebu.maxShortTermLkfs, null, 'the short-term window needs 3 s');
+
+  assert.throws(() => measureLoudness(new Float32Array(1000), sampleRate, channels), /400 ms/);
+  assert.throws(() => measureLoudness(sine, sampleRate, 7), /1 to 6 channels/);
+  assert.throws(() => measureLoudness(new Int16Array(10), sampleRate, channels), /Float32Array/);
+  assert.throws(() => new AacEncoder({ profile: 'lc', usac: { streamId: 1 } }), /usac options need the xhe profile/);
+  assert.throws(() => new AacEncoder({ profile: 'lc', loudnessInfo: info }), /loudnessInfo needs the xhe profile/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', loudnessInfo: { integratedLkfs: -20 } }), /needs integratedLkfs and samplePeakDbfs/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', loudnessInfo: { integratedLkfs: '-20', samplePeakDbfs: -1 } }), /must be a finite number/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', usac: { sbr: 'maybe' } }), /on, off or auto/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', usac: { streamId: 70000 } }), /streamId/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', usac: { independentIntervalFrames: '5' } }), /must be a number/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', transport: 'adts' }));
+  assert.throws(() => new AacEncoder({ profile: 'xhe', metadata: { drcProfile: 'speech' } }), /not available for the ld, eld and xhe profiles/);
+  assert.throws(() => new AacEncoder({ profile: 'xhe', afterburner: true }));
+  assert.throws(() => new AacEncoder({ profile: 'xhe', channels: 6 }));
+  assert.throws(() => new AacEncoder({ channels: 8, bitrate: 512000, measureLoudness: true }));
+  assert.ok(new AacEncoder({ channels: 6, bitrate: 320000, measureLoudness: true }), 'the meter takes 5.1');
 });

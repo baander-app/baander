@@ -390,8 +390,8 @@ MPEG-4 DRC: per-band gains and a program reference level the encoder writes into
 
 ### USAC
 
-Unified Speech and Audio Coding, ISO/IEC 23003-3, object type 42, as the xHE-AAC profile constrains it: the AAC object type whose frames carry no element ids (the configuration fixes the element list) and whose core channels switch per frame between a frequency-domain core with an arithmetic coder and a linear prediction core of ACELP and TCX frames, followed by enhanced SBR, MPS 212 and MPEG-D DRC. The decoder reads it from LOAS/LATM or raw access units; ADTS cannot carry it. The native binding and the Electron service name it `usac`; the codec decodes it and does not encode it.
-*Avoid: xHE-AAC as a separate codec; it is the profile of USAC the decoder targets.*
+Unified Speech and Audio Coding, ISO/IEC 23003-3, object type 42, as the xHE-AAC profile constrains it: the AAC object type whose frames carry no element ids (the configuration fixes the element list) and whose core channels switch per frame between a frequency-domain core with an arithmetic coder and a linear prediction core of ACELP and TCX frames, followed by enhanced SBR, MPS 212 and MPEG-D DRC. The decoder reads it from LOAS/LATM or raw access units; ADTS cannot carry it. The native binding and the Electron service name a decoded stream `usac` and the encoder's profile `xhe`; the codec decodes every USAC core and writes the frequency-domain one (the xHE-AAC encoder).
+*Avoid: xHE-AAC as a separate codec; it is the profile of USAC the codec targets.*
 
 ### Enhanced SBR
 
@@ -429,6 +429,21 @@ A one-to-two box of an MPEG Surround tree: from one input channel, a per-band le
 ### TTT box
 
 The two-to-three box of the 525 tree, which rebuilds left, right and centre from the stereo downmix: in the prediction modes 0 and 1 from two prediction coefficients, a correlation and the residual where coded; in the energy modes 2 to 5 from two level differences, modes 2 and 3 with the centre's share subtracted from the other input before the split. A dual-mode box uses one mode below a band boundary and another above it.
+
+### xHE-AAC encoder
+
+The encoder side of USAC in compatible mode: the AAC-LC analysis and rate loop feeding a USAC frame writer with the frequency-domain core (1024-line frames, mono as a single channel element, stereo as a channel pair, the context arithmetic coder, noise filling, independent frames with the audio pre-roll), so that every stream it writes decodes in FFmpeg master, the FDK decoder, libxaac and the codec's own decoder with no non-standard syntax. It writes LOAS by default and raw access units for MP4, never ADTS, and takes the USAC options (noise filling, pre-roll, the independent frame interval, a stream id, and enhanced SBR and MPS 212 on, off or chosen by bitrate) and a loudness info set. The native binding and the Electron service name it `xhe`; `baac enc` takes it as a profile.
+*Avoid: USAC encoder alone, which also names the linear prediction core the codec does not write.*
+
+### Loudness info set
+
+The loudnessInfoSet() of ISO/IEC 23003-4 that a USAC configuration carries as an extension, for the programme as coded: the sample peak, the true peak, the integrated loudness of ITU-R BS.1770-4, the anchor loudness when supplied, the loudness range of EBU Tech 3342 and the momentary and short-term maxima of EBU Tech 3341, each at 0.25 dB. A player normalises the programme by its integrated loudness. The xHE-AAC encoder writes it in the two-pass form, with the whole programme measured first; the one-pass meter inside the encoder measures the input as it is coded, and its figures serve an MP4 header or a second encode, since a stream's configuration cannot change once it has begun.
+*Avoid: loudness metadata alone, which also names the MPEG-4 program reference level.*
+
+### Prebuilt binding
+
+The native addon compiled per platform and architecture by the `aac-native` GitHub Actions workflow and attached to an `aac-native-v*` release: `prebuilds/<platform>-<arch>/baander_aac.node`, which the package's install script fetches and the loader tries before a local node-gyp build. One binary serves Node and Electron, since the Node-API ABI is the version the binding declares rather than the runtime it was compiled against.
+*Avoid: native module alone, which also names a build from source.*
 
 ### ELD v2
 

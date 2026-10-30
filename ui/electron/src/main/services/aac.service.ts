@@ -9,17 +9,20 @@
 import type {
   AacChannelMode,
   AacLoudness,
+  AacLoudnessMeasurement,
   AacObjectType,
   AacDecoder,
   AacDecoderOptions,
   AacEncoder,
   AacEncoderOptions,
   AacProfile,
+  measureLoudness,
 } from '@baander/aac-native';
 
 type Native = {
   AacDecoder: typeof AacDecoder;
   AacEncoder: typeof AacEncoder;
+  measureLoudness: typeof measureLoudness;
   version: string;
 };
 
@@ -124,7 +127,20 @@ export class AacService {
     return describe(decoder, decoder.decode(data));
   }
 
-  /** Encodes interleaved PCM into a complete stream in the chosen transport. */
+  /**
+   * Measures a whole interleaved signal with the BS.1770-4 loudness meter
+   * (1 to 6 channels in the canonical order); the result is the
+   * `loudnessInfo` of an xHE-AAC encode that follows.
+   */
+  async measureLoudness(pcm: Float32Array, sampleRate: number, channels: number): Promise<AacLoudnessMeasurement> {
+    return (await this.native()).measureLoudness(pcm, sampleRate, channels);
+  }
+
+  /**
+   * Encodes interleaved PCM into a complete stream in the chosen
+   * transport. With `profile: 'xhe'` the options take the USAC settings
+   * (`usac`) and a `loudnessInfo` set written into the stream.
+   */
   async encode(pcm: Float32Array, options: AacEncoderOptions): Promise<Uint8Array> {
     const encoder = new (await this.native()).AacEncoder(options);
     const body = encoder.encode(pcm);
@@ -174,6 +190,15 @@ export class AacService {
   /** Emits the final frames; the session stays open for another stream. */
   async flushEncoder(id: number): Promise<Uint8Array> {
     return toBytes(this.encoder(id).flush());
+  }
+
+  /**
+   * The loudness of the input encoded so far by a session opened with
+   * `measureLoudness: true`: null before 400 ms of input and for a
+   * session without the meter.
+   */
+  async encoderLoudness(id: number): Promise<AacLoudnessMeasurement | null> {
+    return this.encoder(id).loudness;
   }
 
   async closeEncoder(id: number): Promise<boolean> {

@@ -2419,9 +2419,14 @@ yarn test              # node --import tsx --experimental-test-module-mocks --te
 
 It covers the preload bridges, IPC validation and renderer trust, the
 discovery and deep-link services, DSP asset regeneration and the native AAC
-codec service. The codec tests use the compiled `@baander/aac-native` binding
-from `node_modules` or from a build in the codec directory, and skip the
-binding-dependent cases when neither exists.
+codec service (decoding, encoding in every profile including xHE-AAC with
+its loudness metadata, and the loudness meter). The codec tests use the
+compiled `@baander/aac-native` binding from `node_modules` or from a build in
+the codec directory, and skip the binding-dependent cases when neither
+exists. Without `tsx` the service test also runs under Node's own type
+stripping (`node --experimental-strip-types --experimental-test-module-mocks
+--test tests/aac-service.test.ts`); the IPC test does not, since its sources
+import modules without extensions.
 
 The codec itself has CTest suites and a binding smoke test:
 

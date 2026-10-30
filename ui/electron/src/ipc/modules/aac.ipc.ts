@@ -8,16 +8,26 @@ import type {
   AacDrcEffect,
   AacDrcProfile,
   AacEncoderOptions,
+  AacLoudnessInfo,
   AacProfile,
   AacRateControlMode,
   AacSignaling,
   AacTransport,
+  AacUsacOptions,
+  AacUsacTool,
 } from '@baander/aac-native';
 
 const SAMPLE_RATES = new Set([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000, 88200, 96000]);
 const MODES = new Set<AacRateControlMode>(['cbr', 'abr', 'cvbr', 'tvbr']);
-const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2', 'ld', 'eld']);
+const PROFILES = new Set<AacProfile>(['lc', 'he', 'hev2', 'ld', 'eld', 'xhe']);
 const LOW_DELAY_PROFILES = new Set<AacProfile>(['ld', 'eld']);
+const USAC_TOOLS = new Set<AacUsacTool>(['on', 'off', 'auto']);
+const MAX_STREAM_ID = 65535;
+const MAX_LOUDNESS_CHANNELS = 6;
+const MIN_METER_RATE = 8000;
+const MAX_METER_RATE = 384000;
+/** The loudness figures coded in the stream, as the binding names them. */
+const LOUDNESS_FIGURES = ['integratedLkfs', 'samplePeakDbfs', 'truePeakDbtp', 'rangeLu', 'anchorLkfs', 'maxMomentaryLkfs', 'maxShortTermLkfs'] as const;
 const DRC_PROFILES = new Set<AacDrcProfile>(['none', 'film-standard', 'film-light', 'music-standard', 'music-light', 'speech']);
 const DRC_EFFECTS = new Set<AacDrcEffect>(['off', 'none', 'night', 'noisy', 'limited', 'lowlevel', 'dialog', 'general']);
 const MIN_TARGET_LUFS = -31;
@@ -38,6 +48,8 @@ function oneOf<T extends string>(value: unknown, allowed: Set<T>, what: string):
   return value as T;
 }
 
+function frameLength(value: unknown): 960 | 1024 | undefined;
+function frameLength(value: unknown, lowDelay: boolean): 960 | 1024 | 512 | 480 | undefined;
 function frameLength(value: unknown, lowDelay = false): 960 | 1024 | 512 | 480 | undefined {
   if (value === undefined) return undefined;
   const allowed = lowDelay ? LOW_DELAY_FRAME_LENGTHS : FRAME_LENGTHS;
@@ -101,6 +113,41 @@ function metadataOption(value: unknown): AacEncoderOptions['metadata'] {
     drcProfile: oneOf(drcProfile, DRC_PROFILES, 'drcProfile'),
     programRefLevel: refLevel(programRefLevel, 'programRefLevel', false),
   };
+}
+
+/** The USAC encoder options: flags, counts and the on/off/auto tools. */
+function usacOption(value: unknown): AacUsacOptions | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('usac');
+  const { noiseFilling, preroll, independentIntervalFrames, streamId, sbr, mps212 } = value as Record<string, unknown>;
+  if (independentIntervalFrames !== undefined && !(typeof independentIntervalFrames === 'number'
+    && Number.isInteger(independentIntervalFrames) && independentIntervalFrames >= 0)) invalid('independentIntervalFrames');
+  if (streamId !== undefined && !(typeof streamId === 'number' && Number.isInteger(streamId)
+    && streamId >= 0 && streamId <= MAX_STREAM_ID)) invalid('streamId');
+  return {
+    noiseFilling: flag(noiseFilling, 'noiseFilling'),
+    preroll: flag(preroll, 'preroll'),
+    independentIntervalFrames: independentIntervalFrames as number | undefined,
+    streamId: streamId as number | undefined,
+    sbr: oneOf(sbr, USAC_TOOLS, 'sbr'),
+    mps212: oneOf(mps212, USAC_TOOLS, 'mps212'),
+  };
+}
+
+/** The loudness info set: finite figures, the integrated loudness and the sample peak required. */
+function loudnessInfoOption(value: unknown): AacLoudnessInfo | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) invalid('loudnessInfo');
+  const given = value as Record<string, unknown>;
+  const info: Record<string, number> = {};
+  for (const name of LOUDNESS_FIGURES) {
+    const figure = given[name];
+    if (figure === undefined || figure === null) continue;
+    if (!(typeof figure === 'number' && Number.isFinite(figure))) invalid(name);
+    info[name] = figure;
+  }
+  if (info.integratedLkfs === undefined || info.samplePeakDbfs === undefined) invalid('loudnessInfo');
+  return info as unknown as AacLoudnessInfo;
 }
 
 function flag(value: unknown, what: string): boolean | undefined {
@@ -180,8 +227,10 @@ function encoderOptions(value: unknown): AacEncoderOptions {
   if (mode !== undefined && !(typeof mode === 'string' && MODES.has(mode as AacRateControlMode))) invalid('mode');
   if (quality !== undefined && !(typeof quality === 'number' && Number.isInteger(quality) && quality >= 1 && quality <= 100)) invalid('quality');
   const lowDelay = LOW_DELAY_PROFILES.has(profile as AacProfile);
-  if (lowDelay && transport === 'adts') invalid('transport');
+  const usac = profile === 'xhe';
+  if ((lowDelay || usac) && transport === 'adts') invalid('transport');
   if (options.ldSbr !== undefined && profile !== 'eld') invalid('ldSbr');
+  if ((options.usac !== undefined || options.loudnessInfo !== undefined) && !usac) invalid('profile');
   return {
     sampleRate: sampleRate as number | undefined,
     channels: channels as number | undefined,
@@ -198,7 +247,20 @@ function encoderOptions(value: unknown): AacEncoderOptions {
     ldSbr: ldSbrOption(options.ldSbr),
     afterburner: flag(options.afterburner, 'afterburner'),
     metadata: metadataOption(options.metadata),
+    usac: usacOption(options.usac),
+    loudnessInfo: loudnessInfoOption(options.loudnessInfo),
+    measureLoudness: flag(options.measureLoudness, 'measureLoudness'),
   };
+}
+
+function meterRate(value: unknown): number {
+  if (!(typeof value === 'number' && Number.isInteger(value) && value >= MIN_METER_RATE && value <= MAX_METER_RATE)) invalid('sampleRate');
+  return value;
+}
+
+function meterChannels(value: unknown): number {
+  if (!(typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_LOUDNESS_CHANNELS)) invalid('channels');
+  return value;
 }
 
 export function registerAacIpc(): void {
@@ -221,5 +283,9 @@ export function registerAacIpc(): void {
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_ENCODE, (_event, id, pcm) =>
     aac.encodeChunk(sessionId(id), samples(pcm, 'pcm')));
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_FLUSH, (_event, id) => aac.flushEncoder(sessionId(id)));
+  handleTrusted(IPC_CHANNELS.AAC_ENCODER_LOUDNESS, (_event, id) => aac.encoderLoudness(sessionId(id)));
   handleTrusted(IPC_CHANNELS.AAC_ENCODER_CLOSE, (_event, id) => aac.closeEncoder(sessionId(id)));
+
+  handleTrusted(IPC_CHANNELS.AAC_MEASURE_LOUDNESS, (_event, pcm, sampleRate, channels) =>
+    aac.measureLoudness(samples(pcm, 'pcm'), meterRate(sampleRate), meterChannels(channels)));
 }

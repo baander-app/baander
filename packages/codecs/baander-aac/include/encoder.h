@@ -193,6 +193,9 @@ using AacEncoderState = struct AacEncoderState_ {
   AacDrcEncoder drc;
   /* USAC: the frame writer's state (usac_enc.h), NULL for the AAC types. */
   struct AacUsacEncoder_* usac;
+  /* The loudness meter of aac_encoder_set_loudness_measurement, fed with
+   * every input frame; NULL while none runs.  Owned by the API layer. */
+  struct AacLoudnessMeter_* loudness;
 };
 
 /* `sr` and `ch` are the input's; HE-AAC v2 takes a stereo input only. */

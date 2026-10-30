@@ -1,10 +1,11 @@
 /* Node-API binding for baander-aac: streaming decoder and PCM encoder
- * objects over the public C API.  PCM is interleaved 32-bit float at full
- * scale 1.0; AAC data is an ADTS or LOAS stream, LATM elements or raw
- * access units.  Both classes accept input in arbitrary chunk sizes and
- * keep partial frames between calls. */
+ * objects over the public C API, and the loudness meter as a function.
+ * PCM is interleaved 32-bit float at full scale 1.0; AAC data is an ADTS
+ * or LOAS stream, LATM elements or raw access units.  Both classes accept
+ * input in arbitrary chunk sizes and keep partial frames between calls. */
 #include <napi.h>
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -195,6 +196,79 @@ bool drc_profile_of(const std::string& name, AacDrcProfile* out) {
   } else if (name == "speech") {
     *out = AAC_DRC_SPEECH;
   } else {
+    return false;
+  }
+  return true;
+}
+
+/* on, off or auto (the encoder's choice by bitrate) of a USAC tool. */
+bool on_off_auto_of(const std::string& name, int* out) {
+  if (name == "on") {
+    *out = 1;
+  } else if (name == "off") {
+    *out = 0;
+  } else if (name == "auto") {
+    *out = -1;
+  } else {
+    return false;
+  }
+  return true;
+}
+
+/* The figures of a loudness measurement as the binding's object: the
+ * optional ones are null when the meter has no window for them. */
+Napi::Object loudness_object(const Napi::Env& env, const AacLoudnessInfo& info) {
+  Napi::Object o = Napi::Object::New(env);
+  o.Set("integratedLkfs", Napi::Number::New(env, info.integrated_lkfs));
+  o.Set("samplePeakDbfs", Napi::Number::New(env, info.sample_peak_dbfs));
+  o.Set("truePeakDbtp", info.has_true_peak ? Napi::Value(Napi::Number::New(env, info.true_peak_dbtp))
+                                           : Napi::Value(env.Null()));
+  o.Set("rangeLu", info.has_range ? Napi::Value(Napi::Number::New(env, info.range_lu))
+                                  : Napi::Value(env.Null()));
+  o.Set("maxMomentaryLkfs", info.has_momentary
+                                ? Napi::Value(Napi::Number::New(env, info.max_momentary_lkfs))
+                                : Napi::Value(env.Null()));
+  o.Set("maxShortTermLkfs", info.has_short_term
+                                ? Napi::Value(Napi::Number::New(env, info.max_short_term_lkfs))
+                                : Napi::Value(env.Null()));
+  return o;
+}
+
+/* A finite number option into a float figure; `*present` says whether
+ * it was given.  Returns false after throwing. */
+bool loudness_figure(const Napi::Env& env, const Napi::Object& o, const char* key, float* out,
+                     int* present) {
+  *present = 0;
+  if (!option_given(o, key)) {
+    return true;
+  }
+  const Napi::Value v = o.Get(key);
+  if (!v.IsNumber() || !std::isfinite(v.As<Napi::Number>().DoubleValue())) {
+    throw_error(env, std::string("AacEncoder: loudnessInfo.") + key + " must be a finite number");
+    return false;
+  }
+  *out = static_cast<float>(v.As<Napi::Number>().DoubleValue());
+  *present = 1;
+  return true;
+}
+
+/* The loudnessInfo option: integratedLkfs and samplePeakDbfs are needed,
+ * the other figures are written when given. */
+bool loudness_info_of(const Napi::Env& env, const Napi::Object& o, AacLoudnessInfo* info) {
+  memset(info, 0, sizeof(*info));
+  int has_integrated = 0;
+  int has_sample_peak = 0;
+  if (!loudness_figure(env, o, "integratedLkfs", &info->integrated_lkfs, &has_integrated) ||
+      !loudness_figure(env, o, "samplePeakDbfs", &info->sample_peak_dbfs, &has_sample_peak) ||
+      !loudness_figure(env, o, "truePeakDbtp", &info->true_peak_dbtp, &info->has_true_peak) ||
+      !loudness_figure(env, o, "rangeLu", &info->range_lu, &info->has_range) ||
+      !loudness_figure(env, o, "anchorLkfs", &info->anchor_lkfs, &info->has_anchor) ||
+      !loudness_figure(env, o, "maxMomentaryLkfs", &info->max_momentary_lkfs, &info->has_momentary) ||
+      !loudness_figure(env, o, "maxShortTermLkfs", &info->max_short_term_lkfs, &info->has_short_term)) {
+    return false;
+  }
+  if (!has_integrated || !has_sample_peak) {
+    throw_error(env, "AacEncoder: loudnessInfo needs integratedLkfs and samplePeakDbfs");
     return false;
   }
   return true;
@@ -542,7 +616,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
          InstanceAccessor("delay", &Encoder::Delay, nullptr),
          InstanceAccessor("profile", &Encoder::Profile, nullptr),
          InstanceAccessor("config", &Encoder::Config, nullptr),
-         InstanceAccessor("unitSizes", &Encoder::UnitSizes, nullptr)});
+         InstanceAccessor("unitSizes", &Encoder::UnitSizes, nullptr),
+         InstanceAccessor("loudness", &Encoder::Loudness, nullptr)});
   }
 
   explicit Encoder(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Encoder>(info) {
@@ -586,16 +661,19 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
           aot = AAC_AOT_ER_LD;
         } else if (profile == "eld") {
           aot = AAC_AOT_ER_ELD;
+        } else if (profile == "xhe") {
+          aot = AAC_AOT_USAC;
         } else {
-          throw_error(env, "AacEncoder: profile must be lc, he, hev2, ld or eld");
+          throw_error(env, "AacEncoder: profile must be lc, he, hev2, ld, eld or xhe");
           return;
         }
       }
     }
-    profile_ = aot == AAC_AOT_LC    ? "lc"
-               : aot == AAC_AOT_SBR ? "he"
-               : aot == AAC_AOT_PS  ? "hev2"
+    profile_ = aot == AAC_AOT_LC      ? "lc"
+               : aot == AAC_AOT_SBR   ? "he"
+               : aot == AAC_AOT_PS    ? "hev2"
                : aot == AAC_AOT_ER_LD ? "ld"
+               : aot == AAC_AOT_USAC  ? "xhe"
                                       : "eld";
     handle_ = aac_encoder_create(sample_rate_, channels_, bitrate, aot, rc);
     if (!handle_) {
@@ -623,16 +701,19 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
 
  private:
   /* Stream format options: transport, signalling, frame length, CRC, the
-   * MPEG-2 header, the 7.1 channel mode, LD-SBR, the afterburner and the
-   * DRC metadata.  Throws and returns false on an invalid one. */
+   * MPEG-2 header, the 7.1 channel mode, LD-SBR, the afterburner, the
+   * DRC metadata, the USAC options, the loudness info set and the
+   * loudness meter.  Throws and returns false on an invalid one. */
   bool apply_stream_options(const Napi::Env& env, const Napi::CallbackInfo& info) {
     if (info.Length() == 0 || !info[0].IsObject()) {
       return true;
     }
     const Napi::Object o = info[0].As<Napi::Object>();
     const bool low_delay = profile_ == "ld" || profile_ == "eld";
+    const bool usac = profile_ == "xhe";
     AacTransport transport = AAC_TRANSPORT_ADTS;
-    if (!transport_of(option_string(o, "transport", low_delay ? "loas" : "adts"), &transport) ||
+    if (!transport_of(option_string(o, "transport", low_delay || usac ? "loas" : "adts"),
+                      &transport) ||
         transport == AAC_TRANSPORT_DETECT) {
       throw_error(env, "AacEncoder: transport must be adts, loas, latm, latm-raw or raw");
       return false;
@@ -680,12 +761,78 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         return false;
       }
     }
-    /* The error resilient frames of the low-delay profiles carry no fill
-     * elements, so there is nowhere to put the metadata. */
-    if (drc_profile != AAC_DRC_NONE && low_delay) {
-      throw_error(env, "AacEncoder: metadata is not available for the ld and eld profiles");
+    /* The error resilient frames of the low-delay profiles and the USAC
+     * frame carry no fill elements, so there is nowhere to put the
+     * metadata. */
+    if (drc_profile != AAC_DRC_NONE && (low_delay || usac)) {
+      throw_error(env, "AacEncoder: metadata is not available for the ld, eld and xhe profiles");
       return false;
     }
+    /* The USAC options: noise filling, the pre-roll, the independent
+     * frame interval, the stream id, and SBR and MPS 212 as on, off or
+     * auto.  A field left out keeps the encoder's default. */
+    bool have_usac = false;
+    AacUsacEncoderOptions usac_opt;
+    usac_opt.noise_filling = -1;
+    usac_opt.preroll = -1;
+    usac_opt.independent_interval_frames = 0;
+    usac_opt.stream_id = -1;
+    usac_opt.sbr = -1;
+    usac_opt.mps212 = -1;
+    if (option_given(o, "usac")) {
+      if (!o.Get("usac").IsObject()) {
+        throw_error(env, "AacEncoder: usac must be an object");
+        return false;
+      }
+      if (!usac) {
+        throw_error(env, "AacEncoder: usac options need the xhe profile");
+        return false;
+      }
+      const Napi::Object u = o.Get("usac").As<Napi::Object>();
+      have_usac = true;
+      if (option_given(u, "noiseFilling")) {
+        usac_opt.noise_filling = u.Get("noiseFilling").ToBoolean().Value() ? 1 : 0;
+      }
+      if (option_given(u, "preroll")) {
+        usac_opt.preroll = u.Get("preroll").ToBoolean().Value() ? 1 : 0;
+      }
+      if (!option_number(env, u, "independentIntervalFrames",
+                         "AacEncoder: usac.independentIntervalFrames",
+                         &usac_opt.independent_interval_frames) ||
+          !option_number(env, u, "streamId", "AacEncoder: usac.streamId", &usac_opt.stream_id)) {
+        return false;
+      }
+      if (usac_opt.independent_interval_frames < 0) {
+        throw_error(env, "AacEncoder: usac.independentIntervalFrames must be 0 or more");
+        return false;
+      }
+      if (usac_opt.stream_id < -1 || usac_opt.stream_id > 65535) {
+        throw_error(env, "AacEncoder: usac.streamId must be 0 to 65535");
+        return false;
+      }
+      if (!on_off_auto_of(option_string(u, "sbr", "auto"), &usac_opt.sbr) ||
+          !on_off_auto_of(option_string(u, "mps212", "auto"), &usac_opt.mps212)) {
+        throw_error(env, "AacEncoder: usac.sbr and usac.mps212 must be on, off or auto");
+        return false;
+      }
+    }
+    bool have_loudness_info = false;
+    AacLoudnessInfo loudness_info;
+    if (option_given(o, "loudnessInfo")) {
+      if (!o.Get("loudnessInfo").IsObject()) {
+        throw_error(env, "AacEncoder: loudnessInfo must be an object");
+        return false;
+      }
+      if (!usac) {
+        throw_error(env, "AacEncoder: loudnessInfo needs the xhe profile");
+        return false;
+      }
+      if (!loudness_info_of(env, o.Get("loudnessInfo").As<Napi::Object>(), &loudness_info)) {
+        return false;
+      }
+      have_loudness_info = true;
+    }
+    const bool measure = option_bool(o, "measureLoudness", false);
     int ret = 0;
     if ((ret = aac_encoder_set_transport(handle_, transport)) < 0 ||
         (ret = aac_encoder_set_signaling(handle_, signaling)) < 0 ||
@@ -696,7 +843,10 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         (ld_sbr && (ret = aac_encoder_set_ld_sbr(handle_, 1, dual_rate ? 1 : 0)) < 0) ||
         (ret = aac_encoder_set_afterburner(handle_, option_bool(o, "afterburner", false) ? 1 : 0)) < 0 ||
         (drc_profile != AAC_DRC_NONE &&
-         (ret = aac_encoder_set_metadata(handle_, drc_profile, prog_ref_level)) < 0)) {
+         (ret = aac_encoder_set_metadata(handle_, drc_profile, prog_ref_level)) < 0) ||
+        (have_usac && (ret = aac_encoder_set_usac(handle_, &usac_opt)) < 0) ||
+        (have_loudness_info && (ret = aac_encoder_set_loudness_info(handle_, &loudness_info)) < 0) ||
+        (measure && (ret = aac_encoder_set_loudness_measurement(handle_, 1)) < 0)) {
       throw_error(env, std::string("AacEncoder: ") + error_name(ret));
       return false;
     }
@@ -792,6 +942,17 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   Napi::Value Profile(const Napi::CallbackInfo& info) {
     return Napi::String::New(info.Env(), profile_);
   }
+  /* The loudness measured so far by the meter of `measureLoudness`, or
+   * null while there is no meter or fewer than 400 ms were encoded.  The
+   * figures of a flushed stream stay until the next stream begins. */
+  Napi::Value Loudness(const Napi::CallbackInfo& info) {
+    const Napi::Env env = info.Env();
+    AacLoudnessInfo result;
+    if (!handle_ || aac_encoder_loudness(handle_, &result) != AAC_OK) {
+      return env.Null();
+    }
+    return loudness_object(env, result);
+  }
   /* Lengths of the units in the last encode or flush result: one per
    * frame for ADTS and LOAS, one per LATM element or access unit. */
   Napi::Value UnitSizes(const Napi::CallbackInfo& info) {
@@ -825,9 +986,37 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
   std::vector<int> unit_sizes_;
 };
 
+/* measureLoudness(pcm, sampleRate, channels): the loudness meter over a
+ * whole interleaved signal, for the two-pass flow. */
+Napi::Value MeasureLoudness(const Napi::CallbackInfo& info) {
+  const Napi::Env env = info.Env();
+  if (info.Length() < 3 || !info[0].IsTypedArray() ||
+      info[0].As<Napi::TypedArray>().TypedArrayType() != napi_float32_array ||
+      !info[1].IsNumber() || !info[2].IsNumber()) {
+    return throw_error(env, "measureLoudness: expected a Float32Array, the sample rate and the "
+                            "channel count");
+  }
+  const Napi::Float32Array pcm = info[0].As<Napi::Float32Array>();
+  const int sample_rate = info[1].As<Napi::Number>().Int32Value();
+  const int channels = info[2].As<Napi::Number>().Int32Value();
+  AacLoudnessMeter* meter = aac_loudness_create(sample_rate, channels);
+  if (!meter) {
+    return throw_error(env, "measureLoudness: 1 to 6 channels at 8000 to 384000 Hz");
+  }
+  aac_loudness_feed(meter, pcm.Data(), static_cast<int>(pcm.ElementLength() / channels));
+  AacLoudnessInfo result;
+  const int ret = aac_loudness_result(meter, &result);
+  aac_loudness_destroy(meter);
+  if (ret != AAC_OK) {
+    return throw_error(env, "measureLoudness: at least 400 ms of input is needed");
+  }
+  return loudness_object(env, result);
+}
+
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
   exports.Set("AacDecoder", Decoder::Init(env));
   exports.Set("AacEncoder", Encoder::Init(env));
+  exports.Set("measureLoudness", Napi::Function::New(env, MeasureLoudness));
   exports.Set("version", Napi::String::New(env, "0.1.0"));
   return exports;
 }

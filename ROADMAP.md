@@ -911,6 +911,60 @@ suite and streams from a third-party MPEG Surround encoder, which does
 not exist as free software. Figures and limits are in the
 [reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
 
+Checkpoint, 2026-10-30, xHE-AAC encoder: the third tier's third plan, per
+the
+[plan](docs/plans/2026-10-30-007-feat-aac-codec-xhe-aac-encoder-plan.md),
+is delivered. Encoder: USAC (xHE-AAC, object type 42) in compatible mode
+on the AAC-LC analysis and rate loop: the frequency-domain core with the
+context arithmetic coder (bit-exact against the decoder's), noise filling,
+TNS, per-band M/S, independent frames with the audio pre-roll, the
+UsacConfig with the stream id and loudness info extensions, LOAS/LATM and
+raw access units for MP4, never ADTS; enhanced SBR at 2:1 and MPS 212 at
+stereoConfigIndex 1, chosen by bitrate or by the caller; loudness
+measurement per ITU-R BS.1770-4 and EBU Tech 3341/3342 (the K-weighting
+derived per sample rate, the gated integrated loudness, the range, the
+maxima, the 4x oversampled true peak) with the loudnessInfoSet() writer,
+in a two-pass form written into the stream and a one-pass form metered
+inside the encoder; the API (`aac_encoder_set_usac`,
+`aac_encoder_set_loudness_info`, `aac_encoder_set_loudness_measurement`,
+`aac_encoder_loudness`, the meter in `aac.h`), `baac enc ... xhe` with
+`--loudness` and the USAC options and `baac loudness`, the binding's `xhe`
+profile with `usac`, `loudnessInfo`, `measureLoudness` and the exported
+`measureLoudness()`, the Electron service, bridge and IPC validation with
+`measureLoudness` and `encoderLoudness`; per-platform prebuilds of the
+binding through a GitHub Actions workflow, fetched by the package's
+install script and tried by the loader before a local build. Oracles:
+FFmpeg master (the MP4 form; its LATM demuxer refuses the USAC
+configuration), the FDK decoder, libxaac and ours on every stream;
+FFmpeg's `ebur128` and the FDK encoder's own loudness bytes for the meter
+and the writer; the FDK encoder as the behavioural reference for stream
+layout and bitrates. Verification: the two committed FD streams decode in
+all four decoders at 22.7 dB (mono 64 kbit/s) and 20.6 dB (stereo
+96 kbit/s) against the source, FDK and libxaac agreeing with ours at 81 to
+82 dB and FFmpeg at 33 to 37 dB with noise filling (its random signs
+differ) and 136 dB without; raw access units at 44.6, 60.3, 92.9 and
+125.6 kbit/s for 48, 64, 96 and 128 kbit/s; the loudness meter within
+0.05 LU, the range to the figure and the true peak within 0.04 dB of
+`ebur128`; a four-second stereo programme at 96 kbit/s carrying the
+loudness set decodes in all four decoders at 20.8 dB against the source,
+and FFmpeg normalises it by the set (`-target_level -24`) with the same
+-9.0 dB gain as our decoder. SBR at 2:1: pending (the lead fills the
+figures). MPS 212: pending (the lead fills the figures). CTest N/N
+(`test_loudness`, `test_usac_enc` and `test_encoder_loudness` among them)
+and the binding's smoke test (13 tests); the Electron service test (7
+tests) passes under Node's type stripping with a local build.
+[PLACEHOLDER FOR THE LEAD: final CTest count and the SBR/MPS 212 rows.]
+Open: the LPD core, the live loudness leveler and DRC gain sets, the 8:3
+and 4:1 SBR ratios, residual and phase coding in MPS 212 and surround
+input to the USAC encoder are out of scope as planned; the one-pass
+figures cannot enter the stream they were measured from, since a
+configuration cannot change mid-stream; the meter takes up to six
+channels, so 6.1 and 7.1 input has no in-encoder measurement; FFmpeg
+master's LATM path refuses USAC, so its gate runs on the MP4 form; the
+prebuild workflow runs only once pushed. Not run: listening tests and the
+ISO conformance suite. Figures and limits are in the
+[reference comparison](packages/codecs/baander-aac/docs/reference-comparison.md).
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded
