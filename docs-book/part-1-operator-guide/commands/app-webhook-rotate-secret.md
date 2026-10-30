@@ -4,6 +4,11 @@ Replace a webhook's signing secret and print the new one. The command does what 
 
 ## Quick start
 
+The Make examples below target the checkout's development preview. For an
+installed instance, use the `dc` function from
+[Getting started](../getting-started.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+
 ```bash
 make exec cmd="php bin/console app:webhook:rotate-secret aB3dE5fG7hJ9kL1mN3pQr"
 ```

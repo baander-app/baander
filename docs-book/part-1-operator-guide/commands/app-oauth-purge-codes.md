@@ -4,6 +4,11 @@ Delete OAuth authorization codes and device codes that expired more than an hour
 
 ## Quick start
 
+The Make examples below target the checkout's development preview. For an
+installed instance, use the `dc` function from
+[Getting started](../getting-started.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+
 ```bash
 make exec cmd="php bin/console app:oauth:purge-codes"
 ```

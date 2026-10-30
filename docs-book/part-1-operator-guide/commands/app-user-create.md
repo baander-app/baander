@@ -4,22 +4,26 @@ Create a new user account. The command runs the same use case as creating a user
 
 ## Quick start
 
+Run from the installed-instance host shell with the `dc` function from
+[Getting started](../getting-started.md#command-context). Password files in these
+examples are protected files on that host. Use `-T` for redirected input.
+
 Create a regular user:
 
 ```bash
-echo "securepassword" | make exec cmd="php bin/console app:user:create alice@baander.app Alice --password"
+dc exec -T app php bin/console app:user:create alice@baander.app Alice --password < /secure/baander-user-password
 ```
 
-Create a super admin, for example to recover from a lockout. Piped input leaves no terminal to confirm on, so the admin role needs `--force`:
+Create a super admin, for example to recover from a lockout. Redirected input leaves no terminal to confirm on, so the admin role needs `--force`:
 
 ```bash
-echo "adminpassword" | make exec cmd="php bin/console app:user:create root@baander.app Root --password --role=super-admin --force"
+dc exec -T app php bin/console app:user:create root@baander.app Root --password --role=super-admin --force < /secure/baander-user-password
 ```
 
 Print the new user as JSON, for a script:
 
 ```bash
-echo "securepassword" | make exec cmd="php bin/console app:user:create alice@baander.app Alice --password --json"
+dc exec -T app php bin/console app:user:create alice@baander.app Alice --password --json < /secure/baander-user-password
 ```
 
 ## Arguments
@@ -40,10 +44,11 @@ echo "securepassword" | make exec cmd="php bin/console app:user:create alice@baa
 
 ## Password input
 
-When you run the command interactively (without `--password`), it prompts for a hidden password. In scripts or CI, pipe the password via stdin:
+When you run the command interactively (without `--password`), it prompts for a hidden password. In scripts or CI, read the password from a protected file through stdin.
+Disable Compose's pseudo-terminal for redirected input:
 
 ```bash
-echo "mypassword123" | php bin/console app:user:create user@baander.app "John Doe" --password
+dc exec -T app php bin/console app:user:create user@baander.app "John Doe" --password < /secure/baander-user-password
 ```
 
 The password must be between 8 and 255 characters.

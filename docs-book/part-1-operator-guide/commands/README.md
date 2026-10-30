@@ -1,16 +1,28 @@
 # CLI Commands
 
-Baander ships console commands for managing users, libraries, the catalog, metadata, background jobs and the server. The console commands below run inside the app container. Worker deployment uses a separate host entrypoint.
+Baander ships console commands for users, libraries, catalog records, metadata,
+background jobs and the server. Application console commands run inside the
+application container; worker deployment uses a separate host entrypoint.
+
+For an installed instance, use the host shell and `dc` function established in
+[Getting started](../getting-started.md#command-context):
 
 ```bash
-# Run any command
-make exec cmd="php bin/console <command>"
-
-# Example
-make exec cmd="php bin/console app:user:create --help"
+dc exec app php bin/console app:user:create --help
 ```
 
+A plain `php bin/console …` example assumes a shell inside the application
+container, in its application directory. Some reference pages retain
+`make exec cmd="php bin/console …"` development examples. Those select the
+checkout's preview, not the installed instance. For installed-instance work, run
+the same console arguments with `dc exec app php bin/console …`. See
+[Which installation a command targets](../understanding-baander.md#which-installation-a-command-targets)
+before changing targets. Paths used by a console command are container paths.
+
 ## Worker deployment
+
+Read [Background work](../background-work.md) for lifecycle and observation
+procedures. This section defines the host manifest and credentials contract.
 
 Run `bin/worker-deployment.php` from a trusted host checkout with Composer dependencies,
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
@@ -22,11 +34,21 @@ with separate resource ceilings and disjoint CPU sets. It requires explicitly
 authorized shared media volumes and a private named IPC volume. Devices are
 refused; the production source policy also refuses bind mounts.
 
-Build the worker target locally before selecting its immutable image ID:
+Build the worker image with the same layout-aware builder used in
+[Getting started](../getting-started.md#3-build-images-and-start-dependencies).
+Run on the host after installing its standalone tooling dependencies:
 
 ```bash
-docker buildx build --target worker --load -t baander-worker:local .
+php scripts/build-application.php --target worker --tag baander-worker:local --compose-env .env.worker-image.local
+. "$(pwd)/.env.worker-image.local"
+export APP_HOME
 ```
+
+The generated file contains `BAANDER_APPLICATION_IMAGE` and `APP_HOME`, without
+application credentials. Put that immutable image ID in the manifest's `imageId`;
+keep the corresponding `APP_HOME` exported for each controller invocation. The
+controller rejects an unset `APP_HOME`. The storage targets below illustrate the
+current `/var/www/html` image layout; align them with the selected image's layout.
 
 The manifest is a JSON object of at most 8192 bytes. Version 5 requires exactly
 these fields, with JSON integers for version and resource values:
@@ -219,35 +241,29 @@ php bin/worker-deployment.php --help
 timeout --kill-after=5s 60s php bin/worker-deployment.php create /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
 timeout --kill-after=5s 60s php bin/worker-deployment.php start /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
 timeout --kill-after=5s 60s php bin/worker-deployment.php status /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
+timeout --kill-after=5s 60s php bin/worker-deployment.php readiness /etc/baander/worker-manifest.json /etc/baander/worker-credentials.json
 ```
 
-`create` reserves the boot and both unit intents before Docker work. If its reply
-is uncertain, use `reconcile-create` with the identical manifest and credentials;
-it verifies and registers existing never-started units without recreating a
-claimed unit. `start` consumes a one-shot claim for each unit before issuing Docker
-start. An uncertain start requires
-explicit `recover`, never another start. Recovery retires that immutable boot,
-requires confirmed retirement of both units before releasing the joint reservation.
-An unclaimed unit can be cancelled; a claimed unit requires containment evidence.
-Keep the old manifest for
-recovery; a replacement needs a fresh boot ID. `status` reports committed
-observations and always returns `readiness: "not_checked"`; it does not certify
-application readiness. Runtime autoscaling status reports desired, occupied,
-busy, idle, parked, missing, uncertain and disconnected slots, together with
-controller/resource freshness, sample ages, pressure and the decision reason.
-Unavailable evidence remains unknown; it is not an empty queue or an idle slot.
-Stale measurements prohibit growth and lower ordinary admission to at most one;
-severe memory/PID pressure closes ordinary admission. Recovery requires fresh
-samples and respects stabilization and cooldown. Authority loss closes admission
-and starts the existing deployment drain.
+The host actions are `create`, `reconcile-create`, `start`, `status`, `readiness`
+and `recover`. Follow [Stop, replace or recover workers](../background-work.md#stop-replace-or-recover-workers)
+for uncertain outcomes and replacement; timeout or interruption does not cancel
+a Docker operation already submitted. Keep the exact admitted manifest and
+credentials for reconciliation.
 
-Control owns and renews the deployment lease; execution
-observes it. Both units must exchange matching boot/epoch evidence before business
-admission, within 30 seconds of startup. Peer loss, stale evidence or authority
-loss closes admission and drains the pair. Each supervisor has a 35-second drain
-deadline; give external stop handling a longer grace period. Timeout or
-interruption does not cancel an operation
-already submitted to Docker or authorize a retry.
+`status` reports committed observations and always returns
+`readiness: "not_checked"`. The separate read-only `readiness` action verifies the
+exact active manifest, lease, admitted running containers, expected direct-child
+roles, Redis connectivity and execution consumer registrations. Success is a
+point-in-time observation, not proof of completed work or future availability.
+See [Observe background work](../background-work.md#observe-background-work) for
+the distinction between deployment, heartbeat, queue and delivery evidence.
+
+Autoscaling status reports desired, occupied, busy, idle, parked, missing, uncertain
+and disconnected slots, together with controller/resource freshness, sample ages,
+pressure and the decision reason. Unavailable evidence remains unknown; it is not
+an empty queue or an idle slot. See
+[Admission and native work](../background-work.md#admission-and-native-work) for
+the admission and drain policy.
 
 Actions return bounded JSON on stdout. Exit codes are `0` for a confirmed result,
 `1` for `operation_unconfirmed`, `2` for `invalid_configuration`, and `3` for a

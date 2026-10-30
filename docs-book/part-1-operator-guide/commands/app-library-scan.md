@@ -4,20 +4,24 @@ Scan a media library, or every library, for new, changed, returning, or missing 
 
 ## Quick start
 
+Run from the installed-instance host shell with the `dc` function from
+[Getting started](../getting-started.md#command-context). Paths name locations
+inside the application container.
+
 ```bash
-make exec cmd="php bin/console app:library:scan my-music"
+dc exec app php bin/console app:library:scan my-music
 ```
 
 Every library, one after another:
 
 ```bash
-make exec cmd="php bin/console app:library:scan --all"
+dc exec app php bin/console app:library:scan --all
 ```
 
 Release the claim of a scan, or of a delete with files, that is gone:
 
 ```bash
-make exec cmd="php bin/console app:library:scan my-music --release"
+dc exec app php bin/console app:library:scan my-music --release
 ```
 
 ## Arguments
@@ -37,6 +41,12 @@ make exec cmd="php bin/console app:library:scan my-music --release"
 | `--json` | — | After the run, print what the scan endpoint returns, in JSON: the library as it is after its scan, or with `--all` the `dispatched` and `skipped` counts of `scan-all`, where `dispatched` counts the scans the command started. Progress goes to stderr. Not combined with `--release` |
 
 ## Details
+
+Discovery supports `music` and `movie`; scans of other registered library types
+fail as unsupported. A successful scan confirms discovery and committed ingestion
+intents, while catalog import continues in the worker pair. See
+[Library management](../library-management.md) for the stages and their observable
+results.
 
 Starting a scan claims the library: its scan status becomes `scanning`, and while the claim holds, neither the admin panel nor this command starts another scan of it, and a delete with files ([app:album:delete](app-album-delete.md), [app:song:delete](app-song-delete.md)) is refused. A delete with files claims the library the same way while it runs, without changing the scan status; a scan started then is refused with the message that a delete with files is in progress (reason `library_busy`, holder `delete`). The command claims the library, then runs the scan in its own process and prints each stage: the claim, then the number of files discovered, processed and skipped, the number of directories queued for ingestion, and the job ID. The run appears in the job monitor under that ID, like a scan the admin panel queues. Ingesting the queued directories happens afterwards in the worker containers.
 
