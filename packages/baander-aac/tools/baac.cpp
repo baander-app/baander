@@ -1,7 +1,7 @@
 /* baac: command-line encoder/decoder for baander-aac.
  *
  *   baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [mode] [quality] [profile] [options]
- *   baac dec <in.aac> <out.f32le> [rate] [channels]
+ *   baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
  *   baac loudness <in.wav | in.f32le rate channels>
  *   baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
  *
@@ -11,7 +11,8 @@
  * --peak-bitrate N caps the bits of any frame at its share of N bit/s,
  * --bandwidth HZ sets the core's lowpass (no effect on an SBR core) and
  * --vbr-mode 1..5 picks one of the FDK-named VBR modes, whose target
- * replaces the bitrate.  The xhe options: --loudness
+ * replaces the bitrate, and --afterburner turns on the second
+ * quantisation pass.  The xhe options: --loudness
  * measures the whole input first and writes the loudness info set into
  * the stream; --sbr and --mps (on, off, auto), --no-noise-filling,
  * --preroll off and --stream-id N set the USAC encoder options;
@@ -22,7 +23,8 @@
  * and with --loudness a further pass measures each set's output for the
  * loudness info set.  The
  * decoder follows the ADTS headers, so rate and channels only set the
- * output layout (0 keeps the stream's channels).  loudness prints the
+ * output layout (0 keeps the stream's channels); --no-loudness turns off
+ * the loudness normalisation of USAC streams.  loudness prints the
  * meter's figures of a WAV file (PCM or float) or of raw float input.
  * bench encodes and decodes a synthetic stereo signal at 48 kHz (30 s by
  * default) through every profile and prints the times and realtime
@@ -75,7 +77,7 @@ static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
           "[quality] [lc|he|hev2|xhe] [options]\n"
-          "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5\n"
+          "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5  --afterburner\n"
           "         xhe options: --loudness (two-pass: measure the input, write the loudness "
           "info set)\n"
           "                      --sbr on|off|auto  --mps on|off|auto  --no-noise-filling\n"
@@ -83,7 +85,7 @@ static int usage() {
           "                      --rap-ms N | --rap-samples N  (the independent frame interval)\n"
           "                      --rap-max-frames N  --segment-max-bytes N\n"
           "                      --drc  --drc-range LU  (MPEG-D DRC gain sets, 6 to 16 LU)\n"
-          "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream]\n"
+          "       baac dec <in.aac> <out.f32le> [rate] [channels: 0 = as in the stream] [--no-loudness]\n"
           "       baac loudness <in.wav> | <in.f32le> <rate> <channels>\n"
           "       baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]\n");
   return 2;
@@ -263,6 +265,7 @@ struct EncodeOptions {
   int peak_bitrate = 0;
   int bandwidth = 0;
   int vbr_mode = 0;
+  bool afterburner = false;
   AacUsacEncoderOptions opt = default_usac_options();
 };
 
@@ -298,6 +301,8 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     const bool has_value = i + 1 < *argc;
     if (arg == "--loudness") {
       o->loudness = true;
+    } else if (arg == "--afterburner") {
+      o->afterburner = true;
     } else if ((arg == "--peak-bitrate" || arg == "--bandwidth" || arg == "--vbr-mode") &&
                has_value) {
       const int v = atoi(argv[i + 1]);
@@ -502,6 +507,10 @@ static int encode(int argc, char** argv) {
   if (options.vbr_mode && argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
+  if (options.afterburner && aac_encoder_set_afterburner(enc, 1) != AAC_OK) {
+    fprintf(stderr, "baac: --afterburner was refused for this profile\n");
+    return 1;
+  }
   if (options.bandwidth && aac_encoder_set_bandwidth(enc, options.bandwidth) != AAC_OK) {
     fprintf(stderr, "baac: --bandwidth takes 1000 Hz or more\n");
     return 1;
@@ -543,6 +552,17 @@ static int encode(int argc, char** argv) {
 }
 
 static int decode(int argc, char** argv) {
+  /* --no-loudness: leave USAC streams at their coded level */
+  bool loudness = true;
+  int kept = 0;
+  for (int i = 0; i < argc; i++) {
+    if (strcmp(argv[i], "--no-loudness") == 0) {
+      loudness = false;
+    } else {
+      argv[kept++] = argv[i];
+    }
+  }
+  argc = kept;
   if (argc < 4) {
     return usage();
   }
@@ -552,6 +572,9 @@ static int decode(int argc, char** argv) {
   if (!dec) {
     fprintf(stderr, "baac: unsupported decoder configuration\n");
     return 1;
+  }
+  if (!loudness) {
+    aac_decoder_set_loudness(dec, 0, -2400);
   }
   const std::vector<uint8_t> in = read_all(argv[2]);
   FILE* out = open_out(argv[3]);
