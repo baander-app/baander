@@ -675,6 +675,30 @@ int write_streams(const char* dir) {
   return 0;
 }
 
+/* Names the first LOAS frames in which two streams differ, so that a
+ * failed identity check says where the encoders parted. */
+void report_loas_difference(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+  size_t pa = 0;
+  size_t pb = 0;
+  int shown = 0;
+  for (int frame = 0; pa + 3 <= a.size() && pb + 3 <= b.size() && shown < 4; frame++) {
+    const size_t la = 3 + (((size_t)a[pa + 1] & 0x1F) << 8 | a[pa + 2]);
+    const size_t lb = 3 + (((size_t)b[pb + 1] & 0x1F) << 8 | b[pb + 2]);
+    if (la != lb || pa + la > a.size() || pb + lb > b.size() ||
+        memcmp(&a[pa], &b[pb], la) != 0) {
+      size_t at = 0;
+      while (at < la && at < lb && pa + at < a.size() && pb + at < b.size() &&
+             a[pa + at] == b[pb + at]) {
+        at++;
+      }
+      printf("  frame %d: %zu vs %zu bytes, first difference at byte %zu\n", frame, la, lb, at);
+      shown++;
+    }
+    pa += la;
+    pb += lb;
+  }
+}
+
 /* The streams under tests/data decode without error and match the
  * generator's signal; a fresh encode of that signal is byte identical,
  * so a change of the encoder's output shows up here and the streams are
@@ -698,6 +722,9 @@ void test_committed() {
 #if defined(__OPTIMIZE__) && defined(__FAST_MATH__) && !BAAC_SANITIZED
     CHECK(e.stream == stream, "%s: a fresh encode is byte identical (%zu vs %zu bytes)", s.name,
           e.stream.size(), stream.size());
+    if (e.stream != stream) {
+      report_loas_difference(e.stream, stream);
+    }
 #else
     /* Two encodes that differ in a quantised line also differ in every
      * noise filled line after it, so the decodes are compared through
