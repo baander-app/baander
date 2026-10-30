@@ -242,6 +242,18 @@ int aac_asc_read(AacBitReader* r, AacAsc* asc) {
   if (r->overread || asc->sample_rate == 0) {
     return AAC_ERR_DECODE;
   }
+  if (asc->aot == AAC_AOT_MPS) {
+    /* MPEG Surround: sacPayloadEmbedding and the SpatialSpecificConfig,
+     * whose byte alignment counts from its own start; the reader has to
+     * end with the config, as its extension loop runs to the end. */
+    asc->sac_payload_embedding = (int)aac_bitreader_read(r, 1);
+    const int ret = aac_mps_config_read(r, &asc->mps);
+    if (ret) {
+      return ret;
+    }
+    asc->mps_present = 1;
+    return r->overread ? AAC_ERR_DECODE : AAC_OK;
+  }
   if (asc->aot == AAC_AOT_USAC) {
     /* UsacConfig() (ISO/IEC 23003-3 Table 1) ends the config: the frame
      * lengths and the output rate come from it. */

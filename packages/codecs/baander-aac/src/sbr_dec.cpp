@@ -1203,7 +1203,11 @@ void aac_sbr_conceal(AacSbrState* s) {
   s->ready_for_dequant = 1;
 }
 
-void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
+namespace {
+
+/* Everything of aac_sbr_apply up to the synthesis: the reconstructed
+ * frame of every output channel is left in s->X[]. */
+void sbr_reconstruct(AacSbrState* s, int elem_type, const float* left, const float* right) {
   const int nch = elem_type == AAC_ELEM_CPE && right ? 2 : 1;
   const bool ps_output = elem_type == AAC_ELEM_SCE && right;
   if (elem_type != s->elem_type) {
@@ -1226,7 +1230,7 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
   const int core_samples = 32 * slots;
   for (int c = 0; c < nch; c++) {
     AacSbrChannel* ch = &s->data[c];
-    float* pcm = c ? right : left;
+    const float* pcm = c ? right : left;
     float core[AAC_FRAME_SIZE_LONG];
     for (int i = 0; i < core_samples; i++) {
       core[i] = pcm[i] * 32768.0f;
@@ -1256,6 +1260,15 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
       memcpy(s->X[1], s->X[0], sizeof(s->X[0]));
     }
   }
+}
+
+}  // namespace
+
+void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
+  const int nch = elem_type == AAC_ELEM_CPE && right ? 2 : 1;
+  const bool ps_output = elem_type == AAC_ELEM_SCE && right;
+  sbr_reconstruct(s, elem_type, left, right);
+  const int slots = s->slots;
   for (int c = 0; c < (ps_output ? 2 : nch); c++) {
     AacSbrChannel* ch = &s->data[c];
     float* pcm = c ? right : left;
@@ -1267,8 +1280,28 @@ void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right) {
       }
       aac_qmf_synthesize(&ch->synthesis, X, pcm + 64 * i);
     }
-    for (int i = 0; i < 2 * core_samples; i++) {
+    for (int i = 0; i < 64 * slots; i++) {
       pcm[i] *= 1.0f / 32768.0f;
+    }
+  }
+}
+
+void aac_sbr_apply_to_qmf(AacSbrState* s, int elem_type, const float* left, const float* right,
+                          struct AacUsacQmfFrame_* out_left, struct AacUsacQmfFrame_* out_right) {
+  const int nch = elem_type == AAC_ELEM_CPE && right ? 2 : 1;
+  sbr_reconstruct(s, elem_type, left, right);
+  const int slots = s->slots;
+  for (int c = 0; c < nch; c++) {
+    AacUsacQmfFrame* out = c ? out_right : out_left;
+    if (out == nullptr) {
+      continue;
+    }
+    out->slots = slots;
+    for (int i = 0; i < slots; i++) {
+      for (int k = 0; k < 64; k++) {
+        out->x[i][k][0] = s->X[c][0][i][k];
+        out->x[i][k][1] = s->X[c][1][i][k];
+      }
     }
   }
 }

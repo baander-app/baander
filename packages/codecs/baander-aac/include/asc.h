@@ -6,6 +6,7 @@
 #include "aac.h"
 #include "bitstream.h"
 #include "channel_map.h"
+#include "mps.h"
 #include "usac.h"
 
 #ifdef __cplusplus
@@ -71,6 +72,15 @@ using AacAsc = struct AacAsc_ {
    * `channel_config` above hold the AudioSpecificConfig's own fields.
    * The writer does not express this type. */
   AacUsacConfig usac;
+  /* MPEG Surround (audioObjectType 30): the SpatialSpecificConfig the
+   * config carries, with sacPayloadEmbedding (the payload travels in the
+   * core's access units).  In LATM it is the second layer's config,
+   * merged into the core's by the StreamMuxConfig reader; an
+   * AudioSpecificConfig of type 30 on its own keeps `aot` 30 and names
+   * no core.  The writer does not express it. */
+  int mps_present;
+  int sac_payload_embedding;
+  AacMpsConfig mps;
 };
 
 /* Fills `asc` with the settings of a plain AAC-LC stream without any

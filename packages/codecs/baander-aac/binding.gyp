@@ -46,6 +46,7 @@
         "src/mps_params.cpp",
         "src/mps_config.cpp",
         "src/mps_frame.cpp",
+        "src/mps_glue.cpp",
         "src/mps212_tables.cpp",
         "src/mps_tables.cpp",
         "src/mps_tree.cpp",

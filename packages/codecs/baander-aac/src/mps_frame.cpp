@@ -772,7 +772,12 @@ AacMpsState* aac_mps_create(const AacMpsConfig* cfg, int core_frame_length, int 
   return s;
 }
 
-void aac_mps_destroy(AacMpsState* s) { free(s); }
+void aac_mps_destroy(AacMpsState* s) {
+  if (s) {
+    aac_mps_glue_destroy(s->glue);
+    free(s);
+  }
+}
 
 const AacMpsConfig* aac_mps_config(const AacMpsState* s) { return s ? &s->cfg : NULL; }
 
@@ -801,6 +806,8 @@ void aac_mps_reset(AacMpsState* s) {
     }
   }
   s->frame_valid = 0;
+  s->frame_pending = 0;
+  aac_mps_glue_reset(s->glue);
   params_from_history(s);
 }
 
@@ -913,6 +920,7 @@ int aac_mps_read_frame(AacMpsState* s, AacBitReader* r) {
   s->residual_present = f.residual_present;
   s->residual_pos = f.residual_pos;
   s->residual_end = f.residual_end;
+  s->frame_pending = 1;
   return AAC_OK;
 }
 

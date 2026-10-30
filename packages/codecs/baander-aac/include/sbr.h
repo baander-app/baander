@@ -320,6 +320,15 @@ void aac_sbr_mark_lost(AacSbrState* s);
  * parametric stereo output, which is a copy of the left channel while no
  * PS data is active. */
 void aac_sbr_apply(AacSbrState* s, int elem_type, float* left, float* right);
+/* The QMF-domain half of aac_sbr_apply for the MPEG Surround decoder,
+ * which takes the element's reconstructed 64-band QMF frames (32 or 30
+ * slots at the SBR rate, in the scale of the QMF banks) in place of the
+ * synthesised samples: `left` and `right` hold the core samples as for
+ * aac_sbr_apply (a NULL `right` for a single channel; parametric stereo
+ * is not applied), `out_left` and `out_right` receive the frames.  The
+ * caller synthesises them with its own filterbank states. */
+void aac_sbr_apply_to_qmf(AacSbrState* s, int elem_type, const float* left, const float* right,
+                          struct AacUsacQmfFrame_* out_left, struct AacUsacQmfFrame_* out_right);
 
 /* ── Enhanced SBR for USAC (ISO/IEC 23003-3 7.5) ───────────────────
  * The same state decodes UsacSbrData(): the sbr_info and sbr_header of

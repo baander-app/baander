@@ -11,6 +11,7 @@
 #include "limiter.h"
 #include "lowdelay.h"
 #include "mdct.h"
+#include "mps.h"
 #include "sbr.h"
 #include "sbr_ld.h"
 #include "unidrc.h"
@@ -158,6 +159,15 @@ using AacDecoderState = struct AacDecoderState_ {
    * so that it survives reconfigurations and precedes the stream. */
   struct AacUsacState_* usac;
   AacUniDrcRequest unidrc_request;
+  /* MPEG Surround: the configuration (from the AudioSpecificConfig of
+   * object type 30 or the in-band header of the payload), the payload
+   * gathered across the fill elements of a block, the surround decoder
+   * and its filterbanks, allocated on first use.  While `mps_output` is
+   * set the output is the surround decoder's channels in the canonical
+   * order L, R, C, LFE, Ls, Rs (ch[0..5]) rather than the core's. */
+  struct AacDecoderMps_* mps;
+  int mps_output;
+  int has_surround; /* the last frame carried a surround payload that was decoded */
 };
 
 AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp);
@@ -244,6 +254,16 @@ int aac_decoder_output(const AacDecoderState* s, float* out);
 
 /* Output channels for the current layout and request. */
 int aac_decoder_output_channels(const AacDecoderState* s);
+
+/* Installs the MPEG Surround configuration of the stream's
+ * AudioSpecificConfig (NULL: none); an in-band header of the payload
+ * replaces whichever configuration is in force.  The surround decoder
+ * runs once a block of a mono or stereo core carries its payload. */
+void aac_decoder_set_mps_config(AacDecoderState* s, const AacMpsConfig* cfg);
+
+/* Delay the surround decoder adds to the output while it runs, in
+ * samples at the output rate (0 otherwise). */
+int aac_decoder_mps_delay(const AacDecoderState* s);
 
 /* Runs the output limiter, when enabled, over `frames` interleaved frames
  * of `channels` channels that aac_decoder_output produced, in place.  The

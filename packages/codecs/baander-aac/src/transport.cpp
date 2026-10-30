@@ -196,6 +196,7 @@ int apply_asc(AacDecoderState* s, const AacAsc* asc) {
     return ret;
   }
   preset_extension(s, asc);
+  aac_decoder_set_mps_config(s, asc->mps_present ? &asc->mps : nullptr);
   return AAC_OK;
 }
 
@@ -660,6 +661,7 @@ int aac_decoder_transport_set_config(AacDecoderState* s, AacDecoderTransport* t,
 void aac_decoder_transport_reapply(AacDecoderState* s, const AacDecoderTransport* t) {
   if (t->latm.valid) {
     preset_extension(s, &t->latm.asc);
+    aac_decoder_set_mps_config(s, t->latm.asc.mps_present ? &t->latm.asc.mps : nullptr);
   }
 }
 

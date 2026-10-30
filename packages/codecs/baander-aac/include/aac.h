@@ -20,6 +20,7 @@ typedef enum AacObjectType_ {
   AAC_AOT_ER_LC = 17,  /* error resilient AAC-LC (decoder only) */
   AAC_AOT_ER_LD = 23,  /* AAC-LD: 512 or 480 samples per frame, low-overlap window */
   AAC_AOT_PS = 29,     /* HE-AAC v2 (SBR + Parametric Stereo) */
+  AAC_AOT_MPS = 30,    /* MPEG Surround over a core type (configuration only) */
   AAC_AOT_ER_ELD = 39, /* AAC-ELD: the low-delay filterbank, with optional LD-SBR */
   AAC_AOT_USAC = 42,   /* USAC / xHE-AAC (decoder only) */
 } AacObjectType;
@@ -214,6 +215,12 @@ int aac_decoder_channels(AacDecoderHandle ctx);
 int aac_decoder_stream_channels(AacDecoderHandle ctx);
 /* Whether the last decoded frame carried SBR and parametric stereo data. */
 int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps);
+/* Whether the last decoded frame carried MPEG Surround data that was
+ * decoded: the output is then the surround channels (5.1 in the order
+ * L, R, C, LFE, Ls, Rs, or a stereo pair for the 2-1-2 tree) built from
+ * the mono or stereo core, while aac_decoder_stream_channels keeps
+ * reporting the core's channels. */
+int aac_decoder_has_surround(AacDecoderHandle ctx);
 
 /* ── Decoder stream settings ─────────────────────────────────────── */
 
@@ -238,7 +245,8 @@ int aac_decoder_last_frame_concealed(AacDecoderHandle ctx);
 int aac_decoder_concealed_frames(AacDecoderHandle ctx);
 /* Peak limiter on the output (off by default): attack_ms of look-ahead
  * delay, release_ms of gain recovery; aac_decoder_delay reports the
- * delay in output samples. */
+ * delay in output samples, plus the delay of the surround decoder while
+ * it runs. */
 int aac_decoder_set_limiter(AacDecoderHandle ctx, int enabled, int attack_ms, int release_ms);
 int aac_decoder_delay(AacDecoderHandle ctx);
 /* The channel mode of the stream's layout (AAC_MODE_DEFAULT for the plain

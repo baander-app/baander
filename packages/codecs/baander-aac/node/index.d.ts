@@ -179,6 +179,8 @@ export declare class AacDecoder {
   readonly hasSbr: boolean;
   /** The stream carries parametric stereo data, which is decoded: a mono stream plays as stereo. */
   readonly hasPs: boolean;
+  /** The last frame carried MPEG Surround data, which is decoded: the stream plays as 5.1. */
+  readonly hasSurround: boolean;
   /** Frames that failed to decode since construction or `reset()` (concealment off). */
   readonly errors: number;
   /** Frames concealed since construction or `reset()`. */

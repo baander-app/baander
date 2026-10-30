@@ -232,6 +232,7 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
          InstanceAccessor("frameSize", &Decoder::FrameSize, nullptr),
          InstanceAccessor("hasSbr", &Decoder::HasSbr, nullptr),
          InstanceAccessor("hasPs", &Decoder::HasPs, nullptr),
+         InstanceAccessor("hasSurround", &Decoder::HasSurround, nullptr),
          InstanceAccessor("errors", &Decoder::Errors, nullptr),
          InstanceAccessor("concealedFrames", &Decoder::ConcealedFrames, nullptr),
          InstanceAccessor("delay", &Decoder::Delay, nullptr),
@@ -498,6 +499,9 @@ class Decoder : public Napi::ObjectWrap<Decoder> {
       aac_decoder_get_sbr_ps(handle_, nullptr, &ps);
     }
     return Napi::Boolean::New(info.Env(), ps != 0);
+  }
+  Napi::Value HasSurround(const Napi::CallbackInfo& info) {
+    return Napi::Boolean::New(info.Env(), handle_ && aac_decoder_has_surround(handle_) > 0);
   }
   Napi::Value Errors(const Napi::CallbackInfo& info) {
     return Napi::Number::New(info.Env(), errors_);

@@ -478,7 +478,8 @@ int aac_decoder_delay(AacDecoderHandle ctx) {
   if (!ctx) {
     return AAC_ERR_INVALID_ARG;
   }
-  return aac_decoder_limiter_delay(static_cast<AacDecoderState*>(ctx));
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  return aac_decoder_limiter_delay(s) + aac_decoder_mps_delay(s);
 }
 
 int aac_decoder_channel_mode(AacDecoderHandle ctx) {
@@ -595,5 +596,12 @@ int aac_decoder_get_sbr_ps(AacDecoderHandle ctx, int* has_sbr, int* has_ps) {
     *has_ps = s->has_ps;
   }
   return AAC_OK;
+}
+
+int aac_decoder_has_surround(AacDecoderHandle ctx) {
+  if (!ctx) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  return static_cast<AacDecoderState*>(ctx)->has_surround ? 1 : 0;
 }
 #endif /* BAAC_AAC_HAVE_DECODER */

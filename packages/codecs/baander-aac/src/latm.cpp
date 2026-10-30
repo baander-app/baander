@@ -80,6 +80,7 @@ void aac_latm_config_init(AacLatmConfig* cfg, const AacAsc* asc, int audio_mux_v
   cfg->audio_mux_version = audio_mux_version ? 1 : 0;
   cfg->tara_buffer_fullness = 0xFF;
   cfg->latm_buffer_fullness = 0xFF;
+  cfg->num_layers = 1;
   cfg->asc = *asc;
 }
 
@@ -99,35 +100,61 @@ int aac_latm_read_stream_mux_config(AacBitReader* r, AacLatmConfig* cfg) {
   if (c.num_sub_frames + 1 > AAC_LATM_MAX_SUBFRAMES) {
     return AAC_ERR_UNSUPPORTED; /* more access units than one output buffer holds */
   }
-  if (aac_bitreader_read(r, 4) != 0 || aac_bitreader_read(r, 3) != 0) {
-    return AAC_ERR_UNSUPPORTED; /* numProgram, numLayer: one stream only */
+  if (aac_bitreader_read(r, 4) != 0) {
+    return AAC_ERR_UNSUPPORTED; /* numProgram: one program only */
   }
-  if (c.audio_mux_version == 0) {
-    const int ret = aac_asc_read(r, &c.asc);
-    if (ret) {
-      return ret;
-    }
-  } else {
-    const uint32_t asc_len = read_latm_value(r);
-    if (asc_len > (uint32_t)aac_bitreader_bits_left(r)) {
-      return AAC_ERR_DECODE;
-    }
-    const int start = r->pos;
-    const int ret = aac_asc_read(r, &c.asc);
-    if (ret) {
-      return ret;
-    }
-    const int used = r->pos - start;
-    if (used > (int)asc_len) {
-      return AAC_ERR_DECODE;
-    }
-    aac_bitreader_skip(r, (int)asc_len - used); /* fillBits */
-  }
-  c.frame_length_type = (int)aac_bitreader_read(r, 3);
-  if (c.frame_length_type != 0) {
+  c.num_layers = (int)aac_bitreader_read(r, 3) + 1;
+  if (c.num_layers > 2) {
     return AAC_ERR_UNSUPPORTED;
   }
-  c.latm_buffer_fullness = (int)aac_bitreader_read(r, 8);
+  for (int layer = 0; layer < c.num_layers; layer++) {
+    AacAsc second = {};
+    AacAsc* asc = layer == 0 ? &c.asc : &second;
+    if (layer > 0 && aac_bitreader_read(r, 1)) {
+      return AAC_ERR_UNSUPPORTED; /* useSameConfig: a layer without a config of its own */
+    }
+    if (c.audio_mux_version == 0) {
+      const int ret = aac_asc_read(r, asc);
+      if (ret) {
+        return ret;
+      }
+    } else {
+      /* The config is read from a copy of its ascLen bits, so that a
+       * reader that runs to the end of the config (the surround config's
+       * extension loop) stops where the config does. */
+      const uint32_t asc_len = read_latm_value(r);
+      uint8_t copy[AAC_LATM_MAX_ASC_BYTES];
+      if (asc_len > (uint32_t)aac_bitreader_bits_left(r) ||
+          asc_len > 8u * AAC_LATM_MAX_ASC_BYTES) {
+        return AAC_ERR_DECODE;
+      }
+      memset(copy, 0, sizeof(copy));
+      copy_bits(r, copy, (int)asc_len);
+      AacBitReader sub;
+      aac_bitreader_init(&sub, copy, (int)((asc_len + 7) / 8));
+      const int ret = aac_asc_read(&sub, asc);
+      if (ret) {
+        return ret;
+      }
+      if (sub.pos > (int)asc_len) {
+        return AAC_ERR_DECODE;
+      }
+    }
+    if (layer > 0) {
+      /* the second layer: the MPEG Surround config over the first's core */
+      if (!second.mps_present || c.asc.mps_present) {
+        return AAC_ERR_UNSUPPORTED;
+      }
+      c.asc.mps_present = 1;
+      c.asc.sac_payload_embedding = second.sac_payload_embedding;
+      c.asc.mps = second.mps;
+    }
+    c.frame_length_type = (int)aac_bitreader_read(r, 3);
+    if (c.frame_length_type != 0) {
+      return AAC_ERR_UNSUPPORTED;
+    }
+    c.latm_buffer_fullness = (int)aac_bitreader_read(r, 8);
+  }
   c.other_data_present = (int)aac_bitreader_read(r, 1);
   if (c.other_data_present) {
     uint32_t len = 0;
@@ -237,18 +264,25 @@ int aac_latm_read_mux_element(const uint8_t* data, int size, int mux_config_pres
     return AAC_ERR_OVERFLOW;
   }
   int used = 0;
+  const int layers = cfg->num_layers > 1 ? cfg->num_layers : 1;
   for (int i = 0; i < count; i++) {
-    const int length = read_slot_length(&r);
-    if (r.overread || length * 8 > aac_bitreader_bits_left(&r)) {
+    /* the lengths of every layer's payload, then the payloads: the
+     * first layer's is the access unit, a second layer's is dropped */
+    int length[2] = {0, 0};
+    for (int layer = 0; layer < layers; layer++) {
+      length[layer] = read_slot_length(&r);
+    }
+    if (r.overread || (length[0] + length[1]) * 8 > aac_bitreader_bits_left(&r)) {
       return AAC_ERR_DECODE;
     }
-    if (used + length > out_size) {
+    if (used + length[0] > out_size) {
       return AAC_ERR_OVERFLOW;
     }
-    copy_bits(&r, out + used, length * 8);
+    copy_bits(&r, out + used, length[0] * 8);
     payloads[i].offset = used;
-    payloads[i].size = length;
-    used += length;
+    payloads[i].size = length[0];
+    used += length[0];
+    aac_bitreader_skip(&r, length[1] * 8);
   }
   if (cfg->other_data_present) {
     aac_bitreader_skip(&r, cfg->other_data_len_bits);

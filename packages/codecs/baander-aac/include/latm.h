@@ -16,12 +16,17 @@ extern "C" {
  * (LOAS) that frames one AudioMuxElement behind a sync word and length.
  * One program with one layer, all streams in the same time framing and
  * frameLengthType 0 (the payload length in bytes travels with each
- * frame) are supported, which is what AAC over LATM uses. */
+ * frame) are supported, which is what AAC over LATM uses; a second
+ * layer whose config is an MPEG Surround one (object type 30 with
+ * sacPayloadEmbedding) merges into the first layer's AudioSpecificConfig
+ * and its payload, empty when the surround data is embedded in the core's
+ * access units, is dropped. */
 
 #define AAC_LOAS_SYNC 0x2B7
 #define AAC_LOAS_HEADER_BYTES 3
 #define AAC_LOAS_MAX_PAYLOAD 8191 /* 13-bit audioMuxLengthBytes */
 #define AAC_LATM_MAX_SUBFRAMES 4 /* numSubFrames + 1: four SBR blocks fill AAC_DECODER_MAX_OUTPUT */
+#define AAC_LATM_MAX_ASC_BYTES 256 /* a config of audioMuxVersion 1 is read from a copy of its ascLen bits */
 /* Bytes an AudioMuxElement adds to one access unit of `payload_bytes`:
  * the LOAS header, the StreamMuxConfig with the longest config, the
  * 255-byte length chunks and the final alignment. */
@@ -39,6 +44,7 @@ using AacLatmConfig = struct AacLatmConfig_ {
   int other_data_len_bits;
   int crc_check_present;
   int crc_check_sum;
+  int num_layers;           /* 1, or 2 with the MPEG Surround config in the second */
   AacAsc asc;
 };
 

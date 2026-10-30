@@ -106,6 +106,25 @@ test('encodes and decodes HE-AAC v1 and v2', () => {
   }
 });
 
+test('decodes an MPEG Surround stream to 5.1', () => {
+  const stream = readFileSync(new URL('../../tests/data/mps_5151_header_q.loas', import.meta.url));
+  const decoder = new AacDecoder({ channels: 0 });
+  const out = decodeAll(decoder, stream, 1000);
+  assert.equal(decoder.errors, 0);
+  assert.ok(decoder.hasSurround, 'surround decoded');
+  assert.ok(!decoder.hasSbr && !decoder.hasPs);
+  assert.equal(decoder.channels, 6);
+  assert.equal(decoder.sampleRate, 48000);
+  assert.equal(out.length, 96 * 1024 * 6, 'six channels per frame');
+  const stereo = new AacDecoder({ channels: 2 });
+  const mixed = decodeAll(stereo, stream, 1000);
+  assert.equal(stereo.channels, 2);
+  assert.equal(mixed.length, 96 * 1024 * 2, 'downmixed to the stereo request');
+  const plain = new AacDecoder({ channels: 2 });
+  decodeAll(plain, Buffer.concat([new AacEncoder({ sampleRate: 48000, channels: 2, bitrate: 128000, transport: 'loas' }).encode(tones(48000, 48000, 2))]), 1000);
+  assert.ok(!plain.hasSurround, 'no surround in a plain stream');
+});
+
 test('rejects unsupported configurations', () => {
   assert.throws(() => new AacEncoder({ sampleRate: 37000 }));
   assert.throws(() => new AacEncoder({ channels: 9 }));

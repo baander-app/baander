@@ -29,6 +29,7 @@ set(TEST_SOURCES
     test_mps212.cpp
     test_mps_signal.cpp
     test_mps.cpp
+    test_mps_stream.cpp
     test_unidrc.cpp
     test_usac_lpd.cpp
     test_usac_sbr.cpp

@@ -158,10 +158,19 @@ struct AacMpsState_ {
   AacMpsResidualReader residual_reader; /* the caller's core decoder for residual_data() */
   void* residual_ctx;
 
-  /* ── signal state: the hybrid filterbank histories, the decorrelators,
-   * the residual buffers, the mixing matrices per slot and the temporal
-   * shaping state belong here (mps_dec.cpp adds them). ── */
+  /* ── the signal path (mps_glue.cpp): created on the first
+   * aac_mps_apply or aac_mps_set_residual, with the accumulation of core
+   * frames into a spatial frame; `frame_pending` says a frame was read
+   * since the last aac_mps_apply, which otherwise keeps the previous
+   * parameters as for a lost frame. ── */
+  struct AacMpsGlue_* glue;
+  int frame_pending;
 };
+
+/* The glue's state (mps_glue.cpp): aac_mps_destroy frees it,
+ * aac_mps_reset clears it. */
+void aac_mps_glue_destroy(struct AacMpsGlue_* g);
+void aac_mps_glue_reset(struct AacMpsGlue_* g);
 
 /* The mapped parameters of the last frame read or concealed. */
 const AacMpsFrameParams* aac_mps_frame_params(const AacMpsState* s);

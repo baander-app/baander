@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 /* AAC-LC decoding following ISO/IEC 14496-3 subpart 4: syntax (4.4/4.5),
@@ -520,6 +521,344 @@ void imdct_and_window(AacDecoderState* s, AacDecoderChannel* ch) {
   ch->prev_window_shape = ics->window_shape;
 }
 
+/* ── MPEG Surround (ISO/IEC 23003-1) ───────────────────────────── */
+
+constexpr int kExtSacData = 12;      /* extension_type of the surround payload (Table 4.56) */
+constexpr int kSacMaxPayload = 4096; /* bytes of payload gathered across the fill elements of a block */
+constexpr int kMpsBoxes = AAC_MPS_MAX_OTT_BOXES + AAC_MPS_MAX_TTT_BOXES;
+constexpr int kQmfPairDelay = 577;   /* samples the 64-band analysis and synthesis pair delays by */
+/* The reference decoder applies the spatial parameters this much later
+ * than its input arrives (five QMF slots of filter delay and the offset
+ * of its analysis bank); the no-SBR path delays the core output by it
+ * before the analysis, the SBR path its QMF frames by the nearest whole
+ * number of slots. Measured against libxaac on the test streams. */
+constexpr int kInputAlignSamples = 560;
+constexpr int kInputAlignSlots = (kInputAlignSamples + 32) / 64;
+
+}  // namespace
+
+/* The surround decoder of a stream: the configuration in force (the
+ * AudioSpecificConfig's, until an in-band header replaces it), the
+ * payload of the current block as the fill elements deliver it in
+ * segments (ancStart .. ancStop), the decoder state with the QMF slots
+ * per core frame it was built for, the filterbanks of the no-SBR input
+ * path and of the output channels, and the residual channel elements. */
+struct AacDecoderMps_ {
+  AacMpsConfig cfg;
+  int cfg_valid;
+  AacMpsConfig asc_cfg; /* the configuration the AudioSpecificConfig gave, to notice a change */
+  int asc_valid;
+  AacMpsState* st;
+  AacMpsConfig st_cfg;
+  int st_qmf_slots;
+  uint8_t anc[kSacMaxPayload];
+  int anc_len, anc_type, anc_open;
+  int frame_read; /* a spatial frame of this block was parsed */
+  AacQmfAnalysis analysis[AAC_MPS_MAX_INPUT_CHANNELS];
+  AacQmfSynthesis synthesis[AAC_MPS_MAX_OUTPUT_CHANNELS];
+  AacUsacQmfFrame in[AAC_MPS_MAX_INPUT_CHANNELS];
+  AacUsacQmfFrame out[AAC_MPS_MAX_OUTPUT_CHANNELS];
+  float align_pcm[AAC_MPS_MAX_INPUT_CHANNELS][kInputAlignSamples]; /* the no-SBR input delay line */
+  float align_qmf[AAC_MPS_MAX_INPUT_CHANNELS][kInputAlignSlots][64][2]; /* the SBR input delay line */
+  int align_pos;
+  AacDecoderChannel res_ch[kMpsBoxes];
+  float res_pcm[kMpsBoxes][AAC_USAC_MAX_QMF_SLOTS * 64];
+};
+
+namespace {
+
+AacDecoderMps_* mps_block(AacDecoderState* s) {
+  if (!s->mps) {
+    s->mps = (AacDecoderMps_*)calloc(1, sizeof(AacDecoderMps_));
+  }
+  return s->mps;
+}
+
+/* QMF slots per core frame as the surround decoder's input arrives: the
+ * 64-band analysis of the core (16 per 1024 samples), or the SBR's
+ * output (32). */
+int mps_qmf_slots(const AacDecoderState* s) {
+  return core_output_length(s) / 64 * (doubled_output(s) ? 2 : 1);
+}
+
+/* Whether the surround decoder can run on this stream: a mono or stereo
+ * core of the plain filterbanks (the ELD and LD cores have their own
+ * low-delay filterbanks) without parametric stereo, whose only element
+ * is the downmix of the configured tree. */
+bool mps_core_fits(const AacDecoderState* s) {
+  const AacDecoderMps_* m = s->mps;
+  if (!m || !m->cfg_valid || s->ps_output || s->ld_sbr_mode || s->aot == AAC_AOT_ER_LD ||
+      s->aot == AAC_AOT_ER_ELD || s->layout_source == 0 || s->layout.num_elements != 1) {
+    return false;
+  }
+  const int type = s->layout.elems[0].type;
+  const int nin = m->cfg.num_input_channels;
+  return (nin == 1 && type == AAC_ELEM_SCE) || (nin == 2 && type == AAC_ELEM_CPE);
+}
+
+int mps_residual_reader(void* ctx, AacBitReader* r, int box, int frame, int upd_qmf);
+
+/* The surround decoder state for the configuration in force and the
+ * current input timing, created or replaced as needed. */
+AacMpsState* mps_state(AacDecoderState* s) {
+  AacDecoderMps_* m = s->mps;
+  if (!mps_core_fits(s)) {
+    return nullptr;
+  }
+  const int q = mps_qmf_slots(s);
+  if (m->st && (m->st_qmf_slots != q || memcmp(&m->cfg, &m->st_cfg, sizeof(m->cfg)) != 0)) {
+    aac_mps_destroy(m->st);
+    m->st = nullptr;
+  }
+  if (!m->st) {
+    m->st = aac_mps_create(&m->cfg, core_output_length(s), q, aac_decoder_output_rate(s));
+    if (!m->st) {
+      return nullptr;
+    }
+    m->st_cfg = m->cfg;
+    m->st_qmf_slots = q;
+    aac_mps_set_residual_reader(m->st, mps_residual_reader, s);
+    for (int c = 0; c < AAC_MPS_MAX_INPUT_CHANNELS; c++) {
+      aac_qmf_analysis_init(&m->analysis[c], 64);
+    }
+    for (int c = 0; c < AAC_MPS_MAX_OUTPUT_CHANNELS; c++) {
+      aac_qmf_synthesis_init(&m->synthesis[c], 64);
+    }
+    for (int b = 0; b < kMpsBoxes; b++) {
+      memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
+      m->res_ch[b].prev_window_shape = 0;
+    }
+  }
+  return m->st;
+}
+
+/* ResidualData(): one AAC-LC individual_channel_stream per residual
+ * frame of a box, at the residual sampling frequency index, through the
+ * core decoder's syntax and filterbank; the box's time signal is handed
+ * to the surround decoder once its last residual frame is in.  A
+ * residual frame whose length differs from the core frame's (the short
+ * window pairs of the longer spatial frames) is outside this path. */
+int mps_residual_reader(void* ctx, AacBitReader* r, int box, int frame, int upd_qmf) {
+  auto* s = static_cast<AacDecoderState*>(ctx);
+  AacDecoderMps_* m = s->mps;
+  const AacMpsConfig* cfg = &m->cfg;
+  const int bands = s->frame_length / m->st_qmf_slots; /* core samples per QMF slot */
+  const int frames = cfg->residual_frames_per_spatial_frame;
+  if (box < 0 || box >= kMpsBoxes || frame < 0 || frame >= frames ||
+      upd_qmf * bands != s->frame_length || aac_aot_is_er(s->aot) ||
+      cfg->residual_sample_rate_index < 0 ||
+      cfg->residual_sample_rate_index >= AAC_NUM_SAMPLE_RATES) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  AacDecoderChannel* ch = &m->res_ch[box];
+  const int saved = s->rate_index;
+  s->rate_index = cfg->residual_sample_rate_index;
+  const int ret = decode_ics(s, r, &ch->cs, 0);
+  s->rate_index = saved;
+  if (ret) {
+    return ret;
+  }
+  if (ch->cs.ics.window_sequence == AAC_WIN_EIGHT_SHORT &&
+      (upd_qmf == 18 || upd_qmf == 24 || upd_qmf == 30)) {
+    return AAC_ERR_UNSUPPORTED;
+  }
+  dequantize(s, &ch->cs, nullptr, nullptr);
+  apply_tns(&ch->cs);
+  imdct_and_window(s, ch);
+  memcpy(m->res_pcm[box] + (size_t)frame * s->frame_length, ch->output,
+         (size_t)s->frame_length * sizeof(float));
+  if (frame == frames - 1) {
+    aac_mps_set_residual(m->st, box, m->res_pcm[box], frames * s->frame_length);
+  }
+  return 0;
+}
+
+/* The payload gathered from the block's fill elements: with ancType 1
+ * the in-band header (bsSacTimeAlignFlag, bsSacHeaderLen, the
+ * SpatialSpecificConfig over that many bytes, bsSacTimeAlign) ahead of
+ * the SpatialFrame, with ancType 0 the frame alone.  A payload that does
+ * not parse leaves the block without a frame: the surround decoder then
+ * keeps its parameters, as for a lost frame. */
+void parse_sac_payload(AacDecoderState* s, AacDecoderMps_* m) {
+  AacBitReader r;
+  aac_bitreader_init(&r, m->anc, m->anc_len);
+  if (m->anc_type == 1) {
+    const int time_align = (int)aac_bitreader_read(&r, 1);
+    int len = (int)aac_bitreader_read(&r, 7);
+    if (len == 127) {
+      len += (int)aac_bitreader_read(&r, 16);
+    }
+    const int start = r.pos / 8;
+    if (r.overread || len <= 0 || start + len > m->anc_len) {
+      return;
+    }
+    AacBitReader sub;
+    aac_bitreader_init(&sub, m->anc + start, len);
+    AacMpsConfig cfg;
+    if (aac_mps_config_read(&sub, &cfg) != AAC_OK) {
+      return;
+    }
+    aac_bitreader_skip(&r, 8 * len);
+    if (time_align) {
+      aac_bitreader_skip(&r, 16);
+    }
+    if (!m->cfg_valid || memcmp(&cfg, &m->cfg, sizeof(cfg)) != 0) {
+      m->cfg = cfg;
+      m->cfg_valid = 1;
+    }
+  } else if (m->anc_type != 0) {
+    return;
+  }
+  AacMpsState* st = mps_state(s);
+  if (st && aac_mps_read_frame(st, &r) == AAC_OK) {
+    m->frame_read = 1;
+  }
+}
+
+/* extension_payload() of type EXT_SAC_DATA (Table 4.56): ancType,
+ * ancStart, ancStop and the payload segment, gathered until ancStop. */
+int decode_sac_fill(AacDecoderState* s, AacBitReader* r, int count) {
+  aac_bitreader_skip(r, 4); /* extension_type */
+  const int anc_type = (int)aac_bitreader_read(r, 2);
+  const int anc_start = (int)aac_bitreader_read(r, 1);
+  const int anc_stop = (int)aac_bitreader_read(r, 1);
+  const int bytes = count - 1;
+  AacDecoderMps_* m = mps_block(s);
+  if (!m) {
+    aac_bitreader_skip(r, 8 * bytes);
+    return r->overread ? AAC_ERR_DECODE : 0;
+  }
+  if (anc_start) {
+    m->anc_len = 0;
+    m->anc_type = anc_type;
+    m->anc_open = 1;
+  }
+  if (!m->anc_open || m->anc_len + bytes > kSacMaxPayload) {
+    m->anc_open = 0;
+    aac_bitreader_skip(r, 8 * bytes);
+    return r->overread ? AAC_ERR_DECODE : 0;
+  }
+  for (int i = 0; i < bytes; i++) {
+    m->anc[m->anc_len++] = (uint8_t)aac_bitreader_read(r, 8);
+  }
+  if (r->overread) {
+    m->anc_open = 0;
+    return AAC_ERR_DECODE;
+  }
+  if (anc_stop) {
+    m->anc_open = 0;
+    parse_sac_payload(s, m);
+  }
+  return 0;
+}
+
+/* Whether the surround decoder runs on this block, with its state ready. */
+bool mps_prepare(AacDecoderState* s) {
+  if (!s->mps || !s->mps->cfg_valid) {
+    return false;
+  }
+  return mps_state(s) != nullptr;
+}
+
+/* The surround decoder after the core and the SBR: its input is the
+ * 64-band analysis of the downmix when the stream has no SBR (the SBR
+ * stage left its QMF frames otherwise), its output channels are
+ * synthesised into ch[0..] in the canonical order. */
+void mps_stage(AacDecoderState* s, bool active) {
+  AacDecoderMps_* m = s->mps;
+  s->has_surround = 0;
+  if (!active) {
+    s->mps_output = 0;
+    return;
+  }
+  const int nin = m->cfg.num_input_channels;
+  const int nout = m->cfg.num_output_channels;
+  const int q = m->st_qmf_slots;
+  AacDecoderChannel* chans = &s->ch[s->elem_base[0]];
+  if (!s->sbr_mode) {
+    /* The core output passes a delay line before the analysis so that the
+     * spatial parameters meet the audio where the reference decoder
+     * applies them. */
+    for (int c = 0; c < nin; c++) {
+      const int total = 64 * q;
+      float buf[kInputAlignSamples + AAC_USAC_MAX_QMF_SLOTS * 64];
+      memcpy(buf, m->align_pcm[c], sizeof(m->align_pcm[c]));
+      memcpy(buf + kInputAlignSamples, chans[c].output, (size_t)total * sizeof(float));
+      memcpy(m->align_pcm[c], buf + total, sizeof(m->align_pcm[c]));
+      for (int n = 0; n < q; n++) {
+        float in[64];
+        for (int i = 0; i < 64; i++) {
+          in[i] = buf[64 * n + i] * 32768.0f;
+        }
+        aac_qmf_analyze(&m->analysis[c], in, m->in[c].x[n]);
+      }
+      m->in[c].slots = q;
+    }
+  } else {
+    /* The SBR's QMF frames pass the nearest whole number of slots. */
+    int pos = m->align_pos;
+    for (int n = 0; n < q; n++) {
+      for (int c = 0; c < nin; c++) {
+        float slot[64][2];
+        memcpy(slot, m->in[c].x[n], sizeof(slot));
+        memcpy(m->in[c].x[n], m->align_qmf[c][pos], sizeof(slot));
+        memcpy(m->align_qmf[c][pos], slot, sizeof(slot));
+      }
+      pos = (pos + 1) % kInputAlignSlots;
+    }
+    m->align_pos = pos;
+  }
+  const AacUsacQmfFrame* in[AAC_MPS_MAX_INPUT_CHANNELS];
+  AacUsacQmfFrame* out[AAC_MPS_MAX_OUTPUT_CHANNELS];
+  for (int c = 0; c < AAC_MPS_MAX_INPUT_CHANNELS; c++) {
+    in[c] = &m->in[c];
+  }
+  for (int c = 0; c < AAC_MPS_MAX_OUTPUT_CHANNELS; c++) {
+    out[c] = &m->out[c];
+  }
+  aac_mps_apply(m->st, in, out);
+  for (int c = 0; c < nout; c++) {
+    float* pcm = s->ch[c].output;
+    for (int n = 0; n < q; n++) {
+      aac_qmf_synthesize(&m->synthesis[c], m->out[c].x[n], pcm + 64 * n);
+    }
+    for (int i = 0; i < 64 * q; i++) {
+      pcm[i] *= 1.0f / 32768.0f;
+    }
+  }
+  s->mps_output = 1;
+  s->has_surround = m->frame_read;
+  m->frame_read = 0;
+}
+
+void mps_reset(AacDecoderState* s) {
+  AacDecoderMps_* m = s->mps;
+  s->mps_output = 0;
+  s->has_surround = 0;
+  if (!m) {
+    return;
+  }
+  m->anc_open = 0;
+  m->anc_len = 0;
+  m->frame_read = 0;
+  memset(m->align_pcm, 0, sizeof(m->align_pcm));
+  memset(m->align_qmf, 0, sizeof(m->align_qmf));
+  m->align_pos = 0;
+  if (m->st) {
+    aac_mps_reset(m->st);
+  }
+  for (int c = 0; c < AAC_MPS_MAX_INPUT_CHANNELS; c++) {
+    aac_qmf_analysis_init(&m->analysis[c], 64);
+  }
+  for (int c = 0; c < AAC_MPS_MAX_OUTPUT_CHANNELS; c++) {
+    aac_qmf_synthesis_init(&m->synthesis[c], 64);
+  }
+  for (int b = 0; b < kMpsBoxes; b++) {
+    memset(m->res_ch[b].overlap, 0, sizeof(m->res_ch[b].overlap));
+    m->res_ch[b].prev_window_shape = 0;
+  }
+}
+
 /* ── stereo tools (4.6.8) ──────────────────────────────────────── */
 
 struct MsMask {
@@ -848,6 +1187,8 @@ int decode_fil(AacDecoderState* s, AacBitReader* r, int elem, int elem_type, boo
       }
     } else if (ext_type == AAC_EXT_DYNAMIC_RANGE) {
       return aac_drc_decode_fill(&s->drc, r, elem, count);
+    } else if (ext_type == kExtSacData) {
+      return decode_sac_fill(s, r, count);
     }
   }
   aac_bitreader_skip(r, 8 * count);
@@ -952,6 +1293,9 @@ AacDecoderState* aac_decoder_state_create(int sr, int ch, const AacDSP* dsp) {
   s->unidrc_request.boost_percent = 100;
   s->unidrc_request.cut_percent = 100;
   s->unidrc_request.peak_limiter = 1;
+  s->mps = nullptr;
+  s->mps_output = 0;
+  s->has_surround = 0;
   s->last_concealed = 0;
   s->concealed_frames = 0;
   s->conceal_random = kRandomSeed;
@@ -970,6 +1314,10 @@ void aac_decoder_state_destroy(AacDecoderState* s) {
     delete s->ld_sbr[i];
   }
   aac_usac_state_destroy(s->usac);
+  if (s->mps) {
+    aac_mps_destroy(s->mps->st);
+    free(s->mps);
+  }
   delete s;
 }
 
@@ -993,6 +1341,7 @@ void aac_decoder_reset_state(AacDecoderState* s) {
   s->random_state = kRandomSeed;
   s->sbr_mode = 0;
   s->ps_output = 0;
+  mps_reset(s);
   s->blocks_decoded = 0;
   /* The DRC readback and the held gains describe frames before the
    * reset. */
@@ -1207,7 +1556,10 @@ int aac_decoder_output_channels(const AacDecoderState* s) {
   if (!s->layout_source) {
     return 0;
   }
-  return s->ps_output ? 2 : s->layout.num_channels;
+  if (s->ps_output) {
+    return 2;
+  }
+  return s->mps_output ? s->mps->cfg.num_output_channels : s->layout.num_channels;
 }
 
 int aac_decoder_output(const AacDecoderState* s, float* out) {
@@ -1220,6 +1572,19 @@ int aac_decoder_output(const AacDecoderState* s, float* out) {
     in[0] = s->ch[0].output;
     in[1] = s->ch[1].output;
     aac_layout_mix(&stereo, in, s->frame_size, out_channels, out);
+    return out_channels;
+  }
+  if (s->mps_output) {
+    /* The surround decoder's channels in the canonical order, which is
+     * the slot order of the 5.1 (or stereo) configuration: mixed as a
+     * stream of that layout. */
+    const int nout = s->mps->cfg.num_output_channels;
+    AacLayout surround = {};
+    aac_layout_from_config(&surround, nout == 6 ? 6 : 2);
+    for (int c = 0; c < nout; c++) {
+      in[c] = s->ch[c].output;
+    }
+    aac_layout_mix(&surround, in, s->frame_size, out_channels, out);
     return out_channels;
   }
   const AacLayout* l = &s->layout;
@@ -1522,7 +1887,7 @@ void ld_sbr_stage(AacDecoderState* s) {
   }
 }
 
-void sbr_stage(AacDecoderState* s, bool conceal) {
+void sbr_stage(AacDecoderState* s, bool conceal, bool mps_active) {
   const AacLayout* l = &s->layout;
   s->frame_size = output_length(s);
   if (s->ld_sbr_mode) {
@@ -1530,6 +1895,20 @@ void sbr_stage(AacDecoderState* s, bool conceal) {
     return;
   }
   if (!s->sbr_mode) {
+    return;
+  }
+  if (mps_active) {
+    /* The downmix element's reconstructed QMF frames go to the surround
+     * decoder, which synthesises its own output channels. */
+    AacDecoderChannel* chans = &s->ch[s->elem_base[0]];
+    const int type = l->elems[0].type;
+    AacSbrState* sbr = sbr_state(s, 0);
+    if (conceal && sbr->start && !sbr->ready_for_dequant && sbr->elem_type == type) {
+      aac_sbr_conceal(sbr);
+    }
+    AacDecoderMps_* m = s->mps;
+    aac_sbr_apply_to_qmf(sbr, type, chans[0].output,
+                         type == AAC_ELEM_CPE ? chans[1].output : nullptr, &m->in[0], &m->in[1]);
     return;
   }
   /* A mono stream whose element carries parametric stereo becomes a
@@ -1657,6 +2036,10 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
   s->last_concealed = 0;
   s->rvlc_recovered = 0;
   s->num_crc_regions = 0;
+  if (s->mps) {
+    s->mps->frame_read = 0;
+    s->mps->anc_open = 0;
+  }
   aac_drc_frame_begin(&s->drc);
   const bool conceal = s->conceal_mode != AAC_CONCEAL_OFF;
   bool damaged = false;
@@ -1781,7 +2164,9 @@ int aac_decode_raw_data_block(AacDecoderState* s, AacBitReader* r) {
     }
     apply_couplings(s, i, -1);
   }
-  sbr_stage(s, conceal);
+  const bool surround = mps_prepare(s);
+  sbr_stage(s, conceal, surround);
+  mps_stage(s, surround);
   s->stream_channels = l->num_channels;
   s->blocks_decoded++;
   s->decoded_since_reset = 1;
@@ -1824,11 +2209,49 @@ int aac_decoder_conceal_block(AacDecoderState* s) {
     const int nch = l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
     conceal_element(s, i, &s->ch[s->elem_base[i]], nch);
   }
-  sbr_stage(s, true);
+  const bool surround = mps_prepare(s);
+  sbr_stage(s, true, surround);
+  mps_stage(s, surround);
   s->last_concealed = 1;
   s->concealed_frames++;
   s->blocks_decoded++;
   s->decoded_since_reset = 1;
   s->stream_channels = l->num_channels;
   return l->num_channels;
+}
+
+void aac_decoder_set_mps_config(AacDecoderState* s, const AacMpsConfig* cfg) {
+  if (!cfg) {
+    if (s->mps) {
+      s->mps->asc_valid = 0;
+    }
+    return;
+  }
+  AacDecoderMps_* m = mps_block(s);
+  if (!m) {
+    return;
+  }
+  if (m->asc_valid && memcmp(cfg, &m->asc_cfg, sizeof(*cfg)) == 0) {
+    return;
+  }
+  m->asc_cfg = *cfg;
+  m->asc_valid = 1;
+  m->cfg = *cfg;
+  m->cfg_valid = 1;
+}
+
+int aac_decoder_mps_delay(const AacDecoderState* s) {
+  if (!s->mps_output || !s->mps || !s->mps->st) {
+    return 0;
+  }
+  /* The input alignment, the hybrid filterbank's six QMF slots and,
+   * without SBR, the 64-band analysis and synthesis pair around the
+   * surround decoder; a spatial frame longer than the core frame holds
+   * back the frames being gathered. */
+  const int slots = aac_mps_config(s->mps->st)->frame_length;
+  const int gathered = slots > s->mps->st_qmf_slots ? slots - s->mps->st_qmf_slots : 0;
+  if (s->sbr_mode) {
+    return (kInputAlignSlots + 6 + gathered) * 64;
+  }
+  return kInputAlignSamples + (6 + gathered) * 64 + kQmfPairDelay;
 }
