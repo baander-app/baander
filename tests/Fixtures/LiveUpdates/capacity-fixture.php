@@ -22,7 +22,11 @@ final class LiveCapacityFixture
     private array $manifest = [];
     private bool $projectorHeld = false;
 
-    public function __construct(private readonly Connection $connection, private readonly string $root) {}
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly string $root,
+        private readonly ?string $mediaRoot = null,
+    ) {}
 
     /**
      * @param array<string, mixed> $command
@@ -79,11 +83,15 @@ final class LiveCapacityFixture
      */
     private function create(string $run, string $directory): array
     {
+        $mediaDirectory = ($this->mediaRoot ?? $this->root) . '/' . $run;
         if (is_dir($directory)) {
             throw new RuntimeException('Run already exists; use its manifest to clean it first.');
         }
+        if ($mediaDirectory !== $directory && file_exists($mediaDirectory)) {
+            throw new RuntimeException('Owned media leaf already exists; choose a new run.');
+        }
         if (!mkdir($directory, 0700, true)) {
-            throw new RuntimeException('Cannot create owned media directory.');
+            throw new RuntimeException('Cannot create private fixture manifest directory.');
         }
         $password = bin2hex(random_bytes(18));
         $users = [];
@@ -91,17 +99,23 @@ final class LiveCapacityFixture
             $users[] = $this->identity() + ['email' => "live-$run-$i@baander.app", 'password' => $password, 'admin' => $i === 32];
         }
         $this->manifest = [
-            'run' => $run, 'directory' => $directory,
+            'run' => $run, 'directory' => $directory, 'mediaDirectory' => $mediaDirectory,
             'users' => array_slice($users, 0, 32), 'observer' => $users[32],
-            'library' => $this->identity() + ['slug' => 'live-' . $run, 'path' => $directory],
+            'library' => $this->identity() + ['slug' => 'live-' . $run, 'path' => $mediaDirectory],
             'playlist' => $this->identity(), 'album' => $this->identity(),
-            'song' => $this->identity() + ['path' => $directory . '/owned.wav'],
+            'song' => $this->identity() + ['path' => $mediaDirectory . '/owned.wav'],
             'job' => $this->identity(), 'albums' => [], 'songs' => [], 'notifications' => [],
             'collaborators' => [$this->identity(), $this->identity()], 'playlistSong' => $this->identity(),
         ];
         // Save ownership before any database write. Failed or interrupted runs remain recoverable.
         $this->save();
-        file_put_contents($this->manifest['song']['path'], self::wave());
+        if ($mediaDirectory !== $directory && (!mkdir($mediaDirectory, 0755, true) || !chmod($mediaDirectory, 0755))) {
+            throw new RuntimeException('Fixture media needs app-writable MEDIA_STORAGE_PATH shared with source workers.');
+        }
+        $wave = self::wave();
+        if (file_put_contents($this->manifest['song']['path'], $wave) !== strlen($wave) || !chmod($this->manifest['song']['path'], 0644)) {
+            throw new RuntimeException('Cannot write worker-readable owned WAV in MEDIA_STORAGE_PATH.');
+        }
         $configuration = Yaml::parseFile(dirname(__DIR__, 3) . '/config/packages/security.yaml');
         $hasher = new PasswordHasher(new PasswordHasherFactory($configuration['security']['password_hashers']));
         $hash = $hasher->hash($password);
@@ -365,7 +379,13 @@ final class LiveCapacityFixture
             return ['complete' => false, 'survivors' => $survivors, 'sample' => $sample, 'manifestRetained' => true];
         }
         if (is_file($this->manifest['song']['path'])) {
-            unlink($this->manifest['song']['path']);
+            if (!unlink($this->manifest['song']['path'])) {
+                throw new RuntimeException('Cannot remove owned WAV; ownership manifest retained.');
+            }
+        }
+        $mediaDirectory = $this->manifest['library']['path'];
+        if ($mediaDirectory !== $this->manifest['directory'] && is_dir($mediaDirectory) && !rmdir($mediaDirectory)) {
+            throw new RuntimeException('Owned media leaf is not removable; ownership manifest retained.');
         }
         unlink($this->manifest['directory'] . '/manifest.json');
         rmdir($this->manifest['directory']);
@@ -423,18 +443,25 @@ final class LiveCapacityFixture
     private function save(): void
     {
         $path = $this->manifest['directory'] . '/manifest.json';
-        file_put_contents($path . '.tmp', json_encode($this->manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
-        chmod($path . '.tmp', 0600);
-        rename($path . '.tmp', $path);
+        $json = json_encode($this->manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
+        if (file_put_contents($path . '.tmp', $json) !== strlen($json)
+            || !chmod($path . '.tmp', 0600)
+            || !rename($path . '.tmp', $path)) {
+            throw new RuntimeException('Cannot persist private fixture ownership manifest.');
+        }
     }
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     (new Dotenv())->bootEnv(dirname(__DIR__, 3) . '/.env');
+    $mediaStorage = $_SERVER['MEDIA_STORAGE_PATH'] ?? $_ENV['MEDIA_STORAGE_PATH'] ?? getenv('MEDIA_STORAGE_PATH');
+    if (!is_string($mediaStorage) || !str_starts_with($mediaStorage, '/')) {
+        throw new RuntimeException('Fixture requires an absolute configured MEDIA_STORAGE_PATH.');
+    }
     $url = $_SERVER['DATABASE_URL'] ?? $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL');
     $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql', 'postgres' => 'pdo_pgsql']))->parse((string) $url));
     $connection->executeStatement("SET TIME ZONE 'UTC'");
-    $fixture = new LiveCapacityFixture($connection, dirname(__DIR__, 3) . '/var/live-capacity');
+    $fixture = new LiveCapacityFixture($connection, dirname(__DIR__, 3) . '/var/live-capacity', rtrim($mediaStorage, '/') . '/.live-capacity');
     $emit = static function (array $value): void {
         fwrite(STDOUT, json_encode($value, JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
         fflush(STDOUT);

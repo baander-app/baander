@@ -20,6 +20,7 @@ final class CapacityFixtureTest extends TestCase
     private Connection $observer;
     private string $schema;
     private string $root;
+    private string $mediaRoot;
     private \LiveCapacityFixture $fixture;
 
     protected function setUp(): void
@@ -53,7 +54,8 @@ final class CapacityFixtureTest extends TestCase
             });
         }
         $this->root = sys_get_temp_dir() . '/' . $this->schema;
-        $this->fixture = new \LiveCapacityFixture($this->writer, $this->root);
+        $this->mediaRoot = $this->root . '-media';
+        $this->fixture = new \LiveCapacityFixture($this->writer, $this->root, $this->mediaRoot);
     }
 
     protected function tearDown(): void
@@ -66,14 +68,16 @@ final class CapacityFixtureTest extends TestCase
             $this->fixture->close();
         }
         $this->observer->close();
-        if (isset($this->root) && is_dir($this->root)) {
-            foreach (glob($this->root . '/*') as $directory) {
-                foreach (glob($directory . '/*') as $file) {
-                    unlink($file);
+        foreach (isset($this->root) ? [$this->root, $this->mediaRoot] : [] as $root) {
+            if (is_dir($root)) {
+                foreach (glob($root . '/*') as $directory) {
+                    foreach (glob($directory . '/*') as $file) {
+                        unlink($file);
+                    }
+                    rmdir($directory);
                 }
-                rmdir($directory);
+                rmdir($root);
             }
-            rmdir($this->root);
         }
     }
 
@@ -81,6 +85,14 @@ final class CapacityFixtureTest extends TestCase
     {
         $owned = $this->fixture->execute(['op' => 'create', 'run' => 'owned']);
         $other = $this->fixture->execute(['op' => 'create', 'run' => 'other']);
+        self::assertSame($this->root . '/owned', $owned['directory']);
+        self::assertSame($this->mediaRoot . '/owned', $owned['mediaDirectory']);
+        self::assertSame($owned['mediaDirectory'], $owned['library']['path']);
+        self::assertSame($owned['mediaDirectory'] . '/owned.wav', $owned['song']['path']);
+        self::assertSame(0700, fileperms($owned['directory']) & 0777);
+        self::assertSame(0600, fileperms($owned['directory'] . '/manifest.json') & 0777);
+        self::assertSame(0755, fileperms($owned['mediaDirectory']) & 0777);
+        self::assertSame(0644, fileperms($owned['song']['path']) & 0777);
         self::assertCount(32, $owned['users']);
         self::assertCount(32, array_unique(array_column($owned['users'], 'id')));
         self::assertSame([false], array_values(array_unique(array_column($owned['users'], 'admin'))));
@@ -125,6 +137,7 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM users WHERE id = ?', [$owned['users'][0]['id']]));
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM users WHERE id = ?', [$other['users'][0]['id']]));
         self::assertFileExists($other['song']['path']);
+        self::assertDirectoryExists($owned['mediaDirectory']);
         $this->drain($projector);
         // An interrupted producer may have left ownership recorded before writing media.
         unlink($owned['song']['path']);
@@ -132,10 +145,13 @@ final class CapacityFixtureTest extends TestCase
         self::assertTrue($complete['complete']);
         self::assertSame(0, $complete['survivors']);
         self::assertDirectoryDoesNotExist($this->root . '/owned');
+        self::assertDirectoryDoesNotExist($owned['mediaDirectory']);
+        self::assertFileExists($other['song']['path']);
         self::assertNotEmpty($this->observer->fetchAllAssociative('SELECT * FROM query_scope_revision'), 'Cleanup retains revision tombstones.');
         $this->fixture->execute(['op' => 'cleanup', 'run' => 'other', 'waitMs' => 0]);
         $this->drain($projector);
         self::assertTrue($this->fixture->execute(['op' => 'cleanup', 'run' => 'other', 'waitMs' => 0])['complete']);
+        self::assertDirectoryExists($this->mediaRoot);
     }
 
     private function drain(DoctrineLiveChangeProjector $projector): void

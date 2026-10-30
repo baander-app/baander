@@ -263,6 +263,15 @@ timestamp added after the suite snapshot; its receipt is
 checks pass. Full browser, capacity, pool-release and recovery acceptance remain
 open; these fixture results do not establish those outcomes.
 
+The fixture's media source now uses the existing configured media volume, shared
+between web and immutable workers. Private manifests remain under
+`var/live-capacity`; only the recorded run's media leaf is removed during cleanup.
+The focused CI check passes one test with 50 assertions, including separate paths,
+permissions, missing-source cleanup and preservation of another run. The receipt
+is `/tmp/live-u9-fixture-media-integration.log`, with artifact
+`var/test-runs/20261030-213905-e7e9ecff`. Scoped PHPStan, formatting and syntax checks
+pass. Actual worker processing and browser playback remain acceptance work.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
