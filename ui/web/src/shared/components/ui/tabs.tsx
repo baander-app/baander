@@ -95,6 +95,7 @@ const StyledTabsTrigger = styled(TabsPrimitive.Trigger).attrs<DataAttributes>({ 
   gap: 0.375rem;
   border-radius: ${({ theme }) => theme.radii.md};
   border: 1px solid transparent;
+  background: transparent;
   padding: 0.125rem 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;

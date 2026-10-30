@@ -2,6 +2,23 @@ import { test, expect, spaNavigate } from '../fixtures'
 import { setTheme } from '../helpers/theme-utils'
 import { expectContained, expectNoPageOverflow, expectReadable } from './helpers'
 
+for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
+  test(`admin library tabs remain readable before and after selection in ${mood}`, async ({ asAdmin: page }) => {
+    await spaNavigate(page)('/admin/library')
+    await setTheme(page, mood, 'violet')
+    const tabs = page.getByRole('tablist')
+    await expect(tabs.getByRole('tab')).toHaveCount(5)
+    for (const tab of await tabs.getByRole('tab').all()) await expectReadable(tab)
+    const libraries = tabs.getByRole('tab', { name: 'Libraries', exact: true })
+    await libraries.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(tabs.getByRole('tab', { name: 'Metadata', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(libraries).toHaveAttribute('aria-selected', 'false')
+    for (const tab of await tabs.getByRole('tab').all()) await expectReadable(tab)
+    await page.screenshot({ path: test.info().outputPath(`library-tabs-${mood}.png`) })
+  })
+}
+
 test('contrast checks account for text and ancestor opacity', async ({ page }) => {
   await page.setContent('<div id="surface" style="background:white"><span id="text" style="color:black">Readable text</span></div>')
   const text = page.locator('#text')

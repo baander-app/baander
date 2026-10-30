@@ -122,6 +122,19 @@ reviewers returned no findings. The plan names the 32-combination appearance
 matrix, responsive and interaction coverage, current browser entry points and
 repository verification gates. No application tests were run during planning.
 
+Inactive-tab follow-up, 2026-10-30: Admin → Library tabs reproduced 1.6126:1
+contrast in the dark theme because the shared tab trigger inherited the browser's
+`ButtonFace` background. An explicit transparent baseline restores the intended
+surface. Chromium passes five focused cases: all five tabs in each of four moods,
+before and after keyboard selection, plus the existing selected-context-tab
+regression. Firefox and WebKit each pass the dark-theme case. Scoped CI-image
+ESLint and both TypeScript configurations pass; four Chromium screenshots and
+the focused diff were reviewed without remaining issues. Receipts are retained
+in `/tmp/admin-tabs-after.log`, `/tmp/admin-tabs-firefox.log`,
+`/tmp/admin-tabs-webkit.log`, `/tmp/admin-tabs-ci.log` and
+`/tmp/admin-tabs-review.png`. This focused follow-up does not rerun the earlier
+integrated suite.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)
