@@ -170,6 +170,10 @@ void lpd_weight_a(const float* a, float gamma, float* ap);
  * filter at the centre of subframe k, a[n] the filter of lsp1. */
 void lpd_interp_lsp(const float* lsp0, const float* lsp1, int n, float a[][LPD_M + 1]);
 float lpd_stab_fac(const float* lsf, const float* lsf_old);
+/* Keeps a synthesis filter 1 / A(z) stable: a filter with poles on or
+ * outside the unit circle has its bandwidth widened until they are
+ * inside. A stable filter stays as it is. */
+void lpd_stabilise_a(float* a);
 /* Synthesis 1 / A(z) in place over x[0 .. n), reading x[-16 .. 0) as the
  * memory. */
 void lpd_syn_filter(const float* a, float* x, int n);

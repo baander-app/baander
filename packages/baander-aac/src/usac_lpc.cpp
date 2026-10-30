@@ -87,8 +87,10 @@ void lpd_interp_lsp(const float* lsp0, const float* lsp1, int n, float a[][LPD_M
       lsp[i] = w0 * lsp0[i] + w1 * lsp1[i];
     }
     lsp_to_a(lsp, a[k]);
+    lpd_stabilise_a(a[k]);
   }
   lpd_lsp_to_a(lsp1, a[n]);
+  lpd_stabilise_a(a[n]);
 }
 
 float lpd_stab_fac(const float* lsf, const float* lsf_old) {
@@ -101,6 +103,56 @@ float lpd_stab_fac(const float* lsf, const float* lsf_old) {
 }
 
 /* ── filters ────────────────────────────────────────────────────── */
+
+namespace {
+
+/* Whether 1 / A(z) is stable: the step-down recursion finds every
+ * reflection coefficient inside the unit interval. */
+bool syn_filter_stable(const float* a) {
+  double c[LPD_M + 1], t[LPD_M + 1];
+  for (int i = 1; i <= LPD_M; i++) {
+    c[i] = a[i];
+  }
+  for (int m = LPD_M; m >= 1; m--) {
+    const double k = c[m];
+    if (!(fabs(k) < 1.0)) {
+      return false;
+    }
+    const double d = 1.0 - k * k;
+    for (int i = 1; i < m; i++) {
+      t[i] = (c[i] - k * c[m - i]) / d;
+    }
+    for (int i = 1; i < m; i++) {
+      c[i] = t[i];
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+/* Ordered LSFs give a stable filter in exact arithmetic, but a corrupt
+ * set packed at the minimum spacing places its poles so close together
+ * that rounding the coefficients to float moves some outside the unit
+ * circle, and the synthesis then grows past the float range within a
+ * frame. Each pass moves every pole 1 % toward the origin; a filter
+ * still unstable after 64 passes becomes flat. A conforming
+ * stream's filters are stable and pass unchanged. */
+void lpd_stabilise_a(float* a) {
+  for (int pass = 0; pass < 64; pass++) {
+    if (syn_filter_stable(a)) {
+      return;
+    }
+    double g = 1.0;
+    for (int i = 1; i <= LPD_M; i++) {
+      g *= 0.99;
+      a[i] = (float)(g * a[i]);
+    }
+  }
+  if (!syn_filter_stable(a)) {
+    memset(a + 1, 0, LPD_M * sizeof(float));
+  }
+}
 
 void lpd_syn_filter(const float* a, float* x, int n) {
   for (int i = 0; i < n; i++) {

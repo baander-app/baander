@@ -15,48 +15,6 @@
 #include "mdct.h"
 #include "test_util.h"
 #include "usac_fd.h"
-#include "usac_lpd.h"
-
-/* ── test doubles of the LPD module ─────────────────────────────── */
-
-static int g_lpd_calls = 0;
-
-extern "C" int aac_usac_lpd_decode(AacUsacCoreChannel* ch, int frame_length, int indep,
-                                   AacBitReader* r, float* out) {
-  (void)indep;
-  (void)r;
-  g_lpd_calls++;
-  memset(out, 0, (size_t)frame_length * sizeof(float));
-  memset(ch->overlap, 0, (size_t)frame_length * sizeof(float));
-  ch->prev_core_mode = 1;
-  return AAC_OK;
-}
-
-extern "C" void aac_usac_lpd_fac_to_fd(AacUsacCoreChannel* ch, const int* fac_q, int fac_length,
-                                       int frame_length) {
-  (void)ch;
-  (void)fac_q;
-  (void)fac_length;
-  (void)frame_length;
-}
-
-extern "C" int aac_usac_lpd_fd_fac(AacUsacCoreChannel* ch, AacBitReader* r, int fac_length,
-                                   int frame_length) {
-  (void)ch;
-  (void)fac_length;
-  (void)frame_length;
-  aac_bitreader_read(r, 7); /* fac_gain; the AVQ data is not modelled */
-  return AAC_OK;
-}
-
-extern "C" void aac_usac_lpd_fd_postfilter(AacUsacCoreChannel* ch, float* out, int frame_length,
-                                           int short_windows) {
-  (void)ch;
-  (void)out;
-  (void)frame_length;
-  (void)short_windows;
-}
-
 
 /* ── an arithmetic encoder matching the decoder ─────────────────── */
 
@@ -1024,8 +982,8 @@ static int decode_file(const char* path, const char* ref_path, const char* out_p
     return 1;
   }
   StreamResult res = decode_loas(stream, true);
-  printf("%d LOAS frames, %d FD frames decoded%s, %d errors, lpd calls %d\n", res.frames,
-         res.fd_frames, res.lpd_stop ? " (stopped at an LPD frame)" : "", res.errors, g_lpd_calls);
+  printf("%d LOAS frames, %d FD frames decoded%s, %d errors\n", res.frames, res.fd_frames,
+         res.lpd_stop ? " (stopped at an LPD frame)" : "", res.errors);
   const int channels = res.cfg.channels ? res.cfg.channels : 1;
   printf("%zu samples per channel\n", res.pcm.size() / (size_t)channels);
   if (out_path) {
@@ -1068,6 +1026,5 @@ int main(int argc, char** argv) {
   test_frame_768();
   test_stream("usac_fd_cpe_96k.loas", "usac_fd_cpe_96k_fdk.wav", 2, 40.0);
   test_stream("usac_fd_sce_64k.loas", "usac_fd_sce_64k_fdk.wav", 1, 40.0);
-  CHECK(g_lpd_calls == 0, "the LPD double was called %d times", g_lpd_calls);
   return test_summary("test_usac_fd");
 }

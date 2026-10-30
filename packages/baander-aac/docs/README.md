@@ -1405,8 +1405,14 @@ uninitialised envelope grid in concealed USAC SBR frames, an encoder
 stack overflow at eight channels, a frame above
 `aac_encoder_max_frame_bytes` when a coarse quality spent a full
 reservoir, an MPS 2-1-2 phase table read past its end, an unbounded
-USAC sampling rate, left shifts of negative values, and an ASC writer
+USAC sampling rate, left shifts of negative values, an ASC writer
 accepting the scalable object types; each is fixed and its input kept.
+Once the harnesses' finite-output check survived the Release flags, it
+found two ways a damaged USAC frame turned the output into NaN or
+infinity: subband samples near 1e10 whose products overflowed a float
+in the SBR linear prediction, now summed in double, and speech
+synthesis filters that rounding to float made unstable for corrupt,
+tightly packed LPC sets, now pulled back inside the unit circle.
 
 The CMake option `BAAC_FUZZ` builds the tree with ASan and UBSan.
 Under libFuzzer when the compiler links `-fsanitize=fuzzer` (clang with

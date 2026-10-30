@@ -107,6 +107,7 @@ void lpd_fac_synth(const float* x, int length, const float* a, float* out, int o
     y[i] *= scale;
   }
   lpd_weight_a(a, LPD_GAMMA, ap);
+  lpd_stabilise_a(ap);
   lpd_syn_filter(ap, y, out_len);
   memcpy(out, y, (size_t)out_len * sizeof(float));
 }
