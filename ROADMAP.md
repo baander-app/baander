@@ -381,6 +381,15 @@ This measures the native PHP/Swoole preview with development/debug/Vite overhead
 it does not establish production-mode performance or long-duration soak behavior.
 Recovery, populated-view and scanner browser qualification remain open.
 
+U9 playback-fixture checkpoint: the owned WAV now has the available file-index
+observation and matching content hash required by the real playback contract.
+The integration test reads availability through the production repository and
+port, and confirms that an unobserved path stays unavailable. The new scanner
+source remains absent until the real scan. All three fixture tests pass with
+119 assertions; scoped PHPStan, formatting and syntax checks pass. The CI wrapper
+exits zero (`/tmp/live-u9-availability-integration.log`). Playback browser
+qualification continues with this corrected fixture.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

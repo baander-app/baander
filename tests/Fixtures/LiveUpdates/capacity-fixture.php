@@ -112,6 +112,7 @@ final class LiveCapacityFixture
             'library' => $this->identity() + ['slug' => 'live-' . $run, 'path' => $mediaDirectory],
             'playlist' => $this->identity(), 'album' => $this->identity(),
             'song' => $this->identity() + ['path' => $mediaDirectory . '/owned.wav'],
+            'fileIndex' => ['id' => (string) new Uuid()],
             'job' => $this->identity(), 'albums' => [], 'songs' => [], 'notifications' => [],
             'collaborators' => [$this->identity(), $this->identity()], 'playlistSong' => $this->identity(),
         ];
@@ -124,6 +125,13 @@ final class LiveCapacityFixture
         if (file_put_contents($this->manifest['song']['path'], $wave) !== strlen($wave) || !chmod($this->manifest['song']['path'], 0644)) {
             throw new RuntimeException('Cannot write worker-readable owned WAV in MEDIA_STORAGE_PATH.');
         }
+        $hash = hash_file('xxh3', $this->manifest['song']['path']);
+        if (!is_string($hash)) {
+            throw new RuntimeException('Cannot hash the owned source observation.');
+        }
+        $this->manifest['song']['hash'] = $hash;
+        $this->manifest['fileIndex'] += ['path' => $this->manifest['song']['path'], 'hash' => $hash, 'size' => filesize($this->manifest['song']['path']), 'modifiedAt' => filemtime($this->manifest['song']['path'])];
+        $this->save();
         $configuration = Yaml::parseFile(dirname(__DIR__, 3) . '/config/packages/security.yaml');
         $hasher = new PasswordHasher(new PasswordHasherFactory($configuration['security']['password_hashers']));
         $hash = $hasher->hash($password);
@@ -145,6 +153,8 @@ final class LiveCapacityFixture
             }
             $this->insertAlbum($this->manifest['album'], 0);
             $this->insertSong($this->manifest['song'], 0);
+            $source = $this->manifest['fileIndex'];
+            $this->connection->insert('library_file_index', ['id' => $source['id'], 'library_id' => $this->manifest['library']['id'], 'path' => $source['path'], 'hash' => $source['hash'], 'size' => $source['size'], 'extension' => 'wav', 'modified_at' => $source['modifiedAt'], 'discovered_at' => $this->now(), 'available' => 'true']);
             $this->insert('playlists', $this->manifest['playlist'], ['user_id' => $users[0]['id'], 'name' => 'Live playlist ' . $this->manifest['run'], 'is_collaborative' => true]);
             foreach ([1, 2] as $index) {
                 $this->connection->insert('playlist_collaborators', ['id' => $this->manifest['collaborators'][$index - 1]['id'], 'playlist_id' => $this->manifest['playlist']['id'], 'user_id' => $users[$index]['id'], 'role' => 'editor', 'created_at' => $this->now(), 'updated_at' => $this->now()]);
@@ -455,7 +465,7 @@ final class LiveCapacityFixture
     /** @param array{id: string, publicId: string} $identity */
     private function insertSong(array $identity, int $index): void
     {
-        $this->insert('songs', $identity, ['album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index), 'path' => $this->manifest['song']['path'], 'size' => filesize($this->manifest['song']['path']), 'mime_type' => 'audio/wav', 'length' => 60, 'sample_rate' => 8000, 'channels' => 1, 'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'track' => $index + 1, 'disc' => 1]);
+        $this->insert('songs', $identity, ['album_id' => $this->manifest['album']['id'], 'title' => sprintf('Live song %05d', $index), 'path' => $this->manifest['song']['path'], 'hash' => $this->manifest['song']['hash'], 'size' => filesize($this->manifest['song']['path']), 'mime_type' => 'audio/wav', 'length' => 60, 'sample_rate' => 8000, 'channels' => 1, 'bitrate' => 128_000, 'codec' => 'pcm_s16le', 'track' => $index + 1, 'disc' => 1]);
     }
 
     /** @return list<string> */
