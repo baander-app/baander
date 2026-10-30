@@ -418,6 +418,57 @@ move within the scalefactor limits. It raises the segmental SNR by about
 0.6 to 1.0 dB between 32 and 96 kbit/s for roughly twice the encoding
 time; with it off the output is unchanged byte for byte.
 
+### Loudness
+
+The loudness meter (`include/loudness.h`, `src/loudness.cpp`) measures
+a programme in one pass per ITU-R BS.1770-4: the K-weighting as two
+biquads whose coefficients are derived for the sample rate from the
+analogue prototypes behind the standard's 48 kHz table (and match it
+there), the mean square over 400 ms blocks with 75 % overlap, the
+absolute gate at -70 LKFS and the relative gate 10 LU below the mean of
+the blocks above it. It takes 1 to 6 channels in the canonical order L,
+R, C, LFE, Ls, Rs (the LFE does not count, the surrounds count at
++1.5 dB). Alongside the integrated loudness it reports the loudness
+range of EBU Tech 3342 (3 s windows every 100 ms, the absolute gate at
+-70 LUFS, the relative gate 20 LU below the mean, the spread between the
+10th and the 95th percentile), the maximum momentary and short-term
+loudness of EBU Tech 3341 (ungated), the sample peak and the true peak
+of BS.1770-4 Annex 2 (4 times oversampled below 96 kHz, twice from
+96 kHz, through a 25-tap Kaiser-windowed sinc per phase). A result
+needs 400 ms of input; the range and the short-term maximum need 3 s,
+and `has_range` and `has_short_term` say when they exist. No level is
+reported below `AAC_LOUDNESS_SILENCE` (-150 dB), which digital silence
+reads. On 48 kHz stereo the meter runs at about 300 times real time.
+
+`aac_loudness_info_write` writes the loudnessInfoSet() of ISO/IEC
+23003-4 that a USAC configuration carries in the
+ID_CONFIG_EXT_LOUDNESS_INFO extension: one loudnessInfo() for the
+programme as coded (drcSetId 0, downmixId 0) with the sample peak, the
+true peak, the program loudness, the anchor loudness when the caller
+supplies one, the loudness range and the momentary and short-term
+maxima, all marked BS.1770-4 and "accurate"; `aac_loudness_info_bits`
+counts the bits, and the configuration extension pads them to bytes.
+The decoder's `aac_unidrc_parse_loudness` reads the set back. Checked
+against FFmpeg's `ebur128` filter on the EBU test signals that can be
+synthesised (sine levels in mono, stereo and 5.1, the three gating
+cases, the four loudness range pairs, bursts, the true-peak cases) and
+on the FDK decoder's output of the committed USAC streams: the
+integrated loudness agrees within 0.05 LU, the range to the figure, the
+true peak within 0.04 dB; at a quarter-rate sine FFmpeg's resampler
+overshoots the true peak by 0.6 dB where this meter reads 0.1 dB under
+it, and on material with a single 3 s window FFmpeg reports a range of
+20 LU where this meter reports 0. Written into the configuration of
+two FDK streams (every StreamMuxConfig and the UsacConfig copy inside
+each audio pre-roll, which the decoders compare), the set leaves the
+FDK decoder's and libxaac's output unchanged, FFmpeg master reads the
+program loudness from it and normalises by it with `-target_level`
+(from the MP4 form; its LATM decoder does not take USAC), and this
+decoder normalises by it. The suite `test_loudness` holds the
+synthetic cases against the standards' figures, the derived K-weighting
+against the 48 kHz table, the feed chunking, the writer's bit layout
+against hand-computed fields and the FDK encoder's own set, and the
+round trip through the decoder's parser.
+
 ## API
 
 All functions are declared in `include/aac.h` with C linkage.
@@ -753,7 +804,7 @@ the asar archive, which `process.dlopen` cannot read.
 
 ## Testing
 
-`ctest` runs thirty-seven suites, and the transform, filterbank and
+`ctest` runs thirty-eight suites, and the transform, filterbank and
 roundtrip suites again at every DSP dispatch level this machine can run:
 table consistency (prefix-free, complete
 Huffman codebooks; scalefactor bands for 1024 and 960 frames;

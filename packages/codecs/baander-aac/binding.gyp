@@ -67,6 +67,7 @@
         "src/usac_arith_tables.cpp",
         "src/usac_arith.cpp",
         "src/usac_stereo.cpp",
+        "src/loudness.cpp",
         "src/usac_fd.cpp"
       ],
       "include_dirs": [
