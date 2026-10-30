@@ -13,7 +13,7 @@ interface UseArtistDetailReturn {
   artist: Record<string, unknown> | undefined
   albums: AlbumSummary[]
   albumCount: number
-  isLoading: boolean
+  isPending: boolean
   error: unknown
   loadMore: () => void
   hasNextPage: boolean
@@ -27,7 +27,7 @@ export function useArtistDetail(
 
   const {
     data: artistData,
-    isLoading: artistLoading,
+    isPending: artistPending,
     error: artistError,
   } = useGetArtistShow(publicId ?? '', {
     query: { enabled: !!publicId },
@@ -39,7 +39,7 @@ export function useArtistDetail(
 
   const {
     data: albumsData,
-    isLoading: albumsLoading,
+    isPending: albumsPending,
     error: albumsError,
   } = useGetAlbumIndex(
     {
@@ -63,7 +63,7 @@ export function useArtistDetail(
     artist,
     albums,
     albumCount,
-    isLoading: artistLoading || albumsLoading,
+    isPending: artistPending || albumsPending,
     error: artistError ?? albumsError,
     loadMore,
     hasNextPage,

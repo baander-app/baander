@@ -47,7 +47,7 @@ const ErrorText = styled.p`
 
 export function AlbumDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
-  const { data, isLoading, isError, refetch } = useGetAlbumShow(publicId ?? '')
+  const { data, isPending, isError, refetch } = useGetAlbumShow(publicId ?? '')
   const { data: duplicateGroups } = useAlbumDuplicates(publicId)
   const navigate = useNavigate()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -59,7 +59,7 @@ export function AlbumDetailPage() {
   const blurhash: string | null | undefined = album?.coverImage?.blurhash ?? null
   useBlurhashAccent(blurhash, containerRef)
 
-  if (isLoading || !publicId) {
+  if (isPending || !publicId) {
     return (
       <PageContainer>
         <LoadingHeader>

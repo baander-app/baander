@@ -129,17 +129,6 @@ export class LiveQueryCoordinator {
       }
       this.schedule()
     }))
-    this.stops.push(this.client.getMutationCache().subscribe(event => {
-      if (event.type === 'updated' && event.action.type === 'pending') {
-        // Cancel before optimistic callbacks can update the cache. The signal fence also
-        // rejects fetchers which finish after cancellation without consuming their signal.
-        this.client.cancelQueries({
-          predicate: query => this.matches(query.queryKey),
-        }).catch(() => undefined)
-        for (const state of this.adapters.values()) state.request?.abort()
-      }
-      this.schedule()
-    }))
     if (typeof document !== 'undefined') {
       const visibility = () => this.setVisible(document.visibilityState !== 'hidden')
       const connectivity = () => {
@@ -191,7 +180,7 @@ export class LiveQueryCoordinator {
     foreground = foreground && (!this.activeReads.has(id) || this.foregroundReads.has(id))
     const held = this.match(key).some(descriptor => (this.holds.get(descriptor.family) ?? 0) > 0)
     const blocked = !this.running || !this.recovery.getSnapshot().authorityReady || !this.online
-      || (!foreground && (!this.visible || this.client.isMutating() > 0 || held))
+      || (!foreground && (!this.visible || held))
     const atCapacity = foreground
       ? this.activeReads.size >= MAX_PENDING_READS
       : this.backgroundAtCapacity()
@@ -382,8 +371,7 @@ export class LiveQueryCoordinator {
           nextWake = Math.min(nextWake, state.retryAt - now)
           continue
         }
-        if (state.request || this.backgroundAtCapacity()
-          || this.client.isMutating() > 0 || this.holds.get(adapter.family)) continue
+        if (state.request || this.backgroundAtCapacity() || this.holds.get(adapter.family)) continue
         const passAge = now - (this.lastPass.get(adapter.family) ?? -Infinity)
         if (!started.has(adapter.family) && passAge < 500) {
           nextWake = Math.min(nextWake, 500 - passAge)
@@ -436,7 +424,7 @@ export class LiveQueryCoordinator {
         nextWake = Math.min(nextWake, state.retryAt - now)
         continue
       }
-      if (query.state.fetchStatus !== 'idle' || this.client.isMutating() > 0 || this.holds.get(family)) continue
+      if (query.state.fetchStatus !== 'idle' || this.holds.get(family)) continue
       const id = `query:${query.queryHash}`
       if (!this.activeReads.has(id) && this.backgroundAtCapacity()) continue
       const passAge = now - (this.lastPass.get(family) ?? -Infinity)

@@ -229,14 +229,14 @@ function Skeleton() {
 export function LibraryDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { data: library, isLoading, error } = useLibrary(id ?? '')
+  const { data: library, isPending, error } = useLibrary(id ?? '')
   const { data: stats, isLoading: statsLoading } = useLibraryStats(id ?? '')
   const scanMutation = useScanLibrary()
   const deleteMutation = useDeleteLibrary()
   const [deleteTarget, setDeleteTarget] = useState<NonNullable<typeof library> | null>(null)
   const [scanDialogOpen, setScanDialogOpen] = useState(false)
 
-  if (isLoading) return <Skeleton />
+  if (isPending) return <Skeleton />
 
   if (error || !library) {
     return (

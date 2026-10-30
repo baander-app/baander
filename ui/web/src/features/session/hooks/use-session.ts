@@ -11,7 +11,7 @@ import { SessionSyncBus } from '../services/SessionSyncBus'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useLiveCoordinator } from '@/shared/live/context'
 import { authenticatedTransport } from '@/shared/live/transport'
-import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
+import { assertCurrentOwnership, captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { getSessionQueueSongs, useSessionClaim } from './use-session-claim'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -45,6 +45,23 @@ export function useSession() {
   const [dismissedTransfer, setDismissedTransfer] = useState<{ sessionId: string; deviceId: string } | null>(null)
   // Clearing credentials closes the socket; a later login obtains a fresh connection ticket.
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
+  const writeSession = useCallback(async (
+    path: '/api/session/claim' | '/api/session/new',
+    payload: Record<string, unknown>,
+  ): Promise<SessionData> => {
+    const ownership = captureOwnership()
+    const release = coordinator?.beginMutation(['sessions'])
+    try {
+      const response = await AXIOS_INSTANCE.post(path, payload)
+      assertCurrentOwnership(ownership)
+      const session: SessionData = response.data?.data ?? response.data
+      queryClient.setQueryData(SESSION_KEY, session)
+      return session
+    } finally {
+      release?.()
+    }
+  }, [coordinator, queryClient])
 
   const query = useQuery({
     queryKey: SESSION_KEY,
@@ -107,13 +124,10 @@ export function useSession() {
       const { queue, currentIndex } = usePlayerStore.getState()
       const currentTime = getCurrentTime()
       const trackIds = queue.map(t => t.publicId)
-      AXIOS_INSTANCE.post('/api/session/new', {
+      writeSession('/api/session/new', {
         queue: trackIds,
         currentTrackIndex: currentIndex,
         position: currentTime,
-      }).then(res => {
-        if (!isCurrentOwnership(ownership)) return
-        queryClient.setQueryData(SESSION_KEY, res.data?.data ?? res.data)
       }).catch((err) => {
         if (!isCurrentOwnership(ownership)) return
         logger.warn('Session creation failed:', err)
@@ -121,7 +135,7 @@ export function useSession() {
       })
     })
     return unsub
-  }, [query.data, sessionCreated, queryClient, isAuthenticated])
+  }, [query.data, sessionCreated, writeSession, isAuthenticated])
 
   // On session load, either show transfer prompt or hydrate queue
   useEffect(() => {
@@ -284,16 +298,14 @@ export function useSession() {
       const { queue, currentIndex } = usePlayerStore.getState()
       const currentTime = getCurrentTime()
       const trackIds = queue.map(t => t.publicId)
-      const res = await AXIOS_INSTANCE.post('/api/session/claim', {
+      return writeSession('/api/session/claim', {
         deviceId,
         queue: trackIds,
         currentTrackIndex: currentIndex,
         position: currentTime,
       })
-      return res.data?.data ?? res.data
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(SESSION_KEY, data)
+    onSuccess: () => {
       setDismissedTransfer(null)
     },
   })
@@ -303,15 +315,13 @@ export function useSession() {
       const { queue, currentIndex } = usePlayerStore.getState()
       const currentTime = getCurrentTime()
       const trackIds = queue.map((t) => t.publicId)
-      const res = await AXIOS_INSTANCE.post('/api/session/new', {
+      return writeSession('/api/session/new', {
         queue: trackIds,
         currentTrackIndex: currentIndex,
         position: currentTime,
       })
-      return res.data?.data ?? res.data
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(SESSION_KEY, data)
+    onSuccess: () => {
       setDismissedTransfer(null)
     },
   })

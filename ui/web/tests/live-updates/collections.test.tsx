@@ -78,6 +78,22 @@ function setup(coordinated = true) {
 }
 
 describe('personal collection freshness', () => {
+  it('waits for an initial held playlist read without claiming the playlist is missing', async () => {
+    http.onGet('/api/playlists/mix').reply(200, { data: { publicId: 'mix', name: 'Available mix', songs: [] } })
+    const { client, coordinator, wrapper: Wrapper } = setup()
+    const release = coordinator.beginMutation(['catalog'])
+    render(<Wrapper><TestThemeProvider><MemoryRouter initialEntries={['/music/playlists/mix']}>
+      <Routes><Route path="/music/playlists/:publicId" element={<PlaylistDetailPage />} /></Routes>
+    </MemoryRouter></TestThemeProvider></Wrapper>)
+    try {
+      await waitFor(() => expect(client.getQueryState(['/api/playlists/mix'])).toMatchObject({ status: 'pending', fetchStatus: 'idle' }))
+      expect(screen.queryByText('Playlist not found')).toBeNull()
+      expect(http.history.get).toHaveLength(0)
+    } finally { release() }
+    await screen.findByRole('heading', { name: 'Available mix', exact: true })
+    expect(http.history.get.filter(request => request.url === '/api/playlists/mix')).toHaveLength(1)
+  })
+
   it.each([true, false])('converges every playlist key after local create, rename, collaboration removal and delete without socket delivery (coordinator %s)', async coordinated => {
     let name = 'Before'
     let exists = true

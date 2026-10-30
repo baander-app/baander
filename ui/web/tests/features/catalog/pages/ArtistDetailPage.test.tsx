@@ -9,6 +9,7 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
   useGetArtistShow: () => ({
     data: { publicId: 'artist_1', name: 'Test Artist' },
     isLoading: false,
+    isPending: false,
   }),
   useGetAlbumIndex: () => ({
     data: {
@@ -18,6 +19,7 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
       ],
     },
     isLoading: false,
+    isPending: false,
   }),
 }))
 

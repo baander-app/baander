@@ -30,6 +30,7 @@ const makeAlbumsData = (count: number, currentPage = 1, lastPage = 1) => ({
 let artistResult: Record<string, unknown> = {
   data: mockArtistData,
   isLoading: false,
+  isPending: false,
   isError: false,
   error: null,
 }
@@ -37,6 +38,7 @@ let artistResult: Record<string, unknown> = {
 let albumsResult: Record<string, unknown> = {
   data: makeAlbumsData(5),
   isLoading: false,
+  isPending: false,
   isError: false,
   error: null,
 }
@@ -61,12 +63,14 @@ describe('useArtistDetail', () => {
     artistResult = {
       data: mockArtistData,
       isLoading: false,
+      isPending: false,
       isError: false,
       error: null,
     }
     albumsResult = {
       data: makeAlbumsData(5),
       isLoading: false,
+      isPending: false,
       isError: false,
       error: null,
     }
@@ -82,12 +86,12 @@ describe('useArtistDetail', () => {
   })
 
   it('returns loading state', () => {
-    artistResult = { ...artistResult, isLoading: true, data: undefined }
-    albumsResult = { ...albumsResult, isLoading: true, data: undefined }
+    artistResult = { ...artistResult, isLoading: false, isPending: true, data: undefined }
+    albumsResult = { ...albumsResult, isLoading: false, isPending: true, data: undefined }
     const { result } = renderHook(() => useArtistDetail('artist-1'), {
       wrapper: createWrapper(),
     })
-    expect(result.current.isLoading).toBe(true)
+    expect(result.current.isPending).toBe(true)
   })
 
   it('returns error state', () => {

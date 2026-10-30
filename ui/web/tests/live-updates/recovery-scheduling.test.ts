@@ -3,7 +3,7 @@ import { QueryObserver } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OwnedQueryClient } from '@/shared/live/query-client'
 import { LiveQueryCoordinator } from '@/shared/live/query-coordinator'
-import { LiveRecovery, type LiveAuthority } from '@/shared/live/recovery'
+import { LiveRecovery, type LiveAuthority, type LiveSnapshot } from '@/shared/live/recovery'
 import { setAuthorityPending, synchronizeOwnership } from '@/shared/live/ownership'
 import type { LiveTransportListener, SharedLiveTransport } from '@/shared/live/transport'
 
@@ -87,6 +87,75 @@ function recoveredClient(load: (signal: AbortSignal) => Promise<LiveAuthority> =
 }
 
 describe('recovery scheduling lifecycle', () => {
+  it('keeps unrelated query and adapter reads live while a mutation holds its own family', async () => {
+    const client = new OwnedQueryClient()
+    const snapshot: LiveSnapshot = {
+      ...authority(), families: ['catalog', 'notifications'], status: 'current', authorityReady: true,
+    }
+    const coordinator = new LiveQueryCoordinator(client, {
+      getSnapshot: () => snapshot, subscribe: () => () => {}, subscribeEvents: () => () => {},
+      completeRecovery: () => {}, resourceReadFailed: vi.fn(),
+    }, [
+      { family: 'catalog', matches: key => key[0] === 'catalog' },
+      { family: 'notifications', matches: key => key[0] === 'notifications' },
+    ])
+    client.setCoordinator(coordinator)
+    disposals.push(() => client.dispose(), coordinator.start())
+    client.setQueryData(['catalog'], 'Retained catalog')
+    client.setQueryData(['notifications'], 'Previous notifications')
+    const catalogRead = vi.fn(async () => 'Updated catalog')
+    disposals.push(new QueryObserver(client, { queryKey: ['catalog'], queryFn: catalogRead, staleTime: Infinity }).subscribe(() => {}))
+    const queryPending = deferred<string>()
+    const adapterPending = deferred<void>()
+    const mutationPending = deferred<void>()
+    const notificationRead = vi.fn(({ signal }: { signal: AbortSignal }) => {
+      expect(signal.aborted).toBe(false)
+      return queryPending.promise
+    })
+    const notificationObserver = new QueryObserver(client, {
+      queryKey: ['notifications'], queryFn: notificationRead, staleTime: Infinity,
+    })
+    disposals.push(notificationObserver.subscribe(() => {}))
+    const adapterRead = vi.fn((signal: AbortSignal) => {
+      expect(signal.aborted).toBe(false)
+      return adapterPending.promise
+    })
+    disposals.push(coordinator.registerAdapter({ id: 'notification-mirror', family: 'notifications', isActive: () => true, read: adapterRead }))
+    const release = coordinator.beginMutation(['catalog'])
+    coordinator.hint(['notifications'])
+    await vi.advanceTimersByTimeAsync(100)
+    const mutation = client.getMutationCache().build(client, { mutationFn: () => mutationPending.promise }).execute(undefined)
+    try {
+      await flush()
+      expect(notificationRead.mock.calls[0][0].signal.aborted).toBe(false)
+      expect(adapterRead.mock.calls[0][0].aborted).toBe(false)
+      notificationRead.mockResolvedValue('Fresh notifications')
+      queryPending.resolve('Completed notifications')
+      adapterPending.resolve()
+      await flush()
+      const firstView = new QueryObserver(client, { queryKey: ['notifications', 'new-view'], queryFn: async () => 'Newly opened notifications' })
+      disposals.push(firstView.subscribe(() => {}))
+      await flush()
+      expect(firstView.getCurrentResult().data).toBe('Newly opened notifications')
+      coordinator.hint(['catalog', 'notifications'])
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(notificationObserver.getCurrentResult().data).toBe('Fresh notifications')
+      expect(adapterRead).toHaveBeenCalledTimes(2)
+      expect(catalogRead).not.toHaveBeenCalled()
+      expect(client.getQueryData(['catalog'])).toBe('Retained catalog')
+      expect(client.isMutating()).toBe(1)
+      expect(coordinator.getWorkSnapshot().active).toBeLessThanOrEqual(256)
+    } finally {
+      queryPending.resolve('Completed notifications')
+      adapterPending.resolve()
+      mutationPending.resolve()
+      await mutation
+      release()
+    }
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(client.getQueryData(['catalog'])).toBe('Updated catalog')
+  })
+
   it.each(['close before error', 'error before close'] as const)(
     'coalesces disconnect notifications with %s while preserving the next connection',
     async order => {

@@ -398,6 +398,21 @@ the administrator's single capture and unchanged counts for the other users.
 Scoped PHPStan, formatting and syntax checks pass; the receipt is
 `/tmp/live-u9-observer-integration.log`.
 
+U9 mutation-isolation checkpoint: pending writes no longer cancel or pause every
+live reader. Explicit family holds protect related snapshots while unrelated
+queries and adapters continue. Session claim, creation and automatic creation now
+hold their session reads, verify ownership and install the confirmed result before
+release. Playlist, album, artist, library and job detail views distinguish deferred
+initial reads from missing resources.
+
+Regression tests first reproduced unrelated-read cancellation, false missing
+states and the three unprotected session writes. The affected checks pass 75
+distinct tests across nine files. The complete frontend suite passes 2,889 tests
+in 231 files; both TypeScript projects, build and lint pass, with the same eight
+lint warnings. Receipts are `/tmp/live-u9-mutation-isolation-green.log` and
+`/tmp/live-u9-frontend-after-mutation-isolation.log`. The remaining browser checks
+and the bounded audit of other pending-state views continue.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

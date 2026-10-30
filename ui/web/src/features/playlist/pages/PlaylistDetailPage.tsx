@@ -147,7 +147,7 @@ function formatTrackDuration(seconds: number): string {
 export function PlaylistDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
   const navigate = useNavigate()
-  const { data, isLoading, error } = useGetPlaylistShow(
+  const { data, isPending, error } = useGetPlaylistShow(
     publicId!,
     { query: { enabled: !!publicId } }
   )
@@ -182,7 +182,7 @@ export function PlaylistDetailPage() {
     [songs]
   )
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <LoadingContainer>
         <Skeleton style={{ height: '2rem', width: '12rem' }} />

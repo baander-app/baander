@@ -133,7 +133,7 @@ export function ArtistDetailPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const setSelectedItem = useContextPanelStore((s) => s.setSelectedItem)
 
-  const { artist, albums, albumCount, isLoading, error, loadMore, hasNextPage } =
+  const { artist, albums, albumCount, isPending, error, loadMore, hasNextPage } =
     useArtistDetail(publicId)
 
   // Select this artist in context panel
@@ -191,7 +191,7 @@ export function ArtistDetailPage() {
     }
   }
 
-  if (isLoading || !publicId) {
+  if (isPending || !publicId) {
     return (
       <PageContainer>
         <LoadingHeader>

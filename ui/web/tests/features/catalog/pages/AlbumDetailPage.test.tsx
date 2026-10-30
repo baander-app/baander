@@ -24,6 +24,7 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
       },
     },
     isLoading: false,
+    isPending: false,
   }),
 }))
 

@@ -96,7 +96,7 @@ vi.mock('@/features/catalog/hooks/use-artist-detail', () => {
         artist,
         albums: albumSummaries,
         albumCount: total ?? 0,
-        isLoading: mockConfig.artistLoading || mockConfig.albumsLoading || false,
+        isPending: mockConfig.artistLoading || mockConfig.albumsLoading || false,
         error: mockConfig.isError ? new Error('fail') : null,
         loadMore: vi.fn(),
         hasNextPage: false,

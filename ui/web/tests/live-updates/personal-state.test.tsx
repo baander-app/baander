@@ -76,6 +76,94 @@ afterEach(() => {
 })
 
 describe('personal state through owned queries and HTTP', () => {
+  it.each(['claimWithQueue', 'newSession', 'automatic'] as const)('protects the confirmed session from a late read during %s', async action => {
+    const original = usePlayerStore.getState()
+    const queue = [{ publicId: 'local-song', title: 'Local', available: true }]
+    usePlayerStore.setState({ queue, currentTrack: null, currentIndex: 0, isPlaying: false })
+    const dispatch = vi.spyOn(mediator, 'dispatch')
+    const oldSession = { publicId: 'previous', activeDeviceId: 'local', queue: ['local-song'], currentTrackIndex: 0, position: 20 }
+    const confirmedSession = { ...oldSession, publicId: 'confirmed' }
+    let serverSession: typeof oldSession | null = action === 'automatic' ? null : oldSession
+    let holdRead = false
+    let finishRead: ((value: [number, unknown]) => void) | undefined
+    let finishWrite: ((value: [number, unknown]) => void) | undefined
+    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] })
+    mock.onPost('/api/devices').reply(200, {})
+    mock.onGet('/api/session').reply(() => {
+      if (!holdRead) return serverSession ? [200, { data: serverSession }] : [404, {}]
+      holdRead = false
+      return new Promise(resolve => { finishRead = resolve })
+    })
+    const endpoint = action === 'claimWithQueue' ? '/api/session/claim' : '/api/session/new'
+    mock.onPost(endpoint).reply(() => new Promise(resolve => { finishWrite = resolve }))
+    const { client, coordinator, wrapper } = setup()
+    const hook = renderHook(useSession, { wrapper })
+    try {
+      await waitFor(() => expect(hook.result.current.session).toEqual(serverSession))
+      holdRead = true
+      act(() => coordinator.hint(['sessions']))
+      await waitFor(() => expect(finishRead).toBeDefined())
+      const oldRequest = mock.history.get.filter(request => request.url === '/api/session').at(-1)!
+      act(() => {
+        if (action === 'automatic') usePlayerStore.setState({ isPlaying: true })
+        else hook.result.current[action]()
+      })
+      await waitFor(() => expect(finishWrite).toBeDefined())
+      expect(oldRequest.signal?.aborted).toBe(true)
+      const readsBeforeHold = mock.history.get.filter(request => request.url === '/api/session').length
+      act(() => coordinator.hint(['sessions']))
+      await new Promise(resolve => setTimeout(resolve, 600))
+      expect(mock.history.get.filter(request => request.url === '/api/session')).toHaveLength(readsBeforeHold)
+      serverSession = confirmedSession
+      await act(async () => { finishWrite?.([200, { data: confirmedSession }]) })
+      await waitFor(() => expect(hook.result.current.session?.publicId).toBe('confirmed'))
+      await act(async () => { finishRead?.([200, { data: oldSession }]) })
+      await waitFor(() => expect(mock.history.get.filter(request => request.url === '/api/session').length).toBeGreaterThan(readsBeforeHold))
+      expect(client.getQueryData(['session', 'current'])).toEqual(confirmedSession)
+      expect(usePlayerStore.getState().queue).toEqual(queue)
+      expect(dispatch).not.toHaveBeenCalled()
+    } finally {
+      finishWrite?.([200, { data: confirmedSession }])
+      finishRead?.([200, { data: oldSession }])
+      hook.unmount()
+      dispatch.mockRestore()
+      usePlayerStore.setState(original)
+    }
+  })
+
+  it.each(['failed write', 'account replacement'] as const)('releases a session write safely after %s', async outcome => {
+    const original = usePlayerStore.getState()
+    usePlayerStore.setState({ queue: [{ publicId: 'local-song', title: 'Local', available: true }], currentTrack: null, isPlaying: false })
+    const session = { publicId: 'previous', activeDeviceId: 'local', queue: ['local-song'], currentTrackIndex: 0, position: 20 }
+    let finish: ((value: [number, unknown]) => void) | undefined
+    mock.onGet('/api/devices').reply(200, { data: [{ publicId: 'local', deviceId: getDeviceId(), name: 'Here' }] })
+    mock.onPost('/api/devices').reply(200, {})
+    mock.onGet('/api/session').reply(200, { data: session })
+    mock.onPost('/api/session/new').reply(() => new Promise(resolve => { finish = resolve }))
+    const { client, coordinator, wrapper } = setup()
+    const hook = renderHook(useSession, { wrapper })
+    try {
+      await waitFor(() => expect(hook.result.current.session?.publicId).toBe('previous'))
+      act(() => hook.result.current.newSession())
+      await waitFor(() => expect(finish).toBeDefined())
+      if (outcome === 'account replacement') act(() => synchronizeOwnership('personal-b'))
+      await act(async () => { finish?.(outcome === 'failed write' ? [503, {}] : [200, { data: { ...session, publicId: 'late' } }]) })
+      await waitFor(() => expect(hook.result.current.isCreating).toBe(false))
+      if (outcome === 'account replacement') {
+        expect(client.getQueryData(['session', 'current'])).toBeUndefined()
+      } else {
+        const reads = mock.history.get.filter(request => request.url === '/api/session').length
+        act(() => coordinator.hint(['sessions']))
+        await waitFor(() => expect(mock.history.get.filter(request => request.url === '/api/session').length).toBeGreaterThan(reads))
+        expect(client.getQueryData(['session', 'current'])).toEqual(session)
+      }
+    } finally {
+      finish?.([503, {}])
+      hook.unmount()
+      usePlayerStore.setState(original)
+    }
+  })
+
   it('keeps list and count current after remote creation, read and deletion', async () => {
     let rows = [notification('first')]
     mock.onGet('/api/notifications/').reply(() => [200, { data: rows, nextCursor: null }])

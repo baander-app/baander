@@ -339,7 +339,7 @@ function SkeletonRow() {
 }
 
 export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
-  const { data: job, isLoading, isError, error } = useJobDetail(jobId)
+  const { data: job, isPending, isError, error } = useJobDetail(jobId)
   const retryMutation = useRetryJob()
   const cancelMutation = useCancelJob()
   const [confirmAction, setConfirmAction] = useState<'retry' | 'cancel' | null>(null)
@@ -390,7 +390,7 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
           role="dialog"
           aria-label="Job details"
         >
-          {isLoading && (
+          {isPending && (
             <PanelBody>
               <SkeletonRow />
             </PanelBody>
@@ -406,7 +406,7 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
             </PanelBody>
           )}
 
-          {!isLoading && !isError && !job && (
+          {!isPending && !isError && !job && (
             <PanelBody>
               <NotFoundText>Job not found.</NotFoundText>
               <ErrorCloseBtn onClick={onClose}>Close</ErrorCloseBtn>
