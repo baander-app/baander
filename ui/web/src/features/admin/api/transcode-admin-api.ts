@@ -22,7 +22,7 @@ export interface TranscodeSession {
 
 export const transcodeAdminApi = {
   getSessions: (signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: TranscodeSession[] }>('/api/transcode/sessions', { signal }).then(
+    AXIOS_INSTANCE.get<{ data: TranscodeSession[] }>('/api/transcode/sessions/', { signal }).then(
       (r) => r.data.data ?? [],
     ),
 

@@ -17,7 +17,7 @@ export function usePlayArtist() {
     async (artistPublicId: string, artistName: string) => {
       const owner = captureOwnership()
       try {
-        const res = await AXIOS_INSTANCE.get('/api/songs', {
+        const res = await AXIOS_INSTANCE.get('/api/songs/', {
           params: { artistId: artistPublicId, limit: 1000 },
         })
         if (!isCurrentOwnership(owner)) return

@@ -150,6 +150,24 @@ describe('administrative shared sampling', () => {
     expect(JSON.stringify(client.getQueryData(key))).toContain('"revision":"after"')
   })
 
+  it('samples transcode sessions through their canonical collection route', async () => {
+    const { client } = setup()
+    let revision = 'before'
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      if (config.url !== '/api/transcode/sessions/') throw new Error('Collection route requires its canonical path')
+      return respond(config, [{ publicId: 'session', state: revision }])
+    })
+    AXIOS_INSTANCE.defaults.adapter = adapter
+    observe(client, ['admin-transcode-sessions'], signal => transcodeAdminApi.getSessions(signal))
+    await vi.advanceTimersByTimeAsync(200)
+    expect(client.getQueryData(['admin-transcode-sessions'])).toEqual([{ publicId: 'session', state: 'before' }])
+    const initialReads = adapter.mock.calls.length
+    revision = 'after'
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(client.getQueryData(['admin-transcode-sessions'])).toEqual([{ publicId: 'session', state: 'after' }])
+    expect(adapter.mock.calls.length).toBeGreaterThan(initialReads)
+  })
+
   it('aborts handwritten HTTP on authority loss and discards a late adapter result', async () => {
     const { client } = setup()
     let release!: () => void

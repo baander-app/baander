@@ -94,7 +94,7 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
       while (true) {
         signal.throwIfAborted()
         assertCurrentOwnership(owner)
-        const res = await AXIOS_INSTANCE.get('/api/albums', {
+        const res = await AXIOS_INSTANCE.get('/api/albums/', {
           signal,
           params: { sort: 'year', order: 'asc', limit: PER_PAGE, page },
         })

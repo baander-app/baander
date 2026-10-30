@@ -442,6 +442,31 @@ efficiency or test-pruning changes worth applying. Three runtime comments were
 removed; every proof test, ownership guard and cleanup safeguard was retained.
 The phase receipt is `/tmp/live-u9-simplification.json`.
 
+U9 canonical-route and reload checkpoint, 2026-10-31: real Timeline requests
+redirected from a noncanonical collection URL to its registered trailing-slash
+route, where the original DPoP proof was rejected. Timeline, artist playback
+actions and sampled transcode-session reads now request their registered URLs
+directly. Seven expected regression failures were reproduced; all 51 focused
+tests and 11 coverage tests pass. Scoped lint, app TypeScript and browser
+TypeScript pass. Browser qualification of these corrections remains open.
+
+A real worker reload also retained an open socket after losing the worker's
+authentication and subscription maps. The client now replaces the connection
+when ready or health messages expire, including after a previously successful
+subscription. Explicit degraded-health messages retain the connection. The
+regression failed before the fix; 22 focused recovery tests pass, including a
+replacement socket accepting a fresh subscription without claiming playback.
+The native reload browser check remains open. Evidence is retained in
+`/tmp/live-u9-canonical-red.log`, `/tmp/live-u9-canonical-green.log`,
+`/tmp/live-u9-canonical-coverage.log` and `/tmp/live-u9-reload-health-red.log`.
+
+The integrated frontend passes 2,910 tests across 233 files, both TypeScript
+projects, build and lint; lint retains eight existing warnings. Native CI fixture
+verification passes three tests with 122 assertions and wrapper exit zero.
+Receipts are `/tmp/live-u9-frontend-canonical-health-full.log`,
+`/tmp/live-u9-build-canonical-health.log`, `/tmp/live-u9-lint-canonical-health.log`
+and `/tmp/live-u9-fixture-ci-observer-integration.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

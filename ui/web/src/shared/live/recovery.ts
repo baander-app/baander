@@ -165,7 +165,8 @@ export class LiveRecovery {
       this.deadline = null
       this.deliveryAvailable = false
       this.recover('degraded')
-      if (this.subscriptionId === null) this.transport.reconnect?.()
+      // An open socket can outlive its worker's authenticated subscription.
+      this.transport.reconnect?.()
     }, delay)
   }
 

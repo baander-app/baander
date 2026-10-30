@@ -151,7 +151,7 @@ export function ArtistDetailPage() {
   const playTrack = usePlayerStore((s) => s.playTrack)
 
   const fetchArtistSongs = async (): Promise<Track[]> => {
-    const res = await AXIOS_INSTANCE.get('/api/songs', {
+    const res = await AXIOS_INSTANCE.get('/api/songs/', {
       params: { artistId: publicId, limit: 1000 },
     })
     const body = res.data as Record<string, unknown>

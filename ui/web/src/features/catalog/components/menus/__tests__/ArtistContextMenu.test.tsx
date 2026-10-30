@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // Mock shortcut display hook
@@ -20,6 +20,10 @@ vi.mock('react-router-dom', () => ({
 const mockPlayTrack = vi.fn()
 const mockInsertAfterCurrent = vi.fn()
 const mockAddToQueue = vi.fn()
+const mockGet = vi.fn()
+vi.mock('@/shared/api-client/axios-instance', () => ({
+  AXIOS_INSTANCE: { get: (...args: unknown[]) => mockGet(...args) },
+}))
 
 vi.mock('@/features/player/stores/player-store', () => ({
   usePlayerStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -88,5 +92,20 @@ describe('ArtistContextMenu', () => {
     await user.pointer({ keys: '[MouseRight]', target: screen.getByTestId('trigger') })
 
     expect(screen.getByText('I')).toBeInTheDocument()
+  })
+
+  it.each(['Shuffle All Songs', 'Play All Albums'])('plays available songs from the canonical collection through %s', async (action) => {
+    mockGet.mockImplementation(async (url: string) => {
+      if (url !== '/api/songs/') throw new Error('Collection route requires its canonical path')
+      return { data: { data: [{ publicId: 'song', title: 'Song', available: true },
+        { publicId: 'missing', title: 'Missing', available: false }] } }
+    })
+    const user = userEvent.setup()
+    renderMenu()
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByTestId('trigger') })
+    await user.click(screen.getByText(action))
+    await waitFor(() => expect(mockPlayTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ publicId: 'song' }), [expect.objectContaining({ publicId: 'song' })],
+    ))
   })
 })

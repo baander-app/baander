@@ -454,7 +454,7 @@ export const adminLiveCoverage = [
     sources: [
       "filesystem storage occupancy; transcode progress and runtime occupancy",
       "'/api/admin/media/storage-stats'",
-      "'/api/transcode/sessions'",
+      "'/api/transcode/sessions/'",
       "`/api/transcode/sessions/${publicId}`",
     ],
     keyVariants: ["['admin-media-storage-stats']", "['admin-transcode-sessions']"],
@@ -463,7 +463,7 @@ export const adminLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: [
       "src/features/admin/api/media-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/media/storage-stats'",
-      "src/features/admin/api/transcode-admin-api.ts#AXIOS_INSTANCE.get:'/api/transcode/sessions'",
+      "src/features/admin/api/transcode-admin-api.ts#AXIOS_INSTANCE.get:'/api/transcode/sessions/'",
       "src/features/admin/api/transcode-admin-api.ts#AXIOS_INSTANCE.get:`/api/transcode/sessions/${publicId}`",
       "src/features/admin/hooks/use-media-admin.ts#useQuery:['admin-media-storage-stats']",
       "src/features/admin/hooks/use-transcode-admin.ts#useQuery:['admin-transcode-sessions']",

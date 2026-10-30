@@ -347,7 +347,7 @@ describe('personal collection freshness', () => {
       act(() => advanceAuthorization())
       await act(async () => { finish?.(); await pending })
       expect(playTrack).not.toHaveBeenCalled()
-      http.onGet('/api/songs').reply(200, { data: [{ publicId: 'song', title: 'Song', available: true }] })
+      http.onGet('/api/songs/').reply(200, { data: [{ publicId: 'song', title: 'Song', available: true }] })
       await act(() => hook.result.current.artist.playArtist('artist', 'Artist'))
       expect(playTrack).toHaveBeenCalledTimes(1)
       act(() => coordinator.hint(['catalog']))

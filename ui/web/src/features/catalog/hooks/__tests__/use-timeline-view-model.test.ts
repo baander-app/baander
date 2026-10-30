@@ -207,7 +207,11 @@ describe('useTimelineViewModel', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
     expect(mockGet).toHaveBeenCalledTimes(2)
-    expect(mockGet).toHaveBeenNthCalledWith(2, '/api/albums', {
+    expect(mockGet).toHaveBeenNthCalledWith(1, '/api/albums/', {
+      signal: expect.any(AbortSignal),
+      params: { sort: 'year', order: 'asc', limit: 100, page: 1 },
+    })
+    expect(mockGet).toHaveBeenNthCalledWith(2, '/api/albums/', {
       signal: expect.any(AbortSignal),
       params: { sort: 'year', order: 'asc', limit: 100, page: 2 },
     })

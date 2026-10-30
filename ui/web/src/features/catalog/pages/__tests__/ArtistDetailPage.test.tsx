@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
@@ -10,6 +10,8 @@ const testTheme = resolveTheme('dark', 'violet')
 
 const mockNavigate = vi.fn()
 const mockSetSelectedItem = vi.fn()
+const mockPlayTrack = vi.fn()
+const mockGet = vi.fn()
 
 const mockArtistData = {
   name: 'Radiohead',
@@ -127,7 +129,7 @@ vi.mock('@/features/catalog/stores/selection-store', () => ({
 vi.mock('@/features/player/stores/player-store', () => ({
   usePlayerStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
-      playTrack: vi.fn(),
+      playTrack: mockPlayTrack,
       insertAfterCurrent: vi.fn(),
       addToQueue: vi.fn(),
     }),
@@ -135,7 +137,7 @@ vi.mock('@/features/player/stores/player-store', () => ({
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
   AXIOS_INSTANCE: {
-    get: vi.fn(),
+    get: (...args: unknown[]) => mockGet(...args),
   },
 }))
 
@@ -198,6 +200,20 @@ describe('ArtistDetailPage', () => {
     render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
     expect(screen.getByLabelText('Play all')).toBeInTheDocument()
     expect(screen.getByLabelText('Shuffle all')).toBeInTheDocument()
+  })
+
+  it.each(['Play all', 'Shuffle all'])('starts playable artist songs through %s using the canonical collection', async (action) => {
+    mockGet.mockImplementation(async (url: string) => {
+      if (url !== '/api/songs/') throw new Error('Collection route requires its canonical path')
+      return { data: { data: [{ publicId: 'song', title: 'Song', available: true },
+        { publicId: 'missing', title: 'Missing', available: false }] } }
+    })
+    const user = userEvent.setup()
+    render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
+    await user.click(screen.getByLabelText(action))
+    await waitFor(() => expect(mockPlayTrack).toHaveBeenCalledWith(
+      expect.objectContaining({ publicId: 'song' }), [expect.objectContaining({ publicId: 'song' })],
+    ))
   })
 
   it('sets context panel selected item on mount', () => {
