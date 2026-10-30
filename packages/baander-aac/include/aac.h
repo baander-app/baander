@@ -199,8 +199,9 @@ int aac_encoder_set_extension_payload(AacEncoderHandle ctx, const uint8_t* data,
  * than the cap allows.  Holds for every profile and rate control mode
  * whenever the frame's side information fits the cap.  0 removes the
  * cap (default).  Before the first frame only; AAC_ERR_INVALID_ARG for
- * a negative value or, in CBR and ABR outside a VBR mode, a cap below
- * the bitrate. */
+ * a negative value, in CBR and ABR outside a VBR mode for a cap below
+ * the bitrate, and in a VBR mode for a cap below the first mode's
+ * target. */
 int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps);
 /* The lowpass of the core coder in Hz instead of the bitrate's tuning
  * table entry (0, the default): the bands above it are not coded.  The
@@ -221,11 +222,14 @@ int aac_encoder_bandwidth(AacEncoderHandle ctx);
  * chosen to bring music close to the target, spends no surplus on easy
  * frames, and is bounded by the bitrate's rate loop and reservoir as in
  * ABR; every frame carries the VBR marker.  A later
- * aac_encoder_set_quality overrides the mode's quality.  A peak bitrate
- * below the target lowers the mode to the highest one that fits.  0
- * clears the mode and restores the bitrate and rate control given at
- * creation.  Before the first frame only; AAC_ERR_INVALID_ARG for
- * another mode. */
+ * aac_encoder_set_quality overrides the mode's quality, also when a peak
+ * bitrate set afterwards lowers the mode.  A peak bitrate below the
+ * target lowers the mode to the highest one that fits; a peak below the
+ * first mode's target is refused.  0 clears the mode and restores the
+ * bitrate and rate control given at creation, and is refused while a
+ * peak below that bitrate is set under CBR or ABR.  Before the first
+ * frame only; AAC_ERR_INVALID_ARG for another mode or a peak that does
+ * not suit the result. */
 int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode);
 
 /* ── Encoder: USAC (xHE-AAC) ─────────────────────────────────────── */

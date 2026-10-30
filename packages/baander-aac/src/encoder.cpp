@@ -1908,7 +1908,7 @@ int aac_encoder_state_set_vbr_mode(AacEncoderState* s, int mode) {
   }
   const int* quality = s->aot == AAC_AOT_PS ? kVbrModeQualityPs : kVbrModeQuality;
   s->rc_mode = AAC_RC_ABR;
-  s->quality = quality[in_force - 1];
+  s->quality = s->vbr_quality_override ? s->vbr_quality_override : quality[in_force - 1];
   return aac_encoder_state_set_bitrate(
       s, aac_encoder_vbr_mode_bitrate(in_force, s->input_channels));
 }
@@ -2137,7 +2137,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       const int overhead = frame_overhead_bits(s);
       const int dyn = bit_demand(s, frame_pe(s), std::max(avg - overhead, 1));
       max_bits = std::min(hard_max, avg + s->reservoir);
-      target = std::clamp(overhead + dyn, avg / 4, max_bits);
+      target = std::clamp(overhead + dyn, std::min(avg / 4, max_bits), max_bits);
       if (s->vbr_mode) {
         /* A VBR mode spends what its quality asks for and never more
          * than the bitrate's rate loop allows: easy frames stay small,
@@ -2168,8 +2168,10 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
   const int bits = rate_control(s, target, improve, !s->vbr_mode);
   if (s->afterburner && !s->usac) {
     /* The constant-rate modes may fill the frame's budget; the quality
-     * modes only redistribute the bits the frame already has. */
-    const bool fixed_rate = s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR;
+     * modes, the VBR modes among them, only redistribute the bits the
+     * frame already has. */
+    const bool fixed_rate =
+        (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) && !s->vbr_mode;
     aac_afterburner_run(s, bits, fixed_rate ? target : bits);
   }
 

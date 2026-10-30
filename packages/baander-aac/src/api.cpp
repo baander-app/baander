@@ -145,6 +145,9 @@ int aac_encoder_set_quality(AacEncoderHandle ctx, int quality) {
     return AAC_ERR_INVALID_ARG;
   }
   s->quality = quality;
+  if (s->vbr_mode) {
+    s->vbr_quality_override = quality;
+  }
   aac_encoder_state_configure(s);
   return AAC_OK;
 }
@@ -252,8 +255,8 @@ int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* i
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
   }
-  aac_usac_enc_set_program_loudness(s->usac, info);
   if (!info) {
+    aac_usac_enc_set_program_loudness(s->usac, nullptr);
     usac_remove_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO);
     return AAC_OK;
   }
@@ -267,8 +270,13 @@ int aac_encoder_set_loudness_info(AacEncoderHandle ctx, const AacLoudnessInfo* i
   if (bits < 0) {
     return bits;
   }
-  return aac_usac_enc_set_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO, payload,
-                                     (bits + 7) / 8);
+  const int ret = aac_usac_enc_set_config_ext(s->usac, AAC_USAC_CFG_EXT_LOUDNESS_INFO, payload,
+                                              (bits + 7) / 8);
+  if (ret == AAC_OK) {
+    /* the DRC gain sets anchor on the figures the stream carries */
+    aac_usac_enc_set_program_loudness(s->usac, info);
+  }
+  return ret;
 }
 
 int aac_encoder_set_drc_loudness_info(AacEncoderHandle ctx, int drc_set_id,
@@ -397,7 +405,11 @@ int aac_encoder_set_peak_bitrate(AacEncoderHandle ctx, int bps) {
     return AAC_ERR_INVALID_ARG;
   }
   auto* s = static_cast<AacEncoderState*>(ctx);
-  /* a VBR mode may be lowered by the cap; a constant rate cannot */
+  /* a VBR mode may be lowered by the cap down to the first mode; a
+   * constant rate cannot be lowered */
+  if (bps > 0 && s->vbr_mode && bps < aac_encoder_vbr_mode_bitrate(1, s->input_channels)) {
+    return AAC_ERR_INVALID_ARG;
+  }
   if (bps > 0 && !s->vbr_mode && (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) &&
       bps < s->bitrate) {
     return AAC_ERR_INVALID_ARG;
@@ -436,6 +448,17 @@ int aac_encoder_set_vbr_mode(AacEncoderHandle ctx, int mode) {
   if (encoder_started(s)) {
     return AAC_ERR_STATE;
   }
+  /* the peak bitrate in force has to suit the rate control the call
+   * leaves: no lower than the first mode's target in a VBR mode, no lower
+   * than the bitrate given at creation in its CBR or ABR */
+  const int peak = s->peak_bitrate;
+  if (peak > 0 &&
+      ((mode > 0 && peak < aac_encoder_vbr_mode_bitrate(1, s->input_channels)) ||
+       (mode == 0 && (s->base_rc == AAC_RC_CBR || s->base_rc == AAC_RC_ABR) &&
+        peak < (s->vbr_mode ? s->base_bitrate : s->bitrate)))) {
+    return AAC_ERR_INVALID_ARG;
+  }
+  s->vbr_quality_override = 0;
   return aac_encoder_state_set_vbr_mode(s, mode);
 }
 

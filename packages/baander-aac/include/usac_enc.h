@@ -96,12 +96,12 @@ using AacUsacEncoder = struct AacUsacEncoder_ {
    * playout frame (the next independent frame when the pre-roll is off),
    * which opens a segment, and whether aac_encoder_request_independent_frame
    * asked for one before the frame being coded. */
-  int next_ipf;
+  long long next_ipf; /* an interval near INT32_MAX frames cannot overflow it */
   int requested;
   /* The segment size ceiling: the bytes of the access units written
    * since the segment's first frame, and the bytes the pre-roll of the
    * frame being coded will add to them. */
-  int segment_used;
+  long long segment_used;
   int segment_reserved;
   /* The last written frame, for aac_encoder_last_frame_info: its index,
    * flags and access unit bytes, and the bytes of its transport frame,

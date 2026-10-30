@@ -16,6 +16,7 @@
 #include "usac_enc.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -1012,7 +1013,7 @@ void aac_usac_enc_begin_frame(AacEncoderState* s) {
   if (starts_segment) {
     /* a new segment: the interval counts from here, and the pre-roll
      * this frame carries is the first charge against the ceiling */
-    u->next_ipf = k + aac_usac_enc_interval_frames(&u->opt, s->input_rate, s->frame_size);
+    u->next_ipf = (long long)k + aac_usac_enc_interval_frames(&u->opt, s->input_rate, s->frame_size);
     u->segment_used = 0;
     u->segment_reserved = 0;
   }
@@ -1041,7 +1042,8 @@ int aac_usac_enc_frame_bit_ceiling(const AacEncoderState* s) {
    * its lowest band alone, as the rate loop reaches it when it releases
    * every band. */
   const int floor_bits = aac_usac_enc_overhead_bits(s) + kMinChannelBits * s->channels;
-  const int remaining_frames = std::max(1, u->next_ipf - u->frame_index);
+  const int remaining_frames = (int)std::min<long long>(
+      INT_MAX, std::max<long long>(1, u->next_ipf - u->frame_index));
   const long long remaining =
       (long long)u->opt.segment_max_bytes - u->segment_used - u->segment_reserved;
   if (remaining <= 0) {
@@ -1273,7 +1275,7 @@ int aac_usac_enc_drc_loudness(const AacUsacEncoder* u, int drc_set_id, AacLoudne
   if (drc_set_id < 1 || drc_set_id > AAC_DRC_GEN_SETS) {
     return AAC_ERR_INVALID_ARG;
   }
-  if (!u->drc) {
+  if (!u->drc || !u->opt.drc) {
     return AAC_ERR_STATE;
   }
   return aac_drc_gen_loudness(u->drc, drc_set_id, out);
@@ -1285,7 +1287,8 @@ int aac_usac_enc_drc_set_figures(const AacUsacEncoder* u, int drc_set_id, AacLou
   }
   /* A set's entry carries what the selection and the normalisation
    * read, its program loudness and peaks; the LOAS transport repeats the
-   * configuration in every frame, so the other figures stay out. */
+   * configuration at every immediate playout frame, so the other figures
+   * stay out. */
   if (u->has_set_loudness[drc_set_id - 1]) {
     *out = u->set_loudness[drc_set_id - 1];
   } else if (u->has_program_loudness) {

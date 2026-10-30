@@ -291,6 +291,49 @@ void test_vbr_modes() {
   });
   CHECK(plain.stream == cleared.stream, "a cleared mode leaves the plain stream");
 
+  /* A quality set in a mode outlasts a peak bitrate set afterwards. */
+  auto quality_then_peak = [&](bool peak_last) {
+    return encode_with(pcm, sr, 2, 64000, AAC_AOT_LC, AAC_RC_CBR, [&](AacEncoderHandle h) {
+      aac_encoder_set_vbr_mode(h, 4);
+      if (!peak_last) {
+        aac_encoder_set_peak_bitrate(h, 320000);
+      }
+      CHECK(aac_encoder_set_quality(h, 30) == AAC_OK, "quality in a mode");
+      if (peak_last) {
+        CHECK(aac_encoder_set_peak_bitrate(h, 320000) == AAC_OK, "peak after the quality");
+      }
+    });
+  };
+  CHECK(quality_then_peak(true).stream == quality_then_peak(false).stream,
+        "the quality survives a later peak bitrate");
+
+  /* Refused: a peak below the first mode's target in a mode, and clearing
+   * the mode while a peak below the creation's CBR bitrate is set. */
+  {
+    AacEncoderHandle h = aac_encoder_create(sr, 2, 256000, AAC_AOT_LC, AAC_RC_CBR);
+    CHECK(aac_encoder_set_vbr_mode(h, 1) == AAC_OK, "mode 1");
+    CHECK(aac_encoder_set_peak_bitrate(h, 8000) == AAC_ERR_INVALID_ARG, "peak below mode 1");
+    CHECK(aac_encoder_set_vbr_mode(h, 5) == AAC_OK, "mode 5");
+    CHECK(aac_encoder_set_peak_bitrate(h, 128000) == AAC_OK, "peak lowers mode 5");
+    CHECK(aac_encoder_set_vbr_mode(h, 0) == AAC_ERR_INVALID_ARG,
+          "no CBR at 256 kbit/s under a 128 kbit/s peak");
+    CHECK(aac_encoder_set_peak_bitrate(h, 0) == AAC_OK && aac_encoder_set_vbr_mode(h, 0) == AAC_OK,
+          "clearing the peak first");
+    aac_encoder_destroy(h);
+  }
+
+  /* The afterburner spends no surplus in a VBR mode. */
+  const auto mode3 = [&](bool afterburner) {
+    return encode_with(pcm, sr, 2, 64000, AAC_AOT_LC, AAC_RC_CBR, [&](AacEncoderHandle h) {
+      aac_encoder_set_vbr_mode(h, 3);
+      aac_encoder_set_afterburner(h, afterburner ? 1 : 0);
+    });
+  };
+  const double without_ab = kbps(mode3(false).stream, (size_t)n, sr);
+  const double with_ab = kbps(mode3(true).stream, (size_t)n, sr);
+  printf("vbr mode 3: %.1f kbit/s, %.1f with the afterburner\n", without_ab, with_ab);
+  CHECK(with_ab < without_ab * 1.02, "the afterburner keeps a VBR mode's rate");
+
   /* HE-AAC v1 and v2 and xHE-AAC take the modes too. */
   const Encoded hev2 = encode_with(pcm, sr, 2, 64000, AAC_AOT_PS, AAC_RC_CBR, [](AacEncoderHandle h) {
     CHECK(aac_encoder_set_vbr_mode(h, 1) == AAC_OK, "hev2 mode 1");

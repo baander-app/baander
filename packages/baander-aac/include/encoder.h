@@ -172,10 +172,13 @@ using AacEncoderState = struct AacEncoderState_ {
    * aac_encoder_set_vbr_mode): a hard cap on any frame's bits in bits per
    * second (0: none), the lowpass asked for in Hz (0: the tuning table),
    * and the VBR mode in force (0: none).  The bitrate and rate control
-   * given at creation come back when the VBR mode is cleared. */
+   * given at creation come back when the VBR mode is cleared.  A quality
+   * set while a mode is in force (0: none) outlasts the mode's own when
+   * a peak bitrate lowers the mode. */
   int peak_bitrate;
   int bandwidth_override;
   int vbr_mode;
+  int vbr_quality_override;
   int base_bitrate, base_quality;
   AacRateControl base_rc;
   int tools_bitrate; /* the bitrate the SBR encoders were tuned for */

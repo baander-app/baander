@@ -1105,17 +1105,29 @@ int aac_drc_gen_frame(AacDrcGen* g, const float* pcm, AacUniDrcGainFrame* out) {
   constrain(comp_codes, steps);
   constrain(night_codes, steps);
   float tol = kTolerance;
+  int bits = -1;
   for (int attempt = 0; attempt < 6; attempt++) {
     thin(comp_codes, comp_bound, steps, g->grid, g->last_code[0], tol, tol, &out->seq[0]);
     thin(night_codes, night_bound, steps, g->grid, g->last_code[1], tol, tol, &out->seq[1]);
     uint8_t buf[AAC_DRC_GEN_MAX_PAYLOAD_BYTES];
     AacBitWriter w;
     aac_bitwriter_init(&w, buf, (int)sizeof(buf));
-    const int bits = aac_drc_gen_write_gain(&w, &g->config, out, n, g->p.sample_rate);
+    bits = aac_drc_gen_write_gain(&w, &g->config, out, n, g->p.sample_rate);
     if (bits >= 0 && bits <= 8 * kPayloadBudgetBytes) {
       break;
     }
     tol *= 2.0f;
+  }
+  if (bits < 0) {
+    /* Gains that fit no payload: the frame carries a single 0 dB node
+     * per set, and the meters and the next frame's interpolation start
+     * from that, as the decoder does. */
+    for (int s = 0; s < AAC_DRC_GEN_SETS; s++) {
+      out->seq[s].node_count = 1;
+      out->seq[s].node[0].time = n - 1;
+      out->seq[s].node[0].gain_db = 0.0f;
+      out->seq[s].node[0].slope = 0.0f;
+    }
   }
   /* The DRC sets' output for their meters: the input this frame's
    * output carries, times the gains as the decoder interpolates them. */
