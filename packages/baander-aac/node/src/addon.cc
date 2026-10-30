@@ -78,7 +78,8 @@ int option_int(const Napi::Object& o, const char* key, int fallback) {
 
 /* An integer option that, when given, has to be a number: a boolean or an
  * object is refused with the option's name (`what`, as the message names
- * it) instead of being read as 0 or 1.  `*out` keeps its value when the
+ * it) instead of being read as 0 or 1, and so is a number outside the
+ * 32-bit range.  `*out` keeps its value when the
  * option is absent.  Returns false after throwing. */
 bool option_number(const Napi::Env& env, const Napi::Object& o, const char* key, const char* what,
                    int* out) {
@@ -86,11 +87,14 @@ bool option_number(const Napi::Env& env, const Napi::Object& o, const char* key,
     return true;
   }
   const Napi::Value v = o.Get(key);
-  if (!v.IsNumber()) {
-    throw_error(env, std::string(what) + " must be a number");
+  /* a value outside the 32-bit range is refused rather than wrapped, so
+   * that 2^32 cannot turn into 0 (an option's "off") */
+  const double d = v.IsNumber() ? v.As<Napi::Number>().DoubleValue() : 0.0;
+  if (!v.IsNumber() || !(d >= -2147483648.0 && d <= 2147483647.0)) {
+    throw_error(env, std::string(what) + " must be a number in the 32-bit integer range");
     return false;
   }
-  *out = v.As<Napi::Number>().Int32Value();
+  *out = static_cast<int32_t>(d);
   return true;
 }
 
@@ -920,8 +924,9 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
       throw_error(env, std::string("AacEncoder: ") + error_name(ret));
       return false;
     }
-    /* Tuning: the peak first, so that it can lower the VBR mode; a
-     * quality given with a VBR mode overrides the mode's own. */
+    /* Tuning: the VBR mode first, so that a peak below the bitrate is
+     * taken as a cap that lowers the mode rather than refused as in CBR
+     * and ABR; a quality given with a VBR mode overrides the mode's own. */
     int peak_bitrate = 0;
     int bandwidth = 0;
     int vbr_mode = 0;
@@ -930,8 +935,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         !option_number(env, o, "vbrMode", "vbrMode", &vbr_mode)) {
       return false;
     }
-    if ((peak_bitrate && (ret = aac_encoder_set_peak_bitrate(handle_, peak_bitrate)) < 0) ||
-        (vbr_mode && (ret = aac_encoder_set_vbr_mode(handle_, vbr_mode)) < 0) ||
+    if ((vbr_mode && (ret = aac_encoder_set_vbr_mode(handle_, vbr_mode)) < 0) ||
+        (peak_bitrate && (ret = aac_encoder_set_peak_bitrate(handle_, peak_bitrate)) < 0) ||
         (vbr_mode && option_given(o, "quality") &&
          (ret = aac_encoder_set_quality(handle_, option_int(o, "quality", 0))) < 0) ||
         (bandwidth && (ret = aac_encoder_set_bandwidth(handle_, bandwidth)) < 0)) {

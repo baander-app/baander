@@ -1347,7 +1347,13 @@ void install_layout(AacDecoderState* s, const AacLayout* l, int source) {
     base += l->elems[i].type == AAC_ELEM_CPE ? 2 : 1;
   }
   if (changed) {
+    /* a new layout restarts the signal state, not the session's
+     * counters, which only the API's reset clears */
+    const int concealed_frames = s->concealed_frames;
+    const int blocks_decoded = s->blocks_decoded;
     aac_decoder_reset_state(s);
+    s->concealed_frames = concealed_frames;
+    s->blocks_decoded = blocks_decoded;
   }
 }
 
@@ -1849,6 +1855,9 @@ int decode_element(AacDecoderState* s, AacBitReader* r, BlockParse* p, int elem)
            * layout, and the following blocks decode under it. */
           if (!p->sniffing && !same_layout(&s->layout, &l)) {
             install_layout(s, &l, 2);
+            /* the elements decoded before the PCE belong to the old
+             * layout, so the whole block conceals under the new one */
+            memset(s->elem_present, 0, sizeof(s->elem_present));
             ret = AAC_ERR_DECODE;
           }
         } else {

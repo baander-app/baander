@@ -30,10 +30,9 @@
  * comparisons between builds; --streams decodes every .aac and .loas
  * stream in DIR (the committed test streams) and prints the realtime
  * factor of each and of each profile. */
-#include <dirent.h>
-
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <map>
 #include <cmath>
 #include <cstdio>
@@ -268,8 +267,9 @@ struct EncodeOptions {
 
 /* A positive integer option value; false with a message otherwise. */
 static bool positive_option(const char* name, const char* value, int* out) {
-  const long v = atol(value);
-  if (v <= 0 || v > 1000000000L) {
+  char* end = nullptr;
+  const long v = strtol(value, &end, 10);
+  if (end == value || *end != '\0' || v <= 0 || v > 1000000000L) {
     fprintf(stderr, "baac: %s takes a positive count\n", name);
     return false;
   }
@@ -300,13 +300,12 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
       o->loudness = true;
     } else if ((arg == "--peak-bitrate" || arg == "--bandwidth" || arg == "--vbr-mode") &&
                has_value) {
-      const int v = atoi(argv[i + 1]);
-      if (v < 0) {
-        fprintf(stderr, "baac: %s takes a positive number\n", argv[i]);
+      if (!positive_option(argv[i], argv[i + 1],
+                           arg == "--peak-bitrate" ? &o->peak_bitrate
+                           : arg == "--bandwidth"  ? &o->bandwidth
+                                                   : &o->vbr_mode)) {
         return false;
       }
-      (arg == "--peak-bitrate" ? o->peak_bitrate : arg == "--bandwidth" ? o->bandwidth : o->vbr_mode) =
-          v;
       i++;
     } else if (arg == "--sbr" && has_value && on_off_auto(argv[i + 1], &o->opt.sbr)) {
       o->usac = true;
@@ -489,14 +488,15 @@ static int encode(int argc, char** argv) {
     fprintf(stderr, "baac: the USAC options were refused\n");
     return 1;
   }
-  /* the peak first, so that it can lower the VBR mode; a quality given
-   * on the command line overrides the mode's */
-  if (options.peak_bitrate && aac_encoder_set_peak_bitrate(enc, options.peak_bitrate) != AAC_OK) {
-    fprintf(stderr, "baac: --peak-bitrate was refused (below the bitrate in cbr or abr?)\n");
-    return 1;
-  }
+  /* the VBR mode first, so that a peak below the bitrate is taken as a
+   * cap that lowers the mode rather than refused as in cbr and abr; a
+   * quality given on the command line overrides the mode's */
   if (options.vbr_mode && aac_encoder_set_vbr_mode(enc, options.vbr_mode) != AAC_OK) {
     fprintf(stderr, "baac: --vbr-mode takes 1 to 5\n");
+    return 1;
+  }
+  if (options.peak_bitrate && aac_encoder_set_peak_bitrate(enc, options.peak_bitrate) != AAC_OK) {
+    fprintf(stderr, "baac: --peak-bitrate was refused (below the bitrate in cbr or abr?)\n");
     return 1;
   }
   if (options.vbr_mode && argc > 8 && atoi(argv[8]) > 0) {
@@ -861,21 +861,21 @@ static bool bench_stream(const std::vector<uint8_t>& stream, double* audio_secon
 /* The decode realtime factor of every .aac and .loas stream in `dir`,
  * then per profile over the streams of that profile. */
 static int bench_streams(const std::string& dir) {
-  DIR* d = opendir(dir.c_str());
-  if (!d) {
+  std::error_code err;
+  std::filesystem::directory_iterator it(dir, err);
+  if (err) {
     fprintf(stderr, "baac: cannot read %s\n", dir.c_str());
     return 1;
   }
   std::vector<std::string> names;
-  while (dirent* e = readdir(d)) {
-    const std::string n = e->d_name;
+  for (const auto& e : it) {
+    const std::string n = e.path().filename().string();
     const bool aac = n.size() > 4 && n.compare(n.size() - 4, 4, ".aac") == 0;
     const bool loas = n.size() > 5 && n.compare(n.size() - 5, 5, ".loas") == 0;
     if (aac || loas) {
       names.push_back(n);
     }
   }
-  closedir(d);
   std::sort(names.begin(), names.end());
   struct Total {
     double audio = 0.0, wall = 0.0;

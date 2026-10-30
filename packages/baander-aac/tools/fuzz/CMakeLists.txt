@@ -22,6 +22,12 @@ foreach(harness ${FUZZ_HARNESSES})
         add_executable(${harness} ${harness}.cpp fuzz_driver.cpp)
     endif()
     target_link_libraries(${harness} PRIVATE baander-aac)
+    # The harnesses check that the output is finite; under the Release
+    # build's -ffinite-math-only the compiler would fold that check to
+    # true.  The library keeps the flags it ships with.
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${harness} PRIVATE -fno-finite-math-only)
+    endif()
     if(UNIX)
         target_link_libraries(${harness} PRIVATE m)
     endif()

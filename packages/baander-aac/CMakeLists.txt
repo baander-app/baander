@@ -94,7 +94,8 @@ endif()
 # BAAC_FUZZ: the sanitizers over the whole tree and, when the compiler
 # links libFuzzer, its coverage instrumentation; the harnesses under
 # tools/fuzz then run under libFuzzer, else under their own mutation
-# driver.
+# driver.  An undefined-behaviour report stops the run under either, so
+# that it leaves a reproducer.
 set(BAAC_FUZZ_HAVE_LIBFUZZER OFF)
 if(BAAC_FUZZ)
     include(CheckCXXSourceCompiles)
@@ -113,14 +114,17 @@ if(BAAC_FUZZ)
     endif()
     if(BAAC_FUZZ_LIBFUZZER_LINKS)
         set(BAAC_FUZZ_HAVE_LIBFUZZER ON)
-        add_compile_options(-fsanitize=fuzzer-no-link,address,undefined -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined)
+        add_compile_options(-fsanitize=fuzzer-no-link,address,undefined
+                            -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
         message(STATUS "BAAC_FUZZ: libFuzzer with ASan and UBSan")
     else()
-        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined)
+        add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined
+                            -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined)
         message(WARNING "BAAC_FUZZ: this compiler has no libFuzzer; the harnesses run their own mutation driver under ASan and UBSan")
     endif()
+    add_compile_definitions(BAAC_FUZZ_SANITIZED=1)
 endif()
 
 include(CheckCXXCompilerFlag)
@@ -213,8 +217,11 @@ if(BAAC_AAC_BUILD_TOOLS AND BAAC_AAC_BUILD_ENCODER AND BAAC_AAC_BUILD_DECODER)
     add_executable(mps-enc tools/mps-enc.cpp)
     target_include_directories(mps-enc PRIVATE src)
     target_link_libraries(mps-enc PRIVATE baander-aac)
-    # The fuzz harnesses and their seed generator (tools/fuzz/README.md).
-    add_subdirectory(tools/fuzz)
+    # The fuzz harnesses and their seed generator (tools/fuzz/README.md),
+    # which use POSIX processes, signals and directories.
+    if(NOT WIN32)
+        add_subdirectory(tools/fuzz)
+    endif()
 endif()
 
 if(BAAC_AAC_BUILD_TESTS)

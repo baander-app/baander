@@ -622,75 +622,71 @@ void lf_gen(const AacSbrState* s, float X_low[32][40][2], const float W[2][kSlot
 }
 
 /* Covariance of one subband over its `n` columns of X_low (the history
- * and the frame's slots), 4.6.18.6.2. */
-void autocorrelate(const float x[40][2], int n, float phi[3][2][2]) {
+ * and the frame's slots), 4.6.18.6.2.  Summed in double: a damaged frame
+ * can leave subband samples near 1e10, whose products and their products
+ * in the prediction below overflow a float. */
+void autocorrelate(const float x[40][2], int n, double phi[3][2][2]) {
   const int last = n - 1;
-  float real_sum2 = x[0][0] * x[2][0] + x[0][1] * x[2][1];
-  float imag_sum2 = x[0][0] * x[2][1] - x[0][1] * x[2][0];
-  float real_sum1 = 0.0f;
-  float imag_sum1 = 0.0f;
-  float real_sum0 = 0.0f;
+  auto re = [x](int i, int j) {
+    return double(x[i][0]) * x[j][0] + double(x[i][1]) * x[j][1];
+  };
+  auto im = [x](int i, int j) {
+    return double(x[i][0]) * x[j][1] - double(x[i][1]) * x[j][0];
+  };
+  double real_sum2 = re(0, 2);
+  double imag_sum2 = im(0, 2);
+  double real_sum1 = 0.0;
+  double imag_sum1 = 0.0;
+  double real_sum0 = 0.0;
   for (int i = 1; i < last - 1; i++) {
-    real_sum0 += x[i][0] * x[i][0] + x[i][1] * x[i][1];
-    real_sum1 += x[i][0] * x[i + 1][0] + x[i][1] * x[i + 1][1];
-    imag_sum1 += x[i][0] * x[i + 1][1] - x[i][1] * x[i + 1][0];
-    real_sum2 += x[i][0] * x[i + 2][0] + x[i][1] * x[i + 2][1];
-    imag_sum2 += x[i][0] * x[i + 2][1] - x[i][1] * x[i + 2][0];
+    real_sum0 += re(i, i);
+    real_sum1 += re(i, i + 1);
+    imag_sum1 += im(i, i + 1);
+    real_sum2 += re(i, i + 2);
+    imag_sum2 += im(i, i + 2);
   }
   phi[0][1][0] = real_sum2;
   phi[0][1][1] = imag_sum2;
-  phi[2][1][0] = real_sum0 + x[0][0] * x[0][0] + x[0][1] * x[0][1];
-  phi[1][0][0] = real_sum0 + x[last - 1][0] * x[last - 1][0] + x[last - 1][1] * x[last - 1][1];
-  phi[1][1][0] = real_sum1 + x[0][0] * x[1][0] + x[0][1] * x[1][1];
-  phi[1][1][1] = imag_sum1 + x[0][0] * x[1][1] - x[0][1] * x[1][0];
-  phi[0][0][0] = real_sum1 + x[last - 1][0] * x[last][0] + x[last - 1][1] * x[last][1];
-  phi[0][0][1] = imag_sum1 + x[last - 1][0] * x[last][1] - x[last - 1][1] * x[last][0];
+  phi[2][1][0] = real_sum0 + re(0, 0);
+  phi[1][0][0] = real_sum0 + re(last - 1, last - 1);
+  phi[1][1][0] = real_sum1 + re(0, 1);
+  phi[1][1][1] = imag_sum1 + im(0, 1);
+  phi[0][0][0] = real_sum1 + re(last - 1, last);
+  phi[0][0][1] = imag_sum1 + im(last - 1, last);
 }
 
 }  // namespace
 
 /* Second-order linear prediction of one subband over its `n` columns
- * (4.6.18.6.2). */
+ * (4.6.18.6.2), in double for the reason given above. */
 void aac_sbr_lpc_band(float alpha0[2], float alpha1[2], const float (*x)[2], int n) {
-  float phi[3][2][2];
+  double phi[3][2][2];
   autocorrelate(x, n, phi);
+  alpha1[0] = alpha1[1] = 0.0f;
+  alpha0[0] = alpha0[1] = 0.0f;
   /* A band whose energy sits far below any audible level predicts
    * nothing; its tiny correlations, divided by each other, would
    * overflow (and under -ffinite-math-only the overflow is not caught below). */
-  if (phi[1][0][0] <= 1e-15f) {
-    alpha1[0] = alpha1[1] = 0.0f;
-    alpha0[0] = alpha0[1] = 0.0f;
-    return;
+  if (phi[1][0][0] <= 1e-15) return;
+  double a1[2] = {0.0, 0.0};
+  const double dk = phi[2][1][0] * phi[1][0][0] -
+                    (phi[1][1][0] * phi[1][1][0] + phi[1][1][1] * phi[1][1][1]) / 1.000001;
+  if (dk != 0.0) {
+    const double temp_real = phi[0][0][0] * phi[1][1][0] - phi[0][0][1] * phi[1][1][1] -
+                             phi[0][1][0] * phi[1][0][0];
+    const double temp_im = phi[0][0][0] * phi[1][1][1] + phi[0][0][1] * phi[1][1][0] -
+                           phi[0][1][1] * phi[1][0][0];
+    a1[0] = temp_real / dk;
+    a1[1] = temp_im / dk;
   }
-  const float dk = phi[2][1][0] * phi[1][0][0] -
-                   (phi[1][1][0] * phi[1][1][0] + phi[1][1][1] * phi[1][1][1]) / 1.000001f;
-  if (dk == 0.0f) {
-    alpha1[0] = 0.0f;
-    alpha1[1] = 0.0f;
-  } else {
-    const float temp_real = phi[0][0][0] * phi[1][1][0] - phi[0][0][1] * phi[1][1][1] -
-                            phi[0][1][0] * phi[1][0][0];
-    const float temp_im = phi[0][0][0] * phi[1][1][1] + phi[0][0][1] * phi[1][1][0] -
-                          phi[0][1][1] * phi[1][0][0];
-    alpha1[0] = temp_real / dk;
-    alpha1[1] = temp_im / dk;
-  }
-  if (phi[1][0][0] == 0.0f) {
-    alpha0[0] = 0.0f;
-    alpha0[1] = 0.0f;
-  } else {
-    const float temp_real =
-        phi[0][0][0] + alpha1[0] * phi[1][1][0] + alpha1[1] * phi[1][1][1];
-    const float temp_im =
-        phi[0][0][1] + alpha1[1] * phi[1][1][0] - alpha1[0] * phi[1][1][1];
-    alpha0[0] = -temp_real / phi[1][0][0];
-    alpha0[1] = -temp_im / phi[1][0][0];
-  }
-  if (alpha1[0] * alpha1[0] + alpha1[1] * alpha1[1] >= 16.0f ||
-      alpha0[0] * alpha0[0] + alpha0[1] * alpha0[1] >= 16.0f) {
-    alpha1[0] = alpha1[1] = 0.0f;
-    alpha0[0] = alpha0[1] = 0.0f;
-  }
+  const double temp_real = phi[0][0][0] + a1[0] * phi[1][1][0] + a1[1] * phi[1][1][1];
+  const double temp_im = phi[0][0][1] + a1[1] * phi[1][1][0] - a1[0] * phi[1][1][1];
+  const double a0[2] = {-temp_real / phi[1][0][0], -temp_im / phi[1][0][0]};
+  if (a1[0] * a1[0] + a1[1] * a1[1] >= 16.0 || a0[0] * a0[0] + a0[1] * a0[1] >= 16.0) return;
+  alpha1[0] = float(a1[0]);
+  alpha1[1] = float(a1[1]);
+  alpha0[0] = float(a0[0]);
+  alpha0[1] = float(a0[1]);
 }
 
 namespace {

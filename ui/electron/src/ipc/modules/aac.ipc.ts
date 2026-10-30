@@ -24,6 +24,7 @@ const LOW_DELAY_PROFILES = new Set<AacProfile>(['ld', 'eld']);
 const USAC_TOOLS = new Set<AacUsacTool>(['on', 'off', 'auto']);
 const MAX_STREAM_ID = 65535;
 const MAX_BITRATE = 1_000_000;
+const MAX_COUNT = 2_147_483_647;
 const MIN_BANDWIDTH = 1000;
 const MAX_BANDWIDTH = 48000;
 const VBR_MODES = new Set([1, 2, 3, 4, 5]);
@@ -164,10 +165,10 @@ function loudnessInfoOption(value: unknown): AacLoudnessInfo | undefined {
   return info as unknown as AacLoudnessInfo;
 }
 
-/** A whole number of 0 or more, where 0 keeps the default. */
+/** A whole number of 0 or more that the native options hold (a 32-bit integer), where 0 keeps the default. */
 function count(value: unknown, what: string): number | undefined {
   if (value === undefined) return undefined;
-  if (!(typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)) invalid(what);
+  if (!(typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_COUNT)) invalid(what);
   return value;
 }
 

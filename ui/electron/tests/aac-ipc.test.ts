@@ -118,6 +118,7 @@ test('malformed payloads are rejected before the service is called', async () =>
     ['encoder-last-frame', [null]],
     ['encode', [pcm, { profile: 'xhe', usac: { independentIntervalMs: -1 } }]],
     ['encode', [pcm, { profile: 'xhe', usac: { segmentMaxBytes: 1.5 } }]],
+    ['encode', [pcm, { profile: 'xhe', usac: { segmentMaxBytes: 2 ** 32 } }]],
     ['encode', [pcm, { profile: 'xhe', usac: { independentMaxDistanceFrames: '4' } }]],
     ['encode', [pcm, { profile: 'lc', usac: { independentIntervalSamples: 1024 } }]],
     ['encode', [pcm, { profile: 'xhe', usac: { drc: 1 } }]],

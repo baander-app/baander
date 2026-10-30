@@ -351,7 +351,13 @@ test('refuses numeric options that are not numbers', () => {
     () => new AacEncoder({ metadata: { drcProfile: 'speech', programRefLevel: true } }),
     /programRefLevel must be a number/,
   );
+  assert.throws(
+    () => new AacEncoder({ profile: 'xhe', usac: { segmentMaxBytes: 2 ** 32 } }),
+    /segmentMaxBytes must be a number in the 32-bit integer range/,
+  );
   assert.ok(new AacDecoder({ eldDownscale: 1, frameLength: 960, drc: { boost: 50 } }));
+  // a peak below the default bitrate lowers a VBR mode instead of being refused
+  assert.ok(new AacEncoder({ vbrMode: 3, peakBitrate: 96000 }));
 });
 
 test('writes and applies dynamic range control, and runs the afterburner', () => {
