@@ -1740,6 +1740,30 @@ filters keep the output finite, but it can still peak near 1e13. Not
 run: the ten-minute fuzz runs per harness under libFuzzer (no clang
 runtime here), listening tests, the ISO conformance suite.
 
+Checkpoint, 2026-10-30, codec comparison: baander-aac measured against
+FFmpeg's native encoder, FDK AAC, libxaac and Apple's Core Audio AAC
+(qaac under Wine), with ALAC and FLAC as the lossless reference, in
+[codec-comparison.md](packages/baander-aac/docs/codec-comparison.md);
+the harness `packages/baander-aac/bench/` (corpus fetch with checksums,
+reference tool setup, quality, speed, compatibility, lossless and report
+stages) reproduces it and its results are committed. Ten TCDAudio14
+excerpts, 81 configurations, 810 encodes, each scored with GstPEAQ and
+ViSQOL v3 (the ViSQOL build passes its 20 conformance cases). Findings:
+the decoder decodes every encoder's streams, matches FFmpeg and Apple to
+135 dB on AAC-LC and is the fastest measured in three of four families;
+the AAC-LC encoder trails FDK and libxaac by 0.15 to 0.18 PEAQ points at
+80 to 112 kbit/s, almost all of it FDK's afterburner (FDK without it
+scores below ours); encoding runs at 18 times realtime against FDK's
+101; xHE-AAC at 24 to 32 kbit/s trails FDK by 0.4 to 0.6 ViSQOL points;
+Apple's true VBR leads AAC-LC VBR by 0.33 to 0.44 PEAQ points. `baac`
+gained `enc --afterburner` and `dec --no-loudness`. Open, in priority
+order: distortion-measured scalefactor improvement in the rate loop,
+encoder speed, the low-rate xHE-AAC tools (MPS 2-1-2 by bitrate, 4:1
+and 8:3 SBR, LPD), constant-quality VBR, xHE-AAC rate accounting and the
+louder low band of low-rate xHE-AAC decodes, the decoder's loudness
+default. Not run: listening tests, speech, 44.1 kHz, multichannel and
+low-delay comparisons.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

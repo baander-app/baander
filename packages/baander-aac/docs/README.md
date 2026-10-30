@@ -998,7 +998,7 @@ sums. Neither the encoder nor the decoder allocates once it is running
 
 ```sh
 baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] [quality] [lc|he|hev2|xhe] [options]
-baac dec <in.aac> <out.f32le> [rate] [channels]
+baac dec <in.aac> <out.f32le> [rate] [channels] [--no-loudness]
 baac loudness <in.wav> | <in.f32le> <rate> <channels>
 baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
 ```
@@ -1006,7 +1006,9 @@ baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
 For every profile `--peak-bitrate N`, `--bandwidth HZ` and
 `--vbr-mode 1..5` set the tuning controls (with a VBR mode the bitrate
 and mode arguments are replaced by the mode's, and a quality argument
-overrides the mode's quality).
+overrides the mode's quality). `--afterburner` turns on the second
+quantisation pass (not for `xhe`). `baac dec --no-loudness` turns off
+the decoder's loudness normalisation of USAC streams.
 
 With the `xhe` profile, `--loudness` measures the whole input first and
 writes the loudness info set into the stream (the figures go to stderr),
@@ -1375,6 +1377,11 @@ and its random sequence would then run ahead of a conforming decoder's.
 
 ## Fuzzing and benchmarks
 
+[codec-comparison.md](codec-comparison.md) measures the codec against
+FFmpeg's encoder, FDK AAC, libxaac and Apple's AAC (perceptual quality,
+speed, memory, decoder agreement) and lists where it falls short;
+[bench/](../bench/README.md) reproduces it.
+
 Five fuzz harnesses under `tools/fuzz/` drive the decoder, the
 AudioSpecificConfig and StreamMuxConfig parsers, the encoder, MPEG-D
 DRC and MPEG Surround with mutated input, and
@@ -1469,9 +1476,10 @@ include/      public aac.h and internal headers
 src/          tables, FFT/MDCT, QMF, bitstream, ASC, LATM, transport layer, decoder, concealment, error resilience tools (er_vcb11, er_rvlc, er_hcr), SBR and PS decoders, low-delay filterbanks, LD-SBR, limiter, dynamic range control, USAC decoder (usac_config, usac_frame, usac_arith, usac_fd, usac_stereo, usac_lpd with usac_lpc, usac_acelp, usac_tcx and usac_fac), USAC encoder (usac_enc, usac_enc_config, usac_arith_enc, the USAC form of the SBR encoder in sbr_enc_usac, the 2-1-2 encoder in mps212_enc and the MPEG-D DRC gain generator in drc_gen), enhanced SBR (sbr_esbr), MPS 212 (mps212), MPEG Surround (mps_config, mps_frame, mps_params, mps_tables, mps_tree, mps_dec, mps_glue, and the low-delay form of ELD v2 in mps_ld with mps_ld_tables), MPEG-D DRC (unidrc_parse, unidrc_gain, unidrc), psychoacoustics, encoder, afterburner, coding tools, SBR and PS encoders, SIMD
 tools/        baac command-line tool (with the benchmark), mps-enc test stream writer for MPEG Surround, fuzz/ harnesses with their seed generator and mutation driver
 tests/        CTest suites and the committed HE-AAC, ELD, USAC and MPEG Surround reference streams and decodes (tests/data)
+bench/        the codec comparison harness (corpus, reference tools, quality, speed, compatibility) and its results
 node/         Node-API binding (addon.cc, ESM entry, types, smoke test, the prebuild fetch script)
 prebuilds/    prebuilt bindings per platform-arch, fetched from a release (not committed)
-docs/         this file and the reference comparison
+docs/         this file, the reference comparison and the codec comparison
 ```
 
 ## Provenance

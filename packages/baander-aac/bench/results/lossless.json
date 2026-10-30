@@ -1,0 +1,42 @@
+[
+ {
+  "codec": "alac-ffmpeg",
+  "seconds": 130.3173125,
+  "kbps": 697.0160315422403,
+  "enc_cpu": 0.99,
+  "enc_rss_kb": 52196,
+  "dec_cpu": 0.6799999999999999,
+  "dec_rss_kb": 51392,
+  "bit_exact": true
+ },
+ {
+  "codec": "flac-5",
+  "seconds": 130.3173125,
+  "kbps": 629.6765212987337,
+  "enc_cpu": 0.25,
+  "enc_rss_kb": 3420,
+  "dec_cpu": 0.32,
+  "dec_rss_kb": 51616,
+  "bit_exact": true
+ },
+ {
+  "codec": "flac-8",
+  "seconds": 130.3173125,
+  "kbps": 615.062346378575,
+  "enc_cpu": 0.67,
+  "enc_rss_kb": 3496,
+  "dec_cpu": 0.32999999999999996,
+  "dec_rss_kb": 51536,
+  "bit_exact": true
+ },
+ {
+  "codec": "alac-apple-ref",
+  "seconds": 130.3173125,
+  "kbps": 690.2499619918112,
+  "enc_cpu": 0.7200000000000001,
+  "enc_rss_kb": 28172,
+  "dec_cpu": 0.61,
+  "dec_rss_kb": 51644,
+  "bit_exact": true
+ }
+]
