@@ -85,7 +85,8 @@ int aac_latm_write_mux_element(const AacLatmConfig* cfg, int mux_config_present,
                                uint8_t* out, int out_size);
 
 /* One AudioSyncStream frame: syncword, audioMuxLengthBytes and
- * AudioMuxElement(1) with the StreamMuxConfig.  Returns its length. */
+ * AudioMuxElement(1), which carries the StreamMuxConfig of `cfg` unless
+ * `use_same_stream_mux` refers to the previous one.  Returns its length. */
 int aac_loas_write_frame(const AacLatmConfig* cfg, int use_same_stream_mux, const uint8_t* au,
                          int au_size, uint8_t* out, int out_size);
 

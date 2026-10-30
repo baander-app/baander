@@ -4,7 +4,8 @@
  * size ceiling measured on the raw access units, the frame info a muxer
  * cuts by (aligned against the decoded output), a decoder starting at
  * any immediate playout frame of a stream with on-demand independent
- * frames, and the committed stream.
+ * frames, the StreamMuxConfig at the frames a decoder starts at, and
+ * the committed stream.
  *
  * With arguments the program writes the committed stream, or the stream
  * and its cut at each immediate playout frame for the reference
@@ -621,6 +622,139 @@ void test_cuts() {
   check_cuts("SBR 32k mono under a ceiling, requests at 4 and 25", mono, 1, 32000, o, {4, 25});
 }
 
+/* ── the StreamMuxConfig ───────────────────────────────────────── */
+
+/* The units whose AudioMuxElement carries the StreamMuxConfig: its first
+ * bit, useSameStreamMux, is 0 (after the 3-byte header of a LOAS frame). */
+std::vector<int> config_units(const std::vector<std::vector<uint8_t>>& units, size_t header) {
+  std::vector<int> v;
+  for (size_t i = 0; i < units.size(); i++) {
+    if (units[i].size() > header && (units[i][header] & 0x80) == 0) {
+      v.push_back((int)i);
+    }
+  }
+  return v;
+}
+
+std::vector<std::vector<uint8_t>> unit_bytes(const Encoded& e) {
+  std::vector<std::vector<uint8_t>> v;
+  for (const Unit& u : e.units) {
+    v.push_back(u.bytes);
+  }
+  return v;
+}
+
+/* LATM elements with the config in band, one per call, over two streams
+ * with a flush between them. */
+std::vector<std::vector<uint8_t>> encode_latm_twice(const std::vector<float>& pcm, int channels,
+                                                    int bitrate, const AacUsacEncoderOptions& opt,
+                                                    size_t* first_stream_units) {
+  std::vector<std::vector<uint8_t>> units;
+  AacEncoderHandle enc = aac_encoder_create(kRate, channels, bitrate, AAC_AOT_USAC, AAC_RC_CBR);
+  CHECK(enc && aac_encoder_set_usac(enc, &opt) == AAC_OK &&
+            aac_encoder_set_transport(enc, AAC_TRANSPORT_LATM_MCP1) == AAC_OK,
+        "LATM encoder");
+  if (!enc) {
+    return units;
+  }
+  const int frame = aac_encoder_frame_size(enc);
+  std::vector<float> block((size_t)frame * channels);
+  std::vector<uint8_t> buf((size_t)aac_encoder_max_frame_bytes(enc) * 4);
+  for (int pass = 0; pass < 2; pass++) {
+    for (size_t pos = 0; pos < pcm.size(); pos += block.size()) {
+      std::fill(block.begin(), block.end(), 0.0f);
+      const size_t n = std::min(block.size(), pcm.size() - pos);
+      memcpy(block.data(), pcm.data() + pos, n * sizeof(float));
+      const int len = aac_encoder_encode(enc, block.data(), frame, buf.data(), (int)buf.size());
+      CHECK(len > 0, "LATM frame %zu: %d", units.size(), len);
+      if (len <= 0) {
+        break;
+      }
+      units.emplace_back(buf.begin(), buf.begin() + len);
+    }
+    for (;;) {
+      const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
+      CHECK(len >= 0, "LATM flush: %d", len);
+      if (len <= 0) {
+        break;
+      }
+      units.emplace_back(buf.begin(), buf.begin() + len);
+    }
+    if (pass == 0) {
+      *first_stream_units = units.size();
+    }
+  }
+  aac_encoder_destroy(enc);
+  return units;
+}
+
+/* The StreamMuxConfig travels with the first frame and the frames a
+ * decoder starts at (the immediate playout frames, or the independent
+ * frames that open a segment with the pre-roll off), on-demand ones
+ * included, and every other element refers to it.  A LOAS stream cut
+ * between two of those frames decodes from the next one on without an
+ * error, exactly as a cut there does. */
+void check_mux_config(const char* name, int channels, int bitrate, const AacUsacEncoderOptions& opt,
+                      const std::set<int>& requests) {
+  const std::vector<float> pcm = gen_wideband(2 * kRate, kRate, channels);
+  const Encoded raw = encode(pcm, channels, bitrate, opt, AAC_TRANSPORT_RAW, requests);
+  const Encoded loas = encode(pcm, channels, bitrate, opt, AAC_TRANSPORT_LOAS, requests);
+  CHECK(raw.error == 0 && loas.error == 0 && raw.units.size() == loas.units.size(),
+        "%s: encodes (%d, %d; %zu and %zu units)", name, raw.error, loas.error, raw.units.size(),
+        loas.units.size());
+  std::vector<int> want = indices_where(raw, opt.preroll != 0);
+  if (want.empty() || want[0] != 0) {
+    want.insert(want.begin(), 0);
+  }
+  CHECK(want.size() >= 3, "%s: %zu starting points", name, want.size());
+  const std::vector<int> got = config_units(unit_bytes(loas), 3);
+  CHECK(got == want, "%s: LOAS config at %s (wanted %s)", name, join(got).c_str(),
+        join(want).c_str());
+  size_t first = 0;
+  const std::vector<std::vector<uint8_t>> latm =
+      encode_latm_twice(pcm, channels, bitrate, opt, &first);
+  const std::vector<std::vector<uint8_t>> first_stream(latm.begin(), latm.begin() + (long)first);
+  const std::vector<std::vector<uint8_t>> second_stream(latm.begin() + (long)first, latm.end());
+  const std::vector<int> latm_first = config_units(first_stream, 0);
+  const std::vector<int> latm_second = config_units(second_stream, 0);
+  if (requests.empty()) {
+    CHECK(latm_first == want && latm_second == want,
+          "%s: LATM config at %s, after the flush at %s (wanted %s)", name,
+          join(latm_first).c_str(), join(latm_second).c_str(), join(want).c_str());
+  }
+  if (want.size() < 3 || got != want) {
+    return;
+  }
+  const std::vector<std::pair<size_t, size_t>> frames = split_loas(loas.stream);
+  const auto tail = [&](int i) {
+    return std::vector<uint8_t>(loas.stream.begin() + (long)frames[(size_t)i].first,
+                                loas.stream.end());
+  };
+  const int mid = std::max(want[1] + 1, (want[1] + want[2]) / 2);
+  int mid_errors = 0;
+  int at_errors = 0;
+  const std::vector<float> from_mid = decode_loas(tail(mid), channels, &mid_errors);
+  const std::vector<float> from_next = decode_loas(tail(want[2]), channels, &at_errors);
+  CHECK(mid_errors == 0 && at_errors == 0 && !from_next.empty() && from_mid == from_next,
+        "%s: cut at frame %d waits for the config at %d (%d and %d errors, %zu and %zu samples)",
+        name, mid, want[2], mid_errors, at_errors, from_mid.size(), from_next.size());
+  printf("  %s: config at %s\n", name, join(got).c_str());
+}
+
+void test_mux_config() {
+  AacUsacEncoderOptions o = options(0);
+  o.independent_interval_frames = 12;
+  check_mux_config("plain 96k, every 12 frames", 2, 96000, o, {});
+  check_mux_config("plain 96k, requests at 5 and 30", 2, 96000, o, {5, 30});
+  o = options(1);
+  o.independent_interval_frames = 10;
+  check_mux_config("SBR 64k, every 10 frames", 2, 64000, o, {});
+  o = options(0);
+  o.preroll = 0;
+  o.independent_interval_frames = 12;
+  check_mux_config("plain 64k mono without pre-roll", 1, 64000, o, {});
+}
+
 /* ── the API ───────────────────────────────────────────────────── */
 
 void test_api() {
@@ -826,6 +960,7 @@ int main(int argc, char** argv) {
   test_schedule();
   test_segment_ceiling();
   test_cuts();
+  test_mux_config();
   test_committed();
   return test_summary("test_usac_rap");
 }

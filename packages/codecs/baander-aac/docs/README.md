@@ -545,8 +545,15 @@ is the stream's, extensions included. A fill element closes the frame
 when fewer than five bits follow the last arithmetic payload, which
 keeps the decoders whose range decoder reads past the frame's end in
 step. The output is LOAS/LATM by default, raw access units with the
-USAC AudioSpecificConfig for MP4, never ADTS; the afterburner and the
-AAC DRC metadata are refused, as the USAC frame has no place for them;
+USAC AudioSpecificConfig for MP4, never ADTS. A LOAS frame or LATM
+element with the configuration in band carries the StreamMuxConfig at
+the first frame and at every immediate playout frame (at every
+independent frame that opens a segment when the pre-roll is off),
+where a decoder can start and a muxer cuts, and sets useSameStreamMux
+elsewhere, as the FDK encoder does; a decoder that joins between two
+of them skips the frames up to the next one. (AAC-LC and HE-AAC frames
+are each a starting point and carry it in every frame.) The afterburner
+and the AAC DRC metadata are refused, as the USAC frame has no place for them;
 `aac_encoder_set_usac` sets noise filling, the pre-roll, the independent
 frame schedule and the segment size ceiling (below), a stream
 identifier, whether enhanced SBR and MPS 212 are on, off or chosen
@@ -668,8 +675,8 @@ the target of 10 LU brings the decoded range to 10.2 LU one-pass and
 10.7 LU two-pass, and FDK, libxaac and our decoder apply the gains (see
 `docs/reference-comparison.md`). The gains cost about 0.7 kbit/s; the
 configuration grows by 34 bytes (and the loudness entries by up to
-33), which a LOAS stream pays in every frame, since its
-StreamMuxConfig repeats in every frame.
+33), which a LOAS stream pays at each immediate playout frame, where
+its StreamMuxConfig travels.
 
 ## API
 
@@ -1198,7 +1205,7 @@ and coverage, ADTS resync across inserted headers, truncation and
 garbage, byte-wise feeding reproducing the one-shot decode, ASC
 roundtrips over every signalling mode, layout and frame length,
 StreamMuxConfig and LATM element roundtrips, LOAS/LATM/raw roundtrips
-of LC and HE-AAC streams), concealment (transparency on undamaged
+of LC and HE-AAC streams with the StreamMuxConfig in every frame), concealment (transparency on undamaged
 streams, damaged and lost frames at 1 and 10 percent on LC and HE-AAC
 streams with no error, exact counts, bounded discontinuities and the
 fade), 960-sample frames (transforms, API, roundtrips at every rate,
@@ -1277,7 +1284,10 @@ too), the frame reports against the access units, the segment size
 ceiling on a transient-rich signal in the constant-rate and true VBR
 modes with and without the pre-roll, cuts at every immediate playout
 frame of the raw and LOAS forms decoded from cold and aligned at the
-reported position, and the committed stream
+reported position, the StreamMuxConfig of LOAS and LATM streams at the
+first frame and the immediate playout frames only (on-demand ones, the
+pre-roll off and a second stream after a flush included) with a cut
+between two of them decoding as the cut at the next, and the committed stream
 `usac_enc_rap_cpe_64k.loas` with on-demand independent frames under a
 ceiling; `test_drc_gen`: the `uniDrcConfig()`, `uniDrcGain()` and
 loudness info set writers against the parsers, the gain generator on a

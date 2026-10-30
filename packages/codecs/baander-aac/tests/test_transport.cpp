@@ -859,6 +859,14 @@ static void test_latm_roundtrip() {
                                                        &loas_frames, nullptr);
     CHECK(split_loas(loas).size() == n_frames, "%s: %zu LOAS frames for %zu", c.name,
           split_loas(loas).size(), n_frames);
+    /* Every AAC frame is a starting point, so each one carries the
+     * StreamMuxConfig (useSameStreamMux 0, the element's first bit). */
+    size_t with_config = 0;
+    for (const std::vector<uint8_t>& f : loas_frames) {
+      with_config += f.size() > 3 && (f[3] & 0x80) == 0;
+    }
+    CHECK(with_config == loas_frames.size(), "%s: %zu of %zu LOAS frames carry the config",
+          c.name, with_config, loas_frames.size());
     AacDecoderHandle dec = aac_decoder_create(48000, 0);
     int frames = 0;
     std::vector<float> out = decode_chunked(dec, loas, 333, &frames, &errors);
@@ -890,6 +898,10 @@ static void test_latm_roundtrip() {
      * and from the reference for the packet comparisons. */
     const size_t main_frames = n_frames - (c.aot == AAC_AOT_LC ? 2 : 3);
     packets.resize(main_frames);
+    for (size_t i = 0; i < packets.size(); i++) {
+      CHECK(!packets[i].empty() && (packets[i][0] & 0x80) == 0,
+            "%s: LATM packet %zu carries the config", c.name, i);
+    }
     const size_t frame_samples = (size_t)(c.aot == AAC_AOT_LC ? 1024 : 2048) * c.channels;
     const std::vector<float> ref_main(ref.begin(), ref.begin() + (long)(main_frames * frame_samples));
     for (int explicit_transport = 0; explicit_transport < 2; explicit_transport++) {

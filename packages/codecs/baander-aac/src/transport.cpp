@@ -843,6 +843,28 @@ struct AacEncoderTransport_ {
   int frames; /* frames since the last flush */
 };
 
+namespace {
+
+/* Whether the AudioMuxElement of the frame just coded carries the
+ * StreamMuxConfig (useSameStreamMux 0, ISO/IEC 14496-3 1.7.3) rather
+ * than referring to the previous one.  The first element of a stream
+ * always does.  An AAC frame is a starting point of its own, so every
+ * element carries the config.  An xHE-AAC decoder can start only at an
+ * immediate playout frame (ISO/IEC 23003-3, the frame with the audio
+ * pre-roll), or at an independent frame that opens a segment when the
+ * pre-roll is off, so the config travels with those frames alone: a
+ * stream cut there starts with it, and the UsacConfig, which grows with
+ * the DRC and loudness extensions, is not paid in every frame. */
+bool mux_config_due(const AacEncoderState* s, const AacEncoderTransport* t) {
+  if (t->frames == 0 || s->aot != AAC_AOT_USAC || !s->usac) {
+    return true;
+  }
+  const AacUsacEncoder* u = s->usac;
+  return u->opt.preroll ? u->ipf != 0 : u->indep != 0;
+}
+
+}  // namespace
+
 AacEncoderTransport* aac_encoder_transport_create(void) {
   auto* t = new AacEncoderTransport_();
   t->transport = AAC_TRANSPORT_ADTS;
@@ -1000,11 +1022,12 @@ int aac_encoder_transport_wrap(AacEncoderState* s, AacEncoderTransport* t, int f
       const int version = asc.signaling == AAC_SIGNAL_EXPLICIT_BC && asc.sbr_present >= 0;
       AacLatmConfig cfg;
       aac_latm_config_init(&cfg, &asc, version);
+      const int use_same = mux_config_due(s, t) ? 0 : 1;
       if (t->transport == AAC_TRANSPORT_LOAS) {
-        len = aac_loas_write_frame(&cfg, 0, raw, raw_len, out, out_size);
+        len = aac_loas_write_frame(&cfg, use_same, raw, raw_len, out, out_size);
       } else {
         const int mcp = t->transport == AAC_TRANSPORT_LATM_MCP1;
-        len = aac_latm_write_mux_element(&cfg, mcp, 0, raw, raw_len, out, out_size);
+        len = aac_latm_write_mux_element(&cfg, mcp, use_same, raw, raw_len, out, out_size);
       }
       break;
     }

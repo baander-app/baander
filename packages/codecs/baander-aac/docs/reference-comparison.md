@@ -163,7 +163,7 @@ The tuned streams in the four decoders (SNR against the input):
 | music, AAC-LC mode 3 | 109.6 | 27.12 | 27.12 / 27.12 | 27.12 | 27.12 |
 | music, HE-AAC mode 2 | 71.1 | 24.89 | 24.89 / 24.89 | 24.97 | 24.90 |
 | music, HE-AAC v2 mode 1 | 31.7 | 2.25 | 2.25 / 2.25 | 2.24 | 2.25 |
-| music, xHE-AAC mode 2 (LOAS) | 79.7 | 23.65 | - / 23.65 | 23.65 | 23.65 |
+| music, xHE-AAC mode 2 (LOAS) | 77.1 | 23.65 | - / 23.65 | 23.65 | 23.65 |
 | clicks, xHE-AAC TVBR 90, peak 96 (LOAS) | 55.4 | -0.39 | - / -0.39 | -0.08 | -0.45 |
 | clicks, AAC-LC TVBR 100, peak 96 | 37.9 | 7.44 | 7.44 / 7.44 | 7.44 | 7.44 |
 | music, AAC-LC 128 kbit/s, 11 kHz | 127.4 | 27.44 | 27.44 / 27.44 | 27.44 | 27.44 |
@@ -173,8 +173,10 @@ The tuned streams in the four decoders (SNR against the input):
 FFmpeg master agrees with our decode to 131.6 to 136.1 dB on the AAC
 streams and to 27 to 39 dB on the xHE-AAC ones (its noise filling and
 SBR noise draw other random values). The xHE-AAC mode 2 stream is
-79.7 kbit/s in LOAS with the pre-roll and 70.8 kbit/s as raw access
-units without it.
+77.1 kbit/s in LOAS with the pre-roll (79.7 kbit/s while the
+StreamMuxConfig repeated in every frame) and 70.8 kbit/s as raw access
+units without it. The clicks stream's 55.4 kbit/s is from the same
+per-frame StreamMuxConfig and was not measured again.
 
 One finding left as it is: in TVBR the rate loop still spends a full
 reservoir's surplus on frames that fit, so the bitrate of a true VBR
@@ -427,8 +429,9 @@ and 27.0 dB) and 1 to 2 dB above them on the clicks, where noise
 filling and the frames the pre-roll shares the budget with cost a
 little waveform accuracy. Raw access units of the one-second stereo
 clicks signal come to 44.6, 60.3, 92.9 and 125.6 kbit/s at 48, 64, 96
-and 128 kbit/s; LOAS adds about 5 kbit/s for the StreamMuxConfig every
-frame.
+and 128 kbit/s; LOAS adds about 2 kbit/s: its header and the payload
+length in every frame, and the StreamMuxConfig at each immediate
+playout frame.
 
 #### Enhanced SBR and MPEG Surround 2-1-2
 
@@ -470,9 +473,9 @@ phase coding, which keeps the channel offset and costs the sum.
 
 | Stereo | Ours: tools (SBR start, stop index) | kbit/s | SNR | Bandwidth | FDK: tools | SNR | Bandwidth |
 |-------:|-------------------------------------|-------:|----:|----------:|------------|----:|----------:|
-| 24 | 2:1 SBR (default) | 28.2 (LOAS) | 13.0 dB | 9.8 kHz | 8:3 SBR, 2-1-2 with phase | 12.5 dB | 8.4 kHz |
+| 24 | 2:1 SBR (default) | 25.6 (LOAS) | 13.0 dB | 9.8 kHz | 8:3 SBR, 2-1-2 with phase | 12.5 dB | 8.4 kHz |
 | 24 | 2:1 SBR (7, 8), 2-1-2 (opted in) | 24.0 | 16.7 dB (sum) | 11.4 kHz | | | |
-| 32 | 2:1 SBR (default) | 37.0 (LOAS) | 17.8 dB | 11.3 kHz | 8:3 SBR, 2-1-2 with phase | 14.9 dB | 8.6 kHz |
+| 32 | 2:1 SBR (default) | 34.2 (LOAS) | 17.8 dB | 11.3 kHz | 8:3 SBR, 2-1-2 with phase | 14.9 dB | 8.6 kHz |
 | 32 | 2:1 SBR (10, 9), 2-1-2 (opted in) | 32.3 | 17.2 dB (sum) | 13.2 kHz | | | |
 | 48 | 2:1 SBR (12, 9) | 49.4 | 23.2 dB | 15.6 kHz | 2:1 SBR, 2-1-2 with residual | 24.6 dB | 16.8 kHz |
 | 64 | 2:1 SBR (14, 12) | 66.1 | 24.4 dB | 21.6 kHz | 2:1 SBR, 2-1-2 with residual | 25.9 dB | 19.9 kHz |
@@ -493,8 +496,9 @@ Every one of these streams decodes in the FDK decoder and libxaac at
 32 kbit/s points), and in FFmpeg at 31 to 50 dB except the two 2-1-2
 points it rejects. The 2-1-2 is therefore never chosen by bitrate; the
 default stereo points below 48 kbit/s are SBR pairs, whose LOAS bitrate
-is given (the per-frame StreamMuxConfig adds about four kbit/s to the
-access units), and a caller who knows the players opts into the 2-1-2
+is given (the LOAS framing adds about one kbit/s to the access units;
+these two were 28.2 and 37.0 kbit/s while the StreamMuxConfig repeated
+in every frame), and a caller who knows the players opts into the 2-1-2
 for 1.5 to 2 kHz more bandwidth at the same rate. At 96 kbit/s stereo our rule keeps SBR, which codes
 the full band where the FDK encoder's plain core stops at 14 kHz; the
 SNR on music is lower there because the replicated band carries no
@@ -520,9 +524,9 @@ true peak are FFmpeg's `ebur128` on each decode.
 
 | Stream | kbit/s (LOAS / config once) | SNR against the source, all four | Night: ours / FDK / libxaac | General: ours / FDK / libxaac |
 |--------|----------------------------:|---------------------------------:|-----------------------------|-------------------------------|
-| 64 kbit/s, one-pass, 10 LU | 78.6 / 69.5 | 23.3 dB | -17.0 LUFS, 10.3 LU, -0.8 dBTP / -17.0, 10.3, -1.0 / -17.0, 10.3, -0.8 | -17.0, 10.2, -0.8 / -17.0, 10.2, -1.0 / -17.0, 10.2, -0.8 |
-| 64 kbit/s, two-pass, 10 LU | 85.0 / 69.7 | 23.3 dB | -17.5, 10.7, -0.9 / -17.5, 10.7, -1.0 / -17.5, 10.7, -0.9 | -17.4, 10.7, -0.8 / -17.4, 10.7, -1.0 / -17.4, 10.7, -0.7 |
-| 128 kbit/s, one-pass, 6 LU | 144.7 / 127.8 | 27.7 dB | -16.9, 8.8, -0.9 / -16.9, 8.7, -1.0 / -16.9, 8.7, -0.8 | -16.9, 8.7, -0.6 / -16.9, 8.7, -1.0 / -16.8, 8.7, -0.6 |
+| 64 kbit/s, one-pass, 10 LU | 69.9 / 69.6 | 23.3 dB | -17.0 LUFS, 10.3 LU, -0.8 dBTP / -17.0, 10.3, -1.0 / -17.0, 10.3, -0.8 | -17.0, 10.2, -0.8 / -17.0, 10.2, -1.0 / -17.0, 10.2, -0.8 |
+| 64 kbit/s, two-pass, 10 LU | 70.4 / 69.8 | 23.3 dB | -17.5, 10.7, -0.9 / -17.5, 10.7, -1.0 / -17.5, 10.7, -0.9 | -17.4, 10.7, -0.8 / -17.4, 10.7, -1.0 / -17.4, 10.7, -0.7 |
+| 128 kbit/s, one-pass, 6 LU | 128.2 / 127.8 | 27.7 dB | -16.9, 8.8, -0.9 / -16.9, 8.7, -1.0 / -16.9, 8.7, -0.8 | -16.9, 8.7, -0.6 / -16.9, 8.7, -1.0 / -16.8, 8.7, -0.6 |
 
 Without a DRC request every decoder plays the stream as before: the
 same SNR against the source as the stream without gain sets, FFmpeg
@@ -546,14 +550,37 @@ accordingly; so does our decoder. Its curve agrees with libxaac's within
 at a lag of zero. Before the decoder took the one-frame delay it applied
 the gains a frame early, 0.2 to 0.28 dB rms (p99 up to 1.06 dB) from
 FDK; the "ours" figures in the table are from the corrected decoder.
-The FDK decoder fails frames of LOAS streams that repeat a large StreamMuxConfig in
-every frame, with or without the gain sets (10 and 19 failed frames on
-the two 64 kbit/s streams, 16 and 31 on plain streams at 96 and
-128 kbit/s, none at 128 kbit/s with the gain sets); the same streams
-with the configuration sent once decode without a failure, and the
-figures above are from that form. The committed
-`usac_enc_drc_cpe_64k.loas` decodes in FDK, as written, without a
-failure.
+
+The LOAS bitrates are those of the StreamMuxConfig at each immediate
+playout frame; while it repeated in every frame, with the whole
+UsacConfig, the DRC configuration and the loudness entries, the same
+streams came to 78.6, 85.0 and 144.7 kbit/s. Those streams also failed
+frames in the FDK decoder's command-line front end (10 and 19 at
+64 kbit/s, 16 and 31 on plain streams at 96 and 128 kbit/s), which
+feeds the library fixed-size chunks of the file. Driven through its
+public API, the FDK library decodes every one of them without a failure
+when it is fed one LOAS frame per fill. It fails, though, when a fill
+ends inside the last bytes of a StreamMuxConfig or just after it, or
+five bytes into a frame; the failure can carry over to the following
+frames until the next configuration. The FDK encoder's own streams fail
+at the same places: chunk sizes from 1000 to 20000 bytes break 8 of 48
+decodes of its 64 kbit/s stream and 9 of 48 at 128 kbit/s, its
+144 kbit/s stream loses 20 frames in the front end, and our streams
+with the config at the immediate playout frames fail as often (5 and 6
+of 48). It is a fault of the library's partial-input handling. A
+configuration in every frame multiplies the places where it strikes,
+and sending the configuration at the immediate playout frames alone,
+as the FDK encoder does, brings it to FDK's own rate. Of the streams
+above, the 64 kbit/s one-pass stream still loses 9 frames in the front
+end, where a fill boundary lands just after the configuration of one
+immediate playout frame; fed frame by frame it decodes whole. Our
+AAC-LC and HE-AAC LOAS streams, which keep the StreamMuxConfig in every
+frame (each frame is a starting point, and their configuration is a
+few bytes), fail single frames under the same chunked feeding (14 of
+48 chunk sizes at 128 kbit/s AAC-LC, 9 of 48 with the configuration
+once) and none in the front end. The FDK figures in the table are from
+the access units with the configuration sent once, which carry the
+same audio as the streams written now.
 
 ## MPEG Surround
 

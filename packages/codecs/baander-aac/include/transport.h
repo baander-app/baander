@@ -86,7 +86,9 @@ int aac_encoder_transport_max_bytes(const struct AacEncoderState_* s,
                                     const AacEncoderTransport* t);
 /* Wraps the ADTS frame of `frame_len` bytes in the encoder's output buffer
  * into the transport and writes it to `out`; returns its length or
- * AAC_ERR_OVERFLOW. */
+ * AAC_ERR_OVERFLOW.  A LOAS frame or LATM element with the configuration
+ * in band carries the StreamMuxConfig in the first frame of a stream, in
+ * every AAC frame, and in the xHE-AAC frames a decoder starts at. */
 int aac_encoder_transport_wrap(struct AacEncoderState_* s, AacEncoderTransport* t, int frame_len,
                                uint8_t* out, int out_size);
 #endif /* BAAC_AAC_HAVE_ENCODER */
