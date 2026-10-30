@@ -13,7 +13,7 @@ LDFLAGS := \
   -s STRICT=1 \
   -s INITIAL_MEMORY=16777216 \
   -s ALLOW_MEMORY_GROWTH=0 \
-  -s EXPORTED_FUNCTIONS='["_wasm_malloc","_wasm_free","_init_fft","_reset_fft","_process_spectrum","_push_block","_consume_spectrum","_downsample_mag_stride4","_downsample_wave_stride4"]'
+  -s EXPORTED_FUNCTIONS='["_wasm_malloc","_wasm_free","_init_fft","_reset_fft","_process_spectrum","_process_display_spectrum","_push_block","_consume_spectrum","_downsample_mag_stride4","_downsample_wave_stride4"]'
 
 .PHONY: all build clean serve-demo
 

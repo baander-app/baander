@@ -24,7 +24,7 @@ class WasmSpectrumProcessor extends AudioWorkletProcessor {
         const malloc = exp.wasm_malloc || exp._wasm_malloc || exp.malloc || exp._malloc;
         free = exp.wasm_free || exp._wasm_free || exp.free || exp._free;
         const init = exp.init_fft || exp._init_fft;
-        const process = exp.process_spectrum || exp._process_spectrum;
+        const process = exp.process_display_spectrum || exp._process_display_spectrum;
         if (!exp.memory || !malloc || !free || !init || !process) throw new Error('Missing FFT exports');
         exp._initialize?.();
         this._fn = { process };
@@ -75,6 +75,10 @@ class WasmSpectrumProcessor extends AudioWorkletProcessor {
       this._timeOut.set(new Uint8Array(this._memory.buffer, this._wavePtr, 2048));
       this.port.postMessage({
         type: 'spectrum',
+        sampleRate,
+        fftSize: 2048,
+        minDecibels: -100,
+        maxDecibels: 0,
         frequencyData: this._freqOut,
         timeDomainData: this._timeOut,
       });

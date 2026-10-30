@@ -9,6 +9,7 @@ function fixture() {
     free: vi.fn(),
     init: vi.fn(),
     computeFromMag: vi.fn(),
+    computeFromLinear: vi.fn(),
     getCentroidHz: vi.fn(() => 1000),
     getRolloffHz: vi.fn(() => 2000),
     getFlux: vi.fn(() => 0),
@@ -30,15 +31,20 @@ describe('spectral input ownership', () => {
     const { api, processor } = fixture()
     for (const size of [0, 128, 1023, 1025, 2048]) processor.computeSpectralFeatures(new Uint8Array(size))
     expect(api.malloc).not.toHaveBeenCalled()
-    expect(api.computeFromMag).not.toHaveBeenCalled()
+    expect(api.computeFromLinear).not.toHaveBeenCalled()
   })
 
-  it('copies a complete spectrum and frees its native allocation', () => {
+  it('decodes display bytes into linear float magnitudes and frees their native allocation', () => {
     const { api, processor } = fixture()
     const data = Uint8Array.from({ length: 1024 }, (_, i) => i % 256)
     processor.computeSpectralFeatures(data)
-    expect(new Uint8Array(api.memory.buffer, 128, 1024)).toEqual(data)
-    expect(api.computeFromMag).toHaveBeenCalledWith(128)
+    expect(api.malloc).toHaveBeenCalledWith(4096)
+    const linear = new Float32Array(api.memory.buffer, 128, 1024)
+    expect(linear[0]).toBe(0)
+    expect(linear[255]).toBe(1)
+    expect(linear[128]).toBeCloseTo(Math.pow(10, (-100 + 128 * 100 / 255) / 20), 7)
+    expect(api.computeFromLinear).toHaveBeenCalledWith(128)
+    expect(api.computeFromMag).not.toHaveBeenCalled()
     expect(api.free).toHaveBeenCalledWith(128)
     expect(processor.peakFrequency).toBe(100 * 48000 / 2048)
   })

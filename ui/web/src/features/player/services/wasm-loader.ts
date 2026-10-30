@@ -77,6 +77,7 @@ export async function getSpectralFeatures(): Promise<SpectralFeaturesApi> {
     memory: exportedMemory(e),
     malloc: exportedFunction(e, 'wasm_malloc'), free: exportedFunction(e, 'wasm_free'),
     init: exportedFunction(e, 'init_features'), computeFromMag: exportedFunction(e, 'compute_from_mag'),
+    computeFromLinear: exportedFunction(e, 'compute_from_linear'),
     getCentroidHz: exportedFunction(e, 'get_centroid_hz'), getRolloffHz: exportedFunction(e, 'get_rolloff_hz'),
     getFlux: exportedFunction(e, 'get_flux'), getFlatness: exportedFunction(e, 'get_flatness'),
     getPeakIndex: exportedFunction(e, 'get_peak_index'), getBandEnergies: exportedFunction(e, 'get_band_energies'),

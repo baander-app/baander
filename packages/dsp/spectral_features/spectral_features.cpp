@@ -50,10 +50,10 @@ void init_features(int fft_size, int sample_rate) {
   g_peak_idx    = 0;
 }
 
-// Input: mag1024 is uint8_t magnitude for N/2 bins (0..255)
-// Internally we normalize to [0..1], compute features, and keep a copy for flux
-void compute_from_mag(const uint8_t* mag1024) {
-  if (!mag1024) return;
+// Accept either byte linear magnitudes or float linear magnitudes.
+// Keep a copy of the linear spectrum for flux and rolloff.
+static void compute_features(const uint8_t* bytes, const float* linear) {
+  if (!bytes && !linear) return;
   const int B = g_bins;
 
   // Find peak and compute sums
@@ -71,7 +71,7 @@ void compute_from_mag(const uint8_t* mag1024) {
   double flux_acc = 0.0;
 
   for (int k = 0; k < B; ++k) {
-    float v = (float)mag1024[k] / 255.0f;
+    float v = linear ? std::max(0.0f, linear[k]) : (float)bytes[k] / 255.0f;
     if (v > peakVal) { peakVal = v; peakIdx = k; }
 
     sum += v;
@@ -110,6 +110,16 @@ void compute_from_mag(const uint8_t* mag1024) {
 
   // Peak index
   g_peak_idx = peakIdx;
+}
+
+// Legacy utility input remains quantized linear magnitude.
+void compute_from_mag(const uint8_t* magnitudes) {
+  compute_features(magnitudes, nullptr);
+}
+
+// Display consumers decode their dB scale before calling this entrypoint.
+void compute_from_linear(const float* magnitudes) {
+  compute_features(nullptr, magnitudes);
 }
 
 // Rolloff: find smallest k such that cumulative sum reaches percentile of total

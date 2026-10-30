@@ -119,3 +119,25 @@ test('silence and reinitialization reset features and preceding-frame flux', asy
   close(api.get_centroid_hz(), 1000);
   close(api.get_flux(), 0);
 });
+
+test('float magnitudes retain quiet energy ratios and distinguish silence', async () => {
+  const api = await loadWasm('spectral_features');
+  api.init_features(2048, 44100);
+  const ptr = api.wasm_malloc(1024 * 4);
+  try {
+    const magnitudes = new Float32Array(api.memory.buffer, ptr, 1024);
+    magnitudes[10] = 0.00003;
+    magnitudes[20] = 0.00001;
+    api.compute_from_linear(ptr);
+    close(api.get_centroid_hz(), 12.5 * 44100 / 2048);
+    close(api.get_rolloff_hz(0.85), 20 * 44100 / 2048);
+    assert.equal(api.get_peak_index(), 10);
+    magnitudes.fill(0);
+    api.compute_from_linear(ptr);
+    close(api.get_centroid_hz(), 0);
+    close(api.get_rolloff_hz(0.85), 0);
+    close(api.get_flatness(), 0);
+  } finally {
+    api.wasm_free(ptr);
+  }
+});

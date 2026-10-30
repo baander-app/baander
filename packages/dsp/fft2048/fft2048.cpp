@@ -18,6 +18,8 @@ enum WindowType {
 static WindowType g_windowType = WINDOW_HANN;
 static float g_window[N];               // window coefficients
 static bool g_windowReady = false;
+static float g_displayWindow[N];
+static bool g_displayWindowReady = false;
 
 // Streaming accumulator (optional)
 static float g_acc[N];
@@ -131,8 +133,8 @@ void reset_fft() {
 // - input: float[N] in [-1, 1]
 // - magOut: uint8_t[1024] magnitude (scaled 0..255-ish)
 // - waveOut: uint8_t[N] display waveform (0..255)
-void process_spectrum(const float* input, uint8_t* magOut, uint8_t* waveOut) {
-  if (!g_windowReady) init_window(g_windowType);
+static void process_frame(const float* input, uint8_t* magOut, uint8_t* waveOut,
+                          const float* window, bool display) {
 
   static float re[N];
   static float im[N];
@@ -144,7 +146,7 @@ void process_spectrum(const float* input, uint8_t* magOut, uint8_t* waveOut) {
     if (y < 0.0f) y = 0.0f; else if (y > 255.0f) y = 255.0f;
     waveOut[i] = (uint8_t)(y + 0.5f);
 
-    float w = g_window[i];
+    float w = window[i];
     re[i] = x * w;
     im[i] = 0.0f;
   }
@@ -153,13 +155,39 @@ void process_spectrum(const float* input, uint8_t* magOut, uint8_t* waveOut) {
   fft_radix2(re, im);
 
   // Magnitude of 0..N/2-1 (real input symmetry)
-  const float scale = 2.0f / (float)N; // simple normalization
+  const float scale = (display ? 1.0f : 2.0f) / (float)N;
   for (int k = 0; k < HN; ++k) {
     float mag = std::sqrt(re[k]*re[k] + im[k]*im[k]) * scale;
-    float v = mag * 255.0f; // map to byte range
-    if (v < 0.0f) v = 0.0f; else if (v > 255.0f) v = 255.0f;
-    magOut[k] = (uint8_t)(v + 0.5f);
+    if (display) {
+      // Web Audio byte frequency data: floor(255 * (dB - min) / (max - min)).
+      float v = mag > 0.0f ? 255.0f * (20.0f * std::log10(mag) + 100.0f) / 100.0f : 0.0f;
+      if (v < 0.0f) v = 0.0f; else if (v > 255.0f) v = 255.0f;
+      magOut[k] = (uint8_t)v;
+    } else {
+      float v = mag * 255.0f;
+      if (v < 0.0f) v = 0.0f; else if (v > 255.0f) v = 255.0f;
+      magOut[k] = (uint8_t)(v + 0.5f);
+    }
   }
+}
+
+// Preserve the linear utility API and its selectable Hann window.
+void process_spectrum(const float* input, uint8_t* magOut, uint8_t* waveOut) {
+  if (!g_windowReady) init_window(g_windowType);
+  process_frame(input, magOut, waveOut, g_window, false);
+}
+
+// Display contract matches AnalyserNode: periodic Blackman, 1/N, -100..0 dB.
+void process_display_spectrum(const float* input, uint8_t* magOut, uint8_t* waveOut) {
+  if (!g_displayWindowReady) {
+    const double twoPi = 6.283185307179586476925286766559;
+    for (int n = 0; n < N; ++n) {
+      g_displayWindow[n] = (float)(0.42 - 0.5 * std::cos(twoPi * n / N)
+                                  + 0.08 * std::cos(2.0 * twoPi * n / N));
+    }
+    g_displayWindowReady = true;
+  }
+  process_frame(input, magOut, waveOut, g_displayWindow, true);
 }
 
 // Optional: push a small block of interleaved audio, accumulate to 2048 mono samples.

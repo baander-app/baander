@@ -49,6 +49,8 @@ export interface SpectralFeaturesApi {
   free(ptr: number): void
   init(fftSize: number, sampleRate: number): void
   computeFromMag(magPtr: number): void
+  /** Input is Float32Array[fftSize / 2] of linear magnitudes, not encoded dB. */
+  computeFromLinear(magPtr: number): void
   getCentroidHz(): number
   getRolloffHz(percentile: number): number
   getFlux(): number

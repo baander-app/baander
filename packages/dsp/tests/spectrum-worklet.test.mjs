@@ -22,15 +22,15 @@ async function fixture() {
       allocations.push({ ptr, size })
       return ptr
     },
-    process_spectrum(input, mag, wave) {
+    process_display_spectrum(input, mag, wave) {
       frames.push(Array.from(new Float32Array(exp.memory.buffer, input, 2048)))
-      exp.process_spectrum(input, mag, wave)
+      exp.process_display_spectrum(input, mag, wave)
     },
   }
   vm.runInNewContext(await readFile(publicSource, 'utf8'), {
     AudioWorkletProcessor: class { constructor() { this.port = { postMessage: message => messages.push(structuredClone(message)) } } },
     registerProcessor: (_name, value) => { Processor = value },
-    Float32Array, Uint8Array,
+    Float32Array, Uint8Array, sampleRate: 48000,
     WebAssembly: { instantiate: async () => { instantiateCount++; return { instance: { exports: wrapped } } } },
   })
   const processor = new Processor()
@@ -61,6 +61,10 @@ test('actual WASM uses full ABI buffers, preserves arbitrary blocks, and publish
   assert.deepEqual(f.frames.flat(), expected.slice(0, 4096))
   const spectra = f.messages.filter(message => message.type === 'spectrum')
   assert.equal(spectra.length, 1)
+  assert.equal(spectra[0].sampleRate, 48000)
+  assert.equal(spectra[0].fftSize, 2048)
+  assert.equal(spectra[0].minDecibels, -100)
+  assert.equal(spectra[0].maxDecibels, 0)
   assert.equal(spectra[0].frequencyData.length, 1024)
   assert.equal(spectra[0].timeDomainData.length, 2048)
   for (const { ptr, size } of f.allocations) {
@@ -73,4 +77,16 @@ test('duplicate WASM initialization is idempotent', async () => {
   await Promise.all([f.initialize(), f.initialize()])
   assert.equal(f.instantiateCount(), 1)
   assert.equal(f.allocations.length, 3)
+})
+
+test('opposite-phase channels cancel in the mono spectrum without changing output audio', async () => {
+  const f = await fixture()
+  const left = Float32Array.from({ length: 4096 }, (_, i) => Math.sin(2 * Math.PI * 43 * i / 2048))
+  const right = Float32Array.from(left, value => -value)
+  const output = [new Float32Array(4096), new Float32Array(4096)]
+  f.processor.process([[left, right]], [output])
+  const spectrum = f.messages.find(message => message.type === 'spectrum')
+  assert.ok(spectrum.frequencyData.every(value => value === 0))
+  assert.ok(spectrum.timeDomainData.every(value => value === 128))
+  assert.deepEqual(output, [left, right])
 })

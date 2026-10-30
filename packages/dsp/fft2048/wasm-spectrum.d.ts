@@ -19,17 +19,21 @@ declare type WasmSpectrumFromProcessorMessage =
 }
   | {
   type: 'error';
-  reason: 'missing-exports' | 'instantiate-failed';
+  reason: 'init-failed';
   message?: string;
 }
   | {
   type: 'spectrum';
+  sampleRate: number;
+  fftSize: 2048;
+  minDecibels: -100;
+  maxDecibels: 0;
   /**
-   * Downsampled frequency magnitudes (256 bins, 0..255 byte range).
+   * Windowed frequency magnitudes (1024 bins, -100..0 dB encoded as bytes).
    */
   frequencyData: Uint8Array;
   /**
-   * Downsampled waveform (512 samples, 0..255 byte range).
+   * Waveform (2048 samples, 0..255 byte range).
    */
   timeDomainData: Uint8Array;
 };

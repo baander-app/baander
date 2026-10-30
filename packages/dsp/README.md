@@ -90,7 +90,13 @@ The standalone JavaScript demo loaders are separate from this web loading path.
 Playback without a captured audio source exposes neutral buffers and unavailable
 measurements. It does not run a background analysis worker or fabricate channel
 levels. Active analysis uses the spectrum worklet with the native analyser as
-fallback; both feed the processor's owned spectral module.
+fallback; both expose the [display spectrum contract](fft2048/README.md#display-spectrum)
+and feed the processor's owned spectral module through decoded linear floats.
+The Equalizer uses a common logarithmic axis and peak-band aggregation, renders
+the selected mode at full visibility, and clears live readings while paused.
+Channel meters show RMS dBFS on a −60 to 0 scale, with zero signal shown as −∞.
+The shared contract includes the actual sample rate, FFT size and −100 to 0 dB
+bounds. The separate linear FFT utility API is unchanged.
 
 
 The player exposes the latest complete worklet meter report for channel levels,
@@ -98,8 +104,10 @@ stereo RMS, and momentary LUFS. Reports expire after 250 ms of audio time and
 clear at programme and playback lifecycle boundaries. Native LUFS is not averaged
 with analyser estimates. If reports are unavailable, separate channel analysers
 measure all 2048 float samples per channel; fallback loudness remains an
-unweighted energy estimate, not EBU R128. Both taps measure the source mix before
-EQ and output gain. Ready worklet spectrum buffers remain authoritative during
+unweighted energy estimate, not EBU R128. The analysis result exposes
+`loudnessAvailable`; the Equalizer shows unavailable when no fresh native loudness
+report exists, rather than labeling that estimate LUFS. Both taps measure the
+source mix before EQ and output gain. Ready worklet spectrum buffers remain authoritative during
 UI reads. Native browser tests cover mono upmix, right-only, asymmetric and
 opposite-phase stereo with the actual metering worklet and shipped WASM.
 

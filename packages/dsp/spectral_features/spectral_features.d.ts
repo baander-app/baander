@@ -39,6 +39,9 @@ declare interface SpectralFeaturesApi {
    */
   computeFromMag(magPtr: number): void;
 
+  /** Input Float32Array[fftSize / 2] contains linear magnitudes, not encoded dB. */
+  computeFromLinear(magPtr: number): void;
+
   /**
    * Last computed spectral centroid in Hz.
    */

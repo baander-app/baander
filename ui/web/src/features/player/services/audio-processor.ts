@@ -4,6 +4,9 @@ import { createLogger } from '@/shared/lib/logger'
 import { StereoMatrix } from './stereo-matrix'
 
 const logger = createLogger('AudioProcessor')
+const DISPLAY_LINEAR_MAGNITUDES = Float32Array.from({ length: 256 }, (_, value) =>
+  value === 0 ? 0 : Math.pow(10, (-100 + value * 100 / 255) / 20),
+)
 
 // --- Message types ---
 
@@ -11,6 +14,10 @@ interface WasmSpectrumMessage {
   type: 'ready' | 'error' | 'spectrum'
   frequencyData?: Uint8Array
   timeDomainData?: Uint8Array
+  sampleRate?: number
+  fftSize?: number
+  minDecibels?: number
+  maxDecibels?: number
 }
 
 export interface PhaseAnalysis {
@@ -33,6 +40,14 @@ interface MeterFrame {
 // --- Analysis data shape ---
 
 export interface AnalysisData {
+  /** Windowed input FFT: bin k is k * sampleRate / fftSize Hz; Nyquist is omitted. */
+  sampleRate: number
+  fftSize: number
+  /** Bytes map linearly from minDecibels to maxDecibels; zero includes silence. */
+  minDecibels: number
+  maxDecibels: number
+  /** True only for a fresh, measured loudness report, never the RMS estimate. */
+  loudnessAvailable: boolean
   phase: PhaseAnalysis | null
   frequencyData: Uint8Array
   timeDomainData: Uint8Array
@@ -205,6 +220,7 @@ export class AudioProcessor {
       const ownedNode = node
       node.port.onmessage = (event: MessageEvent) => {
         if (!this.ownsWorkletGeneration(generation) || this.wasmSpectrumNode !== ownedNode) return
+        if (event.data === null || typeof event.data !== 'object') return
         const msg = event.data as WasmSpectrumMessage
         if (msg.type === 'ready') {
           if (!this.wasmSpectrumReady) {
@@ -216,6 +232,8 @@ export class AudioProcessor {
           console.error('[AudioProcessor] WASM spectrum error:', msg)
           this.wasmSpectrumReady = false
         } else if (msg.type === 'spectrum' && this.isConnected && this.isPlaying
+          && msg.sampleRate === this.audioContext.sampleRate && msg.fftSize === this.FFT_SIZE
+          && msg.minDecibels === -100 && msg.maxDecibels === 0
           && msg.frequencyData instanceof Uint8Array && msg.frequencyData.length === this.FFT_SIZE / 2
           && msg.timeDomainData instanceof Uint8Array && msg.timeDomainData.length === this.FFT_SIZE) {
           const freqLen = Math.min(this.frequencyData.length, msg.frequencyData.length)
@@ -249,12 +267,14 @@ export class AudioProcessor {
 
     let magPtr = 0
     try {
-      magPtr = this.spectralAPI.malloc(frequencyData.length)
+      magPtr = this.spectralAPI.malloc(frequencyData.length * Float32Array.BYTES_PER_ELEMENT)
       if (!magPtr) throw new Error('Spectral allocation failed')
-      const HEAPU8 = new Uint8Array(this.spectralAPI.memory.buffer)
-      HEAPU8.set(frequencyData, magPtr)
-
-      this.spectralAPI.computeFromMag(magPtr)
+      const magnitudes = new Float32Array(this.spectralAPI.memory.buffer, magPtr, frequencyData.length)
+      for (let i = 0; i < frequencyData.length; i++) {
+        // A floor byte contains no resolved signal; do not add artificial floor energy.
+        magnitudes[i] = DISPLAY_LINEAR_MAGNITUDES[frequencyData[i]]
+      }
+      this.spectralAPI.computeFromLinear(magPtr)
 
       this.spectralCentroid = this.spectralAPI.getCentroidHz()
       this.spectralRolloff = this.spectralAPI.getRolloffHz(0.85)
@@ -273,7 +293,9 @@ export class AudioProcessor {
   private initializeNodes() {
     this.analyzerNode = this.audioContext.createAnalyser()
     this.analyzerNode.fftSize = this.FFT_SIZE
-    this.analyzerNode.smoothingTimeConstant = 0.8
+    this.analyzerNode.smoothingTimeConstant = 0
+    this.analyzerNode.minDecibels = -100
+    this.analyzerNode.maxDecibels = 0
     // Both meter branches observe the same stereo mix, including mono upmix.
     this.analyzerNode.channelCount = 2
     this.analyzerNode.channelCountMode = 'explicit'
@@ -929,6 +951,11 @@ export class AudioProcessor {
   getAnalysisData(): AnalysisData {
     if (this.destroyed || this.passiveMode || !this.isConnected || !this.isPlaying) {
       return {
+        sampleRate: this.audioContext.sampleRate,
+        fftSize: this.FFT_SIZE,
+        minDecibels: -100,
+        maxDecibels: 0,
+        loudnessAvailable: false,
         phase: null,
         frequencyData: this.frequencyData,
         timeDomainData: this.timeDomainData,
@@ -973,6 +1000,11 @@ export class AudioProcessor {
     }
 
     return {
+      sampleRate: this.audioContext.sampleRate,
+      fftSize: this.FFT_SIZE,
+      minDecibels: -100,
+      maxDecibels: 0,
+      loudnessAvailable: Boolean(frame?.loudnessReady && age >= 0 && age <= this.METER_FRAME_MAX_AGE),
       phase,
       frequencyData: this.frequencyData,
       timeDomainData: this.timeDomainData,

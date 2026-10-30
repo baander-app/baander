@@ -210,16 +210,42 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
       [new Uint8Array(128).fill(200), new Uint8Array(2048)],
       [new Uint8Array(1024).fill(200), new Uint8Array(256)],
       [new Float32Array(1024), new Uint8Array(2048)],
-    ]) worklet('wasm-spectrum').emit({ type: 'spectrum', frequencyData, timeDomainData })
+    ]) worklet('wasm-spectrum').emit({ type: 'spectrum', sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0, frequencyData, timeDomainData })
     expect(compute).not.toHaveBeenCalled()
     expect(inspection.frequencyData).toEqual(frequencyBefore)
     expect(inspection.timeDomainData).toEqual(timeBefore)
     worklet('wasm-spectrum').emit({
-      type: 'spectrum', frequencyData: new Uint8Array(1024).fill(200), timeDomainData: new Uint8Array(2048).fill(220),
+      type: 'spectrum', sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0, frequencyData: new Uint8Array(1024).fill(200), timeDomainData: new Uint8Array(2048).fill(220),
     })
     expect(compute).toHaveBeenCalledOnce()
     expect(inspection.frequencyData[0]).toBe(200)
     expect(inspection.timeDomainData[0]).toBe(220)
+  })
+
+  it('configures native analysis with the fixed unsmoothed display scale', () => {
+    expect(graph.analyzerNode).toMatchObject({ fftSize: 2048, minDecibels: -100, maxDecibels: 0, smoothingTimeConstant: 0 })
+    expect(processor.getAnalysisData()).toMatchObject({
+      sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0, loudnessAvailable: false,
+    })
+  })
+
+  it('rejects spectra whose metadata does not describe this audio context', async () => {
+    processor.setPlayingState(true)
+    await connect()
+    await settle()
+    const inspection = processor as unknown as { computeSpectralFeatures(data: Uint8Array): void }
+    const compute = vi.spyOn(inspection, 'computeSpectralFeatures').mockImplementation(() => {})
+    const valid = {
+      type: 'spectrum', sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0,
+      frequencyData: new Uint8Array(1024).fill(200), timeDomainData: new Uint8Array(2048).fill(220),
+    }
+    for (const metadata of [{ sampleRate: 44100 }, { fftSize: 1024 }, { minDecibels: -90 },
+      { maxDecibels: -10 }, { sampleRate: undefined }]) {
+      worklet('wasm-spectrum').emit({ ...valid, ...metadata })
+    }
+    expect(compute).not.toHaveBeenCalled()
+    worklet('wasm-spectrum').emit(valid)
+    expect(compute).toHaveBeenCalledOnce()
   })
 
   it.each(['disconnect', 'destroy'] as const)('ignores addModule completion after %s', async (stop) => {
@@ -428,7 +454,7 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
     if (stop === 'pause') processor.setPlayingState(false)
     else if (stop === 'passive') await processor.initializePassiveMode()
     else processor[stop]()
-    queuedResult({ data: { type: 'spectrum', frequencyData: new Uint8Array(1024).fill(200),
+    queuedResult({ data: { type: 'spectrum', sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0, frequencyData: new Uint8Array(1024).fill(200),
       timeDomainData: new Uint8Array(2048).fill(220) } } as MessageEvent)
     const result = processor.getAnalysisData()
     expect(result.frequencyData.every(value => value === 0)).toBe(true)
@@ -536,6 +562,7 @@ describe('stereo meter report ownership', () => {
     expect(data.rightChannel).toBe(25)
     expect(data.rms).toBeCloseTo(Math.sqrt((0.125 + 0.0625) / 2))
     expect(data.lufs).toBeCloseTo(-0.691 + 20 * Math.log10(data.rms))
+    expect(data.loudnessAvailable).toBe(false)
     expect(graph.leftMeterAnalyzer.getFloatTimeDomainData).toHaveBeenCalledOnce()
     expect(graph.rightMeterAnalyzer.getFloatTimeDomainData).toHaveBeenCalledOnce()
   })
@@ -562,7 +589,7 @@ describe('stereo meter report ownership', () => {
     processor.setPlayingState(true)
     const spectrum = worklet('wasm-spectrum')
     spectrum.emit({ type: 'ready' })
-    spectrum.emit({ type: 'spectrum', frequencyData: new Uint8Array(1024).fill(123), timeDomainData: new Uint8Array(2048).fill(130) })
+    spectrum.emit({ type: 'spectrum', sampleRate: 48000, fftSize: 2048, minDecibels: -100, maxDecibels: 0, frequencyData: new Uint8Array(1024).fill(123), timeDomainData: new Uint8Array(2048).fill(130) })
     graph.analyzerNode.getByteFrequencyData.mockImplementation((data: Uint8Array) => data.fill(9))
     const result = processor.getAnalysisData()
     expect(result.frequencyData.every(value => value === 123)).toBe(true)
@@ -667,6 +694,7 @@ describe('AudioProcessor normalization ownership', () => {
   it('reports the actual bounded correction and responds to target changes and disabling', async () => {
     await start()
     worklet('magic-soup-processor').emit(report({ lufs: -40 }))
+    expect(processor.getAnalysisData().loudnessAvailable).toBe(true)
     expect(processor.getNormalizationGainDb()).toBe(20 * Math.log10(2))
     expect(gains().normalizationGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(2, 10, 0.1)
     processor.setNormalization(true, -43)

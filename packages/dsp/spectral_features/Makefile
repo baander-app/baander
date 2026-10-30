@@ -10,7 +10,7 @@ LDFLAGS := \
   -s STRICT=1 \
   -s INITIAL_MEMORY=16777216 \
   -s ALLOW_MEMORY_GROWTH=0 \
-  -s EXPORTED_FUNCTIONS='["_wasm_malloc","_wasm_free","_init_features","_compute_from_mag","_get_centroid_hz","_get_rolloff_hz","_get_flux","_get_flatness","_get_peak_index","_get_band_energies"]'
+  -s EXPORTED_FUNCTIONS='["_wasm_malloc","_wasm_free","_init_features","_compute_from_mag","_compute_from_linear","_get_centroid_hz","_get_rolloff_hz","_get_flux","_get_flatness","_get_peak_index","_get_band_energies"]'
 
 .PHONY: all build clean serve-demo
 all: build

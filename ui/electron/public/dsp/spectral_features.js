@@ -15,6 +15,7 @@ export async function loadSpectralFeatures(url = './spectral_features.wasm') {
   const malloc          = pick('wasm_malloc',        '_wasm_malloc');
   const free            = pick('wasm_free',          '_wasm_free');
   const init            = pick('init_features',      '_init_features');
+  const computeFromLinear = pick('compute_from_linear', '_compute_from_linear');
   const computeFromMag  = pick('compute_from_mag',   '_compute_from_mag');
   const getCentroidHz   = pick('get_centroid_hz',    '_get_centroid_hz');
   const getRolloffHz    = pick('get_rolloff_hz',     '_get_rolloff_hz');
@@ -30,6 +31,7 @@ export async function loadSpectralFeatures(url = './spectral_features.wasm') {
   if (!free) missing.push('wasm_free');
   if (!init) missing.push('init_features');
   if (!computeFromMag) missing.push('compute_from_mag');
+  if (!computeFromLinear) missing.push('compute_from_linear');
   if (missing.length) {
     console.error('[spectral_features] Missing exports:', missing, 'Available exports:', Object.keys(e));
     throw new Error('Missing required WASM exports: ' + missing.join(', '));
@@ -41,6 +43,7 @@ export async function loadSpectralFeatures(url = './spectral_features.wasm') {
     free,
     init,
     computeFromMag,
+    computeFromLinear,
     getCentroidHz,
     getRolloffHz,
     getFlux,
