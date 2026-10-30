@@ -171,6 +171,35 @@ no issues; mobile music, desktop music and radio screenshots were visually
 reviewed. This conditional-rendering change alters no CSS; the full suite and
 cross-browser checks were not rerun.
 
+Footer-console refinement, 2026-10-30: the
+[focused plan](docs/plans/2026-10-30-refine-footer-player.md) brings artwork,
+metadata and timeline into one central display, with transport and volume beside
+it on desktop and below it on mobile. Existing black, card and muted roles give
+the dark mood distinct surface levels without a palette change. The seek control
+now uses the shared Slider; clock updates remain outside the parent footer, and
+recovery announcements, volume behavior and context-player exclusivity remain
+intact.
+
+Nine unit tests across two files pass. Final Chromium checks pass six cases;
+Firefox and WebKit each pass two, including native playback advancing after a
+pointer seek. The silent WAV fixture now serves byte ranges: its earlier response
+left the native seekable range at zero. These fixture-backed playback checks
+block service workers for cross-browser interception and retain real login; they
+do not qualify production service-worker transport. Twenty theme screenshots
+were reviewed: twelve Chromium images at 390, 768 and 1280 pixels across all four
+moods, plus eight Firefox/WebKit mobile images. Browser appearance checks do not
+measure physical OLED behavior.
+
+Final CI-image scoped ESLint and both TypeScript configurations pass, as do the
+production build and asset verification. Five review lenses found no issues;
+the review receipt is
+`/tmp/compound-engineering-1000/ce-code-review/20261030-193315-555e4fd5/review.json`.
+Final logs are `/tmp/footer-console-accepted.log`,
+`/tmp/footer-console-firefox-accepted.log`,
+`/tmp/footer-console-webkit-accepted.log`, `/tmp/footer-console-unit-final.log`
+and `/tmp/footer-console-ci-final.log`; build evidence is in
+`/tmp/footer-console-ci.log`. The full frontend suite was not rerun.
+
 ## Cohesive operator manual
 
 Delivered, 2026-10-30: the [operator manual](docs-book/part-1-operator-guide/README.md)

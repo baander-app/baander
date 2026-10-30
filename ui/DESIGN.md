@@ -38,6 +38,21 @@ The main content area adapts to context — it is not a fixed page. It reshapes 
 - **Detail (Enter):** Full detail page replaces browse view.
 - **Back:** Returns to previous browse view with scroll position and selection preserved.
 
+### Footer player
+
+The music footer is one console: transport on the left, a flat central card
+containing artwork, title/artist and timeline, and volume on the right. On mobile,
+place the central display above one row of transport and volume controls. Keep
+long metadata within its own region so controls remain reachable. Use the shared
+Slider for seek and volume, with visible handles and keyboard access; keep elapsed
+time, duration and recovery messages in the central display.
+
+For OLED screens, retain the dark mood's true-black background and distinguish
+near-black layers through existing roles: `--color-card` for the footer,
+`--color-muted` for its central display and `--color-secondary` for the play
+button. Other moods use their own values for those roles. Keep these surfaces flat,
+without gradients or shadows.
+
 ### Surfaces
 - Background: `var(--color-background)`
 - Card: `var(--color-card)`

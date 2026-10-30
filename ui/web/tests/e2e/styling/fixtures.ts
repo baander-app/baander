@@ -74,7 +74,20 @@ export async function installCatalogFixtures(page: Page, state: 'empty' | 'popul
     const path = url.pathname.replace(/\/$/, '')
     if (request.method() !== 'GET') return route.fallback()
     if (path === '/api/stream/track' && url.searchParams.get('id') === catalogSong.publicId) {
-      return route.fulfill({ status: 200, contentType: 'audio/wav', body: localAudio() })
+      const audio = localAudio()
+      const range = /^bytes=(\d+)-(\d*)$/.exec(request.headers().range ?? '')
+      if (range) {
+        const start = Number(range[1])
+        const end = Math.min(range[2] ? Number(range[2]) : audio.length - 1, audio.length - 1)
+        if (start > end) {
+          return route.fulfill({ status: 416, headers: { 'Content-Range': `bytes */${audio.length}` } })
+        }
+        return route.fulfill({
+          status: 206, contentType: 'audio/wav', body: audio.subarray(start, end + 1),
+          headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${audio.length}` },
+        })
+      }
+      return route.fulfill({ status: 200, contentType: 'audio/wav', body: audio, headers: { 'Accept-Ranges': 'bytes' } })
     }
     if (!(path in responses)) return route.fallback()
     return route.fulfill({ status: 200, json: responses[path] })

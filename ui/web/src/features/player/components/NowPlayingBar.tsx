@@ -9,51 +9,66 @@ import { ProgressBar } from './ProgressBar'
 import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
 import { CoverArt } from '@/shared/components/cover-art'
 
-function formatTime(seconds: number): string {
-  if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
 export function NowPlayingBar() {
   const activeRadioStation = useRadioStore((s) => s.activeStation)
 
-  // Radio mode takes priority
-  if (activeRadioStation) {
-    return <RadioPlayerBar />
-  }
-
+  if (activeRadioStation) return <RadioPlayerBar />
   return <MusicPlayerBar />
 }
 
-const PlayerContainer = styled.div`
+const PlayerContainer = styled.section`
   border-top: 1px solid var(--color-border);
-  background-color: var(--color-background);
+  background-color: var(--color-card);
+  color: var(--color-card-foreground);
 `
 
 const PlayerContent = styled.div`
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(8.5rem, 1fr) minmax(0, 40rem) minmax(8.5rem, 1fr);
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
+  gap: var(--space-lg);
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-lg);
+
+  @media (max-width: 767px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-md);
+    padding: var(--space-md);
+  }
+`
+
+const TrackDisplay = styled.div`
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-muted);
+  color: var(--color-foreground);
+
+  @media (max-width: 767px) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
 `
 
 const CoverThumbnail = styled.div`
-  width: 2.5rem;
-  height: 2.5rem;
-  flex-shrink: 0;
+  width: 3rem;
+  height: 3rem;
   overflow: hidden;
   border-radius: var(--radius-md);
 `
 
 const TrackInfo = styled.div`
-  min-width: 8rem;
-  flex: 1;
+  min-width: 0;
+  text-align: center;
 `
 
 const TrackTitle = styled.p`
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -62,6 +77,7 @@ const TrackTitle = styled.p`
 `
 
 const TrackSubtitle = styled.p`
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -72,43 +88,27 @@ const TrackSubtitle = styled.p`
 const TransportControls = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-self: end;
+  gap: var(--space-md);
+
+  @media (max-width: 767px) {
+    justify-self: start;
+  }
 `
 
-const DurationVolume = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`
-
-const DurationText = styled.span`
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-muted-foreground);
+const PlayButton = styled(Button)`
+  width: 2.5rem;
+  height: 2.5rem;
 `
 
 const VolumeGroup = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-`
+  justify-self: start;
+  gap: var(--space-md);
 
-const VolumeButton = styled(Button).attrs({ variant: 'ghost' })`
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 2rem;
-  width: 2rem;
-  border-radius: 9999px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  transition: background-color 60ms ease-out;
-
-  &:hover {
-    background-color: var(--color-highlight);
+  @media (max-width: 767px) {
+    justify-self: end;
   }
 `
 
@@ -124,109 +124,48 @@ function MusicPlayerBar() {
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying)
   const playNext = usePlayerStore((s) => s.playNext)
   const playPrevious = usePlayerStore((s) => s.playPrevious)
-  const duration = usePlayerStore((s) => s.duration)
 
   if (!currentTrack) return null
 
   return (
-    <PlayerContainer>
-      {/* Progress bar at top of player */}
-      <ProgressBar />
-      {/* Mounted with the track, before any recovery state can change */}
+    <PlayerContainer aria-label="Playback">
       <PlaybackRecoveryAnnouncer />
-
       <PlayerContent>
-        {/* Cover art */}
-        <CoverThumbnail>
-          <CoverArt albumPublicId={currentTrack.albumPublicId} iconSize={14} />
-        </CoverThumbnail>
-
-        {/* Track info */}
-        <TrackInfo>
-          <TrackTitle>{currentTrack.title}</TrackTitle>
-          <TrackSubtitle>
-            {currentTrack.artistName}
-            {currentTrack.artistName && currentTrack.albumName ? ' · ' : ''}
-            {currentTrack.albumName}
-          </TrackSubtitle>
-        </TrackInfo>
-
-        {/* Transport controls */}
-        <TransportControls>
-          <TransportButton
-            onClick={playPrevious}
-            label="Previous"
-          >
+        <TransportControls role="group" aria-label="Playback controls">
+          <Button variant="ghost" size="icon" onClick={playPrevious} aria-label="Previous">
             <SkipBack size={16} />
-          </TransportButton>
-
-          <TransportButton
+          </Button>
+          <PlayButton
+            variant="secondary"
+            size="icon"
             onClick={() => setIsPlaying(!isPlaying)}
-            label={isPlaying ? 'Pause' : 'Play'}
-            large
+            aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-          </TransportButton>
-
-          <TransportButton
-            onClick={playNext}
-            label="Next"
-          >
+          </PlayButton>
+          <Button variant="ghost" size="icon" onClick={playNext} aria-label="Next">
             <SkipForward size={16} />
-          </TransportButton>
+          </Button>
         </TransportControls>
 
-        {/* Duration + volume */}
-        <DurationVolume>
-          <DurationText>
-            {formatTime(duration)}
-          </DurationText>
-          <VolumeSlider />
-        </DurationVolume>
+        <TrackDisplay role="group" aria-label="Now playing">
+          <CoverThumbnail>
+            <CoverArt albumPublicId={currentTrack.albumPublicId} iconSize={18} />
+          </CoverThumbnail>
+          <TrackInfo>
+            <TrackTitle title={currentTrack.title}>{currentTrack.title}</TrackTitle>
+            <TrackSubtitle>
+              {currentTrack.artistName}
+              {currentTrack.artistName && currentTrack.albumName ? ' · ' : ''}
+              {currentTrack.albumName}
+            </TrackSubtitle>
+            <ProgressBar />
+          </TrackInfo>
+        </TrackDisplay>
+
+        <VolumeSlider />
       </PlayerContent>
     </PlayerContainer>
-  )
-}
-
-const StyledTransportButton = styled(Button).attrs({ variant: 'ghost' })<{ $large?: boolean }>`
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-  transition: background-color 60ms ease-out;
-
-  height: ${({ $large }) => ($large ? '2.5rem' : '2rem')};
-  width: ${({ $large }) => ($large ? '2.5rem' : '2rem')};
-
-  &:hover {
-    background-color: var(--color-highlight);
-  }
-`
-
-function TransportButton({
-  onClick,
-  label,
-  large,
-  children,
-}: {
-  onClick: () => void
-  label: string
-  large?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <StyledTransportButton
-      onClick={onClick}
-      aria-label={label}
-      $large={large}
-    >
-      {children}
-    </StyledTransportButton>
   )
 }
 
@@ -238,12 +177,14 @@ function VolumeSlider() {
 
   return (
     <VolumeGroup>
-      <VolumeButton
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={toggleMute}
         aria-label={muted ? 'Unmute' : 'Mute'}
       >
         {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-      </VolumeButton>
+      </Button>
       <VolumeSliderWrap>
         <Slider
           min={0}

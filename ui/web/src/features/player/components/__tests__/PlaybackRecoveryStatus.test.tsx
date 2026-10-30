@@ -25,8 +25,10 @@ describe('playback recovery status', () => {
   })
 
   afterEach(() => {
-    updateTime(0)
-    usePlayerStore.setState({ isPlaying: false, duration: 0, playbackRecovery: 'none' })
+    act(() => {
+      updateTime(0)
+      usePlayerStore.setState({ isPlaying: false, duration: 0, playbackRecovery: 'none' })
+    })
   })
 
   it('shows the position in both players and announces nothing while playback is healthy', () => {

@@ -96,61 +96,112 @@ for (const width of [390, 768, 1280]) {
   })
 }
 
-for (const width of [390, 768, 1280]) {
-  test(`populated track menus and active playback remain readable at ${width}px`, async ({ populatedCatalog: page }) => {
-    await page.setViewportSize({ width, height: 800 })
-    await spaNavigate(page)(`/music/albums/${catalogAlbum.publicId}`)
-    const song = page.getByText(catalogSong.title, { exact: true }).first()
-    await expect(song).toBeVisible()
-    await song.click({ button: 'right' })
-    const menu = page.getByRole('menu')
-    await expect(menu).toBeVisible()
-    await menu.getByRole('menuitem').first().focus()
-    await expectReadable(menu.getByRole('menuitem').first())
-    await page.keyboard.press('Escape')
+test.describe('local audio playback', () => {
+  test.use({ serviceWorkers: 'block' })
 
-    await page.getByRole('button', { name: 'Play', exact: true }).first().click()
-    const pause = page.getByRole('button', { name: 'Pause', exact: true }).first()
-    await expect(pause).toBeVisible()
-    await page.screenshot({ path: test.info().outputPath('player-placement.png') })
-    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(1)
-    await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
-    await expect(page.getByRole('tab', { name: 'Queue', exact: true })).toBeVisible()
-    const seek = page.getByRole('slider', { name: 'Seek', exact: true }).first()
-    await expect(seek).toBeVisible()
-    await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(0)
-    const beforeSeek = Number(await seek.getAttribute('aria-valuenow'))
-    await pause.focus()
-    await page.keyboard.press('Shift+ArrowRight')
-    await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(beforeSeek + 8)
-    for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
-      await setTheme(page, mood, 'violet')
-      await expectReadable(song)
-      const indicator = song.locator('..').locator('svg').first()
-      await expectReadable(indicator, 3)
-      await expect(indicator).toHaveCSS('fill', await indicator.evaluate((element) => getComputedStyle(element).color))
-      await expectReadable(pause, 3)
-      await expectContained(seek)
-      await expectNoPageOverflow(page)
-    }
-    if (width === 390 || width === 1280) await page.screenshot({ path: test.info().outputPath('active-playback.png') })
-    const volume = page.getByRole('slider', { name: 'Volume', exact: true }).first()
-    await expect(volume).toBeVisible()
-    await volume.focus()
-    await page.keyboard.press('Home')
-    await expect(volume).toHaveAttribute('aria-valuenow', '0')
-    await pause.click()
-    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
-    await page.keyboard.press('q')
-    await page.getByRole('tab', { name: 'Queue', exact: true }).click()
-    await expect(page.getByText(catalogSong.title, { exact: true }).last()).toBeVisible()
-    if (width < 1024) {
+  for (const width of [390, 768, 1280]) {
+    test(`populated track menus and active playback remain readable at ${width}px`, async ({ populatedCatalog: page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await spaNavigate(page)(`/music/albums/${catalogAlbum.publicId}`)
+      const song = page.getByText(catalogSong.title, { exact: true }).first()
+      await expect(song).toBeVisible()
+      await song.click({ button: 'right' })
+      const menu = page.getByRole('menu')
+      await expect(menu).toBeVisible()
+      await menu.getByRole('menuitem').first().focus()
+      await expectReadable(menu.getByRole('menuitem').first())
       await page.keyboard.press('Escape')
-      await expect(page.getByRole('button', { name: 'Close context panel' })).toHaveCount(0)
-    }
-  })
-}
+
+      await page.getByRole('button', { name: 'Play', exact: true }).first().click()
+      const pause = page.getByRole('button', { name: 'Pause', exact: true }).first()
+      await expect(pause).toBeVisible()
+      await page.screenshot({ path: test.info().outputPath('player-placement.png') })
+      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(1)
+      await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
+      await expect(page.getByRole('tab', { name: 'Queue', exact: true })).toBeVisible()
+      const seek = page.getByRole('slider', { name: 'Seek', exact: true }).first()
+      await expect(seek).toBeVisible()
+      const footer = page.getByRole('region', { name: 'Playback', exact: true })
+      const display = footer.getByRole('group', { name: 'Now playing', exact: true })
+      const controls = footer.getByRole('group', { name: 'Playback controls', exact: true })
+      const displayBounds = (await display.boundingBox())!
+      const controlsBounds = (await controls.boundingBox())!
+      if (width >= 768) {
+        expect(controlsBounds.x + controlsBounds.width).toBeLessThan(displayBounds.x)
+      } else {
+        expect(displayBounds.y + displayBounds.height).toBeLessThanOrEqual(controlsBounds.y)
+      }
+      expect((await footer.boundingBox())!.height).toBeLessThanOrEqual(width >= 768 ? 128 : 180)
+      await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(0)
+      const beforeSeek = Number(await seek.getAttribute('aria-valuenow'))
+      await pause.focus()
+      await page.keyboard.press('Shift+ArrowRight')
+      await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(beforeSeek + 8)
+      for (const mood of ['dark', 'warm', 'cool', 'balanced']) {
+        await setTheme(page, mood, 'violet')
+        await expectReadable(song)
+        const indicator = song.locator('..').locator('svg').first()
+        await expectReadable(indicator, 3)
+        await expect(indicator).toHaveCSS('fill', await indicator.evaluate((element) => getComputedStyle(element).color))
+        await expectReadable(pause, 3)
+        await expectReadable(display.getByText(catalogSong.title, { exact: true }))
+        await expectReadable(display.getByText('0:30', { exact: true }))
+        const seekBounds = (await seek.boundingBox())!
+        expect(seekBounds.x).toBeGreaterThan(displayBounds.x)
+        expect(seekBounds.x + seekBounds.width).toBeLessThan(displayBounds.x + displayBounds.width)
+        expect(Math.round(seekBounds.height)).toBeGreaterThanOrEqual(12)
+        await expectContained(seek)
+        await expectNoPageOverflow(page)
+        if (mood === 'dark') {
+          const surfaces = await footer.evaluate((element) => ({
+            base: getComputedStyle(document.body).backgroundColor,
+            footer: getComputedStyle(element).backgroundColor,
+            display: getComputedStyle(element.querySelector('[aria-label="Now playing"]')!).backgroundColor,
+          }))
+          expect(surfaces.base).toBe('rgb(0, 0, 0)')
+          expect(surfaces.footer).not.toBe(surfaces.base)
+          expect(surfaces.display).not.toBe(surfaces.footer)
+        }
+        await footer.screenshot({ path: test.info().outputPath(`footer-${width}-${mood}.png`) })
+      }
+      if (width === 390 || width === 1280) await page.screenshot({ path: test.info().outputPath('active-playback.png') })
+      const volume = page.getByRole('slider', { name: 'Volume', exact: true }).first()
+      await expect(volume).toBeVisible()
+      await volume.focus()
+      await page.keyboard.press('Home')
+      await expect(volume).toHaveAttribute('aria-valuenow', '0')
+      await pause.click()
+      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('slider', { name: 'Seek', exact: true })).toHaveCount(1)
+      await seek.focus()
+      await page.keyboard.press('Home')
+      await expect(seek).toHaveAttribute('aria-valuenow', '0')
+      await page.keyboard.press('ArrowRight')
+      await expect(seek).toHaveAttribute('aria-valuenow', '1')
+      const track = display.locator('[data-slot="slider"]')
+      const trackBounds = (await track.boundingBox())!
+      await page.mouse.click(trackBounds.x + trackBounds.width / 2, trackBounds.y + trackBounds.height / 2)
+      await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(10)
+      const thumbBounds = (await seek.boundingBox())!
+      await page.mouse.move(thumbBounds.x + thumbBounds.width / 2, thumbBounds.y + thumbBounds.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(trackBounds.x + trackBounds.width * 0.75, trackBounds.y + trackBounds.height / 2, { steps: 5 })
+      await page.mouse.up()
+      await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(18)
+      const soughtTime = Number(await seek.getAttribute('aria-valuenow'))
+      await footer.getByRole('button', { name: 'Play', exact: true }).click()
+      await expect.poll(async () => Number(await seek.getAttribute('aria-valuenow'))).toBeGreaterThan(soughtTime + 1)
+      await footer.getByRole('button', { name: 'Pause', exact: true }).click()
+      await page.keyboard.press('q')
+      await page.getByRole('tab', { name: 'Queue', exact: true }).click()
+      await expect(page.getByText(catalogSong.title, { exact: true }).last()).toBeVisible()
+      if (width < 1024) {
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('button', { name: 'Close context panel' })).toHaveCount(0)
+      }
+    })
+  }
+})
 
 for (const width of [390, 768, 1280]) {
   test(`equalizer controls fit at ${width}px`, async ({ emptyCatalog: page }) => {
