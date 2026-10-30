@@ -390,6 +390,14 @@ source remains absent until the real scan. All three fixture tests pass with
 exits zero (`/tmp/live-u9-availability-integration.log`). Playback browser
 qualification continues with this corrected fixture.
 
+The fixture also supports one notification addressed to its owned administrator,
+so the dirty-editor browser case can verify unrelated refresh while an authorized
+metadata write is pending. Ordinary and burst producers retain their 32-principal
+workload. The integration lane passes three tests with 122 assertions, including
+the administrator's single capture and unchanged counts for the other users.
+Scoped PHPStan, formatting and syntax checks pass; the receipt is
+`/tmp/live-u9-observer-integration.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

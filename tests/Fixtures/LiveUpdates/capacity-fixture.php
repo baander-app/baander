@@ -53,6 +53,7 @@ final class LiveCapacityFixture
         $this->manifest = json_decode((string) file_get_contents($directory . '/manifest.json'), true, flags: JSON_THROW_ON_ERROR);
         return match ($op) {
             'ordinary' => $this->produce(32, 0, (int) ($command['sequence'] ?? 1), $progress),
+            'observer-notification' => $this->produce(1, 0, (int) ($command['sequence'] ?? 1), $progress, [$this->manifest['observer']]),
             'burst' => $this->produce((int) ($command['count'] ?? 10_000), (int) ($command['durationMs'] ?? 10_000), (int) ($command['sequence'] ?? 1), $progress),
             'catalog' => $this->catalog((int) ($command['albums'] ?? 10_000), (int) ($command['songs'] ?? 1000)),
             'change' => $this->change($command),
@@ -194,10 +195,12 @@ final class LiveCapacityFixture
 
     /**
      * @param (Closure(array<string, mixed>): void)|null $progress
+     * @param list<array{id: string}>|null $recipients
      * @return array<string, mixed>
      */
-    private function produce(int $count, int $durationMs, int $sequence, ?Closure $progress): array
+    private function produce(int $count, int $durationMs, int $sequence, ?Closure $progress, ?array $recipients = null): array
     {
+        $recipients ??= $this->manifest['users'];
         if ($count < 1 || $durationMs < 0) {
             throw new InvalidArgumentException('Count must be positive and duration nonnegative.');
         }
@@ -207,7 +210,7 @@ final class LiveCapacityFixture
         }
         $this->manifest['notifications'] = [...$this->manifest['notifications'], ...$notifications];
         $this->save();
-        $expected = $this->notificationState();
+        $expected = $this->notificationState($recipients);
         $started = microtime(true) * 1000;
         $captured = 0;
         $first = null;
@@ -222,7 +225,8 @@ final class LiveCapacityFixture
             $this->connection->beginTransaction();
             try {
                 for ($i = $offset; $i < $offset + $batchSize; ++$i) {
-                    $user = $this->manifest['users'][$i % 32];
+                    $recipientIndex = $i % count($recipients);
+                    $user = $recipients[$recipientIndex];
                     $title = 'Live ' . $this->manifest['run'] . " $sequence:$i";
                     $this->connection->insert('notifications', [
                         'id' => $notifications[$i]['id'], 'public_id' => $notifications[$i]['publicId'], 'user_id' => $user['id'],
@@ -230,8 +234,8 @@ final class LiveCapacityFixture
                         // Monotonic timestamp per row gives deterministic newest-row ordering.
                         'created_at' => (new DateTimeImmutable())->modify('+' . $i . ' microseconds')->format('Y-m-d H:i:s.uP'),
                     ]);
-                    ++$expected[$i % 32]['count'];
-                    $expected[$i % 32]['title'] = $title;
+                    ++$expected[$recipientIndex]['count'];
+                    $expected[$recipientIndex]['title'] = $title;
                 }
                 // Concurrent projector may remove older rows, so count only this transaction's xmin.
                 $actual = (int) $this->connection->fetchOne('SELECT count(*) FROM query_change_inbox WHERE xmin::text = pg_current_xact_id()::text');
@@ -253,7 +257,7 @@ final class LiveCapacityFixture
                 $progress(['inserted' => min($offset + $batchSize, $count), 'capturedRows' => $captured, 'users' => $expected, ...$last, 'sample' => $this->sample()]);
             }
         }
-        $observed = $this->notificationState();
+        $observed = $this->notificationState($recipients);
         if ($expected !== $observed) {
             throw new RuntimeException('Committed notification counts or newest markers differ from producer expectations.');
         }
@@ -431,11 +435,14 @@ final class LiveCapacityFixture
         return ['complete' => true, 'survivors' => 0, 'sample' => $sample, 'manifestRetained' => false];
     }
 
-    /** @return list<array{id: string, count: int, title: string|null}> */
-    private function notificationState(): array
+    /**
+     * @param list<array{id: string}> $recipients
+     * @return list<array{id: string, count: int, title: string|null}>
+     */
+    private function notificationState(array $recipients): array
     {
         $result = [];
-        foreach ($this->manifest['users'] as $user) {
+        foreach ($recipients as $user) {
             $result[] = ['id' => $user['id'], 'count' => (int) $this->connection->fetchOne('SELECT count(*) FROM notifications WHERE user_id = ? AND NOT is_read', [$user['id']]), 'title' => $this->connection->fetchOne('SELECT title FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [$user['id']]) ?: null];
         }
         return $result;
