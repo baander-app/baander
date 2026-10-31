@@ -11,8 +11,8 @@
  * --peak-bitrate N caps the bits of any frame at its share of N bit/s,
  * --bandwidth HZ sets the core's lowpass (no effect on an SBR core) and
  * --vbr-mode 1..5 picks one of the FDK-named VBR modes, whose target
- * replaces the bitrate, and --afterburner turns on the second
- * quantisation pass.  The xhe options: --loudness
+ * replaces the bitrate, and --afterburner and --no-afterburner switch
+ * the second quantisation pass (on by default for AAC-LC and HE-AAC).  The xhe options: --loudness
  * measures the whole input first and writes the loudness info set into
  * the stream; --sbr and --mps (on, off, auto), --no-noise-filling,
  * --preroll off and --stream-id N set the USAC encoder options;
@@ -76,7 +76,7 @@ static int usage() {
   fprintf(stderr,
           "usage: baac enc <in.f32le> <out.aac> <rate> <channels> [bitrate] [cbr|abr|cvbr|tvbr] "
           "[quality] [lc|he|hev2|xhe] [options]\n"
-          "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5  --afterburner\n"
+          "         options: --peak-bitrate N  --bandwidth HZ  --vbr-mode 1..5  --[no-]afterburner\n"
           "         xhe options: --loudness (two-pass: measure the input, write the loudness "
           "info set)\n"
           "                      --sbr on|off|auto  --mps on|off|auto  --no-noise-filling\n"
@@ -264,7 +264,7 @@ struct EncodeOptions {
   int peak_bitrate = 0;
   int bandwidth = 0;
   int vbr_mode = 0;
-  bool afterburner = false;
+  int afterburner = -1; /* -1: the profile's default */
   AacUsacEncoderOptions opt = default_usac_options();
 };
 
@@ -302,7 +302,9 @@ static bool parse_encode_options(int* argc, char** argv, EncodeOptions* o) {
     if (arg == "--loudness") {
       o->loudness = true;
     } else if (arg == "--afterburner") {
-      o->afterburner = true;
+      o->afterburner = 1;
+    } else if (arg == "--no-afterburner") {
+      o->afterburner = 0;
     } else if ((arg == "--peak-bitrate" || arg == "--bandwidth" || arg == "--vbr-mode") &&
                has_value) {
       if (!positive_option(argv[i], argv[i + 1],
@@ -507,7 +509,7 @@ static int encode(int argc, char** argv) {
   if (options.vbr_mode && argc > 8 && atoi(argv[8]) > 0) {
     aac_encoder_set_quality(enc, atoi(argv[8]));
   }
-  if (options.afterburner && aac_encoder_set_afterburner(enc, 1) != AAC_OK) {
+  if (options.afterburner >= 0 && aac_encoder_set_afterburner(enc, options.afterburner) != AAC_OK) {
     fprintf(stderr, "baac: --afterburner was refused for this profile\n");
     return 1;
   }
@@ -628,22 +630,22 @@ struct BenchConfig {
   AacObjectType aot;
   int bitrate;
   int frame_length; /* 0 keeps the object type's default */
-  int afterburner;
+  int afterburner; /* -1 keeps the profile's default */
   int usac_sbr;    /* USAC: enhanced SBR (1 on, 0 off) */
   int usac_mps212; /* USAC: MPS 2-1-2 (1 on, 0 off) */
 };
 
 static const BenchConfig kBenchConfigs[] = {
-    {"LC 128k", AAC_AOT_LC, 128000, 0, 0, 0, 0},
-    {"HE-AAC v1 64k", AAC_AOT_SBR, 64000, 0, 0, 0, 0},
-    {"HE-AAC v2 32k", AAC_AOT_PS, 32000, 0, 0, 0, 0},
-    {"LC 960 128k", AAC_AOT_LC, 128000, 960, 0, 0, 0},
-    {"LD 512 64k", AAC_AOT_ER_LD, 64000, 512, 0, 0, 0},
-    {"ELD 512 64k", AAC_AOT_ER_ELD, 64000, 512, 0, 0, 0},
-    {"LC 48k afterburner", AAC_AOT_LC, 48000, 0, 1, 0, 0},
-    {"xHE-AAC 96k", AAC_AOT_USAC, 96000, 0, 0, 0, 0},
-    {"xHE-AAC SBR 48k", AAC_AOT_USAC, 48000, 0, 0, 1, 0},
-    {"xHE-AAC 2-1-2 32k", AAC_AOT_USAC, 32000, 0, 0, 1, 1},
+    {"LC 128k", AAC_AOT_LC, 128000, 0, -1, 0, 0},
+    {"HE-AAC v1 64k", AAC_AOT_SBR, 64000, 0, -1, 0, 0},
+    {"HE-AAC v2 32k", AAC_AOT_PS, 32000, 0, -1, 0, 0},
+    {"LC 960 128k", AAC_AOT_LC, 128000, 960, -1, 0, 0},
+    {"LD 512 64k", AAC_AOT_ER_LD, 64000, 512, -1, 0, 0},
+    {"ELD 512 64k", AAC_AOT_ER_ELD, 64000, 512, -1, 0, 0},
+    {"LC 48k no afterburner", AAC_AOT_LC, 48000, 0, 0, 0, 0},
+    {"xHE-AAC 96k", AAC_AOT_USAC, 96000, 0, -1, 0, 0},
+    {"xHE-AAC SBR 48k", AAC_AOT_USAC, 48000, 0, -1, 1, 0},
+    {"xHE-AAC 2-1-2 32k", AAC_AOT_USAC, 32000, 0, -1, 1, 1},
 };
 
 /* A deterministic stereo test signal: harmonics of a slowly sweeping
@@ -706,8 +708,8 @@ static bool bench_encode(const BenchConfig& cfg, const std::vector<float>& pcm, 
     aac_encoder_destroy(enc);
     return false;
   }
-  if (cfg.afterburner) {
-    aac_encoder_set_afterburner(enc, 1);
+  if (cfg.afterburner >= 0) {
+    aac_encoder_set_afterburner(enc, cfg.afterburner);
   }
   if (cfg.aot == AAC_AOT_USAC) {
     AacUsacEncoderOptions opt;

@@ -111,18 +111,18 @@ static double kbps_of(const std::vector<uint8_t>& stream, int sr, int frame) {
   return frames ? (double)stream.size() * 8.0 * sr / frame / (double)frames / 1000.0 : 0.0;
 }
 
-/* Off, the stream is the stream of an encoder that never heard of the
- * switch: an encoder switched on and off again before its first frame
- * produces the same bytes, and the switch is rejected without a handle. */
-static void test_off_identity() {
+/* AAC-LC runs the pass by default: an encoder switched off and on again
+ * before its first frame produces the bytes of one that never heard of
+ * the switch, and the switch is rejected without a handle. */
+static void test_default_on() {
   const int sr = 44100;
   const std::vector<float> pcm = gen_music(sr * 3, sr, 2);
   CHECK(aac_encoder_set_afterburner(nullptr, 1) == AAC_ERR_INVALID_ARG, "null handle");
   for (AacRateControl rc : {AAC_RC_CBR, AAC_RC_TVBR}) {
     const std::vector<uint8_t> untouched = encode_stream(pcm, sr, 2, 64000, rc);
     AacEncoderHandle enc = aac_encoder_create(sr, 2, 64000, AAC_AOT_LC, rc);
-    CHECK(aac_encoder_set_afterburner(enc, 1) == AAC_OK && aac_encoder_set_afterburner(enc, 0) == AAC_OK,
-          "switch on and off");
+    CHECK(aac_encoder_set_afterburner(enc, 0) == AAC_OK && aac_encoder_set_afterburner(enc, 1) == AAC_OK,
+          "switch off and on");
     std::vector<uint8_t> toggled;
     std::vector<float> block(2048);
     std::vector<uint8_t> buf(16384);
@@ -137,12 +137,15 @@ static void test_off_identity() {
     const int len = aac_encoder_flush(enc, buf.data(), (int)buf.size());
     toggled.insert(toggled.end(), buf.begin(), buf.begin() + std::max(len, 0));
     aac_encoder_destroy(enc);
-    CHECK(toggled == untouched, "rc%d: the switched-off stream equals the untouched one", rc);
-    /* Twice on gives the same stream too: the pass is deterministic. */
+    CHECK(toggled == untouched, "rc%d: the switched-on stream equals the untouched one", rc);
+    /* AAC-LC runs the pass by default, and twice on gives the same
+     * stream: the pass is deterministic. */
     const std::vector<uint8_t> on1 = encode_with(pcm, sr, 2, 64000, rc, 1);
     const std::vector<uint8_t> on2 = encode_with(pcm, sr, 2, 64000, rc, 1);
+    const std::vector<uint8_t> off = encode_with(pcm, sr, 2, 64000, rc, 0);
     CHECK(on1 == on2, "rc%d: the afterburner is deterministic", rc);
-    CHECK(on1 != untouched, "rc%d: the afterburner changes the stream", rc);
+    CHECK(on1 == untouched, "rc%d: the afterburner is on by default", rc);
+    CHECK(off != untouched, "rc%d: the afterburner changes the stream", rc);
   }
 }
 
@@ -153,6 +156,7 @@ static void test_switch_midstream() {
   const std::vector<float> pcm = gen_music(sr * 2, sr, 2);
   const std::vector<uint8_t> off = encode_with(pcm, sr, 2, 48000, AAC_RC_CBR, 0);
   AacEncoderHandle enc = aac_encoder_create(sr, 2, 48000, AAC_AOT_LC, AAC_RC_CBR);
+  aac_encoder_set_afterburner(enc, 0);
   std::vector<uint8_t> mixed;
   std::vector<float> block(2048);
   std::vector<uint8_t> buf(16384);
@@ -290,7 +294,7 @@ static void test_layouts_and_sbr() {
 
 int main() {
   const std::string tmp = make_temp_dir();
-  test_off_identity();
+  test_default_on();
   test_switch_midstream();
   test_quality_and_budget(tmp);
   test_layouts_and_sbr();

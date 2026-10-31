@@ -915,7 +915,8 @@ class Encoder : public Napi::ObjectWrap<Encoder> {
         (ret = aac_encoder_set_mpeg2(handle_, option_bool(o, "mpeg2", false) ? 1 : 0)) < 0 ||
         (mode != AAC_MODE_DEFAULT && (ret = aac_encoder_set_channel_mode(handle_, mode)) < 0) ||
         (ld_sbr && (ret = aac_encoder_set_ld_sbr(handle_, 1, dual_rate ? 1 : 0)) < 0) ||
-        (ret = aac_encoder_set_afterburner(handle_, option_bool(o, "afterburner", false) ? 1 : 0)) < 0 ||
+        (o.Has("afterburner") && !o.Get("afterburner").IsUndefined() &&
+         (ret = aac_encoder_set_afterburner(handle_, option_bool(o, "afterburner", false) ? 1 : 0)) < 0) ||
         (drc_profile != AAC_DRC_NONE &&
          (ret = aac_encoder_set_metadata(handle_, drc_profile, prog_ref_level)) < 0) ||
         (have_usac && (ret = aac_encoder_set_usac(handle_, &usac_opt)) < 0) ||

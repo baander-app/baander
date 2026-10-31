@@ -381,7 +381,11 @@ export interface AacEncoderOptions {
   channelMode?: AacChannelMode;
   /** 'eld' only: SBR with the low-delay filterbank. Default false. */
   ldSbr?: boolean | AacLdSbrOptions;
-  /** A second quantisation pass for better quality at more CPU. Default false. */
+  /**
+   * A second quantisation pass for better quality at about 85 % more CPU.
+   * Default true for 'lc', 'he' and 'hev2', false for 'ld' and 'eld';
+   * 'usac' refuses true.
+   */
   afterburner?: boolean;
   /**
    * A hard cap in bit/s on any single frame: no frame takes more than its

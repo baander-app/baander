@@ -186,7 +186,7 @@ export interface AacEncoderOptions {
   channelMode?: AacChannelMode;
   /** 'eld' only: SBR with the low-delay filterbank. */
   ldSbr?: boolean | AacLdSbrOptions;
-  /** A second quantisation pass for better quality at more CPU. */
+  /** A second quantisation pass for better quality at more CPU; on by default for 'lc', 'he' and 'hev2'. */
   afterburner?: boolean;
   /** A cap in bit/s on any single frame; 0 for none. */
   peakBitrate?: number;

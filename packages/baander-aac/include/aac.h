@@ -165,8 +165,9 @@ int aac_encoder_config(AacEncoderHandle ctx, uint8_t* out, int out_size);
  * AAC_ERR_INVALID_ARG for any other object type. */
 int aac_encoder_set_ld_sbr(AacEncoderHandle ctx, int enabled, int dual_rate);
 /* A second quantisation pass that re-searches the scalefactors and the
- * codebooks of every frame against its bit budget (more CPU, better
- * quality at low bitrates).  Default off; may be switched at any time. */
+ * codebooks of every frame against its bit budget (better quality for
+ * about 85 % more encoder CPU).  Default on for AAC-LC and HE-AAC, off for
+ * AAC-LD and AAC-ELD; USAC refuses it.  May be switched at any time. */
 int aac_encoder_set_afterburner(AacEncoderHandle ctx, int enabled);
 /* Writes dynamic_range_info with the profile's compression curve and
  * `prog_ref_level` (0..127, the program's loudness in quarter dB below
