@@ -60,7 +60,17 @@ required native proof exercised FFI initialization and Zend class/method metadat
 mutation; it first failed at the version floor on the old image. Build contract
 checks passed 16 tests with 121 assertions. Scoped formatting, shell syntax and
 whitespace checks pass; focused runtime review has no remaining findings.
-The smaller runtime builds and complete upgraded-stack qualification remain open.
+All four smaller amd64 runtime builds also passed their version and thread-mode
+checks. Tooling, nginx and registry qualification use PHP 8.5.12 NTS with Swoole
+6.2.4; registry inventory uses PHP 8.5.12 NTS without Swoole. Their image identities
+are recorded below. Complete upgraded-stack qualification remains open.
+
+| Runtime build | Image identity |
+| --- | --- |
+| Tooling | `sha256:ada971949ec0ac67959084ace06772b32f6818d9d252cdbb797c32a65b42c59e` |
+| nginx qualification | `sha256:d0ed4018c8ffc5d77a053acdf956c5bdb959ec6eec40147eff6dc840255ab62c` |
+| Registry inventory PHP | `sha256:243527053dc3902b406dc8c74dc269b78032041e42a8fb209ab0934f2a4639a5` |
+| Registry qualification PHP | `sha256:b83ca8c055f6ce912e1b0a380002d82f2623c283e63d2e6c75001adcdd553ab0` |
 
 ## Cohesive live updates
 
