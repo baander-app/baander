@@ -23,6 +23,26 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## PHP dependency and runtime refresh
+
+Implementation plan delivered locally, 2026-10-31, in the
+[PHP dependency and runtime refresh plan](docs/plans/2026-10-31-0802-chore-php-dependency-runtime-refresh-plan.md).
+The confirmed scope covers all Composer projects, PHP 8.5.12 or newer stable,
+latest stable Swoole, dependency patches and forks, upstream Swoole bundle changes,
+and repeatable maintenance checks. Scheduled update PRs are excluded.
+Six units cover dependency ownership, runtime builds, bundle reconciliation,
+Composer upgrades, maintenance checks and final qualification. Upgrades and runtime
+qualification remain open.
+
+Verification checkpoint: independent source verification checked Composer
+boundaries, runtime pins, patch hashes, local bundle behavior and repository
+automation. Repository, upstream and regression research grounds the implementation
+decisions. All five document-review lenses returned without findings; the confidence,
+contract-preservation, prose and whitespace checks pass. All 17 requirement, flow
+and acceptance entries remain unchanged. Patch applicability, solver compatibility
+and native behavior remain execution-time checks. No dependency updates,
+application tests or image builds ran for this documentation change.
+
 ## Cohesive live updates
 
 Implementation plan delivered, 2026-10-30, in the
