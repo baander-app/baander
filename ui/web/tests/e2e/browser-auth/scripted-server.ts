@@ -1,5 +1,5 @@
 /**
- * The scripted server behind the browser-auth suite: one loopback HTTP server that answers for the
+ * The scripted server behind the browser-auth suite: one loopback server that answers for the
  * web origin (the fixture page and the service worker script), the API origin (login, logout,
  * refresh, images and streams) and a foreign origin that shares the image paths. The three hosts
  * are given at start: the named baander.app hosts a Chromium flag resolves to the loopback, or the
@@ -18,7 +18,8 @@
  * consumed token.
  */
 
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer as createHttpsServer, type ServerOptions } from 'node:https'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { transformSync } from 'esbuild'
@@ -155,7 +156,7 @@ function fixtureHtml(apiOrigin: string): string {
   ].join('')
 }
 
-export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHosts = NAMED_HOSTS): Promise<ScriptedServer> {
+export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHosts = NAMED_HOSTS, tls?: ServerOptions): Promise<ScriptedServer> {
   const worker = transformSync(readFileSync(workerPath, 'utf8'), { loader: 'ts' }).code
   const knownHosts = [hosts.web, hosts.api, hosts.foreign].filter((host): host is string => host !== null)
   let nonces = new Set<string>()
@@ -350,7 +351,7 @@ export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHo
     response.end(fixtureHtml(scripted.apiOrigin))
   }
 
-  const server: Server = createServer(handle)
+  const server = tls ? createHttpsServer(tls, handle) : createServer(handle)
   const scripted: ScriptedServer = {
     webOrigin: '',
     apiOrigin: '',
@@ -384,8 +385,9 @@ export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHo
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Loopback fixture did not start')
-  scripted.webOrigin = `http://${hosts.web}:${address.port}`
-  scripted.apiOrigin = `http://${hosts.api}:${address.port}`
-  scripted.foreignOrigin = hosts.foreign === null ? null : `http://${hosts.foreign}:${address.port}`
+  const scheme = tls ? 'https' : 'http'
+  scripted.webOrigin = `${scheme}://${hosts.web}:${address.port}`
+  scripted.apiOrigin = `${scheme}://${hosts.api}:${address.port}`
+  scripted.foreignOrigin = hosts.foreign === null ? null : `${scheme}://${hosts.foreign}:${address.port}`
   return scripted
 }

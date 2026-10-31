@@ -22,7 +22,9 @@ final class JavaScriptDependencyCheckTest extends TestCase
         $this->write('ui/web/package.json', ['name' => '@baander/web', 'devDependencies' => ['typescript' => '^6.0.3', 'failed' => '^1.0.0']]);
         file_put_contents($this->root . '/ui/web/yarn.lock', '__metadata: {}');
         $this->write('packages/baander-tooling/resources/javascript-dependencies.json', [
+            'version' => 1,
             'scopeDirectories' => ['ui/web'],
+            'resolutions' => [],
             'projects' => ['ui/web/package.json' => ['kind' => 'locked', 'manager' => 'yarn', 'lock' => 'ui/web/yarn.lock']],
             'patches' => [],
             'exceptions' => [['projects' => ['ui/web/package.json'], 'package' => 'typescript', 'declared' => ['^6.0.3'], 'reason' => 'Compiler peer range.']],
@@ -164,6 +166,83 @@ final class JavaScriptDependencyCheckTest extends TestCase
         self::assertSame(1, $report->exitCode());
         self::assertStringContainsString('high', $report->render());
         self::assertStringContainsString('6.0.3', $report->render());
+    }
+
+    public function testIncompletePolicyFailsClosedBeforeAnyProcess(): void
+    {
+        $this->write('packages/baander-tooling/resources/javascript-dependencies.json', ['version' => 1]);
+        $executor = $this->createMock(CommandExecutor::class);
+        $executor->expects(self::never())->method('run');
+        $report = (new Check($executor))->run($this->root, false);
+        self::assertSame(2, $report->exitCode());
+        self::assertSame('gap', $report->toArray()['records'][0]['status']);
+    }
+
+    public function testWrongPolicyShapesFailClosedBeforeAnyProcess(): void
+    {
+        $path = 'packages/baander-tooling/resources/javascript-dependencies.json';
+        $valid = json_decode(file_get_contents($this->root . '/' . $path), true, flags: JSON_THROW_ON_ERROR);
+        $invalid = [
+            [...$valid, 'version' => 2],
+            [...$valid, 'scopeDirectories' => 'ui/web'],
+            [...$valid, 'projects' => []],
+            [...$valid, 'projects' => ['ui/web/package.json' => ['kind' => 'unknown']]],
+            [...$valid, 'projects' => ['ui/web/package.json' => ['kind' => 'locked', 'manager' => 'unknown', 'lock' => 'ui/web/yarn.lock']]],
+            [...$valid, 'projects' => ['ui/web/package.json' => ['kind' => 'locked', 'manager' => 'yarn']]],
+            [...$valid, 'exceptions' => [['package' => 'typescript']]],
+            [...$valid, 'patches' => [['path' => 'fix.patch']]],
+            [...$valid, 'resolutions' => ['ui/web/package.json' => ['typescript' => '7.0.2']]],
+        ];
+        $executor = $this->createMock(CommandExecutor::class);
+        $executor->expects(self::never())->method('run');
+        foreach ($invalid as $policy) {
+            $this->write($path, $policy);
+            self::assertSame(2, (new Check($executor))->run($this->root, false)->exitCode());
+        }
+    }
+
+    public function testOrdinaryPublicDependencyHasCleanYarnOnlineReport(): void
+    {
+        $this->assertCleanOnlineReport('yarn');
+    }
+
+    public function testOrdinaryPublicDependencyHasCleanNpmOnlineReport(): void
+    {
+        $this->assertCleanOnlineReport('npm');
+    }
+
+    private function assertCleanOnlineReport(string $manager): void
+    {
+        $this->write('ui/web/package.json', ['name' => '@baander/web', 'dependencies' => ['axios' => '^1.21.0']]);
+        if ($manager === 'npm') {
+            $path = 'packages/baander-tooling/resources/javascript-dependencies.json';
+            $policy = json_decode(file_get_contents($this->root . '/' . $path), true, flags: JSON_THROW_ON_ERROR);
+            $policy['projects']['ui/web/package.json'] = ['kind' => 'locked', 'manager' => 'npm', 'lock' => 'ui/web/package-lock.json'];
+            $this->write($path, $policy);
+            $this->write('ui/web/package-lock.json', ['packages' => ['' => ['dependencies' => ['axios' => '^1.21.0']]]]);
+        }
+        $executor = $this->createMock(CommandExecutor::class);
+        $executor->expects(self::exactly(3))->method('run')->willReturnCallback(static function (ProcessSpec $spec) use ($manager): ProcessResult {
+            $output = match (true) {
+                in_array('info', $spec->argv, true) => implode("\n", [
+                    '{"value":"@baander/web@workspace:.","children":{"Version":"1.0.0","Dependencies":[{"descriptor":"axios@npm:^1.21.0","locator":"axios@npm:1.21.0"}]}}',
+                    '{"value":"axios@npm:1.21.0","children":{"Version":"1.21.0"}}',
+                ]),
+                in_array('ls', $spec->argv, true) => '{"dependencies":{"axios":{"version":"1.21.0"}}}',
+                in_array('audit', $spec->argv, true) => $manager === 'yarn' ? '' : '{"vulnerabilities":{}}',
+                default => '{"version":"1.21.0"}',
+            };
+            return new ProcessResult(0, null, false, false, $output, '', 0.01);
+        });
+        $report = (new Check($executor))->run($this->root, false);
+        self::assertSame(0, $report->exitCode());
+        $records = $report->toArray()['records'];
+        self::assertNotContains('gap', array_column($records, 'status'));
+        $freshness = array_values(array_filter($records, static fn(array $record): bool => $record['kind'] === 'freshness'));
+        self::assertCount(1, $freshness);
+        self::assertSame('evidence', $freshness[0]['status']);
+        self::assertSame(['1.21.0'], $freshness[0]['details']['resolved']);
+        self::assertSame('1.21.0', $freshness[0]['details']['latest']);
     }
 
     /** @param array<string,mixed> $value */

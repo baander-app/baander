@@ -4,6 +4,9 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { readFileSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
+import { connect } from 'node:net'
+import type { Duplex } from 'node:stream'
+import { startHttpsProxy } from '../../../../../tests/browser/https-proxy.mjs'
 
 // How a native <audio> element reports a stream that the server cuts midway,
 // and whether it can resume at a saved position after the server comes back.
@@ -11,7 +14,6 @@ import type { AddressInfo } from 'node:net'
 // that this test serves itself; nothing is forwarded.
 
 const HOST = 'audio.baander.app'
-const ORIGIN = `http://${HOST}`
 // The fixture is 4.05 s of 192 kbit/s CBR MP3 without Xing or ID3 headers, so
 // copies of it join into one longer stream, as a progressive encode writes it.
 const FIXTURE = readFileSync(new URL('./fixtures/tone-4s.mp3', import.meta.url))
@@ -90,7 +92,14 @@ class InterruptionServer {
   private readonly scripts = new Map<string, Behaviour[]>()
   private readonly held = new Map<string, ServerResponse>()
   private readonly server = createServer((request, response) => this.handle(request, response))
+  private readonly tunnels = new Set<Duplex>()
+  private tls: Awaited<ReturnType<typeof startHttpsProxy>> | undefined
   private port = 0
+
+  get origin(): string {
+    if (!this.port) throw new Error('The media fixture has not started')
+    return this.tls?.origin ?? `http://${HOST}`
+  }
 
   get proxy(): string {
     return `http://127.0.0.1:${this.port}`
@@ -100,7 +109,7 @@ class InterruptionServer {
   script(id: string, behaviours: Behaviour[]): string {
     this.scripts.set(id, [...behaviours])
 
-    return `${ORIGIN}/media/${id}.mp3`
+    return `${this.origin}/media/${id}.mp3`
   }
 
   requestsFor(id: string): RequestRecord[] {
@@ -122,9 +131,33 @@ class InterruptionServer {
     }
   }
 
-  async start(): Promise<void> {
+  async start(secure = true): Promise<void> {
     await this.listen(0)
     this.port = (this.server.address() as AddressInfo).port
+    if (!secure) return
+    this.tls = await startHttpsProxy({ hostname: HOST, upstreamPort: this.port })
+    this.server.on('connect', (request, socket, head) => {
+      const target = new URL(this.origin)
+      if (request.url !== target.host) {
+        socket.destroy()
+        return
+      }
+      const upstream = connect(Number(target.port), '127.0.0.1', () => {
+        socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+        if (head.length) upstream.write(head)
+        socket.pipe(upstream).pipe(socket)
+      })
+      this.tunnels.add(socket)
+      socket.on('error', () => upstream.destroy())
+      socket.on('close', () => {
+        this.tunnels.delete(socket)
+        upstream.destroy()
+      })
+      upstream.on('error', () => socket.destroy())
+      upstream.on('close', () => {
+        if (!upstream.readableEnded) socket.destroy()
+      })
+    })
   }
 
   // Held responses are reset and new connections are refused until `recover`.
@@ -134,6 +167,7 @@ class InterruptionServer {
     }
     const closed = new Promise<void>(resolve => this.server.close(() => resolve()))
     this.server.closeAllConnections()
+    for (const socket of this.tunnels) socket.destroy()
     await closed
   }
 
@@ -142,6 +176,7 @@ class InterruptionServer {
   }
 
   async stop(): Promise<void> {
+    await this.tls?.close()
     if (this.server.listening) {
       await this.goDown()
     }
@@ -331,9 +366,9 @@ const open = (page: Page, url: string) => page.evaluate(source => window.mediaPr
 const round = (value: number) => Number(value.toFixed(3))
 const covers = (ranges: number[][], time: number) => ranges.some(([start, end]) => start <= time && time < end)
 
-async function openProbe(browser: Browser): Promise<Page> {
-  const page = await browser.newPage()
-  await page.goto(`${ORIGIN}/`)
+async function openProbe(browser: Browser, origin: string): Promise<Page> {
+  const page = await browser.newPage({ ignoreHTTPSErrors: true })
+  await page.goto(`${origin}/`)
   await page.evaluate(installMediaProbe)
 
   return page
@@ -402,7 +437,7 @@ for (const engine of [chromium, firefox, webkit]) {
 
     test.beforeEach(async () => {
       server = new InterruptionServer()
-      await server.start()
+      await server.start(engine !== webkit)
       browser = await launch(engine, server)
     })
 
@@ -422,7 +457,7 @@ for (const engine of [chromium, firefox, webkit]) {
         { id: 'chunked-clean-end', cut: 'clean', then: 'bad-gateway' },
       ]
       const urls = cases.map(({ id, then }) => server.script(id, [id.startsWith('length') ? 'length-held' : 'chunked-held', then]))
-      const pages = await Promise.all(cases.map(() => openProbe(browser!)))
+      const pages = await Promise.all(cases.map(() => openProbe(browser!, server.origin)))
       const outcomes = await Promise.all(pages.map(async (page, index) => {
         await open(page, urls[index])
         const beforeCut = await waitFor(page, current => current.time >= PLAYING_BEFORE_CUT, 8000)
@@ -478,7 +513,7 @@ for (const engine of [chromium, firefox, webkit]) {
       const urls = flows.map(({ id }) => id === 'resume-ranged'
         ? server.script(id, ['length-held', 'ranged-complete'])
         : server.script(id, ['chunked-held', 'chunked-complete']))
-      const pages = await Promise.all(flows.map(() => openProbe(browser!)))
+      const pages = await Promise.all(flows.map(() => openProbe(browser!, server.origin)))
       const playing = await Promise.all(pages.map(async (page, index) => {
         await open(page, urls[index])
 

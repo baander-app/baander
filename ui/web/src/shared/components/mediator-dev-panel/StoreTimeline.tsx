@@ -75,7 +75,13 @@ function HistoricalStores({ stores }: { stores: StoreCaptures }) {
   </details>
 
   if (entries.length <= 50) return entries.map(renderCapture)
-  return <CaptureScroll ref={scrollRef} role="region" aria-label="Recorded store instances" tabIndex={0}>
+  return <CaptureScroll ref={scrollRef} role="region" aria-label="Recorded store instances" tabIndex={0}
+    onKeyDown={event => {
+      if (event.target === event.currentTarget && event.key === 'End') {
+        event.preventDefault()
+        virtualizer.scrollToIndex(entries.length - 1, { align: 'end' })
+      }
+    }}>
     <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
       {virtualizer.getVirtualItems().map(row => <div key={row.key} data-index={row.index} ref={virtualizer.measureElement}
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${row.start}px)` }}>

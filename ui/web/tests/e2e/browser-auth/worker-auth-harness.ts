@@ -7,6 +7,10 @@
  */
 
 import { test as base, expect, type Page } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { buildFixtureBundles, type StoreKind } from './fixture-bundles'
 import type { RefreshState } from './refresh-state'
 import {
@@ -249,25 +253,35 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
 
   localServer: [async ({ browserName }, provide) => {
     expect(['chromium', 'webkit']).toContain(browserName)
-    const server = await startScriptedServer(await buildFixtureBundles(), browserName === 'webkit' ? LOOPBACK_HOSTS : NAMED_HOSTS)
+    const directory = mkdtempSync(join(tmpdir(), 'baander-browser-auth-'))
+    let server: ScriptedServer | undefined
     try {
+      const key = join(directory, 'key.pem')
+      const cert = join(directory, 'cert.pem')
+      if (browserName === 'chromium') {
+        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key,
+          '-out', cert, '-days', '1', '-subj', '/CN=web.baander.app'], { stdio: 'ignore' })
+      }
+      server = await startScriptedServer(await buildFixtureBundles(),
+        browserName === 'webkit' ? LOOPBACK_HOSTS : NAMED_HOSTS,
+        browserName === 'chromium' ? { key: readFileSync(key), cert: readFileSync(cert) } : undefined)
       await provide(server)
     } finally {
-      await server.close()
+      await server?.close()
+      rmSync(directory, { recursive: true, force: true })
     }
   }, { scope: 'worker' }],
 
-  browser: [async ({ playwright, browserName, localServer }, provide) => {
-    const origins = serverOrigins(localServer)
+  browser: [async ({ playwright, browserName }, provide) => {
     const browser = browserName === 'webkit'
       ? await playwright.webkit.launch()
       : await playwright.chromium.launch({
         channel: 'chromium',
         args: [
           '--host-resolver-rules=' + Object.values(NAMED_HOSTS).map(host => `MAP ${host} 127.0.0.1`).join(', ') + ', MAP * ~NOTFOUND',
-          '--unsafely-treat-insecure-origin-as-secure=' + origins.join(','),
           '--no-proxy-server',
           '--disable-background-networking',
+          '--ignore-certificate-errors',
         ],
       })
     try {
@@ -278,7 +292,7 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
   }, { scope: 'worker' }],
 
   context: async ({ browser, localServer }, provide) => {
-    const context = await browser.newContext({ serviceWorkers: 'allow' })
+    const context = await browser.newContext({ serviceWorkers: 'allow', ignoreHTTPSErrors: true })
     const origins = serverOrigins(localServer)
     await context.route('**/*', route => origins.includes(new URL(route.request().url()).origin)
       ? route.continue()

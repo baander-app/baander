@@ -148,6 +148,74 @@ Cloudflare and Google resolvers now return answers, and Vercel verifies the
 domain configuration. Certificate issuance completed, and the custom domain
 passed the page, search, fragment, carousel, redirect and 404 checks above.
 
+## Web dependency refresh
+
+Checkpoint, 2026-10-31: refreshed the web application, embedded player, public
+website, shared packages and test/build tooling. Eight manifests retain their
+existing package-manager and lock ownership. Electron, React Native/TV and native
+codecs are outside this change.
+
+The web stack now uses React 19.3.1, Vite 8.3.5, Vitest 5.0.5, ESLint 10.14.0,
+Orval 8.46.0 and Playwright 1.64.1. Build tools use Node 24.22.2 and Yarn 4.18.1.
+TypeScript 6.0.3 remains in the web and shared packages because typescript-eslint
+requires a compiler below 6.1; the site and embedded player use 7.0.2. Node type
+definitions follow the supported Node 24 runtime. Consumer changes preserve the
+TanStack mutation callback contract and both player module formats' AI worker.
+
+The [maintenance guide](docs-book/part-2-developer-guide/contributing.md#javascript-dependency-maintenance)
+documents offline ownership checks and explicit online dependency, advisory and
+patch inspection. CI runs the offline command without network access. Authored
+patches, Yarn builtin patches and transitive resolutions have separate ownership.
+There are no authored JavaScript patches. Nine exact site resolutions reduce the
+Vercel dependency tree from 44 advisory records to 22, removing its critical
+finding. Remaining fixes require incompatible transitive releases. The web lint
+tree retains one moderate minimatch advisory requiring version 11; its compatible
+Babel security update is applied. These findings remain visible in online output.
+Yarn still reports three upstream dash.js peer requirements in the `@svta/cml-*`
+packages; the real DASH playback check passes for the tested path.
+
+Authoritative checks on `baander-ci:php-refresh` (Node 24.22.2, PHP 8.5.12) pass:
+web 239 files / 2,975 tests with coverage; player 12 files / 167 tests; shared one
+test; token generation and 66 tests; site four helper tests and a 204-page build.
+Web/player typechecks and builds, generated-client drift, immutable installs,
+source policy, PHPStan, formatting and tooling architecture checks pass. The
+focused tooling suite passes 57 tests with 204 assertions, including 13 new
+dependency-check tests. Web lint has zero errors and five existing source warnings;
+coverage output adds three generated-file warnings when present. The first full
+coverage run timed out during the source census under parallel load; the focused
+case and full suite pass with two workers and unchanged assertions.
+
+The site browser suite passes 39 cases and native authentication passes 24 cases.
+New Chromium enforces HTTPS for the `.app` fixture hosts; disposable TLS fixtures
+restore local browser checks while preserving stream aborts. The shared proxy
+passed an 8 MiB byte-preservation and client-abort smoke check. Real DASH
+publication and adaptive HLS browser scenarios pass with the selected image.
+The isolated preview passes live Recents refresh through a delivery outage and
+authoritative-read retry without a second change hint. Its styling/playback suite
+passes 37 of 38 cases on the first run; one login-render wait times out and passes
+in isolation with unchanged assertions. Coverage includes real authentication,
+volume dragging, track playback, equalizer controls and visualizations, and admin
+tab contrast. The historical store debugger passes its browser case and 11 unit
+tests after routing focused End-key scrolling through the virtualizer.
+Real Chromium also loads the built player's AI worker with HTTP 200 and receives
+its ready message from both ESM and bundled CJS, without model or external requests.
+
+Native audio qualification remains partial. Four worklet meter assertions produce
+the same numerical failures on the previous Chromium. The interruption suite
+passes five of six cases; current WebKit fails the prerequisite that a held MP3
+advance at least one second before the cut. The original HTTP fixture passes with
+exact Playwright 1.60.0/WebKit, so this is a new browser qualification gap. WebKit
+retains its original HTTP fixture, and the assertions remain unchanged. These
+observations do not establish an application audio regression or authorize a playback redesign.
+No remote push or website deployment is part of this checkpoint.
+
+Final review raised two dependency-check findings: malformed policy could silently
+disable checks, and successful online freshness needed explicit coverage. Both
+are fixed and independently rechecked. Offline mode passes with 18 evidence
+records; online mode reports 112 evidence records, seven findings and no gaps.
+The completed implementation plan is removed; its requirements and review history
+remain in Git. Existing unrelated local work is preserved.
+
 ## PHP dependency and runtime refresh
 
 Implementation plan delivered locally, 2026-10-31, in the

@@ -28,7 +28,8 @@ final class Check
             return $report;
         }
         $latest = [];
-        $internal = array_column(array_column($projects, 'manifest'), 'name');
+        $internal = array_column($projects, 'manifest')
+            |> (static fn(array $manifests): array => array_column($manifests, 'name'));
         foreach ($projects as $path => $project) {
             $cwd = $root . '/' . dirname($path);
             $classification = $project['classification'];
@@ -125,7 +126,7 @@ final class Check
                         $exception = $candidate['reason'];
                     }
                 }
-                $versions = array_values(array_unique($direct[$name] ?? []));
+                $versions = ($direct[$name] ?? []) |> array_unique(...) |> array_values(...);
                 if ($classification['kind'] === 'locked' && $versions === []) {
                     $report->add('gap', $path, 'direct-version', 'Direct resolved version was not established; declared constraint is not installed-version evidence.', ['package' => $name, 'declared' => $declared]);
                 }

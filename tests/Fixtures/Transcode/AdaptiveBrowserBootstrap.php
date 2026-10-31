@@ -189,7 +189,7 @@ $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, fals
 assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
 $encoder = new SegmentEncoder($ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
-$origin = 'http://adaptive.baander.app:18778';
+$origin = 'https://adaptive.baander.app:18779';
 $state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(),
     'audioProfile' => $audioProfile->name, 'sourceStartTime' => $sourceStartTime, 'jobs' => []];
 $owner = Uuid::generate();
@@ -254,7 +254,7 @@ try {
         }
         usleep(50_000);
     } while (true);
-    AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'manifestUrl' => $manifest,
+    AdaptiveBrowserFixture::writeJson($directory . '/ready.json', ['origin' => $origin, 'upstreamOrigin' => 'http://adaptive.baander.app:18778', 'manifestUrl' => $manifest,
         'expectedDuration' => $probe->duration - $sourceStartTime, 'frameRate' => $probe->framerate,
         'sourceTimestampOrigin' => $probe->sourceTimestampOrigin, 'rawSourceDuration' => $rawProbe['format']['duration'] ?? null,
         'expectedAudioDelay' => $delayedAudio ? 8 - $sourceStartTime : 0,

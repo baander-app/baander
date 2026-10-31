@@ -58,7 +58,9 @@ writeFileSync(process.argv[2], JSON.stringify({ dashjs, playwright }))
 JS
 cp ui/web/node_modules/dashjs/dist/modern/umd/dash.all.min.js "$workspace/assets/"
 cp ui/web/tests/e2e/transcode-publication/index.html "$workspace/assets/"
+cp "$workspace/assets/versions.json" "$workspace/browser/versions.json"
 cp ui/web/tests/e2e/transcode-publication/browser.mjs "$workspace/browser/"
+cp tests/browser/https-proxy.mjs "$workspace/browser/"
 cp -R ui/web/node_modules/playwright-core "$workspace/browser/node_modules/"
 timeout 30s docker create --name "$fixture" --network none --memory=1g --pids-limit=128 --user root \
     -e BAANDER_PROGRESSIVE_DIRECTORY=/tmp/baander-publication \
