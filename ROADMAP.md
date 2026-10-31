@@ -1798,6 +1798,24 @@ puts it at 1.71 CPU seconds against Apple's 1.61 and FDK's 1.64. CTest
 VBR needs a perceptual model with tonality; quality scale of the TVBR
 mode.
 
+Checkpoint, 2026-10-31, psychoacoustic model: delivered forward
+masking for AAC-LC and HE-AAC (a band's energy in the previous long
+frame masks noise 30 dB below it), measured on the ten-item corpus
+against the previous commit at +0.011 ± 0.008 PEAQ and +0.008 ± 0.005
+ViSQOL pooled over 64 to 192 kbit/s, no rate worse, HE-AAC 48 kbit/s
++0.006, encode time unchanged. TVBR and CVBR no longer spend leftover
+bits like CBR, so low TVBR qualities fall below the nominal bitrate
+(quality 10 from 131 to 97 kbit/s). Measured and not landed: a tonality
+offset on the thresholds (pooled +0.005 ± 0.013), a true VBR fitted to
+Apple's per-band noise (-0.11 ± 0.26 against CBR at 136 kbit/s), and
+steeper threshold spreading in it (PEAQ level with CBR at 5 to 7 % more
+bits, ViSQOL -0.09). The DRC metadata test now checks the decoded frames
+for the metadata, not the stream size. The low-delay and xHE-AAC
+encoders keep their committed streams. CTest 46/46, Node smoke tests
+14/14, clean under ASan and UBSan. Open: true VBR on sparse tonal items
+(glockenspiel), the TVBR quality scale (quality 50 gives about 230
+kbit/s).
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

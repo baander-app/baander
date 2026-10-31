@@ -191,12 +191,69 @@ bit allocation. Its tonality dependence explains part of the noise
 placement, but our thresholds with tonality added did not reproduce
 the gain.
 
+## Psychoacoustic model
+
+A third round added tonality and temporal masking to our thresholds and
+tested them in CBR and in true VBR. Only forward masking landed.
+
+**Forward masking.** For AAC-LC and HE-AAC with 1024-sample frames,
+each band's energy in the previous long frame now masks noise 30 dB
+below it. A band that decays is then coded no finer than that level.
+Against the previous commit:
+
+| Rate | PEAQ | ViSQOL |
+|---|---|---|
+| 64k | -0.000 ± 0.010 | +0.003 ± 0.004 |
+| 96k | +0.008 ± 0.022 | +0.016 ± 0.014 |
+| 128k | +0.019 ± 0.015 | +0.011 ± 0.012 |
+| 192k | +0.017 ± 0.019 | +0.001 ± 0.002 |
+| HE-AAC 48k | +0.006 ± 0.017 | +0.002 ± 0.005 |
+| 64 to 192k pooled (40 pairs) | +0.011 ± 0.008 | +0.008 ± 0.005 |
+
+The gain is small but holds at every rate. A level 3 dB lower gave less
+(+0.016 at 128 kbit/s), and the same rule between short windows gave
+nothing. Encode time did not change. The low-delay and xHE-AAC encoders
+keep the plain model and their committed streams.
+
+**Tonality.** A band's tonality is the share of its energy in spectral
+peaks. Peaks are found on a phase-insensitive power estimate: each
+line's square plus the square of its neighbours' half difference. Each
+peak counts with its two neighbours. Noise-like bands were allowed up to
+6 dB more noise than tonal ones. In CBR this gained +0.025 to +0.03 at
+96 and 128 kbit/s, but pooled over 64 to 192 kbit/s on top of forward
+masking it measured +0.005 ± 0.013 PEAQ and +0.002 ± 0.005 ViSQOL. It
+did not land.
+
+**True VBR with a fitted model.** A regression of Apple's per-band noise
+on our threshold, Bark frequency, tonality and energy-to-threshold ratio
+leaves a 5.3 dB residual:
+
+noise / threshold ≈ -12.5 + 0.83·bark - 6.8·tonality +
+0.18·bark·tonality + 0.48·(energy / threshold) dB
+
+Used directly as a true-VBR rule at 136 kbit/s, it scored -0.11 ± 0.26
+PEAQ and -0.10 ViSQOL against our CBR. Contrabassoon, steelpan, soprano
+and Strauss improved by 0.4 to 0.5. Glockenspiel fell by 1.9 and
+harpsichord by 1.1. In glockenspiel's bands 14 to 34 our noise sat 5 to
+10 dB above Apple's. Steeper threshold spreading (25/40 and 35/50
+dB/Bark against 15/30) brought PEAQ level with CBR (+0.01 to +0.04 ±
+0.2), but it used 5 to 7 % more bits and ViSQOL stayed 0.09 lower.
+Smoothing tonality across frames or neighbouring bands, or weighting it
+more heavily, did not help.
+
+**TVBR spending.** TVBR and CVBR used to spend leftover bits like CBR,
+so a low TVBR quality never went below the nominal bitrate. They now
+stop at the noise their quality asks for. On the 45 s excerpt, quality
+10 now gives 97 kbit/s instead of 131. Quality 50 gives 230 instead of
+240.
+
 ## Remaining gaps
 
-- **True VBR.** Apple's VBR leads by about 0.2 PEAQ. Closing that needs
-  a perceptual model with tonality and probably temporal masking, not
-  a new allocation rule (see above). Our quality scale is also off:
-  quality 60 gives about 294 kbit/s.
+- **True VBR.** Apple's VBR leads by about 0.2 PEAQ. Neither a new
+  allocation rule nor tonality and forward masking in our thresholds
+  closed it (see above). Sparse tonal items such as glockenspiel are
+  where every model-based rule loses. Our quality scale is also high:
+  quality 50 gives about 230 kbit/s.
 - **Bandwidth at 192 kbit/s and up.** Apple codes sparse bands to
   19.5 kHz there. PEAQ penalises it in our encoder and ViSQOL rewards
   it; a listening test would decide.

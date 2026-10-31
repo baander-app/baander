@@ -711,8 +711,18 @@ static void test_no_metadata_identity() {
   const std::vector<uint8_t> plain = encode_stream(pcm, kRate, 2, 128000, AAC_RC_CBR);
   const std::vector<uint8_t> none = encode_with_metadata(pcm, kRate, 2, 128000, AAC_DRC_NONE, 124);
   CHECK(plain == none, "AAC_DRC_NONE writes nothing");
+  /* At a constant rate the metadata displaces audio bits rather than
+   * growing the stream, so look for it in the decoded frames. */
   const std::vector<uint8_t> with = encode_with_metadata(pcm, kRate, 2, 128000, AAC_DRC_FILM_STANDARD, 124);
-  CHECK(with.size() > plain.size(), "the metadata takes bits");
+  CHECK(with != plain, "the metadata changes the stream");
+  std::vector<FrameDrc> infos;
+  decode_with(with, 2, 0, 0, 0, -1, 0, &infos);
+  int carrying = 0;
+  for (const FrameDrc& f : infos) {
+    carrying += f.has_drc;
+  }
+  CHECK(!infos.empty() && carrying == (int)infos.size(), "metadata in %d of %zu frames", carrying,
+        infos.size());
 }
 
 /* FFmpeg's native decoder parses the fill element: it must decode the

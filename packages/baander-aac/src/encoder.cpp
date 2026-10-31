@@ -2136,7 +2136,10 @@ void aac_encoder_state_reset(AacEncoderState* s) {
     ch->prev_window_shape = AAC_WIN_KBD;
     ch->tns_present = 0;
     memset(ch->tns_n_filt, 0, sizeof(ch->tns_n_filt));
-    aac_psy_init(&ch->psy);
+    /* Forward masking was measured on AAC-LC and HE-AAC
+     * (src/psycho.cpp); the low-delay and xHE-AAC cores keep the plain
+     * model. */
+    aac_psy_init(&ch->psy, !s->usac && s->frame_length >= 960);
   }
   for (int e = 0; e < s->num_elements; e++) {
     s->elem[e].max_sfb = 0;
@@ -2550,13 +2553,14 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
       target = std::min(target, max_bits);
     }
   }
-  const int bits = rate_control(s, target, improve, !s->vbr_mode);
+  /* Only the constant-rate modes spend a surplus: the quality modes,
+   * TVBR and CVBR among them, stop at the noise their quality asks for. */
+  const bool fixed_rate = (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) && !s->vbr_mode;
+  const int bits = rate_control(s, target, improve, fixed_rate);
   if (s->afterburner && !s->usac) {
     /* The constant-rate modes may fill the frame's budget; the quality
      * modes, the VBR modes among them, only redistribute the bits the
      * frame already has. */
-    const bool fixed_rate =
-        (s->rc_mode == AAC_RC_CBR || s->rc_mode == AAC_RC_ABR) && !s->vbr_mode;
     aac_afterburner_run(s, bits, fixed_rate ? target : bits);
   }
 
