@@ -206,6 +206,15 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/Dependencies/
     -
+      name: JavaScriptDependencies
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\JavaScriptDependencies\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/JavaScriptDependencies/
+    -
       name: ComposerSemver
       collectors:
         -
@@ -354,8 +363,12 @@ deptrac:
       - Filesystem
       - Process
       - ComposerSemver
+    JavaScriptDependencies:
+      - Configuration
+      - Process
     ComposerSemver: {  }
     CLI:
+      - JavaScriptDependencies
       - Dependencies
       - Acceptance
       - Backend
@@ -379,6 +392,7 @@ deptrac:
       - Runtime
       - Architecture
     ToolingTests:
+      - JavaScriptDependencies
       - Dependencies
       - Acceptance
       - Backend

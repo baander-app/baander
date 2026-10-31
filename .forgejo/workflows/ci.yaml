@@ -224,6 +224,8 @@ jobs:
             -   name: PHP tooling regressions
                 run: |
                     docker run --rm --network none "$CI_IMAGE" \
+                      composer check:js-dependencies:local
+                    docker run --rm --network none "$CI_IMAGE" \
                       composer run-script --timeout=720 check:php-dependencies:local
                     docker run --rm --network none "$CI_IMAGE" \
                       composer check:tooling-architecture

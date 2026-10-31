@@ -1,0 +1,116 @@
+{
+    "version": 1,
+    "scopeDirectories": [
+        "ui/web",
+        "ui/site",
+        "ui/shared",
+        "ui/design-tokens",
+        "tests/e2e"
+    ],
+    "projects": {
+        "ui/web/package.json": {
+            "kind": "locked",
+            "manager": "yarn",
+            "lock": "ui/web/yarn.lock"
+        },
+        "ui/web/packages/baander-player/package.json": {
+            "kind": "locked",
+            "manager": "yarn",
+            "lock": "ui/web/packages/baander-player/yarn.lock"
+        },
+        "ui/site/package.json": {
+            "kind": "locked",
+            "manager": "yarn",
+            "lock": "ui/site/yarn.lock"
+        },
+        "ui/shared/package.json": {
+            "kind": "locked",
+            "manager": "yarn",
+            "lock": "ui/shared/yarn.lock"
+        },
+        "tests/e2e/package.json": {
+            "kind": "locked",
+            "manager": "npm",
+            "lock": "tests/e2e/package-lock.json"
+        },
+        "ui/shared/dpop/package.json": {
+            "kind": "manifest-only",
+            "reason": "Published library manifest; no independent install or lock."
+        },
+        "ui/shared/blurhash/package.json": {
+            "kind": "manifest-only",
+            "reason": "Published library manifest; no independent install or lock."
+        },
+        "ui/design-tokens/package.json": {
+            "kind": "dependency-free",
+            "reason": "Token generator uses Node builtins."
+        }
+    },
+    "exceptions": [
+        {
+            "projects": [
+                "ui/web/package.json",
+                "ui/shared/package.json",
+                "ui/shared/dpop/package.json",
+                "ui/shared/blurhash/package.json"
+            ],
+            "package": "typescript",
+            "declared": [
+                "^6.0.3",
+                "6.0.3"
+            ],
+            "reason": "typescript-eslint declares TypeScript <6.1; shared source consumers retain the same compiler generation."
+        },
+        {
+            "projects": [
+                "ui/web/package.json"
+            ],
+            "package": "@types/node",
+            "declared": [
+                "^24.19.2"
+            ],
+            "reason": "Types follow the supported Node 24 build runtime."
+        }
+    ],
+    "patches": [],
+    "resolutions": {
+        "ui/site/package.json": {
+            "ajv@npm:8.6.3": {
+                "value": "npm:8.20.0",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "js-yaml@npm:4.1.1": {
+                "value": "npm:4.3.2",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "minimatch@npm:10.1.1": {
+                "value": "npm:10.2.6",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "path-to-regexp@npm:6.1.0": {
+                "value": "npm:6.3.0",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "path-to-regexp@npm:8.3.0": {
+                "value": "npm:8.4.2",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "smol-toml@npm:1.5.2": {
+                "value": "npm:1.9.1",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "tar@npm:7.5.11": {
+                "value": "npm:7.5.22",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "undici@npm:5.28.4": {
+                "value": "npm:5.29.0",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            },
+            "zod@npm:4.1.11": {
+                "value": "npm:4.6.7",
+                "reason": "Exact upstream selector replacement within the same major reduces audited advisory exposure; remaining advisories stay visible."
+            }
+        }
+    }
+}

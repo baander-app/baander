@@ -195,6 +195,8 @@
       "cache:clear": "symfony-cmd",
       "assets:install %PUBLIC_DIR%": "symfony-cmd"
     },
+    "check:js-dependencies": "@php scripts/check-js-dependencies.php --online",
+    "check:js-dependencies:local": "@php scripts/check-js-dependencies.php --local-only",
     "check:php-dependencies": "@php scripts/check-php-dependencies.php",
     "check:php-dependencies:local": "@php scripts/check-php-dependencies.php --local-only",
     "check:tooling-architecture": [
