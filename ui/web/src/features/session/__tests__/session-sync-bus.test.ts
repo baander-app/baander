@@ -124,6 +124,50 @@ describe('SessionSyncBus', () => {
     bus.disconnect()
   })
 
+  it.each(['session.joined', 'session.state'])('delivers a full 3,000-song %s snapshot', async type => {
+    const callbacks = events()
+    const bus = createBus(undefined, callbacks)
+    await bus.connect()
+    const state = {
+      queue: Array.from({ length: 3000 }, (_, index) => `song${index.toString().padStart(17, '0')}`),
+      currentTrackIndex: 2999,
+      position: 12,
+      playbackState: 'paused',
+      activeDeviceId: null,
+    }
+    const data = JSON.stringify({ type, data: state })
+    expect(new TextEncoder().encode(data).byteLength).toBeGreaterThan(65_536)
+    try {
+      FakeWebSocket.instances[0].onmessage?.({ data })
+      expect(callbacks.onStateUpdate).toHaveBeenCalledExactlyOnceWith(state)
+    } finally {
+      bus.disconnect()
+    }
+  })
+
+  it('bounds freshness frames separately from the general socket envelope', async () => {
+    const transport = new SharedLiveTransport({
+      wsEndpoint: 'wss://api.baander.app/api/ws',
+      getConnectionTicket: async () => ticket(),
+    })
+    const messages = vi.fn()
+    const unsubscribe = transport.subscribe({ onMessage: messages })
+    const release = transport.retain()
+    await transport.waitForAttempt()
+    try {
+      const socket = FakeWebSocket.instances[0]
+      socket.onmessage?.({ data: JSON.stringify({ type: 'live.changed', padding: 'a'.repeat(65_536) }) })
+      socket.onmessage?.({ data: JSON.stringify({ type: 'live.changed', padding: 'ø'.repeat(33_000) }) })
+      socket.onmessage?.({ data: JSON.stringify({ type: 'session.state', padding: 'a'.repeat(16_777_216) }) })
+      expect(messages).not.toHaveBeenCalled()
+      socket.onmessage?.({ data: JSON.stringify({ type: 'live.health' }) })
+      expect(messages).toHaveBeenCalledExactlyOnceWith({ type: 'live.health' })
+    } finally {
+      unsubscribe()
+      release()
+    }
+  })
+
   it('obtains a fresh single-use ticket on each reconnect without putting an access token in the URL', async () => {
     const issue = vi.fn<TicketProvider>(async () => ticket())
       .mockResolvedValueOnce(ticket('a')).mockResolvedValueOnce(ticket('b'))

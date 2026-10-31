@@ -687,6 +687,39 @@ preview and persistent data were untouched. Evidence is retained in
 `/tmp/live-review-role-red/`, `/tmp/live-review-role-green/`,
 `/tmp/live-review-role-final/` and `/tmp/live-review-role-phpstan.log`.
 
+Review findings #1, #2, #4 and #5 are fixed. The shared socket keeps its 64 KiB
+UTF-8 freshness-frame limit while allowing full session snapshots under a
+separate 16 MiB envelope ceiling. Coordinated resource attempts time out after
+30 seconds, preserving shorter explicit deadlines and the separate control
+budgets. Timeout releases a stalled request's admission slot. Sidebar reads,
+saves and resets now consume the controller's response envelope; reset discards
+older edits while preserving edits made during the request. Passkey registration
+tracks attempt ownership separately from authorization so an obsolete completion
+cannot leave the controls disabled or overwrite a newer attempt.
+
+Each fix has a failing-before/passing-after regression. Focused gates pass:
+24 transport/session tests in three files, 63 admission/coordinator/API tests in
+five files, 45 sidebar/draft tests in four files, and 17 passkey hook tests.
+The first full frontend run found one synchronization defect in a palette test:
+Blob deep equality let an older extraction satisfy the newer-image wait. A held
+HTTP response reproduced that false-positive wait; the test now waits for exact
+Blob identity while retaining its newer-palette and obsolete-result assertions.
+The production hook is unchanged. Its focused palette/image/extractor selection
+passes 25 tests in three files.
+
+Final frontend verification: 2,962 tests across 237 files pass. Both TypeScript
+configurations and the production build pass; full ESLint reports zero errors
+and eight existing warnings. All five phase-simplification lenses returned no
+findings. Evidence is retained in `/tmp/live-review-transport-{red,green}.log`,
+`/tmp/live-review-timeout-{red,green}.log`,
+`/tmp/live-u9-sidebar-envelope-{red,reset-red,final-green}.log`,
+`/tmp/live-u9-passkey-attempt-{red,green}.log`,
+`/tmp/live-palette-debug-delayed-response.log`, `/tmp/live-palette-debug-fixed.log`,
+`/tmp/live-review-fixes-frontend-full-final.log`,
+`/tmp/live-review-fixes-typecheck.log`, `/tmp/live-review-fixes-lint.log` and
+`/tmp/live-review-fixes-build.log`. No review finding remains unapplied. The final
+CI-image capacity/populated qualification is a separate checkpoint below.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

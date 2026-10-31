@@ -134,7 +134,7 @@ it('refreshes sidebar baselines while preserving editor edits and exposes confli
   const schema = () => ({ mediaType: 'music', sections: [{ id: 'custom', label, type: 'navigation', items: [
     { id: 'mine', type: 'page_link', label: 'My item', icon: 'home', config: { route: '/' } },
   ] }] })
-  AXIOS_INSTANCE.defaults.adapter = async config => response(config, schema())
+  AXIOS_INSTANCE.defaults.adapter = async config => response(config, { data: schema() })
   const { coordinator, wrapper } = setup()
   const reader = renderHook(() => useSidebarConfig(), { wrapper })
   await waitFor(() => expect(useSidebarStore.getState().schemas.music.sections[0].label).toBe('Server section'))
@@ -187,12 +187,42 @@ it('acknowledges only submitted sidebar sections and keeps newer edits open afte
   await waitFor(() => expect(saveConfig).toBeDefined())
   fireEvent.click(screen.getByRole('button', { name: 'Remove item' }))
   await act(async () => {
-    pending.resolve(response(saveConfig!, { mediaType: 'music', sections: [{ ...sections[0], items: [sections[0].items[1]] }] }))
+    pending.resolve(response(saveConfig!, { data: { mediaType: 'music', sections: [{ ...sections[0], items: [sections[0].items[1]] }] } }))
   })
   expect(useSidebarStore.getState().isEditorOpen).toBe(true)
   expect(screen.queryByText('Two')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(useSidebarStore.getState().schemas.music.sections[0].items.map(item => item.id)).toEqual(['two'])
+})
+
+it.each([false, true])('resets to enveloped defaults while preserving edits made during reset: %s', async newerEdit => {
+  const pending = deferred<AxiosResponse>()
+  let resetConfig: InternalAxiosRequestConfig | undefined
+  const schema = { mediaType: 'music' as const, sections: [{ id: 'default', label: 'Default section', type: 'navigation' as const, items: [
+    { id: 'one', type: 'page_link' as const, label: 'One', icon: 'home', config: { route: '/' } },
+    { id: 'two', type: 'page_link' as const, label: 'Two', icon: 'home', config: { route: '/' } },
+  ] }] }
+  useSidebarStore.getState().setSchema('music', schema)
+  useSidebarStore.getState().setEditorOpen(true)
+  AXIOS_INSTANCE.defaults.adapter = config => { resetConfig = config; return pending.promise }
+  render(<SidebarEditor />)
+  fireEvent.click(screen.getAllByRole('button', { name: 'Remove item' })[0])
+  fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+  await waitFor(() => expect(resetConfig?.method).toBe('delete'))
+  if (newerEdit) fireEvent.click(screen.getByRole('button', { name: 'Remove item' }))
+  await act(async () => { pending.resolve(response(resetConfig!, { data: schema })) })
+  expect(useSidebarStore.getState().schemas.music).toEqual(schema)
+  expect(useSidebarStore.getState().isEditorOpen).toBe(true)
+  if (newerEdit) {
+    expect(screen.queryByText('One')).not.toBeInTheDocument()
+    expect(screen.queryByText('Two')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+  } else {
+    expect(screen.getByText('One')).toBeInTheDocument()
+    expect(screen.getByText('Two')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled()
+  }
 })
 
 it('purges unavailable sidebar baseline data and disables saving while preserving edited sections', async () => {
@@ -203,7 +233,7 @@ it('purges unavailable sidebar baseline data and disables saving while preservin
   ] }] }
   AXIOS_INSTANCE.defaults.adapter = async config => {
     if (denied) throw new AxiosError('Denied', 'ERR_BAD_REQUEST', config, undefined, { ...response(config, {}), status: 403 })
-    return response(config, schema)
+    return response(config, { data: schema })
   }
   const { coordinator, wrapper } = setup()
   renderHook(() => useSidebarConfig(), { wrapper })
@@ -456,7 +486,7 @@ it('keeps identical decoded sidebar snapshots referentially stable across refres
   const schema = { mediaType: 'music', sections: [{ id: 'custom', label: 'Same section', type: 'navigation', items: [] }] }
   AXIOS_INSTANCE.defaults.adapter = async config => {
     reads++
-    return response(config, JSON.parse(JSON.stringify(schema)))
+    return response(config, { data: JSON.parse(JSON.stringify(schema)) })
   }
   const { coordinator, wrapper } = setup()
   renderHook(() => useSidebarConfig(), { wrapper })

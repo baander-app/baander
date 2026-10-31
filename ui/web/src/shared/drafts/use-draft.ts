@@ -88,6 +88,12 @@ function createDraft<T extends Record<string, unknown>>(initialData: T) {
       baseline = {} as T
       publish({ ...snapshot, values, status: 'unavailable', pending: null })
     },
+    resetToServer: (data: T) => {
+      if (snapshot.pending || snapshot.status === 'unavailable') return
+      baseline = { ...data }
+      lastReceived = { ...data }
+      publish({ values: { ...data }, dirty: new Set(), status: 'clean', pending: null })
+    },
     beginSave: (): DraftSubmission<T> | null => {
       if (snapshot.status !== 'dirty' || snapshot.pending || snapshot.dirty.size === 0) return null
       const submission = {
@@ -157,6 +163,7 @@ export function useDraft<T extends Record<string, unknown>>({ identity, initialD
     updateField: controller.updateField,
     receive: controller.receive,
     revokeAccess: controller.revokeAccess,
+    resetToServer: controller.resetToServer,
     beginSave: controller.beginSave,
     completeSave: controller.completeSave,
     failSave: controller.failSave,

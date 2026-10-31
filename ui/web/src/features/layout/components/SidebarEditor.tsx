@@ -404,7 +404,8 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
       const res = await AXIOS_INSTANCE.put(`/api/user/sidebar-config/${activeMedia}`, submission.values)
       if (!mounted.current || !isCurrentOwnership(owner)) return
       draft.completeSave(submission)
-      if (res.data?.mediaType) setSchema(activeMedia, res.data)
+      const schema = res.data?.data as MediaSidebarSchema | undefined
+      if (schema?.mediaType) setSchema(activeMedia, schema)
       if (revision === editRevision.current) setEditorOpen(false)
     } catch {
       if (!mounted.current || !isCurrentOwnership(owner)) return
@@ -423,10 +424,10 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
     try {
       const res = await AXIOS_INSTANCE.delete(`/api/user/sidebar-config/${activeMedia}`)
       if (!mounted.current || !isCurrentOwnership(owner)) return
-      if (res.data?.mediaType) setSchema(activeMedia, res.data)
+      const schema = res.data?.data as MediaSidebarSchema | undefined
+      if (schema?.mediaType) setSchema(activeMedia, schema)
       if (revision === editRevision.current) {
-        draft.receive({ sections: res.data?.sections ?? [] })
-        draft.resolveConflict('server')
+        draft.resetToServer({ sections: schema?.sections ?? [] })
       }
     } catch {
       return

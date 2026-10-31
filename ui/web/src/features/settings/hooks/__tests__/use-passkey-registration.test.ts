@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
@@ -12,6 +12,7 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
 // Import after mocks
 import { usePasskeyRegistration } from '../use-passkey-registration';
 import { postPasskeyOptions, postPasskeyRegister } from '@/shared/api-client/gen/endpoints';
+import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/ownership';
 
 const mockPostPasskeyOptions = vi.mocked(postPasskeyOptions);
 const mockPostPasskeyRegister = vi.mocked(postPasskeyRegister);
@@ -179,4 +180,113 @@ describe('usePasskeyRegistration', () => {
 
     expect(result.current.error).toBe('Failed to register passkey');
   });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+}
+
+describe('passkey registration attempt ownership', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    synchronizeOwnership('passkey-registration');
+    vi.stubGlobal('navigator', { credentials: { create: vi.fn().mockResolvedValue(createMockCredential()) } });
+    mockPostPasskeyOptions.mockResolvedValue(VALID_OPTIONS_RESPONSE as never);
+    mockPostPasskeyRegister.mockResolvedValue({} as never);
+  });
+
+  afterEach(() => {
+    synchronizeOwnership(null);
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['options', 'credential', 'registration'] as const)(
+    'releases loading after authorization changes during %s', async stage => {
+      const pending = deferred<unknown>();
+      if (stage === 'options') mockPostPasskeyOptions.mockReturnValueOnce(pending.promise as never);
+      if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
+      if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
+      const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
+      let attempt!: Promise<void>;
+      await act(async () => { attempt = result.current.register(); });
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        advanceAuthorization();
+        pending.resolve(stage === 'options' ? VALID_OPTIONS_RESPONSE : stage === 'credential' ? createMockCredential() : {});
+        await attempt;
+      });
+
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+      expect(result.current.success).toBe(false);
+      expect(mockPostPasskeyRegister).toHaveBeenCalledTimes(stage === 'registration' ? 1 : 0);
+      if (stage === 'options') expect(navigator.credentials.create).not.toHaveBeenCalled();
+      await act(async () => { await result.current.register(); });
+      expect(result.current.success).toBe(true);
+    },
+  );
+
+  it.each(['options', 'credential', 'registration'] as const)(
+    'releases loading after an obsolete %s rejects', async stage => {
+      const pending = deferred<unknown>();
+      if (stage === 'options') mockPostPasskeyOptions.mockReturnValueOnce(pending.promise as never);
+      if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
+      if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
+      const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
+      let attempt!: Promise<void>;
+      await act(async () => { attempt = result.current.register(); });
+      await act(async () => {
+        advanceAuthorization();
+        pending.reject(new Error('Obsolete registration failure'));
+        await attempt;
+      });
+      expect(result.current).toMatchObject({ loading: false, error: null, success: false });
+    },
+  );
+
+  it('keeps the newer attempt pending when a superseded attempt finishes', async () => {
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    mockPostPasskeyOptions.mockReturnValueOnce(first.promise as never).mockReturnValueOnce(second.promise as never);
+    const { result } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
+    let firstAttempt!: Promise<void>;
+    let secondAttempt!: Promise<void>;
+    await act(async () => {
+      firstAttempt = result.current.register('First');
+      secondAttempt = result.current.register('Second');
+    });
+    await act(async () => { first.resolve(VALID_OPTIONS_RESPONSE); await firstAttempt; });
+    expect(result.current).toMatchObject({ loading: true, error: null, success: false });
+    expect(navigator.credentials.create).not.toHaveBeenCalled();
+    await act(async () => { second.resolve(VALID_OPTIONS_RESPONSE); await secondAttempt; });
+    expect(result.current).toMatchObject({ loading: false, error: null, success: true });
+    expect(mockPostPasskeyRegister).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'Second' }));
+  });
+
+  it.each(['options', 'credential', 'registration'] as const)(
+    'ignores a %s completion after unmount', async stage => {
+      const invalidateQueries = vi.spyOn(QueryClient.prototype, 'invalidateQueries');
+      const pending = deferred<unknown>();
+      if (stage === 'options') mockPostPasskeyOptions.mockReturnValueOnce(pending.promise as never);
+      if (stage === 'credential') vi.mocked(navigator.credentials.create).mockReturnValueOnce(pending.promise as Promise<Credential | null>);
+      if (stage === 'registration') mockPostPasskeyRegister.mockReturnValueOnce(pending.promise as never);
+      const { result, unmount } = renderHook(() => usePasskeyRegistration(), { wrapper: createWrapper() });
+      let attempt!: Promise<void>;
+      await act(async () => { attempt = result.current.register(); });
+      unmount();
+      await act(async () => {
+        pending.resolve(stage === 'options' ? VALID_OPTIONS_RESPONSE : stage === 'credential' ? createMockCredential() : {});
+        await attempt;
+      });
+      expect(mockPostPasskeyRegister).toHaveBeenCalledTimes(stage === 'registration' ? 1 : 0);
+      expect(result.current.success).toBe(false);
+      expect(invalidateQueries).not.toHaveBeenCalled();
+      if (stage === 'options') expect(navigator.credentials.create).not.toHaveBeenCalled();
+    },
+  );
 });

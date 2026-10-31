@@ -7,6 +7,29 @@ function renderDraft() {
 }
 
 describe('server snapshots and field drafts', () => {
+  it('explicitly discards edits when reset returns the unchanged server baseline', () => {
+    const { result } = renderDraft()
+    act(() => result.current.updateField('title', 'my title'))
+    act(() => result.current.resetToServer({ title: 'old', year: 2000 }))
+    expect(result.current.values).toEqual({ title: 'old', year: 2000 })
+    expect(result.current.status).toBe('clean')
+    expect(result.current.canSave).toBe(false)
+  })
+
+  it.each(['pending', 'unavailable'] as const)('does not reset a %s draft', status => {
+    const { result } = renderDraft()
+    act(() => result.current.updateField('title', 'my title'))
+    act(() => {
+      if (status === 'pending') result.current.beginSave()
+      else result.current.revokeAccess()
+    })
+    const previous = result.current.values
+    act(() => result.current.resetToServer({ title: 'old', year: 2000 }))
+    expect(result.current.values).toBe(previous)
+    expect(result.current.status).toBe(status === 'pending' ? 'dirty' : 'unavailable')
+    expect(result.current.canSave).toBe(false)
+  })
+
   it('keeps local text during a remote update and requires explicit resolution', () => {
     const { result } = renderDraft()
     act(() => result.current.updateField('title', 'my title'))

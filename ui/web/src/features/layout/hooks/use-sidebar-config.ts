@@ -26,7 +26,8 @@ export function useSidebarConfig() {
         const res = await AXIOS_INSTANCE.get(`/api/user/sidebar-config/${activeMedia}`, { signal })
         if (!current()) return
         store.setError(null)
-        const next = res.data?.sections?.length > 0 ? res.data as MediaSidebarSchema : ALL_SCHEMAS[activeMedia]
+        const schema = res.data?.data as MediaSidebarSchema | undefined
+        const next = schema && schema.sections?.length > 0 ? schema : ALL_SCHEMAS[activeMedia]
         const currentSchema = useSidebarStore.getState().schemas[activeMedia]
         const shared = replaceEqualDeep(currentSchema, next)
         if (shared !== currentSchema) store.setSchema(activeMedia, shared)

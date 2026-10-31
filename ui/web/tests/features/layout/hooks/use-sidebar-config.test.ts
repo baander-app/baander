@@ -56,7 +56,7 @@ describe('use-sidebar-config (extended)', () => {
       ...ALL_SCHEMAS.music,
       sections: [ALL_SCHEMAS.music.sections[0]],
     }
-    mockedGet.mockResolvedValueOnce({ data: customSchema })
+    mockedGet.mockResolvedValueOnce({ data: { data: customSchema } })
 
     renderHook(() => useSidebarConfig())
 
@@ -104,7 +104,7 @@ describe('use-sidebar-config (extended)', () => {
         schemas: { ...ALL_SCHEMAS, music: { ...ALL_SCHEMAS.music, sections: [] } },
         isLoading: false,
       })
-      mockedGet.mockResolvedValueOnce({ data: ALL_SCHEMAS.music })
+      mockedGet.mockResolvedValueOnce({ data: { data: ALL_SCHEMAS.music } })
 
       const { result } = renderHook(() => useSidebarConfig())
 

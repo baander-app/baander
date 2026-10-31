@@ -24,6 +24,7 @@ export function usePasskeyRegistration() {
     success: false,
   });
   const mountedRef = useRef(true);
+  const attemptRef = useRef<symbol | null>(null);
   const queryClient = useQueryClient();
   const coordinator = useLiveCoordinator();
 
@@ -31,12 +32,17 @@ export function usePasskeyRegistration() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      attemptRef.current = null;
     };
   }, []);
 
   const register = useCallback(async (name = 'Passkey') => {
+    if (!mountedRef.current) return;
+    const attempt = Symbol('passkey-registration');
+    attemptRef.current = attempt;
     const owner = captureOwnership();
-    const current = () => mountedRef.current && isCurrentOwnership(owner);
+    const ownsAttempt = () => mountedRef.current && attemptRef.current === attempt;
+    const current = () => ownsAttempt() && isCurrentOwnership(owner);
     const release = coordinator?.beginMutation(['account']);
     setState({ loading: true, error: null, success: false });
 
@@ -94,6 +100,10 @@ export function usePasskeyRegistration() {
       setState({ loading: false, error: message, success: false });
     } finally {
       release?.();
+      if (ownsAttempt()) {
+        attemptRef.current = null;
+        setState(current => current.loading ? { ...current, loading: false } : current);
+      }
     }
   }, [queryClient, coordinator]);
 

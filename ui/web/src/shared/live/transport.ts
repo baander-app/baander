@@ -1,6 +1,10 @@
 import { requestWebSocketTicket, webSocketEndpoint } from '@/shared/auth/websocket-ticket'
 import { LIVE_MAX_BYTES } from './protocol'
 
+// The shared socket also carries full session queues; match the native envelope ceiling.
+const MAX_ENVELOPE_BYTES = 16_777_216
+const encoder = new TextEncoder()
+
 export interface LiveTransportConfig {
   wsEndpoint: string
   getConnectionTicket: (signal: AbortSignal) => Promise<string>
@@ -91,13 +95,17 @@ export class SharedLiveTransport {
         for (const listener of this.listeners) listener.onOpen?.()
       }
       socket.onmessage = event => {
-        if (!ownsSocket() || typeof event.data !== 'string' || event.data.length > LIVE_MAX_BYTES) return
+        if (!ownsSocket() || typeof event.data !== 'string' || event.data.length > MAX_ENVELOPE_BYTES) return
+        const bytes = encoder.encode(event.data).byteLength
+        if (bytes > MAX_ENVELOPE_BYTES) return
         let message: unknown
         try {
           message = JSON.parse(event.data)
         } catch {
           return
         }
+        if (typeof message === 'object' && message !== null && 'type' in message
+          && typeof message.type === 'string' && message.type.startsWith('live.') && bytes > LIVE_MAX_BYTES) return
         for (const listener of this.listeners) listener.onMessage?.(message)
       }
       socket.onerror = () => {

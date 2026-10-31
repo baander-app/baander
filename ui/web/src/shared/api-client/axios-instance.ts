@@ -20,6 +20,7 @@ interface CustomAxiosRequestConfig extends AxiosRequestConfig {
 }
 
 const MAX_DPOP_NONCE_RETRIES = 1;
+const RESOURCE_ATTEMPT_TIMEOUT_MS = 30_000;
 
 // Scalar metadata survives Axios config cloning without retaining crypto objects.
 const authSessions = new WeakMap<object, number>();
@@ -118,6 +119,9 @@ AXIOS_INSTANCE.interceptors.request.use(async (config: InternalAxiosRequestConfi
     if (read && !isAuthorityControlRequest(config)) {
       const release = await liveHttpAdmission.acquire(signal, read.priority);
       resourcePermits.set(config, release);
+      config.timeout = config.timeout && config.timeout > 0
+        ? Math.min(config.timeout, RESOURCE_ATTEMPT_TIMEOUT_MS)
+        : RESOURCE_ATTEMPT_TIMEOUT_MS;
       const configuredAdapter = Axios.getAdapter(config.adapter ?? AXIOS_INSTANCE.defaults.adapter);
       const adapter = admittedAdapters.get(configuredAdapter) ?? configuredAdapter;
       const admittedAdapter: AxiosAdapter = async request => {

@@ -51,6 +51,7 @@ describe('Axios resource admission', () => {
   })
   afterEach(() => {
     AXIOS_INSTANCE.defaults.adapter = previousAdapter
+    vi.unstubAllGlobals()
     vi.useRealTimers()
   })
 
@@ -71,6 +72,68 @@ describe('Axios resource admission', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await Promise.all([background, foreground])
     expect(order.slice(20)).toEqual(['/api/catalog/user', '/api/catalog?page=20'])
+  })
+
+  it('times out stalled XHR responses and admits the next background reader', async () => {
+    const sent: StalledRequest[] = []
+    class StalledRequest {
+      timeout = 0
+      status = 200
+      statusText = 'OK'
+      responseText = '{}'
+      onloadend: (() => void) | null = null
+      ontimeout: (() => void) | null = null
+      onabort: (() => void) | null = null
+      private timer: ReturnType<typeof setTimeout> | undefined
+      open() {}
+      setRequestHeader() {}
+      getAllResponseHeaders() { return 'Content-Type: application/json' }
+      send() {
+        sent.push(this)
+        if (sent.length === 5) {
+          this.onloadend?.()
+        } else if (this.timeout > 0) {
+          this.timer = setTimeout(() => this.ontimeout?.(), this.timeout)
+        }
+      }
+      abort() {
+        clearTimeout(this.timer)
+        this.onabort?.()
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', StalledRequest)
+    AXIOS_INSTANCE.defaults.adapter = 'xhr'
+    const controllers = Array.from({ length: 5 }, () => resourceSignal())
+    const requests = controllers.map(controller =>
+      AXIOS_INSTANCE.get('/api/catalog', { signal: controller.signal }).catch(error => error as unknown),
+    )
+    try {
+      await flush()
+      expect(sent).toHaveLength(4)
+      await vi.advanceTimersByTimeAsync(29_999)
+      expect(sent).toHaveLength(4)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(sent).toHaveLength(5)
+      const results = await Promise.all(requests)
+      expect(results.slice(0, 4).every(result => result instanceof AxiosError && result.code === 'ECONNABORTED')).toBe(true)
+      expect(results[4]).toMatchObject({ status: 200 })
+      expect(sent.every(request => request.timeout === 30_000)).toBe(true)
+    } finally {
+      controllers.forEach(controller => controller.abort())
+      await Promise.all(requests)
+    }
+  })
+
+  it.each([undefined, 0, -1, 5_000, 60_000])('bounds resource timeout %s while preserving shorter deadlines', async timeout => {
+    let admittedTimeout: number | undefined
+    AXIOS_INSTANCE.defaults.adapter = async config => {
+      admittedTimeout = config.timeout
+      return response(config)
+    }
+    await AXIOS_INSTANCE.get('/api/catalog', { signal: resourceSignal().signal, timeout })
+    expect(admittedTimeout).toBe(timeout === 5_000 ? 5_000 : 30_000)
+    await AXIOS_INSTANCE.get('/api/live/recovery', { signal: resourceSignal().signal, timeout: 7_000 })
+    expect(admittedTimeout).toBe(7_000)
   })
 
   it('counts nonce retries as fresh HTTP attempts', async () => {
