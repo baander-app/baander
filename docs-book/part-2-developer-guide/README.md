@@ -9,7 +9,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Architecture Overview](architecture.md) | DDD bounded contexts, four-layer structure, and shared kernel |
 | [Shared Kernel](shared-kernel.md) | UUID v7, cursor pagination, search, Swoole async, caching, WebSocket |
 | [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, message protocol, party sync |
-| [Live Updates](live-updates.md) | Query coverage, change sources, audiences, and freshness message contracts |
+| [Live Updates](live-updates.md) | Committed change capture, shared query refresh, ownership, and recovery |
 | [API Reference](api-reference.md) | OpenAPI spec, REST patterns, and authentication flows |
 
 ## Development
@@ -21,7 +21,7 @@ Understand the architecture, write code following project conventions, and contr
 | [CQRS and Messaging](cqrs-and-messaging.md) | Commands, handlers, domain events, and async processing |
 | [Search](search.md) | PGroonga full-text search, making a context searchable |
 | [Database Naming](database-naming.md) | Index, unique-constraint and foreign-key names in migrations and mappings |
-| [Testing](testing.md) | PHPUnit suites, conventions, and code examples |
+| [Testing](testing.md) | Disposable PHPUnit runners, browser qualification, live-update capacity and evidence boundaries |
 | [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components |
 
 ## Bounded Contexts

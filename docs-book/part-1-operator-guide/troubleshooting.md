@@ -37,6 +37,7 @@ or malformed settings but does not prove that every integration works. See
 | Requests return 503 and jobs stop | [Redis unreachable](#redis-unreachable) | Redis health row, service logs and effective credentials |
 | All pages fail with connection errors | [Database connection refused](#database-connection-refused) | PostgreSQL health row and database logs |
 | Scan submitted but catalog unchanged | [Media not appearing after scan](#media-not-appearing-after-scan) | Discovery, outbox, consumer and ingestion evidence |
+| A mounted view stays stale | [Live views stop updating](#live-views-stop-updating) | Committed producer result, publication backlog, delivery health, authorization and HTTP refresh |
 | Stream fails or a quality tier is absent | [Transcoding failures](#transcoding-failures) | Selected media job, FFmpeg and source permissions |
 | Login or token renewal fails | [OAuth token issues](#oauth-token-issues) | Configuration, key readability, clock and DPoP error |
 | Upload or source access says permission denied | [Permission errors](#permission-errors) | Exact mount, process identity and path permissions |
@@ -63,6 +64,72 @@ only show collector startup. Swoole's configured log is under the application's
 worker-log boundaries.
 
 ## Common Issues
+
+### Live views stop updating
+
+A connected socket does not establish that a change was published or that the
+browser read its new contents. Record the affected view, account permissions,
+operation time, and the indicator: **Connecting…**, **Updating…**, or **Updates
+unavailable**. Then trace the stages in order:
+
+1. Confirm that the producer committed the expected change. For a scan or queued
+   job, follow its completion through [Background Work](background-work.md#observe-background-work).
+   A submitted job or successful enqueue is not a completed catalog change.
+2. Collect web worker diagnostics:
+
+   ```bash
+   dc exec -T app php bin/console app:server:stats
+   ```
+
+   Inspect `live_updates` for every responding worker. Worker zero owns projection;
+   `projector_enabled` need not be true elsewhere. A recent
+   `last_successful_projection_check_age_ms` includes empty or busy checks and does
+   not prove publication advanced. Compare `projection_error_count`,
+   `backlog_observed`, and `last_observed_oldest_pending_age_ms`. That last value
+   belongs to the most recent successful observation; it does not age with the
+   clock. Null means an empty observed inbox only when `backlog_observed` is true.
+   Backlog older than five seconds makes the pipeline degraded.
+3. Check delivery separately. `last_successful_reconciliation_age_ms` and
+   `max_subscription_read_age_ms` describe successful permission/revision reads;
+   null means no successful read was recorded. Compare `active_subscriptions`,
+   `read_error_count`, `pending_send_count`, and `slow_peer_close_count` across
+   workers. Pending sends exclude a send already in progress. Error and close
+   counts accumulate since worker startup, so compare samples and incident times.
+4. Inspect the affected browser's network results without copying tokens or DPoP
+   proofs. An authorization reset deliberately removes protected cached data and
+   obtains `/api/live/recovery` before protected reads resume. A recovery `401` or
+   `403` requires checking the account and current library, playlist, or admin
+   access. Restoring a socket cannot restore revoked permissions. A temporary
+   delivery failure with unchanged permissions instead retains readable data.
+5. Once recovery succeeds, confirm that the affected resource endpoint is read
+   again and returns the committed result. A failed or slow HTTP refresh can keep
+   **Updating…** or **Updates unavailable** visible after delivery recovers. Check
+   that endpoint's status and application logs. If its response is current but the
+   view is stale, retain a browser reproduction with the view and timestamps for
+   a client-refresh investigation.
+
+A `301` followed by a protected collection read's `403` can indicate a client URL
+that differs from the registered route, including its trailing slash. DPoP signs
+the original request URL; following a redirect does not sign the destination anew.
+Retain the path and status sequence without the proof or token for a client fix.
+Do not disable proof verification to make the redirected request succeed.
+
+The browser expects readiness within ten seconds and valid health messages within
+fifteen seconds. Visible degraded clients also recover over HTTP every thirty
+seconds, with bounded retries. These are configured detection and recovery budgets,
+not measured end-to-end latency. Server diagnostics describe the web process;
+they do not prove rendered browser freshness. See the
+[developer guide's field table](../part-2-developer-guide/live-updates.md#inspecting-the-runtime)
+for the diagnostic meanings. Verify the original view after correcting the failed
+stage, without discarding a user's unsaved edits or restarting playback.
+
+After a worker reload, a socket can remain open while its worker's authentication
+and subscription maps have been replaced. The browser replaces that connection
+when its ready or health deadline expires and obtains a fresh ticket. An open
+socket alone is therefore insufficient recovery evidence: confirm new readiness,
+the resource's authorized HTTP response and the rendered result. The same view can
+retain readable data during a delivery outage while a later authorization change
+requires it to remove protected content.
 
 ### Redis unreachable
 
@@ -230,8 +297,11 @@ implemented ingestion path. See [Library Management](library-management.md).
    explain zero discovered files, correct those before submitting another scan.
 3. For files queued for ingestion, follow the worker observations in
    [Background Work](background-work.md#observe-background-work). Check the outbox
-   relay as well as the consumer. `/ready` checks only PostgreSQL and Redis; a fresh
-   consumer heartbeat does not prove that the outbox relay has delivered a message.
+   relay as well as the consumer. Read the `messenger` component in a fresh
+   `/health` response: the top-level status can be healthy while workers are
+   stopped, and saved readiness flags can outlive them. `/ready` checks only
+   PostgreSQL and Redis; a fresh consumer heartbeat does not prove that the outbox
+   relay has delivered a message.
 4. Inspect current and failed jobs:
 
    ```bash
