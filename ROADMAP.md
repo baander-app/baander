@@ -4,6 +4,33 @@ Updated: 2026-10-31. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
+## Learning and plan maintenance
+
+Checkpoint, 2026-10-31: reviewed all eight documents in `docs/solutions/` against
+current source and tests. Six received reference or implementation-description
+corrections; the registry reactor and Swoole table learnings remain unchanged.
+The documents cover distinct failures, so none were consolidated or deleted.
+The shared durable-consumer heartbeat can mask an individual consumer's outage;
+that limitation is recorded for follow-up, with no runtime change in this refresh.
+
+`CONCEPTS.md` gained Library and Transcode session definitions. Forty-seven
+existing entries lost implementation details or configuration values that belong
+in reference documentation; two of those also received source-backed corrections
+to codec defaults and bitrate accounting. No concepts were removed.
+
+Removed 24 implemented plans and their 23 roadmap links. Seven plans remain where
+implementation or the intended outcome is still incomplete or unproven. The PHP
+dependency refresh and AAC player-controls implementation are complete within the
+accepted scope; their qualification limits remain in the checkpoints below.
+Plan history is available from commit `4613c414d` and earlier revisions.
+
+Verification: all eight learning frontmatter blocks parse, categories match their
+directories, and all ten relative Markdown links resolve. Prose preservation
+audits and whitespace checks pass after accounting for the intentional reference,
+vocabulary and plan-inventory changes. Historical native measurements were not
+rerun; this checkpoint makes no new runtime qualification claim. `AGENTS.md`
+already describes both the learning store and shared vocabulary.
+
 ## Resume here
 
 Continue the Back-to-next-movie investigation through a newly reviewed, bounded
@@ -26,7 +53,7 @@ trees; they are not acceptance evidence for a new change.
 ## Public project website and documentation
 
 Implementation plan delivered locally, 2026-10-31, in the
-[public project website plan](docs/plans/2026-10-31-1530-feat-public-project-website-plan.md).
+public project website plan.
 The intended audience is prospective hosts familiar with personal media servers.
 Direction A introduces the interface and playback experience, then connects the
 project explanation to installation and the hosted operator and developer guides.
@@ -69,7 +96,7 @@ Source links open the repository, and the footer credits Martin Juul. The playli
 header now uses the shared duration formatter, correcting fractional seconds in
 the captured application view (26 focused tests passed).
 
-The [manual rendering plan](docs/plans/2026-10-31-1700-feat-public-manual-rendering-plan.md)
+The manual rendering plan
 is implemented: PHP 8.5 tokenization, Shiki highlighting and sanitized, themed
 Mermaid SVGs render during the build. Diagrams use Inter, readable scrolling
 regions and the classic appearance without node shadows. Code and diagrams remain
@@ -77,7 +104,7 @@ readable without JavaScript. The configurable website budget defaults to 600
 seconds. CI installs Chromium before rendering, checks the artifact in a browser
 and retains its Vercel package and checksum; it does not deploy automatically.
 
-The [bAAC page plan](docs/plans/2026-10-31-1800-feat-public-aac-page-plan.md)
+The bAAC page plan
 is implemented at `/baac/`. Eight quality plots and eight throughput charts share
 validated data with their tables: 55 quality configurations with 550 supporting
 rows, 33 speed observations and four separate lossless references. Vendor colors,
@@ -124,7 +151,7 @@ passed the page, search, fragment, carousel, redirect and 404 checks above.
 ## PHP dependency and runtime refresh
 
 Implementation plan delivered locally, 2026-10-31, in the
-[PHP dependency and runtime refresh plan](docs/plans/2026-10-31-0802-chore-php-dependency-runtime-refresh-plan.md).
+PHP dependency and runtime refresh plan.
 The confirmed scope covers all Composer projects, PHP 8.5.12 or newer stable,
 latest stable Swoole, dependency patches and forks, upstream Swoole bundle changes,
 and repeatable maintenance checks. Scheduled update PRs are excluded.
@@ -469,7 +496,7 @@ or AAC suite was rerun for this merge.
 ## Cohesive live updates
 
 Implementation plan delivered, 2026-10-30, in the
-[live update architecture plan](docs/plans/2026-10-30-2030-feat-cohesive-live-updates-plan.md).
+live update architecture plan.
 The confirmed scope covers all React Query server state and related readers such
 as sidebar Recents. Nine units in three dependent review groups cover transactional
 change capture, scoped revisions, shared WebSocket delivery, targeted query
@@ -1281,7 +1308,7 @@ above applies to the unchanged behavior, not a byte-identical source digest.
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
-[loudness target plan](docs/plans/2026-10-30-2007-feat-loudness-target-levels-plan.md).
+loudness target plan.
 Settings and Equalizer share Quiet (−23), Relaxed (−18), Balanced (−16) and
 Louder (−14 LUFS), plus a custom numeric target. Fractional targets survive save,
 fetch, local restoration and version rollback. Invalid input retains the last
@@ -1305,7 +1332,7 @@ pass. All planned units and the independent review's follow-up checks are closed
 ## Recessed footer material
 
 Delivered, 2026-10-30, under the reviewed
-[recessed footer material plan](docs/plans/2026-10-30-1957-feat-recessed-footer-material-plan.md).
+recessed footer material plan.
 The selected recessed-display prototype A now supplies the music footer's shallow
 inset shading and faint lower lip. The dark mood retains true black and distinct
 near-black layers. Secondary text and the seek track receive local contrast
@@ -1340,7 +1367,7 @@ establish physical OLED performance.
 ## Cohesive web styling
 
 Delivered, 2026-10-30, under the reviewed
-[styling repair plan](docs/plans/2026-10-30-1843-fix-cohesive-web-styling-plan.md).
+styling repair plan.
 The six units repair shared controls and web consumers, sizing, semantic color
 roles and interaction states. The required checks and final screenshot review
 are complete within the qualification scope recorded below.
@@ -1486,7 +1513,7 @@ reviewed. This conditional-rendering change alters no CSS; the full suite and
 cross-browser checks were not rerun.
 
 Footer-console refinement, 2026-10-30: the
-[focused plan](docs/plans/2026-10-30-refine-footer-player.md) brings artwork,
+focused plan brings artwork,
 metadata and timeline into one central display, with transport and volume beside
 it on desktop and below it on mobile. Existing black, card and muted roles give
 the dark mood distinct surface levels without a palette change. The seek control
@@ -1517,7 +1544,7 @@ and `/tmp/footer-console-ci-final.log`; build evidence is in
 ## Equalizer visualization calibration
 
 Delivered, 2026-10-30, under the
-[calibration plan](docs/plans/2026-10-30-calibrate-equalizer-visualizations.md).
+calibration plan.
 All seven modes now consume a documented input-spectrum contract, render the
 selected mode visibly and clear stale readings. The changes are committed
 locally; nothing has been pushed.
@@ -1613,7 +1640,7 @@ publishing remains separate.
 Requirements checkpoint, 2026-10-30: the user confirmed an easy-to-follow manual
 built from the existing operator book, covering understanding Baander, setup,
 daily operation, maintenance and recovery. The
-[implementation plan](docs/plans/2026-10-30-1817-docs-cohesive-operator-manual-plan.md)
+implementation plan
 defines 11 requirements and five acceptance examples. Operational facts and command
 examples must be verified against source before prose is revised with `prose-fix`.
 
@@ -1678,7 +1705,7 @@ stopped instance. The authoritative CI image passed 28 tests and 102 assertions;
 the four changed PHP files passed the tooling formatter. Separate Git directories
 without a recorded primary checkout require a worktree-local configuration file.
 
-The [implementation plan](docs/plans/2026-10-29-1726-feat-configurable-development-libraries-plan.md)
+The implementation plan
 adds local library definitions in `dev.local.json`, read-only media mounts and
 idempotent library creation during preview startup. The requested Movies library
 uses the developer's video directory; scanning remains manual.
@@ -1695,7 +1722,7 @@ Delivered, 2026-10-30: the user authorized the application correction after
 merging tooling into master and pushing both `origin/master` and
 `baander-github/master` at `5fc3f901`. The correction is implemented on
 `fix/paused-seek-readiness` under the reviewed
-[implementation plan](docs/plans/2026-10-30-1141-fix-paused-seek-readiness-plan.md),
+implementation plan,
 committed as `b31baff1`.
 
 The two-file application patch removes both extra 21-second paused lookahead
@@ -1750,7 +1777,7 @@ for the tooling plan's U11 and this plan's U1 is complete.
 ## Cohesive project tooling
 
 Requirements checkpoint, 2026-10-29: the user confirmed the scope in the
-[implementation plan](docs/plans/2026-10-29-1854-refactor-cohesive-project-tooling-plan.md)
+implementation plan
 after the whole-package audit of `packages/baander-tooling`. The intended outcome
 is shared configuration, image selection, application layout, Docker targeting,
 process completion, cleanup and evidence contracts, with every retained correctness
@@ -2329,7 +2356,7 @@ this audit. These results establish the audit baseline, not remediation acceptan
 
 ## PHP-first testing and development tooling
 
-The [implementation plan](docs/plans/2026-10-27-1812-refactor-php-first-development-tooling-plan.md)
+The implementation plan
 defines complete Python removal from repository-owned testing and development
 workflows, using PHP for workflow logic and Bash for short launchers and shell
 operations. Hosts require PHP 8.5+ with Swoole. Shipped backup and operator
@@ -2672,7 +2699,7 @@ verification records are committed locally; nothing has been pushed.
 
 ## Fixed product name
 
-The [implementation plan](docs/plans/2026-10-27-1741-fix-fixed-product-name-plan.md)
+The implementation plan
 defines Bånder as the fixed app display name, removes operator naming overrides,
 and aligns email, passkey, TOTP and native app labels while preserving technical
 identifiers and credential data. The three implementation units are complete.
@@ -2700,7 +2727,7 @@ findings.
 
 ## Local development workflow
 
-The [implementation plan](docs/plans/2026-10-26-1949-feat-local-development-workflow-plan.md)
+The implementation plan
 defines a persistent development instance at `baander.test` that updates
 automatically when master advances, with isolated worktree previews for feature
 verification. Make remains the entry point. Libraries, accounts, settings and
@@ -3044,7 +3071,7 @@ not select more outage work.
 
 Checkpoint, 2026-10-23, transport and robustness: the first tier of the gap
 list against the AOSP fdk-aac upstream, per the
-[plan](docs/plans/2026-10-23-002-feat-aac-codec-transport-robustness-plan.md),
+plan,
 is delivered in `packages/baander-aac`. Decoder: streaming input with
 ADTS and LOAS resync, ADTS CRC verification, an AudioSpecificConfig reader
 with implicit, backward compatible and hierarchical SBR/PS signalling, LATM
@@ -3062,7 +3089,7 @@ bridge suites did not run in that environment. Deviations by design are
 recorded in the [codec README](packages/baander-aac/docs/README.md).
 
 Checkpoint, 2026-10-24, low delay and dynamics: the second tier, per the
-[plan](docs/plans/2026-10-23-003-feat-aac-codec-low-delay-and-drc-plan.md),
+plan,
 is delivered. Decoder: the error resilient object types with virtual
 codebook 11, RVLC and HCR, AAC-LD at 512 and 480, AAC-ELD with downscaled
 playout, LD-SBR as a self-contained module, MPEG-4 dynamic range control
@@ -3085,7 +3112,7 @@ findings, all applied. Not run: listening tests, interop for ELD with LD-SBR
 and for the RVLC and HCR tools.
 
 Checkpoint, 2026-10-29, USAC decoder: the third tier's first plan, per the
-[plan](docs/plans/2026-10-24-005-feat-aac-codec-usac-decoder-plan.md), is
+plan, is
 delivered. Decoder: USAC (xHE-AAC, object type 42) over LOAS/LATM and raw
 access units with the UsacConfig, extension elements, pre-roll and
 independent frames; the frequency-domain core with the context arithmetic
@@ -3117,7 +3144,7 @@ conformance suite. Figures and limits are in the
 
 Checkpoint, 2026-10-30, MPEG Surround decoder: the third tier's second
 plan, per the
-[plan](docs/plans/2026-10-29-006-feat-aac-codec-mpeg-surround-decoder-plan.md),
+plan,
 is delivered. Decoder: MPEG Surround (ISO/IEC 23003-1) 5.1 in AAC-LC
 streams from a mono downmix (trees 5151 and 5152, five OTT boxes) or a
 stereo downmix (tree 525, a TTT box with three OTT boxes), the payload as
@@ -3164,7 +3191,7 @@ not exist as free software. Figures and limits are in the
 
 Checkpoint, 2026-10-30, xHE-AAC encoder: the third tier's third plan, per
 the
-[plan](docs/plans/2026-10-30-007-feat-aac-codec-xhe-aac-encoder-plan.md),
+plan,
 is delivered. Encoder: USAC (xHE-AAC, object type 42) in compatible mode
 on the AAC-LC analysis and rate loop: the frequency-domain core with the
 context arithmetic coder (bit-exact against the decoder's), noise filling,
@@ -3228,7 +3255,7 @@ ISO conformance suite. Figures and limits are in the
 
 Checkpoint, 2026-10-30, player-grade controls: the third tier's fourth
 plan, per the
-[plan](docs/plans/2026-10-30-008-feat-aac-codec-player-grade-controls-plan.md),
+plan,
 is delivered. Decoder: `aac_decoder_flush` drains the delayed tail at the
 end of a stream and `aac_decoder_clear_history` prepares a seek, after
 which a random access frame decodes bit for bit as in a fresh decoder

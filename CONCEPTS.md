@@ -10,27 +10,35 @@ The persisted identity used inside the application for primary keys, foreign key
 
 ### Public ID
 
-An entity's independent, 21-character NanoID, represented by `PublicId` in code and usually `publicId` in resources. Public routes, relationships, cursors and realtime messages use this identity; existing snake-case contracts use `public_id`. A contextual name such as `videoId` still carries a public ID. Resolving it does not grant access to the entity.
+An entity's independent public identity, used by public routes, relationships, cursors and realtime messages instead of its internal UUID.
+
+A contextual name for an entity still carries its public ID. Resolving it does not grant access to the entity.
 
 ### Browser device token
 
-The client-generated UUID sent as `deviceId` during device registration and session claims, and in the `X-Baander-Device-Id` header. It identifies the browser installation within the account. The device resource's `publicId` addresses rename and forget operations and appears as a listening session's `activeDeviceId`.
+The client-generated identity of a browser installation within an account, used during device registration and session claims.
+
+It is distinct from the device resource's public ID, which addresses device management and identifies a listening session's active device.
 
 ### EQ audio-output token
 
-The optional client value stored in an EQ profile's `deviceId`. It names an audio output according to the client and does not refer to the persisted device resource. The profile itself has a public ID.
+An optional client-defined identity for the audio output associated with an equalizer profile.
+
+It does not refer to the persisted browser device resource. The profile itself has a public ID.
 
 ### OAuth client identifier
 
-The registered client's public ID, carried by OAuth's `client_id`, administration's `clientId` and the access-token JWT's `client_id` claim. It is separate from a token identifier or secret.
+The registered OAuth client's public ID, used in authorization requests, administration and access-token claims.
+
+It is separate from a token identifier or secret.
 
 ## Local development
 
 ### Persistent development instance
 
-The configured local Baander instance at `baander.test` that automatically follows
-master. Its libraries, accounts and settings survive ordinary updates. It runs
-independently of source edits and branch switches in development worktrees.
+The configured local Baander instance that automatically follows the main development branch and retains its libraries, accounts and settings through ordinary updates.
+
+It runs independently of source edits and branch switches in development worktrees.
 
 ### Worktree preview
 
@@ -61,7 +69,9 @@ Replacing the web server's worker processes while the server itself keeps runnin
 
 ### Passkey user handle
 
-The user's public ID encoded as bytes for WebAuthn registration, authentication and account signals. It identifies the account independently of the authenticator's credential ID. Passkeys enrolled with UUID handles are invalidated and require re-enrollment; authentication has no UUID-handle fallback.
+The user's public ID encoded for passkey registration, authentication and account signals.
+
+It identifies the account independently of the authenticator's credential ID.
 
 ### Refresh token chain
 
@@ -74,11 +84,15 @@ A refresh token that a rotation has already used. It stays stored, marked with t
 
 ### Lost-response grace
 
-The server's answer to a client that lost the response of a rotation: a consumed refresh token presented again by the same DPoP key, within the grace window, while its replacement is still unused, gets a fresh pair and the unused replacement is revoked. Any other presentation of a consumed token is a reuse, which revokes the chain. The window is an operator setting measured on the database clock; zero turns the grace off.
+The bounded opportunity to recover a lost token-rotation response by presenting the consumed refresh token again with the same DPoP key while its replacement remains unused.
+
+Recovery issues a fresh pair and revokes the unused replacement. Any other presentation of a consumed token is a reuse, which revokes the chain. The operator can disable the grace; its window is measured on the database clock.
 
 ### DPoP store outage
 
-The state in which the Redis store behind the DPoP nonce and replay checks cannot answer. The checks stay fail-closed: no proof is accepted, but the server answers "come back later" (503 with a retry delay) rather than a nonce challenge or a denial, so clients keep their session and retry. The two revocation routes, logout and revoke, are the exception: they accept a proof whose replay check could not run once every other check passed, log one warning, and revoke the chain.
+The state in which the shared store behind DPoP nonce and replay checks cannot answer.
+
+The checks stay fail-closed: no proof is accepted, but the server reports temporary unavailability with a retry delay rather than a nonce challenge or a denial, so clients keep their session and retry. Logout and revocation are the exception: they accept a proof whose replay check could not run once every other check passed, log one warning, and revoke the chain.
 
 ### Pending logout
 
@@ -86,16 +100,15 @@ A logout the browser has recorded but the server has not yet confirmed. The tab 
 
 ### WebSocket handshake ticket
 
-A single-use credential obtained through an authenticated, DPoP-protected API
-request. It authorizes one upgrade at `/api/ws`, bound to the requesting user,
-access token and browser Origin. It expires within thirty seconds, or when the
-access token expires if that is sooner. Redemption consumes it atomically and
-checks current token and user state. A ticket is a bearer capability during that
-short window; it does not sign later WebSocket messages.
+A single-use credential obtained through an authenticated, DPoP-protected API request that authorizes one WebSocket upgrade bound to the requesting user, access token and browser Origin.
+
+Its short lifetime cannot outlast the access token. Redemption consumes it atomically and checks current token and user state. A ticket is a bearer capability during that window; it does not sign later WebSocket messages.
 
 ### Socket reconciliation
 
-The periodic check inside the web server that closes every WebSocket connection whose token chain is dead: every access token of the chain is revoked or expired, or the chain is gone from the database. The chain is the unit, not the handshake token, because a rotation revokes the token a socket was opened with while the session goes on; rotation alone never closes a socket. The close on logout, revoke and reuse verdicts is the fast path; the reconciliation is the backstop that ends a socket within a minute whatever ended its chain, including a console process in another container or an expiry nobody refreshed.
+The periodic check that closes WebSocket connections whose refresh token chain has no live access token or no longer exists.
+
+The chain is the unit because rotation revokes the token a socket was opened with while the sign-in continues; rotation alone never closes a socket. Logout, revocation and reuse verdicts close sockets immediately; reconciliation provides a bounded backstop for changes made elsewhere and for expiry without refresh.
 
 ### Signed delivery URL
 
@@ -117,29 +130,29 @@ An opaque marker of the complete playlist state returned with its displayed song
 
 ### Limiter generation
 
-The Redis token shared by every subject of one named limiter. Clearing the limiter
-replaces this token, making previously read state unwritable without scanning
-subject keys. Consumers retry against the new generation; other named limiters
-retain their own state.
+The shared identity of one named limiter's state, replaced when that limiter is cleared.
+
+Replacement makes previously read state unwritable without scanning subjects. Consumers retry against the new generation; other named limiters retain their own state.
 
 ### Limiter revision tombstone
 
-An empty subject state with an opaque revision that Redis retains for ten seconds
-after an absent read or per-subject reset. Snapshots are writable for at most two
-seconds, so a paused writer cannot mistake an expired state for the absence it
-previously read.
+An empty subject state whose opaque revision outlives the snapshots that could otherwise mistake it for an earlier absence.
+
+An absent read or per-subject reset retains this marker so a paused writer cannot restore stale state after expiry.
 
 ## Provider requests
 
 ### Public destination policy
 
-The destination check shared by metadata, IPRD catalog and push transports. It
-permits approved HTTPS hostnames on port 443 only when every resolved address is
-public, then pins an approved address while preserving TLS hostname verification.
-It has no LAN exception. Webhooks and operator-configured lyrics retain separate
-policies.
+The destination check shared by metadata, radio station catalog and push transports, admitting approved HTTPS hostnames on the standard secure port only when every resolved address is public.
+
+It pins an approved address while preserving TLS hostname verification and has no LAN exception. Webhooks and operator-configured lyrics retain separate policies.
 
 ## Media availability
+
+### Library
+
+A watched directory whose discovered media populates the catalog and whose membership determines a user's access to its media.
 
 ### Accepted directory
 
@@ -161,12 +174,15 @@ without an index observation is unavailable until a scan confirms its source.
 
 ### Loudness target
 
-The loudness, measured in LUFS, that playback normalization aims to reach. Baander
-offers Quiet (−23), Relaxed (−18), Balanced (−16) and Louder (−14), or a custom
-numeric target. The target controls playback gain within the existing gain limits;
-it does not change the source recording or select a transcoding standard.
+The loudness, measured in LUFS, that playback normalization aims to reach.
+
+A listener chooses a preset or a custom target. The target controls playback gain within the gain limits; it does not change the source recording or select a transcoding standard.
 
 ## Media execution
+
+### Transcode session
+
+A user's playback lifecycle for a video transcode job, carrying its preparation, playback controls, position and completion state.
 
 ### Transcode execution generation
 
@@ -183,9 +199,9 @@ and treating cancellation as terminal.
 
 ### Owned video job
 
-A transcode job belonging to one playback user, video and quality tier. Another
-user's job for the same source has independent controls, execution claims and
-output. Historical jobs whose owner cannot be resolved retain no owner.
+A transcode job belonging to one playback user, video and quality tier.
+
+Another user's job for the same source has independent controls, execution claims and output.
 
 ### Rendition set
 
@@ -209,13 +225,9 @@ A source without audio has no canonical audio track.
 
 ### Source audio selection
 
-The source audio chosen for movie encoding: the first track marked default in
-discovery order, or the first audio track when none is marked. No audio means no
-selection. Its nullable ordinal is a position among audio streams, separate from
-the global FFprobe stream index. The same choice supplies mapping, filter
-attributes and manifest language without reordering discovered tracks. It is
-independent of the selected video's Source timestamp origin and does not add
-interactive track controls.
+The source audio chosen for movie encoding: the first track marked default in discovery order, or the first audio track when none is marked.
+
+No audio means no selection. Its position among audio streams is separate from its position among all source streams. The same choice supplies encoding attributes and manifest language without reordering discovered tracks. It is independent of the selected video's Source timestamp origin and does not add interactive track controls.
 
 ### Selected video endpoint
 
@@ -249,30 +261,25 @@ fan out transactionally to sibling renditions of the same playback owner and vid
 
 ### Source subtitle track key
 
-The letter `s` followed by a subtitle stream's absolute FFprobe index, such as
-`s2`. It identifies that source track in extraction jobs, generation output and
-signed subtitle URLs. Language, title and dispositions describe the track and do
-not identify it; two tracks may share a language.
+The stable identity of a source subtitle track derived from its position among all source streams, used across extraction, generation output and signed subtitle URLs.
+
+Language, title and dispositions describe the track and do not identify it; two tracks may share a language.
 
 ## Asynchronous execution
 
 ### Asynchronous workload catalog
 
-The admitted message classes, transport selections, resource classes and routing
-modes checked against compiled Messenger wiring. A default workload routes to its
-transport without a stamp; an explicit-only workload can run inline and enters its
-transport only through an explicit selection.
+The inventory of admitted asynchronous workloads, their transports, resource classes and routing modes, checked against the application's configured message routing.
+
+A default workload routes to its transport automatically; an explicit-only workload can run inline and enters its transport only through an explicit selection.
 
 ### Workload resource class
 
-A catalog description of a workload as `io`, `cpu` or `coordination`. It describes
-the work without reserving execution slots, CPU or memory.
+A workload classification that distinguishes input/output work, computation and coordination without reserving execution slots, CPU or memory.
 
 ### Consumer identity
 
-The Redis consumer name generated from a deployment namespace digest, supervisor
-boot ID, worker role and launch generation. Its registration is scoped to a Redis
-stream and consumer group.
+The identity of one worker launch within a deployment and boot, scoped to its message stream and consumer group.
 
 ### Worker deployment pair
 
@@ -384,27 +391,28 @@ the baseline through the selected event.
 
 ### Isolated store verification
 
-A comparison of one recorded synchronous action with the current registered pure
-transition, calculated from detached captured data. It reports match, mismatch or
-unavailable and leaves live application state and recorder history unchanged. Its
-initial scope is the catalog selection store's `select` and `clear` actions.
+A comparison of one recorded synchronous store action with its registered pure transition, calculated from detached captured data.
+
+It reports whether the results match or the comparison is unavailable and leaves live application state and recorder history unchanged.
 
 ## Audio codec
 
 ### bAAC
 
-The public name of Bånder's AAC encoder and decoder library. Its package directory
-and technical identifiers retain `baander-aac`; page titles, prose and chart labels
-use **bAAC**.
+The public name of Bånder's AAC encoder and decoder library.
 
 ### HE-AAC profile
 
-The object type an AAC stream or encoder session uses: AAC-LC codes the whole spectrum; HE-AAC v1 adds spectral band replication, HE-AAC v2 adds parametric stereo on top. The native binding and the Electron service name them `lc`, `he` and `hev2`. The ADTS header of an HE-AAC stream still names the AAC-LC profile and the core rate; a decoder recognises the profile from the data it carries.
+The AAC profile that determines whether AAC-LC codes the whole spectrum, HE-AAC v1 adds Spectral band replication or HE-AAC v2 adds Parametric stereo as well.
+
+An HE-AAC transport header can describe the AAC-LC core while the additional profile information is carried in the coded data.
 
 ### Spectral band replication
 
-The HE-AAC tool that codes only the lower half of the spectrum with AAC-LC at half the sample rate and reconstructs the upper half from it, guided by per-frame envelope energies, noise floors and inverse filtering levels carried in a fill element after each channel element. A stream's output rate is twice its core rate once it carries SBR data, and a frame is 2048 samples.
+The HE-AAC tool that codes the lower spectrum with AAC-LC and reconstructs the upper spectrum from it using transmitted envelope, noise and inverse-filtering information.
 *Avoid: SBR as a separate stream or codec.*
+
+The reconstructed output has a higher sample rate than the coded core.
 
 ### Parametric stereo
 
@@ -412,7 +420,9 @@ The HE-AAC v2 tool that codes a stereo pair as one SBR channel plus per-band int
 
 ### Codec delay
 
-Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles (1920 and 5379 with 960-sample frames). The encoder reports it and its flush drains it. The decoder's limiter adds its own look-ahead, which the decoder reports separately.
+The number of input-rate samples before the first input sample appears in the decoded output of an encoded stream.
+
+The encoder reports its delay and drains it on flush. A decoder's Peak limiter adds its own look-ahead, reported separately.
 
 ### AAC transport
 
@@ -429,15 +439,19 @@ What the decoder does with a frame it cannot parse, that fails its CRC or that n
 
 ### Channel mode
 
-The 7.1 layout of an eight-channel stream, which the channel count alone does not fix: back pair behind the side pair (configuration 12, the default), front centre pair (configuration 7), top front pair (configuration 14) or the rear surround layout signalled by a PCE. The decoder reports the mode of the stream's layout; other channel counts have one layout each.
+The spatial layout of an audio stream where its channel count alone does not determine speaker placement.
+
+The decoder reports the layout so consumers can distinguish alternative surround arrangements.
 
 ### Peak limiter
 
-A look-ahead gain stage on the decoder's output that keeps every sample within full scale after a downmix or loud content, at the cost of its attack window as delay. Off by default.
+A look-ahead gain stage on the decoder's output that keeps samples within full scale after a downmix or loud content, adding its attack window to playback delay.
 
 ### Low-delay profile
 
-AAC-LD and AAC-ELD, the object types for conversation and live links: frames of 512 or 480 samples instead of 1024, a single long window without block switching, and for AAC-ELD a low-overlap filterbank whose window spans four frames with most of its weight at the front, so the codec delay drops to a few tens of milliseconds. The native binding and the Electron service name them `ld` and `eld`. ADTS cannot carry them; LOAS is their default transport.
+An AAC profile for conversation and live links that reduces delay through shorter frames and a filterbank designed for low overlap.
+
+AAC-LD and AAC-ELD differ in their filterbanks and extension tools. Their transport must support these profiles; ADTS cannot carry them.
 
 ### LD-SBR
 
@@ -446,25 +460,33 @@ Spectral band replication for AAC-ELD, run through a low-delay filterbank and a 
 
 ### Error resilience tools
 
-The optional tools of the error-resilient AAC syntax (object types 17, 23 and 39): virtual codebooks that bound the values a damaged section can take, reversible variable length coding of the scalefactors readable from both ends, and reordering of the spectral codewords so that a bit error damages few of them. The AudioSpecificConfig says which of the three a stream uses; the decoder reads them all, the encoder writes none.
+The AAC syntax tools that limit damage from bit errors by bounding decoded values, allowing scalefactors to be read from either end and separating spectral codewords.
+
+The AudioSpecificConfig declares which tools a stream uses; support for decoding a tool does not imply that the encoder writes it.
 
 ### Afterburner
 
-A second quantisation pass in the encoder that re-searches the scalefactors and codebooks of a frame against its bit budget, trading CPU for quality at low bitrates. Off by default and switchable at any time.
+A second quantisation pass that re-searches a frame's scalefactors and codebooks against its bit budget, trading encoder CPU for quality.
+
+It can be switched during encoding for profiles that support it.
 
 ### Dynamic range control
 
-MPEG-4 DRC: per-band gains and a program reference level the encoder writes into fill elements as metadata, which a decoder applies on request, scaled by the listener's boost and cut shares and optionally normalised to a target loudness. The DVB variant adds a heavy compression gain in the ancillary data. The encoder derives the gains from one of five named compression profiles; the decoder applies nothing unless asked.
+The MPEG-4 AAC tool that carries compression gains and a program reference level as metadata for optional decoder processing.
 *Avoid: MPEG-D DRC, the separate loudness and DRC standard of USAC streams.*
+
+The listener controls the applied boost, cut and optional normalization; the DVB variant also carries a heavy compression gain.
 
 ### USAC
 
-Unified Speech and Audio Coding, ISO/IEC 23003-3, object type 42, as the xHE-AAC profile constrains it: the AAC object type whose frames carry no element ids (the configuration fixes the element list) and whose core channels switch per frame between a frequency-domain core with an arithmetic coder and a linear prediction core of ACELP and TCX frames, followed by enhanced SBR, MPS 212 and MPEG-D DRC. The decoder reads it from LOAS/LATM or raw access units; ADTS cannot carry it. The native binding and the Electron service name a decoded stream `usac` and the encoder's profile `xhe`; the codec decodes every USAC core and writes the frequency-domain one (the xHE-AAC encoder).
+Unified Speech and Audio Coding as constrained by the xHE-AAC profile, whose core channels can switch between frequency-domain and linear-prediction coding and whose extensions provide Enhanced SBR, MPS 212 and MPEG-D DRC.
 *Avoid: xHE-AAC as a separate codec; it is the profile of USAC the codec targets.*
+
+Its configuration fixes the element list rather than repeating element identities in each frame. It travels in LOAS, LATM or raw access units; ADTS cannot carry it. bAAC decodes both core forms and encodes the frequency-domain form through its xHE-AAC encoder.
 
 ### Enhanced SBR
 
-Spectral band replication as USAC carries it: the header travels in the configuration, the core runs at 2:1, 8:3 (a 768-line core) or 4:1 of the output rate, the patch source bands are flattened before patching, and the standard adds a harmonic transposer, predictive vector coding of the envelopes and inter-TES. The decoder implements the three additions but no stream at hand uses them.
+Spectral band replication for USAC, with configuration-carried headers, additional core-to-output rate relationships and tools for harmonic transposition, envelope prediction and transient shaping.
 *Avoid: eSBR, which names the same tool.*
 
 ### MPS 212
@@ -474,22 +496,28 @@ The MPEG Surround one-to-two tool of a USAC channel pair: one core channel plus 
 
 ### stereoConfigIndex
 
-The configuration value of a USAC channel pair that orders its stereo tools: 0 no MPS 212; 1 SBR on the single core channel, then MPS 212 from the parameters alone; 2 the same order with a residual signal; 3 MPS 212 on the core band with the residual, then SBR of both output channels. Only 2 is unverified against a reference, for lack of a stream.
+The USAC channel-pair configuration that determines the order of MPS 212 and Spectral band replication and whether reconstruction includes a residual signal.
 
 ### MPEG-D DRC
 
-The loudness and dynamic range standard of USAC streams (ISO/IEC 23003-4): loudness metadata and DRC gain sets in the configuration, gain sequences in extension elements, and a selection process that matches the listener's request (target loudness, a named effect with its fallback order, album mode, boost and cut) to the sets the stream carries. The decoder normalises to -24 LUFS by default and applies DRC only to prevent clipping unless an effect is requested; MPEG-4 DRC is refused on a USAC stream.
+The USAC loudness and dynamic range standard that describes loudness metadata, available gain sets and the process for selecting sets to match a listener's request.
 *Avoid: dynamic range control alone, which is the MPEG-4 tool.*
+
+Selection accounts for target loudness, requested effect and fallback order, album mode, boost and cut. Without a requested effect, the decoder applies DRC only to prevent clipping. MPEG-4 dynamic range control is a separate tool and is refused on a USAC stream.
 
 ### Pre-roll frame
 
-The audio pre-roll of a USAC stream access point: an extension element at the front of an independent frame (one whose `usacIndependencyFlag` is set, so that it decodes without history) that carries the stream configuration and the previous access units a decoder needs to warm its state. A cold decoder decodes them and drops their output; a warm one skips them. A seek or a configuration change lands on such a frame.
+The audio pre-roll carried at a USAC access point, containing the stream configuration and previous access units needed to warm decoder state.
 *Avoid: keyframe, which belongs to video.*
+
+A cold decoder decodes these units and drops their output; a warm one skips them. Seeking or changing configuration starts at such an access point.
 
 ### MPEG Surround
 
-ISO/IEC 23003-1 as AAC carries it: a 5.1 programme coded as a mono or stereo AAC-LC downmix plus a spatial payload of per-band level, correlation and prediction parameters, from which the decoder rebuilds the six channels in the QMF domain. The payload travels as `EXT_SAC_DATA` fill elements with an in-band header, or its configuration as an object type 30 layer of a two-layer LATM stream. The tree names the box layout: 5151 and 5152 build 5.1 from a mono downmix through five OTT boxes in two orders, 525 from a stereo downmix through a TTT box and three OTT boxes. The decoder decodes these three trees, reports the decoded surround as `hasSurround` and refuses the 7.1 trees, the HRTF and binaural modes and the 3D mode; the codec has no MPEG Surround encoder, and the test tool `mps-enc` writes the suites' streams.
-*Avoid: MPS alone for the 5.1 trees; MPS 212 is the one-box tool of USAC and ELD v2.*
+The AAC spatial coding tool that represents a multichannel programme as a mono or stereo downmix plus parameters from which a decoder rebuilds the surround channels.
+*Avoid: MPS alone for surround trees; MPS 212 is the one-box tool of USAC and ELD v2.*
+
+Its payload carries level, correlation and prediction information. A tree defines how OTT boxes and TTT boxes expand the downmix; its configuration can travel with the coded data or in the transport configuration.
 
 ### OTT box
 
@@ -497,49 +525,66 @@ A one-to-two box of an MPEG Surround tree: from one input channel, a per-band le
 
 ### TTT box
 
-The two-to-three box of the 525 tree, which rebuilds left, right and centre from the stereo downmix: in the prediction modes 0 and 1 from two prediction coefficients, a correlation and the residual where coded; in the energy modes 2 to 5 from two level differences, modes 2 and 3 with the centre's share subtracted from the other input before the split. A dual-mode box uses one mode below a band boundary and another above it.
+A two-to-three box in an MPEG Surround tree that rebuilds left, right and centre from a stereo downmix using prediction or energy parameters and any coded residual.
+
+A dual-mode box uses different reconstruction modes below and above a band boundary.
 
 ### xHE-AAC encoder
 
-The encoder side of USAC in compatible mode: the AAC-LC analysis and rate loop feeding a USAC frame writer with the frequency-domain core (1024-line frames, mono as a single channel element, stereo as a channel pair, the context arithmetic coder, noise filling, independent frames with the audio pre-roll), so that every stream it writes decodes in FFmpeg master, the FDK decoder, libxaac and the codec's own decoder with no non-standard syntax. It writes LOAS by default and raw access units for MP4, never ADTS, and takes the USAC options (noise filling, pre-roll, the independent frame interval, a stream id, enhanced SBR on, off or chosen by bitrate, and MPS 212 opted into, since FFmpeg cannot decode it) and a loudness info set. The native binding and the Electron service name it `xhe`; `baac enc` takes it as a profile.
+The bAAC encoder for the xHE-AAC profile of USAC, using a frequency-domain core with arithmetic coding, noise filling and independent access points with audio pre-roll.
 *Avoid: USAC encoder alone, which also names the linear prediction core the codec does not write.*
+
+It produces stream or packet transports suitable for playback and muxing, with optional Enhanced SBR, MPS 212 and loudness metadata. ADTS cannot carry its output.
 
 ### Loudness info set
 
-The loudnessInfoSet() of ISO/IEC 23003-4 that a USAC configuration carries as an extension, for the programme as coded: the sample peak, the true peak, the integrated loudness of ITU-R BS.1770-4, the anchor loudness when supplied, the loudness range of EBU Tech 3342 and the momentary and short-term maxima of EBU Tech 3341, each at 0.25 dB. A player normalises the programme by its integrated loudness. The xHE-AAC encoder writes it in the two-pass form, with the whole programme measured first; the one-pass meter inside the encoder measures the input as it is coded, and its figures serve an MP4 header or a second encode, since a stream's configuration cannot change once it has begun.
+The USAC configuration metadata describing a programme's peaks, integrated and anchor loudness, loudness range and short-term maxima for playback normalization.
 *Avoid: loudness metadata alone, which also names the MPEG-4 program reference level.*
+
+The xHE-AAC encoder can write measurements collected before encoding. Measurements collected during a single pass can serve a later encode or container metadata; the active stream's configuration cannot change after encoding begins.
 
 ### Immediate playout frame
 
-The independent USAC frame that carries the audio pre-roll and, in LOAS and LATM, the StreamMuxConfig: the point where a decoder can start and a muxer cuts a segment (an HLS or DASH segment, an MP4 fragment). The xHE-AAC encoder places them by an interval in frames, milliseconds or samples, a maximum distance and a per-segment byte ceiling, adds one on request, and reports each frame's index, independence, pre-roll bytes and sample position so that a muxer can find them. The frames the pre-roll repeats are independent too.
+An independent USAC access point that carries audio pre-roll and, in stream transports, the configuration needed for a decoder to start and a muxer to cut a segment.
 *Avoid: keyframe, which belongs to video; independent frame alone, which also names the frames before it.*
+
+The encoder places these access points under interval and segment-size constraints or on request and reports their positions to the muxer. The frames repeated in the pre-roll are independent too.
 
 ### DRC gain set
 
-An MPEG-D DRC set the xHE-AAC encoder writes when asked: a gain sequence per access unit plus a set description in the uniDrcConfig that names its effect, from which a decoder picks the set that matches the listener's request. The encoder writes two: drcSetId 1, "general compression", which brings the programme's loudness range towards a target of 6 to 16 LU, and drcSetId 2, "night", which adds a limiter holding the true peak at -1 dBTP after normalising to -16 LUFS. The gains of an access unit apply to the frame after it.
+An MPEG-D DRC gain sequence and its effect description, from which a decoder selects processing that matches the listener's request.
 *Avoid: DRC profile, which names the MPEG-4 DRC metadata's compression curves.*
+
+The xHE-AAC encoder can supply general compression and night-listening processing. Gains carried by one access unit apply to the following frame.
 
 ### VBR mode
 
-One of the five variable bitrate modes the FDK encoder names, 1 to 5, which the AAC encoder takes as stereo targets of 32, 72, 112, 148 and 228 kbit/s scaled per channel. Each frame's thresholds come from the mode's quality, and the target becomes the nominal bitrate whose reservoir bounds every frame. A peak bitrate lowers the mode to the highest one that fits.
-*Avoid: quality alone, which names the TVBR setting the modes are built on.*
+An AAC encoder quality setting that determines a variable bitrate target scaled by channel count and bounds frame allocation through the bit reservoir.
+*Avoid: quality alone, which names the underlying quality setting.*
+
+A peak bitrate can lower the selected mode to one that fits the cap.
 
 ### Peak bitrate
 
-The per-frame cap of the AAC encoder's rate loop, in bit/s: no frame takes more than its share of it, and the bit reservoir never lends a frame more, in every profile and rate control mode whenever the frame's side information fits. Transport headers and the pre-roll of an immediate playout frame stay outside it. It bounds the burst a transport must carry; the segment byte ceiling bounds a segment instead.
+The per-frame cap of the AAC encoder's rate loop, limiting each frame's allocation and borrowing from the bit reservoir whenever its side information fits.
+
+The cap covers the rate loop's accounted bits rather than the complete transported access point: additional transport framing and the pre-roll of an Immediate playout frame can exceed it. It bounds frame bursts; the segment byte ceiling bounds a segment instead.
 
 ### Decoder flush and seek reset
 
-The two ends of a decoder's playback: the flush drains the samples the decoder still holds at the end of a stream, the decoder delay of them per channel, and then resets it; the seek reset (`aac_decoder_clear_history`) drops the input and the audio history and keeps the configuration, so that a random access frame fed next decodes as in a fresh decoder. The binding and the Electron service name them `flush` and `clearHistory`.
+The distinct decoder operations for draining delayed output at the end of a stream and discarding history before playback resumes at a random access point.
 *Avoid: reset alone, which also clears the configuration and the counters.*
+
+Flush emits the retained samples and then resets playback state. Seek reset drops buffered input and audio history while retaining configuration, allowing the next random access frame to decode as in a fresh decoder.
 
 ### Prebuilt binding
 
-The native addon compiled per platform and architecture by the `aac-native` GitHub Actions workflow and attached to an `aac-native-v*` release: `prebuilds/<platform>-<arch>/baander_aac.node`, which the package's install script fetches and the loader tries before a local node-gyp build. One binary serves Node and Electron, since the Node-API ABI is the version the binding declares rather than the runtime it was compiled against.
+A distributed native bAAC addon built for a target platform and architecture that can be installed without compiling from source.
 *Avoid: native module alone, which also names a build from source.*
+
+Its stable runtime interface allows a compatible binary to serve both Node and Electron; a local source build remains a separate installation path.
 
 ### ELD v2
 
-AAC-ELD with the 2-1-2 tool: an ELD core of 512 samples carrying a mono downmix, the low-delay form of the spatial configuration in the ELD-specific configuration and the spatial frame in the ELD extension payload, decoded to stereo through the low-delay filterbank pair and decorrelator with 256 samples of added delay. The decoder reads it; the test tool writes it on the codec's ELD encoder.
+AAC-ELD with MPS 212, carrying a mono core and low-delay spatial parameters that reconstruct stereo through a low-delay filterbank and decorrelator.
 *Avoid: ELD with LD-SBR, which is a different extension of the same core.*
-

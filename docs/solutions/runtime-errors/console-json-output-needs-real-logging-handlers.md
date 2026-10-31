@@ -35,13 +35,13 @@ Capturing the live `app:library:list --json` process separately showed exit stat
 zero, empty stderr, and stdout containing a Messenger INFO record followed by `[]`.
 The application had no libraries yet; an empty catalog was a valid response.
 The consumer decodes the entire stdout string and wraps decoding failures in that
-error ([Libraries.php](../../../packages/baander-tooling/src/Development/Libraries.php), lines 21–40).
+error ([Libraries.php](../../../packages/baander-tooling/src/Development/Libraries.php), lines 27–47).
 
 ## What Didn't Work
 
 Passing reconciliation tests did not establish that the real command produced
 clean stdout. Their runner supplies JSON strings directly
-([DevelopmentLibrariesTest.php](../../../scripts/tests/php/DevelopmentLibrariesTest.php), lines 40–47).
+([DevelopmentLibrariesTest.php](../../../scripts/tests/php/DevelopmentLibrariesTest.php), lines 40–48).
 Those tests prove command sequencing and catalog reconciliation; they do not run
 the application's logging stack.
 

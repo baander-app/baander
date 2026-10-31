@@ -22,7 +22,13 @@ tags: [swoole-task, messenger, lease, fencing-token, scan-claim, restart, librar
 
 ## Context
 
-`StartLibraryScanHandler` (the admin panel's Scan) and `ScanAllLibrariesHandler` claim a library (`scan_status = 'scanning'`) and then dispatch `ScanLibraryCommand`. That message is routed to the `swoole_task` transport (`config/packages/messenger.yaml:79`), whose DSN is `swoole://task` (`messenger.yaml:13`). The task is held in the Swoole server's memory until a task worker takes it. A server restart drops every queued task.
+The transport descriptions below record the original October 2026 failure.
+Library scans now use the durable `async` transport configured in
+`config/packages/messenger.php`, with Messenger retries. The scan lease and
+transaction-level fencing remain necessary when a queued job is delayed, retried
+or interrupted.
+
+`StartLibraryScanHandler` (the admin panel's Scan) and `ScanAllLibrariesHandler` claim a library (`scan_status = 'scanning'`) and then dispatch `ScanLibraryCommand`. At the time, that message was routed to the `swoole_task` transport (`config/packages/messenger.yaml:79`), whose DSN was `swoole://task` (`messenger.yaml:13`). The task was held in the Swoole server's memory until a task worker took it. A server restart dropped every queued task.
 
 Before the fix, nothing cleared the claim except the scan itself. After a restart the library kept `scanning`, refused every new scan, and the web panel kept Scan disabled and polled forever. The same claim was also left behind when the handler threw before discovery started, or when the process was killed mid-scan. The only recovery was `app:library:scan --release`.
 
@@ -35,14 +41,15 @@ Anything written when work is queued on `swoole_task`, and cleared only when tha
 1. **It expires.** Store an expiry, not just a flag. A holder that is still working renews it; a holder that is gone stops renewing, and the state lapses.
 2. **It is fenced.** Give each holder an ID and carry that ID in the message. Renew, complete and fail only `WHERE claim_id = :claim`. A holder whose claim was taken over then fails its next renewal and stops, instead of overwriting the new holder's state.
 
-The library scan claim now does both (migration `migrations/Version20261008200000.php`):
+The library scan claim now does both (original migration `Version20261008200000`;
+the current fresh-install schema is in `migrations/Version20261017000000.php`):
 
 - `libraries.claim_id`, `claim_expires_at` and `claim_kind` hold the claim (renamed from `scan_claim_*` on 2026-10-10, when deletes with files began to hold the library too). A check constraint ties `scan_status = 'scanning'` to a `scan` claim; a `delete` claim leaves the scan status alone.
 - The lease is 15 minutes (`LibraryScanClaims::DEFAULT_LEASE_SECONDS = 900`), measured on the database clock: `claim_expires_at = clock_timestamp() + make_interval(secs => :lease)` (`LibraryRepository`'s claim and renew statements).
 - `MusicScanner` and `MovieScanner` call `LibraryScanLease::renew()` while traversing directories and hashing files. `renew()` writes to the database at most once a minute (`RENEWAL_INTERVAL_SECONDS = 60`), so frequent calls are cheap. Each directory write and each missing-path batch also calls the unthrottled `guardWrite()` inside its transaction, as described below.
-- One `UPDATE` takes the claim when it is free, already this holder's, or lapsed (`LibraryRepository.php:166`). Of two concurrent takeovers, exactly one updates a row.
+- One `UPDATE` takes the claim when it is free, already this holder's, or lapsed (`LibraryRepository.php:338-355`). Of two concurrent takeovers, exactly one updates a row.
 - The claim ID travels in `ScanLibraryCommand`. When the scan starts, `ScanLibraryHandler` calls `acquire($library, $claimId)`. A retried job therefore re-claims the free library under its old ID, and stops with a conflict if a newer scan holds a live claim.
-- A lapsed claim reads as `failed` (`LibraryRepository::discoveryStatus`, `LibraryRepository.php:291`), so the UI stops showing a scan that no one is running.
+- A lapsed claim reads as `failed` (`LibraryRepository::discoveryStatus`), so the UI stops showing a scan that no one is running.
 - `app:library:scan --release` refuses a live claim unless `--force` is given. A forced release waits for an already guarded scan write to finish. Once release completes, the old scan stops at its next heartbeat or write check and cannot commit another batch.
 
 ## Guard writes inside their transaction
@@ -77,11 +84,11 @@ references elsewhere in this note describe the original claim repair.
 
 ## When to Apply
 
-- Any new route to `swoole_task` whose sender writes state first. The current `swoole_task` routes are in `config/packages/messenger.yaml:79-105`.
-- A dispatch that falls back to Redis. `SwooleTaskWithRedisFallbackSender` sends to the durable `async` transport when the task queue is unavailable. The same message can then wait in Redis much longer than it would in the task queue, so the lease must also tolerate a queued wait. The scan handles this: a claim that lapsed while queued reads `failed`, and the scan renews it on start unless another scan took it.
+- Any new route to `swoole_task` whose sender writes state first. Current application workloads are listed in `config/packages/messenger.php`; library scans use durable `async`.
+- Durable delivery also needs claim fencing. A message can wait longer than its lease, or be retried after its original holder stops. A queued scan whose claim lapses reads `failed`; when execution starts, it acquires its claim again unless another holder has taken the library.
 - State set before work runs on any transport, if the work can die without running its cleanup (a killed process, an exception before the `try`).
 
-As of this writing, the library scan claim is the only queue-time claim found on a `swoole_task` route. The other senders (metadata sync, e-mail and push, image pruning, radio station sync, outbox relay, transcode position) write no state that waits on the task.
+In the original investigation, the library scan claim was the only queue-time claim found on a `swoole_task` route. The other senders (metadata sync, e-mail and push, image pruning, radio station sync, outbox relay, transcode position) wrote no state that waited on the task.
 
 ## Examples
 
@@ -116,6 +123,11 @@ try {
 An older, weaker version of this pattern is `RecommendationJobCleanupService` (`src/Recommendation/Infrastructure/Swoole/RecommendationJobCleanupService.php`). It marks old `pending` and stale `in_progress` jobs as `failed` when the server starts. A startup sweep only runs when the web server restarts. It does not free a job whose task worker died while the server stayed up, and it guesses from timestamps instead of from a holder that stopped renewing. Prefer a lease for new work.
 
 Tests: `tests/Integration/LibraryScanClaimTest.php` covers concurrent claims and takeovers, release with and without `--force`, and a lapsed claim reading as failed. `tests/Unit/Library/Application/CommandHandler/ScanLibraryHandlerTest.php` covers the handler side.
+
+`LibraryScanClaimTest` also verifies transaction-required write guards and owner
+matching. `tests/Unit/Library/Application/ScannerAvailabilityTest.php`
+verifies that a released or replaced claim cannot commit directory or missing-path
+writes.
 
 ## Related
 
