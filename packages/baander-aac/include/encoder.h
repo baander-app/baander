@@ -90,6 +90,24 @@ using AacEncChannel = struct AacEncChannel_ {
   float coef[1024]; /* MDCT coefficients, [window * 128 + k] for short windows */
   float x34[1024];  /* |coef|^(3/4) */
   float form[AAC_MAX_BANDS]; /* sum of sqrt(|coef|) per group band */
+  /* Spectral bits per codebook of each group band at the last few
+   * scalefactors it was quantized with in this frame (sf -9: empty),
+   * filled by sectioning and the scalefactor smoothing; the rate loop
+   * requantizes many bands at an unchanged scalefactor. */
+  int bits_sf[AAC_MAX_BANDS][4];
+  int bits_max[AAC_MAX_BANDS][4];
+  int bits_book[AAC_MAX_BANDS][4][AAC_NUM_CODEBOOKS + 1];
+  unsigned char bits_next[AAC_MAX_BANDS];
+  /* Each group band's smallest valid scalefactor in this frame (-1 not
+   * known yet), and the scalefactor its search last found for the
+   * allowance in sf_allowed (sf_found -1: none). */
+  int sf_floor[AAC_MAX_BANDS];
+  float sf_allowed[AAC_MAX_BANDS];
+  int sf_found[AAC_MAX_BANDS];
+  /* The scalefactor each group band's lines in quant were last
+   * quantized with (-1: zero lines) and their largest magnitude. */
+  int quant_sf[AAC_MAX_BANDS];
+  int quant_max[AAC_MAX_BANDS];
   /* Per group band, indexed group * num_swb + sfb. */
   float energy[AAC_MAX_BANDS];
   float thr[AAC_MAX_BANDS];      /* masking threshold */

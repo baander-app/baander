@@ -145,16 +145,38 @@ int quantize_band(AacEncChannel* c, int g, int w0, int b, int sf) {
       }
     }
   }
+  const int idx = g * ics->num_swb + b;
+  c->quant_sf[idx] = sf;
+  c->quant_max[idx] = max_mag;
   return max_mag;
 }
 
-float band_noise(const AacEncChannel* c, int g, int w0, int b, int sf) {
+/* Zeroes the lines of band b of group g. */
+void clear_band(AacEncChannel* c, int g, int w0, int b) {
   const AacIcsInfo* ics = &c->ics;
+  for (int w = w0; w < w0 + ics->group_len[g]; w++) {
+    for (int i = w * 128 + ics->swb_offset[b]; i < w * 128 + ics->swb_offset[b + 1]; i++) {
+      c->quant[i] = 0;
+    }
+  }
+  const int idx = g * ics->num_swb + b;
+  c->quant_sf[idx] = -1;
+  c->quant_max[idx] = 0;
+}
+
+/* The noise of band b quantized at sf, without storing the quantized
+ * values (the same sum as quantize_band followed by band_noise). */
+float band_noise_at(const AacEncChannel* c, int g, int w0, int b, int sf) {
+  const AacIcsInfo* ics = &c->ics;
+  const float scale = g_sf_scale34[sf];
   const float gain = g_sf_gain[sf];
   float noise = 0.0f;
   for (int w = w0; w < w0 + ics->group_len[g]; w++) {
     for (int i = w * 128 + ics->swb_offset[b]; i < w * 128 + ics->swb_offset[b + 1]; i++) {
-      const int q = c->quant[i] < 0 ? -c->quant[i] : c->quant[i];
+      int q = (int)(c->x34[i] * scale + kQuantRound);
+      if (q > AAC_ESC_MAX_MAG) {
+        q = AAC_ESC_MAX_MAG;
+      }
       const float d = fabsf(c->coef[i]) - aac_pow43[q] * gain;
       noise += d * d;
     }
@@ -187,8 +209,7 @@ int find_scalefactor(AacEncChannel* c, int g, int w0, int b, int sf_min, float a
   int hi = kMaxSf;
   while (lo < hi) {
     const int mid = (lo + hi + 1) / 2;
-    quantize_band(c, g, w0, b, mid);
-    if (band_noise(c, g, w0, b, mid) <= allowed) {
+    if (band_noise_at(c, g, w0, b, mid) <= allowed) {
       lo = mid;
     } else {
       hi = mid - 1;
@@ -211,10 +232,7 @@ int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int s
   }
   const int est = std::clamp(
       100 + (int)floorf((8.0f / 3.0f) * log2f(6.75f * allowed / form)), sf_min, kMaxSf);
-  auto fits = [&](int sf) {
-    quantize_band(c, g, w0, b, sf);
-    return band_noise(c, g, w0, b, sf) <= allowed;
-  };
+  auto fits = [&](int sf) { return band_noise_at(c, g, w0, b, sf) <= allowed; };
   int lo, hi; /* lo fits (or is sf_min), hi does not (or is past the range) */
   if (fits(est)) {
     lo = est;
@@ -253,18 +271,6 @@ int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int s
   return lo;
 }
 
-int spectral_bits(const AacEncChannel* c, int g, int w0, int b, int cb) {
-  const AacIcsInfo* ics = &c->ics;
-  const int dim = aac_codebook_info[cb].dim;
-  int bits = 0;
-  for (int w = w0; w < w0 + ics->group_len[g]; w++) {
-    for (int i = w * 128 + ics->swb_offset[b]; i < w * 128 + ics->swb_offset[b + 1]; i += dim) {
-      bits += aac_huffman_bits(cb, c->quant + i);
-    }
-  }
-  return bits;
-}
-
 int band_max_mag(const AacEncChannel* c, int g, int w0, int b) {
   const AacIcsInfo* ics = &c->ics;
   int max_mag = 0;
@@ -277,18 +283,6 @@ int band_max_mag(const AacEncChannel* c, int g, int w0, int b) {
     }
   }
   return max_mag;
-}
-
-/* Spectral bits of the band with its cheapest applicable codebook. */
-int best_spectral_bits(const AacEncChannel* c, int g, int w0, int b) {
-  const int max_mag = band_max_mag(c, g, w0, b);
-  int best = kInfBits;
-  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
-    if (kCodebookMaxVal[cb] >= max_mag) {
-      best = std::min(best, spectral_bits(c, g, w0, b, cb));
-    }
-  }
-  return best;
 }
 
 /* Spectral bits of band b of group g with each codebook that can code
@@ -368,6 +362,69 @@ void band_book_bits(const AacEncChannel* c, int g, int w0, int b, int max_mag, i
   cost[11] = b11;
 }
 
+/* Spectral bits of band b of group g quantized at scalefactor sf, per
+ * codebook as band_book_bits gives them, and the band's largest
+ * magnitude.  They come from the band's cache when it holds sf;
+ * otherwise c->quant must hold the band quantized at sf, and the count
+ * goes into the cache. */
+const int* band_bits_at(AacEncChannel* c, int g, int w0, int b, int sf, int* max_mag) {
+  const int idx = g * c->ics.num_swb + b;
+  for (int k = 0; k < 4; k++) {
+    if (c->bits_sf[idx][k] == sf) {
+      *max_mag = c->bits_max[idx][k];
+      return c->bits_book[idx][k];
+    }
+  }
+  const int k = c->bits_next[idx];
+  c->bits_next[idx] = (unsigned char)((k + 1) & 3);
+  const int m = band_max_mag(c, g, w0, b);
+  band_book_bits(c, g, w0, b, m, c->bits_book[idx][k]);
+  c->bits_sf[idx][k] = sf;
+  c->bits_max[idx][k] = m;
+  *max_mag = m;
+  return c->bits_book[idx][k];
+}
+
+/* Spectral bits of the band at scalefactor sf with its cheapest
+ * applicable codebook.  With `quantized` false the band is quantized
+ * first if the cache cannot answer. */
+int best_bits_at(AacEncChannel* c, int g, int w0, int b, int sf, bool quantized) {
+  const int idx = g * c->ics.num_swb + b;
+  if (!quantized) {
+    bool cached = false;
+    for (int k = 0; k < 4; k++) {
+      cached = cached || c->bits_sf[idx][k] == sf;
+    }
+    if (!cached) {
+      quantize_band(c, g, w0, b, sf);
+    }
+  }
+  int max_mag = 0;
+  const int* book = band_bits_at(c, g, w0, b, sf, &max_mag);
+  int best = kInfBits;
+  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+    if (kCodebookMaxVal[cb] >= max_mag) {
+      best = std::min(best, book[cb]);
+    }
+  }
+  return best;
+}
+
+/* Empties every band's caches: the frame's spectrum changed. */
+void clear_band_caches(AacEncChannel* c) {
+  for (int i = 0; i < AAC_MAX_BANDS; i++) {
+    for (int k = 0; k < 4; k++) {
+      c->bits_sf[i][k] = -9;
+    }
+    c->bits_next[i] = 0;
+    c->sf_floor[i] = -1;
+    c->sf_found[i] = -1;
+    c->quant_sf[i] = -1;
+    c->quant_max[i] = 0;
+  }
+  memset(c->quant, 0, sizeof(c->quant));
+}
+
 /* ── sectioning (ISO/IEC 14496-3 4.6.3, Table 4.46) ─────────────── */
 
 /* Chooses the codebook of every band of group g below max_sfb so that the
@@ -383,12 +440,28 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
   int from[AAC_MAX_SFB_LONG][kNumBooks];
   int* cb_out = c->cb + g * ics->num_swb;
 
-  int book_bits[AAC_NUM_CODEBOOKS + 1];
   for (int b = 0; b < max_sfb; b++) {
     const int tool = c->tool[g * ics->num_swb + b];
-    const int max_mag = tool ? 0 : band_max_mag(c, g, w0, b);
-    if (!tool) {
-      band_book_bits(c, g, w0, b, max_mag, book_bits);
+    int max_mag = 0;
+    const int* book_bits =
+        tool ? nullptr : band_bits_at(c, g, w0, b, c->sf[g * ics->num_swb + b], &max_mag);
+    /* The cheapest predecessor, and the cheapest other than it, each
+     * the lowest-numbered book among equals: a band that changes book
+     * comes from one of the two. */
+    int m1 = kInfBits, i1 = -1, m2 = kInfBits, i2 = -1;
+    if (b > 0) {
+      for (int prev = 0; prev < kNumBooks; prev++) {
+        const int v = cost[b - 1][prev];
+        if (v < m1) {
+          m2 = m1;
+          i2 = i1;
+          m1 = v;
+          i1 = prev;
+        } else if (v < m2) {
+          m2 = v;
+          i2 = prev;
+        }
+      }
     }
     for (int cb = 0; cb < kNumBooks; cb++) {
       cost[b][cb] = kInfBits;
@@ -405,15 +478,26 @@ int section_group(AacEncChannel* c, int g, int w0, int max_sfb) {
         cost[b][cb] = header + band;
         continue;
       }
-      for (int prev = 0; prev < kNumBooks; prev++) {
-        if (cost[b - 1][prev] >= kInfBits) {
-          continue;
+      /* Same result as trying every predecessor in book order and
+       * keeping the first strictly cheaper total. */
+      const int sw = i1 != cb ? i1 : i2;
+      const int sw_cost = i1 != cb ? m1 : m2;
+      const int stay = cost[b - 1][cb];
+      int best_prev = -1, best_total = kInfBits;
+      if (sw >= 0 && sw_cost < kInfBits) {
+        best_prev = sw;
+        best_total = sw_cost + header + band;
+      }
+      if (stay < kInfBits) {
+        const int total = stay + band;
+        if (total < best_total || (total == best_total && cb < best_prev)) {
+          best_prev = cb;
+          best_total = total;
         }
-        const int total = cost[b - 1][prev] + (prev == cb ? 0 : header) + band;
-        if (total < cost[b][cb]) {
-          cost[b][cb] = total;
-          from[b][cb] = prev;
-        }
+      }
+      if (best_prev >= 0) {
+        cost[b][cb] = best_total;
+        from[b][cb] = best_prev;
       }
     }
   }
@@ -467,9 +551,20 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
       if (c->allowed[idx] < 0.0f) {
         continue;
       }
-      const int sf_min = min_scalefactor(c, g, w0, b);
-      c->sf[idx] = estimate ? find_scalefactor_from_estimate(c, g, w0, b, sf_min, c->allowed[idx])
-                            : find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
+      /* The search depends only on the spectrum and the allowance, so a
+       * band whose allowance did not change since the last pass keeps
+       * the scalefactor found then. */
+      if (c->sf_found[idx] < 0 || c->sf_allowed[idx] != c->allowed[idx]) {
+        if (c->sf_floor[idx] < 0) {
+          c->sf_floor[idx] = min_scalefactor(c, g, w0, b);
+        }
+        const int sf_min = c->sf_floor[idx];
+        c->sf_found[idx] = estimate
+                               ? find_scalefactor_from_estimate(c, g, w0, b, sf_min, c->allowed[idx])
+                               : find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
+        c->sf_allowed[idx] = c->allowed[idx];
+      }
+      c->sf[idx] = c->sf_found[idx];
       c->cb[idx] = 1; /* coded; the book is chosen by sectioning */
     }
     w0 += ics->group_len[g];
@@ -489,11 +584,9 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
       }
       const int sf = c->sf[idx];
       if (prev_sf >= 0 && prev_sf != sf && std::abs(prev_sf - sf) <= kMaxSfDelta) {
-        quantize_band(c, g, w0, b, prev_sf);
-        if (band_noise(c, g, w0, b, prev_sf) <= c->allowed[idx]) {
-          const int bits_new = best_spectral_bits(c, g, w0, b) + 1;
-          quantize_band(c, g, w0, b, sf);
-          const int bits_old = best_spectral_bits(c, g, w0, b) +
+        if (band_noise_at(c, g, w0, b, prev_sf) <= c->allowed[idx]) {
+          const int bits_new = best_bits_at(c, g, w0, b, prev_sf, false) + 1;
+          const int bits_old = best_bits_at(c, g, w0, b, sf, false) +
                                aac_scalefactor_bits[sf - prev_sf + AAC_SCALE_DIFF_ZERO];
           if (bits_new < bits_old) {
             c->sf[idx] = prev_sf;
@@ -523,8 +616,9 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
       prev = c->sf[idx];
     }
 
-    /* Final quantization with the chosen scalefactors. */
-    memset(c->quant, 0, sizeof(c->quant));
+    /* Final quantization with the chosen scalefactors; a band whose lines
+     * already hold its scalefactor's values (or zeros, uncoded) keeps
+     * them. */
     w0 = 0;
     first_coded = -1;
     int dropped = 0;
@@ -532,9 +626,15 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
       for (int b = 0; b < nswb; b++) {
         const int idx = g * nswb + b;
         if (c->cb[idx] == 0 || is_tool_book(c->cb[idx])) {
+          if (c->quant_sf[idx] != -1) {
+            clear_band(c, g, w0, b);
+          }
           continue;
         }
-        if (quantize_band(c, g, w0, b, c->sf[idx]) == 0) {
+        const int max_mag = c->quant_sf[idx] == c->sf[idx]
+                                ? c->quant_max[idx]
+                                : quantize_band(c, g, w0, b, c->sf[idx]);
+        if (max_mag == 0) {
           c->cb[idx] = 0;
           c->sf[idx] = -1;
           dropped++;
@@ -2391,6 +2491,7 @@ int aac_encode_frame_internal(AacEncoderState* s, const float* pcm) {
     for (int i = 0; i < AAC_FRAME_SIZE_LONG; i++) {
       ch->x34[i] = powf(fabsf(ch->coef[i]), 0.75f);
     }
+    clear_band_caches(ch);
     const AacIcsInfo* ics = &ch->ics;
     int w0 = 0;
     for (int g = 0; g < ics->num_window_groups; g++) {
