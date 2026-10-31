@@ -1,0 +1,7872 @@
+[
+ {
+  "config": "lc-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.133437663929508,
+  "delay": 2048,
+  "gain_db": -0.04181324352499274
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.68123275594195,
+  "snr_vs_source": 12.133437636030473,
+  "delay": 2048,
+  "gain_db": -0.04181341484154896
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 19.47375156442607,
+  "snr_vs_source": 12.114374051325278,
+  "delay": 2048,
+  "gain_db": -0.041434032254809426
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 19.67262585956236,
+  "snr_vs_source": 12.149966267332264,
+  "delay": 1808,
+  "gain_db": -0.04135089565507275
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 19.55680427608798,
+  "snr_vs_source": 12.157364851384358,
+  "delay": 2048,
+  "gain_db": -0.04181319832690096
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 22.553683775611923,
+  "delay": 2048,
+  "gain_db": 0.014348597244730782
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.65628066691733,
+  "snr_vs_source": 22.55368373829854,
+  "delay": 2048,
+  "gain_db": 0.01434837792386398
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 44.14513618356173,
+  "snr_vs_source": 22.553313057228422,
+  "delay": 2048,
+  "gain_db": 0.014335707941760926
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 44.18389060755565,
+  "snr_vs_source": 22.55353072840146,
+  "delay": 1808,
+  "gain_db": 0.0144566827242566
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 44.58043113578731,
+  "snr_vs_source": 22.555928129185432,
+  "delay": 2048,
+  "gain_db": 0.014348276655168081
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.844289230189524,
+  "delay": 2048,
+  "gain_db": 0.008609204700841581
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.81990616411395,
+  "snr_vs_source": 13.844289222537467,
+  "delay": 2048,
+  "gain_db": 0.008609044715816012
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 54.21598759888727,
+  "snr_vs_source": 13.844298311696008,
+  "delay": 2048,
+  "gain_db": 0.008617096713981738
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.204909333410505,
+  "snr_vs_source": 13.844288357158261,
+  "delay": 1808,
+  "gain_db": 0.008734593685479842
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 54.26457579976304,
+  "snr_vs_source": 13.844297502416536,
+  "delay": 2048,
+  "gain_db": 0.008609204804097732
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 16.28495720454326,
+  "delay": 2048,
+  "gain_db": 0.014435525461912468
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.87567588810504,
+  "snr_vs_source": 16.28495715893818,
+  "delay": 2048,
+  "gain_db": 0.01443536027398002
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 35.896411116328196,
+  "snr_vs_source": 16.281206332023185,
+  "delay": 2048,
+  "gain_db": 0.014447418210057305
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 35.896027396992956,
+  "snr_vs_source": 16.281160267769256,
+  "delay": 1808,
+  "gain_db": 0.014477122219297991
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 35.70299315495111,
+  "snr_vs_source": 16.283359853633584,
+  "delay": 2048,
+  "gain_db": 0.014435390357489331
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.136251783605793,
+  "delay": 2048,
+  "gain_db": -0.0515945975925448
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.9692080382784,
+  "snr_vs_source": 10.13625176735568,
+  "delay": 2048,
+  "gain_db": -0.051594888006932044
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 35.94346977237809,
+  "snr_vs_source": 10.135413070235169,
+  "delay": 2048,
+  "gain_db": -0.05156614677611659
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 35.93866820087218,
+  "snr_vs_source": 10.135425120209888,
+  "delay": 1808,
+  "gain_db": -0.051495866866440226
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 35.525186920665455,
+  "snr_vs_source": 10.135873136265232,
+  "delay": 2048,
+  "gain_db": -0.051594763488356024
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.441190990236985,
+  "delay": 2048,
+  "gain_db": -0.17104079062404395
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 134.19625328757144,
+  "snr_vs_source": 8.441191039486458,
+  "delay": 2048,
+  "gain_db": -0.17104078569956455
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 21.13823065917522,
+  "snr_vs_source": 8.403228968904575,
+  "delay": 2048,
+  "gain_db": -0.17100547665412913
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.138936894300233,
+  "snr_vs_source": 8.403223453991526,
+  "delay": 1808,
+  "gain_db": -0.17099170976907177
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 21.080027944693423,
+  "snr_vs_source": 8.412913155711138,
+  "delay": 2048,
+  "gain_db": -0.17103630380046092
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.74882746789778,
+  "delay": 2048,
+  "gain_db": -0.012421795520187186
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.95202917044452,
+  "snr_vs_source": 12.748827448641947,
+  "delay": 2048,
+  "gain_db": -0.012421951029652274
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 35.08754835962706,
+  "snr_vs_source": 12.740968148874467,
+  "delay": 2048,
+  "gain_db": -0.012421833851221292
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 36.9610060592063,
+  "snr_vs_source": 12.749657837381898,
+  "delay": 1808,
+  "gain_db": -0.012288497186457335
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 37.31308577631338,
+  "snr_vs_source": 12.749739612883959,
+  "delay": 2048,
+  "gain_db": -0.01242194888412239
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.231496723887162,
+  "delay": 2048,
+  "gain_db": -0.01890544473191912
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.89151998706603,
+  "snr_vs_source": 12.231496708396605,
+  "delay": 2048,
+  "gain_db": -0.018905672066757976
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 18.563581975403622,
+  "snr_vs_source": 12.234666722992472,
+  "delay": 2048,
+  "gain_db": -0.018838644586110107
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 18.56360595911175,
+  "snr_vs_source": 12.234675523767635,
+  "delay": 1808,
+  "gain_db": -0.018756010381414445
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 18.520104021603096,
+  "snr_vs_source": 12.208189098400421,
+  "delay": 2048,
+  "gain_db": -0.018904976654570648
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 16.170275600944933,
+  "delay": 2048,
+  "gain_db": -0.0010274082962086874
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.92117895373414,
+  "snr_vs_source": 16.17027557770245,
+  "delay": 2048,
+  "gain_db": -0.0010275555461651308
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 38.80494816911341,
+  "snr_vs_source": 16.16861055673484,
+  "delay": 2048,
+  "gain_db": -0.0010316045512088758
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 39.10182132235561,
+  "snr_vs_source": 16.1702312252181,
+  "delay": 1808,
+  "gain_db": -0.0010094905079837348
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 39.0535039956873,
+  "snr_vs_source": 16.169883669443944,
+  "delay": 2048,
+  "gain_db": -0.0010274977357543065
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.045779618704396,
+  "delay": 2048,
+  "gain_db": 0.007607993337264116
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.75893911763185,
+  "snr_vs_source": 15.045779632248056,
+  "delay": 2048,
+  "gain_db": 0.007607801077018466
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 49.2769534036341,
+  "snr_vs_source": 15.045697795597302,
+  "delay": 2048,
+  "gain_db": 0.007614875643029465
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 49.2514029037048,
+  "snr_vs_source": 15.04565460269594,
+  "delay": 1808,
+  "gain_db": 0.00770773880364535
+ },
+ {
+  "config": "lc-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 49.382917714401124,
+  "snr_vs_source": 15.045485603447244,
+  "delay": 2048,
+  "gain_db": 0.007607930666862659
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.11681758645424,
+  "delay": 2048,
+  "gain_db": 0.018514128615030295
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.47978945178687,
+  "snr_vs_source": 20.116817599428206,
+  "delay": 2048,
+  "gain_db": 0.018513956991861077
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 32.863635474920464,
+  "snr_vs_source": 19.887508281723346,
+  "delay": 2048,
+  "gain_db": 0.018477883568720162
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 69.26558552806479,
+  "snr_vs_source": 20.11721971235088,
+  "delay": 1808,
+  "gain_db": 0.018621363708223763
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.08904860572383,
+  "snr_vs_source": 20.116817635865957,
+  "delay": 2048,
+  "gain_db": 0.018513858861763356
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.025705522756983,
+  "delay": 2048,
+  "gain_db": 0.01597047403050772
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.65286473586707,
+  "snr_vs_source": 28.02570606647919,
+  "delay": 2048,
+  "gain_db": 0.01597023558559471
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 64.29213603752467,
+  "snr_vs_source": 28.024685593195887,
+  "delay": 2048,
+  "gain_db": 0.015958112158529346
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.0917035339497,
+  "snr_vs_source": 28.02545262959178,
+  "delay": 1808,
+  "gain_db": 0.01606262588703496
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.30839232570793,
+  "snr_vs_source": 28.025705845871578,
+  "delay": 2048,
+  "gain_db": 0.01597014596801126
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.16997470504942,
+  "delay": 2048,
+  "gain_db": 0.0009823702324625132
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.6647707119095,
+  "snr_vs_source": 28.16997457102524,
+  "delay": 2048,
+  "gain_db": 0.0009822119424737464
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 77.25839243175861,
+  "snr_vs_source": 28.16988923056279,
+  "delay": 2048,
+  "gain_db": 0.0009893011992065234
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.23409717879338,
+  "snr_vs_source": 28.16982618894206,
+  "delay": 1808,
+  "gain_db": 0.001034898226584843
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.27618948787585,
+  "snr_vs_source": 28.16997452158228,
+  "delay": 2048,
+  "gain_db": 0.0009820979344492397
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 23.16251288109898,
+  "delay": 2048,
+  "gain_db": 0.012069591772586815
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.71964243883056,
+  "snr_vs_source": 23.162512778451372,
+  "delay": 2048,
+  "gain_db": 0.012069425984937
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 68.76560071443254,
+  "snr_vs_source": 23.162338271501422,
+  "delay": 2048,
+  "gain_db": 0.012083993220035442
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.34057120129364,
+  "snr_vs_source": 23.162414794394994,
+  "delay": 1808,
+  "gain_db": 0.012076075208388192
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.35789345012722,
+  "snr_vs_source": 23.162512832812396,
+  "delay": 2048,
+  "gain_db": 0.01206937462354685
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.307760870508268,
+  "delay": 2048,
+  "gain_db": -0.02263424264655393
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.76776695730035,
+  "snr_vs_source": 19.307760816634094,
+  "delay": 2048,
+  "gain_db": -0.02263452727299202
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 68.24702947715603,
+  "snr_vs_source": 19.30769287144121,
+  "delay": 2048,
+  "gain_db": -0.022605438411390195
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.53665457503199,
+  "snr_vs_source": 19.30757437833671,
+  "delay": 1808,
+  "gain_db": -0.022612612324837047
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.45351503149232,
+  "snr_vs_source": 19.30776081069659,
+  "delay": 2048,
+  "gain_db": -0.022634498596306
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.37874306391642,
+  "delay": 2048,
+  "gain_db": 0.022921963402946773
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 134.7260929437675,
+  "snr_vs_source": 18.37874320256708,
+  "delay": 2048,
+  "gain_db": 0.022921953260457803
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 59.59157846336942,
+  "snr_vs_source": 18.378408203970768,
+  "delay": 2048,
+  "gain_db": 0.022958789797976106
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.609080404070724,
+  "snr_vs_source": 18.378496901186203,
+  "delay": 1808,
+  "gain_db": 0.02288793199174582
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 134.98281159826885,
+  "snr_vs_source": 18.37874309078756,
+  "delay": 2048,
+  "gain_db": 0.02292193902389214
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.541540906010113,
+  "delay": 2048,
+  "gain_db": 0.010401254965374087
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.67375150070964,
+  "snr_vs_source": 19.54154090791125,
+  "delay": 2048,
+  "gain_db": 0.010401103013189854
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 39.762232937047955,
+  "snr_vs_source": 19.499839932618595,
+  "delay": 2048,
+  "gain_db": 0.010399104255033096
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.81447014205781,
+  "snr_vs_source": 19.541400701084694,
+  "delay": 1808,
+  "gain_db": 0.0104795410914193
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.2567967334634,
+  "snr_vs_source": 19.54154092357043,
+  "delay": 2048,
+  "gain_db": 0.010401013670301334
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.317420176006937,
+  "delay": 2048,
+  "gain_db": 0.007237532038148476
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.7186902955879,
+  "snr_vs_source": 20.317420225032514,
+  "delay": 2048,
+  "gain_db": 0.007237269355391124
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.55116594698208,
+  "snr_vs_source": 20.31731782802661,
+  "delay": 2048,
+  "gain_db": 0.007299184699515967
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.8699429087196,
+  "snr_vs_source": 20.317322756836006,
+  "delay": 1808,
+  "gain_db": 0.00730862031572083
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.49349186222142,
+  "snr_vs_source": 20.317420238564754,
+  "delay": 2048,
+  "gain_db": 0.007237362402604959
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 25.648725337365867,
+  "delay": 2048,
+  "gain_db": 0.014203292434784704
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.75058583268634,
+  "snr_vs_source": 25.6487255296225,
+  "delay": 2048,
+  "gain_db": 0.014203150973688182
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 50.44988006611902,
+  "snr_vs_source": 25.634227402942848,
+  "delay": 2048,
+  "gain_db": 0.01420005942267181
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.3712178519839,
+  "snr_vs_source": 25.64862239251132,
+  "delay": 1808,
+  "gain_db": 0.014176429234198302
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.3596915258749,
+  "snr_vs_source": 25.64872544813417,
+  "delay": 2048,
+  "gain_db": 0.014203074598347538
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.87099951402118,
+  "delay": 2048,
+  "gain_db": 0.007592375416760652
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.66259446669514,
+  "snr_vs_source": 26.870999413744258,
+  "delay": 2048,
+  "gain_db": 0.00759219049692054
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 69.99116317139617,
+  "snr_vs_source": 26.870764881724316,
+  "delay": 2048,
+  "gain_db": 0.007596090215730276
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.4881756613013,
+  "snr_vs_source": 26.870629639855657,
+  "delay": 1808,
+  "gain_db": 0.0076294087155183935
+ },
+ {
+  "config": "lc-ours-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.33419715773937,
+  "snr_vs_source": 26.870999514493374,
+  "delay": 2048,
+  "gain_db": 0.007592174392474139
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.185287548070526,
+  "delay": 1024,
+  "gain_db": 0.05223888235397814
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.58030155855806,
+  "snr_vs_source": 17.185287521139628,
+  "delay": 1024,
+  "gain_db": 0.05223872324790922
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 19.336062721557262,
+  "snr_vs_source": 17.23550847419706,
+  "delay": 784,
+  "gain_db": 0.05234647651338491
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 32.147207184328,
+  "delay": 1024,
+  "gain_db": 0.0129585046102706
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.67785616861104,
+  "snr_vs_source": 32.14720786283572,
+  "delay": 1024,
+  "gain_db": 0.012958281391490878
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 44.51274679342535,
+  "snr_vs_source": 32.13782763021103,
+  "delay": 784,
+  "gain_db": 0.013065854049757223
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.886305826791023,
+  "delay": 1024,
+  "gain_db": 0.013308308808820345
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.74705685350236,
+  "snr_vs_source": 30.886306180478215,
+  "delay": 1024,
+  "gain_db": 0.013308145187067353
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 49.80807684199411,
+  "snr_vs_source": 30.885468730779557,
+  "delay": 784,
+  "gain_db": 0.013369534389994896
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.447052185851287,
+  "delay": 1024,
+  "gain_db": 0.020167386008112378
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.86419568336564,
+  "snr_vs_source": 20.447052187416407,
+  "delay": 1024,
+  "gain_db": 0.02016725357520873
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.812659527652443,
+  "snr_vs_source": 20.443398070542578,
+  "delay": 784,
+  "gain_db": 0.020179733599613926
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.030306683001966,
+  "delay": 1024,
+  "gain_db": 0.017135214887464004
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.80850332133653,
+  "snr_vs_source": 10.030306660456684,
+  "delay": 1024,
+  "gain_db": 0.01713494979756616
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 17.153522891785496,
+  "snr_vs_source": 10.018973598246461,
+  "delay": 784,
+  "gain_db": 0.01718205572783063
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.903842589609527,
+  "delay": 1024,
+  "gain_db": 0.055733223864224246
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 136.39248618033523,
+  "snr_vs_source": 10.903842539683504,
+  "delay": 1024,
+  "gain_db": 0.055733163428570806
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 13.480629119269505,
+  "snr_vs_source": 11.11765789549614,
+  "delay": 784,
+  "gain_db": 0.055672937386866066
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.127399609728538,
+  "delay": 1024,
+  "gain_db": 0.03203739864795298
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.78984110482108,
+  "snr_vs_source": 14.127399606446538,
+  "delay": 1024,
+  "gain_db": 0.032037261959675635
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 17.472137347621487,
+  "snr_vs_source": 14.110650488793354,
+  "delay": 784,
+  "gain_db": 0.03211891899076247
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.74417398126946,
+  "delay": 1024,
+  "gain_db": 0.015279692431421387
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.75821366314668,
+  "snr_vs_source": 17.74417397013853,
+  "delay": 1024,
+  "gain_db": 0.015279443363533991
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 22.79649707088459,
+  "snr_vs_source": 17.704961397555742,
+  "delay": 784,
+  "gain_db": 0.015374110331841929
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 25.665763052299454,
+  "delay": 1024,
+  "gain_db": 0.017564022291305176
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.83530787117695,
+  "snr_vs_source": 25.665763128760922,
+  "delay": 1024,
+  "gain_db": 0.017563858341878423
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 34.5182256888078,
+  "snr_vs_source": 25.65586491488729,
+  "delay": 784,
+  "gain_db": 0.01755892156692166
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.734347624146842,
+  "delay": 1024,
+  "gain_db": 0.017891204221079468
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.6844582592167,
+  "snr_vs_source": 28.734347852071423,
+  "delay": 1024,
+  "gain_db": 0.017891019348588034
+ },
+ {
+  "config": "lc-ffmpeg-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 39.65496174200598,
+  "snr_vs_source": 28.745577834934394,
+  "delay": 784,
+  "gain_db": 0.017939528922280533
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.227080806691866,
+  "delay": 2048,
+  "gain_db": 0.025920270106808654
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.6872992078595,
+  "snr_vs_source": 21.227080805673545,
+  "delay": 2048,
+  "gain_db": 0.025920109095500785
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.26944595450306,
+  "snr_vs_source": 21.22718438750099,
+  "delay": 1808,
+  "gain_db": 0.026017221677211516
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 38.71102529878622,
+  "delay": 2048,
+  "gain_db": 0.007917142333871328
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.91132055027163,
+  "snr_vs_source": 38.711026694016354,
+  "delay": 2048,
+  "gain_db": 0.007916937811077666
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 73.8545402424194,
+  "snr_vs_source": 38.70998731681571,
+  "delay": 1808,
+  "gain_db": 0.007758018803950671
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 34.56256895817495,
+  "delay": 2048,
+  "gain_db": 0.020073630612555227
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.79640641632298,
+  "snr_vs_source": 34.5625700727865,
+  "delay": 2048,
+  "gain_db": 0.0200734670379619
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.19152332848668,
+  "snr_vs_source": 34.56161871196248,
+  "delay": 1808,
+  "gain_db": 0.02011744370106669
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 25.510596883121103,
+  "delay": 2048,
+  "gain_db": 0.02314578957538161
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.84697003984832,
+  "snr_vs_source": 25.51059707949404,
+  "delay": 2048,
+  "gain_db": 0.023145639884276037
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.33025671453407,
+  "snr_vs_source": 25.510466060380814,
+  "delay": 1808,
+  "gain_db": 0.023126568699192128
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.90001304082769,
+  "delay": 2048,
+  "gain_db": 0.016951895490964874
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.88712661437498,
+  "snr_vs_source": 12.900013047406171,
+  "delay": 2048,
+  "gain_db": 0.01695161922043309
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.34231579642556,
+  "snr_vs_source": 12.899971926398381,
+  "delay": 1808,
+  "gain_db": 0.017013053914481435
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.0840415618268,
+  "delay": 2048,
+  "gain_db": 0.0426685104983835
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.37113110091872,
+  "snr_vs_source": 15.08404152085295,
+  "delay": 2048,
+  "gain_db": 0.042668450771830485
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.544996347218046,
+  "snr_vs_source": 15.083842323962601,
+  "delay": 1808,
+  "gain_db": 0.04258051822254956
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.543343182771654,
+  "delay": 2048,
+  "gain_db": 0.01214865813885508
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.8362501671378,
+  "snr_vs_source": 17.543343191732752,
+  "delay": 2048,
+  "gain_db": 0.012148532297844215
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.78042455801507,
+  "snr_vs_source": 17.54325192198677,
+  "delay": 1808,
+  "gain_db": 0.012224089153776322
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.66358338129114,
+  "delay": 2048,
+  "gain_db": 0.017774435429827193
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.8501603452655,
+  "snr_vs_source": 21.66358339388127,
+  "delay": 2048,
+  "gain_db": 0.017774187187306802
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.87358290058691,
+  "snr_vs_source": 21.66344061771957,
+  "delay": 1808,
+  "gain_db": 0.017844962645038348
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.94684070406945,
+  "delay": 2048,
+  "gain_db": 0.014968364534830386
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.95924471331696,
+  "snr_vs_source": 28.94684093517259,
+  "delay": 2048,
+  "gain_db": 0.014968224090472855
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.37391664264737,
+  "snr_vs_source": 28.946510819737195,
+  "delay": 1808,
+  "gain_db": 0.01493944293137306
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.543242688266922,
+  "delay": 2048,
+  "gain_db": 0.0217523801305225
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.85248958795273,
+  "snr_vs_source": 30.54324306526059,
+  "delay": 2048,
+  "gain_db": 0.02175219771446794
+ },
+ {
+  "config": "lc-fdk-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.46857392033631,
+  "snr_vs_source": 30.542133225140688,
+  "delay": 1808,
+  "gain_db": 0.02179503934707877
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.953985127969382,
+  "delay": 1600,
+  "gain_db": 0.019795835637058112
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.68488520882542,
+  "snr_vs_source": 20.95398515779895,
+  "delay": 1600,
+  "gain_db": 0.019795665685689686
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 73.1700011781418,
+  "snr_vs_source": 20.95415270542756,
+  "delay": 1360,
+  "gain_db": 0.019896616900326996
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 39.57863247407779,
+  "delay": 1600,
+  "gain_db": 0.002214939076569808
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.91127744262167,
+  "snr_vs_source": 39.57863304362631,
+  "delay": 1600,
+  "gain_db": 0.002214744601441152
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 73.85243227888303,
+  "snr_vs_source": 39.577051963345326,
+  "delay": 1360,
+  "gain_db": 0.0020709788279126566
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 36.09199255045107,
+  "delay": 1600,
+  "gain_db": 0.010446904302178277
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.84716285310543,
+  "snr_vs_source": 36.09199310815322,
+  "delay": 1600,
+  "gain_db": 0.010446753439136265
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.17695591239577,
+  "snr_vs_source": 36.09118199245923,
+  "delay": 1360,
+  "gain_db": 0.010480596677098077
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 27.014021797218547,
+  "delay": 1600,
+  "gain_db": 0.011677177892746325
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.87114291422918,
+  "snr_vs_source": 27.014021795419186,
+  "delay": 1600,
+  "gain_db": 0.011677024031933277
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.34321001722503,
+  "snr_vs_source": 27.01368927688986,
+  "delay": 1360,
+  "gain_db": 0.011645352597824182
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.0046365909738,
+  "delay": 1600,
+  "gain_db": 0.0357296630211553
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.88811774807203,
+  "snr_vs_source": 13.004636607956975,
+  "delay": 1600,
+  "gain_db": 0.03572939217439139
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.341945754438306,
+  "snr_vs_source": 13.00457377230427,
+  "delay": 1360,
+  "gain_db": 0.035785716075409923
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.576126159139775,
+  "delay": 1600,
+  "gain_db": 0.011479990060265266
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 136.5207220949604,
+  "snr_vs_source": 15.576126110810282,
+  "delay": 1600,
+  "gain_db": 0.01148001555247774
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.60529514275494,
+  "snr_vs_source": 15.576046119099985,
+  "delay": 1360,
+  "gain_db": 0.011417778222116625
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.557190761526698,
+  "delay": 1600,
+  "gain_db": 0.0064641843308225425
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.89543819470137,
+  "snr_vs_source": 17.55719072960995,
+  "delay": 1600,
+  "gain_db": 0.006464045171208809
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.78137117263829,
+  "snr_vs_source": 17.557124022621558,
+  "delay": 1360,
+  "gain_db": 0.006537260292849793
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 22.788215478061037,
+  "delay": 1600,
+  "gain_db": 0.013854740888991992
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.7849378318108,
+  "snr_vs_source": 22.788215472454247,
+  "delay": 1600,
+  "gain_db": 0.013854463522896926
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.87506884908774,
+  "snr_vs_source": 22.787993950549957,
+  "delay": 1360,
+  "gain_db": 0.013910916464293259
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 29.58030731400324,
+  "delay": 1600,
+  "gain_db": 0.00502342716551258
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.92224329663256,
+  "snr_vs_source": 29.580307408524774,
+  "delay": 1600,
+  "gain_db": 0.005023287760343199
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.39824243147612,
+  "snr_vs_source": 29.579875852993375,
+  "delay": 1360,
+  "gain_db": 0.005004301344082042
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 31.696015189066358,
+  "delay": 1600,
+  "gain_db": 0.010965295399352586
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.8376463653718,
+  "snr_vs_source": 31.696015751161653,
+  "delay": 1600,
+  "gain_db": 0.010965100032645407
+ },
+ {
+  "config": "lc-libxaac-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.48530844081691,
+  "snr_vs_source": 31.69463456876384,
+  "delay": 1360,
+  "gain_db": 0.011014698775681715
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.131550632822556,
+  "delay": 2112,
+  "gain_db": 0.010741510919857103
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.47923133951136,
+  "snr_vs_source": 20.13155062344575,
+  "delay": 2112,
+  "gain_db": 0.010741336494780212
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.78246122894258,
+  "snr_vs_source": 20.131939527856524,
+  "delay": 1872,
+  "gain_db": 0.01084606164071681
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 31.869898933893307,
+  "delay": 2112,
+  "gain_db": -0.0014655129350423417
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.63070889907556,
+  "snr_vs_source": 31.869898650788976,
+  "delay": 2112,
+  "gain_db": -0.0014657523728445242
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.09382565100556,
+  "snr_vs_source": 31.869729409414663,
+  "delay": 1872,
+  "gain_db": -0.001380614130944988
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 25.885735693988927,
+  "delay": 2112,
+  "gain_db": 0.006292176448717572
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.7169108489276,
+  "snr_vs_source": 25.885735752649456,
+  "delay": 2112,
+  "gain_db": 0.0062920149019112855
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.19800211030703,
+  "snr_vs_source": 25.885653487857855,
+  "delay": 1872,
+  "gain_db": 0.006338126348968851
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 23.72966657663884,
+  "delay": 2112,
+  "gain_db": 0.017103090595314535
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.75569527167,
+  "snr_vs_source": 23.729666611146275,
+  "delay": 2112,
+  "gain_db": 0.01710290268700732
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.30395356725313,
+  "snr_vs_source": 23.729529663956317,
+  "delay": 1872,
+  "gain_db": 0.01711208208189985
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.538062774783839,
+  "delay": 2112,
+  "gain_db": 0.011716867581807795
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 136.0546051336604,
+  "snr_vs_source": 12.538062770325084,
+  "delay": 2112,
+  "gain_db": 0.011716624806301847
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.30939880021266,
+  "snr_vs_source": 12.538062654953384,
+  "delay": 1872,
+  "gain_db": 0.011719160652788243
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.76930136310812,
+  "delay": 2112,
+  "gain_db": -0.03349703021994216
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.4731653151483,
+  "snr_vs_source": 14.769301246714603,
+  "delay": 2112,
+  "gain_db": -0.033497054850111604
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.57436957095041,
+  "snr_vs_source": 14.769137415062804,
+  "delay": 1872,
+  "gain_db": -0.033558426532963155
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.388943328390738,
+  "delay": 2112,
+  "gain_db": 0.0109925688980051
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.66898241653615,
+  "snr_vs_source": 19.388943345102263,
+  "delay": 2112,
+  "gain_db": 0.010992380167976715
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.78654582785737,
+  "snr_vs_source": 19.388831042276347,
+  "delay": 1872,
+  "gain_db": 0.011061021438004859
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.444902327011164,
+  "delay": 2112,
+  "gain_db": 0.009521711286792908
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.7816874274822,
+  "snr_vs_source": 18.444902388813755,
+  "delay": 2112,
+  "gain_db": 0.009521473990821608
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.84655452309167,
+  "snr_vs_source": 18.444756804441873,
+  "delay": 1872,
+  "gain_db": 0.009612843179061893
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.040908442448046,
+  "delay": 2112,
+  "gain_db": 0.010496233924703275
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.70295360261153,
+  "snr_vs_source": 26.040908422054034,
+  "delay": 2112,
+  "gain_db": 0.01049609856816311
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.37297313766251,
+  "snr_vs_source": 26.04075330118867,
+  "delay": 1872,
+  "gain_db": 0.01046965460319798
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.191464647228706,
+  "delay": 2112,
+  "gain_db": 0.006850977506235419
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.54989024776262,
+  "snr_vs_source": 26.191464674850046,
+  "delay": 2112,
+  "gain_db": 0.006850788715029424
+ },
+ {
+  "config": "lc-apple-cbr128",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.4776793589514,
+  "snr_vs_source": 26.191269498370534,
+  "delay": 1872,
+  "gain_db": 0.006891411991362249
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.454010402307055,
+  "delay": 2048,
+  "gain_db": 0.010889011169418254
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.35660650096025,
+  "snr_vs_source": 26.45401042756857,
+  "delay": 2048,
+  "gain_db": 0.010888847082839192
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 32.80244867453439,
+  "snr_vs_source": 25.538764392376017,
+  "delay": 2048,
+  "gain_db": 0.010871289093450531
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 80.29618573066324,
+  "snr_vs_source": 26.453945432160513,
+  "delay": 1808,
+  "gain_db": 0.010963409825704696
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 134.9982174312455,
+  "snr_vs_source": 26.454010495737737,
+  "delay": 2048,
+  "gain_db": 0.010888730486640887
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 29.173703558495955,
+  "delay": 2048,
+  "gain_db": 0.011062216146435214
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.46293805564818,
+  "snr_vs_source": 29.17370369946346,
+  "delay": 2048,
+  "gain_db": 0.011061989416090948
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 64.2692813183449,
+  "snr_vs_source": 29.172406295643523,
+  "delay": 2048,
+  "gain_db": 0.011051154061912438
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.0818260386557,
+  "snr_vs_source": 29.17341800116507,
+  "delay": 1808,
+  "gain_db": 0.011154596117166606
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.15760724185648,
+  "snr_vs_source": 29.17370330256603,
+  "delay": 2048,
+  "gain_db": 0.011061891384018707
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 29.44655151361936,
+  "delay": 2048,
+  "gain_db": -0.004893906883671846
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.49854687647124,
+  "snr_vs_source": 29.446551306787935,
+  "delay": 2048,
+  "gain_db": -0.004894073196275747
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 77.06522594333505,
+  "snr_vs_source": 29.44649088482741,
+  "delay": 2048,
+  "gain_db": -0.004886978961014429
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.23695927456086,
+  "snr_vs_source": 29.44640066635778,
+  "delay": 1808,
+  "gain_db": -0.004844143793824383
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.1127893101168,
+  "snr_vs_source": 29.44655114381868,
+  "delay": 2048,
+  "gain_db": -0.004894189870171544
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 27.743147506033978,
+  "delay": 2048,
+  "gain_db": -0.004183376481468126
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.55027471402371,
+  "snr_vs_source": 27.743147443167867,
+  "delay": 2048,
+  "gain_db": -0.004183568030699341
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 68.75261860523308,
+  "snr_vs_source": 27.74274190453411,
+  "delay": 2048,
+  "gain_db": -0.004174804793430185
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.34740654688345,
+  "snr_vs_source": 27.74281271068539,
+  "delay": 1808,
+  "gain_db": -0.004178511439978992
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.2793968865286,
+  "snr_vs_source": 27.74314709755386,
+  "delay": 2048,
+  "gain_db": -0.004183611240944125
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 27.911475142291074,
+  "delay": 2048,
+  "gain_db": 0.0005478520826992199
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.4564622177889,
+  "snr_vs_source": 27.91147515099138,
+  "delay": 2048,
+  "gain_db": 0.0005475270326634918
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 68.31568297520509,
+  "snr_vs_source": 27.911062643359593,
+  "delay": 2048,
+  "gain_db": 0.0005780066652622102
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.582354830580144,
+  "snr_vs_source": 27.91021365471476,
+  "delay": 1808,
+  "gain_db": 0.0005696839916094004
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.25897026375657,
+  "snr_vs_source": 27.911475389576434,
+  "delay": 2048,
+  "gain_db": 0.0005475691139748955
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.171626049663907,
+  "delay": 2048,
+  "gain_db": 0.0022866676663857366
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.39658227849503,
+  "snr_vs_source": 26.171626019541367,
+  "delay": 2048,
+  "gain_db": 0.0022866388017744378
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 59.46947582468185,
+  "snr_vs_source": 26.16969743067173,
+  "delay": 2048,
+  "gain_db": 0.002320650259316875
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.63093770023026,
+  "snr_vs_source": 26.1696651581832,
+  "delay": 1808,
+  "gain_db": 0.0022402469826948777
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.43236955057688,
+  "snr_vs_source": 26.171626448529747,
+  "delay": 2048,
+  "gain_db": 0.0022866046286689583
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.13883017982151,
+  "delay": 2048,
+  "gain_db": -0.010126645008095013
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.47104823967112,
+  "snr_vs_source": 26.138830306946165,
+  "delay": 2048,
+  "gain_db": -0.010126780203487805
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 39.76493719104326,
+  "snr_vs_source": 25.951392782891002,
+  "delay": 2048,
+  "gain_db": -0.010126260948034541
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.82211005847314,
+  "snr_vs_source": 26.138416064148267,
+  "delay": 1808,
+  "gain_db": -0.010060286101760879
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.1797476384336,
+  "snr_vs_source": 26.138830136403172,
+  "delay": 2048,
+  "gain_db": -0.010126889583732127
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.36625437186843,
+  "delay": 2048,
+  "gain_db": 0.007295945168287673
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.55622548268525,
+  "snr_vs_source": 26.366254615875945,
+  "delay": 2048,
+  "gain_db": 0.0072956787625797735
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.54657058072549,
+  "snr_vs_source": 26.36608521039743,
+  "delay": 2048,
+  "gain_db": 0.007358588212424403
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.86442258504962,
+  "snr_vs_source": 26.365816958473776,
+  "delay": 1808,
+  "gain_db": 0.0073383710492845484
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.38519834459277,
+  "snr_vs_source": 26.366254611680144,
+  "delay": 2048,
+  "gain_db": 0.007295748115297469
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 29.079370399309553,
+  "delay": 2048,
+  "gain_db": 0.00018630332737973348
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.56726724328558,
+  "snr_vs_source": 29.079370570594843,
+  "delay": 2048,
+  "gain_db": 0.00018614932320910676
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 50.47177640360759,
+  "snr_vs_source": 29.04751163970066,
+  "delay": 2048,
+  "gain_db": 0.00018237743942559303
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.38083972350914,
+  "snr_vs_source": 29.07899894038796,
+  "delay": 1808,
+  "gain_db": 0.00015362465792253177
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.26271280879922,
+  "snr_vs_source": 29.0793706932067,
+  "delay": 2048,
+  "gain_db": 0.00018607627223009228
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.032266593334374,
+  "delay": 2048,
+  "gain_db": -0.001630823303021638
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.50637061810167,
+  "snr_vs_source": 30.03226655377177,
+  "delay": 2048,
+  "gain_db": -0.0016310252083828283
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.0042998789963,
+  "snr_vs_source": 30.031812801461406,
+  "delay": 2048,
+  "gain_db": -0.0016270203851762974
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.48692290497124,
+  "snr_vs_source": 30.031441316967566,
+  "delay": 1808,
+  "gain_db": -0.0016080582572788828
+ },
+ {
+  "config": "lc-ours-cbr256",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 135.17939094126103,
+  "snr_vs_source": 30.032266295022517,
+  "delay": 2048,
+  "gain_db": -0.0016310605903581462
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 23.39565979435751,
+  "delay": 2112,
+  "gain_db": 0.012395705301497518
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.41054646996602,
+  "snr_vs_source": 23.39565984336221,
+  "delay": 2112,
+  "gain_db": 0.012395545509606323
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 80.28737594966621,
+  "snr_vs_source": 23.39563580435529,
+  "delay": 1872,
+  "gain_db": 0.012468247439267877
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 35.82800007128955,
+  "delay": 2112,
+  "gain_db": 0.004607173827852977
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.50751447750403,
+  "snr_vs_source": 35.82800052373451,
+  "delay": 2112,
+  "gain_db": 0.00460693764864799
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.08367677293022,
+  "snr_vs_source": 35.82728261977877,
+  "delay": 1872,
+  "gain_db": 0.0046778751916816495
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.85913460298938,
+  "delay": 2112,
+  "gain_db": 0.010957335625116865
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.67058212942456,
+  "snr_vs_source": 30.85913472672507,
+  "delay": 2112,
+  "gain_db": 0.010957174294299219
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 75.20856778695877,
+  "snr_vs_source": 30.85888879736234,
+  "delay": 1872,
+  "gain_db": 0.010989157140301466
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.748649499877803,
+  "delay": 2112,
+  "gain_db": 0.013052186098674385
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.76098667348745,
+  "snr_vs_source": 26.74864953893069,
+  "delay": 2112,
+  "gain_db": 0.01305202646064576
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 68.30098198294642,
+  "snr_vs_source": 26.748378073288087,
+  "delay": 1872,
+  "gain_db": 0.013052811056679875
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.017773961418525,
+  "delay": 2112,
+  "gain_db": 0.008964945432647609
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.9866094096824,
+  "snr_vs_source": 15.01777396784176,
+  "delay": 2112,
+  "gain_db": 0.00896470538115739
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.336978656743156,
+  "snr_vs_source": 15.017715346350947,
+  "delay": 1872,
+  "gain_db": 0.008958413630709715
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.533214121739487,
+  "delay": 2112,
+  "gain_db": 0.005944665794724871
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.5580615548856,
+  "snr_vs_source": 18.53321410306182,
+  "delay": 2112,
+  "gain_db": 0.0059446576634047295
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.57861689880026,
+  "snr_vs_source": 18.532989219424742,
+  "delay": 1872,
+  "gain_db": 0.0059045074802514105
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.471357552415043,
+  "delay": 2112,
+  "gain_db": 0.009552098681136014
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.6096237309737,
+  "snr_vs_source": 21.471357543036966,
+  "delay": 2112,
+  "gain_db": 0.009551936000832303
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.79187141848982,
+  "snr_vs_source": 21.471184733489554,
+  "delay": 1872,
+  "gain_db": 0.009612563583122943
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 24.3794870655894,
+  "delay": 2112,
+  "gain_db": 0.010858145765323627
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.66277424665816,
+  "snr_vs_source": 24.379487142388605,
+  "delay": 2112,
+  "gain_db": 0.010857904660579456
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 65.85495468986696,
+  "snr_vs_source": 24.37911787620122,
+  "delay": 1872,
+  "gain_db": 0.010908369722852092
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.1467857308535,
+  "delay": 2112,
+  "gain_db": 0.006168373882320301
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.5876942967123,
+  "snr_vs_source": 30.14678592552334,
+  "delay": 2112,
+  "gain_db": 0.006168218597936791
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 70.383205817612,
+  "snr_vs_source": 30.146351915319023,
+  "delay": 1872,
+  "gain_db": 0.0061330349659743395
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.285311352835286,
+  "delay": 2112,
+  "gain_db": 0.003016183316025512
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 135.50902913557985,
+  "snr_vs_source": 28.28531131725997,
+  "delay": 2112,
+  "gain_db": 0.0030159804701463165
+ },
+ {
+  "config": "lcvbr-apple-tvbr82",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.48260680176806,
+  "snr_vs_source": 28.284781332695626,
+  "delay": 1872,
+  "gain_db": 0.003056123250665504
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 9.159395733661714,
+  "delay": 5635,
+  "gain_db": -0.16206977849704776
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 134.1200335982933,
+  "snr_vs_source": 9.15939563231253,
+  "delay": 5635,
+  "gain_db": -0.162069982992551
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 12.23910784520288,
+  "snr_vs_source": 9.00484127518767,
+  "delay": 4673,
+  "gain_db": -0.1611881372766697
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.122059458834247,
+  "snr_vs_source": 9.083220168527488,
+  "delay": 5635,
+  "gain_db": -0.15569339767472432
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 133.12556660007104,
+  "snr_vs_source": 9.159395640346794,
+  "delay": 4673,
+  "gain_db": -0.16207006195348062
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.6246213181307,
+  "delay": 5635,
+  "gain_db": 0.0068562286251457934
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.41221245050707,
+  "snr_vs_source": 20.6246212971627,
+  "delay": 5635,
+  "gain_db": 0.006856047474662941
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 37.73122066535492,
+  "snr_vs_source": 20.617502040545478,
+  "delay": 4673,
+  "gain_db": 0.006901232189118132
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 61.59620604995113,
+  "snr_vs_source": 20.62433126697362,
+  "delay": 5635,
+  "gain_db": 0.008170296948879665
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 127.05305605168434,
+  "snr_vs_source": 20.624621353384995,
+  "delay": 4673,
+  "gain_db": 0.006855771467756896
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.209107689304084,
+  "delay": 5635,
+  "gain_db": -0.07964815969388686
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 134.82005984728764,
+  "snr_vs_source": 12.20910766918865,
+  "delay": 5635,
+  "gain_db": -0.07964841123077611
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 42.4619341983027,
+  "snr_vs_source": 12.208841228879749,
+  "delay": 4673,
+  "gain_db": -0.07960537855659497
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 62.30467447249292,
+  "snr_vs_source": 12.209404323548995,
+  "delay": 5635,
+  "gain_db": -0.0784519895895467
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 133.70555338525185,
+  "snr_vs_source": 12.20910763533669,
+  "delay": 4673,
+  "gain_db": -0.07964859840216777
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.261558310294994,
+  "delay": 5635,
+  "gain_db": -0.01967510901363679
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.2476304486683,
+  "snr_vs_source": 13.261558264969906,
+  "delay": 5635,
+  "gain_db": -0.019675295838994057
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 15.129206216073994,
+  "snr_vs_source": 13.239763988158932,
+  "delay": 4673,
+  "gain_db": -0.01966887802677799
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.72667834143056,
+  "snr_vs_source": 13.261847978797888,
+  "delay": 5635,
+  "gain_db": -0.017397320481846137
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 82.40444420730265,
+  "snr_vs_source": 13.261545080310022,
+  "delay": 4673,
+  "gain_db": -0.01967560578177954
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 3.215032757018635,
+  "delay": 5635,
+  "gain_db": -0.0237604684932117
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 60.556754869036986,
+  "snr_vs_source": 3.215100354498915,
+  "delay": 5635,
+  "gain_db": -0.023760663660942833
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 1.942592898261457,
+  "snr_vs_source": 2.765886481378942,
+  "delay": 4673,
+  "gain_db": -0.023449669080927476
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 37.47014348558298,
+  "snr_vs_source": 3.214315124525906,
+  "delay": 5635,
+  "gain_db": -0.01907701451849422
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 59.88205572421058,
+  "snr_vs_source": 3.215104157057693,
+  "delay": 4673,
+  "gain_db": -0.023760606101348856
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.4979139545886544,
+  "delay": 5635,
+  "gain_db": -0.9770082737078758
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.5132933295321,
+  "snr_vs_source": 2.4979138366084577,
+  "delay": 5635,
+  "gain_db": -0.9770086248185743
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 1.8700251536840387,
+  "snr_vs_source": 2.3181432952823773,
+  "delay": 4673,
+  "gain_db": -0.9769179396273093
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 49.10431457255633,
+  "snr_vs_source": 2.4995807443477167,
+  "delay": 5635,
+  "gain_db": -0.9734930298536381
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 60.27216879716376,
+  "snr_vs_source": 2.49794807049781,
+  "delay": 4673,
+  "gain_db": -0.9770085169930756
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.756132484374366,
+  "delay": 5635,
+  "gain_db": -0.014367337580068668
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 97.8191456564086,
+  "snr_vs_source": 8.756132515227081,
+  "delay": 5635,
+  "gain_db": -0.014367521562564455
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 7.506731889970882,
+  "snr_vs_source": 8.646586535821733,
+  "delay": 4673,
+  "gain_db": -0.01439161195335208
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 37.843947871320985,
+  "snr_vs_source": 8.751427991990612,
+  "delay": 5635,
+  "gain_db": -0.011080944326954844
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 62.79216078115316,
+  "snr_vs_source": 8.756335292554896,
+  "delay": 4673,
+  "gain_db": -0.014367793412343299
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.956814835984515,
+  "delay": 5635,
+  "gain_db": -0.1489008723870507
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.93767891611577,
+  "snr_vs_source": 8.956814765828566,
+  "delay": 5635,
+  "gain_db": -0.1489010550532293
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 11.301639031094666,
+  "snr_vs_source": 8.890933180543621,
+  "delay": 4673,
+  "gain_db": -0.1488711538707136
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 56.987320893432084,
+  "snr_vs_source": 8.957606193222874,
+  "delay": 5635,
+  "gain_db": -0.14582790457495043
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 86.61137573263723,
+  "snr_vs_source": 8.956815545481962,
+  "delay": 4673,
+  "gain_db": -0.14890114736934906
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.221020536842543,
+  "delay": 5635,
+  "gain_db": -0.04475714279317705
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 105.12075580603407,
+  "snr_vs_source": 14.221020383867183,
+  "delay": 5635,
+  "gain_db": -0.04475744742641359
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 24.460718252463675,
+  "snr_vs_source": 14.162693488398636,
+  "delay": 4673,
+  "gain_db": -0.04471139889007749
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 56.83265139696758,
+  "snr_vs_source": 14.221560132416258,
+  "delay": 5635,
+  "gain_db": -0.04297408121602655
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 100.1900544269958,
+  "snr_vs_source": 14.221020885245233,
+  "delay": 4673,
+  "gain_db": -0.04475765918966825
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 11.974335234218996,
+  "delay": 5635,
+  "gain_db": -0.11271948639668691
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 134.6143172899388,
+  "snr_vs_source": 11.974335185561078,
+  "delay": 5635,
+  "gain_db": -0.11271973875493982
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 32.06708008033918,
+  "snr_vs_source": 11.972121554049453,
+  "delay": 4673,
+  "gain_db": -0.11265367302775878
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.55956172561859,
+  "snr_vs_source": 11.974995662292967,
+  "delay": 5635,
+  "gain_db": -0.11009351720220006
+ },
+ {
+  "config": "he-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 133.51357513845272,
+  "snr_vs_source": 11.974335048011477,
+  "delay": 4673,
+  "gain_db": -0.11271992151901887
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.545488049313995,
+  "delay": 5057,
+  "gain_db": -0.017462593501896186
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.4563535754015,
+  "snr_vs_source": 12.545488008874514,
+  "delay": 5057,
+  "gain_db": -0.017462815550007758
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.48082517763789,
+  "snr_vs_source": 12.37872051499173,
+  "delay": 5057,
+  "gain_db": -0.012488113995230471
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.220111117915966,
+  "delay": 5057,
+  "gain_db": 0.06951114231946987
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.30097664891332,
+  "snr_vs_source": 26.220112027030936,
+  "delay": 5057,
+  "gain_db": 0.06951099240937718
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 62.0729703374611,
+  "snr_vs_source": 26.21460940367576,
+  "delay": 5057,
+  "gain_db": 0.07078386925781147
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.6624287856045,
+  "delay": 5057,
+  "gain_db": 0.058794550716076394
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.7248986361588,
+  "snr_vs_source": 21.662429100621026,
+  "delay": 5057,
+  "gain_db": 0.058794289719823534
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 66.91259624447726,
+  "snr_vs_source": 21.661326703224972,
+  "delay": 5057,
+  "gain_db": 0.05998966409182068
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.074722554866213,
+  "delay": 5057,
+  "gain_db": 0.05891007181315483
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 117.27715410451772,
+  "snr_vs_source": 17.07472275236774,
+  "delay": 5057,
+  "gain_db": 0.05890992452300927
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.569496721974026,
+  "snr_vs_source": 17.07401895165711,
+  "delay": 5057,
+  "gain_db": 0.061155155876539996
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.801838736573957,
+  "delay": 5057,
+  "gain_db": 0.034693186192237026
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 105.94808047779752,
+  "snr_vs_source": 5.801838308456276,
+  "delay": 5057,
+  "gain_db": 0.03469298012561651
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.83187523272107,
+  "snr_vs_source": 5.80269632288427,
+  "delay": 5057,
+  "gain_db": 0.039231357748998275
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.72522263955125,
+  "delay": 5057,
+  "gain_db": -0.08555779538570296
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.48977293713278,
+  "snr_vs_source": 4.725222649461704,
+  "delay": 5057,
+  "gain_db": -0.08555814976702067
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 51.236127005378364,
+  "snr_vs_source": 4.726373566782128,
+  "delay": 5057,
+  "gain_db": -0.0820454103764731
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.142395313130411,
+  "delay": 5057,
+  "gain_db": 0.06571616875701823
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.60158130314255,
+  "snr_vs_source": 10.14239528891528,
+  "delay": 5057,
+  "gain_db": 0.06571595187493477
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 40.62266395129658,
+  "snr_vs_source": 10.138947802831584,
+  "delay": 5057,
+  "gain_db": 0.06895870854931173
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.085808011418177,
+  "delay": 5057,
+  "gain_db": 0.03172785462859699
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.80196341837998,
+  "snr_vs_source": 13.08580798582862,
+  "delay": 5057,
+  "gain_db": 0.031727668225310396
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 55.8406135636925,
+  "snr_vs_source": 13.086197433272357,
+  "delay": 5057,
+  "gain_db": 0.03476552575828017
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.614509492018183,
+  "delay": 5057,
+  "gain_db": 0.047174553978768255
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.52573395007708,
+  "snr_vs_source": 18.614509549108313,
+  "delay": 5057,
+  "gain_db": 0.047174298725886
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 46.22743489845167,
+  "snr_vs_source": 18.606411387165384,
+  "delay": 5057,
+  "gain_db": 0.048941262265972896
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.476369698217447,
+  "delay": 5057,
+  "gain_db": 0.048707565232124675
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.79546351879287,
+  "snr_vs_source": 18.476369783881317,
+  "delay": 5057,
+  "gain_db": 0.04870733444756198
+ },
+ {
+  "config": "he-fdk-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 53.36519946911153,
+  "snr_vs_source": 18.474360174784803,
+  "delay": 5057,
+  "gain_db": 0.05129054347781322
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.731424801378635,
+  "delay": 4165,
+  "gain_db": 0.05034943084738612
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.62295933328153,
+  "snr_vs_source": 12.731424865860903,
+  "delay": 4165,
+  "gain_db": 0.05034924389612917
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 26.35787774514389,
+  "snr_vs_source": 12.570403678877478,
+  "delay": 4165,
+  "gain_db": 0.05244122926361891
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 27.561198632957552,
+  "delay": 4165,
+  "gain_db": 0.09742042831642815
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.6133558174479,
+  "snr_vs_source": 27.561200587884528,
+  "delay": 4165,
+  "gain_db": 0.09742025498741144
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 57.443734283887096,
+  "snr_vs_source": 27.54822154434801,
+  "delay": 4165,
+  "gain_db": 0.09865132027665686
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.760932654051224,
+  "delay": 4165,
+  "gain_db": 0.11316935288729778
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.74056142004267,
+  "snr_vs_source": 21.760933921968707,
+  "delay": 4165,
+  "gain_db": 0.11316910841046245
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.63955841735529,
+  "snr_vs_source": 21.75342961440011,
+  "delay": 4165,
+  "gain_db": 0.11439260848221641
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.44378021385884,
+  "delay": 4165,
+  "gain_db": 0.10467065056816932
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.93178904094393,
+  "snr_vs_source": 17.443780326284394,
+  "delay": 4165,
+  "gain_db": 0.10467047175459361
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 49.24741410173631,
+  "snr_vs_source": 17.44001952950482,
+  "delay": 4165,
+  "gain_db": 0.10690689949804066
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.981265708985441,
+  "delay": 4165,
+  "gain_db": 0.036392288816227525
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.4770946160131,
+  "snr_vs_source": 5.981265673864496,
+  "delay": 4165,
+  "gain_db": 0.03639206980978969
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.994509219458635,
+  "snr_vs_source": 5.9820416055243335,
+  "delay": 4165,
+  "gain_db": 0.040891316891069576
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.753493800205224,
+  "delay": 4165,
+  "gain_db": -0.09112018088268904
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.04199191681798,
+  "snr_vs_source": 4.753493774197517,
+  "delay": 4165,
+  "gain_db": -0.09112052025528067
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 51.08704884993113,
+  "snr_vs_source": 4.754248354734768,
+  "delay": 4165,
+  "gain_db": -0.08756558283874347
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.463437252424814,
+  "delay": 4165,
+  "gain_db": 0.08383467955599007
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.27900782229955,
+  "snr_vs_source": 10.463437225870745,
+  "delay": 4165,
+  "gain_db": 0.08383448941545157
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 33.771189644005624,
+  "snr_vs_source": 10.444080809465,
+  "delay": 4165,
+  "gain_db": 0.08704404805523265
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.402617157730951,
+  "delay": 4165,
+  "gain_db": 0.11098458250493612
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.6539018031057,
+  "snr_vs_source": 13.40261724066141,
+  "delay": 4165,
+  "gain_db": 0.11098441274084458
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 45.856137030367364,
+  "snr_vs_source": 13.399459214423977,
+  "delay": 4165,
+  "gain_db": 0.11418554116438209
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.637304392112732,
+  "delay": 4165,
+  "gain_db": 0.0828065624326786
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.64699911895,
+  "snr_vs_source": 19.63730469824786,
+  "delay": 4165,
+  "gain_db": 0.08280626363364867
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 44.78861654665391,
+  "snr_vs_source": 19.62329305374506,
+  "delay": 4165,
+  "gain_db": 0.08466364142784463
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.47156053770984,
+  "delay": 4165,
+  "gain_db": 0.09285253471152664
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.82907398007723,
+  "snr_vs_source": 19.471560716175084,
+  "delay": 4165,
+  "gain_db": 0.09285231444269265
+ },
+ {
+  "config": "he-libxaac-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 39.58652292568678,
+  "snr_vs_source": 19.42778953661596,
+  "delay": 4165,
+  "gain_db": 0.09546699268548299
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 11.407991424722253,
+  "delay": 5186,
+  "gain_db": 0.001422489775521286
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.4158690664653,
+  "snr_vs_source": 11.407991389441728,
+  "delay": 5186,
+  "gain_db": 0.0014222936721291278
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 29.247193732988123,
+  "snr_vs_source": 11.347821684896214,
+  "delay": 5186,
+  "gain_db": 0.003994951754044349
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 23.286231984523535,
+  "delay": 5186,
+  "gain_db": 0.10311918510136227
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.47615460009926,
+  "snr_vs_source": 23.28623222641812,
+  "delay": 5186,
+  "gain_db": 0.1031190318436547
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 61.413304873622934,
+  "snr_vs_source": 23.282499932259036,
+  "delay": 5186,
+  "gain_db": 0.10441975347693885
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.97500672143854,
+  "delay": 5186,
+  "gain_db": 0.07200587283891681
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.47520945549454,
+  "snr_vs_source": 17.975006883381155,
+  "delay": 5186,
+  "gain_db": 0.07200562829520353
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 66.454884917688,
+  "snr_vs_source": 17.97453231198114,
+  "delay": 5186,
+  "gain_db": 0.07325018030656834
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.542624525741019,
+  "delay": 5186,
+  "gain_db": 0.01147331259007548
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.65989307987599,
+  "snr_vs_source": 14.542624454831369,
+  "delay": 5186,
+  "gain_db": 0.011473176370052473
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.37600031481232,
+  "snr_vs_source": 14.542464958018726,
+  "delay": 5186,
+  "gain_db": 0.013738364507117039
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.774247461335688,
+  "delay": 5186,
+  "gain_db": 0.10068115971848784
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 109.83225418766993,
+  "snr_vs_source": 5.774247444044629,
+  "delay": 5186,
+  "gain_db": 0.10068094651633527
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.6226051862131,
+  "snr_vs_source": 5.775144953353899,
+  "delay": 5186,
+  "gain_db": 0.1051043966543182
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.245924298920615,
+  "delay": 5186,
+  "gain_db": -0.4430388745164349
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 129.38006717273555,
+  "snr_vs_source": 4.245924218850284,
+  "delay": 5186,
+  "gain_db": -0.44303921126244267
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 50.61762779703641,
+  "snr_vs_source": 4.246763972884518,
+  "delay": 5186,
+  "gain_db": -0.4395034474184508
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 9.655541000019545,
+  "delay": 5186,
+  "gain_db": 0.024836364476967278
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 124.59740277557779,
+  "snr_vs_source": 9.655540945313593,
+  "delay": 5186,
+  "gain_db": 0.024836171270388837
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 39.223812774715675,
+  "snr_vs_source": 9.651342213591212,
+  "delay": 5186,
+  "gain_db": 0.028065872382531148
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.347923328894073,
+  "delay": 5186,
+  "gain_db": -0.04009710673223927
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.30568073213308,
+  "snr_vs_source": 10.347923279916849,
+  "delay": 5186,
+  "gain_db": -0.04009729894217642
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 53.189340740459684,
+  "snr_vs_source": 10.348361476134096,
+  "delay": 5186,
+  "gain_db": -0.03691722653131242
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.29901566297616,
+  "delay": 5186,
+  "gain_db": 0.10486668858274667
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.4080708359552,
+  "snr_vs_source": 18.299015867236708,
+  "delay": 5186,
+  "gain_db": 0.10486638349554371
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 61.81902991015399,
+  "snr_vs_source": 18.297651708162807,
+  "delay": 5186,
+  "gain_db": 0.10674907151295822
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.312211488274679,
+  "delay": 5186,
+  "gain_db": 0.06698956665924335
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.52807723969806,
+  "snr_vs_source": 15.312211562528177,
+  "delay": 5186,
+  "gain_db": 0.06698930679710687
+ },
+ {
+  "config": "he-apple-cbr48",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 58.80034515538271,
+  "snr_vs_source": 15.311646172796427,
+  "delay": 5186,
+  "gain_db": 0.06964459511607973
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.321810351274802,
+  "delay": 5635,
+  "gain_db": -0.027618125323984007
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.69921103617958,
+  "snr_vs_source": 13.321810290985571,
+  "delay": 5635,
+  "gain_db": -0.027618326849448746
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 15.436966853412322,
+  "snr_vs_source": 13.18218794285438,
+  "delay": 4673,
+  "gain_db": -0.027503921468353343
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 16.593926200867642,
+  "snr_vs_source": 13.113644373462607,
+  "delay": 5635,
+  "gain_db": -0.023274132890752173
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 17.06599367396349,
+  "snr_vs_source": 13.29161340535821,
+  "delay": 4673,
+  "gain_db": -0.02761827778582847
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.372172059717723,
+  "delay": 5635,
+  "gain_db": 0.01960257973093345
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.23907594708666,
+  "snr_vs_source": 26.372172228389708,
+  "delay": 5635,
+  "gain_db": 0.019602419855749453
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 37.6219818919568,
+  "snr_vs_source": 26.361536665336445,
+  "delay": 4673,
+  "gain_db": 0.019646490833982958
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 38.81415680067276,
+  "snr_vs_source": 26.36761491127229,
+  "delay": 5635,
+  "gain_db": 0.02090973674902014
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 39.01279164401732,
+  "snr_vs_source": 26.37298632769855,
+  "delay": 4673,
+  "gain_db": 0.01960207631615439
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.82583431211766,
+  "delay": 5635,
+  "gain_db": 0.01675315632681721
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.0580626957954,
+  "snr_vs_source": 20.82583443373767,
+  "delay": 5635,
+  "gain_db": 0.01675288961124014
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 45.62716992185396,
+  "snr_vs_source": 20.82530444200315,
+  "delay": 4673,
+  "gain_db": 0.016797733169927838
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 49.712254688027386,
+  "snr_vs_source": 20.825572947785677,
+  "delay": 5635,
+  "gain_db": 0.017895205749186315
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 49.94500530452349,
+  "snr_vs_source": 20.825794543678036,
+  "delay": 4673,
+  "gain_db": 0.016752565989843357
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.293059741015803,
+  "delay": 5635,
+  "gain_db": 0.009565063042891666
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.71953716587092,
+  "snr_vs_source": 18.29305961157941,
+  "delay": 5635,
+  "gain_db": 0.009564875611703574
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 19.93087365347204,
+  "snr_vs_source": 18.341532244322806,
+  "delay": 4673,
+  "gain_db": 0.009570694207795907
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 32.48686236779125,
+  "snr_vs_source": 18.298994177451288,
+  "delay": 5635,
+  "gain_db": 0.011791451657796423
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 32.42434521271283,
+  "snr_vs_source": 18.285897077898106,
+  "delay": 4673,
+  "gain_db": 0.009564538101319435
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.817139901656306,
+  "delay": 5635,
+  "gain_db": -0.027747833417238188
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 74.31103441493667,
+  "snr_vs_source": 6.817129036263832,
+  "delay": 5635,
+  "gain_db": -0.027748059756920865
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 6.594417385625235,
+  "snr_vs_source": 6.530935485876376,
+  "delay": 4673,
+  "gain_db": -0.027374245509786774
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 20.185209046374013,
+  "snr_vs_source": 6.806500127053984,
+  "delay": 5635,
+  "gain_db": -0.023346764389791243
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 20.359353718260216,
+  "snr_vs_source": 6.816316504030148,
+  "delay": 4673,
+  "gain_db": -0.027748079377890707
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.377568017550336,
+  "delay": 5635,
+  "gain_db": 0.05589376262858007
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.1232038564115,
+  "snr_vs_source": 7.377567943313602,
+  "delay": 5635,
+  "gain_db": 0.05589340324360577
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 6.814687570314383,
+  "snr_vs_source": 7.458386078082828,
+  "delay": 4673,
+  "gain_db": 0.05599198982296544
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 22.297672736044163,
+  "snr_vs_source": 7.377239595090231,
+  "delay": 5635,
+  "gain_db": 0.059261557842210176
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 22.287916330793553,
+  "snr_vs_source": 7.378139003238623,
+  "delay": 4673,
+  "gain_db": 0.05589294103995561
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.742923132599302,
+  "delay": 5635,
+  "gain_db": 0.018442880806145742
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 93.83677228760384,
+  "snr_vs_source": 10.742922506443744,
+  "delay": 5635,
+  "gain_db": 0.01844267793526471
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 9.605650492531254,
+  "snr_vs_source": 10.636635470984665,
+  "delay": 4673,
+  "gain_db": 0.018489536409829668
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.70068370559178,
+  "snr_vs_source": 10.74708486606314,
+  "delay": 5635,
+  "gain_db": 0.02173163202482375
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 25.41695395013698,
+  "snr_vs_source": 10.745631727931592,
+  "delay": 4673,
+  "gain_db": 0.018442343417379665
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.455007325345687,
+  "delay": 5635,
+  "gain_db": -0.0012018673281765093
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.93394214358716,
+  "snr_vs_source": 14.455007254116945,
+  "delay": 5635,
+  "gain_db": -0.0012020696576532778
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 17.102229007435493,
+  "snr_vs_source": 14.421271082054488,
+  "delay": 4673,
+  "gain_db": -0.001171427895318409
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.478411809835933,
+  "snr_vs_source": 14.465412453524081,
+  "delay": 5635,
+  "gain_db": 0.0018437149283180335
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 21.590527012011655,
+  "snr_vs_source": 14.438684502456383,
+  "delay": 4673,
+  "gain_db": -0.001202313862440086
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.962064438823788,
+  "delay": 5635,
+  "gain_db": 0.0010488501232230666
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 132.39437122809076,
+  "snr_vs_source": 20.962064415698407,
+  "delay": 5635,
+  "gain_db": 0.0010485606456641324
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 29.913757691395798,
+  "snr_vs_source": 20.928892676800285,
+  "delay": 4673,
+  "gain_db": 0.0010963624161899456
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 32.04415992302131,
+  "snr_vs_source": 20.948679055368892,
+  "delay": 5635,
+  "gain_db": 0.002785471857586676
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 32.008604540381654,
+  "snr_vs_source": 20.95057669258363,
+  "delay": 4673,
+  "gain_db": 0.0010483229716148632
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.83510583854117,
+  "delay": 5635,
+  "gain_db": 0.010874378070564295
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 133.05299187044182,
+  "snr_vs_source": 21.8351058202515,
+  "delay": 5635,
+  "gain_db": 0.010874134404698364
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 45.254228907213616,
+  "snr_vs_source": 21.831353153987898,
+  "delay": 4673,
+  "gain_db": 0.01094068655994783
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 46.03172651613019,
+  "snr_vs_source": 21.830807056921408,
+  "delay": 5635,
+  "gain_db": 0.013443493990172395
+ },
+ {
+  "config": "he-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 46.049177615411345,
+  "snr_vs_source": 21.833468386369685,
+  "delay": 4673,
+  "gain_db": 0.010873797481450443
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.546002232984325,
+  "delay": 5635,
+  "gain_db": -0.07278653229131025
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.32526203246678,
+  "snr_vs_source": 4.546002155730459,
+  "delay": 5635,
+  "gain_db": -0.07278674441811199
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 30.681240256218164,
+  "snr_vs_source": 4.5408360364582725,
+  "delay": 4673,
+  "gain_db": -0.0724096289869903
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 24.901028820911357,
+  "snr_vs_source": 4.522723035331092,
+  "delay": 5635,
+  "gain_db": -0.06759093246874924
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 122.8200627498122,
+  "snr_vs_source": 4.546003534207378,
+  "delay": 4673,
+  "gain_db": -0.07278670061331255
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.93201944468332,
+  "delay": 5635,
+  "gain_db": 0.043718339092729125
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.49352376566993,
+  "snr_vs_source": 7.932019212326331,
+  "delay": 5635,
+  "gain_db": 0.043717988707692584
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 62.42940405868899,
+  "snr_vs_source": 7.932153009867118,
+  "delay": 4673,
+  "gain_db": 0.04391036191622282
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 62.003283061924925,
+  "snr_vs_source": 7.93238023890256,
+  "delay": 5635,
+  "gain_db": 0.04507716610333071
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 123.39717754327523,
+  "snr_vs_source": 7.932020104275496,
+  "delay": 4673,
+  "gain_db": 0.04371858793221556
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.961620090816238,
+  "delay": 5635,
+  "gain_db": -0.03581804851778201
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.53956667921757,
+  "snr_vs_source": 4.961619893339888,
+  "delay": 5635,
+  "gain_db": -0.03581834698785519
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 63.450540945657735,
+  "snr_vs_source": 4.961953831985043,
+  "delay": 4673,
+  "gain_db": -0.03576785158352295
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.08297376428537,
+  "snr_vs_source": 4.962133872247777,
+  "delay": 5635,
+  "gain_db": -0.03456388751743884
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 123.62109174638451,
+  "snr_vs_source": 4.961622595266336,
+  "delay": 4673,
+  "gain_db": -0.0358180838343619
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.416458593687743,
+  "delay": 5635,
+  "gain_db": -0.059981910135041526
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.08639630203393,
+  "snr_vs_source": 8.416458631987727,
+  "delay": 5635,
+  "gain_db": -0.05998237425919896
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 66.64904820831593,
+  "snr_vs_source": 8.416517996480916,
+  "delay": 4673,
+  "gain_db": -0.05991937650621311
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.57382300641959,
+  "snr_vs_source": 8.417099918849146,
+  "delay": 5635,
+  "gain_db": -0.05768264861684796
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 81.33093272485418,
+  "snr_vs_source": 8.416457034825758,
+  "delay": 4673,
+  "gain_db": -0.059981274331646836
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 1.5962070587248223,
+  "delay": 5635,
+  "gain_db": -1.1605322942682783
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 71.92681088012053,
+  "snr_vs_source": 1.5961916319803506,
+  "delay": 5635,
+  "gain_db": -1.1605325621633604
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 56.89584260712592,
+  "snr_vs_source": 1.59636008310018,
+  "delay": 4673,
+  "gain_db": -1.16018218362113
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 45.182078939171156,
+  "snr_vs_source": 1.597417550230368,
+  "delay": 5635,
+  "gain_db": -1.1552194539394467
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 66.22294248156626,
+  "snr_vs_source": 1.5962221562457468,
+  "delay": 4673,
+  "gain_db": -1.1605320732833708
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.1965395471246447,
+  "delay": 5635,
+  "gain_db": 0.38029049543057014
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.50106745277256,
+  "snr_vs_source": 2.196539398799379,
+  "delay": 5635,
+  "gain_db": 0.38028981614184154
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 54.457085871049586,
+  "snr_vs_source": 2.1966870342980287,
+  "delay": 4673,
+  "gain_db": 0.38055763681839466
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 53.56970913320389,
+  "snr_vs_source": 2.1986221572105924,
+  "delay": 5635,
+  "gain_db": 0.38509562088270494
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 59.51100843911364,
+  "snr_vs_source": 2.196565991627303,
+  "delay": 4673,
+  "gain_db": 0.38029009856744056
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.023465064591656,
+  "delay": 5635,
+  "gain_db": -0.14451732625908392
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 94.19084120535908,
+  "snr_vs_source": 4.023465256326474,
+  "delay": 5635,
+  "gain_db": -0.144517489264255
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 37.336934510849346,
+  "snr_vs_source": 4.0224273987670305,
+  "delay": 4673,
+  "gain_db": -0.14442024290972943
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 37.39063020139165,
+  "snr_vs_source": 4.023150880764646,
+  "delay": 5635,
+  "gain_db": -0.14122849423762993
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 55.333879740037744,
+  "snr_vs_source": 4.023711071139296,
+  "delay": 4673,
+  "gain_db": -0.14451734757081858
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.689211846882875,
+  "delay": 5635,
+  "gain_db": -0.04395043219866006
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.23508814013144,
+  "snr_vs_source": 7.68921182772916,
+  "delay": 5635,
+  "gain_db": -0.04395116436180659
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.05754510057058,
+  "snr_vs_source": 7.689325900770925,
+  "delay": 4673,
+  "gain_db": -0.0438756013152153
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 62.70722244876616,
+  "snr_vs_source": 7.690410552959525,
+  "delay": 5635,
+  "gain_db": -0.04078576821045675
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 88.50629624419847,
+  "snr_vs_source": 7.689212918570044,
+  "delay": 4673,
+  "gain_db": -0.043951037216023475
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.235923798809116,
+  "delay": 5635,
+  "gain_db": -0.025341443316606677
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 112.67452380446004,
+  "snr_vs_source": 7.235923533955453,
+  "delay": 5635,
+  "gain_db": -0.02534185929576057
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 57.9114756326075,
+  "snr_vs_source": 7.235938519776431,
+  "delay": 4673,
+  "gain_db": -0.02515466092223151
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 57.47994581587143,
+  "snr_vs_source": 7.236667473844429,
+  "delay": 5635,
+  "gain_db": -0.023459422980416186
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 107.31723817922501,
+  "snr_vs_source": 7.2359260528655875,
+  "delay": 4673,
+  "gain_db": -0.02534113820011639
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.970444218852584,
+  "delay": 5635,
+  "gain_db": -0.030620053782270496
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.93837530123432,
+  "snr_vs_source": 4.970444210637024,
+  "delay": 5635,
+  "gain_db": -0.030620227261010706
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 71.18292758958351,
+  "snr_vs_source": 4.970515086584191,
+  "delay": 4673,
+  "gain_db": -0.030538590778552942
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.36294745081173,
+  "snr_vs_source": 4.971350818627644,
+  "delay": 5635,
+  "gain_db": -0.027878744060505275
+ },
+ {
+  "config": "hev2-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 122.79177647369661,
+  "snr_vs_source": 4.970444964164516,
+  "delay": 4673,
+  "gain_db": -0.03062016699715064
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.902323605004527,
+  "delay": 5635,
+  "gain_db": -0.03517046888218295
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 129.78882578048453,
+  "snr_vs_source": 4.902323481692809,
+  "delay": 5635,
+  "gain_db": -0.03517068458893864
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 17.076907123377044,
+  "snr_vs_source": 4.903288702374421,
+  "delay": 4673,
+  "gain_db": -0.03513881107845818
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 16.679809100009784,
+  "snr_vs_source": 4.887056067464771,
+  "delay": 5635,
+  "gain_db": -0.029880220480850546
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 17.265927731484474,
+  "snr_vs_source": 4.908592513132336,
+  "delay": 4673,
+  "gain_db": -0.03516963564904603
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.747208176658878,
+  "delay": 5635,
+  "gain_db": 0.014322970732126737
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 130.33675134522096,
+  "snr_vs_source": 8.747208149447335,
+  "delay": 5635,
+  "gain_db": 0.014322767304761444
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 40.226340538930586,
+  "snr_vs_source": 8.747302524687381,
+  "delay": 4673,
+  "gain_db": 0.014535471546968264
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 40.224391031463036,
+  "snr_vs_source": 8.747553917958335,
+  "delay": 5635,
+  "gain_db": 0.01565976610468381
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 40.25268728146899,
+  "snr_vs_source": 8.74716770080329,
+  "delay": 4673,
+  "gain_db": 0.014323203560872796
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.0468030611730335,
+  "delay": 5635,
+  "gain_db": -0.004162746158005221
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.81078217455092,
+  "snr_vs_source": 5.046802854209687,
+  "delay": 5635,
+  "gain_db": -0.004162982474189819
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 48.59530812916951,
+  "snr_vs_source": 5.047159810091262,
+  "delay": 4673,
+  "gain_db": -0.004115798377435784
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 48.58060941020977,
+  "snr_vs_source": 5.047305923786832,
+  "delay": 5635,
+  "gain_db": -0.0029440937677181448
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 48.73749892600671,
+  "snr_vs_source": 5.046808929894691,
+  "delay": 4673,
+  "gain_db": -0.004162806098079061
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.704044014195164,
+  "delay": 5635,
+  "gain_db": -0.050098672340229376
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.37882819772383,
+  "snr_vs_source": 8.704043962234152,
+  "delay": 5635,
+  "gain_db": -0.05009878422478943
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 29.005021764961928,
+  "snr_vs_source": 8.707021623717372,
+  "delay": 4673,
+  "gain_db": -0.050038987390014576
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 29.005336281167168,
+  "snr_vs_source": 8.707682221890861,
+  "delay": 5635,
+  "gain_db": -0.0478043869056685
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 29.005854276756644,
+  "snr_vs_source": 8.706949641681359,
+  "delay": 4673,
+  "gain_db": -0.05009798600844868
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.5880924516848554,
+  "delay": 5635,
+  "gain_db": -1.1023325606506194
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 83.07801277474333,
+  "snr_vs_source": 2.588093177067174,
+  "delay": 5635,
+  "gain_db": -1.1023328661937797
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 23.093496949730408,
+  "snr_vs_source": 2.587389348282583,
+  "delay": 4673,
+  "gain_db": -1.1019955944801247
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 23.092381050174836,
+  "snr_vs_source": 2.5881071831560836,
+  "delay": 5635,
+  "gain_db": -1.0970687549097733
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 23.094318980462717,
+  "snr_vs_source": 2.5873460083926103,
+  "delay": 4673,
+  "gain_db": -1.102332201933501
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.0274791773719345,
+  "delay": 5635,
+  "gain_db": 0.6297200050971291
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 130.35945072553295,
+  "snr_vs_source": 2.0274791619439507,
+  "delay": 5635,
+  "gain_db": 0.6297197048501229
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 18.412447924983883,
+  "snr_vs_source": 2.026182951291843,
+  "delay": 4673,
+  "gain_db": 0.630031642165867
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 18.41945819967768,
+  "snr_vs_source": 2.0280690648851123,
+  "delay": 5635,
+  "gain_db": 0.6338588104175558
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 18.41315437012019,
+  "snr_vs_source": 2.026025166455965,
+  "delay": 4673,
+  "gain_db": 0.6297208140495775
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.205200562998317,
+  "delay": 5635,
+  "gain_db": -0.11825388588707844
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 91.3042293309239,
+  "snr_vs_source": 4.205199377128554,
+  "delay": 5635,
+  "gain_db": -0.11825409881746761
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 28.93690422287607,
+  "snr_vs_source": 4.203085923416252,
+  "delay": 4673,
+  "gain_db": -0.11814288176442893
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 28.944364769654808,
+  "snr_vs_source": 4.203706201371233,
+  "delay": 5635,
+  "gain_db": -0.11498793936815001
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 29.673156564052153,
+  "snr_vs_source": 4.204280426276976,
+  "delay": 4673,
+  "gain_db": -0.11825382611544298
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.354394225684459,
+  "delay": 5635,
+  "gain_db": 0.0024686224063699847
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 131.7657731351034,
+  "snr_vs_source": 8.354394179922856,
+  "delay": 5635,
+  "gain_db": 0.002468443076543858
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 21.650744929862434,
+  "snr_vs_source": 8.354595327470646,
+  "delay": 4673,
+  "gain_db": 0.002561607999451966
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.65223676253153,
+  "snr_vs_source": 8.35573184208617,
+  "delay": 5635,
+  "gain_db": 0.0055884288148165
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 21.650736434091293,
+  "snr_vs_source": 8.354478738814079,
+  "delay": 4673,
+  "gain_db": 0.0024678192150154182
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.75746001368506,
+  "delay": 5635,
+  "gain_db": -0.038936403567723946
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 118.18901172449053,
+  "snr_vs_source": 7.757459856723543,
+  "delay": 5635,
+  "gain_db": -0.03893679769614591
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 29.91104483366982,
+  "snr_vs_source": 7.756957019250615,
+  "delay": 4673,
+  "gain_db": -0.03872186268590588
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 29.911418294445635,
+  "snr_vs_source": 7.757752463777457,
+  "delay": 5635,
+  "gain_db": -0.03707180900807528
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 29.917026911505573,
+  "snr_vs_source": 7.756950671961053,
+  "delay": 4673,
+  "gain_db": -0.03893631140978695
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.178575794044356,
+  "delay": 5635,
+  "gain_db": -0.015468490578630941
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 130.96193419295392,
+  "snr_vs_source": 5.178575670047058,
+  "delay": 5635,
+  "gain_db": -0.015468713259165379
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 41.24516762231296,
+  "snr_vs_source": 5.178396784823337,
+  "delay": 4673,
+  "gain_db": -0.015381632654943292
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 41.229031737355335,
+  "snr_vs_source": 5.179243482767669,
+  "delay": 5635,
+  "gain_db": -0.012759213753781933
+ },
+ {
+  "config": "hev2-ours-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "apple",
+  "ok": true,
+  "snr_vs_ours": 41.249869848864705,
+  "snr_vs_source": 5.178326726311076,
+  "delay": 4673,
+  "gain_db": -0.01546866551329074
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.816173617466586,
+  "delay": 7105,
+  "gain_db": 0.03021711881081685
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.37635584309203,
+  "snr_vs_source": 4.816173511823854,
+  "delay": 7105,
+  "gain_db": 0.030216864167584116
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 23.94293027384725,
+  "snr_vs_source": 4.785493509361655,
+  "delay": 7105,
+  "gain_db": 0.03798130542196128
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.7736357211756175,
+  "delay": 7106,
+  "gain_db": -0.03907470912278059
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.05285567314397,
+  "snr_vs_source": 7.773635678271859,
+  "delay": 7106,
+  "gain_db": -0.03907495681859553
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 63.57739673255226,
+  "snr_vs_source": 7.774060864013716,
+  "delay": 7106,
+  "gain_db": -0.03782046726431949
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.966607197057512,
+  "delay": 7106,
+  "gain_db": 0.03473903752318173
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.50180523326193,
+  "snr_vs_source": 4.96660707962395,
+  "delay": 7106,
+  "gain_db": 0.034738770940550986
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 72.01679374123923,
+  "snr_vs_source": 4.9671136144055845,
+  "delay": 7106,
+  "gain_db": 0.035969072054475665
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.607109741608426,
+  "delay": 7106,
+  "gain_db": -0.012437949010339568
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.93251979770167,
+  "snr_vs_source": 8.607109715454802,
+  "delay": 7106,
+  "gain_db": -0.012438181660207744
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.12986625017369,
+  "snr_vs_source": 8.607760534993968,
+  "delay": 7106,
+  "gain_db": -0.010146803740363808
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.2309724302365295,
+  "delay": 7105,
+  "gain_db": -1.2137096187560135
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 98.42844074909534,
+  "snr_vs_source": 2.230972028772731,
+  "delay": 7105,
+  "gain_db": -1.213709908816325
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.541613898565686,
+  "snr_vs_source": 2.231858376564587,
+  "delay": 7105,
+  "gain_db": -1.2084431484887184
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.4045134475618086,
+  "delay": 7105,
+  "gain_db": 0.25835662667264514
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.83517510529325,
+  "snr_vs_source": 2.4045134054753374,
+  "delay": 7105,
+  "gain_db": 0.25835561833298737
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 55.094331583343205,
+  "snr_vs_source": 2.406636892831227,
+  "delay": 7105,
+  "gain_db": 0.26227697299998587
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.128584648626567,
+  "delay": 7105,
+  "gain_db": -0.06422827969582492
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 123.02796706297558,
+  "snr_vs_source": 4.128584567752538,
+  "delay": 7105,
+  "gain_db": -0.06422838689379025
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 39.88569953626922,
+  "snr_vs_source": 4.128847729622357,
+  "delay": 7105,
+  "gain_db": -0.06091061395095548
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.50847273258642,
+  "delay": 7105,
+  "gain_db": 0.006687392173361671
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.96275369449675,
+  "snr_vs_source": 8.508472620048257,
+  "delay": 7105,
+  "gain_db": 0.006687011495624238
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.019536673306305,
+  "snr_vs_source": 8.509641764936637,
+  "delay": 7105,
+  "gain_db": 0.009789948165036269
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.4628486627246176,
+  "delay": 7105,
+  "gain_db": -0.009531373007521967
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 124.88933513722189,
+  "snr_vs_source": 7.462848622579105,
+  "delay": 7105,
+  "gain_db": -0.009531485970183915
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 46.2873514037219,
+  "snr_vs_source": 7.463113083951032,
+  "delay": 7105,
+  "gain_db": -0.007665180319993587
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.0050803832103075,
+  "delay": 7105,
+  "gain_db": 0.09490408039056035
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.28779465663638,
+  "snr_vs_source": 5.005080296925843,
+  "delay": 7105,
+  "gain_db": 0.09490396021850431
+ },
+ {
+  "config": "hev2-fdk-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 51.3618087443989,
+  "snr_vs_source": 5.005926618254474,
+  "delay": 7105,
+  "gain_db": 0.09763561217019695
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.888160062508541,
+  "delay": 5122,
+  "gain_db": 0.029759001143508317
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.16901807767435,
+  "snr_vs_source": 4.8881599207449735,
+  "delay": 5122,
+  "gain_db": 0.029758768631201242
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.894334279665575,
+  "snr_vs_source": 4.832961873591096,
+  "delay": 5122,
+  "gain_db": 0.03943255192446631
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.921855821748976,
+  "delay": 5122,
+  "gain_db": 0.048900615768954214
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.08550631888787,
+  "snr_vs_source": 7.921855667332311,
+  "delay": 5122,
+  "gain_db": 0.04890061760337906
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 58.03378292269393,
+  "snr_vs_source": 7.922253554198169,
+  "delay": 5122,
+  "gain_db": 0.0501508436003283
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.982344397562243,
+  "delay": 5122,
+  "gain_db": 0.05825920674880463
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.0032143224051,
+  "snr_vs_source": 4.982344303652551,
+  "delay": 5122,
+  "gain_db": 0.058258940685531405
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 54.70592614040858,
+  "snr_vs_source": 4.982838142930295,
+  "delay": 5122,
+  "gain_db": 0.059501450237545564
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.747506791231894,
+  "delay": 5122,
+  "gain_db": 0.02164725261953953
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 128.3248228307575,
+  "snr_vs_source": 8.747506746469195,
+  "delay": 5122,
+  "gain_db": 0.02164705315512574
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 47.22213475808012,
+  "snr_vs_source": 8.747617073446685,
+  "delay": 5122,
+  "gain_db": 0.023926222781776273
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.328713085714328,
+  "delay": 5122,
+  "gain_db": -0.7545850787290744
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.67081960460169,
+  "snr_vs_source": 2.3287127118021713,
+  "delay": 5122,
+  "gain_db": -0.7545853106403497
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.932229068898614,
+  "snr_vs_source": 2.329965443435274,
+  "delay": 5122,
+  "gain_db": -0.7494309796000531
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.0732010441564586,
+  "delay": 5122,
+  "gain_db": 0.428321691266672
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.44202205490174,
+  "snr_vs_source": 2.073200914161971,
+  "delay": 5122,
+  "gain_db": 0.4283210292966943
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 52.42851093186737,
+  "snr_vs_source": 2.0753647425869435,
+  "delay": 5122,
+  "gain_db": 0.4326542300934998
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.0928511465152875,
+  "delay": 5122,
+  "gain_db": 0.021719478090136017
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.55810273715896,
+  "snr_vs_source": 4.092851170877781,
+  "delay": 5122,
+  "gain_db": 0.021719436871649074
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 33.075956297063705,
+  "snr_vs_source": 4.0902734702072765,
+  "delay": 5122,
+  "gain_db": 0.02498014468008218
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.473818623201456,
+  "delay": 5122,
+  "gain_db": 0.02728146751410529
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 127.82902233053304,
+  "snr_vs_source": 8.473818487744051,
+  "delay": 5122,
+  "gain_db": 0.027281539765569917
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 44.883458291708216,
+  "snr_vs_source": 8.474254308220031,
+  "delay": 5122,
+  "gain_db": 0.030351234282592163
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.301081603478064,
+  "delay": 5122,
+  "gain_db": 0.06900026844190657
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 125.59004207512578,
+  "snr_vs_source": 7.301081431832501,
+  "delay": 5122,
+  "gain_db": 0.06899995022638435
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 44.55739894517457,
+  "snr_vs_source": 7.3011823605286255,
+  "delay": 5122,
+  "gain_db": 0.07085540595175269
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.918785346962396,
+  "delay": 5122,
+  "gain_db": 0.11236821450207707
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "ffmpeg",
+  "ok": true,
+  "snr_vs_ours": 126.48429145915743,
+  "snr_vs_source": 4.918785228556591,
+  "delay": 5122,
+  "gain_db": 0.1123680187288415
+ },
+ {
+  "config": "hev2-libxaac-cbr32",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 36.95092987646747,
+  "snr_vs_source": 4.919329269806537,
+  "delay": 5122,
+  "gain_db": 0.11514334916710786
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.270028715204344,
+  "delay": 5635,
+  "gain_db": -1.5104467624367057
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 42.49012304877161,
+  "snr_vs_source": 5.275189244757578,
+  "delay": 5635,
+  "gain_db": -1.5075422841728847
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 18.15604674029053,
+  "snr_vs_source": 5.145687013770411,
+  "delay": 5635,
+  "gain_db": -1.4769038923063937
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 14.783473508170937,
+  "delay": 5635,
+  "gain_db": -0.15930759020775845
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 78.35345293441854,
+  "snr_vs_source": 14.783618876206475,
+  "delay": 5635,
+  "gain_db": -0.15909945009672036
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 50.47543647748452,
+  "snr_vs_source": 14.784451336651516,
+  "delay": 5635,
+  "gain_db": -0.15806166281700362
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.67283943261167,
+  "delay": 5635,
+  "gain_db": -1.3802474108640703
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 80.17675523444609,
+  "snr_vs_source": 7.672843053129292,
+  "delay": 5635,
+  "gain_db": -1.380248538246349
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 58.355132358225575,
+  "snr_vs_source": 7.673881129297503,
+  "delay": 5635,
+  "gain_db": -1.3792137529066564
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.312316750549098,
+  "delay": 5635,
+  "gain_db": -1.029957966880982
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 72.36852876453884,
+  "snr_vs_source": 8.312266641298912,
+  "delay": 5635,
+  "gain_db": -1.030041638459092
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 32.89031298964392,
+  "snr_vs_source": 8.315983689104455,
+  "delay": 5635,
+  "gain_db": -1.02802234371607
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 1.567864061014689,
+  "delay": 5635,
+  "gain_db": -0.8079322239613203
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 60.630022173416734,
+  "snr_vs_source": 1.567904138355518,
+  "delay": 5635,
+  "gain_db": -0.8076839597163249
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 22.921349022289668,
+  "snr_vs_source": 1.574898507547572,
+  "delay": 5635,
+  "gain_db": -0.8027946720518984
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": -0.5198732777290931,
+  "delay": 5634,
+  "gain_db": -3.2353201058815166
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 56.10884525333834,
+  "snr_vs_source": -0.5197251138150479,
+  "delay": 5634,
+  "gain_db": -3.235056538106127
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 24.656298061389734,
+  "snr_vs_source": -0.517839641653033,
+  "delay": 5634,
+  "gain_db": -3.2299262387975918
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.536785160109267,
+  "delay": 5635,
+  "gain_db": -0.3049431368225598
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 61.505326789799035,
+  "snr_vs_source": 7.537191241691703,
+  "delay": 5635,
+  "gain_db": -0.3048465689392588
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 31.227425052630913,
+  "snr_vs_source": 7.538889413687754,
+  "delay": 5635,
+  "gain_db": -0.3019235749243287
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.335075674928278,
+  "delay": 5635,
+  "gain_db": -1.7071607253741932
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 71.19935521264308,
+  "snr_vs_source": 5.335104064157746,
+  "delay": 5635,
+  "gain_db": -1.7071997260089868
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 26.678513304939763,
+  "snr_vs_source": 5.340524192635568,
+  "delay": 5635,
+  "gain_db": -1.7044709704058782
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 9.228949027453691,
+  "delay": 5635,
+  "gain_db": -0.7732541404691018
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 74.64800027626589,
+  "snr_vs_source": 9.229117218879972,
+  "delay": 5635,
+  "gain_db": -0.7730757839615556
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 36.792549629517126,
+  "snr_vs_source": 9.2305322337191,
+  "delay": 5635,
+  "gain_db": -0.7715978525737408
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.210422713593412,
+  "delay": 5635,
+  "gain_db": -1.890574730696476
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 73.21932591497072,
+  "snr_vs_source": 6.210631035534297,
+  "delay": 5635,
+  "gain_db": -1.8904224899085322
+ },
+ {
+  "config": "xhe-ours-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 48.40532689092207,
+  "snr_vs_source": 6.212753483557824,
+  "delay": 5635,
+  "gain_db": -1.8884696624634922
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.402541180532351,
+  "delay": 1,
+  "gain_db": -0.24470263661841893
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 17.03265283888007,
+  "snr_vs_source": 4.5424899921030875,
+  "delay": 1,
+  "gain_db": -0.19543503136546675
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.527310139199393,
+  "delay": 0,
+  "gain_db": 0.17879205202664172
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 31.614685963908368,
+  "snr_vs_source": 7.539496703439481,
+  "delay": 0,
+  "gain_db": 0.17970010756335267
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.733203415142633,
+  "delay": -1,
+  "gain_db": 0.04723123327176662
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 26.516659819690407,
+  "snr_vs_source": 8.706495751205685,
+  "delay": -1,
+  "gain_db": 0.05945453083979018
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.316624864879786,
+  "delay": 1,
+  "gain_db": -0.0979915609375604
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 22.502999034039362,
+  "snr_vs_source": 10.48123573577696,
+  "delay": 1,
+  "gain_db": -0.07478561154787308
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 1.6590722622748288,
+  "delay": 1,
+  "gain_db": -1.4625283841219718
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 33.86832767350284,
+  "snr_vs_source": 1.6630929524425309,
+  "delay": 1,
+  "gain_db": -1.4494625849724851
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 2.1929364510421543,
+  "delay": 1,
+  "gain_db": 0.25159868370367144
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 19.449481980690372,
+  "snr_vs_source": 2.2281185606900547,
+  "delay": 1,
+  "gain_db": 0.22455789103778906
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.372130995186196,
+  "delay": 1,
+  "gain_db": -0.2031910968882557
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 20.184626790832034,
+  "snr_vs_source": 5.388643447080033,
+  "delay": 1,
+  "gain_db": -0.19181811688790185
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.438482847855569,
+  "delay": 1,
+  "gain_db": -0.12055265804757416
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.872742445940197,
+  "snr_vs_source": 7.459609729851727,
+  "delay": 1,
+  "gain_db": -0.11367361693962116
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 7.763794386329014,
+  "delay": 1,
+  "gain_db": -0.09733632287275387
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.14190008875189,
+  "snr_vs_source": 7.9028703161040434,
+  "delay": 1,
+  "gain_db": -0.07061404076061892
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 4.8349450504030695,
+  "delay": 1,
+  "gain_db": -0.1694359822922403
+ },
+ {
+  "config": "xhe-fdk-cbr24",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 18.052132946804466,
+  "snr_vs_source": 4.9773638932079045,
+  "delay": 1,
+  "gain_db": -0.14352281979232387
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 13.890352138803818,
+  "delay": 5635,
+  "gain_db": -0.024702326106493748
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 54.02748011688714,
+  "snr_vs_source": 13.892532353214268,
+  "delay": 5635,
+  "gain_db": -0.02431112580898842
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 25.08512152325092,
+  "snr_vs_source": 13.647918305632125,
+  "delay": 5635,
+  "gain_db": -0.016516515446327044
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.881500189826156,
+  "delay": 5635,
+  "gain_db": 0.041567355304860415
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 78.08346695678483,
+  "snr_vs_source": 26.88101508625055,
+  "delay": 5635,
+  "gain_db": 0.04177166583623302
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 72.92139110211804,
+  "snr_vs_source": 26.878735981278716,
+  "delay": 5635,
+  "gain_db": 0.04279534362488713
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.217463298406084,
+  "delay": 5635,
+  "gain_db": -0.0005040702796274279
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 79.28231373213718,
+  "snr_vs_source": 20.217418772147408,
+  "delay": 5635,
+  "gain_db": -0.0005049967994558914
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.04881147270883,
+  "snr_vs_source": 20.21750206998012,
+  "delay": 5635,
+  "gain_db": 0.0006287290528226383
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 16.99480459071249,
+  "delay": 5635,
+  "gain_db": 0.018416139949166358
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 72.90322751013684,
+  "snr_vs_source": 16.994842511009466,
+  "delay": 5635,
+  "gain_db": 0.018337099457009787
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.12273094448086,
+  "snr_vs_source": 16.995243758532563,
+  "delay": 5635,
+  "gain_db": 0.02058984764150553
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.7713810015318545,
+  "delay": 5635,
+  "gain_db": 0.003417386006313407
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 67.54232043898047,
+  "snr_vs_source": 6.771503751343067,
+  "delay": 5635,
+  "gain_db": 0.0037066076255802484
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 62.20624881134354,
+  "snr_vs_source": 6.772404920201769,
+  "delay": 5635,
+  "gain_db": 0.008648996869212291
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 5.983197354679314,
+  "delay": 5635,
+  "gain_db": -0.28821738956354626
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 62.13352662193514,
+  "snr_vs_source": 5.983395978535233,
+  "delay": 5635,
+  "gain_db": -0.2879775570140679
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.692897454485596,
+  "snr_vs_source": 5.985293121070776,
+  "delay": 5635,
+  "gain_db": -0.2848254985659064
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.592615213002672,
+  "delay": 5635,
+  "gain_db": -0.007838288665815355
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 61.72340464842144,
+  "snr_vs_source": 10.59315518489595,
+  "delay": 5635,
+  "gain_db": -0.007750210395741442
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.58702447142545,
+  "snr_vs_source": 10.59360489411006,
+  "delay": 5635,
+  "gain_db": -0.00479009408690369
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 12.795456227478532,
+  "delay": 5635,
+  "gain_db": -0.026431725198705028
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.57351949511508,
+  "snr_vs_source": 12.79552453489299,
+  "delay": 5635,
+  "gain_db": -0.026474112390765768
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.66135675292611,
+  "snr_vs_source": 12.797100114583904,
+  "delay": 5635,
+  "gain_db": -0.023406318638477426
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 20.884296242024185,
+  "delay": 5635,
+  "gain_db": -0.0018177289239367511
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 74.80361291231122,
+  "snr_vs_source": 20.884323050924074,
+  "delay": 5635,
+  "gain_db": -0.0016402985967045145
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 69.15448928081193,
+  "snr_vs_source": 20.884980568512816,
+  "delay": 5635,
+  "gain_db": -8.040494699435102e-05
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 22.620523117898905,
+  "delay": 5635,
+  "gain_db": 0.027638870543757053
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 72.03979041491804,
+  "snr_vs_source": 22.620376286136278,
+  "delay": 5635,
+  "gain_db": 0.027766394051011646
+ },
+ {
+  "config": "xhe-ours-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 66.20556136789425,
+  "snr_vs_source": 22.619227845280918,
+  "delay": 5635,
+  "gain_db": 0.03012806705895415
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.343305364188017,
+  "delay": 0,
+  "gain_db": -0.021548752552210337
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 60.498707795762414,
+  "snr_vs_source": 15.343806317432126,
+  "delay": 0,
+  "gain_db": -0.020876239728724683
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 30.13270865242914,
+  "delay": 0,
+  "gain_db": 0.009575649433859617
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 73.08578242220648,
+  "snr_vs_source": 30.130974115319837,
+  "delay": 0,
+  "gain_db": 0.010746117366652725
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 24.62743331186937,
+  "delay": 0,
+  "gain_db": -0.005131661693227127
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.03109536068355,
+  "snr_vs_source": 24.62815240112952,
+  "delay": 0,
+  "gain_db": -0.0040042739957865045
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 18.928850617007896,
+  "delay": 0,
+  "gain_db": 0.011441179930563945
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 66.60184338474065,
+  "snr_vs_source": 18.929084981157686,
+  "delay": 0,
+  "gain_db": 0.013557786231907988
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.562316741039624,
+  "delay": 0,
+  "gain_db": -0.029214395563943507
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 19.166617299340466,
+  "snr_vs_source": 6.510676127313047,
+  "delay": 0,
+  "gain_db": -0.024007889941564685
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.818481618879371,
+  "delay": 0,
+  "gain_db": -0.10876662901300847
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 21.084855773926826,
+  "snr_vs_source": 6.954742001301034,
+  "delay": 0,
+  "gain_db": -0.0953770436520669
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 10.932644542411404,
+  "delay": 0,
+  "gain_db": -0.0013033726052384808
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 41.45442907540768,
+  "snr_vs_source": 10.933916638956907,
+  "delay": 0,
+  "gain_db": 0.0017474594037232974
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 15.177868451196996,
+  "delay": 0,
+  "gain_db": 0.005719042830805652
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.62499308855553,
+  "snr_vs_source": 15.178904135858671,
+  "delay": 0,
+  "gain_db": 0.008705558144927116
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 21.97985844067498,
+  "delay": 0,
+  "gain_db": 0.004600776920120594
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 69.00843538141817,
+  "snr_vs_source": 21.979990643143474,
+  "delay": 0,
+  "gain_db": 0.006418332393235746
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 22.089004881875773,
+  "delay": 0,
+  "gain_db": -0.0062081915061530215
+ },
+ {
+  "config": "xhe-fdk-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 66.1904684339894,
+  "snr_vs_source": 22.089207243277205,
+  "delay": 0,
+  "gain_db": -0.003700169556036094
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-libxaac-cbr64",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": false,
+  "error": "0 samples decoded"
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "strauss48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 17.087163661719764,
+  "delay": 5635,
+  "gain_db": 0.030808115192746892
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "strauss48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 62.77542086533516,
+  "snr_vs_source": 17.087869939389527,
+  "delay": 5635,
+  "gain_db": 0.030937725620341104
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "strauss48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 31.633491269588564,
+  "snr_vs_source": 16.968475440693254,
+  "delay": 5635,
+  "gain_db": 0.03283396301225116
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "sopr48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 28.98860208273358,
+  "delay": 5635,
+  "gain_db": 0.0402992394625227
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "sopr48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 78.05606311592997,
+  "snr_vs_source": 28.987904575807498,
+  "delay": 5635,
+  "gain_db": 0.04050731511056292
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "sopr48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 72.93635493288357,
+  "snr_vs_source": 28.984257693381956,
+  "delay": 5635,
+  "gain_db": 0.041525052801269495
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "contrabassoon48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 27.841418842787384,
+  "delay": 5635,
+  "gain_db": 0.019460621602431276
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "contrabassoon48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 79.28521330320136,
+  "snr_vs_source": 27.841303612031382,
+  "delay": 5635,
+  "gain_db": 0.019459175813821804
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "contrabassoon48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 74.112042269463,
+  "snr_vs_source": 27.83952033981608,
+  "delay": 5635,
+  "gain_db": 0.020575789672518278
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "guitar48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 19.296540919851783,
+  "delay": 5635,
+  "gain_db": 0.01681556089057626
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "guitar48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 72.89915088062779,
+  "snr_vs_source": 19.296621042732433,
+  "delay": 5635,
+  "gain_db": 0.016737154500873465
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "guitar48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 67.13388371822947,
+  "snr_vs_source": 19.296705416855332,
+  "delay": 5635,
+  "gain_db": 0.018978029864630395
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "glock48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 6.865260448297823,
+  "delay": 5635,
+  "gain_db": 0.0034012746070545444
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "glock48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 67.43085929982709,
+  "snr_vs_source": 6.865408256158077,
+  "delay": 5635,
+  "gain_db": 0.0036829790564905547
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "glock48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 61.758268641100116,
+  "snr_vs_source": 6.8662992679214625,
+  "delay": 5635,
+  "gain_db": 0.008618070611870325
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "castanets48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 8.048797953203854,
+  "delay": 5635,
+  "gain_db": 0.01840554745482012
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "castanets48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 62.00352224769087,
+  "snr_vs_source": 8.049080867347497,
+  "delay": 5635,
+  "gain_db": 0.018652763516843
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "castanets48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 59.263422893971985,
+  "snr_vs_source": 8.04988581317488,
+  "delay": 5635,
+  "gain_db": 0.021755435347074095
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "harpsichord48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 11.066318305901552,
+  "delay": 5635,
+  "gain_db": 0.01794229663418974
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "harpsichord48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 62.278635710649056,
+  "snr_vs_source": 11.06686154995205,
+  "delay": 5635,
+  "gain_db": 0.01803397875422481
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "harpsichord48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.58341026735573,
+  "snr_vs_source": 11.067232244537637,
+  "delay": 5635,
+  "gain_db": 0.020988232902540545
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "steely48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 16.59599821159685,
+  "delay": 5635,
+  "gain_db": 0.02806624502889981
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "steely48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 70.51476352151637,
+  "snr_vs_source": 16.59612101201593,
+  "delay": 5635,
+  "gain_db": 0.028025420959665835
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "steely48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 64.63709040007994,
+  "snr_vs_source": 16.597272506843964,
+  "delay": 5635,
+  "gain_db": 0.031076066943074222
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "ravel48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 25.182903634404873,
+  "delay": 5635,
+  "gain_db": 0.013847364061182874
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "ravel48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 74.80127351951423,
+  "snr_vs_source": 25.18276277066848,
+  "delay": 5635,
+  "gain_db": 0.014025856283281235
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "ravel48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 69.16811267675592,
+  "snr_vs_source": 25.18219124474635,
+  "delay": 5635,
+  "gain_db": 0.015577100649830576
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "moonlight48_stereo",
+  "decoder": "ours",
+  "ok": true,
+  "snr_vs_ours": null,
+  "snr_vs_source": 26.823747562468817,
+  "delay": 5635,
+  "gain_db": 0.029112235360766774
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "moonlight48_stereo",
+  "decoder": "fdk",
+  "ok": true,
+  "snr_vs_ours": 72.03818970868834,
+  "snr_vs_source": 26.823483258090587,
+  "delay": 5635,
+  "gain_db": 0.029240210375088126
+ },
+ {
+  "config": "xhe-ours-cbr96",
+  "item": "moonlight48_stereo",
+  "decoder": "libxaac",
+  "ok": true,
+  "snr_vs_ours": 61.978665314875975,
+  "snr_vs_source": 26.81856826876526,
+  "delay": 5635,
+  "gain_db": 0.031591537895829275
+ }
+]

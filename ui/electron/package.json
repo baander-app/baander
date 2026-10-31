@@ -29,7 +29,7 @@
     "test:smoke": "node tests/runtime-smoke.mjs"
   },
   "dependencies": {
-    "@baander/aac-native": "file:../../packages/codecs/baander-aac",
+    "@baander/aac-native": "file:../../packages/baander-aac",
     "@napi-rs/keyring": "^1.3.0"
   },
   "devDependencies": {

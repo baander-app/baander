@@ -1,0 +1,17 @@
+# Build artifacts (build/ is node-gyp's, cmake-build*/ CMake's)
+build/
+cmake-build*/
+node_modules/
+package-lock.json
+
+# Object files (from accidental in-tree builds)
+*.o
+*.a
+*.so
+
+# IDE / tool config
+.clang-format
+.idea/
+
+# Prebuilt bindings are release assets fetched by the install script
+prebuilds/*/

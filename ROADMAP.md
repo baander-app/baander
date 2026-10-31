@@ -2475,7 +2475,7 @@ Keep these limits separate from selected work:
   coverage, display-gamut certification or Dolby Vision support. See the
   [testing guide](docs-book/part-2-developer-guide/testing.md) for the measured cases.
 - Native codec acceptance remains conditional on the selected release path.
-  [AAC reference coverage](packages/codecs/baander-aac/docs/README.md) does not
+  [AAC reference coverage](packages/baander-aac/docs/README.md) does not
   exercise the 34-band and phase decoder paths; listening tests and the HE-AAC
   IPC/bridge suites were not run in that checkpoint. The original 5% HE-AAC CBR
   target was not established by the delivered 6% acceptance gate. These limits
@@ -2596,6 +2596,346 @@ verification; the historical contract remains in Git. Evidence remains under
 `var/test-runs/player-status-outage-production-accepted`; the pinned history
 retains failed attempts and acceptance limits. This completed checkpoint does
 not select more outage work.
+
+### AAC codec gap closure against the fdk-aac upstream
+
+Checkpoint, 2026-10-23, transport and robustness: the first tier of the gap
+list against the AOSP fdk-aac upstream, per the
+[plan](docs/plans/2026-10-23-002-feat-aac-codec-transport-robustness-plan.md),
+is delivered in `packages/baander-aac`. Decoder: streaming input with
+ADTS and LOAS resync, ADTS CRC verification, an AudioSpecificConfig reader
+with implicit, backward compatible and hierarchical SBR/PS signalling, LATM
+and LOAS demux, raw access units, error concealment on by default with
+counters, a look-ahead peak limiter, 960-sample frames, channel configuration
+14 and the PCE height extension with the 7.1 modes. Encoder: ADTS with CRC,
+LOAS, LATM, raw access units, 960-sample frames, the four 7.1 layouts and the
+MPEG-2 ADTS variant. The binding decodes through the streaming API and takes
+every new option; the Electron service, IPC validation and bridge types
+follow. Code review found eleven defects, all corrected. Verification: CTest
+14/14 in the release and sanitizer builds, FFmpeg interop over LATM and LOAS
+in both directions (131 to 137 dB), the binding's smoke test (7 tests) and the
+Electron service suite (5 tests). Listening tests and the Electron IPC and
+bridge suites did not run in that environment. Deviations by design are
+recorded in the [codec README](packages/baander-aac/docs/README.md).
+
+Checkpoint, 2026-10-24, low delay and dynamics: the second tier, per the
+[plan](docs/plans/2026-10-23-003-feat-aac-codec-low-delay-and-drc-plan.md),
+is delivered. Decoder: the error resilient object types with virtual
+codebook 11, RVLC and HCR, AAC-LD at 512 and 480, AAC-ELD with downscaled
+playout, LD-SBR as a self-contained module, MPEG-4 dynamic range control
+applied on the spectrum or the QMF bands, and the object type, program
+reference level and DRC presence reported. Encoder: AAC-LD and AAC-ELD over
+every transport, ELD with LD-SBR, DRC metadata from five compression
+profiles, and the afterburner. Performance: table-driven Huffman reading,
+FFT-form QMF banks, SIMD kernels (SSE2, AVX2, NEON) behind a dispatch table
+and a `baac bench` command. Binding, Electron service, IPC validation, bridge
+types and CONCEPTS.md follow. Limits: the LD-SBR windows and frame grid, the
+RVLC escape codebook and the HCR reordering rules were written without the
+standard's tables and round-trip within the codec only; the DRC metadata
+path is not available for the low-delay types. Verification: CTest 28/28 in
+the release and sanitizer builds, FFmpeg decoding the LD, ELD and DRC streams
+at 135 to 137 dB, afterburner gains of 0.6 to 1.0 dB segmental SNR, encode
+1.3 to 2 times and decode 1.1 to 1.9 times faster with byte-identical
+encoder output, the binding's smoke test (10 tests) and the Electron service
+suite (5 tests). A read-only review found fourteen correctness and contract
+findings, all applied. Not run: listening tests, interop for ELD with LD-SBR
+and for the RVLC and HCR tools.
+
+Checkpoint, 2026-10-29, USAC decoder: the third tier's first plan, per the
+[plan](docs/plans/2026-10-24-005-feat-aac-codec-usac-decoder-plan.md), is
+delivered. Decoder: USAC (xHE-AAC, object type 42) over LOAS/LATM and raw
+access units with the UsacConfig, extension elements, pre-roll and
+independent frames; the frequency-domain core with the context arithmetic
+coder, noise filling, TNS, M/S and complex prediction; the linear prediction
+core with ACELP, TCX, forward aliasing cancellation and the LSF and vector
+quantisers; enhanced SBR at 2:1, 8:3 and 4:1 with pre-flattening; MPS 212
+at stereoConfigIndex 1, 2 and 3, with residual coding at 2 and 3; MPEG-D DRC and
+loudness with the selection process; concealment; the streaming API, `baac`
+and the Node binding with the loudness and DRC options. The normative
+tables are ISO/IEC 23003-3 and 23003-1 data transcribed from libxaac
+(Apache-2.0) and verified entry by entry; libxaac is the bit-level oracle,
+FDK the behavioural one through its binaries only, and FFmpeg master is no
+oracle for the 2:1 and 8:3 streams (its output is wrong). Verification
+against the FDK decoder (loudness normalisation off, delay 0 throughout):
+81 to 84 dB on the FD core, 80 dB with 2:1 SBR and residual-coded MPS 212
+and on mono 2:1 SBR, 61 dB on LPD speech at 4:1 and 52 dB at 2:1, 24 and
+26 dB on LPD music at 8:3 and 4:1 where libxaac itself reaches 20 and 27 dB
+(the references disagree by 38 to 50 dB in the SBR bands); parsing
+bit-exact with libxaac on every stream; the DRC normalisation gain exact
+against FDK. CTest 34/34 (`test_usac_config`, `test_usac_fd`,
+`test_usac_lpd`, `test_usac_sbr`, `test_mps212` and `test_unidrc` among
+them) and the binding's smoke test (11 tests). Open: the harmonic
+transposer, PVC and inter-TES are implemented but unverified, since the FDK
+encoder emits none and no stream at hand uses them; stereoConfigIndex 2 is
+verified by construction only; per-platform prebuilt binaries for the
+Electron client are pending. Not run: listening tests and the ISO
+conformance suite. Figures and limits are in the
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
+
+Checkpoint, 2026-10-30, MPEG Surround decoder: the third tier's second
+plan, per the
+[plan](docs/plans/2026-10-29-006-feat-aac-codec-mpeg-surround-decoder-plan.md),
+is delivered. Decoder: MPEG Surround (ISO/IEC 23003-1) 5.1 in AAC-LC
+streams from a mono downmix (trees 5151 and 5152, five OTT boxes) or a
+stereo downmix (tree 525, a TTT box with three OTT boxes), the payload as
+EXT_SAC_DATA fill elements with the in-band header or signalled by an
+object type 30 configuration in a two-layer LATM stream; the baseline
+tools (OTT and TTT boxes with the TTT prediction modes 0 and 1, energy
+modes 4 and 5 and centre-subtraction modes 2 and 3, decorrelators with
+ducking, residual coding, smoothing, STP and GES temporal shaping,
+arbitrary downmix gains, fixed gains and the matrix mode); six channels
+in the canonical order, the existing stereo downmix when two are
+requested; the surround flag (`aac_decoder_has_surround`, `hasSurround`
+in the binding) and the added delay reported (1521 samples for AAC-LC
+plus surround, 256 for ELD v2); AAC-ELD v2 (an ELD 512-frame core with
+the low-delay 2-1-2 payload in the ELD extension) decoding to stereo. The
+normative tables are ISO/IEC 23003-1 data transcribed from libxaac
+(Apache-2.0) with attribution, as the USAC ones. Oracles: no free encoder
+writes MPEG Surround 5.1, so the test tool `mps-enc` (`tools/mps-enc.cpp`,
+a CMake target) writes streams from 5.1 or stereo WAV with the codec's
+own AAC-LC or ELD encoder; libxaac is the reference decoder (its
+parameter mapping equals ours bit for bit; its decodes of the first
+second are committed as `tests/data/mps_*_xaac.wav`); the FDK decoder
+binary pads the AAC-LC core to six channels without running its surround
+decoder, so it is no oracle for 5.1, but it decodes ELD v2. Verification
+against libxaac (delay 0, first second, per channel L R C LFE Ls Rs):
+62 to 72 dB on the 5151 tree, 64 to 72 dB on 5152, 63 to 73 dB on 525 in
+TTT prediction mode 1 and 47 to 66 dB in energy mode 5 on a broadband
+programme; ELD v2 at 77 dB against libxaac and 77 dB against the FDK
+decoder. CTest 37/37 (`test_mps`, `test_mps_signal` and
+`test_mps_stream` added) and the binding's smoke test (12 tests,
+`hasSurround` among them). Open: TTT prediction mode 0 and the
+centre-subtraction modes 2 and 3 are verified by construction only, since
+libxaac's own output breaks there; energy modes whose two level
+differences exceed about 48 dB cannot be matched against libxaac's
+fixed-point weights; the object type 30 form is checked against the
+in-band form only (40 dB or better); SBR input (HE-AAC plus surround) is
+wired but exercised by no stream; LD-SBR with the spatial payload,
+temporal shaping in the low-delay path and ELD frame lengths other than
+512 are not covered; the 7.1 trees, the HRTF and binaural modes and the
+3D mode are refused; per-platform prebuilt binaries for the Electron
+client remain pending. Not run: listening tests, the ISO conformance
+suite and streams from a third-party MPEG Surround encoder, which does
+not exist as free software. Figures and limits are in the
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
+
+Checkpoint, 2026-10-30, xHE-AAC encoder: the third tier's third plan, per
+the
+[plan](docs/plans/2026-10-30-007-feat-aac-codec-xhe-aac-encoder-plan.md),
+is delivered. Encoder: USAC (xHE-AAC, object type 42) in compatible mode
+on the AAC-LC analysis and rate loop: the frequency-domain core with the
+context arithmetic coder (bit-exact against the decoder's), noise filling,
+TNS, per-band M/S, independent frames with the audio pre-roll, the
+UsacConfig with the stream id and loudness info extensions, LOAS/LATM and
+raw access units for MP4, never ADTS; enhanced SBR at 2:1 and MPS 212 at
+stereoConfigIndex 1, opted into by the caller (FFmpeg's USAC decoder rejects every such stream, so never chosen by bitrate); loudness
+measurement per ITU-R BS.1770-4 and EBU Tech 3341/3342 (the K-weighting
+derived per sample rate, the gated integrated loudness, the range, the
+maxima, the 4x oversampled true peak) with the loudnessInfoSet() writer,
+in a two-pass form written into the stream and a one-pass form metered
+inside the encoder; the API (`aac_encoder_set_usac`,
+`aac_encoder_set_loudness_info`, `aac_encoder_set_loudness_measurement`,
+`aac_encoder_loudness`, the meter in `aac.h`), `baac enc ... xhe` with
+`--loudness` and the USAC options and `baac loudness`, the binding's `xhe`
+profile with `usac`, `loudnessInfo`, `measureLoudness` and the exported
+`measureLoudness()`, the Electron service, bridge and IPC validation with
+`measureLoudness` and `encoderLoudness`; per-platform prebuilds of the
+binding through a GitHub Actions workflow, fetched by the package's
+install script and tried by the loader before a local build. Oracles:
+FFmpeg master (the MP4 form; its LATM demuxer refuses the USAC
+configuration), the FDK decoder, libxaac and ours on every stream;
+FFmpeg's `ebur128` and the FDK encoder's own loudness bytes for the meter
+and the writer; the FDK encoder as the behavioural reference for stream
+layout and bitrates. Verification: the two committed FD streams decode in
+all four decoders at 22.7 dB (mono 64 kbit/s) and 20.6 dB (stereo
+96 kbit/s) against the source, FDK and libxaac agreeing with ours at 81 to
+82 dB and FFmpeg at 33 to 37 dB with noise filling (its random signs
+differ) and 136 dB without; raw access units at 44.6, 60.3, 92.9 and
+125.6 kbit/s for 48, 64, 96 and 128 kbit/s; the loudness meter within
+0.05 LU, the range to the figure and the true peak within 0.04 dB of
+`ebur128`; a four-second stereo programme at 96 kbit/s carrying the
+loudness set decodes in all four decoders at 20.8 dB against the source,
+and FFmpeg normalises it by the set (`-target_level -24`) with the same
+-9.0 dB gain as our decoder. SBR at 2:1: the committed mono 32 and
+stereo 64 kbit/s streams decode in all four decoders at 17.5 and
+19.4 dB against the source, FDK and libxaac agreeing with ours at 58 to
+80 dB and FFmpeg at 26 to 27 dB; on a six-second music excerpt the
+ladder gives 11.4 to 17.3 kHz of bandwidth at 16 to 48 kbit/s mono and
+15.6 to 21.6 kHz at 48 to 96 kbit/s stereo, within 1 kbit/s of the
+asked rate. MPS 212: the committed stereo 32 kbit/s stream decodes in
+the FDK decoder and libxaac at 77 and 79 dB against ours and 20.5 dB on
+the channels' sum against the source; FFmpeg rejects every
+stereoConfigIndex 1 stream, the FDK encoder's included, which is why the
+tool is opt-in. CTest 41/41 (`test_loudness`, `test_usac_enc`,
+`test_usac_enc_sbr` and `test_encoder_loudness` among them), the
+sanitizer build with the release flags on the encoder, loudness, SBR,
+transport, round-trip, interop and allocation suites clean, and the
+binding's smoke test (13 tests); the Electron service test (7 tests)
+passes under Node's type stripping with a local build.
+Open: the LPD core, the live loudness leveler and DRC gain sets, the 8:3
+and 4:1 SBR ratios, residual and phase coding in MPS 212 and surround
+input to the USAC encoder are out of scope as planned; the one-pass
+figures cannot enter the stream they were measured from, since a
+configuration cannot change mid-stream; the meter takes up to six
+channels, so 6.1 and 7.1 input has no in-encoder measurement; FFmpeg
+master's LATM path refuses USAC, so its gate runs on the MP4 form; the
+prebuild workflow runs only once pushed. Not run: listening tests and the
+ISO conformance suite. Figures and limits are in the
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
+
+Checkpoint, 2026-10-30, player-grade controls: the third tier's fourth
+plan, per the
+[plan](docs/plans/2026-10-30-008-feat-aac-codec-player-grade-controls-plan.md),
+is delivered. Decoder: `aac_decoder_flush` drains the delayed tail at the
+end of a stream and `aac_decoder_clear_history` prepares a seek, after
+which a random access frame decodes bit for bit as in a fresh decoder
+(checked on ten profiles and the surround streams); the decoder delay is
+documented per configuration; the field tolerance rules (a PCE in any
+element order, a mid-stream ADTS PCE layout change, implicit SBR that
+disappears, an SBR header that cannot be built); MPEG-D DRC gains apply
+to the frame after the access unit that carries them, as in FDK and
+libxaac (the gain curve within 0.015 dB rms of libxaac's and 0.07 dB of
+FDK's, from 0.2 to 0.28 dB before). Encoder: xHE-AAC random access (the
+immediate playout frame interval in frames, milliseconds or samples, a
+maximum distance, a per-segment byte ceiling, independent frames on
+request, per-frame info for a muxer; a cut at any immediate playout
+frame decodes in FDK, libxaac and ours); the StreamMuxConfig only at the
+first frame and the immediate playout frames, which saves 2.5 to
+15 kbit/s and brings the FDK decoder's partial-input failures down to
+its own rate; a peak bitrate cap per frame, a bandwidth override and the
+VBR modes 1 to 5 under their FDK names; MPEG-D DRC gain sets ("general
+compression" and "night", a 6 to 16 LU target range, one- and
+two-pass), applied alike by FDK and libxaac and ignored by FFmpeg, for
+0.5 to 0.7 kbit/s. Robustness: five fuzz harnesses with a seed
+generator, the `BAAC_FUZZ` sanitizer build and `test_fuzz_smoke`; the
+first runs found seven bugs, and the finite-output check, once the
+review had it survive the Release flags, found damaged USAC frames
+turning the output into NaN or infinity in the SBR linear prediction
+(float products overflowing) and the speech core (synthesis filters
+made unstable by rounding to float); all are fixed and their inputs
+replayed on every run. Release builds drop
+`-funsafe-math-optimizations`, whose approximate 1/sqrt encoded
+differently on Intel and AMD runners. Client: the binding and
+the Electron service, IPC validation and bridge take every new call and
+option. The codec package moved to `packages/baander-aac`. A three-part
+review (decoder and client, encoder, tools and fuzz build) found
+sixteen findings; fifteen are fixed, among them a VBR mode refused with
+a peak bitrate in the binding and `baac`, the fuzz harnesses' finite
+check compiled out under the Release flags, the CMake tools not
+building on Windows, and the afterburner spending surplus bits in a VBR
+mode. Figures are in the
+[reference comparison](packages/baander-aac/docs/reference-comparison.md).
+Verification: CTest 46/46 in the Release build and in the Debug build
+under ASan and UBSan, the binding's smoke test (14 tests),
+the Electron AAC service (9 tests), IPC and bridge suites (4 tests)
+under Node's type stripping, CI green on the four prebuild
+platforms. Open: the night set's gain codes stop at -31.875 dB, so a
+programme anchored near -47 LUFS or lower cannot hold -1 dBTP; the FDK
+decoder's front end still loses frames where a chunk boundary lands
+just after a configuration (its own fault, fed frame by frame it
+decodes whole); on corrupt speech frames the stabilised synthesis
+filters keep the output finite, but it can still peak near 1e13. Not
+run: the ten-minute fuzz runs per harness under libFuzzer (no clang
+runtime here), listening tests, the ISO conformance suite.
+
+Checkpoint, 2026-10-30, codec comparison: baander-aac measured against
+FFmpeg's native encoder, FDK AAC, libxaac and Apple's Core Audio AAC
+(qaac under Wine), with ALAC and FLAC as the lossless reference, in
+[codec-comparison.md](packages/baander-aac/docs/codec-comparison.md);
+the harness `packages/baander-aac/bench/` (corpus fetch with checksums,
+reference tool setup, quality, speed, compatibility, lossless and report
+stages) reproduces it and its results are committed. Ten TCDAudio14
+excerpts, 81 configurations, 810 encodes, each scored with GstPEAQ and
+ViSQOL v3 (the ViSQOL build passes its 20 conformance cases). Findings:
+the decoder decodes every encoder's streams, matches FFmpeg and Apple to
+135 dB on AAC-LC and is the fastest measured in three of four families;
+the AAC-LC encoder trails FDK and libxaac by 0.15 to 0.18 PEAQ points at
+80 to 112 kbit/s, almost all of it FDK's afterburner (FDK without it
+scores below ours); encoding runs at 18 times realtime against FDK's
+101; xHE-AAC at 24 to 32 kbit/s trails FDK by 0.4 to 0.6 ViSQOL points;
+Apple's true VBR leads AAC-LC VBR by 0.33 to 0.44 PEAQ points. `baac`
+gained `enc --afterburner` and `dec --no-loudness`. Open, in priority
+order: distortion-measured scalefactor improvement in the rate loop,
+encoder speed, the low-rate xHE-AAC tools (MPS 2-1-2 by bitrate, 4:1
+and 8:3 SBR, LPD), constant-quality VBR, xHE-AAC rate accounting and the
+louder low band of low-rate xHE-AAC decodes, the decoder's loudness
+default. Not run: listening tests, speech, 44.1 kHz, multichannel and
+low-delay comparisons.
+
+Checkpoint, 2026-10-30, encoder tuning against Apple AAC: Apple's Core
+Audio encoder probed by its output streams only (no disassembly), with
+the new `aac-probe` tool, in
+[apple-aac-probe.md](packages/baander-aac/docs/apple-aac-probe.md).
+Delivered for AAC-LC and the HE-AAC core, each measured on the ten-item
+corpus with paired 95 % intervals: sine long windows and a TNS switch-on
+gain of 2 (PEAQ +0.14 and +0.16 at 96 and 128 kbit/s); a rate loop with
+a warm-started false-position reduction search and estimated
+scalefactors (128 kbit/s from 15 to 37 times realtime, PEAQ cost at most
+0.008); sparse 6 dB SNR bands from the lowpass up to 20 kHz at 48 to
+95 kbit/s per channel (96 kbit/s PEAQ +0.21, ViSQOL +0.15 to +0.21 at 96
+to 160 kbit/s). The low-delay and xHE-AAC encoders keep their committed
+streams. The concealment smoke and continuity tests were made
+independent of encoder tuning. CTest 46/46, Node smoke tests 14/14.
+Open: true VBR (Apple leads our CBR by 0.23 PEAQ at an equal 136
+kbit/s, and our quality scale is off), bandwidth at 192 kbit/s and up
+(PEAQ and ViSQOL disagree), encode speed (Apple about 94 times realtime,
+ours about 34). Not run: listening tests, mono.
+
+Checkpoint, 2026-10-31, true VBR and encoder speed: a study of Apple's
+true VBR against our thresholds, on frame-aligned streams, found its
+noise follows sqrt(energy × threshold) and rises with band flatness
+(tonal bands near 24 dB SNR, noisy ones near 9). Five VBR designs built
+on that matched our CBR at best at an equal mean rate. They are
+recorded in [apple-aac-probe.md](packages/baander-aac/docs/apple-aac-probe.md)
+and none landed. Delivered: the rate loop reuses per-band codebook
+bits, scalefactors and quantized values between passes, and sectioning
+runs in linear time per band. Output is byte-identical. AAC-LC 128
+kbit/s goes from 37 to 82 times realtime. The harness's speed stage
+puts it at 1.71 CPU seconds against Apple's 1.61 and FDK's 1.64. CTest
+46/46, Node smoke tests 14/14, clean under ASan and UBSan. Open: true
+VBR needs a perceptual model with tonality; quality scale of the TVBR
+mode.
+
+Checkpoint, 2026-10-31, psychoacoustic model: delivered forward
+masking for AAC-LC and HE-AAC (a band's energy in the previous long
+frame masks noise 30 dB below it), measured on the ten-item corpus
+against the previous commit at +0.011 ± 0.008 PEAQ and +0.008 ± 0.005
+ViSQOL pooled over 64 to 192 kbit/s, no rate worse, HE-AAC 48 kbit/s
++0.006, encode time unchanged. TVBR and CVBR no longer spend leftover
+bits like CBR, so low TVBR qualities fall below the nominal bitrate
+(quality 10 from 131 to 97 kbit/s). Measured and not landed: a tonality
+offset on the thresholds (pooled +0.005 ± 0.013), a true VBR fitted to
+Apple's per-band noise (-0.11 ± 0.26 against CBR at 136 kbit/s), and
+steeper threshold spreading in it (PEAQ level with CBR at 5 to 7 % more
+bits, ViSQOL -0.09). The DRC metadata test now checks the decoded frames
+for the metadata, not the stream size. The low-delay and xHE-AAC
+encoders keep their committed streams. CTest 46/46, Node smoke tests
+14/14, clean under ASan and UBSan. Open: true VBR on sparse tonal items
+(glockenspiel), the TVBR quality scale (quality 50 gives about 230
+kbit/s).
+
+Checkpoint, 2026-10-31, beyond FDK's afterburner and Apple's HE-AAC:
+delivered, each measured on the ten-item corpus with paired 95 %
+intervals against the previous commit: the afterburner keeps its trial
+quantizations (byte-identical, about 85 % more instructions than no
+afterburner instead of 390 %); the scalefactor search checks two to six
+coarser steps above the noise boundary (PEAQ +0.026 to +0.057 at 64 to
+128 kbit/s); the afterburner is on by default for AAC-LC and HE-AAC
+(PEAQ +0.017 to +0.067, `--no-afterburner` turns it off); Apple's
+HE-AAC streams, probed by their output only, led to a higher SBR range
+for stereo at 40 to 56 kbit/s (PEAQ +0.13, +0.36 and +0.28) and a
+two-envelope split of steady SBR frames (pooled +0.012 ± 0.010). The
+codec comparison was rerun for our encoder
+([codec-comparison.md](packages/baander-aac/docs/codec-comparison.md)):
+AAC-LC now scores above FDK, libxaac and Apple at 80 to 160 kbit/s on
+PEAQ (inside the intervals except Apple at 112) and on ViSQOL at 80 and
+112 (intervals exclude zero); HE-AAC v1 leads FDK by 0.15 to 0.17 at 40
+and 56 kbit/s and is level with Apple; the SBR range also lifted
+xHE-AAC at 48 kbit/s by 0.54 PEAQ. CTest 46/46, Node smoke tests 14/14.
+Open: encode speed with the afterburner on (36× realtime against FDK's
+83× and Apple's 79× in the same run), xHE-AAC at 24 to 32 kbit/s,
+Apple's true VBR (0.17 to 0.19 PEAQ ahead at 128 to 160 kbit/s), Apple's
+coupled stereo SBR and additional sinusoids. Not run: listening tests.
 
 ## Roadmap maintenance
 

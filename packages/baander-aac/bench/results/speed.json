@@ -1,0 +1,401 @@
+[
+ {
+  "kind": "baseline",
+  "family": "",
+  "codec": "apple",
+  "config": "wine qaac --check",
+  "seconds": 0,
+  "cpu": 0.08,
+  "wall": 0.55,
+  "rss_kb": 37324
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "ours",
+  "config": "lc-ours-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 127.8614458842527,
+  "cpu": 3.61,
+  "wall": 3.63,
+  "rss_kb": 71384
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "oursbw",
+  "config": "lc-oursbw-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 127.85272870018707,
+  "cpu": 3.25,
+  "wall": 3.26,
+  "rss_kb": 71440
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "oursnoab",
+  "config": "lc-oursnoab-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 127.85659618325845,
+  "cpu": 2.1199999999999997,
+  "wall": 2.17,
+  "rss_kb": 71508
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "ffmpeg",
+  "config": "lc-ffmpeg-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 131.9864542172783,
+  "cpu": 3.6999999999999997,
+  "wall": 3.83,
+  "rss_kb": 52528
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "fdk",
+  "config": "lc-fdk-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 128.05979251605575,
+  "cpu": 1.57,
+  "wall": 1.58,
+  "rss_kb": 3308
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "fdknoab",
+  "config": "lc-fdknoab-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 128.05684586228708,
+  "cpu": 0.65,
+  "wall": 0.68,
+  "rss_kb": 3208
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "libxaac",
+  "config": "lc-libxaac-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 130.6551192114248,
+  "cpu": 0.9,
+  "wall": 0.9,
+  "rss_kb": 59788
+ },
+ {
+  "kind": "encode",
+  "family": "lc",
+  "codec": "apple",
+  "config": "lc-apple-cbr128",
+  "seconds": 130.3173125,
+  "kbps": 130.67654383986778,
+  "cpu": 1.6600000000000001,
+  "wall": 2.14,
+  "rss_kb": 45396
+ },
+ {
+  "kind": "encode",
+  "family": "he",
+  "codec": "ours",
+  "config": "he-ours-cbr48",
+  "seconds": 130.3173125,
+  "kbps": 47.984599129912226,
+  "cpu": 2.56,
+  "wall": 2.57,
+  "rss_kb": 71872
+ },
+ {
+  "kind": "encode",
+  "family": "he",
+  "codec": "oursnoab",
+  "config": "he-oursnoab-cbr48",
+  "seconds": 130.3173125,
+  "kbps": 47.98294163716735,
+  "cpu": 1.81,
+  "wall": 1.84,
+  "rss_kb": 71928
+ },
+ {
+  "kind": "encode",
+  "family": "he",
+  "codec": "fdk",
+  "config": "he-fdk-cbr48",
+  "seconds": 130.3173125,
+  "kbps": 48.061150739277245,
+  "cpu": 1.68,
+  "wall": 1.69,
+  "rss_kb": 3308
+ },
+ {
+  "kind": "encode",
+  "family": "he",
+  "codec": "libxaac",
+  "config": "he-libxaac-cbr48",
+  "seconds": 130.3173125,
+  "kbps": 49.34024402935719,
+  "cpu": 0.88,
+  "wall": 0.9,
+  "rss_kb": 60476
+ },
+ {
+  "kind": "encode",
+  "family": "he",
+  "codec": "apple",
+  "config": "he-apple-cbr48",
+  "seconds": 130.3173125,
+  "kbps": 49.38714493517505,
+  "cpu": 1.5,
+  "wall": 1.98,
+  "rss_kb": 46000
+ },
+ {
+  "kind": "encode",
+  "family": "hev2",
+  "codec": "ours",
+  "config": "hev2-ours-cbr32",
+  "seconds": 130.3173125,
+  "kbps": 31.991819966360953,
+  "cpu": 1.43,
+  "wall": 1.44,
+  "rss_kb": 71880
+ },
+ {
+  "kind": "encode",
+  "family": "hev2",
+  "codec": "fdk",
+  "config": "hev2-fdk-cbr32",
+  "seconds": 130.3173125,
+  "kbps": 32.04995498967184,
+  "cpu": 1.06,
+  "wall": 1.07,
+  "rss_kb": 3308
+ },
+ {
+  "kind": "encode",
+  "family": "hev2",
+  "codec": "libxaac",
+  "config": "hev2-libxaac-cbr32",
+  "seconds": 130.3173125,
+  "kbps": 33.33193354490025,
+  "cpu": 0.5700000000000001,
+  "wall": 0.59,
+  "rss_kb": 60520
+ },
+ {
+  "kind": "encode",
+  "family": "xhe",
+  "codec": "ours",
+  "config": "xhe-ours-cbr64",
+  "seconds": 130.3173125,
+  "kbps": 69.2056629083722,
+  "cpu": 5.329999999999999,
+  "wall": 5.4,
+  "rss_kb": 71992
+ },
+ {
+  "kind": "encode",
+  "family": "xhe",
+  "codec": "fdk",
+  "config": "xhe-fdk-cbr64",
+  "seconds": 130.3173125,
+  "kbps": 71.39656137399241,
+  "cpu": 4.55,
+  "wall": 4.61,
+  "rss_kb": 16896
+ },
+ {
+  "kind": "encode",
+  "family": "xhe",
+  "codec": "libxaac",
+  "config": "xhe-libxaac-cbr64",
+  "seconds": 130.3173125,
+  "kbps": 64.00199513015586,
+  "cpu": 2.21,
+  "wall": 2.22,
+  "rss_kb": 62996
+ },
+ {
+  "kind": "decode",
+  "family": "lc",
+  "codec": "ours",
+  "config": "lc-fdk-cbr128.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.21,
+  "wall": 0.22,
+  "rss_kb": 8692
+ },
+ {
+  "kind": "decode",
+  "family": "lc",
+  "codec": "ffmpeg",
+  "config": "lc-fdk-cbr128.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.5700000000000001,
+  "wall": 0.52,
+  "rss_kb": 53008
+ },
+ {
+  "kind": "decode",
+  "family": "lc",
+  "codec": "fdk",
+  "config": "lc-fdk-cbr128.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.4,
+  "wall": 0.42,
+  "rss_kb": 3192
+ },
+ {
+  "kind": "decode",
+  "family": "lc",
+  "codec": "libxaac",
+  "config": "lc-fdk-cbr128.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.38999999999999996,
+  "wall": 0.4,
+  "rss_kb": 42332
+ },
+ {
+  "kind": "decode",
+  "family": "lc",
+  "codec": "apple",
+  "config": "lc-fdk-cbr128.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.31,
+  "wall": 0.9,
+  "rss_kb": 38920
+ },
+ {
+  "kind": "decode",
+  "family": "he",
+  "codec": "ours",
+  "config": "he-fdk-cbr48.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.42,
+  "wall": 0.48,
+  "rss_kb": 8708
+ },
+ {
+  "kind": "decode",
+  "family": "he",
+  "codec": "ffmpeg",
+  "config": "he-fdk-cbr48.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.42000000000000004,
+  "wall": 0.39,
+  "rss_kb": 53324
+ },
+ {
+  "kind": "decode",
+  "family": "he",
+  "codec": "fdk",
+  "config": "he-fdk-cbr48.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.56,
+  "wall": 0.58,
+  "rss_kb": 3332
+ },
+ {
+  "kind": "decode",
+  "family": "he",
+  "codec": "libxaac",
+  "config": "he-fdk-cbr48.aac",
+  "seconds": 130.3173125,
+  "cpu": 1.08,
+  "wall": 1.13,
+  "rss_kb": 42948
+ },
+ {
+  "kind": "decode",
+  "family": "he",
+  "codec": "apple",
+  "config": "he-fdk-cbr48.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.4,
+  "wall": 1.03,
+  "rss_kb": 38056
+ },
+ {
+  "kind": "decode",
+  "family": "hev2",
+  "codec": "ours",
+  "config": "hev2-fdk-cbr32.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.36,
+  "wall": 0.37,
+  "rss_kb": 8308
+ },
+ {
+  "kind": "decode",
+  "family": "hev2",
+  "codec": "ffmpeg",
+  "config": "hev2-fdk-cbr32.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.48,
+  "wall": 0.45,
+  "rss_kb": 53760
+ },
+ {
+  "kind": "decode",
+  "family": "hev2",
+  "codec": "fdk",
+  "config": "hev2-fdk-cbr32.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.6900000000000001,
+  "wall": 0.69,
+  "rss_kb": 3316
+ },
+ {
+  "kind": "decode",
+  "family": "hev2",
+  "codec": "libxaac",
+  "config": "hev2-fdk-cbr32.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.87,
+  "wall": 0.9,
+  "rss_kb": 42964
+ },
+ {
+  "kind": "decode",
+  "family": "hev2",
+  "codec": "apple",
+  "config": "hev2-fdk-cbr32.aac",
+  "seconds": 130.3173125,
+  "cpu": 0.38,
+  "wall": 0.97,
+  "rss_kb": 37504
+ },
+ {
+  "kind": "decode",
+  "family": "xhe",
+  "codec": "ours",
+  "config": "xhe-fdk-cbr64.loas",
+  "seconds": 130.3173125,
+  "cpu": 0.77,
+  "wall": 0.78,
+  "rss_kb": 10368
+ },
+ {
+  "kind": "decode",
+  "family": "xhe",
+  "codec": "fdk",
+  "config": "xhe-fdk-cbr64.loas",
+  "seconds": 130.3173125,
+  "cpu": 1.01,
+  "wall": 1.04,
+  "rss_kb": 3636
+ },
+ {
+  "kind": "decode",
+  "family": "xhe",
+  "codec": "libxaac",
+  "config": "xhe-fdk-cbr64.loas",
+  "seconds": 130.3173125,
+  "cpu": 1.03,
+  "wall": 1.05,
+  "rss_kb": 43404
+ }
+]

@@ -1,0 +1,43 @@
+{
+  "name": "@baander/aac-native",
+  "version": "0.1.0",
+  "description": "baander-aac: AAC-LC encoder and decoder with a native Node-API binding",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/baander-app/baander.git"
+  },
+  "private": true,
+  "type": "module",
+  "main": "node/index.js",
+  "types": "node/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./node/index.d.ts",
+      "default": "./node/index.js"
+    }
+  },
+  "files": [
+    "node/index.js",
+    "node/index.d.ts",
+    "node/scripts/",
+    "node/src/",
+    "prebuilds/",
+    "binding.gyp",
+    "src/",
+    "include/"
+  ],
+  "scripts": {
+    "install": "node node/scripts/fetch-prebuilds.mjs --install",
+    "prebuild:download": "node node/scripts/fetch-prebuilds.mjs",
+    "test": "node --test node/test/smoke.test.mjs"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.9.2",
+    "node-gyp": "^11.0.0"
+  },
+  "gypfile": true,
+  "engines": {
+    "node": ">=26"
+  }
+}

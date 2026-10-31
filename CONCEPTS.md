@@ -385,5 +385,134 @@ The HE-AAC v2 tool that codes a stereo pair as one SBR channel plus per-band int
 
 ### Codec delay
 
-Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles. The encoder reports it and its flush drains it.
+Samples at the input rate before the first input sample appears in the decoded output of a stream the encoder produced: 2048 for AAC-LC, 5635 for the HE-AAC profiles (1920 and 5379 with 960-sample frames). The encoder reports it and its flush drains it. The decoder's limiter adds its own look-ahead, which the decoder reports separately.
+
+### AAC transport
+
+The framing an AAC stream travels in: ADTS (self-synchronising headers per frame, implicit HE-AAC signalling), LOAS (self-synchronising AudioSyncStream carrying LATM), LATM (an AudioMuxElement with its StreamMuxConfig in band or out of band) or raw access units with an AudioSpecificConfig (the MP4 form). The decoder detects ADTS and LOAS from their sync words; the other forms are told to it.
+*Avoid: container, which is the MP4 or Matroska file around the transport.*
+
+### AudioSpecificConfig
+
+The configuration record of ISO/IEC 14496-3 that names the object type, sample rate, channel layout and frame length of a stream and, with explicit signalling, its SBR and PS extension and output rate. Out-of-band in MP4 and LATM, in band in a StreamMuxConfig.
+
+### Error concealment
+
+What the decoder does with a frame it cannot parse, that fails its CRC or that never arrived: it continues the last good spectrum with a fade and then substitutes noise at its band energies, keeps the SBR envelope and PS parameters decaying, and crossfades into the next good frame. Concealed frames are counted; with concealment off the frame is an error.
+
+### Channel mode
+
+The 7.1 layout of an eight-channel stream, which the channel count alone does not fix: back pair behind the side pair (configuration 12, the default), front centre pair (configuration 7), top front pair (configuration 14) or the rear surround layout signalled by a PCE. The decoder reports the mode of the stream's layout; other channel counts have one layout each.
+
+### Peak limiter
+
+A look-ahead gain stage on the decoder's output that keeps every sample within full scale after a downmix or loud content, at the cost of its attack window as delay. Off by default.
+
+### Low-delay profile
+
+AAC-LD and AAC-ELD, the object types for conversation and live links: frames of 512 or 480 samples instead of 1024, a single long window without block switching, and for AAC-ELD a low-overlap filterbank whose window spans four frames with most of its weight at the front, so the codec delay drops to a few tens of milliseconds. The native binding and the Electron service name them `ld` and `eld`. ADTS cannot carry them; LOAS is their default transport.
+
+### LD-SBR
+
+Spectral band replication for AAC-ELD, run through a low-delay filterbank and a frame grid of the short frame; its header travels in the AudioSpecificConfig rather than in the stream. With dual rate the core runs at half the input rate as in HE-AAC; without it the core and the SBR share one rate.
+*Avoid: HE-AAC ELD, which no standard names.*
+
+### Error resilience tools
+
+The optional tools of the error-resilient AAC syntax (object types 17, 23 and 39): virtual codebooks that bound the values a damaged section can take, reversible variable length coding of the scalefactors readable from both ends, and reordering of the spectral codewords so that a bit error damages few of them. The AudioSpecificConfig says which of the three a stream uses; the decoder reads them all, the encoder writes none.
+
+### Afterburner
+
+A second quantisation pass in the encoder that re-searches the scalefactors and codebooks of a frame against its bit budget, trading CPU for quality at low bitrates. Off by default and switchable at any time.
+
+### Dynamic range control
+
+MPEG-4 DRC: per-band gains and a program reference level the encoder writes into fill elements as metadata, which a decoder applies on request, scaled by the listener's boost and cut shares and optionally normalised to a target loudness. The DVB variant adds a heavy compression gain in the ancillary data. The encoder derives the gains from one of five named compression profiles; the decoder applies nothing unless asked.
+*Avoid: MPEG-D DRC, the separate loudness and DRC standard of USAC streams.*
+
+### USAC
+
+Unified Speech and Audio Coding, ISO/IEC 23003-3, object type 42, as the xHE-AAC profile constrains it: the AAC object type whose frames carry no element ids (the configuration fixes the element list) and whose core channels switch per frame between a frequency-domain core with an arithmetic coder and a linear prediction core of ACELP and TCX frames, followed by enhanced SBR, MPS 212 and MPEG-D DRC. The decoder reads it from LOAS/LATM or raw access units; ADTS cannot carry it. The native binding and the Electron service name a decoded stream `usac` and the encoder's profile `xhe`; the codec decodes every USAC core and writes the frequency-domain one (the xHE-AAC encoder).
+*Avoid: xHE-AAC as a separate codec; it is the profile of USAC the codec targets.*
+
+### Enhanced SBR
+
+Spectral band replication as USAC carries it: the header travels in the configuration, the core runs at 2:1, 8:3 (a 768-line core) or 4:1 of the output rate, the patch source bands are flattened before patching, and the standard adds a harmonic transposer, predictive vector coding of the envelopes and inter-TES. The decoder implements the three additions but no stream at hand uses them.
+*Avoid: eSBR, which names the same tool.*
+
+### MPS 212
+
+The MPEG Surround one-to-two tool of a USAC channel pair: one core channel plus per-band level, correlation and phase parameters, optionally a residual signal, from which the decoder widens the pair in the QMF domain. The order in which it runs against the SBR is named by the stereoConfigIndex.
+*Avoid: MPEG Surround alone, which also names the 5.1 trees; the 2-1-2 tool is one OTT box.*
+
+### stereoConfigIndex
+
+The configuration value of a USAC channel pair that orders its stereo tools: 0 no MPS 212; 1 SBR on the single core channel, then MPS 212 from the parameters alone; 2 the same order with a residual signal; 3 MPS 212 on the core band with the residual, then SBR of both output channels. Only 2 is unverified against a reference, for lack of a stream.
+
+### MPEG-D DRC
+
+The loudness and dynamic range standard of USAC streams (ISO/IEC 23003-4): loudness metadata and DRC gain sets in the configuration, gain sequences in extension elements, and a selection process that matches the listener's request (target loudness, a named effect with its fallback order, album mode, boost and cut) to the sets the stream carries. The decoder normalises to -24 LUFS by default and applies DRC only to prevent clipping unless an effect is requested; MPEG-4 DRC is refused on a USAC stream.
+*Avoid: dynamic range control alone, which is the MPEG-4 tool.*
+
+### Pre-roll frame
+
+The audio pre-roll of a USAC stream access point: an extension element at the front of an independent frame (one whose `usacIndependencyFlag` is set, so that it decodes without history) that carries the stream configuration and the previous access units a decoder needs to warm its state. A cold decoder decodes them and drops their output; a warm one skips them. A seek or a configuration change lands on such a frame.
+*Avoid: keyframe, which belongs to video.*
+
+### MPEG Surround
+
+ISO/IEC 23003-1 as AAC carries it: a 5.1 programme coded as a mono or stereo AAC-LC downmix plus a spatial payload of per-band level, correlation and prediction parameters, from which the decoder rebuilds the six channels in the QMF domain. The payload travels as `EXT_SAC_DATA` fill elements with an in-band header, or its configuration as an object type 30 layer of a two-layer LATM stream. The tree names the box layout: 5151 and 5152 build 5.1 from a mono downmix through five OTT boxes in two orders, 525 from a stereo downmix through a TTT box and three OTT boxes. The decoder decodes these three trees, reports the decoded surround as `hasSurround` and refuses the 7.1 trees, the HRTF and binaural modes and the 3D mode; the codec has no MPEG Surround encoder, and the test tool `mps-enc` writes the suites' streams.
+*Avoid: MPS alone for the 5.1 trees; MPS 212 is the one-box tool of USAC and ELD v2.*
+
+### OTT box
+
+A one-to-two box of an MPEG Surround tree: from one input channel, a per-band level difference and correlation, and a decorrelated copy of the input (or, in the residual bands, a coded residual signal) it produces two output channels. An LFE box carries the level difference alone. The 2-1-2 tool is a tree of one OTT box.
+
+### TTT box
+
+The two-to-three box of the 525 tree, which rebuilds left, right and centre from the stereo downmix: in the prediction modes 0 and 1 from two prediction coefficients, a correlation and the residual where coded; in the energy modes 2 to 5 from two level differences, modes 2 and 3 with the centre's share subtracted from the other input before the split. A dual-mode box uses one mode below a band boundary and another above it.
+
+### xHE-AAC encoder
+
+The encoder side of USAC in compatible mode: the AAC-LC analysis and rate loop feeding a USAC frame writer with the frequency-domain core (1024-line frames, mono as a single channel element, stereo as a channel pair, the context arithmetic coder, noise filling, independent frames with the audio pre-roll), so that every stream it writes decodes in FFmpeg master, the FDK decoder, libxaac and the codec's own decoder with no non-standard syntax. It writes LOAS by default and raw access units for MP4, never ADTS, and takes the USAC options (noise filling, pre-roll, the independent frame interval, a stream id, enhanced SBR on, off or chosen by bitrate, and MPS 212 opted into, since FFmpeg cannot decode it) and a loudness info set. The native binding and the Electron service name it `xhe`; `baac enc` takes it as a profile.
+*Avoid: USAC encoder alone, which also names the linear prediction core the codec does not write.*
+
+### Loudness info set
+
+The loudnessInfoSet() of ISO/IEC 23003-4 that a USAC configuration carries as an extension, for the programme as coded: the sample peak, the true peak, the integrated loudness of ITU-R BS.1770-4, the anchor loudness when supplied, the loudness range of EBU Tech 3342 and the momentary and short-term maxima of EBU Tech 3341, each at 0.25 dB. A player normalises the programme by its integrated loudness. The xHE-AAC encoder writes it in the two-pass form, with the whole programme measured first; the one-pass meter inside the encoder measures the input as it is coded, and its figures serve an MP4 header or a second encode, since a stream's configuration cannot change once it has begun.
+*Avoid: loudness metadata alone, which also names the MPEG-4 program reference level.*
+
+### Immediate playout frame
+
+The independent USAC frame that carries the audio pre-roll and, in LOAS and LATM, the StreamMuxConfig: the point where a decoder can start and a muxer cuts a segment (an HLS or DASH segment, an MP4 fragment). The xHE-AAC encoder places them by an interval in frames, milliseconds or samples, a maximum distance and a per-segment byte ceiling, adds one on request, and reports each frame's index, independence, pre-roll bytes and sample position so that a muxer can find them. The frames the pre-roll repeats are independent too.
+*Avoid: keyframe, which belongs to video; independent frame alone, which also names the frames before it.*
+
+### DRC gain set
+
+An MPEG-D DRC set the xHE-AAC encoder writes when asked: a gain sequence per access unit plus a set description in the uniDrcConfig that names its effect, from which a decoder picks the set that matches the listener's request. The encoder writes two: drcSetId 1, "general compression", which brings the programme's loudness range towards a target of 6 to 16 LU, and drcSetId 2, "night", which adds a limiter holding the true peak at -1 dBTP after normalising to -16 LUFS. The gains of an access unit apply to the frame after it.
+*Avoid: DRC profile, which names the MPEG-4 DRC metadata's compression curves.*
+
+### VBR mode
+
+One of the five variable bitrate modes the FDK encoder names, 1 to 5, which the AAC encoder takes as stereo targets of 32, 72, 112, 148 and 228 kbit/s scaled per channel. Each frame's thresholds come from the mode's quality, and the target becomes the nominal bitrate whose reservoir bounds every frame. A peak bitrate lowers the mode to the highest one that fits.
+*Avoid: quality alone, which names the TVBR setting the modes are built on.*
+
+### Peak bitrate
+
+The per-frame cap of the AAC encoder's rate loop, in bit/s: no frame takes more than its share of it, and the bit reservoir never lends a frame more, in every profile and rate control mode whenever the frame's side information fits. Transport headers and the pre-roll of an immediate playout frame stay outside it. It bounds the burst a transport must carry; the segment byte ceiling bounds a segment instead.
+
+### Decoder flush and seek reset
+
+The two ends of a decoder's playback: the flush drains the samples the decoder still holds at the end of a stream, the decoder delay of them per channel, and then resets it; the seek reset (`aac_decoder_clear_history`) drops the input and the audio history and keeps the configuration, so that a random access frame fed next decodes as in a fresh decoder. The binding and the Electron service name them `flush` and `clearHistory`.
+*Avoid: reset alone, which also clears the configuration and the counters.*
+
+### Prebuilt binding
+
+The native addon compiled per platform and architecture by the `aac-native` GitHub Actions workflow and attached to an `aac-native-v*` release: `prebuilds/<platform>-<arch>/baander_aac.node`, which the package's install script fetches and the loader tries before a local node-gyp build. One binary serves Node and Electron, since the Node-API ABI is the version the binding declares rather than the runtime it was compiled against.
+*Avoid: native module alone, which also names a build from source.*
+
+### ELD v2
+
+AAC-ELD with the 2-1-2 tool: an ELD core of 512 samples carrying a mono downmix, the low-delay form of the spatial configuration in the ELD-specific configuration and the spatial frame in the ELD extension payload, decoded to stereo through the low-delay filterbank pair and decorrelator with 256 samples of added delay. The decoder reads it; the test tool writes it on the codec's ELD encoder.
+*Avoid: ELD with LD-SBR, which is a different extension of the same core.*
 

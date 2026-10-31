@@ -12,13 +12,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@baander/aac-native@file:../../packages/codecs/baander-aac::locator=%40baander%2Fdesktop%40workspace%3A.":
+"@baander/aac-native@file:../../packages/baander-aac::locator=%40baander%2Fdesktop%40workspace%3A.":
   version: 0.1.0
-  resolution: "@baander/aac-native@file:../../packages/codecs/baander-aac#../../packages/codecs/baander-aac::hash=ca5d85&locator=%40baander%2Fdesktop%40workspace%3A."
+  resolution: "@baander/aac-native@file:../../packages/baander-aac#../../packages/baander-aac::hash=402763&locator=%40baander%2Fdesktop%40workspace%3A."
   dependencies:
     node-addon-api: "npm:^8.9.2"
     node-gyp: "npm:^11.0.0"
-  checksum: 10c0/fe43499630784fbcfef38a38a2b372223d9ec67316767a5ad77c11ef2249a1966ba4753307bb627163e87f0ba82a2357d43813912c46dfd1e159b92f66e44e80
+  checksum: 10c0/f508df809300cd899fac3c474804f17bc5b6c89a33bc51dbd86442b5c12be9698082d99d6704977cf1a89917eecdd10cfd87b542a180f2aad892b5553e9b4b5d
   languageName: node
   linkType: hard
 
@@ -26,7 +26,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@baander/desktop@workspace:."
   dependencies:
-    "@baander/aac-native": "file:../../packages/codecs/baander-aac"
+    "@baander/aac-native": "file:../../packages/baander-aac"
     "@electron/fuses": "npm:^2.1.1"
     "@electron/rebuild": "npm:^4.0.4"
     "@napi-rs/keyring": "npm:^1.3.0"
