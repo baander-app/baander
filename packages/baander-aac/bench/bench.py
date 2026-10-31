@@ -104,16 +104,16 @@ def cfg_list():
             add("lc", "oursbw", k, "cbr", "aac", ["baac"],
                 lambda s, f, o, b=b, k=k: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr",
                                            "0", "lc", "--bandwidth", str(BW_FDK[k])])
-        add("lc", "oursab", k, "cbr", "aac", ["baac"],
+        add("lc", "oursnoab", k, "cbr", "aac", ["baac"],
             lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "lc",
-                                  "--afterburner"])
+                                  "--no-afterburner"])
         add("lc", "ffmpeg", k, "cbr", "aac", ["ffmpeg"],
             lambda s, f, o, k=k: [TOOLS["ffmpeg"], "-v", "error", "-y", "-threads", "1", "-i", s,
                                   "-c:a", "aac", "-b:a", f"{k}k", "-f", "adts", o])
         add("lc", "fdk", k, "cbr", "aac", ["fdk_enc"],
             lambda s, f, o, b=b: [TOOLS["fdk_enc"], "-r", str(b), "-t", "2", s, o])
         if k in BW_FDK:
-            # Experiment: FDK without its afterburner, like our default.
+            # Experiment: FDK without its afterburner.
             add("lc", "fdknoab", k, "cbr", "aac", ["fdk_enc"],
                 lambda s, f, o, b=b: [TOOLS["fdk_enc"], "-r", str(b), "-t", "2", "-a", "0", s, o])
         add("lc", "libxaac", k, "cbr", "aac", ["xaac_enc"],
@@ -138,9 +138,9 @@ def cfg_list():
         b = k * 1000
         add("he", "ours", k, "cbr", "aac", ["baac"],
             lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he"])
-        add("he", "oursab", k, "cbr", "aac", ["baac"],
+        add("he", "oursnoab", k, "cbr", "aac", ["baac"],
             lambda s, f, o, b=b: [TOOLS["baac"], "enc", f, o, "48000", "2", str(b), "cbr", "0", "he",
-                                  "--afterburner"])
+                                  "--no-afterburner"])
         add("he", "fdk", k, "cbr", "aac", ["fdk_enc"],
             lambda s, f, o, b=b: [TOOLS["fdk_enc"], "-r", str(b), "-t", "5", s, o])
         add("he", "libxaac", k, "cbr", "aac", ["xaac_enc"],
@@ -682,7 +682,7 @@ def stage_report(args):
             if len(pts) < 2 or not (pts[0][0] <= rate <= pts[-1][0]):
                 return None
             return float(np.interp(rate, [p[0] for p in pts], [p[1] for p in pts]))
-        encs = ["ours", "oursab", "oursbw", "ffmpeg", "fdk", "fdknoab", "libxaac", "apple"]
+        encs = ["ours", "oursnoab", "oursbw", "ffmpeg", "fdk", "fdknoab", "libxaac", "apple"]
         for fam, rates in grids.items():
             for rate in rates:
                 base = {m: {i: interp(fam, "ours", i, rate, m) for i in MUSIC}

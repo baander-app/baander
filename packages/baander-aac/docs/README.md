@@ -418,15 +418,15 @@ samples; the SBR headers travel in the AudioSpecificConfig and the
 payloads after the channel elements. The DRC metadata path is not
 available for the low-delay types, whose frames carry no fill elements.
 
-`aac_encoder_set_afterburner` enables a second quantisation pass after
+`aac_encoder_set_afterburner` switches a second quantisation pass after
 the rate loop: for every band it measures the real quantisation noise
 against the band's allowance and moves scalefactors one step at a time
 where the noise falls most per bit, paid from the frame's slack in the
 constant-rate modes or from bands with margin in the quality modes,
 re-sectioning the codebooks and counting the bits exactly after every
-move within the scalefactor limits. It raises the segmental SNR by about
-0.6 to 1.0 dB between 32 and 96 kbit/s for roughly twice the encoding
-time; with it off the output is unchanged byte for byte.
+move within the scalefactor limits. It is on by default for AAC-LC and
+HE-AAC, where it adds 0.02 to 0.07 PEAQ points for about 70 % more
+encoding time, and off for AAC-LD and AAC-ELD.
 
 Three tuning controls apply to every profile and leave the stream
 unchanged byte for byte while they are unset.
@@ -1006,8 +1006,8 @@ baac bench [--seconds N] [--dump DIR] [--only NAME] [--streams DIR]
 For every profile `--peak-bitrate N`, `--bandwidth HZ` and
 `--vbr-mode 1..5` set the tuning controls (with a VBR mode the bitrate
 and mode arguments are replaced by the mode's, and a quality argument
-overrides the mode's quality). `--afterburner` turns on the second
-quantisation pass (not for `xhe`). `baac dec --no-loudness` turns off
+overrides the mode's quality). `--afterburner` and `--no-afterburner`
+switch the second quantisation pass (not for `xhe`). `baac dec --no-loudness` turns off
 the decoder's loudness normalisation of USAC streams.
 
 With the `xhe` profile, `--loudness` measures the whole input first and
@@ -1443,16 +1443,16 @@ The synthetic 30 s stereo signal at 48 kHz:
 
 | Configuration | kbit/s | Encode | Decode |
 | --- | ---: | ---: | ---: |
-| LC 128k | 127.9 | 23x | 880x |
-| HE-AAC v1 64k | 64.0 | 33x | 220x |
-| HE-AAC v2 32k | 31.9 | 65x | 450x |
-| LC 960 128k | 127.9 | 24x | 370x |
-| LD 512 64k | 66.9 | 28x | 960x |
-| ELD 512 64k | 67.6 | 24x | 630x |
-| LC 48k afterburner | 47.9 | 21x | 1360x |
-| xHE-AAC 96k | 101.4 | 19x | 370x |
-| xHE-AAC SBR 48k | 54.3 | 29x | 250x |
-| xHE-AAC SBR + MPS 2-1-2 32k | 37.0 | 39x | 230x |
+| LC 128k | 127.9 | 44x | 700x |
+| HE-AAC v1 64k | 64.0 | 53x | 290x |
+| HE-AAC v2 32k | 31.9 | 84x | 290x |
+| LC 960 128k | 127.9 | 36x | 250x |
+| LD 512 64k | 66.9 | 60x | 570x |
+| ELD 512 64k | 67.6 | 56x | 550x |
+| LC 48k no afterburner | 47.9 | 77x | 700x |
+| xHE-AAC 96k | 97.3 | 22x | 280x |
+| xHE-AAC SBR 48k | 51.8 | 34x | 240x |
+| xHE-AAC SBR + MPS 2-1-2 32k | 34.3 | 42x | 180x |
 
 The committed streams, decoded (the USAC streams are the FDK encoder's
 and ours; the decoder's API does not tell a USAC 2-1-2 pair from a plain
@@ -1468,8 +1468,9 @@ pair, so those count as stereo):
 | xHE-AAC mono / stereo | 3 / 3 | 530x / 300x |
 | xHE-AAC SBR mono / stereo | 6 / 6 | 420x / 200x |
 
-Encoding runs at 19 to 65 times realtime and decoding at 70 to 1400
-times. MPEG Surround 5.1 is the slowest decode: it synthesises six
+On the synthetic signal, encoding runs at 22 to 84 times realtime and
+decoding at 180 to 700 times. AAC-LC and HE-AAC encode with the
+afterburner on, their default. MPEG Surround 5.1 is the slowest decode: it synthesises six
 channels through the hybrid QMF bank.
 
 ## Project structure

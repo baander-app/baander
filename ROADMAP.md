@@ -1816,6 +1816,29 @@ encoders keep their committed streams. CTest 46/46, Node smoke tests
 (glockenspiel), the TVBR quality scale (quality 50 gives about 230
 kbit/s).
 
+Checkpoint, 2026-10-31, beyond FDK's afterburner and Apple's HE-AAC:
+delivered, each measured on the ten-item corpus with paired 95 %
+intervals against the previous commit: the afterburner keeps its trial
+quantizations (byte-identical, about 85 % more instructions than no
+afterburner instead of 390 %); the scalefactor search checks two to six
+coarser steps above the noise boundary (PEAQ +0.026 to +0.057 at 64 to
+128 kbit/s); the afterburner is on by default for AAC-LC and HE-AAC
+(PEAQ +0.017 to +0.067, `--no-afterburner` turns it off); Apple's
+HE-AAC streams, probed by their output only, led to a higher SBR range
+for stereo at 40 to 56 kbit/s (PEAQ +0.13, +0.36 and +0.28) and a
+two-envelope split of steady SBR frames (pooled +0.012 ± 0.010). The
+codec comparison was rerun for our encoder
+([codec-comparison.md](packages/baander-aac/docs/codec-comparison.md)):
+AAC-LC now scores above FDK, libxaac and Apple at 80 to 160 kbit/s on
+PEAQ (inside the intervals except Apple at 112) and on ViSQOL at 80 and
+112 (intervals exclude zero); HE-AAC v1 leads FDK by 0.15 to 0.17 at 40
+and 56 kbit/s and is level with Apple; the SBR range also lifted
+xHE-AAC at 48 kbit/s by 0.54 PEAQ. CTest 46/46, Node smoke tests 14/14.
+Open: encode speed with the afterburner on (36× realtime against FDK's
+83× and Apple's 79× in the same run), xHE-AAC at 24 to 32 kbit/s,
+Apple's true VBR (0.17 to 0.19 PEAQ ahead at 128 to 160 kbit/s), Apple's
+coupled stereo SBR and additional sinusoids. Not run: listening tests.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded

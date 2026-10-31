@@ -1,6 +1,9 @@
 # Codec comparison
 
-Measured on 2026-10-30 at codec commit 166dec8. baander-aac against
+First measured on 2026-10-30 at codec commit 166dec8; our encoder was
+measured again on 2026-10-31 at commit 129ce92, after the tuning in the
+[Apple probe note](apple-aac-probe.md). The other encoders' streams and
+scores are those of the first run. baander-aac against
 FFmpeg's native `aac` encoder, Fraunhofer FDK AAC, Ittiam's libxaac and
 Apple's Core Audio AAC encoder, with ALAC and FLAC as the lossless
 reference. The harness in
@@ -15,28 +18,30 @@ the generated tables are in `bench/results/` (`quality.csv`,
   decoder to floating-point precision on AAC-LC. It is the fastest
   decoder measured in three of the four families, and it needs under
   10 MiB of memory.
-- **The AAC-LC encoder trails FDK and libxaac at 64 to 128 kbit/s.**
-  The gap is about 0.15 to 0.18 PEAQ grade points at equal bitrate.
-  ViSQOL rates ours level or slightly ahead at those rates. The encoder
-  leads FFmpeg's encoder by 0.26 to 0.27 PEAQ points from 160 kbit/s
-  up.
-- **Most of that gap is FDK's afterburner, not the core encoder.**
-  Without its afterburner FDK scores below ours at every measured rate.
-  Its afterburner adds 0.25 to 0.41 points. Ours, which is off by
-  default, adds 0.06 to 0.11.
-- **The encoder is slow.** AAC-LC encodes at 18 times realtime on one
-  core, against 101 for FDK and 181 for libxaac.
+- **The AAC-LC encoder now leads at 80 to 160 kbit/s.** At equal
+  bitrate it scores 0.03 to 0.32 PEAQ points above FDK, libxaac and
+  Apple, and 0.11 to 0.31 ViSQOL points above them at 80 and 112
+  kbit/s. Most of these PEAQ leads are inside the 95 % intervals; the
+  ViSQOL leads at 80 and 112 kbit/s are not. At 192 kbit/s and up it is
+  level on PEAQ, and Apple leads on ViSQOL. In the first run FDK and
+  libxaac led by 0.15 to 0.18 PEAQ points at 80 to 112 kbit/s.
+- **Our afterburner is now on by default,** and our encoder without it
+  scores above FDK without its own at every measured rate.
+- **The encoder is slower than FDK and Apple.** AAC-LC at 128 kbit/s
+  encodes at 36 times realtime, against 83 for FDK, 79 for Apple and
+  145 for libxaac in the same run. Without the afterburner it runs at 61.
+- **HE-AAC v1 leads FDK and libxaac at 40 to 56 kbit/s** by 0.15 to
+  0.24 PEAQ points and is level with Apple. HE-AAC v2 is at parity
+  with FDK.
 - **xHE-AAC below 32 kbit/s is the largest quality gap.** FDK leads by
   0.4 to 0.6 ViSQOL points there. FDK uses tools our encoder does not
   have yet: 4:1 and 8:3 SBR, MPEG Surround 2-1-2 and the LPD core.
-- **Apple's true VBR mode is the best AAC-LC encoder at 112 to 160
-  kbit/s.** At equal bitrate it beats our VBR by 0.33 to 0.44 PEAQ
-  points.
-- **HE-AAC v2 is at parity.** HE-AAC v1 trails FDK by about 0.13 PEAQ
-  points, and ViSQOL sees parity there too.
+- **Apple's true VBR still leads at 128 to 160 kbit/s,** by 0.17 to 0.19
+  PEAQ points over our VBR, down from 0.33 to 0.44. ViSQOL puts our VBR
+  0.04 to 0.12 points ahead.
 - **Lossless:** ALAC needs 690 to 697 kbit/s on this corpus, FLAC 615 to
   630. Both decode at about 200 to 400 times realtime. AAC-LC at 256
-  kbit/s is 2.7 times smaller than ALAC and scores -0.04 on PEAQ.
+  kbit/s is 2.7 times smaller than ALAC and scores -0.02 on PEAQ.
 
 ## What was measured
 
@@ -62,9 +67,9 @@ same nominal bitrates. AAC-LC used 64, 96, 128, 192 and 256 kbit/s.
 HE-AAC v1 used 32, 48 and 64, HE-AAC v2 24 and 32, and xHE-AAC 24, 32,
 48, 64 and 96. AAC-LC also ran in each encoder's own VBR scale: ours and
 FDK's modes 2 to 5, and Apple's true VBR at qualities 45, 63, 82 and
-100. Experiments added our encoder with its afterburner, our encoder
-with FDK's lowpass, and FDK without its afterburner. That makes 81
-configurations and 810 encodes.
+100. Experiments added our encoder without its afterburner, our
+encoder with FDK's lowpass, and FDK without its afterburner. That makes
+81 configurations and 810 encodes.
 
 **Quality pipeline.** One decoder per family decodes every encoder's
 stream, so only the encoder differs. That is FFmpeg for AAC-LC and
@@ -131,102 +136,107 @@ linearly along each encoder's own rate curve.
 
 ## AAC-LC
 
-Constant bitrate, each encoder's CBR mode. "ours+AB" is our encoder with
-`--afterburner`.
+Constant bitrate, each encoder's CBR mode. "ours" has its afterburner
+on, the default; "ours, no AB" is `--no-afterburner`. The first run's
+row shows our encoder on 2026-10-30, with the afterburner off.
 
 | Encoder | 64 kbit/s PEAQ / ViSQOL | 96 | 128 | 192 | 256 |
 |---------|------------------------:|---:|----:|----:|----:|
-| ours | -3.19 / 3.85 | -1.95 / 4.10 | -0.96 / 4.35 | -0.14 / 4.50 | -0.04 / 4.71 |
-| ours+AB | -3.12 / 3.84 | -1.84 / 4.10 | -0.90 / 4.35 | -0.13 / 4.50 | -0.02 / 4.72 |
+| ours | -3.07 / 3.87 | -1.47 / 4.35 | -0.68 / 4.52 | -0.07 / 4.51 | -0.02 / 4.72 |
+| ours, no AB | -3.14 / 3.87 | -1.54 / 4.35 | -0.73 / 4.52 | -0.09 / 4.51 | -0.03 / 4.72 |
+| ours, first run | -3.19 / 3.85 | -1.95 / 4.10 | -0.96 / 4.35 | -0.14 / 4.50 | -0.04 / 4.71 |
 | FFmpeg | -3.00 / 3.50 | -1.97 / 4.08 | -1.14 / 4.20 | -0.39 / 4.48 | -0.27 / 4.67 |
 | FDK | -2.99 / 3.77 | -1.71 / 4.09 | -0.79 / 4.28 | -0.10 / 4.47 | 0.05 / 4.49 |
-| FDK without AB | -3.24 / - | -2.12 / - | -1.08 / - | - | - |
+| FDK without AB | -3.24 / 3.78 | -2.12 / 4.09 | -1.08 / 4.28 | - | - |
 | libxaac | -2.94 / 3.81 | -1.65 / 4.12 | -0.74 / 4.29 | -0.21 / 4.62 | -0.17 / 4.65 |
 | Apple | -2.92 / 3.50 | -1.88 / 4.25 | -0.67 / 4.43 | -0.07 / 4.67 | 0.02 / 4.72 |
 
 The bitrates achieved at nominal 128 kbit/s are 127.9 (ours), 131.8
-(FFmpeg), 128.7 (FDK), 130.9 (libxaac) and 131.3 (Apple). The full
-table with the worst item, PEAQ advanced and the intervals is in
-`bench/results/tables.md`.
+(FFmpeg), 128.7 (FDK), 130.9 (libxaac) and 131.3 (Apple). At 64 kbit/s
+the others spend 1.4 to 5.2 % more than our 63.9, and no lower point
+exists to interpolate from. The full table with the worst item, PEAQ
+advanced and the intervals is in `bench/results/tables.md`.
 
 At equal bitrate (interpolated), Δ vs ours:
 
-| kbit/s | FFmpeg | FDK | libxaac | Apple | ours+AB |
-|-------:|-------:|----:|--------:|------:|--------:|
-| 80, PEAQ | -0.03 ± 0.26 | **+0.18 ± 0.05** | **+0.15 ± 0.11** | +0.05 ± 0.21 | +0.08 ± 0.03 |
-| 80, ViSQOL | **-0.25 ± 0.09** | -0.05 ± 0.04 | -0.04 ± 0.06 | **-0.17 ± 0.10** | 0.00 |
-| 112, PEAQ | -0.19 ± 0.26 | **+0.18 ± 0.08** | **+0.18 ± 0.10** | +0.05 ± 0.36 | +0.08 ± 0.03 |
-| 112, ViSQOL | -0.10 ± 0.16 | -0.04 ± 0.04 | -0.04 ± 0.05 | **+0.10 ± 0.07** | 0.00 |
-| 160, PEAQ | **-0.27 ± 0.13** | **+0.10 ± 0.05** | **+0.06 ± 0.05** | +0.15 ± 0.18 | +0.04 ± 0.03 |
-| 160, ViSQOL | -0.10 ± 0.21 | **-0.05 ± 0.04** | +0.02 ± 0.06 | **+0.11 ± 0.06** | 0.00 |
-| 224, PEAQ | **-0.26 ± 0.07** | **+0.07 ± 0.06** | -0.10 ± 0.14 | **+0.06 ± 0.06** | +0.01 ± 0.02 |
-| 224, ViSQOL | -0.04 ± 0.13 | **-0.13 ± 0.08** | +0.02 ± 0.05 | **+0.08 ± 0.05** | 0.00 |
+| kbit/s | FFmpeg | FDK | libxaac | Apple | ours, no AB |
+|-------:|-------:|----:|--------:|------:|------------:|
+| 80, PEAQ | -0.32 ± 0.32 | -0.11 ± 0.15 | -0.15 ± 0.18 | -0.24 ± 0.24 | **-0.07 ± 0.02** |
+| 80, ViSQOL | **-0.38 ± 0.11** | **-0.19 ± 0.08** | **-0.18 ± 0.09** | **-0.31 ± 0.14** | 0.00 |
+| 112, PEAQ | **-0.56 ± 0.35** | -0.19 ± 0.21 | -0.20 ± 0.21 | **-0.32 ± 0.26** | **-0.06 ± 0.02** |
+| 112, ViSQOL | **-0.31 ± 0.15** | **-0.25 ± 0.09** | **-0.25 ± 0.10** | **-0.11 ± 0.09** | 0.00 |
+| 160, PEAQ | **-0.44 ± 0.18** | -0.07 ± 0.13 | -0.11 ± 0.15 | -0.03 ± 0.11 | **-0.03 ± 0.01** |
+| 160, ViSQOL | -0.19 ± 0.20 | **-0.14 ± 0.05** | **-0.07 ± 0.05** | +0.02 ± 0.04 | 0.00 |
+| 224, PEAQ | **-0.30 ± 0.08** | +0.02 ± 0.06 | -0.15 ± 0.15 | +0.02 ± 0.08 | -0.01 ± 0.02 |
+| 224, ViSQOL | -0.05 ± 0.13 | **-0.14 ± 0.08** | +0.02 ± 0.05 | **+0.08 ± 0.05** | 0.00 |
 
 Bold differences have an interval that excludes zero.
 
-**FDK and libxaac lead on PEAQ.** At 80 to 112 kbit/s both lead by 0.15
-to 0.18 points, and the lead is significant. It shrinks to 0.06 to 0.10
-points at 160. ViSQOL puts ours level with or slightly ahead of them.
-FDK is ahead on all ten items at 64, 96 and 128 kbit/s, so the gap is
-systematic and not the work of one item. The largest gaps are on glock
-and harpsichord, where FDK leads by 0.28 to 0.53 points at 96 and 128
-kbit/s. Both items combine sharp attacks with sustained
-tonal partials.
+**Ours now leads from 80 to 160 kbit/s.** On PEAQ every competitor
+scores below ours at 80 to 160 kbit/s; the leads over FFmpeg, and over
+Apple at 112, are significant, the rest are inside the intervals. On
+ViSQOL ours leads every competitor at 80 and 112 kbit/s with intervals
+that exclude zero. At 224 kbit/s FDK and Apple are level on PEAQ and
+Apple leads on ViSQOL, where it codes sparse bands up to 19.5 kHz.
 
-**The afterburner explains most of the gap.**
+**Where the first run's gap went.** FDK's afterburner is still worth
+0.25 to 0.41 PEAQ points over FDK without it. Our encoder without its
+afterburner gained 0.05 to 0.41 points since the first run, from sine
+long windows, sparse bands above the lowpass, forward masking and a
+scalefactor search that checks coarser steps above the noise boundary.
+The afterburner, now on by default, adds 0.05 to 0.07 on top:
 
-| kbit/s | FDK's afterburner gain | Our afterburner gain | FDK without AB vs ours |
-|-------:|-----------------------:|---------------------:|-----------------------:|
-| 64 | +0.25 | +0.06 ± 0.03 | -0.05 ± 0.06 |
-| 96 | +0.41 | +0.11 ± 0.04 | -0.18 ± 0.09 |
-| 128 | +0.29 | +0.06 ± 0.03 | -0.12 ± 0.10 |
+| kbit/s | FDK's afterburner gain | Our afterburner gain | FDK without AB vs ours without AB |
+|-------:|-----------------------:|---------------------:|----------------------------------:|
+| 64 | +0.25 | +0.07 | -0.10 |
+| 96 | +0.41 | +0.07 | -0.58 |
+| 128 | +0.29 | +0.05 | -0.35 |
 
-All figures are PEAQ points at the nominal rate. Without its
-afterburner, FDK's encoder is no better than ours. FDK's afterburner
-works inside scalefactor estimation, on every band, before the rate
-loop settles. It compares the real quantisation distortion with the
-threshold, saves bits where the distortion allows, and smooths
-scalefactor differences, and the bits it saves feed back into lower
-thresholds. ours runs after the rate loop and only spends the slack the
-loop leaves. The method is the scalefactor improvement step of 3GPP TS
-26.403.
+All figures are PEAQ points at the nominal rate.
 
-**Bandwidth is not the cause.** Our lowpass is 0.8 to 2.6 kHz wider than
-FDK's at 64 to 128 kbit/s: 14.6 against 12.6 kHz at 64, and 17.6
-against 15.0 kHz at 128. Restricting ours to FDK's lowpass
-(`--bandwidth`) gained +0.11 ± 0.03 PEAQ at 64 kbit/s and nothing
-measurable at 96 or 128.
+**Glockenspiel is the item left.** At 128 kbit/s FDK and libxaac score
+-0.57 and -0.53 on it against our -1.01. On harpsichord, where FDK led
+by 0.33 in the first run, ours now scores -0.64 against FDK's -1.29.
 
-**Against FFmpeg's encoder,** ours is level at 64 to 112 kbit/s on
-PEAQ and ahead by 0.26 to 0.27 points from 160 up. ViSQOL puts ours clearly ahead at 64 to 80
-kbit/s, where FFmpeg cuts the bandwidth to 12 kHz.
+**Bandwidth.** Our lowpass is 0.8 to 2.6 kHz wider than FDK's at 64 to
+128 kbit/s: 14.6 against 12.6 kHz at 64, and 17.6 against 15.0 kHz at
+128, and from 96 to 190 kbit/s ours codes sparse bands above it up to
+20 kHz. Restricting ours to FDK's lowpass (`--bandwidth`) gains
++0.12 ± 0.03 PEAQ at 64 kbit/s but costs 0.15 ± 0.07 ViSQOL, and costs
+0.21 ± 0.17 PEAQ at 96.
 
-**Apple** scores best on ViSQOL from 96 kbit/s up. Its PEAQ results
-vary widely by item: it is the best encoder on harpsichord at 128
-kbit/s (-0.53 against our -1.62) and among the worst on glock (-1.28).
-That is why its PEAQ intervals are wide.
+**Against FFmpeg's encoder,** ours is level at 64 kbit/s on PEAQ and
+ahead by 0.30 to 0.56 points from 80 kbit/s up. ViSQOL puts ours clearly
+ahead at 64 to 112 kbit/s, where FFmpeg cuts the bandwidth to 12 kHz.
+
+**Apple** has the best PEAQ mean at 64 kbit/s, on 5 % more bits, and
+the best ViSQOL at 192 kbit/s. Its PEAQ results vary widely by
+item: at 128 kbit/s it is the best encoder on moonlight (-0.03) and
+among the worst on glock (-1.28). That is why its PEAQ intervals are
+wide.
 
 ### VBR
 
 | Encoder, mode | kbit/s | PEAQ | ViSQOL |
 |---------------|-------:|-----:|-------:|
-| ours, mode 2 / 3 / 4 / 5 | 71.9 / 111.9 / 147.9 / 225.2 | -2.84 / -1.50 / -0.55 / -0.00 | 3.91 / 4.33 / 4.41 / 4.52 |
+| ours, mode 2 / 3 / 4 / 5 | 71.9 / 111.9 / 148.0 / 224.4 | -2.69 / -1.14 / -0.39 / 0.03 | 3.93 / 4.46 / 4.58 / 4.52 |
 | FDK, mode 2 / 3 / 4 / 5 | 102.7 / 121.2 / 154.9 / 221.6 | -1.57 / -1.23 / -0.48 / -0.08 | 3.86 / 4.31 / 4.41 / 4.69 |
 | Apple TVBR 45 / 63 / 82 / 100 | 106.3 / 136.0 / 165.0 / 219.7 | -1.33 / -0.41 / -0.06 / 0.04 | 4.28 / 4.45 / 4.56 / 4.71 |
 
-At equal bitrate, Apple's true VBR leads our VBR by **+0.41 ± 0.34,
-+0.44 ± 0.23 and +0.33 ± 0.12** PEAQ points at 112, 128 and 160 kbit/s.
-On ViSQOL the lead is +0.03, +0.03 and +0.10. FDK's VBR leads ours by
-0.19 ± 0.16 and 0.12 ± 0.11 PEAQ points at 112 and 128 kbit/s and is
-level at 160. On PEAQ our VBR is
-no better than our own CBR at the same bitrate: -1.50 against -1.45 at
-112 kbit/s. On ViSQOL it is slightly better: 4.32 against 4.23.
+At equal bitrate, Apple's true VBR leads our VBR by +0.02 ± 0.14,
+**+0.17 ± 0.12 and +0.19 ± 0.09** PEAQ points at 112, 128 and 160
+kbit/s; in the first run the lead was 0.33 to 0.44. On ViSQOL ours
+leads by 0.11, 0.12 and 0.04. FDK's VBR scores 0.12 to 0.18 PEAQ points
+below ours at 112 to 160 kbit/s, inside the intervals, and 0.12 to 0.37
+ViSQOL points below. On PEAQ our VBR is still no better than our own
+CBR at the same bitrate: -1.14 against -1.08 at 112 kbit/s.
 
 ## HE-AAC
 
 | Encoder | v1 32 kbit/s PEAQ / ViSQOL | v1 48 | v1 64 | v2 24 | v2 32 |
 |---------|---------------------------:|------:|------:|------:|------:|
-| ours | -3.63 / 3.59 | -3.25 / 3.93 | -2.54 / 4.27 | -3.67 / 3.68 | -3.53 / 3.86 |
+| ours | -3.55 / 3.64 | -2.77 / 4.09 | -2.43 / 4.29 | -3.63 / 3.71 | -3.50 / 3.88 |
+| ours, first run | -3.63 / 3.59 | -3.25 / 3.93 | -2.54 / 4.27 | -3.67 / 3.68 | -3.53 / 3.86 |
 | FDK | -3.53 / 3.68 | -3.06 / 3.92 | -2.43 / 4.29 | -3.64 / 3.73 | -3.51 / 3.90 |
 | libxaac | -3.49 / 3.64 | -3.11 / 3.92 | -2.45 / 4.31 | -3.56 / 3.71 | -3.45 / 3.87 |
 | Apple | -3.56 / 3.65 | -2.68 / 4.06 | -2.47 / 4.31 | - | - |
@@ -234,30 +244,35 @@ no better than our own CBR at the same bitrate: -1.50 against -1.45 at
 FFmpeg's native encoder has no HE-AAC. Apple's Windows encoder has no
 HE-AAC v2.
 
-At equal bitrate, FDK leads HE-AAC v1 by +0.13 PEAQ points at both 40
-and 56 kbit/s, with intervals of ±0.07 and ±0.13. On ViSQOL the
-difference is +0.03 and -0.01, which is parity. Apple at 48 kbit/s has
-the best mean on both metrics, +0.57 ± 0.39 PEAQ and +0.13 ± 0.23
-ViSQOL, but it is also worst on some items. HE-AAC v2 is at parity with
-FDK within 0.05 on both metrics. Ours, FDK and libxaac reach the same
-audio bandwidth for v1: 15, 16.5 and 24 kHz at 32, 48 and 64 kbit/s.
-Apple reaches 13.8, 22.0 and 24 kHz. PEAQ's validity for SBR is limited, so treat the HE-AAC
-PEAQ differences as indications.
+At equal bitrate, ours now leads FDK by 0.15 ± 0.12 and 0.17 ± 0.15
+PEAQ points at 40 and 56 kbit/s, and libxaac by 0.17 and 0.24; on
+ViSQOL ours leads both by 0.08 to 0.12. In the first run FDK led by
+0.13. Apple is level: 0.06 ± 0.14 below ours at 40 kbit/s and
+0.00 ± 0.31 at 56, and 0.03 to 0.06 below on ViSQOL. Most of the change
+at 48 kbit/s comes from a higher SBR range, learned from Apple's
+streams: ours now codes SBR to 20.3 kHz there, where it stopped at
+16.9 kHz. HE-AAC v2 is at parity with FDK within 0.05 on both metrics.
+PEAQ's validity for SBR is limited, so treat the HE-AAC PEAQ
+differences as indications.
 
 ## xHE-AAC
 
 | Encoder | 24 kbit/s nominal: achieved, PEAQ, ViSQOL | 32 | 48 | 64 | 96 |
 |---------|-----------------------------------------:|---:|---:|---:|---:|
-| ours | 25.7, -3.68, 3.39 | 34.4, -3.54, 3.68 | 51.8, -2.96, 3.95 | 69.3, -2.13, 4.27 | 104.0, -1.30, 4.33 |
+| ours | 25.7, -3.68, 3.39 | 34.4, -3.54, 3.68 | 51.8, -2.42, 4.12 | 69.3, -2.13, 4.27 | 104.0, -1.30, 4.33 |
 | FDK | 27.7, -3.40, 4.02 | 36.3, -3.27, 4.06 | 54.1, -3.00, 4.00 | 71.6, -1.79, 4.33 | 96.4, -1.53, 4.17 |
 | libxaac | - | - | - | 64.3, -2.77, 4.31 | 96.4, -1.43, 4.38 |
 
 At equal bitrate, FDK leads at 32 kbit/s by **0.44 ± 0.23** ViSQOL
 points and 0.24 ± 0.14 PEAQ points. At 24 kbit/s nominal FDK leads by
 0.63 ± 0.32 ViSQOL points, on 2 kbit/s more. Our worst item there
-scores 2.44 against FDK's 3.29. At 48 kbit/s FDK still leads by 0.12 ±
-0.09 ViSQOL points. At 64 and 80 kbit/s the two are level within the
-intervals, and libxaac is level as well.
+scores 2.44 against FDK's 3.29. At 48 kbit/s ours now leads by
+0.43 ± 0.22 PEAQ points and is level on ViSQOL. The HE-AAC SBR range
+above also applies to the xHE-AAC encoder's 2:1 SBR from 36 to 60
+kbit/s, and moved its 48 kbit/s scores from -2.96 and 3.95; the other
+rates in that range were not measured. At 64 and
+80 kbit/s the two are level within the intervals, and libxaac is level
+as well.
 
 **Our low-rate xHE-AAC decodes are louder in the low band.** At 24
 kbit/s, eight of our ten decodes needed 0.8 to 3.2 dB of attenuation to
@@ -296,20 +311,24 @@ system).
 
 | Encode | AAC-LC 128 | HE-AAC 48 | HE-AAC v2 32 | xHE-AAC 64 |
 |--------|-----------:|----------:|-------------:|-----------:|
-| ours | 18× | 28× | 65× | 20× |
-| ours+AB | 12× | 19× | - | - |
-| FFmpeg | 42× | - | - | - |
-| FDK | 101× (233× without AB) | 89× | 148× | 34×, including its loudness pass |
-| libxaac | 181× | 189× | 290× | 78× |
-| Apple, under Wine | 94× | 101× | - | - |
+| ours | 36× | 51× | 91× | 24× |
+| ours, no AB | 61× | 72× | - | - |
+| FFmpeg | 35× | - | - | - |
+| FDK | 83× (200× without AB) | 78× | 123× | 29×, including its loudness pass |
+| libxaac | 145× | 148× | 229× | 59× |
+| Apple, under Wine | 79× | 87× | - | - |
 
 | Decode | AAC-LC | HE-AAC | HE-AAC v2 | xHE-AAC |
 |--------|-------:|-------:|----------:|--------:|
-| ours | **724×** | 372× | **483×** | **197×** |
-| FFmpeg | 251× | 296× | 296× | - |
-| FDK | 395× | 326× | 237× | 142× |
-| libxaac | 501× | 150× | 192× | 136× |
-| Apple, under Wine | 465× | **420×** | 352× | - |
+| ours | **621×** | 310× | **362×** | **169×** |
+| FFmpeg | 229× | 310× | 271× | - |
+| FDK | 326× | 233× | 189× | 129× |
+| libxaac | 334× | 121× | 150× | 127× |
+| Apple, under Wine | 420× | **326×** | 343× | - |
+
+These figures are from the second run, on 2026-10-31. The machine ran
+about 20 % slower than in the first run: FDK's unchanged encoder went
+from 101× to 83×. Compare within the table, not with the first run.
 
 The decodes are of FDK's streams, or libxaac's where FDK has none. The
 FFmpeg figures include its demuxer and WAV muxer.
@@ -389,7 +408,7 @@ Over the 130 s corpus, single-threaded:
 
 Every lossless stream decodes with FFmpeg. On this corpus ALAC is 10 to
 13 % larger than FLAC and decodes at about half FLAC's speed. AAC-LC at 256
-kbit/s is 2.7 times smaller than ALAC and scores -0.04 PEAQ and 4.71
+kbit/s is 2.7 times smaller than ALAC and scores -0.02 PEAQ and 4.72
 ViSQOL with our encoder. baander-aac has no lossless mode, and none is
 proposed here. Both lossless codecs decode cheaply through FFmpeg,
 which Baander already uses, so a lossless tier is a passthrough decision
@@ -404,7 +423,7 @@ for the server rather than codec work.
 | xHE-AAC encode | yes; FD core, 2:1 eSBR, opt-in MPS 2-1-2 | no | yes; FD and LPD cores, 2:1, 4:1, 8:3 SBR, MPS 2-1-2 | yes; only 64 and 96 kbit/s, its parameter check resets other rates | not tested |
 | AAC-LD / ELD encode | yes | no | yes | yes | not tested |
 | Rate modes | CBR, ABR, CVBR, TVBR, VBR modes 1 to 5 | CBR, VBR | CBR, VBR modes 1 to 5 | CBR in its test application | CBR, ABR, CVBR, TVBR |
-| Second quantisation pass | opt-in afterburner | two-loop search | afterburner, on by default | not checked | not documented |
+| Second quantisation pass | afterburner, on by default for AAC-LC and HE-AAC | two-loop search | afterburner, on by default | not checked | not documented |
 | Decode LC / HE / v2 / xHE | yes | yes; xHE partial from FFmpeg 7.1 | yes | yes | yes / yes / yes / not tested |
 | Decode ER tools, LD, ELD, MPEG Surround | yes | partial | yes | yes | not tested |
 | MPEG-D DRC and loudness | encode and decode | no | encode and decode | encode and decode | not tested |
@@ -417,34 +436,20 @@ licensing applies to every implementation alike.
 
 ## Where we fall short, in priority order
 
-1. **Quantisation: FDK-style scalefactor improvement inside the rate
-   loop, on by default.**
-   - *Evidence:* FDK's afterburner is worth 0.25 to 0.41 PEAQ points.
-     FDK without it scores below ours. Our afterburner recovers only
-     0.06 to 0.11.
-   - *Approach:* measure the real quantisation distortion per band
-     during scalefactor estimation. Raise scalefactors where the
-     distortion stays under the threshold, reduce scalefactor
-     differences, and recalibrate the bits-to-perceptual-entropy
-     estimate so the rate loop spends what this saves (3GPP TS 26.403,
-     scalefactor improvement). Keep the current pass as a final
-     slack-spending step.
-   - *Target:* close the 0.15 to 0.18 point gap at 80 to 128 kbit/s,
-     then re-measure HE-AAC v1, whose AAC-LC core shares the
-     quantiser.
-2. **Encoder speed.**
-   - *Evidence:* AAC-LC encodes at 18× realtime, against FDK's 101×
-     with its afterburner and libxaac's 181×. HE-AAC encodes at 28×
-     against 89×. Our afterburner costs a further 50 %. A default-on
-     improvement pass from item 1 must not make this worse.
-   - *Approach:* profile the encoder before changing it; no profile was
-     taken for this comparison. Likely suspects, unverified, are the
-     per-move re-sectioning and exact bit counting of the afterburner,
-     the scalefactor search, and the psychoacoustic model's per-line
-     work.
-   - *Target:* at least 60× realtime for AAC-LC at 128 kbit/s with the
-     improved quantiser on.
-3. **xHE-AAC at 24 to 32 kbit/s.**
+The first run's top item, an FDK-style scalefactor improvement inside
+the rate loop, is done: see the AAC-LC section and the
+[Apple probe note](apple-aac-probe.md).
+
+1. **Encoder speed.**
+   - *Evidence:* with the afterburner on, AAC-LC at 128 kbit/s encodes
+     at 36× realtime, against FDK's 83×, Apple's 79× and libxaac's 145×.
+     HE-AAC at 48 encodes at 51× against FDK's 78×. The afterburner
+     costs 40 % of our encode time.
+   - *Approach:* profile the afterburner's candidate moves and recounts,
+     which dominate, and the coarser-scalefactor check in the
+     scalefactor search.
+   - *Target:* FDK's speed with the afterburner on.
+2. **xHE-AAC at 24 to 32 kbit/s.**
    - *Evidence:* FDK leads by 0.4 to 0.6 ViSQOL points, and our worst
      item is 0.85 points lower.
    - *Approach, in order:* select MPEG Surround 2-1-2 by bitrate for
@@ -454,30 +459,37 @@ licensing applies to every implementation alike.
      and 8:3 for 48 to 64. Widen the SBR range at low rates, since
      ours stops at 12.7 kHz against FDK's 18. Last, add the LPD core
      for speech-like content, which needs a speech corpus to measure.
-4. **AAC-LC VBR.**
-   - *Evidence:* Apple's true VBR leads by 0.33 to 0.44 PEAQ points at
-     112 to 160 kbit/s. Our VBR modes score no better than our CBR at
-     the same bitrate on PEAQ.
-   - *Approach:* hold a constant perceptual quality across frames, so
-     that easy frames spend less and hard frames more, rather than
-     tracking the mode's bitrate target. Revisit after item 1, which
-     changes the cost of every quality step.
-5. **xHE-AAC rate accounting and low-rate level.** Our LOAS streams
+3. **AAC-LC true VBR.**
+   - *Evidence:* Apple's true VBR leads ours by 0.17 to 0.19 PEAQ points
+     at 128 to 160 kbit/s. Our VBR modes score no better than our CBR at
+     the same bitrate on PEAQ. Glockenspiel is where every
+     threshold-based rule we tried loses.
+   - *Approach:* see the true VBR section of the
+     [Apple probe note](apple-aac-probe.md) for the five designs
+     measured; the next lever is a model of tonal masking.
+4. **AAC-LC at 64 kbit/s and below.** FDK, libxaac and Apple score
+   0.08 to 0.15 PEAQ points above ours at nominal 64 kbit/s, on 1.4 to
+   5.2 % more bits; ViSQOL ranks ours first. A measurement at 56 kbit/s
+   would allow an equal-bitrate comparison.
+5. **HE-AAC tools Apple uses.** Apple's streams use coupled stereo SBR
+   in 87 to 90 % of frames at 32 and 48 kbit/s, and additional
+   sinusoids in 10 to 14 % of frames. Ours uses neither.
+6. **xHE-AAC rate accounting and low-rate level.** Our LOAS streams
    exceed the nominal bitrate by 7 to 8 %. Either subtract the pre-roll
    and StreamMuxConfig overhead from the budget, or document that the
    nominal rate is the payload rate. Separately, find out why the low
    band of our 24 and 32 kbit/s decodes comes out 0.8 to 3.2 dB louder
    than the source. Start with the noise-filling level.
-6. **The decoder's loudness default.** Normalising USAC streams to
+7. **The decoder's loudness default.** Normalising USAC streams to
    -24 LUFS by default follows FDK, but a music player may prefer
    consistent album levels or its own ReplayGain. Decide the product
    default in the binding. The codec already exposes the switch.
-7. **Test coverage of the comparison itself.** Add a speech item and
+8. **Test coverage of the comparison itself.** Add a speech item and
    44.1 kHz material, and run low-delay profiles and multichannel.
    Accept raw access units with an AudioSpecificConfig in `baac dec`,
    so that libxaac's xHE-AAC streams can be cross-decoded. Run a small
    MUSHRA listening test on the items where PEAQ and ViSQOL disagree,
-   such as Apple at 64 kbit/s and glock at 96 to 128.
+   such as Apple at 64 kbit/s and bandwidth at 192 kbit/s.
 
 ## Reproducing
 
