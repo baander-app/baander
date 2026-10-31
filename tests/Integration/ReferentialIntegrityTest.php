@@ -53,6 +53,8 @@ final class ReferentialIntegrityTest extends TestCase
         'party_members.audio_profile_id' => 'identifier within the video\'s probe data',
         'party_members.subtitle_track_id' => 'identifier within the video\'s probe data',
         'passkeys.credential_id' => 'the credential\'s own WebAuthn identifier',
+        'query_change_inbox.scope_id' => 'polymorphic with scope_kind; includes global wildcard and deletion invalidations that outlive the referenced row',
+        'query_scope_revision.scope_id' => 'polymorphic with scope_kind; durable revision identity includes global wildcard and deleted scopes',
         'radio_stations.external_id' => 'external station directory identifier',
         'recommendations.source_id' => 'polymorphic with source_type',
         'recommendations.target_id' => 'polymorphic with target_type',

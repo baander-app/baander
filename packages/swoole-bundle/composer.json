@@ -25,29 +25,22 @@
             "homepage": "https://github.com/k911"
         }
     ],
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/Rastusik/swoole-reflection.git"
-        }
-    ],
     "require": {
-        "php": "^8.3",
+        "php": "^8.5",
         "ext-json": "*",
         "beberlei/assert": "^3.3.3",
-        "laminas/laminas-code": "^4.7||^4.8",
-        "monolog/monolog": "^3.6",
-        "symfony/cache": "^7.4|^8.0",
-        "symfony/config": "^7.4|^8.0",
-        "symfony/console": "^7.4|^8.0",
-        "symfony/dependency-injection": "^7.4|^8.0",
-        "symfony/filesystem": "^7.4|^8.0",
-        "symfony/http-foundation": "^7.4|^8.0",
-        "symfony/http-kernel": "^7.4|^8.0",
-        "symfony/process": "^7.4|^8.0",
         "friendsofphp/proxy-manager-lts": "^1.0.19",
-        "upscale/ext-swoole": "6.2.0",
-        "upscale/swoole-reflection": "dev-reflection-fix as 3.3.0"
+        "laminas/laminas-code": "^4.7||^4.8",
+        "monolog/monolog": "^3.10",
+        "symfony/cache": "^8.1",
+        "symfony/config": "^8.1",
+        "symfony/console": "^8.1",
+        "symfony/dependency-injection": "^8.1",
+        "symfony/filesystem": "^8.1",
+        "symfony/http-foundation": "^8.1",
+        "symfony/http-kernel": "^8.1",
+        "symfony/process": "^8.1",
+        "upscale/ext-swoole": "6.2.4"
     },
     "require-dev": {
         "ext-ffi": "^8.3",
@@ -68,30 +61,30 @@
         "phpstan/phpstan-beberlei-assert": "^2.0",
         "phpstan/phpstan-doctrine": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
-        "phpunit/php-code-coverage": "^12.0",
-        "phpunit/phpcov": "^11.0",
-        "phpunit/phpunit": "^12.5",
+        "phpunit/php-code-coverage": "^14.5.0",
+        "phpunit/phpcov": "^13.2.0",
+        "phpunit/phpunit": "^13.4.5",
         "ramsey/uuid": "^4.7",
         "rector/rector": "^2.3",
         "slevomat/coding-standard": "^8.22",
         "squizlabs/php_codesniffer": "^4.0",
-        "swoole-bundle/z-engine": "8.3.1|8.4.1|8.5.1",
-        "swoole/ide-helper": "^6.0.0",
-        "symfony/debug-bundle": "^7.4|^8.0",
-        "symfony/doctrine-messenger": "^7.4|^8.0",
-        "symfony/error-handler": "^7.4|^8.0",
+        "swoole-bundle/z-engine": "8.5.2",
+        "swoole/ide-helper": "6.2.4",
+        "symfony/debug-bundle": "^8.1",
+        "symfony/doctrine-messenger": "^8.1",
+        "symfony/error-handler": "^8.1",
         "symfony/flex": "^2.4.7",
-        "symfony/framework-bundle": "^7.4|^8.0",
-        "symfony/messenger": "^7.4|^8.0",
-        "symfony/monolog-bridge": "^7.4|^8.0",
+        "symfony/framework-bundle": "^8.1",
+        "symfony/messenger": "^8.1",
+        "symfony/monolog-bridge": "^8.1",
         "symfony/monolog-bundle": "^3.10 || ^4.0",
-        "symfony/stopwatch": "^7.4|^8.0",
-        "symfony/twig-bridge": "^7.4|^8.0",
-        "symfony/twig-bundle": "^7.4|^8.0",
-        "symfony/var-dumper": "^7.4|^8.0",
-        "symfony/var-exporter": "^7.4|^8.0",
-        "symfony/web-profiler-bundle": "^7.4|^8.0",
-        "symfony/yaml": "^7.4|^8.0",
+        "symfony/stopwatch": "^8.1",
+        "symfony/twig-bridge": "^8.1",
+        "symfony/twig-bundle": "^8.1",
+        "symfony/var-dumper": "^8.1",
+        "symfony/var-exporter": "^8.1",
+        "symfony/web-profiler-bundle": "^8.1",
+        "symfony/yaml": "^8.1",
         "twig/twig": "^3.24"
     },
     "suggest": {
@@ -207,14 +200,14 @@
     },
     "extra": {
         "symfony": {
-            "require": "7.4.*"
+            "require": "8.1.*"
         }
     },
     "config": {
         "process-timeout": 1200,
         "sort-packages": true,
         "platform": {
-            "ext-swoole": "6.2.0"
+            "ext-swoole": "6.2.4"
         },
         "allow-plugins": {
             "phpstan/extension-installer": true,

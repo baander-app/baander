@@ -24,7 +24,16 @@ final class RegistryQualificationTest extends TestCase
         try {
             try {
                 $reflection->getMethod('command')->invokeArgs($qualification, [
-                    'argv' => [PHP_BINARY, '-r', 'pcntl_async_signals(true); pcntl_signal(15, static function (): never { exit(0); }); usleep(30000000);'],
+                    'argv' => [PHP_BINARY, '-r', <<<'PHP'
+$done = false;
+Swoole\Process::signal(15, static function () use (&$done): void { $done = true; });
+$timer = Swoole\Timer::after(30000, static function () use (&$done): void { $done = true; });
+while (!$done) { Swoole\Event::dispatch(); }
+Swoole\Process::signal(15, null);
+if (Swoole\Timer::exists($timer)) { Swoole\Timer::clear($timer); }
+Swoole\Event::wait();
+exit(0);
+PHP],
                     'requireZero' => false,
                     'timeout' => 1.0,
                 ]);
@@ -82,6 +91,8 @@ final class RegistryQualificationTest extends TestCase
             symlink(__DIR__ . '/Fixtures/registry-command.php', $this->root . '/bin/' . $command);
         }
         foreach ([
+            'test_runtime_lifecycle',
+            'test_cluster_convergence',
             'test_cluster_cleanup',
             'test_storage_cleanup',
             'run_rqlite_contract',

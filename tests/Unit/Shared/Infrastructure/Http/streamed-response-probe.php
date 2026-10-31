@@ -51,7 +51,7 @@ $server->set([
     'log_file' => $directory . '/swoole.log',
     'max_wait_time' => 1,
 ]);
-$streams = new InFlightStreams(static fn (int $fd): bool => $server->exist($fd) && $server->close($fd, true));
+$streams = new InFlightStreams(static fn(int $fd): bool => $server->exist($fd) && $server->close($fd, true));
 $aborter = new InFlightStreamAborter($streams);
 $processor = new ResponseHeadersAndStatusProcessor(new StreamedResponseProcessor(
     new CoWrapper(new ServicePoolContainer([]), new BundleSwoole()),
@@ -78,7 +78,7 @@ $server->on('request', static function (SwooleRequest $request, SwooleResponse $
             echo str_pad('first-', 16_384, '.');
             flush();
             try {
-                while (true) {
+                for (;;) {
                     Async::sleep(0.05);
                 }
             } catch (CoroutineCanceledException $cancelled) {

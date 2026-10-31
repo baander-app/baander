@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 final class CpuProcessPoolHealthLifecycleTest extends TestCase
 {
@@ -84,7 +84,7 @@ foreach (['owner', 'worker'] as $stage) {
 }
 $probe->destroy();
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $fixture, dirname(__DIR__, 5) . '/vendor/autoload.php', $directory]);
+        $process = CoroutineProbe::create(['-r', $fixture, dirname(__DIR__, 5) . '/vendor/autoload.php', $directory]);
         $process->setTimeout(10);
 
         try {
@@ -97,11 +97,17 @@ PHP;
             foreach (is_file($directory . '/pids') ? file($directory . '/pids', FILE_IGNORE_NEW_LINES) : [] as $entry) {
                 [$pid, $start] = explode(' ', $entry);
                 $stat = @file_get_contents('/proc/' . $pid . '/stat');
-                if ($stat === false) { continue; }
+                if ($stat === false) {
+                    continue;
+                }
                 $fields = explode(' ', substr($stat, strrpos($stat, ')') + 2));
-                if ($fields[19] === $start) { \Swoole\Process::kill((int) $pid, SIGKILL); }
+                if ($fields[19] === $start) {
+                    \Swoole\Process::kill((int) $pid, SIGKILL);
+                }
             }
-            foreach (glob($directory . '/*') ?: [] as $file) { unlink($file); }
+            foreach (glob($directory . '/*') ?: [] as $file) {
+                unlink($file);
+            }
             rmdir($directory);
         }
     }

@@ -17,4 +17,4 @@ USER 1000:1000
 RUN ! command -v python && ! command -v python3 \
     && php -r 'foreach (["pcntl", "posix"] as $extension) { if (extension_loaded($extension)) { throw new RuntimeException("Unexpected extension: " . $extension); } }' \
     && php vendor/bin/phpunit --configuration phpunit-tooling.xml.dist \
-        --do-not-cache-result --exclude-group registry-python-subject
+        --do-not-record-test-run-history --exclude-group registry-python-subject

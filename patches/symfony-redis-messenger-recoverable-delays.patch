@@ -1,38 +1,60 @@
 --- a/Transport/Connection.php
 +++ b/Transport/Connection.php
-@@ -459,27 +459,60 @@
-         $now = microtime();
-         $now = substr($now, 11).substr($now, 2, 3);
-
--        $queuedMessageCount = $this->rawCommand('ZCOUNT', 0, $now) ?? 0;
+@@ -55,14 +55,6 @@
+         'cluster' => false, // force use of cluster
+     ];
+ 
+-    private const CLAIM_DELAYED_MESSAGE_SCRIPT = <<<'LUA'
+-        local message = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1], 'WITHSCORES', 'LIMIT', 0, 1)
+-        if message[1] then
+-            redis.call('ZADD', KEYS[1], 'XX', ARGV[2], message[1])
+-        end
+-        return message
+-        LUA;
 -
+     private \Redis|Relay|\RedisCluster|null $redis = null;
+     private \Closure $redisInitializer;
+     private string $stream;
+@@ -487,34 +479,63 @@
+     private function handleDelayedMessages(): void
+     {
+         $now = microtime();
+-        $milliseconds = substr($now, 2, 3);
+-        $seconds = (int) substr($now, 11);
+-        $now = $seconds.$milliseconds;
+-        $claimExpiry = ($seconds + intdiv(max($this->redeliverTimeout, 1000), 1000)).$milliseconds;
+-
+-        $queuedMessageCount = $this->rawCommand('ZCOUNT', 0, $now) ?? 0;
++        $now = substr($now, 11).substr($now, 2, 3);
+ 
 -        while ($queuedMessageCount--) {
--            if (!$message = $this->rawCommand('ZPOPMIN', 1)) {
+-            if (!$message = $this->rawCommand('EVAL', self::CLAIM_DELAYED_MESSAGE_SCRIPT, $now, $claimExpiry)) {
 +        // Bound promotion work so a due backlog cannot monopolize each poll.
 +        for ($attempt = 0; $attempt < 100; ++$attempt) {
 +            if (!$messages = $this->rawCommand('ZRANGEBYSCORE', 0, $now, 'LIMIT', 0, 1)) {
                  break;
              }
-
+ 
 -            [$queuedMessage, $expiry] = $message;
+-
 +            $queuedMessage = $messages[0];
-+            $decodedQueuedMessage = json_decode($queuedMessage, true);
+             $decodedQueuedMessage = json_decode($queuedMessage, true);
 +            if (!\is_array($decodedQueuedMessage)) {
 +                throw new TransportException('Invalid message in the Redis delay queue.');
 +            }
-
--            if (\strlen($expiry) === \strlen($now) ? $expiry > $now : \strlen($expiry) < \strlen($now)) {
--                // if a future-placed message is popped because of a race condition with
--                // another running consumer, the message is readded to the queue
--
--                if (!$this->rawCommand('ZADD', 'NX', $expiry, $queuedMessage)) {
--                    throw new TransportException('Could not add a message to the redis stream.');
+ 
+-            try {
+-                $this->add(\is_array($decodedQueuedMessage) && \array_key_exists('body', $decodedQueuedMessage) ? $decodedQueuedMessage['body'] : $queuedMessage, $decodedQueuedMessage['headers'] ?? [], 0);
+-            } catch (\Throwable $e) {
+-                try {
+-                    $this->rawCommand('ZADD', 'XX', $expiry, $queuedMessage);
+-                } catch (TransportException) {
 -                }
 +            $this->promoteDelayedMessage($queuedMessage, $now, \array_key_exists('body', $decodedQueuedMessage) ? $decodedQueuedMessage['body'] : $queuedMessage, $decodedQueuedMessage['headers'] ?? []);
 +        }
 +    }
-
--                break;
+ 
+-                throw $e;
 +    private function promoteDelayedMessage(string $queuedMessage, string $now, string $body, array $headers): void
 +    {
 +        // Prepare the payload exactly as add() does; Lua must not round-trip JSON
@@ -66,9 +88,8 @@
              }
 +            throw new TransportException($error ?? $e->getMessage(), 0, $e);
 +        }
-
--            $decodedQueuedMessage = json_decode($queuedMessage, true);
--            $this->add(\array_key_exists('body', $decodedQueuedMessage) ? $decodedQueuedMessage['body'] : $queuedMessage, $decodedQueuedMessage['headers'] ?? [], 0);
+ 
+-            $this->rawCommand('ZREM', $queuedMessage);
 +        if (false === $result) {
 +            if ($error = $redis->getLastError() ?: null) {
 +                $redis->clearLastError();
@@ -76,3 +97,4 @@
 +            throw new TransportException($error ?? 'Could not promote a message from the Redis delay queue.');
          }
      }
+ 

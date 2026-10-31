@@ -60,14 +60,15 @@ final class BackendComparisonTest extends TestCase
         file_put_contents($path, json_encode($data, JSON_THROW_ON_ERROR));
     }
 
-    /** @param array<positive-int,?list<string>> $lines */
-    private function lane(string $directory, string $name = 'ordinary', array $lines = [5 => ['ProbeTest::testProbe']]): void
+    /** @param array<positive-int,?list<positive-int>> $lines */
+    private function lane(string $directory, string $name = 'ordinary', array $lines = [5 => [1]]): void
     {
         $driver = $this->createStub(Driver::class);
         $driver->method('name')->willReturn('fixture');
         $driver->method('version')->willReturn('1');
         $coverage = new CodeCoverage($driver, new Filter());
         $data = new ProcessedCodeCoverageData();
+        $data->setTestIds([0 => 'ProbeTest::testProbe']);
         $data->setLineCoverage([self::SOURCE => $lines]);
         $coverage->setData($data);
         $path = $directory . '/run/' . $name . '.cov';
@@ -107,7 +108,7 @@ final class BackendComparisonTest extends TestCase
     public function testNonexecutableHeaderIsExcludedFromRealSerializedCoverage(): void
     {
         $directory = $this->directory . '/reference';
-        $this->lane($directory, lines: [10 => null, 12 => ['ProbeTest::testProbe']]);
+        $this->lane($directory, lines: [10 => null, 12 => [1]]);
         $this->clover(
             $directory,
             entries: '<line type="method" num="10" count="1"/><line type="stmt" num="12" count="1"/>',
@@ -178,7 +179,7 @@ final class BackendComparisonTest extends TestCase
 
     public function testExactLineDifferencesAreRejectedEvenWhenCloverCountsAgree(): void
     {
-        $this->lane($this->directory . '/candidate', lines: [6 => ['ProbeTest::testProbe']]);
+        $this->lane($this->directory . '/candidate', lines: [6 => [1]]);
         $this->expectExceptionMessage('executable_difference');
         $this->comparison->compare($this->directory . '/reference', $this->directory . '/candidate');
     }

@@ -24,20 +24,24 @@ new review and does not establish that a patch is obsolete.
 ## Symfony Redis Messenger delayed promotion
 
 `symfony-redis-messenger-recoverable-delays.patch` targets the locked
-`symfony/redis-messenger` 8.0.8. Composer Patches 2.0.0 applies it; the reviewed
+`symfony/redis-messenger` 8.1.10, revision
+`484058b2e3055dc56be9b1463cf510e06228542c`. Composer Patches 2.0.0 applies it; the reviewed
 SHA-256 is recorded in `patches.lock.json`. Keep that lockfile available before
 Composer installation, including in production image builds. The upstream package
 retains its MIT license.
 
-The upstream transport removes a due sorted-set member before adding it to the
-stream. A rejected write or interruption can therefore lose an accepted retry.
-The patch selects a due member without removing it, uses the existing transport
-insertion path, then removes the exact member only after insertion succeeds. Body,
-headers, serializer behavior and existing delayed-member formats are preserved.
-Each poll promotes at most 100 messages.
+Upstream 8.1.10 leases a due sorted-set member by moving its score forward before
+inserting it into the stream. That improves recovery over the previous removal-first
+algorithm, but does not provide Baander's bounded promotion and immediate retry
+behavior. The retained patch selects a due member without removing it and runs a
+Lua script that checks its score, inserts the stream entry, then removes the exact
+member. A failed insertion retains the original due member. The payload uses the
+native client's serializer, preserving bodies, headers and existing delayed-member
+formats. Each poll promotes at most 100 messages.
 
-This is recoverable, at-least-once promotion, not an atomic or exactly-once transfer.
-Concurrent pollers or interruption after insertion can produce duplicate deliveries.
+This is recoverable, at-least-once promotion. Redis executes the script without
+interleaving commands, but does not roll back writes after a script error. A failed
+removal after insertion can therefore produce duplicate deliveries on retry.
 Consumer effects still need their existing stable operation IDs and idempotency.
 Malformed queue members are retained and reported, not silently discarded. Poison
 members and Redis resource exhaustion can block promotion; quarantine and explicit

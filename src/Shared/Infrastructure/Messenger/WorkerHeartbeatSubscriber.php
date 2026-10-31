@@ -8,6 +8,7 @@ use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Event\ConsoleAlarmEvent;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\Event\WorkerRunningEvent;
@@ -32,6 +33,7 @@ final class WorkerHeartbeatSubscriber implements EventSubscriberInterface
     private ?int $lastDeliveryAt = null;
 
     public function __construct(
+        #[Autowire(lazy: true)]
         private readonly MessengerWorkerHealth $health,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,

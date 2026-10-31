@@ -264,7 +264,7 @@ final class RecommendationRepositoryTest extends TestCase
         }
 
         // Create a global recommendation — should appear (global + user recommendations)
-        $noUserRec = Recommendation::create('song', 'no-user-src', 'song', 'no-user-tgt', 99);
+        $noUserRec = Recommendation::create('song', Uuid::generate()->toString(), 'song', Uuid::generate()->toString(), 99);
         $this->recommendationRepository->save($noUserRec);
 
         $results = $this->recommendationRepository->findForUser($user->getId(), 3);

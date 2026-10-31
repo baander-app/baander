@@ -46,7 +46,7 @@ final class TransportCommandsTest extends KernelTestCase
         $this->sendFailed('available');
         $this->sendFailed('delayed', delayed: true);
 
-        $tester = $this->runCommand('app:failed-message:flush', ['--force' => true]);
+        $tester = $this->executeTransportAdministrationCommand('app:failed-message:flush', ['--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertStringContainsString('Removed 2 failed messages.', $tester->getDisplay());
@@ -58,7 +58,7 @@ final class TransportCommandsTest extends KernelTestCase
         $available = $this->sendFailed('available');
         $delayed = $this->sendFailed('delayed', delayed: true);
 
-        $tester = $this->runCommand('app:failed-message:flush');
+        $tester = $this->executeTransportAdministrationCommand('app:failed-message:flush');
 
         self::assertSame(Command::INVALID, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame([$available, $delayed], $this->storedIds());
@@ -72,7 +72,7 @@ final class TransportCommandsTest extends KernelTestCase
 
         $pages = [];
         foreach (['1', '2'] as $page) {
-            $tester = $this->runCommand('app:failed-message:list', ['--page' => $page, '--limit' => '2', '--json' => true]);
+            $tester = $this->executeTransportAdministrationCommand('app:failed-message:list', ['--page' => $page, '--limit' => '2', '--json' => true]);
             self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
 
             $api = $this->controller()->listFailed(new Request(['page' => $page, 'limit' => '2']));
@@ -84,7 +84,7 @@ final class TransportCommandsTest extends KernelTestCase
 
         self::assertSame([[$newest, $delayed], [$oldest]], $pages);
 
-        $table = $this->runCommand('app:failed-message:list');
+        $table = $this->executeTransportAdministrationCommand('app:failed-message:list');
         self::assertStringContainsString('Probe "second" failed.', $table->getDisplay());
         self::assertStringContainsString('Page 1 of 1, 3 messages in total.', $table->getDisplay());
     }
@@ -94,7 +94,7 @@ final class TransportCommandsTest extends KernelTestCase
         $this->sendFailed('counted');
         $this->sendFailed('delayed', delayed: true);
 
-        $tester = $this->runCommand('app:monitor:transport', ['--json' => true]);
+        $tester = $this->executeTransportAdministrationCommand('app:monitor:transport', ['--json' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         $api = $this->controller()->status();
@@ -106,7 +106,7 @@ final class TransportCommandsTest extends KernelTestCase
     }
 
     /** @param array<string, mixed> $input */
-    private function runCommand(string $command, array $input = []): CommandTester
+    private function executeTransportAdministrationCommand(string $command, array $input = []): CommandTester
     {
         $tester = new CommandTester($this->application->find($command));
         $tester->execute($input, ['interactive' => false]);

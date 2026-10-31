@@ -65,6 +65,25 @@
             }
         },
         {
+            "path": "src/Bridge/Doctrine/ContextualRegistry.php",
+            "status": "introduced-during-reconciliation",
+            "local_sha256": null,
+            "upstream_sha256": null,
+            "subsystem": "doctrine",
+            "behavior_delta": "Adapts Symfony 8.1 Doctrine manager reset to the contextual pool: close and release only the current coroutine assignment, preserving the shared proxy and other coroutine assignments.",
+            "recommended_disposition": "introduced-local-implementation",
+            "rationale": "Adapts Symfony 8.1 Doctrine manager reset to the contextual pool: close and release only the current coroutine assignment, preserving the shared proxy and other coroutine assignments.",
+            "current_local_sha256": "dba204e8c95098ef1faa191e3fcc0b18789a6c0c4ec16558c3d4dd43b7a5c130",
+            "current_source_presence": "present",
+            "final_disposition": "introduced-local-implementation",
+            "final_reason": "Adapts Symfony 8.1 Doctrine manager reset to the contextual pool: close and release only the current coroutine assignment, preserving the shared proxy and other coroutine assignments.",
+            "source_review_status": "recorded",
+            "runtime_qualification": {
+                "status": "pending-authoritative-gates",
+                "scope": "Focused real-manager and overlapping-coroutine regression passes; full upgraded-stack qualification remains pending."
+            }
+        },
+        {
             "path": "src/Bridge/Doctrine/DBAL/ConnectionKeepAliveInitializer.php",
             "status": "different",
             "local_sha256": "b3747166ab721a006580f0b9197e92b15c35c4f2a443635292ebf004d7394bd6",
@@ -174,10 +193,10 @@
             "recommended_disposition": "adapt-cohort",
             "rationale": "Adopt applicable pooling/debug reset behavior, preserve local DBAL transaction-finalizer and avoid an undeclared resetter-bundle dependency.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "a133afd35ae18183965dfe233dc86a9f7f6672e083876ba69a73f2d7e6144223",
+            "current_local_sha256": "a66ed690007a3d5d85c8aeda1878cc8e883e4306ab88c95123efc94a4403ffe3",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Pools connection event-manager at connection limit and fixes debug data-holder stateful/kernel.reset metadata; removes obsolete EntityManagerResetter logger wiring. Preserves application TransactionFinalizingDBALAliveKeeper and reset-before-release/retry ordering rather than external resetter-bundle migration.",
+            "final_reason": "Pools connection event-manager at connection limit and fixes debug data-holder stateful/kernel.reset metadata; removes obsolete EntityManagerResetter logger wiring. Preserves application TransactionFinalizingDBALAliveKeeper and reset-before-release/retry ordering rather than external resetter-bundle migration. Installs the contextual Doctrine registry so manager reset replaces only the current coroutine assignment instead of applying native lazy reset to the shared wrapper.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
@@ -7985,7 +8004,7 @@
     "reconciliation": {
         "baseline_fields_immutable": true,
         "baseline_entry_count": 403,
-        "current_record_entry_count": 405,
+        "current_record_entry_count": 406,
         "hash_scope": "Current packages/swoole-bundle/src file bytes at reconciliation; concurrent edits require hash refresh.",
         "source_disposition_scope": "All baseline and introduced package source paths have an explicit implementation, local alternative, retained contract, platform decision or optional-feature/defect deferral. Runtime acceptance is tracked separately.",
         "runtime_qualification_status": "pending-authoritative-gates",
@@ -7996,7 +8015,7 @@
             "deferred-optional-feature": 28,
             "deferred-unconfigured-defect": 3,
             "deferred-unconfigured-feature": 103,
-            "introduced-local-implementation": 2,
+            "introduced-local-implementation": 3,
             "not-applicable": 1,
             "not-applicable-current-platform": 1,
             "retained-equivalent": 149,

@@ -63,7 +63,9 @@ final class SchedulerRecoveryPollerTest extends TestCase
         self::assertInstanceOf(EntityManagerInterface::class, $configured);
         self::assertSame(0, $configured->getConnection()->getTransactionNestingLevel());
         $this->configuredManager = $configured;
-        $this->manager = new EntityManager($this->writer, $configured->getConfiguration(), $configured->getEventManager());
+        $eventManager = $configured->getEventManager();
+        self::assertInstanceOf(\Doctrine\Common\EventManager::class, $eventManager);
+        $this->manager = new EntityManager($this->writer, $configured->getConfiguration(), $eventManager);
         $this->jobs = new ScheduledJobRepository($this->manager);
     }
 
@@ -121,8 +123,8 @@ final class SchedulerRecoveryPollerTest extends TestCase
         $second = $this->job(2);
         $firstClaims = (new DoctrineSchedulerRecoveryScheduleStore($this->connection()))->claimPendingJobs(1, 3600);
         $secondClaims = (new DoctrineSchedulerRecoveryScheduleStore($this->connection()))->claimPendingJobs(1, 3600);
-        self::assertSame([$first->getId()->toString()], array_map(static fn (Uuid $id): string => $id->toString(), $firstClaims));
-        self::assertSame([$second->getId()->toString()], array_map(static fn (Uuid $id): string => $id->toString(), $secondClaims));
+        self::assertSame([$first->getId()->toString()], array_map(static fn(Uuid $id): string => $id->toString(), $firstClaims));
+        self::assertSame([$second->getId()->toString()], array_map(static fn(Uuid $id): string => $id->toString(), $secondClaims));
         self::assertTrue($this->isDeferred($first));
         self::assertTrue($this->isDeferred($second));
         self::assertSame([], (new DoctrineSchedulerRecoveryScheduleStore($this->connection()))->claimPendingJobs());
@@ -178,7 +180,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
     public function testUnacknowledgedClaimCannotInvokeMaterializerAndRecoveryFollowsActualCommit(bool $committed): void
     {
         $job = $this->job(1);
-        $connection = new class($this->parameters, $this->writer->getDriver()) extends Connection {
+        $connection = new class ($this->parameters, $this->writer->getDriver()) extends Connection {
             public bool $committed = false;
             public function commit(): void
             {
@@ -305,7 +307,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
     {
         $connection = $this->connection();
         $materializer = new DoctrineSchedulerOccurrenceMaterializer($connection);
-        $scoped = new class($materializer, $connection, $this->schema) implements SchedulerOccurrenceMaterializerInterface {
+        $scoped = new class ($materializer, $connection, $this->schema) implements SchedulerOccurrenceMaterializerInterface {
             public function __construct(private DoctrineSchedulerOccurrenceMaterializer $materializer, private Connection $connection, private string $schema) {}
             public function materialize(Uuid $jobId, int $minuteLimit = 60): int
             {

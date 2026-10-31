@@ -24,8 +24,7 @@ final class SpotifyAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<int, array{id: string, name: string, popularity: int, genres: list<string>, imageUrl: string|null}>
@@ -169,7 +168,8 @@ final class SpotifyAdapter
     {
         $url = self::BASE_URL . $endpoint . ($params !== [] ? '?' . http_build_query($params) : '');
         $token = $this->authenticate();
-        for ($attempt = 0; $attempt < 2; ++$attempt) {
+        $retried = false;
+        while (true) {
             $this->logger->debug('Spotify API request', ['service' => 'spotify', 'method' => $method, 'endpoint' => $endpoint]);
             $response = null;
             try {
@@ -191,10 +191,11 @@ final class SpotifyAdapter
                 return [];
             }
             $errorStatus = $data['error']['status'] ?? null;
-            if (($status === 429 || $errorStatus === 429) && $attempt === 0) {
+            if (($status === 429 || $errorStatus === 429) && !$retried) {
                 $wait = max(0, (int) ($headers['retry-after'][0] ?? $data['error']['retry-after']['value'] ?? 1));
                 $this->logger->info('Spotify rate limit hit, retrying', ['service' => 'spotify', 'retry_after' => $wait]);
                 Async::sleep($wait);
+                $retried = true;
                 continue;
             }
             if ($status >= 300 || isset($data['error'])) {
@@ -205,7 +206,5 @@ final class SpotifyAdapter
 
             return $data;
         }
-
-        return [];
     }
 }

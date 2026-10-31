@@ -63,11 +63,14 @@ function drillRedis(Client $docker, string $container, string ...$arguments): st
 }
 
 /** @param array<string,mixed> $model */
-function drillCreateService(ResourceLedger $ledger, Client $docker, array $model, string $service, string $project, string $network): string
+function drillCreateService(ResourceLedger $ledger, Client $docker, array $model, string $service, string $project, string $network, string $composeFile): string
 {
     $definition = $model['services'][$service];
+    $hashOutput = $docker->compose($project, $composeFile, ['config', '--hash', $service])->stdout |> trim(...);
+    drillCheck(preg_match('/^' . preg_quote($service, '/') . ' ([a-f0-9]{64})$/D', $hashOutput, $matches) === 1, 'Compose did not return the fixture service configuration hash.');
     $arguments = ['--network', $network, '--network-alias', $service === 'postgres' ? 'database' : $service,
-        '--label', 'com.docker.compose.project=' . $project, '--label', 'com.docker.compose.service=' . $service];
+        '--label', 'com.docker.compose.project=' . $project, '--label', 'com.docker.compose.service=' . $service,
+        '--label', 'com.docker.compose.config-hash=' . $matches[1], '--label', 'com.docker.compose.oneoff=False'];
     foreach ($definition['environment'] as $key => $_) {
         array_push($arguments, '--env', $key);
     }
@@ -257,7 +260,8 @@ try {
             'postgres_image' => ($invocationEnvironment['BAANDER_DATABASE_TEST_IMAGE'] ?? '') ?: $tooling->images->role('postgres')->reference,
             'redis_image' => ($invocationEnvironment['BAANDER_DATABASE_REDIS_IMAGE'] ?? '') ?: $tooling->images->role('fixtureRedis')->reference,
         ];
-        $release = ['source' => getcwd(), 'revision' => str_repeat('d', 40), 'images' => []];
+        $release = ['source' => getcwd(), 'revision' => str_repeat('d', 40), 'images' => [],
+            'effective' => ['budgets' => $tooling->budgets->toArray()]];
         $imageMetadata = [];
         foreach ($imageReferences as $role => $reference) {
             $imageMetadata[$reference] ??= json_decode($docker->run(['image', 'inspect', $reference])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
@@ -312,12 +316,13 @@ try {
             foreach (['database', 'redis', 'var', 'secrets', 'storage', 'conversions', 'transcode_state'] as $key) {
                 $ledger->create(ResourceKind::Volume, $model['volumes'][$key]['name'], []);
             }
-            $postgres = drillCreateService($ledger, $docker, $model, 'postgres', $name, $name);
-            $sourceRedis = drillCreateService($ledger, $docker, $model, 'redis', $name, $name);
+            $postgres = drillCreateService($ledger, $docker, $model, 'postgres', $name, $name, $instance['compose_file']);
+            $sourceRedis = drillCreateService($ledger, $docker, $model, 'redis', $name, $name, $instance['compose_file']);
             $docker->run(['exec', $postgres, '/bin/sh', '-ec',
                 'for n in $(seq 1 60); do pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" && exit 0; sleep 1; done; exit 1'], timeout: 70);
             $docker->run(['exec', $sourceRedis, '/bin/sh', '-ec',
                 'export REDISCLI_AUTH="$REDIS_PASSWORD"; for n in $(seq 1 60); do redis-cli ping | grep -qx PONG && exit 0; sleep 1; done; exit 1'], timeout: 70);
+            drillCheck($database->container($instance, $docker) === ($docker->run(['inspect', '--format', '{{.Id}}', $postgres])->stdout |> trim(...)), 'Compose discovered a different PostgreSQL container.');
             drillCheck($database->inspect($instance, $release)['fresh']);
             drillSql($docker, $postgres, "CREATE EXTENSION IF NOT EXISTS pgroonga; CREATE TABLE development_checkpoint_probe(id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, value text); INSERT INTO development_checkpoint_probe(value) VALUES ('retained library identity'); CREATE INDEX development_checkpoint_probe_search ON development_checkpoint_probe USING pgroonga(value);");
             try {

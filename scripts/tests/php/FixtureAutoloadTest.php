@@ -93,7 +93,8 @@ PHP;
         $executor = new EngineExecutor(ExecutionContext::bounded(60, $environment));
         try {
             $executor->run(new ProcessSpec(['composer', '--working-dir=' . $directory, 'dump-autoload', '--no-dev', '--optimize', '--no-interaction', '--no-scripts', '--no-plugins']));
-            $executor->run(new ProcessSpec(['composer', '--working-dir=' . $directory . '/scripts', 'install', '--no-dev', '--optimize-autoloader', '--no-interaction', '--no-progress', '--no-scripts', '--no-plugins']));
+            $executor->run(new ProcessSpec(['cp', '-a', $root . '/scripts/vendor', $directory . '/scripts/vendor']));
+            $executor->run(new ProcessSpec(['composer', '--working-dir=' . $directory . '/scripts', 'dump-autoload', '--no-dev', '--optimize', '--no-interaction', '--no-scripts', '--no-plugins']));
             $probe = $executor->run(new ProcessSpec([PHP_BINARY, '-r', <<<'PHP'
 require $argv[1] . '/vendor/autoload.php';
 if (class_exists(\Baander\Tooling\Fixtures\Worker\CompletionCursor::class) || class_exists(\PHPUnit\Framework\TestCase::class)) { exit(81); }

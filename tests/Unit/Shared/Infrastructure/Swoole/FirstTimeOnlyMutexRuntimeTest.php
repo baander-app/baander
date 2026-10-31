@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 final class FirstTimeOnlyMutexRuntimeTest extends TestCase
 {
@@ -65,7 +65,7 @@ Swoole\Coroutine\run(static function () use ($argv, $mutex, &$completed, &$error
 });
 echo json_encode(['completed' => $completed, 'errors' => $errors, 'acquired' => $underlying->isAcquired()], JSON_THROW_ON_ERROR);
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php', (string) $waiters, $failInitialization ? '1' : '0']);
+        $process = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php', (string) $waiters, $failInitialization ? '1' : '0']);
         $process->setTimeout(5);
         $process->run();
 

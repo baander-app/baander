@@ -96,13 +96,24 @@ final class LibraryScanClaimRace
      * @param array{process: resource, output: resource, application: string} $child
      * @return array<string, mixed>
      */
-    public static function finish(array $child): array
+    public static function finish(array $child, ?Connection $observer = null): array
     {
         $deadline = microtime(true) + 10;
         while (proc_get_status($child['process'])['running']) {
             if (microtime(true) > $deadline) {
-                proc_terminate($child['process'], 9);
-                throw new \RuntimeException('Claim contender did not finish.');
+                try {
+                    $activity = $observer?->fetchAllAssociative(
+                        'SELECT state, wait_event_type, wait_event, query, pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE application_name = ?',
+                        [$child['application']],
+                    );
+                } finally {
+                    proc_terminate($child['process'], 9);
+                    rewind($child['output']);
+                    $output = (string) stream_get_contents($child['output']);
+                    fclose($child['output']);
+                    proc_close($child['process']);
+                }
+                throw new \RuntimeException('Claim contender did not finish. Activity: ' . json_encode($activity, JSON_THROW_ON_ERROR) . ' Output: ' . $output);
             }
             usleep(1000);
         }

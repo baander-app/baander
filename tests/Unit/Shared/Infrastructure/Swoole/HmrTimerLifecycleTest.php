@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 final class HmrTimerLifecycleTest extends TestCase
 {
@@ -101,7 +101,7 @@ CHILD;
 
     private function assertProbe(string $script, string $output): void
     {
-        $process = new Process([PHP_BINARY, '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
+        $process = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
         $process->setTimeout(5);
         $process->run();
         self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());

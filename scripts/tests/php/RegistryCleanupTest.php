@@ -147,6 +147,8 @@ PHP;
     /** @return iterable<string,array{string,string}> */
     public static function contracts(): iterable
     {
+        yield 'coroutine lifecycle' => ['test_runtime_lifecycle.php', 'signal cleanup and child reaping'];
+        yield 'voter convergence' => ['test_cluster_convergence.php', 'voter convergence'];
         yield 'cluster resources' => ['test_cluster_cleanup.php', 'exhaustive cleanup, reaping and literal argv'];
         yield 'bounded storage' => ['test_storage_cleanup.php', 'diagnostic controls and failure-preserving cleanup'];
     }

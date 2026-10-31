@@ -193,6 +193,7 @@ final class AccessTokenCacheTransactionTest extends TestCase
         return 'oauth_revoked_' . $token->getTokenId()->toString();
     }
 
+    /** @phpstan-impure */
     private function revokedStatus(Connection $connection, AccessToken $token): int
     {
         $status = $connection->fetchOne(

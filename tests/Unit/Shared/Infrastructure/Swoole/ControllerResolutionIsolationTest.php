@@ -55,9 +55,15 @@ final class ControllerResolutionIsolationTest extends TestCase
         $container->set(ControllerResolutionFixture::class, $controller);
         $resolver = new NonMutatingControllerResolver($container);
         $request = new Request(attributes: ['_controller' => ControllerResolutionFixture::class . '::action']);
-        self::assertSame([$controller, 'action'], $resolver->getController($request));
-        self::assertSame([$controller, 'action'], $resolver->getController($request));
+        self::assertSame([$controller, 'action'], $this->resolveController($resolver, $request));
+        self::assertSame([$controller, 'action'], $this->resolveController($resolver, $request));
         self::assertSame(1, $controller->containerWrites);
+    }
+
+    /** @phpstan-impure */
+    private function resolveController(NonMutatingControllerResolver $resolver, Request $request): callable|false
+    {
+        return $resolver->getController($request);
     }
 
     public function testUnconfiguredAbstractControllerStillFails(): void

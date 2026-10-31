@@ -11,7 +11,8 @@
          displayDetailsOnTestsThatTriggerDeprecations="true"
          displayDetailsOnTestsThatTriggerNotices="true"
          cacheDirectory=".phpunit.cache"
-         executionOrder="depends,random"
+         executionOrder="random"
+         resolveDependencies="true"
          beStrictAboutOutputDuringTests="true"
 >
     <php>

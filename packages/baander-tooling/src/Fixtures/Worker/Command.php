@@ -57,17 +57,7 @@ final class Command
     /** @param list<string> $arguments */
     private function journal(string $action, array $arguments = []): ProcessResult
     {
-        return $this->resources->runContainer($this->resources->id . '-observer', [
-            ...$this->common,
-            '--entrypoint',
-            'php',
-            $this->image,
-            '-d',
-            'memory_limit=64M',
-            self::FIXTURE,
-            $action,
-            ...$arguments,
-        ]);
+        return $this->check($this->resources->id . '-prepare', $action, $arguments);
     }
 
     /** @param list<string> $arguments */

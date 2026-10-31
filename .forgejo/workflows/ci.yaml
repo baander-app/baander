@@ -18,6 +18,8 @@ env:
 jobs:
     quality-gate:
         runs-on: docker-cli
+        env:
+            BAANDER_TEST_DOCKER_SOCKET_PATH: ${{ vars.BAANDER_TEST_DOCKER_SOCKET_PATH || '/var/run/docker.sock' }}
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:
@@ -221,6 +223,8 @@ jobs:
 
             -   name: PHP tooling regressions
                 run: |
+                    docker run --rm --network none "$CI_IMAGE" \
+                      composer run-script --timeout=720 check:php-dependencies:local
                     docker run --rm --network none "$CI_IMAGE" \
                       composer check:tooling-architecture
                     docker run --rm --network none "$CI_IMAGE" \

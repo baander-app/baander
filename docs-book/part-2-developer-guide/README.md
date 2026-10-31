@@ -17,6 +17,7 @@ Understand the architecture, write code following project conventions, and contr
 | Page | Description |
 |------|-------------|
 | [Development Environment](development-environment.md) | Docker setup, Makefile commands, IDE config, and Xdebug |
+| [PHP Dependencies](php-dependencies.md) | Runtime selections, Composer updates, patch reviews and maintenance checks |
 | [Coding Conventions](coding-conventions.md) | Domain models, value objects, repositories, CQRS, ports, and anti-corruption |
 | [CQRS and Messaging](cqrs-and-messaging.md) | Commands, handlers, domain events, and async processing |
 | [Search](search.md) | PGroonga full-text search, making a context searchable |

@@ -66,6 +66,7 @@
         "cleanup": 120,
         "backend": 3600,
         "messaging": 600,
+        "dependencies": 600,
         "http": 180,
         "fixture": 600,
         "workerLifecycle": 1300,

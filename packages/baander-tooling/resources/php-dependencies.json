@@ -1,5 +1,11 @@
 {
     "version": 1,
+    "excludedTrees": {
+        "var": {
+            "kind": "generated",
+            "reason": "Retained build and test evidence and disposable contexts, not repository-owned source projects."
+        }
+    },
     "projects": {
         "composer.json": {
             "kind": "locked",
@@ -24,56 +30,137 @@
         "packages/baander-tooling/composer.json": {
             "kind": "package",
             "owner": "standalone tooling",
-            "consumers": ["composer.json", "scripts/composer.json"],
+            "consumers": [
+                "composer.json",
+                "scripts/composer.json"
+            ],
             "development": "No separate development requirements."
         },
         "packages/baander-phpstan-rules/composer.json": {
             "kind": "package",
             "owner": "PHPStan rules",
-            "consumers": ["composer.json"],
+            "consumers": [
+                "composer.json"
+            ],
             "development": "Validate independent development constraints in a disposable install; the root static-analysis suite exercises the rules."
         },
         "packages/swoole-bundle/composer.json": {
             "kind": "fork",
             "owner": "Swoole runtime integration",
-            "consumers": ["composer.json"],
+            "consumers": [
+                "composer.json"
+            ],
             "development": "Validate the package's own development constraints and Flex/platform configuration in a disposable install."
         }
     },
-    "internalPackages": ["baander/tooling", "baander/phpstan-rules", "tsduck/php"],
+    "internalPackages": [
+        "baander/tooling",
+        "baander/phpstan-rules",
+        "tsduck/php"
+    ],
     "runtimes": {
         "php": {
             "minimum": "8.5.12",
             "source": "https://www.php.net/releases/index.php?json&version=8",
             "declarations": [
-                {"path": "Dockerfile", "kind": "php-image"},
-                {"path": "docker/runner/Dockerfile", "kind": "assignment", "key": "PHP_VERSION"},
-                {"path": "relay/docker/build-tooling-php.sh", "kind": "assignment", "key": "version"},
-                {"path": "relay/docker/build-qualification-php.sh", "kind": "assignment", "key": "php_version"},
-                {"path": "docker/nginx/Dockerfile.test", "kind": "assignment", "key": "PHP_VERSION"},
-                {"path": "docker/nginx/Dockerfile.test", "kind": "alpine-package", "key": "PHP_PACKAGE_VERSION"}
+                {
+                    "path": "Dockerfile",
+                    "kind": "php-image"
+                },
+                {
+                    "path": "docker/runner/Dockerfile",
+                    "kind": "assignment",
+                    "key": "PHP_VERSION"
+                },
+                {
+                    "path": "relay/docker/build-tooling-php.sh",
+                    "kind": "assignment",
+                    "key": "version"
+                },
+                {
+                    "path": "relay/docker/build-qualification-php.sh",
+                    "kind": "assignment",
+                    "key": "php_version"
+                },
+                {
+                    "path": "docker/nginx/Dockerfile.test",
+                    "kind": "assignment",
+                    "key": "PHP_VERSION"
+                },
+                {
+                    "path": "docker/nginx/Dockerfile.test",
+                    "kind": "alpine-package",
+                    "key": "PHP_PACKAGE_VERSION"
+                }
             ]
         },
         "swoole": {
             "source": "https://pecl.php.net/rest/r/swoole/allreleases.xml",
             "declarations": [
-                {"path": "Dockerfile", "kind": "swoole-install"},
-                {"path": "docker/runner/Dockerfile", "kind": "assignment", "key": "SWOOLE_VERSION"},
-                {"path": "docker/nginx/Dockerfile.test", "kind": "assignment", "key": "SWOOLE_VERSION"},
-                {"path": "relay/docker/build-qualification-php.sh", "kind": "assignment", "key": "swoole_version"},
-                {"path": "composer.json", "kind": "json", "pointer": "/config/platform/ext-swoole"},
-                {"path": "packages/swoole-bundle/composer.json", "kind": "json", "pointer": "/require/upscale~1ext-swoole"},
-                {"path": "packages/swoole-bundle/composer.json", "kind": "json", "pointer": "/config/platform/ext-swoole"}
+                {
+                    "path": "Dockerfile",
+                    "kind": "swoole-install"
+                },
+                {
+                    "path": "docker/runner/Dockerfile",
+                    "kind": "assignment",
+                    "key": "SWOOLE_VERSION"
+                },
+                {
+                    "path": "docker/nginx/Dockerfile.test",
+                    "kind": "assignment",
+                    "key": "SWOOLE_VERSION"
+                },
+                {
+                    "path": "relay/docker/build-qualification-php.sh",
+                    "kind": "assignment",
+                    "key": "swoole_version"
+                },
+                {
+                    "path": "composer.json",
+                    "kind": "json",
+                    "pointer": "/config/platform/ext-swoole"
+                },
+                {
+                    "path": "packages/swoole-bundle/composer.json",
+                    "kind": "json",
+                    "pointer": "/require/upscale~1ext-swoole"
+                },
+                {
+                    "path": "packages/swoole-bundle/composer.json",
+                    "kind": "json",
+                    "pointer": "/config/platform/ext-swoole"
+                },
+                {
+                    "path": "composer.json",
+                    "kind": "json",
+                    "pointer": "/require/swoole~1ide-helper"
+                }
             ]
         },
         "composer": {
             "source": "https://getcomposer.org/versions",
             "declarations": [
-                {"path": "Dockerfile", "kind": "composer-image"},
-                {"path": "docker/runner/Dockerfile", "kind": "composer-image"},
-                {"path": "relay/docker/Dockerfile", "kind": "composer-image"},
-                {"path": "relay/docker/backup.Dockerfile", "kind": "composer-image"},
-                {"path": "relay/docker/rqlite.Dockerfile", "kind": "composer-image"}
+                {
+                    "path": "Dockerfile",
+                    "kind": "composer-image"
+                },
+                {
+                    "path": "docker/runner/Dockerfile",
+                    "kind": "composer-image"
+                },
+                {
+                    "path": "relay/docker/Dockerfile",
+                    "kind": "composer-image"
+                },
+                {
+                    "path": "relay/docker/backup.Dockerfile",
+                    "kind": "composer-image"
+                },
+                {
+                    "path": "relay/docker/rqlite.Dockerfile",
+                    "kind": "composer-image"
+                }
             ]
         }
     },
@@ -84,15 +171,21 @@
             "reviewedReference": "5c06419c4a1aaf87fda0d8065dd050c7e3d5380e",
             "reviewedVersion": "8.5.2",
             "reason": "Stable upstream still rejects thread-safe PHP and lacks the typed-static initialization and TLS globals handling required by the application ZTS runtime.",
-            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/ZEngineBootstrapRuntimeTest.php", "tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php", "scripts/test-web-runtime-container.php"]
+            "proofs": [
+                "tests/Unit/Shared/Infrastructure/Swoole/ZEngineBootstrapRuntimeTest.php",
+                "tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php",
+                "scripts/test-web-runtime-container.php"
+            ]
         },
         "patches/symfony-redis-messenger-recoverable-delays.patch": {
             "package": "symfony/redis-messenger",
             "upstream": "https://github.com/symfony/redis-messenger",
-            "reviewedReference": "v8.1.10",
+            "reviewedReference": "484058b2e3055dc56be9b1463cf510e06228542c",
             "reviewedVersion": "8.1.10",
             "reason": "Upstream has lease-based recovery but does not preserve the bounded promotion and malformed-member retention required by the local delayed-delivery contract.",
-            "proofs": ["tests/Integration/MessengerDelayedPromotionTest.php"]
+            "proofs": [
+                "tests/Integration/MessengerDelayedPromotionTest.php"
+            ]
         }
     },
     "forks": {
@@ -104,16 +197,101 @@
             "historicalBase": null,
             "comparison": "packages/swoole-bundle/upstream-review.json",
             "reason": "Local coroutine ownership, authenticated WebSockets, drain and streaming behavior require selective reconciliation against upstream.",
-            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/CoWrapperSchedulingTest.php", "tests/Unit/Shared/Infrastructure/Swoole/WithWebSocketHandlerHandshakeTest.php", "tests/Unit/Shared/Infrastructure/Http/StreamedResponseProcessorTest.php", "scripts/test-web-shutdown-container.php"]
-        },
-        "upscale/swoole-reflection": {
-            "upstream": "https://github.com/upscalesoftware/swoole-reflection",
-            "reviewedReference": "8e33b2d8458953e6bbf01189785b92e3ad369f78",
-            "reviewedVersion": "3.2.0",
-            "source": "https://github.com/Rastusik/swoole-reflection",
-            "sourceReference": "5e318ae5d92f4c7b7eae8f2525446551db9495d5",
-            "reason": "The fork avoids deprecated accessibility calls. Repository and installed-package tracing found no consumers outside its own tests and generated Composer maps; its PSR-4-only autoload has no registration side effects. Remove the unused dependency during resolution and verify fresh autoload/container behavior.",
-            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php"]
+            "proofs": [
+                "tests/Unit/Shared/Infrastructure/Swoole/CoWrapperSchedulingTest.php",
+                "tests/Unit/Shared/Infrastructure/Swoole/WithWebSocketHandlerHandshakeTest.php",
+                "tests/Unit/Shared/Infrastructure/Http/StreamedResponseProcessorTest.php",
+                "scripts/test-web-shutdown-container.php"
+            ]
         }
+    },
+    "reviewedDeviations": {
+        "checkedOn": "2026-10-31",
+        "reason": "Latest stable reliforp/reli-prof 0.12.0 pins four shared dependencies; Symfony MonologBundle 4.1.0 also requires the blocked Monolog upgrade. These records explain findings and do not suppress them.",
+        "upstream": "https://github.com/reliforp/reli-prof/tree/0.12.0",
+        "sourceReference": "22ef419d0670cd257fdf7970efafbe0fa09464ae",
+        "packages": [
+            {
+                "package": "monolog/monolog",
+                "locked": "3.10.0",
+                "latest": "3.12.1",
+                "latestSource": "https://repo.packagist.org/p2/monolog/monolog.json",
+                "latestSourceReference": "d7059e4c691d05ea1222b5124bed0f961be46e15",
+                "blockingRequirements": [
+                    {
+                        "package": "reliforp/reli-prof",
+                        "version": "0.12.0",
+                        "requires": "monolog/monolog",
+                        "constraint": "3.10.0"
+                    }
+                ]
+            },
+            {
+                "package": "symfony/monolog-bundle",
+                "locked": "v4.0.2",
+                "latest": "v4.1.0",
+                "latestSource": "https://repo.packagist.org/p2/symfony/monolog-bundle.json",
+                "latestSourceReference": "a22de65db405738364af77310761fdd0dce7a40e",
+                "blockingRequirements": [
+                    {
+                        "package": "symfony/monolog-bundle",
+                        "version": "v4.1.0",
+                        "requires": "monolog/monolog",
+                        "constraint": "^3.12"
+                    },
+                    {
+                        "package": "reliforp/reli-prof",
+                        "version": "0.12.0",
+                        "requires": "monolog/monolog",
+                        "constraint": "3.10.0"
+                    }
+                ]
+            },
+            {
+                "package": "webmozart/assert",
+                "locked": "2.3.0",
+                "latest": "2.5.0",
+                "latestSource": "https://repo.packagist.org/p2/webmozart/assert.json",
+                "latestSourceReference": "8a163706bbcac613733dba03f51e13b5eb1bb819",
+                "blockingRequirements": [
+                    {
+                        "package": "reliforp/reli-prof",
+                        "version": "0.12.0",
+                        "requires": "webmozart/assert",
+                        "constraint": "2.3.0"
+                    }
+                ]
+            },
+            {
+                "package": "amphp/amp",
+                "locked": "v3.1.1",
+                "latest": "v3.1.3",
+                "latestSource": "https://repo.packagist.org/p2/amphp/amp.json",
+                "latestSourceReference": "73c38b323ff8d790abf0f76c56fcc892bda4111a",
+                "blockingRequirements": [
+                    {
+                        "package": "reliforp/reli-prof",
+                        "version": "0.12.0",
+                        "requires": "amphp/amp",
+                        "constraint": "3.1.1"
+                    }
+                ]
+            },
+            {
+                "package": "amphp/parallel",
+                "locked": "v2.3.3",
+                "latest": "v2.4.0",
+                "latestSource": "https://repo.packagist.org/p2/amphp/parallel.json",
+                "latestSourceReference": "37f5b2754fadc229c00f9416bd68fb8d04529a81",
+                "blockingRequirements": [
+                    {
+                        "package": "reliforp/reli-prof",
+                        "version": "0.12.0",
+                        "requires": "amphp/parallel",
+                        "constraint": "2.3.3"
+                    }
+                ]
+            }
+        ]
     }
 }

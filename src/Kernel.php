@@ -17,8 +17,10 @@ use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
 {
-    use CoroutinesSupportingKernel;
-    use MicroKernelTrait;
+    use CoroutinesSupportingKernel, MicroKernelTrait {
+        CoroutinesSupportingKernel::initializeContainer insteadof MicroKernelTrait;
+        CoroutinesSupportingKernel::getContainerBaseClass insteadof MicroKernelTrait;
+    }
 
     /**
      * Registers custom DBAL types before any EntityManager is built.

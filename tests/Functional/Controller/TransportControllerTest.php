@@ -119,8 +119,7 @@ final class TransportControllerTest extends TestCase
 
     public function testAMessageThatExhaustsItsRetriesInAWorkerIsCountedAndListed(): void
     {
-        // The Swoole pool resetter reports releasing the worker's manager.
-        $this->expectOutputString("[swoole] Resetting Doctrine EntityManager: Doctrine\\ORM\\EntityManager\n");
+        $this->expectOutputString('');
         $async = static::getContainer()->get('messenger.transport.async');
         self::assertInstanceOf(TransportInterface::class, $async);
         // The async retry strategy allows three retries; this is the last attempt.

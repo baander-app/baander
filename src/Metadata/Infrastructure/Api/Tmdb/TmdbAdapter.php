@@ -27,8 +27,7 @@ final class TmdbAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
-    ) {
-    }
+    ) {}
 
     public function searchMovie(string $query, ?int $year = null, int $limit = 20): TmdbSearchResultDto
     {
@@ -39,7 +38,7 @@ final class TmdbAdapter
 
         $data = $this->request('/search/movie', $params);
         $results = array_map(
-            fn (array $item) => TmdbMovieDto::fromApiResponse($item),
+            fn(array $item) => TmdbMovieDto::fromApiResponse($item),
             array_slice($data['results'] ?? [], 0, $limit),
         );
 
@@ -74,7 +73,7 @@ final class TmdbAdapter
         $data = $this->request('/genre/movie/list');
 
         return array_map(
-            fn (array $item) => new TmdbGenreDto(id: $item['id'], name: $item['name']),
+            fn(array $item) => new TmdbGenreDto(id: $item['id'], name: $item['name']),
             $data['genres'] ?? [],
         );
     }
@@ -87,7 +86,8 @@ final class TmdbAdapter
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query($params);
         $this->logger->debug('TMDB API request', ['service' => 'tmdb', 'endpoint' => $endpoint]);
-        for ($attempt = 0; $attempt < 2; ++$attempt) {
+        $retried = false;
+        while (true) {
             $response = null;
             try {
                 $response = $this->httpClient->request('GET', $url, ['api.themoviedb.org'], [
@@ -104,10 +104,11 @@ final class TmdbAdapter
             } finally {
                 $response?->cancel();
             }
-            if ($status === 429 && $attempt === 0) {
+            if ($status === 429 && !$retried) {
                 $wait = max(0.0, (float) ($headers['retry-after'][0] ?? 1));
                 $this->logger->info('TMDB rate limit hit, retrying', ['service' => 'tmdb', 'retry_after' => $wait]);
                 Async::sleep($wait);
+                $retried = true;
                 continue;
             }
             if ($status >= 300) {
@@ -125,8 +126,6 @@ final class TmdbAdapter
                 return [];
             }
         }
-
-        return [];
     }
 
 }

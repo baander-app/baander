@@ -29,8 +29,7 @@ final class DiscogsAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
-    ) {
-    }
+    ) {}
 
     public function searchArtist(string $query, int $limit = 25, int $offset = 0): DiscogsSearchResultDto
     {
@@ -188,7 +187,8 @@ final class DiscogsAdapter
         $queryString = http_build_query($params, '', '&');
         $url = self::BASE_URL . $endpoint . ($queryString !== '' ? "?{$queryString}" : '');
         $this->logger->debug('Discogs API request', ['service' => 'discogs', 'endpoint' => $endpoint]);
-        for ($attempt = 0; $attempt < 2; ++$attempt) {
+        $retried = false;
+        while (true) {
             $response = null;
             try {
                 $response = $this->httpClient->request('GET', $url, ['api.discogs.com'], [
@@ -211,10 +211,11 @@ final class DiscogsAdapter
             }
             if ($status === 429) {
                 $retryAfter = $headers['retry-after'][0] ?? null;
-                if ($retryAfter !== null && $attempt === 0) {
+                if ($retryAfter !== null && !$retried) {
                     $wait = max(0, (int) $retryAfter);
                     $this->logger->info('Discogs rate limit hit, retrying', ['service' => 'discogs', 'retry_after' => $wait]);
                     Async::sleep($wait);
+                    $retried = true;
                     continue;
                 }
                 $this->logger->warning('Discogs API rate limit exceeded', ['service' => 'discogs']);
@@ -230,8 +231,6 @@ final class DiscogsAdapter
 
             return is_array($data) ? $data : [];
         }
-
-        return [];
     }
 
 }

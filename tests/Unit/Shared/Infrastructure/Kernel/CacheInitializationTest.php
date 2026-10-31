@@ -26,12 +26,13 @@ final class CacheInitializationTest extends TestCase
     public function testUnavailableLockFailsInsteadOfCompilingWithoutExclusion(): void
     {
         $directory = sys_get_temp_dir() . '/baander-cache-' . bin2hex(random_bytes(8));
+        $kernel = $this->kernel($directory);
         $filesystem = new Filesystem();
-        $filesystem->mkdir($directory . '/.container.lock');
+        $filesystem->mkdir($kernel->getBuildDir() . '/' . $kernel->containerClassForTest() . '.php.swoole.lock');
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('Cannot open the container initialization lock.');
-            $this->kernel($directory)->initializeForTest();
+            $this->expectExceptionMessage('Could not open container initialization lock');
+            $kernel->initializeForTest();
         } finally {
             $filesystem->remove($directory);
         }
@@ -58,5 +59,10 @@ final class CacheInitializationKernel extends Kernel
     public function initializeForTest(): void
     {
         $this->initializeContainer();
+    }
+
+    public function containerClassForTest(): string
+    {
+        return $this->getContainerClass();
     }
 }

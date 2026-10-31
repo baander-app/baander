@@ -199,6 +199,15 @@ services with build definitions. A successful build does not replace running
 services or migrate their data. Build inputs and cache settings are described in
 the [development environment guide](../part-2-developer-guide/development-environment.md).
 
+PHP dependency updates also require a clean Composer installation from the reviewed
+locks, including retained patches, and new images for each affected role. The
+selected stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1. An updated checkout
+does not change the runtime or dependencies already loaded by a worker. Follow
+the retirement and fresh-boot sequence above when replacing it. Maintainers can
+check version drift and patch status through
+[PHP dependency maintenance](../part-2-developer-guide/php-dependencies.md);
+those checks do not replace application startup, delivery or drain qualification.
+
 ## Docker Compose Changes
 
 When `docker-compose.yml` changes (new services, new volume mounts, network changes, environment variable additions), a simple `dc restart` is not enough -- Docker Compose needs to recreate the affected containers from scratch.

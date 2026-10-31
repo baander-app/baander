@@ -4,11 +4,27 @@ PHP FFI bindings for [TSDuck](https://tsduck.io/) — the MPEG Transport Stream 
 TSDuck C++ library from PHP, including TS processing, section file manipulation, input switching, system monitoring, and
 plugin event handling.
 
+## Availability and qualification
+
+This reference describes the PHP API and its intended native polling contract.
+The selected upstream TSDuck v3.43-4549 library does not export the declared
+`tspyphp*` polling functions. The C++ bridge implementation is absent from the
+repository and Docker build inputs, so FFI bootstrap fails before these examples
+can run. Installing upstream `libtsduck` alone does not supply that bridge.
+
+Native qualification and its automatic CI gate remain blocked pending a separately
+scoped bridge implementation. See the
+[TSDuck qualification blocker](../../../docs-book/part-2-developer-guide/php-dependencies.md#tsduck-qualification-blocker)
+for the recorded failure and required qualification command. The polling and
+thread-safety descriptions below define the intended behavior; they do not certify
+an available native implementation.
+
 ## Requirements
 
-- **PHP 8.0+** (64-bit build required for plugin event handling)
+- **PHP 8.5+** (64-bit build required for plugin event handling)
 - **FFI extension** enabled (`ext-ffi`)
-- **libtsduck** shared library installed (minimum version 3.38-3838)
+- **mbstring extension** enabled (`ext-mbstring`)
+- **libtsduck** shared library installed (minimum version 3.38-3838), with the additional native polling bridge described above
 
 ### Enabling FFI
 
@@ -106,8 +122,8 @@ objects are managed by the `NativeObject` base class, which provides:
 
 - **Opaque pointer storage** — each PHP object wraps a C++ object via an opaque `void*`
 - **Deterministic cleanup** — call `close()` explicitly, or rely on the destructor as a safety net
-- **Thread-safe polling** — log messages and plugin events from C++ threads are queued and polled from PHP (no unsafe
-  FFI callbacks from non-PHP threads)
+- **Polling contract** — the required native bridge must queue log messages and plugin events from C++ threads for
+  polling from PHP, without FFI callbacks from non-PHP threads
 
 ### Class Hierarchy
 
@@ -441,8 +457,9 @@ $report->close();
 
 #### `AbstractAsyncReport` (abstract, polling-based)
 
-Polling-based async report for receiving log messages from C++ background threads. This is the thread-safe variant for
-PHP — instead of using FFI callbacks (unsafe from non-PHP threads), it polls a message queue.
+PHP interface for polling log messages from C++ background threads. Its intended
+native bridge queues messages for PHP to poll, avoiding FFI callbacks from
+non-PHP threads. That bridge is currently unavailable, as described above.
 
 Subclass and implement `processMessages()`:
 
@@ -675,8 +692,9 @@ freed. Calling `close()` on them is safe but has no effect.
 
 ## Thread Safety
 
-PHP's FFI closures are **not safe** to invoke from non-PHP threads (unlike Python's GIL). The PHP bindings use a *
-*polling architecture** to handle this:
+PHP's FFI closures are **not safe** to invoke from non-PHP threads. The required
+native bridge must support the following polling sequence; this contract remains
+unqualified while the bridge is missing:
 
 1. C++ background threads generate events/log messages
 2. Messages are queued in thread-safe queues by C++ bridge objects

@@ -27,7 +27,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/baander-audio-delay-'.bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-audio-delay-' . bin2hex(random_bytes(6));
         mkdir($this->directory);
     }
 
@@ -35,7 +35,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     {
         $artifacts = getenv('BAANDER_MEDIA_ARTIFACT_DIR');
         if (is_string($artifacts) && $artifacts !== '') {
-            (new Filesystem())->mirror($this->directory, $artifacts.'/'.$this->artifactName);
+            (new Filesystem())->mirror($this->directory, $artifacts . '/' . $this->artifactName);
         }
         (new Filesystem())->remove($this->directory);
     }
@@ -48,11 +48,17 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         float $audioDelay = 8.0,
         bool $encodedSourceAudio = false,
     ): void {
-        $this->artifactName = sprintf('audio-delay-%s-%s-%d-%s-%s', $encoderName, $profileName, $startSegment,
-            $audioDelay, $encodedSourceAudio ? 'source-aac' : 'source-pcm');
+        $this->artifactName = sprintf(
+            'audio-delay-%s-%s-%d-%s-%s',
+            $encoderName,
+            $profileName,
+            $startSegment,
+            $audioDelay,
+            $encodedSourceAudio ? 'source-aac' : 'source-pcm',
+        );
         $source = $this->createSource($audioDelay, $encodedSourceAudio);
         $json = $this->runMedia(FFprobeArguments::video($source));
-        file_put_contents($this->directory.'/production-probe.json', $json);
+        file_put_contents($this->directory . '/production-probe.json', $json);
         $raw = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         $probe = VideoProbeResult::fromProbeOutput($raw);
         self::assertNull($probe->sourceTimestampOrigin);
@@ -71,17 +77,36 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         } else {
             self::assertEqualsWithDelta($audioDelay, (float) $sourceAudio[0]['pts_time'], 0.002);
         }
-        $encoder = new SegmentEncoder($this->createStub(FFmpegPortInterface::class),
-            $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
-        $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
-            $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
+        $encoder = new SegmentEncoder(
+            $this->createStub(FFmpegPortInterface::class),
+            $this->createStub(TranscodeStoragePortInterface::class),
+            EncoderProfile::software($encoderName),
+        );
+        $tier = new QualityTier(
+            'fixture',
+            64,
+            64,
+            100_000,
+            200_000,
+            200_000,
+            $encoderName === 'libx264' ? 'avc1' : 'hvc1',
+            $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0',
+        );
         $profile = AudioProfile::fromString($profileName);
-        $output = $this->directory.'/output';
+        $output = $this->directory . '/output';
         mkdir($output);
-        $this->runMedia($encoder->buildStreamArgs($source, $tier, $encoder->buildVideoFilters($probe, $tier),
-            $output, $startSegment, audioProfile: $profile,
+        $this->runMedia($encoder->buildStreamArgs(
+            $source,
+            $tier,
+            $encoder->buildVideoFilters($probe, $tier),
+            $output,
+            $startSegment,
+            audioProfile: $profile,
             audioFilters: $encoder->buildAudioFiltersForProfile($probe, $profile),
-            hasAudio: $probe->hasAudio(), sourceFrameRate: $probe->framerate, sourceTimestampOrigin: $probe->sourceTimestampOrigin));
+            hasAudio: $probe->hasAudio(),
+            sourceFrameRate: $probe->framerate,
+            sourceTimestampOrigin: $probe->sourceTimestampOrigin,
+        ));
 
         $presentation = (new PublishedPresentationReader())->read($output);
         self::assertNotNull($presentation);
@@ -96,7 +121,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         foreach ($presentation->tracks as $track) {
             self::assertNotEmpty($track->segments);
             if ($track->kind === MediaTrack::Video) {
-                $this->assertUnshiftedVideoEdit($output.'/'.$track->initFile, $track->timescale);
+                $this->assertUnshiftedVideoEdit($output . '/' . $track->initFile, $track->timescale);
             }
             $segments = [];
             $previousEnd = null;
@@ -109,8 +134,8 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                 }
                 $previousEnd = $segment->start + $segment->duration;
                 $segments[$segment->ordinal] = ['url' => $segment->file, 'duration' => $segment->duration / $track->timescale];
-                $combined = $this->directory.'/'.$track->kind->value.'-'.$segment->ordinal.'.mp4';
-                file_put_contents($combined, file_get_contents($output.'/'.$track->initFile).file_get_contents($output.'/'.$segment->file));
+                $combined = $this->directory . '/' . $track->kind->value . '-' . $segment->ordinal . '.mp4';
+                file_put_contents($combined, file_get_contents($output . '/' . $track->initFile) . file_get_contents($output . '/' . $segment->file));
                 $raw = $this->probe($combined);
                 self::assertCount(1, $raw['streams']);
                 self::assertSame($track->kind->value, $raw['streams'][0]['codec_type']);
@@ -122,11 +147,13 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                     $decoded = $this->decodeVideo($combined);
                     self::assertCount(count($packets), $decoded);
                     array_push($markers, ...$decoded);
-                    $clock = $this->videoClock($output.'/'.$segment->file);
+                    $clock = $this->videoClock($output . '/' . $segment->file);
                     self::assertCount(count($decoded), $clock);
                     self::assertSame($segment->start - $track->presentationTimeOffset, min(array_column($clock, 'pts')));
-                    self::assertSame($segment->start + $segment->duration - $track->presentationTimeOffset,
-                        max(array_map(static fn (array $sample): int => $sample['pts'] + $sample['duration'], $clock)));
+                    self::assertSame(
+                        $segment->start + $segment->duration - $track->presentationTimeOffset,
+                        max(array_map(static fn(array $sample): int => $sample['pts'] + $sample['duration'], $clock)),
+                    );
                     $ffprobeShift = max(0, -min(array_column($clock, 'cto'))) / $track->timescale;
                     $unexplainedShifts = [];
                     foreach ($clock as $index => $sample) {
@@ -168,12 +195,12 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                 }
                 $prefix = (new ManifestGenerator())->generateMediaManifest($track->initFile, $segments, false);
                 self::assertStringContainsString("#EXT-X-TARGETDURATION:7\n", $prefix);
-                file_put_contents($output.'/'.$track->kind->value.'-prefix-'.$segment->ordinal.'.m3u8', $prefix);
+                file_put_contents($output . '/' . $track->kind->value . '-prefix-' . $segment->ordinal . '.m3u8', $prefix);
                 $this->observation(['track' => $track->kind->value, 'ordinal' => $segment->ordinal,
                     'start' => $segment->start, 'duration' => $segment->duration / $track->timescale,
                     'firstPacket' => $packets[0], 'lastPacket' => $packets[array_key_last($packets)]]);
             }
-            $playlist = $output.'/'.$track->kind->value.'.m3u8';
+            $playlist = $output . '/' . $track->kind->value . '.m3u8';
             $manifest = (new ManifestGenerator())->generateMediaManifest($track->initFile, $segments, true);
             self::assertStringContainsString("#EXT-X-TARGETDURATION:7\n", $manifest);
             self::assertStringContainsString('#EXT-X-ENDLIST', $manifest);
@@ -217,7 +244,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         foreach (['libx264', 'libx265'] as $encoder) {
             foreach (['streaming_stereo', 'opus_stereo'] as $profile) {
                 foreach ([0, 1, 4] as $start) {
-                    yield $encoder.' '.$profile.' restart '.$start => [$encoder, $profile, $start];
+                    yield $encoder . ' ' . $profile . ' restart ' . $start => [$encoder, $profile, $start];
                 }
             }
         }
@@ -229,7 +256,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
 
     private function createSource(float $audioDelay, bool $encodedAudio): string
     {
-        $source = $this->directory.'/source.mov';
+        $source = $this->directory . '/source.mov';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-filter_threads', '1',
             '-f', 'lavfi', '-i', 'color=c=red:s=64x64:r=25,drawbox=x=0:y=0:w=iw:h=ih:color=green:t=fill:enable=gte(t\,10),drawbox=x=0:y=0:w=iw:h=ih:color=blue:t=fill:enable=gte(t\,20)',
             '-itsoffset', (string) $audioDelay, '-f', 'lavfi', '-i',
@@ -246,7 +273,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $reference = unpack('g*', substr($sourcePcm, (int) (($sourceStart + 2) * 48_000) * 4, $windowSamples * 4));
         self::assertIsArray($reference);
         self::assertCount($windowSamples, $reference);
-        $referenceEnergy = array_sum(array_map(static fn (float $sample): float => $sample * $sample, $reference));
+        $referenceEnergy = array_sum(array_map(static fn(float $sample): float => $sample * $sample, $reference));
         $bestCorrelation = -1.0;
         $bestLag = null;
         // A chirped tone distinguishes temporal alignment despite lossy encoding and gain changes.
@@ -348,7 +375,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
         $samples = [];
         for ($index = 0; $index < $count; ++$index) {
             $duration = ($flags & 0x100) !== 0 ? $this->word($data, $offset, $trun['end']) : $defaultDuration;
-            if (!is_int($duration) || $duration <= 0) {
+            if ($duration <= 0) {
                 throw new \RuntimeException('The fixture sample duration must be a positive integer.');
             }
             $offset += ($flags & 0x200) !== 0 ? 4 : 0;
@@ -399,7 +426,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     private function onlyBox(array $boxes, string $type): array
     {
         if (count($boxes[$type] ?? []) !== 1) {
-            throw new \RuntimeException('The fixture requires exactly one '.$type.' box.');
+            throw new \RuntimeException('The fixture requires exactly one ' . $type . ' box.');
         }
         return $boxes[$type][0];
     }
@@ -417,7 +444,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     /** @return list<int> */
     private function decodeVideo(string $path): array
     {
-        $decoded = $path.'.rgb';
+        $decoded = $path . '.rgb';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
             '-i', $path, '-map', '0:v:0', '-fps_mode', 'passthrough', '-pix_fmt', 'rgb24', '-f', 'rawvideo', $decoded]);
         $pixels = file_get_contents($decoded);
@@ -436,7 +463,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
 
     private function decodeAudio(string $path): string
     {
-        $decoded = $path.'.f32le';
+        $decoded = $path . '.f32le';
         $this->runMedia(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-y',
             '-i', $path, '-map', '0:a:0', '-ac', '1', '-ar', '48000', '-c:a', 'pcm_f32le', '-f', 'f32le', $decoded]);
         $pcm = file_get_contents($decoded);
@@ -491,7 +518,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     private function probe(string $path): array
     {
         $json = $this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', $path]);
-        file_put_contents($path.'.probe.json', $json);
+        file_put_contents($path . '.probe.json', $json);
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 
@@ -500,27 +527,27 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     {
         $json = $this->runMedia(['/usr/bin/ffprobe', '-v', 'error', '-select_streams', $selector,
             '-show_packets', '-show_entries', 'packet=pts_time,duration_time,flags', '-of', 'json', $path]);
-        file_put_contents($path.'.'.$selector[0].'-packets.json', $json);
+        file_put_contents($path . '.' . $selector[0] . '-packets.json', $json);
         return json_decode($json, true, 512, JSON_THROW_ON_ERROR)['packets'];
     }
 
     /** @param array<string, mixed> $observation */
     private function observation(array $observation): void
     {
-        file_put_contents($this->directory.'/decode-observations.jsonl', json_encode($observation, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
+        file_put_contents($this->directory . '/decode-observations.jsonl', json_encode($observation, JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
     }
 
     /** @param list<string> $arguments */
     private function runMedia(array $arguments): string
     {
-        file_put_contents($this->directory.'/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
+        file_put_contents($this->directory . '/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
         $process = new Process($arguments);
         $process->setTimeout(30);
         $process->run();
-        file_put_contents($this->directory.'/receipts.jsonl', json_encode([
+        file_put_contents($this->directory . '/receipts.jsonl', json_encode([
             'arguments' => $arguments, 'exitCode' => $process->getExitCode(), 'stderr' => $process->getErrorOutput(),
-        ], JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
-        self::assertTrue($process->isSuccessful(), $process->getOutput().$process->getErrorOutput());
+        ], JSON_THROW_ON_ERROR) . "\n", FILE_APPEND);
+        self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());
         return $process->getOutput();
     }
 }

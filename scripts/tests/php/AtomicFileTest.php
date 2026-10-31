@@ -173,7 +173,10 @@ final class AtomicFileTest extends TestCase
         $unexpected?->release();
     }
 
-    /** @return array{int, string, string} */
+    /**
+     * @return array{int, string, string}
+     * @phpstan-impure
+     */
     private function contender(): array
     {
         $child = proc_open(

@@ -154,6 +154,8 @@ final class QualificationRunner
                 throw new RuntimeException('Missing required executable: ' . $command, 2);
             }
         }
+        $this->contract('test_runtime_lifecycle');
+        $this->contract('test_cluster_convergence');
         $this->download(
             'https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz',
             'openssl.tar.gz',

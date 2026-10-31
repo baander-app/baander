@@ -9,6 +9,7 @@ use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\CurlMultiHandler;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Promise\RejectedPromise;
+use Http\Client\Exception\HttpException;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
@@ -44,17 +45,11 @@ final class PushTransport
             $address = str_contains($ip, ':') ? '[' . $ip . ']' : $ip;
             $options['curl'] = [
                 CURLOPT_RESOLVE => [$safe['host'] . ':443:' . $address],
-                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-                CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_MAXREDIRS => 0,
-                CURLOPT_PROXY => '',
-                CURLOPT_NOPROXY => '*',
-                CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_SSL_VERIFYHOST => 2,
                 CURLOPT_FRESH_CONNECT => true,
                 CURLOPT_FORBID_REUSE => true,
             ];
+            $request = $request->withProtocolVersion('1.1');
+            $options['protocols'] = ['https'];
             $options['proxy'] = '';
             $options['allow_redirects'] = false;
             $options['verify'] = true;
@@ -71,12 +66,12 @@ final class PushTransport
                     }
                     if ($response->getStatusCode() >= 400) {
                         // Retain only the response needed for normal 404/410 expiry handling.
-                        throw new RequestException('Push service rejected notification.', $request, $response);
+                        throw new HttpException('Push service rejected notification.', $request, $response);
                     }
 
                     return $response;
                 },
-                static fn (): never => throw new RequestException('Push transport failed.', $request),
+                static fn(): never => throw new RequestException('Push transport failed.', $request),
             );
         } catch (\Throwable) {
             return new RejectedPromise(new RequestException('Push destination could not be contacted safely.', $request));

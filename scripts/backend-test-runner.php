@@ -87,7 +87,7 @@ final class BackendTestRunner
         $noCoverage = false;
         $valueOptions = ['--filter', '--group', '--exclude-group', '--random-order-seed', '--order-by', '--coverage-filter'];
         $selectionOptions = ['--testsuite', '--exclude-testsuite'];
-        $flags = ['--no-progress', '--display-all-issues', '--no-coverage', '--do-not-cache-result'];
+        $flags = ['--no-progress', '--display-all-issues', '--no-coverage', '--do-not-record-test-run-history', '--resolve-dependencies', '--do-not-resolve-dependencies'];
         $discoveryArguments = [];
         for ($i = 0; $i < count($input); $i++) {
             $argument = $input[$i];

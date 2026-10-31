@@ -31,14 +31,14 @@ final class LibraryMemberAdministrationTest extends TestCase
         }
 
         $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($apiMember, $library['publicId']), $admin), 200);
-        self::assertSame(Command::SUCCESS, $this->runCommand('app:library:member:grant', ['user' => $cliMember->getEmail(), 'library' => $library['slug']])->getStatusCode());
+        self::assertSame(Command::SUCCESS, $this->executeLibraryMemberCommand('app:library:member:grant', ['user' => $cliMember->getEmail(), 'library' => $library['slug']])->getStatusCode());
 
         foreach ([$apiMember, $cliMember] as $member) {
             $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/albums/' . $album, $member), 200);
         }
 
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $library['publicId']), $admin), 200);
-        self::assertSame(Command::SUCCESS, $this->runCommand('app:library:member:revoke', ['user' => $cliMember->getPublicId()->toString(), 'library' => $library['publicId']])->getStatusCode());
+        self::assertSame(Command::SUCCESS, $this->executeLibraryMemberCommand('app:library:member:revoke', ['user' => $cliMember->getPublicId()->toString(), 'library' => $library['publicId']])->getStatusCode());
 
         foreach ([$apiMember, $cliMember] as $member) {
             self::assertSame(404, $this->authenticatedRequest('GET', '/api/albums/' . $album, $member)->getStatusCode());
@@ -68,7 +68,7 @@ final class LibraryMemberAdministrationTest extends TestCase
         $cliList = $this->json('app:library:member:list', ['user' => $cliMember->getPublicId()->toString()]);
         // Other tests add libraries to the shared database concurrently; compare this test's own.
         $ownApi = self::only($apiList, [$granted['publicId'], $other['publicId']]);
-        self::assertEquals([$granted['publicId'] => true, $other['publicId'] => false], array_map(static fn (array $entry): bool => $entry['granted'], $ownApi));
+        self::assertEquals([$granted['publicId'] => true, $other['publicId'] => false], array_map(static fn(array $entry): bool => $entry['granted'], $ownApi));
         self::assertSame($ownApi, self::only($cliList, [$granted['publicId'], $other['publicId']]));
 
         $apiRevoke = $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $other['publicId']), $admin), 200, 'data')['data'];
@@ -107,7 +107,7 @@ final class LibraryMemberAdministrationTest extends TestCase
             ['app:library:member:revoke', ['user' => $member->getPublicId()->toString(), 'library' => 'no-such-library'], 'Library "no-such-library" not found.'],
         ];
         foreach ($cliCalls as [$name, $arguments, $message]) {
-            $tester = $this->runCommand($name, $arguments);
+            $tester = $this->executeLibraryMemberCommand($name, $arguments);
             self::assertSame(Command::FAILURE, $tester->getStatusCode(), $name);
             self::assertStringContainsString($message, self::flat($tester->getErrorOutput()), $name);
             self::assertSame('', $tester->getDisplay(), $name . ' prints nothing on stdout.');
@@ -167,7 +167,7 @@ final class LibraryMemberAdministrationTest extends TestCase
     }
 
     /** @param array<string, string> $arguments */
-    private function runCommand(string $name, array $arguments): CommandTester
+    private function executeLibraryMemberCommand(string $name, array $arguments): CommandTester
     {
         $tester = new CommandTester((new Application($this->client->getKernel()))->find($name));
         $tester->execute($arguments, ['capture_stderr_separately' => true]);
@@ -182,7 +182,7 @@ final class LibraryMemberAdministrationTest extends TestCase
      */
     private function json(string $name, array $arguments): array
     {
-        $tester = $this->runCommand($name, $arguments + ['--json' => true]);
+        $tester = $this->executeLibraryMemberCommand($name, $arguments + ['--json' => true]);
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getErrorOutput());
         $data = json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($data);

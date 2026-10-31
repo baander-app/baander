@@ -33,7 +33,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
         $this->passkeyRepository = $this->createStub(PasskeyRepositoryInterface::class);
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
         $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $this->transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
         $this->handler = $this->createRegisterPasskeyHandlerFixture();
     }
 
@@ -49,15 +49,22 @@ final class RegisterPasskeyHandlerTest extends TestCase
 
     public function testRegistersPasskey(): void
     {
-        $insideTransaction = false;
+        $insideTransaction = new class {
+            public bool $active = false;
+
+            public function isActive(): bool
+            {
+                return $this->active;
+            }
+        };
         $this->transaction = $this->createMock(TransactionPortInterface::class);
         $this->transaction->expects($this->once())->method('run')->willReturnCallback(
-            static function (callable $operation) use (&$insideTransaction): mixed {
-                $insideTransaction = true;
+            static function (callable $operation) use ($insideTransaction): mixed {
+                $insideTransaction->active = true;
                 try {
                     return $operation();
                 } finally {
-                    $insideTransaction = false;
+                    $insideTransaction->active = false;
                 }
             },
         );
@@ -69,14 +76,14 @@ final class RegisterPasskeyHandlerTest extends TestCase
         $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
         $this->passkeyRepository->method('ofCredentialId')->willReturn(null);
         $this->passkeyRepository->expects($this->once())->method('save')->willReturnCallback(
-            static function () use (&$insideTransaction): void {
-                self::assertTrue($insideTransaction);
+            static function () use ($insideTransaction): void {
+                self::assertTrue($insideTransaction->isActive());
             },
         );
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
-            static function (object $event) use (&$insideTransaction): object {
-                self::assertTrue($insideTransaction);
+            static function (object $event) use ($insideTransaction): object {
+                self::assertTrue($insideTransaction->isActive());
                 self::assertInstanceOf(PasskeyRegistered::class, $event);
                 return $event;
             },
@@ -93,7 +100,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
 
         $this->assertSame('My Key', $result->getName());
         $this->assertSame('cred-id', $result->getCredentialId());
-        self::assertFalse($insideTransaction);
+        self::assertFalse($insideTransaction->isActive());
     }
 
     public function testThrowsOnUserNotFound(): void

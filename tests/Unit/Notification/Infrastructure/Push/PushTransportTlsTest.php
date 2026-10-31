@@ -76,12 +76,12 @@ final class PushTransportTlsTest extends TestCase
             $captured = $options;
             $options['curl'][CURLOPT_CONNECT_TO] = [$host . ':443:127.0.0.1:' . $this->server->tlsPort];
             if ($trust) {
-                $options['curl'][CURLOPT_CAINFO] = $this->server->certificate;
+                $options['verify'] = $this->server->certificate;
             }
 
             return $curl($request, $options);
         };
-        $transport = new PushTransport(new PublicDestinationPolicy(static fn (): array => ['1.1.1.1']), ['baander.app'], $handler);
+        $transport = new PushTransport(new PublicDestinationPolicy(static fn(): array => ['1.1.1.1']), ['baander.app'], $handler);
         $keys = VAPID::createVapidKeys();
         $webPush = ExpectedWebPushConstruction::create(new WebPushFactory($transport), ['VAPID' => ['subject' => 'mailto:push@baander.app', ...$keys]]);
         $subscription = Subscription::create([
@@ -94,10 +94,11 @@ final class PushTransportTlsTest extends TestCase
         self::assertNotNull($captured);
         $host = (string) parse_url($url, PHP_URL_HOST);
         self::assertSame([$host . ':443:1.1.1.1'], $captured['curl'][CURLOPT_RESOLVE]);
-        self::assertTrue($captured['curl'][CURLOPT_SSL_VERIFYPEER]);
-        self::assertSame(2, $captured['curl'][CURLOPT_SSL_VERIFYHOST]);
-        self::assertFalse($captured['curl'][CURLOPT_FOLLOWLOCATION]);
-        self::assertSame('', $captured['curl'][CURLOPT_PROXY]);
+        self::assertTrue($captured['verify']);
+        self::assertSame(['https'], $captured['protocols']);
+        self::assertFalse($captured['allow_redirects']);
+        self::assertSame('', $captured['proxy']);
+        self::assertSame([CURLOPT_RESOLVE, CURLOPT_FRESH_CONNECT, CURLOPT_FORBID_REUSE], array_keys($captured['curl']));
         self::assertSame(2, $captured['_curl_retries']);
 
         return $report;

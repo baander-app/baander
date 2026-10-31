@@ -23,12 +23,12 @@ final class LibraryDiscoveryObservationRace
     /** @param list<string> $paths */
     public static function scanner(Connection $connection, Library $library, array $paths, TransactionPortInterface $transaction): MusicScanner|MovieScanner
     {
-        $directory = new class($paths) implements DirectoryScannerPortInterface {
+        $directory = new class ($paths) implements DirectoryScannerPortInterface {
             /** @param list<string> $paths */
             public function __construct(private array $paths) {}
             public function scan(LibraryPath $path): array
             {
-                return array_map(static fn (string $file): MediaFile => new MediaFile($file, basename($file), pathinfo($file, PATHINFO_EXTENSION), (int) filesize($file), (int) filemtime($file)), $this->paths);
+                return array_map(static fn(string $file): MediaFile => new MediaFile($file, basename($file), pathinfo($file, PATHINFO_EXTENSION), (int) filesize($file), (int) filemtime($file)), $this->paths);
             }
         };
         $cancellation = new class implements JobCancellationCheckpointInterface {
@@ -80,10 +80,10 @@ final class LibraryDiscoveryObservationRace
     /** @param array{process: resource, output: resource, application: string, payload: string} $child
      * @return array<string, mixed>
      */
-    public static function finish(array $child): array
+    public static function finish(array $child, ?Connection $observer = null): array
     {
         try {
-            return LibraryScanClaimRace::finish($child);
+            return LibraryScanClaimRace::finish($child, $observer);
         } finally {
             unlink($child['payload']);
         }

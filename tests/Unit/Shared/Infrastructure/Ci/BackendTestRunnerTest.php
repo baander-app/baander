@@ -6,6 +6,11 @@ namespace App\Tests\Unit\Shared\Infrastructure\Ci;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use SebastianBergmann\CodeCoverage\CodeCoverage;
+use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
+use SebastianBergmann\CodeCoverage\Driver\Driver;
+use SebastianBergmann\CodeCoverage\Filter;
+use SebastianBergmann\CodeCoverage\Serialization\Serializer;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
@@ -87,11 +92,11 @@ final class BackendTestRunnerTest extends TestCase
     {
         $fixture = dirname(__DIR__, 5) . '/tests/Fixtures/BackendRunner/DatasetFixtureTest.php';
         $configuration = $this->directory . '/phpunit.xml';
-        file_put_contents($configuration, '<phpunit executionOrder="depends,random"><testsuites><testsuite name="Fixtures"><file>' . $fixture . '</file></testsuite></testsuites></phpunit>');
+        file_put_contents($configuration, '<phpunit executionOrder="random" resolveDependencies="true"><testsuites><testsuite name="Fixtures"><file>' . $fixture . '</file></testsuite></testsuites></phpunit>');
         $this->runHelper(['discover', $this->directory, '-c', $configuration, '--random-order-seed=12345']);
         $discovery = \BackendTestRunner::readJson($this->directory . '/discovery.json');
         self::assertSame(12345, $discovery['seed']);
-        self::assertContains('--order-by=depends,random', $discovery['arguments']);
+        self::assertContains('--order-by=random', $discovery['arguments']);
         self::assertContains('App\\Tests\\Fixtures\\BackendRunner\\DatasetFixtureTest::testLabels#alpha # "quoted"', $discovery['files'][$fixture]);
         \BackendTestRunner::writeJson($this->directory . '/ordinary.json', ['files' => [$fixture], 'processes' => 2, 'batch' => 1]);
         $this->runHelper(['run', $this->directory, 'ordinary']);
@@ -103,11 +108,11 @@ final class BackendTestRunnerTest extends TestCase
     {
         $fixture = dirname(__DIR__, 5) . '/tests/Fixtures/BackendRunner/DatasetFixtureTest.php';
         $configuration = $this->directory . '/phpunit.xml';
-        file_put_contents($configuration, '<phpunit executionOrder="depends,random"><testsuites><testsuite name="Fixtures"><file>' . $fixture . '</file></testsuite></testsuites></phpunit>');
+        file_put_contents($configuration, '<phpunit executionOrder="random" resolveDependencies="true"><testsuites><testsuite name="Fixtures"><file>' . $fixture . '</file></testsuite></testsuites></phpunit>');
         $this->runHelper(['discover', $this->directory, '-c', $configuration]);
         $discovery = \BackendTestRunner::readJson($this->directory . '/discovery.json');
         self::assertContains('--random-order-seed=' . $discovery['seed'], $discovery['arguments']);
-        self::assertContains('--order-by=depends,random', $discovery['arguments']);
+        self::assertContains('--order-by=random', $discovery['arguments']);
     }
 
     public function testWorkerCrashFailsWithoutSuccessManifest(): void
@@ -236,20 +241,14 @@ PHP_SOURCE;
             file_put_contents($report, '<testsuite><testcase classname="' . $identity[0] . '" name="test"/></testsuite>');
             $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
             $lines = [4 => null, 8 => null, 12 => [], 16 => $lane === 'first' ? [] : null];
-            $lines[$coveredLine] = [$identity];
+            $lines[$coveredLine] = [0 => 1];
             $data->setLineCoverage(['included.php' => $lines]);
-            $serialized = [
-                'buildInformation' => ['timestamp' => 'fixture', 'runtime' => ['name' => 'PHP', 'version' => PHP_VERSION, 'vendorUrl' => 'https://baander.app'], 'phpCodeCoverage' => ['version' => \SebastianBergmann\CodeCoverage\Version::id(), 'serializationFormat' => 1, 'driverInformation' => ['name' => 'fixture', 'version' => '1']]],
-                'basePath' => $this->directory,
-                'codeCoverage' => $data,
-                'testResults' => [$identity => ['size' => 'small', 'status' => 'success', 'time' => 0.0]],
-            ];
             $coverage = $this->directory . '/' . $lane . '.cov';
-            file_put_contents($coverage, "<?php // phpunit/php-code-coverage serialization format 1\nreturn unserialize(base64_decode('" . base64_encode(serialize($serialized)) . "'));");
+            $this->writeCoverage($coverage, $data, $identity);
             \BackendTestRunner::writeJson($this->directory . '/' . $lane . '.result.json', ['status' => 0, 'runId' => 'current', 'hashes' => ['junit' => hash_file('sha256', $report), 'coverage' => hash_file('sha256', $coverage)]]);
         }
         \BackendTestRunner::finalize($this->directory);
-        self::assertStringContainsString('Lines:   66.67% (2/3)', (string) file_get_contents($text));
+        self::assertMatchesRegularExpression('/Lines:\s+66\.66% \(2\/3\)/', (string) file_get_contents($text));
         $document = new \DOMDocument();
         self::assertTrue($document->load($clover));
         $files = $document->getElementsByTagName('file');
@@ -294,15 +293,9 @@ PHP_SOURCE;
         $report = $this->directory . '/ordinary.junit.xml';
         file_put_contents($report, '<testsuite><testcase classname="A" name="test"/></testsuite>');
         $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
-        $data->setLineCoverage(['included.php' => [4 => ['A::test']]]);
-        $serialized = [
-            'buildInformation' => ['timestamp' => 'fixture', 'runtime' => ['name' => 'PHP', 'version' => PHP_VERSION, 'vendorUrl' => 'https://baander.app'], 'phpCodeCoverage' => ['version' => \SebastianBergmann\CodeCoverage\Version::id(), 'serializationFormat' => 1, 'driverInformation' => ['name' => 'fixture', 'version' => '1']]],
-            'basePath' => $this->directory,
-            'codeCoverage' => $data,
-            'testResults' => ['A::test' => ['size' => 'small', 'status' => 'success', 'time' => 0.0]],
-        ];
+        $data->setLineCoverage(['included.php' => [4 => [0 => 1]]]);
         $coverage = $this->directory . '/ordinary.cov';
-        file_put_contents($coverage, "<?php // phpunit/php-code-coverage serialization format 1\nreturn unserialize(base64_decode('" . base64_encode(serialize($serialized)) . "'));");
+        $this->writeCoverage($coverage, $data, 'A::test');
         \BackendTestRunner::writeJson($this->directory . '/ordinary.result.json', ['status' => 0, 'runId' => 'current', 'hashes' => ['junit' => hash_file('sha256', $report), 'coverage' => hash_file('sha256', $coverage)]]);
         $process = new Process([PHP_BINARY, dirname(__DIR__, 5) . '/scripts/backend-test-runner.php', 'finalize', $this->directory]);
         $process->setTimeout(120);
@@ -312,6 +305,21 @@ PHP_SOURCE;
         self::assertDirectoryExists($target);
         self::assertFileExists($target . '.tmp-current');
         self::assertFileDoesNotExist($this->directory . '/finalize.json');
+    }
+
+    private function writeCoverage(string $path, ProcessedCodeCoverageData $data, string $identity): void
+    {
+        $data->setTestIds([$identity]);
+        foreach ($data->coveredFiles() as $file) {
+            $data->renameFile($file, $this->directory . '/' . $file);
+        }
+        $driver = $this->createStub(Driver::class);
+        $driver->method('name')->willReturn('fixture');
+        $driver->method('version')->willReturn('1');
+        $coverage = new CodeCoverage($driver, new Filter());
+        $coverage->setData($data);
+        $coverage->setTests([$identity => ['size' => 'small', 'status' => 'success', 'time' => 0.0]]);
+        (new Serializer())->serialize($path, $coverage);
     }
 
     /** @param list<string> $arguments */

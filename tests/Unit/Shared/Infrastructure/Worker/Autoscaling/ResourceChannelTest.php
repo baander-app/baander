@@ -33,13 +33,19 @@ final class ResourceChannelTest extends TestCase
     public function testPrivateBoundedPublicationPreservesSampleAge(): void
     {
         $channel = $this->channel();
-        self::assertSame('unavailable', $channel->read(10)->state);
+        self::assertSame('unavailable', $this->observationState($channel, 10));
         $channel->publish(new ResourceObservation('known', 10, 0.2, 0.01, 0.3, 0.4));
         self::assertSame(0.3, $channel->read(20)->memoryRatio);
         self::assertSame(10.0, $channel->read(20)->sampledAt);
         $path = $this->directory . '/' . $this->boot . '/resource.json';
         self::assertSame(0600, fileperms($path) & 0777);
         self::assertLessThanOrEqual(4096, filesize($path));
+    }
+
+    /** @phpstan-impure */
+    private function observationState(ResourceChannel $channel, float $now): string
+    {
+        return $channel->read($now)->state;
     }
 
     public function testForeignOversizedMalformedAndFutureSamplesStayUnavailable(): void
@@ -50,9 +56,9 @@ final class ResourceChannelTest extends TestCase
         self::assertSame('unavailable', $channel->read(9)->state);
         $path = $this->directory . '/' . $this->boot . '/resource.json';
         file_put_contents($path, str_repeat('x', 4097));
-        self::assertSame('unavailable', $channel->read(10)->state);
+        self::assertSame('unavailable', $this->observationState($channel, 10));
         file_put_contents($path, '{}');
-        self::assertSame('unavailable', $channel->read(10)->state);
+        self::assertSame('unavailable', $this->observationState($channel, 10));
     }
 
     public function testConcurrentPublicationAllowsOnlyBoundedClockSkew(): void
@@ -60,11 +66,11 @@ final class ResourceChannelTest extends TestCase
         $channel = $this->channel();
         foreach ([10.001, 10.25] as $sampledAt) {
             $channel->publish(new ResourceObservation('known', $sampledAt, 0.2, 0.01, 0.3, 0.4));
-            self::assertSame('known', $channel->read(10)->state);
+            self::assertSame('known', $this->observationState($channel, 10));
             self::assertSame($sampledAt, $channel->read(10)->sampledAt);
         }
         $channel->publish(new ResourceObservation('known', 10.251, 0.2, 0.01, 0.3, 0.4));
-        self::assertSame('unavailable', $channel->read(10)->state);
+        self::assertSame('unavailable', $this->observationState($channel, 10));
     }
 
     public function testPublicFileIsNeverAccepted(): void
@@ -72,7 +78,7 @@ final class ResourceChannelTest extends TestCase
         $channel = $this->channel();
         $channel->publish(new ResourceObservation('unknown', 10));
         chmod($this->directory . '/' . $this->boot . '/resource.json', 0644);
-        self::assertSame('unavailable', $channel->read(10)->state);
+        self::assertSame('unavailable', $this->observationState($channel, 10));
     }
 
     private function channel(int $epoch = 1): ResourceChannel

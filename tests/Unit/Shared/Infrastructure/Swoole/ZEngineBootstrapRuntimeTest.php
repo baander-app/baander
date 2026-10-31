@@ -39,7 +39,10 @@ final class ZEngineBootstrapRuntimeTest extends TestCase
             $method->setFinal(false);
             self::assertFalse(new \ReflectionClass(ZEngineBootstrapFixture::class)->isFinal());
             self::assertFalse(new \ReflectionMethod(ZEngineBootstrapFixture::class, 'service')->isFinal());
-            self::assertInstanceOf(\stdClass::class, new ZEngineBootstrapFixture()->service());
+            $fixture = new ZEngineBootstrapFixture();
+            $service = $fixture->service();
+            self::assertInstanceOf(\stdClass::class, $service);
+            self::assertSame($service, $fixture->storedService());
         } finally {
             $method->setFinal(true);
             $reflection->setFinal(true);
@@ -51,6 +54,11 @@ final class ZEngineBootstrapFixture
 {
     /** @var array<string, object> */
     private array $services = [];
+
+    public function storedService(): ?object
+    {
+        return $this->services['probe'] ?? null;
+    }
 
     final public function service(): object
     {

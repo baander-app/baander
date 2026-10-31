@@ -146,16 +146,22 @@ final class RecommendationJobUseCasesTest extends TestCase
         }
     }
 
+    /** @phpstan-impure */
+    private function jobStatus(RecommendationJob $job): RecommendationJobStatus
+    {
+        return $job->getStatus();
+    }
+
     public function testCancellingAPendingJobCancelsItAndRepeatingItChangesNothing(): void
     {
         $job = $this->jobs->create(isFull: true);
 
         $this->cancel()(new CancelRecommendationJobCommand($job->getPublicId()->toString()));
-        self::assertSame(RecommendationJobStatus::Cancelled, $job->getStatus());
+        self::assertSame(RecommendationJobStatus::Cancelled, $this->jobStatus($job));
         $cancelledAt = $job->getCompletedAt();
 
         $this->cancel()(new CancelRecommendationJobCommand($job->getPublicId()->toString()));
-        self::assertSame(RecommendationJobStatus::Cancelled, $job->getStatus());
+        self::assertSame(RecommendationJobStatus::Cancelled, $this->jobStatus($job));
         self::assertSame($cancelledAt, $job->getCompletedAt());
     }
 

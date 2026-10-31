@@ -15,6 +15,12 @@ requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
 resources for web, dependencies and concurrent instances. Use Yarn for frontend
 work; never run npm.
 
+The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
+Dependency maintenance needs PHP 8.5 or newer and exactly Composer 2.11.1 on
+`PATH`; its local check does not require Swoole. See
+[PHP dependency maintenance](php-dependencies.md) for the seven projects, local
+and online checks, retained fixes and recorded upgrade blockers.
+
 Host setup uses the Composer project under `scripts/`, which installs the local
 `baander/tooling` library from `packages/baander-tooling/`; application
 dependencies and the application kernel are not prerequisites. It checks the PHP

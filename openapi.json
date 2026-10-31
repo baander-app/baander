@@ -1878,6 +1878,33 @@
                 }
             }
         },
+        "/api/live/recovery": {
+            "get": {
+                "tags": [
+                    "Live Updates"
+                ],
+                "summary": "Recover current live update authorization and health",
+                "operationId": "get_live_recovery",
+                "responses": {
+                    "200": {
+                        "description": "Current authorized live families",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LiveRecoveryResource"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "description": "Current principal unavailable"
+                    }
+                }
+            }
+        },
         "/api/oauth/clients/": {
             "get": {
                 "tags": [
@@ -8304,8 +8331,7 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "example": null,
-                                            "nullable": true
+                                            "example": null
                                         }
                                     },
                                     "type": "object"
@@ -17457,33 +17483,6 @@
                 }
             }
         },
-        "/api/live/recovery": {
-            "get": {
-                "tags": [
-                    "Live Updates"
-                ],
-                "summary": "Recover current live update authorization and health",
-                "operationId": "get_live_recovery",
-                "responses": {
-                    "200": {
-                        "description": "Current authorized live families",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/LiveRecoveryResource"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Authentication required"
-                    },
-                    "403": {
-                        "description": "Current principal unavailable"
-                    }
-                }
-            }
-        },
         "/api/monitor/rate-limiters": {
             "get": {
                 "tags": [
@@ -22961,6 +22960,7 @@
                         "items": {
                             "type": "object"
                         },
+                        "default": [],
                         "minItems": 1
                     }
                 },
@@ -23052,10 +23052,7 @@
             },
             "CreatePlaylistRequest": {
                 "required": [
-                    "name",
-                    "isPublic",
-                    "isCollaborative",
-                    "isSmart"
+                    "name"
                 ],
                 "properties": {
                     "name": {
@@ -23072,15 +23069,18 @@
                     },
                     "isPublic": {
                         "type": "boolean",
-                        "example": false
+                        "example": false,
+                        "default": false
                     },
                     "isCollaborative": {
                         "type": "boolean",
-                        "example": false
+                        "example": false,
+                        "default": false
                     },
                     "isSmart": {
                         "type": "boolean",
-                        "example": false
+                        "example": false,
+                        "default": false
                     },
                     "smartRules": {
                         "description": "Rules for smart playlist auto-population",
@@ -23110,13 +23110,15 @@
                     "isPublic": {
                         "type": "boolean",
                         "example": true,
-                        "nullable": true
+                        "nullable": true,
+                        "default": null
                     },
                     "isCollaborative": {
                         "description": "The owner's switch for collaborator editing",
                         "type": "boolean",
                         "example": false,
-                        "nullable": true
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -23225,9 +23227,7 @@
                     "syncConfig": {
                         "type": "object",
                         "default": {},
-                        "additionalProperties": {
-                            "nullable": true
-                        }
+                        "additionalProperties": {}
                     },
                     "syncSchedule": {
                         "type": "string",
@@ -23283,9 +23283,7 @@
                     "parameters": {
                         "type": "object",
                         "default": {},
-                        "additionalProperties": {
-                            "nullable": true
-                        }
+                        "additionalProperties": {}
                     }
                 },
                 "type": "object"
@@ -23323,9 +23321,7 @@
                     "parameters": {
                         "type": "object",
                         "default": {},
-                        "additionalProperties": {
-                            "nullable": true
-                        }
+                        "additionalProperties": {}
                     }
                 },
                 "type": "object"
@@ -24077,8 +24073,7 @@
                         "type": "boolean"
                     },
                     "storedValue": {
-                        "description": "The user's choice as stored, also when it is no longer allowed; null when they have none",
-                        "nullable": true
+                        "description": "The user's choice as stored, also when it is no longer allowed; null when they have none"
                     },
                     "storedValueValid": {
                         "description": "False when the stored choice is no longer allowed, so the user gets the value after a reset",
@@ -24119,6 +24114,80 @@
                             "server_default",
                             "default"
                         ]
+                    }
+                },
+                "type": "object"
+            },
+            "LiveFamily": {
+                "type": "string",
+                "enum": [
+                    "catalog",
+                    "activity",
+                    "playlists",
+                    "libraries",
+                    "notifications",
+                    "account",
+                    "preferences",
+                    "devices",
+                    "sessions",
+                    "radio",
+                    "lyrics",
+                    "recommendations",
+                    "admin-users",
+                    "admin-settings",
+                    "admin-jobs",
+                    "admin-runtime",
+                    "admin-alerts",
+                    "admin-security",
+                    "admin-metadata",
+                    "admin-media",
+                    "deployment-definitions"
+                ]
+            },
+            "LiveRecoveryResource": {
+                "required": [
+                    "version",
+                    "families",
+                    "authorizationFingerprint",
+                    "health"
+                ],
+                "properties": {
+                    "version": {
+                        "type": "integer",
+                        "enum": [
+                            1
+                        ]
+                    },
+                    "families": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LiveFamily"
+                        }
+                    },
+                    "authorizationFingerprint": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "health": {
+                        "required": [
+                            "state",
+                            "oldestPendingAgeMs"
+                        ],
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "current",
+                                    "degraded"
+                                ]
+                            },
+                            "oldestPendingAgeMs": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0
+                            }
+                        },
+                        "type": "object"
                     }
                 },
                 "type": "object"
@@ -24668,10 +24737,16 @@
                     },
                     "fileDeletion": {
                         "description": "The check of every song file, when deleteFiles is true",
-                        "nullable": true,
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/FileDeletionPreviewResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
                             }
                         ]
                     }
@@ -24798,10 +24873,16 @@
                     },
                     "fileDeletion": {
                         "description": "The check of the song file, when deleteFile is true",
-                        "nullable": true,
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/FileDeletionPreviewResource"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
                             }
                         ]
                     }
@@ -24816,9 +24897,7 @@
                 "properties": {
                     "data": {
                         "type": "array",
-                        "items": {
-                            "nullable": true
-                        }
+                        "items": {}
                     },
                     "meta": {
                         "required": [
@@ -25247,9 +25326,7 @@
                 "properties": {
                     "data": {
                         "type": "array",
-                        "items": {
-                            "nullable": true
-                        }
+                        "items": {}
                     },
                     "meta": {
                         "required": [
@@ -26171,80 +26248,6 @@
                 },
                 "type": "object"
             },
-            "LiveFamily": {
-                "type": "string",
-                "enum": [
-                    "catalog",
-                    "activity",
-                    "playlists",
-                    "libraries",
-                    "notifications",
-                    "account",
-                    "preferences",
-                    "devices",
-                    "sessions",
-                    "radio",
-                    "lyrics",
-                    "recommendations",
-                    "admin-users",
-                    "admin-settings",
-                    "admin-jobs",
-                    "admin-runtime",
-                    "admin-alerts",
-                    "admin-security",
-                    "admin-metadata",
-                    "admin-media",
-                    "deployment-definitions"
-                ]
-            },
-            "LiveRecoveryResource": {
-                "required": [
-                    "version",
-                    "families",
-                    "authorizationFingerprint",
-                    "health"
-                ],
-                "properties": {
-                    "version": {
-                        "type": "integer",
-                        "enum": [
-                            1
-                        ]
-                    },
-                    "families": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/LiveFamily"
-                        }
-                    },
-                    "authorizationFingerprint": {
-                        "type": "string",
-                        "pattern": "^[0-9a-f]{64}$"
-                    },
-                    "health": {
-                        "required": [
-                            "state",
-                            "oldestPendingAgeMs"
-                        ],
-                        "properties": {
-                            "state": {
-                                "type": "string",
-                                "enum": [
-                                    "current",
-                                    "degraded"
-                                ]
-                            },
-                            "oldestPendingAgeMs": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0
-                            }
-                        },
-                        "type": "object"
-                    }
-                },
-                "type": "object"
-            },
             "SystemSettingResource": {
                 "required": [
                     "key",
@@ -26273,8 +26276,7 @@
                         ]
                     },
                     "storedValue": {
-                        "description": "Raw stored value, also when it is no longer allowed; null when unset",
-                        "nullable": true
+                        "description": "Raw stored value, also when it is no longer allowed; null when unset"
                     },
                     "isExplicit": {
                         "description": "Whether a value is stored rather than the default applying",
@@ -26337,7 +26339,6 @@
                     },
                     "default": {
                         "description": "Default value; null when the setting follows fallbackKey",
-                        "nullable": true,
                         "oneOf": [
                             {
                                 "type": "boolean"
@@ -26347,6 +26348,13 @@
                             },
                             {
                                 "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
                             }
                         ]
                     },
@@ -27002,7 +27010,6 @@
                     },
                     "choice": {
                         "description": "The user's explicit choice; null when they have none",
-                        "nullable": true,
                         "oneOf": [
                             {
                                 "type": "boolean"
@@ -27012,6 +27019,13 @@
                             },
                             {
                                 "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
                             }
                         ]
                     },
@@ -27135,6 +27149,10 @@
             "description": "User management for administrators"
         },
         {
+            "name": "Live Updates",
+            "description": "Authenticated live update recovery endpoints"
+        },
+        {
             "name": "Auth",
             "description": "User registration, login, and profile management"
         },
@@ -27245,10 +27263,6 @@
         {
             "name": "Debug",
             "description": "Debug and profiling endpoints"
-        },
-        {
-            "name": "Live Updates",
-            "description": "Authenticated live update recovery endpoints"
         },
         {
             "name": "Streaming",

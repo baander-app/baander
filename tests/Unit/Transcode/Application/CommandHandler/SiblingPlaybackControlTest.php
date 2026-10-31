@@ -85,17 +85,26 @@ final class SiblingPlaybackControlTest extends TestCase
             self::assertTrue($userId->equals($this->sessions[0]->getUserId()));
             self::assertTrue($videoId->equals($this->sessions[0]->getVideoId()));
             return array_values(array_filter(
-                $this->sessions, static fn (TranscodeSession $session): bool => !in_array($session->getSessionState(), [SessionState::Completed, SessionState::Failed, SessionState::Cancelled], true),
+                $this->sessions,
+                static fn(TranscodeSession $session): bool => !in_array($session->getSessionState(), [SessionState::Completed, SessionState::Failed, SessionState::Cancelled], true),
             ));
         });
-        $this->sessionPort->method('save')->willReturnCallback(function (): void { ++$this->persistenceWrites; });
+        $this->sessionPort->method('save')->willReturnCallback(function (): void {
+            ++$this->persistenceWrites;
+        });
         $this->jobPort = $this->createStub(TranscodeJobPortInterface::class);
-        $this->jobPort->method('save')->willReturnCallback(function (): void { ++$this->persistenceWrites; });
-        $this->jobPort->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?TranscodeJob => $this->jobs[$id->toString()] ?? null);
+        $this->jobPort->method('save')->willReturnCallback(function (): void {
+            ++$this->persistenceWrites;
+        });
+        $this->jobPort->method('findByUuid')->willReturnCallback(fn(Uuid $id): ?TranscodeJob => $this->jobs[$id->toString()] ?? null);
         $this->ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
-        $this->ownership->method('lockAdmission')->willReturnCallback(function (Uuid $id): void { $this->locks[] = 'video:' . $id; });
-        $this->ownership->method('lockSession')->willReturnCallback(function (Uuid $id): void { $this->locks[] = $id->toString(); });
-        $this->ownership->method('find')->willReturnCallback(fn (Uuid $id): ?TranscodeRuntimeSnapshot => $this->runtimes[$id->toString()] ?? null);
+        $this->ownership->method('lockAdmission')->willReturnCallback(function (Uuid $id): void {
+            $this->locks[] = 'video:' . $id;
+        });
+        $this->ownership->method('lockSession')->willReturnCallback(function (Uuid $id): void {
+            $this->locks[] = $id->toString();
+        });
+        $this->ownership->method('find')->willReturnCallback(fn(Uuid $id): ?TranscodeRuntimeSnapshot => $this->runtimes[$id->toString()] ?? null);
         $this->ownership->method('control')->willReturnCallback(function (Uuid $job, Uuid $session, string $request, ?string $status = null, ?AudioProfile $profile = null, ?float $position = null, ?int $segment = null, bool $seek = true): TranscodeControlResult {
             $this->controls[] = ['session' => $session->toString(), 'request' => $request, 'seek' => $seek];
             $previous = $this->runtimes[$job->toString()];
@@ -108,7 +117,7 @@ final class SiblingPlaybackControlTest extends TestCase
             return new TranscodeControlResult($runtime, true);
         });
         $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation) => $operation());
+        $this->transaction->method('run')->willReturnCallback(static fn(callable $operation) => $operation());
     }
 
     public function testFreshSeekReturnsTheAuthoritativeGenerationAndReplayReturnsNoContinuation(): void
@@ -137,14 +146,16 @@ final class SiblingPlaybackControlTest extends TestCase
         self::assertSame([$request], array_values(array_unique(array_column($this->controls, 'request'))));
         foreach (array_slice($this->sessions, 0, 3) as $session) {
             $runtime = $this->runtimes[$session->getJobId()->toString()];
-            self::assertSame(match ($action) { 'pause' => 'paused', 'cancel' => 'cancelled', default => 'running' }, $runtime->desired->status);
+            self::assertSame(match ($action) {
+                'pause' => 'paused', 'cancel' => 'cancelled', default => 'running'
+            }, $runtime->desired->status);
             self::assertSame(in_array($action, ['seek', 'progress'], true) ? 61.0 : 60.0, $session->getWallClockOffset());
             self::assertSame($action === 'profile' ? 'mobile_mono' : 'streaming_stereo', $session->getAudioProfile()->name);
         }
         foreach (array_slice($this->sessions, 3) as $session) {
             self::assertSame(0.0, $session->getWallClockOffset());
         }
-        $sorted = array_map(static fn (TranscodeSession $session): string => $session->getId()->toString(), array_slice($this->sessions, 0, 3));
+        $sorted = array_map(static fn(TranscodeSession $session): string => $session->getId()->toString(), array_slice($this->sessions, 0, 3));
         sort($sorted);
         self::assertSame(['video:' . $this->sessions[0]->getVideoId(), ...$sorted], $this->locks);
     }
@@ -154,9 +165,17 @@ final class SiblingPlaybackControlTest extends TestCase
     {
         $source = $this->sessions[0];
         $this->runtimes[$source->getJobId()->toString()] = new TranscodeRuntimeSnapshot(
-            $source->getJobId(), $source->getId(), 'admitted',
+            $source->getJobId(),
+            $source->getId(),
+            'admitted',
             new DesiredTranscodeState(AudioProfile::streamingStereo(), position: 60.0),
-            6, 5, $generation, 'ready', '/generation-' . $generation, null, true,
+            6,
+            5,
+            $generation,
+            'ready',
+            '/generation-' . $generation,
+            null,
+            true,
         );
         $before = $this->runtimes;
         $result = $this->dispatch('seek', Uuid::generate()->toString(), expectedRevision: 5, expectedGeneration: $expectedGeneration);
@@ -199,9 +218,17 @@ final class SiblingPlaybackControlTest extends TestCase
     {
         $source = $this->sessions[0];
         $this->runtimes[$source->getJobId()->toString()] = new TranscodeRuntimeSnapshot(
-            $source->getJobId(), $source->getId(), 'admitted',
+            $source->getJobId(),
+            $source->getId(),
+            'admitted',
             new DesiredTranscodeState(AudioProfile::streamingStereo(), $status, 60.0),
-            $revision, $revision, $generation, 'ready', '/generation-' . $generation, null, true,
+            $revision,
+            $revision,
+            $generation,
+            'ready',
+            '/generation-' . $generation,
+            null,
+            true,
         );
 
         $this->dispatch('progress', Uuid::generate()->toString());
@@ -232,8 +259,16 @@ final class SiblingPlaybackControlTest extends TestCase
     {
         $source = $this->sessions[0];
         $this->runtimes[$source->getJobId()->toString()] = new TranscodeRuntimeSnapshot(
-            $source->getJobId(), $source->getId(), 'admitted', new DesiredTranscodeState(AudioProfile::streamingStereo()),
-            5, 5, 3, $outcome, null, 'encoder failed',
+            $source->getJobId(),
+            $source->getId(),
+            'admitted',
+            new DesiredTranscodeState(AudioProfile::streamingStereo()),
+            5,
+            5,
+            3,
+            $outcome,
+            null,
+            'encoder failed',
         );
 
         self::assertNull($this->dispatch('seek', Uuid::generate()->toString()));
@@ -261,9 +296,16 @@ final class SiblingPlaybackControlTest extends TestCase
         $job->markInProgress();
         $job->markCompleted();
         $this->runtimes[$source->getJobId()->toString()] = new TranscodeRuntimeSnapshot(
-            $source->getJobId(), $source->getId(), 'admitted',
+            $source->getJobId(),
+            $source->getId(),
+            'admitted',
             new DesiredTranscodeState(AudioProfile::streamingStereo(), position: 60.0),
-            5, 5, 3, 'complete', '/generation-3', null,
+            5,
+            5,
+            3,
+            'complete',
+            '/generation-3',
+            null,
         );
         $request = Uuid::generate()->toString();
 
@@ -271,7 +313,9 @@ final class SiblingPlaybackControlTest extends TestCase
 
         self::assertCount(3, $this->controls);
         foreach (array_slice($this->sessions, 0, 3) as $session) {
-            self::assertSame(match ($action) { 'pause' => SessionState::Paused, 'cancel' => SessionState::Cancelled, default => SessionState::Active }, $session->getSessionState());
+            self::assertSame(match ($action) {
+                'pause' => SessionState::Paused, 'cancel' => SessionState::Cancelled, default => SessionState::Active
+            }, $session->getSessionState());
             self::assertSame($action === 'progress' ? 61.0 : 60.0, $session->getWallClockOffset());
             self::assertSame($action === 'cancel' ? 0 : 1, $this->jobs[$session->getJobId()->toString()]->getReferenceCount());
         }
@@ -332,13 +376,19 @@ final class SiblingPlaybackControlTest extends TestCase
         $job->attachSession();
         $request = Uuid::generate()->toString();
         $this->dispatch('cancel', $request);
-        self::assertSame(1, $job->getReferenceCount());
+        self::assertSame(1, $this->referenceCount($job));
         $source->getState()->state = SessionState::Active;
 
         $this->dispatch('cancel', $request);
 
-        self::assertSame(1, $job->getReferenceCount());
+        self::assertSame(1, $this->referenceCount($job));
         self::assertSame(SessionState::Cancelled, $source->getSessionState());
+    }
+
+    /** @phpstan-impure */
+    private function referenceCount(TranscodeJob $job): int
+    {
+        return $job->getReferenceCount();
     }
 
     private function dispatch(string $action, string $request, int $expectedRevision = 5, ?int $expectedGeneration = 3): ?int

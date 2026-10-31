@@ -113,7 +113,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         });
         $bus = new MessageBus([new SendMessageMiddleware(new SendersLocator(
             [FilesDiscovered::class => ['async']],
-            new ServiceLocator(['async' => static fn (): SenderInterface => $sender]),
+            new ServiceLocator(['async' => static fn(): SenderInterface => $sender]),
         ))]);
         $inner = $this->createMock(OutboxEventDispatcherInterface::class);
         $inner->expects($this->never())->method('dispatch');
@@ -172,7 +172,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         self::assertSame(0, $this->writer->getTransactionNestingLevel());
         self::assertSame(1, $this->rowCount($this->observer, 'library_file_index'));
         self::assertSame(1, $this->rowCount($this->observer, 'domain_event_outbox'));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $message = $this->discovery(0, $library, $path);
         self::assertSame(hash_file('xxh3', $path), $message->files[0]->hash);
         self::assertSame(filesize($path), $message->files[0]->size);
@@ -210,7 +210,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         $scan = $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
         self::assertSame(2, $scan->filesProcessed);
         self::assertSame(2, $this->rowCount($this->observer, 'library_file_index'));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         self::assertCount(2, $this->transport->getSent()[0]->getMessage()->files);
     }
 
@@ -235,7 +235,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         }
         self::assertSame([$accepted], $this->observer->fetchFirstColumn('SELECT path FROM library_file_index'));
         self::assertSame(1, $this->rowCount($this->observer, 'domain_event_outbox'));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         self::assertSame(1, $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library))->filesProcessed);
         self::assertSame(2, $this->rowCount($this->observer, 'library_file_index'));
     }
@@ -254,7 +254,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         self::assertSame(0, $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library))->filesProcessed);
         $this->failSend = false;
         $this->observer->executeStatement('UPDATE domain_event_outbox SET next_attempt_at = clock_timestamp()');
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $this->discovery(0, $library, $path);
         self::assertNotNull($this->observer->fetchOne("SELECT relayed_at FROM domain_event_outbox WHERE event_name = 'library.directory_indexed'"));
     }
@@ -278,7 +278,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
             $this->index->markUnavailableByPaths($library->getId(), [$path]);
         }
         $this->scanner($type)->scan($library, publishDirectory: $this->capture($library));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $message = $this->discovery(0, $library, $path);
         self::assertTrue(rename($path, $path . '.absent'));
         $consumer = $this->kernel->getContainer()->get('test.service_container')->get(FilesDiscoveredHandler::class);
@@ -289,7 +289,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         self::assertTrue(rename($path . '.absent', $path));
         self::assertSame($message->files[0]->hash, hash_file('xxh3', $path));
         self::assertSame(1, $this->scanner($type)->scan($library, publishDirectory: $this->capture($library))->filesProcessed);
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $returned = $this->discovery(1, $library, $path);
         self::assertEquals($message, $returned);
         if ($type === LibraryType::Music) {
@@ -310,7 +310,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         $first = $this->discovery(0, $library, $path);
         self::assertNull($this->observer->fetchOne("SELECT relayed_at FROM domain_event_outbox WHERE event_name = 'library.directory_indexed'"));
         $this->expireAfterSend = false;
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $duplicate = $this->discovery(1, $library, $path);
         self::assertEquals($first, $duplicate);
         $consumer = $this->kernel->getContainer()->get('test.service_container')->get(FilesDiscoveredHandler::class);
@@ -335,7 +335,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         $originalBytes = file_get_contents($path);
         self::assertIsString($originalBytes);
         $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $original = $this->discovery(0, $library, $path);
         $this->audioFile(title: 'Replacement source', frequency: 880);
         $this->scanner(LibraryType::Music)->scan($library, rescan: true);
@@ -359,13 +359,13 @@ final class LibraryDirectoryPublicationTest extends TestCase
         $library = $this->library(LibraryType::Music);
         $path = $this->audioFile(title: 'Original source', frequency: 440);
         $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $older = $this->discovery(0, $library, $path);
 
         $this->audioFile(title: 'Replacement source', frequency: 880);
         clearstatcache(true, $path);
         $this->scanner(LibraryType::Music)->scan($library, rescan: true, publishDirectory: $this->capture($library));
-        self::assertSame(1, ($this->relay)(new RelayOutboxCommand()));
+        self::assertSame(1, $this->relayPublishedEvents());
         $newer = $this->discovery(1, $library, $path);
         self::assertNotSame($older->files[0]->hash, $newer->files[0]->hash);
         self::assertSame(hash_file('xxh3', $path), $newer->files[0]->hash);
@@ -528,10 +528,8 @@ final class LibraryDirectoryPublicationTest extends TestCase
     private function synchronizedTransaction(?Closure $before = null, ?Closure $after = null): TransactionPortInterface
     {
         $inner = $this->kernel->getContainer()->get('test.service_container')->get(TransactionPortInterface::class);
-        return new class($inner, $before, $after) implements TransactionPortInterface {
-            public function __construct(private TransactionPortInterface $inner, private ?Closure $before, private ?Closure $after)
-            {
-            }
+        return new class ($inner, $before, $after) implements TransactionPortInterface {
+            public function __construct(private TransactionPortInterface $inner, private ?Closure $before, private ?Closure $after) {}
 
             public function run(callable $operation): mixed
             {
@@ -581,10 +579,16 @@ final class LibraryDirectoryPublicationTest extends TestCase
     {
         return function (string $directory, array $files) use ($library): void {
             $this->events->dispatch(new LibraryDirectoryIndexed($library->getId()->toString(), $library->getType()->value, $directory, array_map(
-                static fn (DiscoveredFile $file): array => ['absolute_path' => $file->absolutePath, 'relative_path' => $file->relativePath, 'extension' => $file->extension, 'size' => $file->size, 'modified_at' => $file->modifiedAt, 'hash' => $file->hash],
+                static fn(DiscoveredFile $file): array => ['absolute_path' => $file->absolutePath, 'relative_path' => $file->relativePath, 'extension' => $file->extension, 'size' => $file->size, 'modified_at' => $file->modifiedAt, 'hash' => $file->hash],
                 $files,
             )));
         };
+    }
+
+    /** @phpstan-impure */
+    private function relayPublishedEvents(): int
+    {
+        return ($this->relay)(new RelayOutboxCommand());
     }
 
     private function rowCount(Connection $connection, string $table): int

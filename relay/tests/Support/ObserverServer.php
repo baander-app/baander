@@ -8,8 +8,7 @@ final class ObserverServer
 {
     public static function run(string $directory, int $node, int $upstreamPort, int $port): void
     {
-        \Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
-        \Swoole\Coroutine\run(static function () use ($directory, $node, $upstreamPort, $port): void {
+        Runtime::runCoroutines(static function () use ($directory, $node, $upstreamPort, $port): void {
             $context = stream_context_create(['ssl' => [
                 'local_cert' => "{$directory}/node-{$node}.crt",
                 'local_pk' => "{$directory}/node-{$node}.key",

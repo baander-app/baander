@@ -6,6 +6,12 @@
 *.md diff=markdown
 *.php diff=php
 
+# Unified diffs encode blank context lines with a space.
+patches/*.patch whitespace=-blank-at-eol,-blank-at-eof
+
+# Preserve the checksum of the migration already applied to local instances.
+migrations/Version20261030210000.php whitespace=-blank-at-eol
+
 /.github export-ignore
 CHANGELOG.md export-ignore
 

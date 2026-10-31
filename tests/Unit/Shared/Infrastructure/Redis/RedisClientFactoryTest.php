@@ -59,6 +59,28 @@ final class RedisClientFactoryTest extends TestCase
         return $redis;
     }
 
+    public function testMalformedDsnDoesNotExposeCredentialsInTheExceptionOrItsTrace(): void
+    {
+        $previous = ini_set('zend.exception_ignore_args', '0');
+        try {
+            $dsn = 'redis://default:private-fixture-password@redis.baander.app:6379/other';
+            try {
+                new RedisClientFactory($dsn);
+                self::fail('A Redis DSN with a path must be rejected.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertSame('Cannot parse Redis DSN.', $error->getMessage());
+                self::assertNull($error->getPrevious());
+                self::assertInstanceOf(\SensitiveParameterValue::class, $error->getTrace()[0]['args'][0] ?? null);
+                self::assertStringNotContainsString($dsn, $error->getMessage() . $error->getTraceAsString());
+                self::assertStringNotContainsString('private-fixture-password', $error->getMessage() . $error->getTraceAsString());
+            }
+        } finally {
+            if ($previous !== false) {
+                ini_set('zend.exception_ignore_args', $previous);
+            }
+        }
+    }
+
     // --- borrow() tests ---
 
     public function test_borrow_returns_callback_result(): void

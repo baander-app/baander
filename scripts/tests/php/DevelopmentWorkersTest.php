@@ -361,6 +361,12 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         }
     }
 
+    /** @phpstan-impure */
+    private function recipeFingerprint(\Baander\Tooling\Tests\Historical\DeploymentContainerRecipe $recipe): string
+    {
+        return $recipe->fingerprint();
+    }
+
     public function testHistoricalRecipeIdentityDoesNotNeedSourceContents(): void
     {
         $source = $this->root . '/helper-empty-source/movies';
@@ -387,13 +393,13 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             mediaMounts: [['source' => $source, 'target' => '/media/movies', 'readOnly' => true, 'role' => 'source']],
             sourceMountPolicy: 'local-development',
         );
-        $original = $recipe->fingerprint();
+        $original = $this->recipeFingerprint($recipe);
         file_put_contents($source . '/unrelated-media', 'media is not an input to retirement');
-        self::assertSame($original, $recipe->fingerprint());
+        self::assertSame($original, $this->recipeFingerprint($recipe));
         unlink($source . '/unrelated-media');
         \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory($source);
         \Baander\Tooling\Tests\Historical\DeploymentContainerRecipe::verifySourceDirectory(dirname($source));
-        self::assertSame($original, $recipe->fingerprint());
+        self::assertSame($original, $this->recipeFingerprint($recipe));
         self::assertSame([], array_values(array_diff(scandir($source), ['.', '..'])));
     }
 

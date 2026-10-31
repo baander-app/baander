@@ -65,6 +65,18 @@ final class RouterInitializationIsolationTest extends TestCase
         }
     }
 
+    /** @phpstan-impure */
+    private function loadRoutes(LockingLoader $loader, string $resource, ?string $type): mixed
+    {
+        return $loader->load($resource, $type);
+    }
+
+    /** @phpstan-impure */
+    private function loadCache(LockingConfigCacheFactory $factory, string $path): ConfigCacheInterface
+    {
+        return $factory->cache($path, static function (): void {});
+    }
+
     public function testLoaderCachesByResourceAndTypeWhileHoldingTheMutex(): void
     {
         $mutex = new RouterInitializationMutex();
@@ -74,8 +86,8 @@ final class RouterInitializationIsolationTest extends TestCase
             return $type;
         });
         $loader = new LockingLoader($decorated, $mutex);
-        self::assertSame('attribute', $loader->load('routes', 'attribute'));
-        self::assertSame('attribute', $loader->load('routes', 'attribute'));
+        self::assertSame('attribute', $this->loadRoutes($loader, 'routes', 'attribute'));
+        self::assertSame('attribute', $this->loadRoutes($loader, 'routes', 'attribute'));
         self::assertSame('yaml', $loader->load('routes', 'yaml'));
         self::assertFalse($mutex->isAcquired());
     }
@@ -123,8 +135,8 @@ final class RouterInitializationIsolationTest extends TestCase
         });
         $factory = new LockingConfigCacheFactory($decorated, $mutex);
         $path = sys_get_temp_dir() . '/baander-router-' . bin2hex(random_bytes(8));
-        self::assertSame($cache, $factory->cache($path, static function (): void {}));
-        self::assertSame($cache, $factory->cache($path, static function (): void {}));
+        self::assertSame($cache, $this->loadCache($factory, $path));
+        self::assertSame($cache, $this->loadCache($factory, $path));
         self::assertFalse($mutex->isAcquired());
     }
 }

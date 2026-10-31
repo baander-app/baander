@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use Tsduck\Exception\TsduckException;
 use Tsduck\Exception\VersionMismatchException;
 use Tsduck\FFI\LibTSDuck;
+use Tsduck\Info;
 
 /**
  * Tests for the Composer package bootstrap: FFI availability, library loading,
@@ -38,7 +39,7 @@ class BootstrapTest extends TestCase
             try {
                 LibTSDuck::getInstance();
                 self::$libraryLoaded = true;
-            } catch (TsduckException | VersionMismatchException) {
+            } catch (TsduckException|VersionMismatchException) {
                 self::$libraryLoaded = false;
             }
         } else {
@@ -107,23 +108,9 @@ class BootstrapTest extends TestCase
             $this->markTestSkipped('libtsduck is not available.');
         }
 
-        $ffi = LibTSDuck::getInstance();
-
-        // First call to get the required buffer size.
-        $size = \FFI::new('size_t');
-        $size->cdata = 0;
-        $ffi->tspyVersionString(null, \FFI::addr($size));
-
-        $bufferSize = (int) $size->cdata + 2;
-        $this->assertGreaterThan(0, $bufferSize, 'Version string buffer size should be positive.');
-
-        // Second call to retrieve the actual string.
-        $buffer = \FFI::new("uint8_t[{$bufferSize}]");
-        $size->cdata = $bufferSize;
-        $ffi->tspyVersionString($buffer, \FFI::addr($size));
-
-        $versionString = \FFI::string($buffer, (int) $size->cdata);
+        $versionString = Info::version();
         $this->assertNotEmpty($versionString, 'Version string should not be empty.');
+        $this->assertMatchesRegularExpression('/\d+\.\d+/', $versionString);
     }
 
     public function testVersionMatchesMinimum(): void
@@ -187,7 +174,7 @@ class BootstrapTest extends TestCase
         if (self::$libraryLoaded) {
             try {
                 LibTSDuck::getInstance();
-            } catch (TsduckException | VersionMismatchException) {
+            } catch (TsduckException|VersionMismatchException) {
                 // Expected if library not available after reset.
             }
         }

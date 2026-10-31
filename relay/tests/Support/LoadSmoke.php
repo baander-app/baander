@@ -54,8 +54,9 @@ final class LoadSmoke
         foreach ($schedule as [$due, $kind, $index]) {
             $remaining = $start + $due - Runtime::now();
             if ($remaining > 0) {
-                Coroutine::sleep($remaining);
+                Coroutine::sleep(max(0.001, $remaining));
             }
+            self::checkCancellation();
             if ($failures !== []) {
                 break;
             }
@@ -86,6 +87,7 @@ final class LoadSmoke
         }
         $deadline = Runtime::now() + 10;
         while ($pending > 0 && Runtime::now() < $deadline) {
+            self::checkCancellation();
             Coroutine::sleep(0.005);
         }
         Runtime::requireThat($pending === 0, 'Registry workload did not drain within ten seconds.');
@@ -104,6 +106,13 @@ final class LoadSmoke
             'maximum_dispatch_lag_ms' => round($maximumLag * 1000, 2),
         ];
     }
+    private static function checkCancellation(): void
+    {
+        if (Coroutine::isCanceled()) {
+            throw new \RuntimeException('Registry workload was cancelled.');
+        }
+    }
+
     public static function run(string $rqlited, string $server, int $normalSeconds = 10, int $burstSeconds = 10): void
     {
         Runtime::requireThat(
@@ -135,17 +144,18 @@ final class LoadSmoke
             foreach (array_slice($registrations, 0, 10) as $registration) {
                 Runtime::requireThat($apis[0]->request('GET', '/api/servers/' . $registration['publicId'])[0] === 200, 'Registry warm-up lookup failed.');
             }
-            \Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
             $report = [];
             $peak = 0;
-            \Swoole\Coroutine\run(static function () use ($apis, $registrations, $normalSeconds, $burstSeconds, &$report, &$peak): void {
+            // Allow both ten-second drains, two seconds for the sampler,
+            // both permitted one-second dispatch lags and one second of overhead.
+            Runtime::runCoroutines(static function () use ($apis, $registrations, $normalSeconds, $burstSeconds, &$report, &$peak): void {
                 $sampling = new \stdClass();
                 $sampling->active = true;
                 $samplingFailures = [];
                 $stopped = new Channel(1);
                 Coroutine::create(static function () use ($apis, &$sampling, &$samplingFailures, &$peak, $stopped): void {
                     try {
-                        while ($sampling->active) {
+                        while ($sampling->active && !Coroutine::isCanceled()) {
                             foreach ($apis as $api) {
                                 $peak = max($peak, self::processRssBytes($api->process));
                             }
@@ -170,7 +180,7 @@ final class LoadSmoke
                     'burst' => $burst,
                     'api_peak_rss_mib' => round($peak / 1024 / 1024, 2),
                 ];
-            });
+            }, $normalSeconds + $burstSeconds + 25);
             echo json_encode($report, JSON_THROW_ON_ERROR) . "\n";
             foreach (['lookup_p95_ms', 'heartbeat_p95_ms'] as $key) {
                 Runtime::requireThat($report['normal'][$key] <= 1000, 'Normal latency exceeded release threshold.');

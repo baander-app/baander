@@ -90,11 +90,28 @@ final class ClusterContract
         $last = '';
         do {
             try {
-                $states = array_map(static fn($index) => $cluster->request($index, '/status')[1]['store'], $indices);
+                $states = [];
+                foreach ($indices as $index) {
+                    [$status, $body] = $cluster->request($index, '/status');
+                    $state = $body['store'] ?? null;
+                    if ($status !== 200 || !is_array($state) || !is_array($state['leader'] ?? null)) {
+                        throw new \RuntimeException("Voter {$index}: incomplete status or leader.");
+                    }
+                    $leader = $state['leader']['node_id'] ?? null;
+                    if (!is_string($leader)
+                        || preg_match('/^node-(0|[1-9][0-9]*)$/D', $leader) !== 1
+                        || strlen(substr($leader, 5)) > strlen((string) ($cluster->count - 1))
+                        || (int) substr($leader, 5) >= $cluster->count) {
+                        throw new \RuntimeException("Voter {$index}: invalid cluster leader identity.");
+                    }
+                    if (!is_int($state['db_applied_index'] ?? null)) {
+                        throw new \RuntimeException("Voter {$index}: invalid applied index.");
+                    }
+                    $states[] = $state;
+                }
                 $leaders = array_unique(array_map(static fn($state) => $state['leader']['node_id'], $states));
                 if (count($leaders) === 1
-                    && reset($leaders) !== ''
-                    && array_all($states, static fn($state) => (int) $state['db_applied_index'] >= $acknowledgedIndex)) {
+                    && array_all($states, static fn($state) => $state['db_applied_index'] >= $acknowledgedIndex)) {
                     foreach ($indices as $voter) {
                         foreach ($expectedRows as $id => $expected) {
                             Runtime::requireThat(

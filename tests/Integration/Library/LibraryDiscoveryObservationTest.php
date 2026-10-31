@@ -238,6 +238,7 @@ final class LibraryDiscoveryObservationTest extends TestCase
         });
         // Include unavailable rows in the lock set too.
         $this->index->markUnavailableByPaths($library->getId(), [$paths[1001]]);
+        $this->writer->executeStatement('DELETE FROM query_change_inbox');
         $absent = $this->root . '/Movie/1002.mp4';
         // Pause the first mutation statement after every prelock SELECT has returned.
         // The trigger is local to this disposable schema and uses a session-held barrier.
@@ -272,9 +273,14 @@ SQL);
             );
         } finally {
             $this->observer->executeQuery('SELECT pg_advisory_unlock(891234, 701)')->free();
-            $outcome = Race::finish($child);
+            $outcome = Race::finish($child, $this->observer);
         }
         self::assertSame(['done' => true], $outcome);
+        self::assertSame([
+            ['family' => 'admin-media', 'scope_kind' => 'admin', 'scope_id' => '*'],
+            ['family' => 'catalog', 'scope_kind' => 'library', 'scope_id' => $library->getId()->toString()],
+            ['family' => 'libraries', 'scope_kind' => 'library', 'scope_id' => $library->getId()->toString()],
+        ], $this->observer->fetchAllAssociative('SELECT DISTINCT family, scope_kind, scope_id FROM query_change_inbox ORDER BY family, scope_kind, scope_id'));
         self::assertSame(['hash' => 'newly-observed', 'available' => true], $this->observer->fetchAssociative('SELECT hash, available FROM library_file_index WHERE path = ?', [$absent]));
         self::assertSame($kind === 'remove' ? 1 : 1003, (int) $this->observer->fetchOne('SELECT count(*) FROM library_file_index'));
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM library_file_index WHERE available'));
@@ -384,19 +390,19 @@ SQL);
     /** @param list<string> $paths */
     private function message(Library $library, array $paths, LibraryType $type = LibraryType::Movie): FilesDiscovered
     {
-        return new FilesDiscovered($library->getId(), $type->value, dirname($paths[0]), array_map(static fn (string $path): DiscoveredFile => new DiscoveredFile($path, basename($path), pathinfo($path, PATHINFO_EXTENSION), (int) filesize($path), (int) filemtime($path), (string) hash_file('xxh3', $path)), $paths));
+        return new FilesDiscovered($library->getId(), $type->value, dirname($paths[0]), array_map(static fn(string $path): DiscoveredFile => new DiscoveredFile($path, basename($path), pathinfo($path, PATHINFO_EXTENSION), (int) filesize($path), (int) filemtime($path), (string) hash_file('xxh3', $path)), $paths));
     }
 
     /** @return array<string, mixed> */
     private function payload(FilesDiscovered $message): array
     {
-        return ['library' => $message->libraryId->toString(), 'type' => $message->libraryType, 'directory' => $message->directory, 'files' => array_map(static fn (DiscoveredFile $file): array => get_object_vars($file), $message->files)];
+        return ['library' => $message->libraryId->toString(), 'type' => $message->libraryType, 'directory' => $message->directory, 'files' => array_map(static fn(DiscoveredFile $file): array => get_object_vars($file), $message->files)];
     }
 
     private function transaction(?Closure $after = null): TransactionPortInterface
     {
         $inner = $this->kernel->getContainer()->get('test.service_container')->get(TransactionPortInterface::class);
-        return new class($inner, $after) implements TransactionPortInterface {
+        return new class ($inner, $after) implements TransactionPortInterface {
             public function __construct(private TransactionPortInterface $inner, private ?Closure $after) {}
             public function run(callable $operation): mixed
             {

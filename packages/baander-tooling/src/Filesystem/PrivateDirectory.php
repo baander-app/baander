@@ -39,6 +39,17 @@ final class PrivateDirectory
         self::inspect($path, false);
     }
 
+    /**
+     * @return array<int|string, int>|false
+     * @phpstan-impure
+     */
+    private static function metadata(string $path): array|false
+    {
+        clearstatcache(true, $path);
+
+        return lstat($path);
+    }
+
     private static function inspect(string $path, bool $createDirectories): void
     {
         if ($path === '' || str_contains($path, "\0")) {
@@ -54,13 +65,12 @@ final class PrivateDirectory
                 throw new \RuntimeException("Refusing parent traversal in development state path: {$path}");
             }
             $current .= '/' . $component;
-            clearstatcache(true, $current);
-            $info = @lstat($current);
+            $info = @self::metadata($current);
             if ($info === false && $createDirectories) {
                 if (!@mkdir($current, 0700) && !is_dir($current)) {
                     throw new \RuntimeException("Cannot create development directory: {$current}");
                 }
-                $info = lstat($current);
+                $info = self::metadata($current);
             }
             if ($info !== false && ($info['mode'] & 0170000) === 0120000) {
                 throw new \RuntimeException("Refusing symlink development state path: {$current}");

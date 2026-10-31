@@ -15,6 +15,12 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class RecommendationWorkerAdmissionTest extends TestCase
 {
+    /** @phpstan-impure */
+    private function jobStatus(\App\Recommendation\Domain\Model\RecommendationJob $job): string
+    {
+        return $job->getStatus()->value;
+    }
+
     public function testHttpAdmissionReturnsAPendingJobAndWorkerDeliveryCompletesIt(): void
     {
         $admin = $this->createAdminUser();
@@ -24,14 +30,15 @@ final class RecommendationWorkerAdmissionTest extends TestCase
         self::assertSame(RecommendationGenerationResult::EXECUTION_ASYNC, $data['execution']);
         $transport = static::getContainer()->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $transport);
-        $executions = array_values(array_filter($transport->getSent(), static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof ExecuteRecommendationJobCommand));
+        $executions = array_values(array_filter($transport->getSent(), static fn(Envelope $envelope): bool => $envelope->getMessage() instanceof ExecuteRecommendationJobCommand));
         self::assertCount(1, $executions);
         $message = $executions[0]->getMessage();
         static::getContainer()->get(MessageBusInterface::class)->dispatch(new Envelope($message, [new ReceivedStamp('async')]));
         $job = static::getContainer()->get(RecommendationJobPortInterface::class)->getById($message->jobId);
-        self::assertSame('completed', $job->getStatus()->value);
+        self::assertNotNull($job);
+        self::assertSame('completed', $this->jobStatus($job));
         // Redelivery acknowledges a terminal job without repeating its computation.
         static::getContainer()->get(MessageBusInterface::class)->dispatch(new Envelope($message, [new ReceivedStamp('async')]));
-        self::assertSame('completed', $job->getStatus()->value);
+        self::assertSame('completed', $this->jobStatus($job));
     }
 }

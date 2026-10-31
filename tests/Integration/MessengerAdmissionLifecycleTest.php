@@ -58,8 +58,11 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         $this->boot = bin2hex(random_bytes(16));
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/' . $this->boot, 0700);
-        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 1),
-            new WorkerAutoscalingProfile(maximumConcurrency: 2));
+        $this->ledger = new AdmissionLedger(
+            $this->directory,
+            new DeploymentLease('worker.baander.app', $this->boot, 1),
+            new WorkerAutoscalingProfile(maximumConcurrency: 2),
+        );
         $this->ledger->initialize(hrtime(true) / 1e9);
         $this->publishTarget(2);
 
@@ -106,8 +109,13 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         self::assertIsString($dsn);
         $parts = parse_url($dsn);
         self::assertIsArray($parts);
-        $proxy = new ReplyLossProxy($this->directory, $parts['host'], $parts['port'] ?? 6379, $command,
-            $this->directory . '/' . $this->boot . '/admission.json');
+        $proxy = new ReplyLossProxy(
+            $this->directory,
+            $parts['host'],
+            $parts['port'] ?? 6379,
+            $command,
+            $this->directory . '/' . $this->boot . '/admission.json',
+        );
         $connection = null;
         try {
             $proxyDsn = preg_replace_callback('#(?<=://)[^/]+#', static function (array $match) use ($proxy): string {
@@ -120,8 +128,10 @@ final class MessengerAdmissionLifecycleTest extends TestCase
                 'timeout' => 2.0, 'read_timeout' => 2.0,
             ]);
             $connection = Connection::fromDsn($proxyDsn, $options);
-            $transport = new OrdinaryAdmissionTransport(new RedisTransport($connection, $serializer), new WorkerAdmissionContext($this->ledger,
-                new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1)));
+            $transport = new OrdinaryAdmissionTransport(new RedisTransport($connection, $serializer), new WorkerAdmissionContext(
+                $this->ledger,
+                new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1),
+            ));
             $dispatcher = new EventDispatcher();
             $dispatcher->addSubscriber(new OrdinaryAdmissionSubscriber($transport));
             $effects = 0;
@@ -211,8 +221,10 @@ final class MessengerAdmissionLifecycleTest extends TestCase
                 'pending' => $this->redis->xPending($this->stream, 'test')[0],
             ];
         });
-        $transport = new OrdinaryAdmissionTransport($observed, new WorkerAdmissionContext($this->ledger,
-            new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1)));
+        $transport = new OrdinaryAdmissionTransport($observed, new WorkerAdmissionContext(
+            $this->ledger,
+            new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1),
+        ));
         $dispatcher = new EventDispatcher();
         $dispatcher->addSubscriber(new OrdinaryAdmissionSubscriber($transport));
         $activeEnvelope = null;
@@ -220,8 +232,8 @@ final class MessengerAdmissionLifecycleTest extends TestCase
             $activeEnvelope = $event->getEnvelope();
         });
         $dispatcher->addSubscriber(new SendFailedMessageForRetryListener(
-            new ServiceLocator(['async' => static fn () => $transport]),
-            new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(delayMilliseconds: 0, jitter: 0)]),
+            new ServiceLocator(['async' => static fn() => $transport]),
+            new ServiceLocator(['async' => static fn() => new MultiplierRetryStrategy(delayMilliseconds: 0, jitter: 0)]),
             eventDispatcher: $dispatcher,
         ));
         $retried = [];
@@ -253,7 +265,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         self::assertSame(1, $observations['sent'][0]['pending']);
         self::assertSame('busy', $observations['keepalive'][0]['slot']['state']);
         self::assertSame(1, $observations['keepalive'][0]['pending']);
-        $this->assertCompletionRetainsOwnership($observations, 'reject');
+        $this->assertCompletionRetainsOwnership($observations, 'ack');
         self::assertSame(1, $this->snapshot()['completed']);
         self::assertNull($this->snapshot()['slots']['consumer-0']['requestId']);
         self::assertSame(1, $this->redis->xLen($this->stream));
@@ -275,7 +287,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         $this->runOneDelivery($transport, $bus, $dispatcher);
         self::assertSame(2, $calls);
         self::assertCount(2, $observations['keepalive']);
-        $this->assertCompletionRetainsOwnership($observations, 'ack');
+        $this->assertCompletionRetainsOwnership($observations, 'ack', 1);
         self::assertSame(2, $this->snapshot()['completed']);
         self::assertNull($this->snapshot()['slots']['consumer-0']['requestId']);
         self::assertSame(0, $this->redis->xLen($this->stream));
@@ -296,8 +308,17 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         try {
             // Restrict only a disposable principal; the admin connection stays
             // available to inspect retained data and remove the fixture.
-            self::assertNotFalse($this->redis->rawCommand('ACL', 'SETUSER', $user, 'on', '>' . $password,
-                'resetkeys', '~' . $this->stream . '*', '+@all', '-xadd'));
+            self::assertNotFalse($this->redis->rawCommand(
+                'ACL',
+                'SETUSER',
+                $user,
+                'on',
+                '>' . $password,
+                'resetkeys',
+                '~' . $this->stream . '*',
+                '+@all',
+                '-xadd',
+            ));
             $options = array_replace(MessengerConfiguration::messenger()['transports']['async']['options'], [
                 'stream' => $this->stream, 'group' => 'test', 'consumer' => 'consumer-0',
                 'timeout' => 2.0, 'read_timeout' => 2.0, 'auth' => [$user, $password],
@@ -307,18 +328,22 @@ final class MessengerAdmissionLifecycleTest extends TestCase
             $restricted = Connection::fromDsn($dsn, $options);
             $inner = new RedisTransport($restricted, $serializer);
             $inner->setup();
-            $transport = new OrdinaryAdmissionTransport($inner, new WorkerAdmissionContext($this->ledger,
-                new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1)));
+            $transport = new OrdinaryAdmissionTransport($inner, new WorkerAdmissionContext(
+                $this->ledger,
+                new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1),
+            ));
             $dispatcher = new EventDispatcher();
             $dispatcher->addSubscriber(new OrdinaryAdmissionSubscriber($transport));
             $dispatcher->addSubscriber(new SendFailedMessageForRetryListener(
-                new ServiceLocator(['async' => static fn () => $transport]),
-                new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(delayMilliseconds: 0, jitter: 0)]),
+                new ServiceLocator(['async' => static fn() => $transport]),
+                new ServiceLocator(['async' => static fn() => new MultiplierRetryStrategy(delayMilliseconds: 0, jitter: 0)]),
                 eventDispatcher: $dispatcher,
             ));
             $calls = 0;
             $retried = 0;
-            $dispatcher->addListener(WorkerMessageRetriedEvent::class, static function () use (&$retried): void { ++$retried; });
+            $dispatcher->addListener(WorkerMessageRetriedEvent::class, static function () use (&$retried): void {
+                ++$retried;
+            });
             $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
                 ExtractAlbumCoverCommand::class => [function (ExtractAlbumCoverCommand $received) use ($message, &$calls): void {
                     self::assertEquals($message, $received);
@@ -372,10 +397,10 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     }
 
     /** @param array<string, list<array<string, mixed>>> $observations */
-    private function assertCompletionRetainsOwnership(array $observations, string $operation): void
+    private function assertCompletionRetainsOwnership(array $observations, string $operation, int $delivery = 0): void
     {
-        $before = $observations['before_' . $operation][0];
-        $after = $observations['after_' . $operation][0];
+        $before = $observations['before_' . $operation][$delivery];
+        $after = $observations['after_' . $operation][$delivery];
         self::assertSame('completing', $before['slot']['state']);
         self::assertNotNull($before['slot']['requestId']);
         self::assertSame($before['slot']['requestId'], $after['slot']['requestId']);
@@ -415,7 +440,10 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function snapshot(): array { return $this->ledger->snapshot(hrtime(true) / 1e9); }
+    private function snapshot(): array
+    {
+        return $this->ledger->snapshot(hrtime(true) / 1e9);
+    }
 
     protected function tearDown(): void
     {

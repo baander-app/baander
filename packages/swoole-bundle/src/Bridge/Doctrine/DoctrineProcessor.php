@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace SwooleBundle\SwooleBundle\Bridge\Doctrine;
 
 use Assert\Assertion;
+use Doctrine\Bundle\DoctrineBundle\Registry;
 use SwooleBundle\SwooleBundle\Bridge\Doctrine\DBAL\DBALPlatformAliveKeeper;
 use SwooleBundle\SwooleBundle\Bridge\Doctrine\DBAL\ConnectionKeepAliveInitializer;
 use SwooleBundle\SwooleBundle\Bridge\Doctrine\ORM\EntityManagerResetter;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices\CompileProcessor;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices\Proxifier;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\ContainerConstants;
@@ -35,6 +37,10 @@ final class DoctrineProcessor implements CompileProcessor
 
         $doctrineDef = $container->findDefinition('doctrine');
         $doctrineDef->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE);
+        if ($doctrineDef->getClass() === Registry::class) {
+            $doctrineDef->setClass(ContextualRegistry::class);
+            $doctrineDef->setArgument(5, new Reference(Swoole::class));
+        }
 
         $entityManagers = $container->getParameter('doctrine.entity_managers');
 

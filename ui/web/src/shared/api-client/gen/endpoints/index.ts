@@ -683,9 +683,9 @@ export interface CreatePlaylistRequest {
   name: string;
   /** @nullable */
   description?: string | null;
-  isPublic: boolean;
-  isCollaborative: boolean;
-  isSmart: boolean;
+  isPublic?: boolean;
+  isCollaborative?: boolean;
+  isSmart?: boolean;
   /** Rules for smart playlist auto-population */
   smartRules?: CreatePlaylistRequestSmartRulesItem[];
 }
@@ -755,7 +755,7 @@ export interface StartRadioRequest {
   streamUrl: string;
 }
 
-export type CreateRadioSourceRequestSyncConfig = {[key: string]: unknown | null};
+export type CreateRadioSourceRequestSyncConfig = {[key: string]: unknown};
 
 export interface CreateRadioSourceRequest {
   name: string;
@@ -782,7 +782,7 @@ export const CreateScheduledJobRequestJobType = {
   console: 'console',
 } as const;
 
-export type CreateScheduledJobRequestParameters = {[key: string]: unknown | null};
+export type CreateScheduledJobRequestParameters = {[key: string]: unknown};
 
 export interface CreateScheduledJobRequest {
   /** @maxLength 255 */
@@ -803,7 +803,7 @@ export const UpdateScheduledJobRequestJobType = {
   console: 'console',
 } as const;
 
-export type UpdateScheduledJobRequestParameters = {[key: string]: unknown | null};
+export type UpdateScheduledJobRequestParameters = {[key: string]: unknown};
 
 export interface UpdateScheduledJobRequest {
   /** @maxLength 255 */
@@ -1275,7 +1275,7 @@ export interface AdminUserSettingResource {
   /** Whether the user may change the setting themselves */
   userEditable: boolean;
   /** The user's choice as stored, also when it is no longer allowed; null when they have none */
-  storedValue: unknown | null;
+  storedValue: unknown;
   /** False when the stored choice is no longer allowed, so the user gets the value after a reset */
   storedValueValid: boolean;
   /** Effective value */
@@ -1283,6 +1283,65 @@ export interface AdminUserSettingResource {
   /** The value the setting would have after a reset */
   resetValue: boolean | number | string;
   source: AdminUserSettingResourceSource;
+}
+
+export type LiveFamily = typeof LiveFamily[keyof typeof LiveFamily];
+
+
+export const LiveFamily = {
+  catalog: 'catalog',
+  activity: 'activity',
+  playlists: 'playlists',
+  libraries: 'libraries',
+  notifications: 'notifications',
+  account: 'account',
+  preferences: 'preferences',
+  devices: 'devices',
+  sessions: 'sessions',
+  radio: 'radio',
+  lyrics: 'lyrics',
+  recommendations: 'recommendations',
+  'admin-users': 'admin-users',
+  'admin-settings': 'admin-settings',
+  'admin-jobs': 'admin-jobs',
+  'admin-runtime': 'admin-runtime',
+  'admin-alerts': 'admin-alerts',
+  'admin-security': 'admin-security',
+  'admin-metadata': 'admin-metadata',
+  'admin-media': 'admin-media',
+  'deployment-definitions': 'deployment-definitions',
+} as const;
+
+export type LiveRecoveryResourceVersion = typeof LiveRecoveryResourceVersion[keyof typeof LiveRecoveryResourceVersion];
+
+
+export const LiveRecoveryResourceVersion = {
+  NUMBER_1: 1,
+} as const;
+
+export type LiveRecoveryResourceHealthState = typeof LiveRecoveryResourceHealthState[keyof typeof LiveRecoveryResourceHealthState];
+
+
+export const LiveRecoveryResourceHealthState = {
+  current: 'current',
+  degraded: 'degraded',
+} as const;
+
+export type LiveRecoveryResourceHealth = {
+  state: LiveRecoveryResourceHealthState;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  oldestPendingAgeMs: number | null;
+};
+
+export interface LiveRecoveryResource {
+  version: LiveRecoveryResourceVersion;
+  families: LiveFamily[];
+  /** @pattern ^[0-9a-f]{64}$ */
+  authorizationFingerprint: string;
+  health: LiveRecoveryResourceHealth;
 }
 
 export interface ClientResource {
@@ -1665,7 +1724,7 @@ export type PaginatedResponseMeta = {
 };
 
 export interface PaginatedResponse {
-  data: (unknown | null)[];
+  data: unknown[];
   meta: PaginatedResponseMeta;
 }
 
@@ -1971,7 +2030,7 @@ export type CursorPaginatedResponseMeta = {
 };
 
 export interface CursorPaginatedResponse {
-  data: (unknown | null)[];
+  data: unknown[];
   meta: CursorPaginatedResponseMeta;
 }
 
@@ -2595,71 +2654,12 @@ export interface ScheduledJobResource {
   updatedAt: string;
 }
 
-export type LiveFamily = typeof LiveFamily[keyof typeof LiveFamily];
-
-
-export const LiveFamily = {
-  catalog: 'catalog',
-  activity: 'activity',
-  playlists: 'playlists',
-  libraries: 'libraries',
-  notifications: 'notifications',
-  account: 'account',
-  preferences: 'preferences',
-  devices: 'devices',
-  sessions: 'sessions',
-  radio: 'radio',
-  lyrics: 'lyrics',
-  recommendations: 'recommendations',
-  'admin-users': 'admin-users',
-  'admin-settings': 'admin-settings',
-  'admin-jobs': 'admin-jobs',
-  'admin-runtime': 'admin-runtime',
-  'admin-alerts': 'admin-alerts',
-  'admin-security': 'admin-security',
-  'admin-metadata': 'admin-metadata',
-  'admin-media': 'admin-media',
-  'deployment-definitions': 'deployment-definitions',
-} as const;
-
-export type LiveRecoveryResourceVersion = typeof LiveRecoveryResourceVersion[keyof typeof LiveRecoveryResourceVersion];
-
-
-export const LiveRecoveryResourceVersion = {
-  NUMBER_1: 1,
-} as const;
-
-export type LiveRecoveryResourceHealthState = typeof LiveRecoveryResourceHealthState[keyof typeof LiveRecoveryResourceHealthState];
-
-
-export const LiveRecoveryResourceHealthState = {
-  current: 'current',
-  degraded: 'degraded',
-} as const;
-
-export type LiveRecoveryResourceHealth = {
-  state: LiveRecoveryResourceHealthState;
-  /**
-     * @minimum 0
-     * @nullable
-     */
-  oldestPendingAgeMs: number | null;
-};
-
-export interface LiveRecoveryResource {
-  version: LiveRecoveryResourceVersion;
-  families: LiveFamily[];
-  /** @pattern ^[0-9a-f]{64}$ */
-  authorizationFingerprint: string;
-  health: LiveRecoveryResourceHealth;
-}
-
 export interface SystemSettingResource {
   key: string;
   /** Effective value */
   value: boolean | number | string;
   /** Raw stored value, also when it is no longer allowed; null when unset */
-  storedValue: unknown | null;
+  storedValue: unknown;
   /** Whether a value is stored rather than the default applying */
   isExplicit: boolean;
   /** False when the stored value is no longer allowed and the default applies */
@@ -4634,7 +4634,7 @@ export type GetLibraryShow200 = {
 };
 
 export type DeleteLibraryDelete200 = {
-  data?: unknown | null;
+  data?: unknown;
 };
 
 export type PatchLibraryUpdateBody = {
@@ -10232,6 +10232,107 @@ export const useDeleteAdminUserSettingsReset = <TError = ErrorType<ApiError>,
       > => {
       return useMutation(getDeleteAdminUserSettingsResetMutationOptions(options), queryClient);
     }
+
+export const getGetLiveRecoveryUrl = () => {
+
+
+
+
+  return `/api/live/recovery`
+}
+
+/**
+ * @summary Recover current live update authorization and health
+ */
+export const getLiveRecovery = async ( options?: RequestInit): Promise<LiveRecoveryResource> => {
+
+  return customInstance<LiveRecoveryResource>(getGetLiveRecoveryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLiveRecoveryQueryKey = () => {
+    return [
+    `/api/live/recovery`
+    ] as const;
+    }
+
+
+export const getGetLiveRecoveryQueryOptions = <TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLiveRecoveryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLiveRecovery>>> = ({ signal }) => getLiveRecovery({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetLiveRecoveryQueryResult = NonNullable<Awaited<ReturnType<typeof getLiveRecovery>>>
+export type GetLiveRecoveryQueryError = ErrorType<void>
+
+
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLiveRecovery>>,
+          TError,
+          Awaited<ReturnType<typeof getLiveRecovery>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getLiveRecovery>>,
+          TError,
+          Awaited<ReturnType<typeof getLiveRecovery>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Recover current live update authorization and health
+ */
+
+export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetLiveRecoveryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetOauthClientsIndexUrl = () => {
 
@@ -28472,107 +28573,6 @@ export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError>,
       > => {
       return useMutation(getPostMonitorJobsCancelMutationOptions(options), queryClient);
     }
-
-export const getGetLiveRecoveryUrl = () => {
-
-
-
-
-  return `/api/live/recovery`
-}
-
-/**
- * @summary Recover current live update authorization and health
- */
-export const getLiveRecovery = async ( options?: RequestInit): Promise<LiveRecoveryResource> => {
-
-  return customInstance<LiveRecoveryResource>(getGetLiveRecoveryUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetLiveRecoveryQueryKey = () => {
-    return [
-    `/api/live/recovery`
-    ] as const;
-    }
-
-
-export const getGetLiveRecoveryQueryOptions = <TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetLiveRecoveryQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLiveRecovery>>> = ({ signal }) => getLiveRecovery({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetLiveRecoveryQueryResult = NonNullable<Awaited<ReturnType<typeof getLiveRecovery>>>
-export type GetLiveRecoveryQueryError = ErrorType<void>
-
-
-export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getLiveRecovery>>,
-          TError,
-          Awaited<ReturnType<typeof getLiveRecovery>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getLiveRecovery>>,
-          TError,
-          Awaited<ReturnType<typeof getLiveRecovery>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Recover current live update authorization and health
- */
-
-export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetLiveRecoveryQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
 
 export const getGetMonitorRatelimitersListUrl = () => {
 

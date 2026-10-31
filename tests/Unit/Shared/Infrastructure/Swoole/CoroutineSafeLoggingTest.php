@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler as OriginalStreamHandler;
 use PHPUnit\Framework\TestCase;
@@ -12,7 +13,6 @@ use SwooleBundle\SwooleBundle\Bridge\Monolog\StreamHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices\ClassModificationProcessor;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices\Proxifier;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\Process\Process;
 
 final class CoroutineSafeLoggingTest extends TestCase
 {
@@ -84,7 +84,7 @@ if (count($ids) !== 1 || reset($ids) === -1 || LogStream::$bytes !== "first\nsec
 if (!in_array('close', array_column(LogStream::$owners, 0), true)) { exit(3); }
 echo "line output preserved; stream lifecycle has one owner; context released by producer\n";
 CHILD;
-        $process = new Process([PHP_BINARY, '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
+        $process = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
         $process->setTimeout(10);
         $process->run();
         self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());

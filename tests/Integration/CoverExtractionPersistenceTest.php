@@ -67,9 +67,7 @@ final class CoverExtractionPersistenceTest extends TestCase
         $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
         $params['serverVersion'] = '18';
         $observer = DriverManager::getConnection($params);
-        // Installed Swoole resetter emits this diagnostic when discarding a closed manager.
-        // Assert the specific output rather than weakening strict-output checks.
-        $this->expectOutputString("[swoole] Resetting Doctrine EntityManager: Doctrine\\ORM\\EntityManager\n");
+        $this->expectOutputString('');
         $kernel = new Kernel('test', false);
         $kernel->boot();
         $container = $kernel->getContainer()->get('test.service_container');
@@ -121,7 +119,7 @@ final class CoverExtractionPersistenceTest extends TestCase
             $bus = new MessageBus([
                 new SendMessageMiddleware(new SendersLocator(
                     [ExtractAlbumCoverCommand::class => ['async']],
-                    new ServiceLocator(['async' => static fn () => $async]),
+                    new ServiceLocator(['async' => static fn() => $async]),
                 )),
                 new HandleMessageMiddleware(new HandlersLocator([ExtractAlbumCoverCommand::class => [$handler]])),
             ]);
@@ -160,12 +158,12 @@ final class CoverExtractionPersistenceTest extends TestCase
             });
             $events->addSubscriber(new AddErrorDetailsStampListener());
             $events->addSubscriber(new SendFailedMessageForRetryListener(
-                new ServiceLocator(['async' => static fn () => $async]),
-                new ServiceLocator(['async' => static fn () => new MultiplierRetryStrategy(1, 0)]),
+                new ServiceLocator(['async' => static fn() => $async]),
+                new ServiceLocator(['async' => static fn() => new MultiplierRetryStrategy(1, 0)]),
                 eventDispatcher: $events,
             ));
             $events->addSubscriber(new SendFailedMessageToFailureTransportListener(
-                new ServiceLocator(['async' => static fn () => $failed]),
+                new ServiceLocator(['async' => static fn() => $failed]),
             ));
             $events->addListener(WorkerRunningEvent::class, static function (WorkerRunningEvent $event): void {
                 if ($event->isWorkerIdle()) {

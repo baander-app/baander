@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 final class FrameworkIsolationErrorRegistryTest extends TestCase
 {
@@ -65,7 +65,7 @@ restore_error_handler();
 restore_exception_handler();
 echo json_encode(['checks' => $checks, 'seen' => $seen], JSON_THROW_ON_ERROR);
 PHP;
-        $process = new Process([PHP_BINARY, '-d', 'ffi.enable=true', '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
+        $process = CoroutineProbe::create(['-d', 'ffi.enable=true', '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
         $process->setTimeout(15);
         self::assertSame(0, $process->run(), $process->getErrorOutput());
         $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);

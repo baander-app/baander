@@ -72,7 +72,7 @@ class SectionFileTest extends TestCase
     /**
      * Creates a SectionFile for tests.
      */
-    private function createSectionFile(DuckContext $duck = null): SectionFile
+    private function createSectionFile(?DuckContext $duck = null): SectionFile
     {
         return new SectionFile($duck ?? $this->createContext());
     }

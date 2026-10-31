@@ -36,7 +36,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
         $this->bus = $this->createMessageBus();
         $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $this->transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
         $this->handler = $this->createCreateUserHandlerFixture();
     }
 
@@ -44,7 +44,7 @@ final class CreateUserHandlerTest extends TestCase
     private function createMessageBus(bool $expectCalls = false): MessageBusInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(MessageBusInterface::class) : $this->createStub(MessageBusInterface::class);
-        $double->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
+        $double->method('dispatch')->willReturnCallback(fn(object $m) => new Envelope($m));
         return $double;
     }
 
@@ -71,11 +71,11 @@ final class CreateUserHandlerTest extends TestCase
 
         $this->bus->expects($this->once())
             ->method('dispatch')
-            ->willReturnCallback(fn (object $m) => new Envelope($m));
+            ->willReturnCallback(fn(object $m) => new Envelope($m));
 
         $this->eventDispatcher->expects($this->once())
             ->method('dispatch')
-            ->with($this->callback(fn (object $e) => $e instanceof UserCreatedByOperator));
+            ->with($this->callback(fn(object $e) => $e instanceof UserCreatedByOperator));
 
         $user = ($this->handler)(new CreateUserCommand($email, 'Alice', 'password123', $roles));
 
@@ -196,33 +196,40 @@ final class CreateUserHandlerTest extends TestCase
 
     public function testEventFailureEscapesTheTransaction(): void
     {
-        $active = false;
+        $active = new class {
+            public bool $active = false;
+
+            public function isActive(): bool
+            {
+                return $this->active;
+            }
+        };
         $failure = new \RuntimeException('Outbox insertion failed.');
         $this->transaction = $this->createMock(TransactionPortInterface::class);
         $this->transaction->expects($this->once())->method('run')->willReturnCallback(
-            function (callable $operation) use (&$active, $failure): mixed {
-                $active = true;
+            function (callable $operation) use ($active, $failure): mixed {
+                $active->active = true;
                 try {
                     return $operation();
                 } catch (\RuntimeException $exception) {
                     $this->assertSame($failure, $exception);
                     throw $exception;
                 } finally {
-                    $active = false;
+                    $active->active = false;
                 }
             },
         );
         $userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->userRepository = $userRepository;
         $userRepository->expects($this->once())->method('save')->willReturnCallback(
-            function () use (&$active): void {
-                $this->assertTrue($active);
+            function () use ($active): void {
+                $this->assertTrue($active->isActive());
             },
         );
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
-            function () use (&$active, $failure): never {
-                $this->assertTrue($active);
+            function () use ($active, $failure): never {
+                $this->assertTrue($active->isActive());
                 throw $failure;
             },
         );
@@ -230,8 +237,8 @@ final class CreateUserHandlerTest extends TestCase
         $this->passwordHasher->method('hash')->willReturn('hashed-pw');
         $this->bus = $this->createMock(MessageBusInterface::class);
         $this->bus->expects($this->once())->method('dispatch')->willReturnCallback(
-            function (object $message) use (&$active): Envelope {
-                $this->assertTrue($active);
+            function (object $message) use ($active): Envelope {
+                $this->assertTrue($active->isActive());
                 return new Envelope($message);
             },
         );

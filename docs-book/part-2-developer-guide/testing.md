@@ -1181,7 +1181,8 @@ bash scripts/test-worker-retirement-container.sh
 bash scripts/test-worker-recovery-container.sh
 bash scripts/test-worker-command-container.sh
 bash scripts/test-worker-operator-container.sh
-bash scripts/test-worker-lifecycle-container.sh
+BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+  bash scripts/test-worker-lifecycle-container.sh
 bash scripts/test-docker-context.sh
 bash scripts/test-worker-containment-container.sh
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
@@ -1208,14 +1209,22 @@ treats unexpected output as risky.
 The operator runner requires the host tooling baseline above and Docker. Its
 default host mode also requires the operator PHP runtime with `posix` and
 `pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its executable) and a local Unix
-endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). The host
-controller reaches a loopback-published database port; the worker reaches the same
-database through its private network. Its outer 240-second timeout bounds native
-database waits; DBAL `connect_timeout` is not a hard connection deadline.
+target selected through the
+[shared Docker configuration](../../packages/baander-tooling/README.md#configuration-and-image-roles).
+The host controller reaches a loopback-published database port; the worker reaches
+the same database through its private network. Its outer 240-second timeout bounds
+native database waits; DBAL `connect_timeout` is not a hard connection deadline.
 
 `BAANDER_TEST_OPERATOR_IN_CONTAINER=1` runs the entrypoint in a separate trusted
 controller container with PHP and a verified static Docker CLI. The CLI comes from
 the catalog's `operatorHelper` role (`BAANDER_TEST_DOCKER_CLI_IMAGE` overrides it).
+Container mode requires `BAANDER_TEST_DOCKER_SOCKET_PATH`: the Unix socket path on
+the selected Docker daemon's host, used as the source of the controller's bind
+mount. The examples use `/var/run/docker.sock` for a standard rootful daemon.
+For rootless Docker or a forwarded socket, replace that value with the actual
+daemon-host source path. A socket path visible inside the outer runner may differ
+from that source path.
+
 Only the controller receives the daemon socket mount. Its SELinux process label is
 disabled to access that socket without relabeling it; this exception applies only
 to the trusted test controller. Credentials are streamed into private files owned
@@ -1227,8 +1236,9 @@ authority. Version 4 manifests require a complete autoscaling profile, separate
 control/execution budgets and disjoint CPU sets, read-only source and writable derived volumes, and a private IPC volume.
 Each unit has separate memory/CPU/PID ceilings, including encoder threads;
 see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
-With no explicit endpoint override, setup uses the
-runner's ambient Docker connection, supporting CI runners outside the daemon host.
+With no explicit override in the shared Docker configuration, setup captures the
+runner's ambient Docker connection. The explicit socket mapping supplies the
+controller's daemon-host bind source when the runner is itself a container.
 
 The paired operator fixture requires at least four host CPUs and 13 GiB of host
 memory. Combined web/media and control-capacity runs require 15 GiB: 7424 MiB
@@ -1248,14 +1258,17 @@ production build.
 Forgejo now includes a
 blocking operator lifecycle step using container mode and
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to copy source and dependencies from the built
-image. Adding that gate does not establish a passing Forgejo run. Status does not
-certify readiness.
+image. Its `quality-gate` job sets `BAANDER_TEST_DOCKER_SOCKET_PATH` from the
+repository variable of the same name, defaulting to `/var/run/docker.sock`. Set
+that variable for a runner with a different daemon-host socket path. Adding that
+gate does not establish a passing Forgejo run. Status does not certify readiness.
 
 The standalone lifecycle runner pauses Redis and PostgreSQL in separate disposable
 operator projects, with no HTTP container and an ordinary maximum of two:
 
 ```bash
 BAANDER_TEST_IMAGE=baander-ci:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
   bash scripts/test-worker-lifecycle-container.sh
 ```
 
@@ -1309,7 +1322,8 @@ local image reference to the production runner:
 
 ```bash
 php scripts/build-application.php --buildx --target worker --tag baander-worker:test
-BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-worker-production-container.sh
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+  bash scripts/test-worker-production-container.sh
 ```
 
 The runner has a 300-second outer deadline; image build time is outside that bound.
@@ -1332,14 +1346,15 @@ configuration does not establish a passing Forgejo run. The recorded immutable-i
 lifecycle and combined Chromium playback/recovery gates passed before the paired
 deployment change. Retain image identity, phase, containment and cleanup evidence
 with the runner's artifacts before claiming a result for a newer deployment.
-Native Swoole is pinned to Composer's required 6.2.0. PIE installation failures
-fail the image build.
+The production recipes select PHP 8.5.12 and Composer 2.11.1. Native Swoole is
+pinned to Composer's required 6.2.4. PIE installation failures fail the image build.
 
 The combined two-command runner exercises shared media with the production worker
 image:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-two-command-deployment-container.sh
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+  bash scripts/test-two-command-deployment-container.sh
 ```
 
 It has a 900-second outer deadline. For an attached browser checkpoint, install web
@@ -1347,7 +1362,7 @@ dependencies and provide the pinned Playwright Docker image, then enable the
 optional hook:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-worker:test \
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
 BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
   bash scripts/test-two-command-deployment-container.sh
 ```
@@ -1438,6 +1453,7 @@ The reserved-control pressure drill runs separately from the full backend suite:
 ```bash
 php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
   bash scripts/test-worker-control-capacity-container.sh
 ```
 
@@ -1462,6 +1478,7 @@ image and run the dedicated drill:
 ```bash
 php scripts/build-application.php --buildx --target worker --tag baander-worker:test
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
   BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_USE_IMAGE=0 \
   bash scripts/test-worker-media-control-container.sh
 ```
@@ -1522,7 +1539,7 @@ Run browser controls against the immutable production worker image through the
 combined deployment runner:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-worker:test \
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
 BAANDER_TEST_BROWSER_CLIENT_CONTROLS=1 \
 BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
   bash scripts/test-two-command-deployment-container.sh
@@ -1566,7 +1583,8 @@ Run the dedicated production-browser check against the production worker image
 built from the current checkout:
 
 ```bash
-BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-movie-endpoint-browser.sh
+BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
+  bash scripts/test-movie-endpoint-browser.sh
 ```
 
 The wrapper selects `BAANDER_TEST_MOVIE_ENDPOINT=1` in the disposable two-command
@@ -1868,6 +1886,7 @@ classes without installing development dependencies or PHPUnit:
 
 ```bash
 BAANDER_TEST_IMAGE=baander-worker:test BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
+  BAANDER_TEST_DOCKER_SOCKET_PATH=/var/run/docker.sock \
   BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_USE_IMAGE=0 \
   bash scripts/test-worker-autoscaling-container.sh
 ```

@@ -25,9 +25,6 @@ use Symfony\Component\Messenger\Transport\TransportInterface;
  */
 final class FailedMessagesCommandTest extends KernelTestCase
 {
-    /** The Swoole pool resetter prints this when a retry worker releases its manager. */
-    private const string RESET_NOTICE = "[swoole] Resetting Doctrine EntityManager: Doctrine\\ORM\\EntityManager\n";
-
     private Application $application;
 
     protected function setUp(): void
@@ -46,13 +43,13 @@ final class FailedMessagesCommandTest extends KernelTestCase
         $first = $this->sendFailed('listed');
         $second = $this->sendFailed('detailed');
 
-        $list = $this->runCommand('messenger:failed:show');
+        $list = $this->executeFailedMessageCommand('messenger:failed:show');
         self::assertSame(Command::SUCCESS, $list->getStatusCode(), $list->getDisplay());
         self::assertStringContainsString($first, $list->getDisplay());
         self::assertStringContainsString($second, $list->getDisplay());
         self::assertStringContainsString('Probe "listed" failed.', $list->getDisplay());
 
-        $one = $this->runCommand('messenger:failed:show', ['id' => $second]);
+        $one = $this->executeFailedMessageCommand('messenger:failed:show', ['id' => $second]);
         self::assertSame(Command::SUCCESS, $one->getStatusCode(), $one->getDisplay());
         self::assertStringContainsString(FailureTransportProbe::class, $one->getDisplay());
         self::assertStringContainsString('Probe "detailed" failed.', $one->getDisplay());
@@ -63,7 +60,7 @@ final class FailedMessagesCommandTest extends KernelTestCase
         $removed = $this->sendFailed('removed');
         $kept = $this->sendFailed('kept');
 
-        $tester = $this->runCommand('messenger:failed:remove', ['id' => [$removed], '--force' => true]);
+        $tester = $this->executeFailedMessageCommand('messenger:failed:remove', ['id' => [$removed], '--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame([$kept], $this->storedIds());
@@ -74,7 +71,7 @@ final class FailedMessagesCommandTest extends KernelTestCase
         $this->sendFailed('available');
         $delayed = $this->sendFailed('delayed', delayed: true);
 
-        $tester = $this->runCommand('messenger:failed:remove', ['--all' => true, '--force' => true]);
+        $tester = $this->executeFailedMessageCommand('messenger:failed:remove', ['--all' => true, '--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame([$delayed], $this->storedIds());
@@ -82,11 +79,11 @@ final class FailedMessagesCommandTest extends KernelTestCase
 
     public function testRetryByIdHandlesTheMessageAndRemovesIt(): void
     {
-        $this->expectOutputString(self::RESET_NOTICE);
+        $this->expectOutputString('');
         $retried = $this->sendFailed('recovered', fail: false);
         $other = $this->sendFailed('untouched');
 
-        $tester = $this->runCommand('messenger:failed:retry', ['id' => [$retried], '--force' => true]);
+        $tester = $this->executeFailedMessageCommand('messenger:failed:retry', ['id' => [$retried], '--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         self::assertSame([$other], $this->storedIds());
@@ -94,10 +91,10 @@ final class FailedMessagesCommandTest extends KernelTestCase
 
     public function testRetryThatFailsAgainKeepsTheMessageWithAHigherRetryCount(): void
     {
-        $this->expectOutputString(self::RESET_NOTICE);
+        $this->expectOutputString('');
         $id = $this->sendFailed('still broken');
 
-        $tester = $this->runCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
+        $tester = $this->executeFailedMessageCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         $ids = $this->storedIds();
@@ -115,13 +112,13 @@ final class FailedMessagesCommandTest extends KernelTestCase
      */
     public function testRepeatedFailedRetriesKeepTheMessageListed(): void
     {
-        $this->expectOutputString(str_repeat(self::RESET_NOTICE, 5));
+        $this->expectOutputString('');
         $this->sendFailed('exhausted');
 
         $retryCounts = [];
         for ($attempt = 1; $attempt <= 5; ++$attempt) {
             [$id] = $this->storedIds();
-            $tester = $this->runCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
+            $tester = $this->executeFailedMessageCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
             self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
             $remaining = $this->storedIds();
             self::assertCount(1, $remaining);
@@ -133,10 +130,10 @@ final class FailedMessagesCommandTest extends KernelTestCase
 
     public function testUnrecoverableFailureOnRetryKeepsTheMessageListed(): void
     {
-        $this->expectOutputString(self::RESET_NOTICE);
+        $this->expectOutputString('');
         $id = $this->sendFailed('unrecoverable probe');
 
-        $tester = $this->runCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
+        $tester = $this->executeFailedMessageCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
 
         self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
         $ids = $this->storedIds();
@@ -149,7 +146,7 @@ final class FailedMessagesCommandTest extends KernelTestCase
     }
 
     /** @param array<string, mixed> $input */
-    private function runCommand(string $command, array $input = []): CommandTester
+    private function executeFailedMessageCommand(string $command, array $input = []): CommandTester
     {
         $tester = new CommandTester($this->application->find($command));
         $tester->execute($input, ['interactive' => false]);

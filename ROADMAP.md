@@ -31,8 +31,10 @@ The confirmed scope covers all Composer projects, PHP 8.5.12 or newer stable,
 latest stable Swoole, dependency patches and forks, upstream Swoole bundle changes,
 and repeatable maintenance checks. Scheduled update PRs are excluded.
 Six units cover dependency ownership, runtime builds, bundle reconciliation,
-Composer upgrades, maintenance checks and final qualification. Upgrades and runtime
-qualification remain open.
+Composer upgrades, maintenance checks and final qualification. Implementation is
+retained at the user's wrap-up checkpoint on 2026-10-31. Qualification is partial;
+the remaining checks below are recorded follow-up work, not authorization to
+continue expanding this upgrade.
 
 Verification checkpoint: independent source verification checked Composer
 boundaries, runtime pins, patch hashes, local bundle behavior and repository
@@ -93,6 +95,272 @@ pass. Five simplification lenses reviewed both source cohorts; redundant comment
 and an obsolete PHP compatibility branch were removed without weakening the proofs.
 These checks use the existing Composer lock; upgraded dependency qualification
 and final code review remain open.
+
+U4 dependency checkpoint: all four owned Composer locks now resolve on PHP 8.5.12
+with Composer 2.11.1. Symfony is on 8.1, z-engine uses stable 8.5.2, Swoole stubs
+match 6.2.4, and WebPush 11 uses the existing destination-enforcing Guzzle handler.
+The unused reflection fork and its repository were removed. Both retained patches
+apply in a clean application CI build; Redis delayed promotion is rebased on
+8.1.10. The rebuilt image is
+`sha256:307d6dfad7c92cfe56a1b8dd32fb5f4917fce34eb16b937463652c18042de459`.
+Application cache compilation passes after explicitly selecting the coroutine
+kernel's two methods that conflict with Symfony's new traits. Functional console
+test helpers were renamed to avoid the new inherited static command helper.
+
+The dated currency audit fetched official metadata for 242 public packages and
+checked every owned manifest's production and development constraints. Five root
+packages remain behind stable because the latest reli-prof 0.12.0 pins their shared
+dependencies: Monolog, Webmozart Assert, Amp, Parallel and MonologBundle. Exact
+versions, upstream references and solver blockers are recorded in the
+[dependency guide](docs-book/part-2-developer-guide/php-dependencies.md) and tooling
+policy. Scripts, registry tooling and TSDuck locks have no remaining stable drift.
+Independent disposable Swoole-bundle and PHPStan-rule development installs pass.
+These are resolution and build checks; complete application qualification remains
+open.
+
+TSDuck native qualification is blocked, as explicitly accepted by the user on
+2026-10-31. Its required PHP 8.5/FFI/PHPUnit 13 probe fails during bootstrap because
+the bindings declare `tspyphp*` polling bridge functions absent from upstream
+TSDuck v3.43-4549 and the Docker build. Repository history contains no bridge
+implementation to recover. Native qualification and automatic CI wiring remain
+open for separately scoped C++ bridge work. The probe fails rather than skipping;
+no native callback or lifetime pass is claimed.
+
+U5 maintenance checkpoint: the standalone checker covers all seven manifests,
+four locks, runtime recipes, patch hashes and the fork's reviewed source inventory.
+Local mode validates consistency without network access. Online mode compares
+stable releases independently of Composer's host platform filtering, assesses
+advisories and inspects the pinned Composer image's platform metadata. It preserves
+findings when another source is unavailable and does not change dependencies.
+The local gate joins CI; no scheduled updates or online CI dependency were added.
+
+The upgraded CI image passes 32 checker tests with 186 assertions. Independent
+release comparison now includes every locked production and development dependency,
+including indirect dependencies; the real online run covered 239 public packages.
+JSON and text output both redact credentials. Local inspection
+returns 0. The real online assessment returns 1 for attributed findings and has
+zero evidence gaps; its nonempty locks have no advisory, abandonment or policy
+findings. The registry tooling lock is explicitly empty. Composer's older JWT
+candidate is a maintenance-host Sodium limitation, not a behind-stable exception;
+the report retains that diagnostic. All four locks pass platform checks in the
+selected application runtime. Receipts are retained under `var/dependency-checks/`.
+Tooling formatting checks 409 files with zero fixes. Full tooling and application
+qualification remain open.
+
+U6 integration repair checkpoint: Symfony 8.1 manager reset now replaces only the
+current coroutine's EntityManager assignment, preserving the shared wrapper and
+other assignments. The new native regression passes two tests with 16 assertions
+in the upgraded CI image. Messenger proofs follow Symfony's retry ACK and delayed
+promotion behavior while retaining completion ownership and duplicate recovery
+checks. The regenerated OpenAPI specification and client pass drift, generation
+parity, web typechecking and four null-schema transformer tests.
+
+Full-suite diagnosis also exposed stale migration fixtures and costly planning in
+the existing live-query capture trigger. Unmatched file-index observations now keep
+their direct scopes without planning unrelated media-owner joins. The measured
+1,000-row update fell from 12.8 seconds to 1.05 seconds; the existing lock race keeps
+its row count and deadline. Bulk capture, matched-media ownership and migration
+checks pass four tests with 81 assertions in disposable PostgreSQL. No local data
+was reset. The offline fixture-loader proof now copies installed tooling, matching
+production fixture provisioning, and passes five tests with 24 assertions. Final
+full-suite and runtime acceptance remains open.
+
+The authoritative tooling suite passes 1,169 tests with 5,699 assertions in CI
+image `sha256:7c9e43c7e04d4b2ea08d6efe7ae113ad130e5c582db2726a4a29c0fb4f0c5311`.
+Seven cases skip because they require separate operator services or the native
+analyzer; those checks remain open. The run completed cleanup successfully.
+
+Final static checks pass in rebuilt CI image
+`sha256:c4ad1b3f78984a4cb1162599034452527234231adfe48a6a0319c2d189880d8b`:
+application and tooling PHPStan, application and tooling Deptrac, tooling source
+policy, formatting of all 409 tooling files, OpenAPI drift and local dependency
+consistency. The web suite passes 2,975 tests across 239 files; lint has no errors
+and eight warnings. Production assets pass build and manifest verification.
+The worker image also builds with its production-only dependency installation:
+`sha256:2158b5015feae7b591d61ba01913c6cf972a70180a31b227b5ce856f25272d0c`.
+Full backend and production runtime qualification remain open.
+
+The first full coverage run selected 10,965 tests. Ordinary tests passed 7,017
+tests with 39,161 assertions; the second stack lane passed 1,226 tests with 22,486
+assertions. Native and first-stack failures kept acceptance open. Controlled
+probes reproduced child-process crashes when Xdebug coverage and native Swoole
+coroutine switching ran together. Coroutine probes now disable only their own
+unmerged coverage; parent PHPUnit coverage stays enabled. The affected cohort
+passes 24 tests with 96 assertions under parent coverage.
+
+The first stack failure came from committed OAuth fixture events whose users had
+already been deleted. Fixture cleanup now removes those users' events explicitly.
+The ordered OAuth and scanned-track check passes four tests with 170 assertions,
+including preservation of another user's event. An FFmpeg timeout from the native
+lane did not recur in controlled runs: both coverage modes pass one test with 330
+assertions within the unchanged 30-second deadline. Its cause remains unproven;
+the full native rerun remains required. Five-lens simplification of these repairs
+found no code changes to apply; one comment finding was skipped because it is in
+a protected proof fixture. Final full coverage and runtime qualification remain
+open.
+
+The coverage retry uses rebuilt CI image
+`sha256:3d24946077f13a9bc90d621668eb5872271f0bd8ef87179b2a9ae423321a7aee`.
+Application PHPStan passes again after the fixture changes. Ordinary coverage
+passes 7,017 tests with 39,161 assertions; native coverage passes 888 tests with
+30,015 assertions and no skips. Neither the child-process crashes nor the FFmpeg
+timeout recurred. Both database lanes and merged coverage acceptance remain open.
+The rebuilt worker image is
+`sha256:5712dccb46e5ac99f7be8585d9573a5fa295c4a18dfbda8020e5eca3d3c97b8d`.
+Separate media observer and cancellation proofs pass 63 Node tests without skips.
+
+Full backend coverage passes 10,966 tests with 120,760 assertions in that CI
+image, recorded in `var/test-runs/20261031-103936-6cbdf89e`. The database lanes
+pass 1,835 tests with 29,100 assertions and 1,226 tests with 22,484 assertions.
+Merged coverage validates at 84.03% of lines, 77.41% of methods and 60.85% of
+classes. The complete run finished cleanup successfully.
+
+Preview refresh exposed a changed applied-migration checksum. The saved instance
+uses the original capture migration from commit `505a9c342`; no saved local
+instance records the later master checksum. The original migration bytes are
+restored, and a new forward migration replaces only the two final capture
+functions. This retains super-admin visibility and the unmatched-file fast path
+while allowing the existing preview to use its normal upgrade rehearsal. The
+replacement function definitions match the tested definitions exactly apart from
+`CREATE OR REPLACE`. Syntax, formatting and five-lens simplification pass. The
+upgrade-preservation, fresh-install and committed-capture checks pass 43 tests
+with 1,137 assertions in `var/test-runs/20261031-112450-1a819e31`. The preview
+refresh remains open; the full-suite receipt above predates this migration
+packaging change. The Swoole-disabled Messenger selection also passes 47 tests
+with 344 assertions, including successful cleanup.
+
+Production worker qualification exposed early Redis initialization during Symfony
+8.1 console signal-listener registration. The heartbeat subscriber now initializes
+its health service lazily, allowing worker environment validation to run first.
+Malformed Redis DSNs also use a constant error message and a sensitive constructor
+parameter, keeping credentials out of messages and argument traces. Against the
+unfixed image, the new regression selection produces three expected failures;
+with the source fix, all 18 tests pass with 65 assertions under parent coverage.
+Actual worker-command qualification and final image checks remain open.
+
+The preceding runtime checkpoint passed production worker admission, messaging
+(165 tests with 2,490 assertions), retirement, recovery, descendant containment and
+four Xdebug scenarios. Worker inventory integrity passed for 77,747 files;
+redistribution qualification remains open with 5,466 review gaps. CI now declares
+the daemon-host Docker socket source explicitly, with a configurable rootful
+default; the testing guide documents the same setting for local operator checks.
+
+Registry static analysis and its exact native PHPUnit control pass. The latter
+runs one test with one assertion and no skip, closing the analyzer-dependent case
+from the full tooling run. Six operator-dependent tooling cases and the remaining
+registry modes still require their separate qualification.
+
+The registry release run passed its 32 C++ tests, transport, quorum recovery,
+restore and full-disk checks, then exited with a segmentation fault after the
+load-smoke assertions. That run is failed qualification. A native reproduction
+isolated signal removal after a nested coroutine scheduler destroyed the harness
+reactor. The registry harness now owns dispatch and signal cleanup together,
+restores I/O hooks before closing ordinary processes, and raises queued signals
+from PHP after native dispatch returns. Both the load driver and observer use
+that scope.
+
+Four native lifecycle scenarios pass on PHP 8.5.12 NTS and Swoole 6.2.4:
+completion, task failure, timeout and SIGTERM. They verify coroutine cleanup,
+hook restoration and child reaping; the completion case also returns through
+final signal cleanup. These checks use source overlays in the retained
+qualification image. Final registry qualification remains open. The convergence
+regression fails against the old fixture's acceptance of a null leader and passes
+with the repair. It covers 18 transient invalid states, differing leaders, valid
+leaders and acknowledged rows on every voter. The final standalone proof and its
+source overlays completed cleanup successfully.
+
+The nine changed registry runner, fixture and test files pass focused PHPStan and
+formatting checks on the host. Five simplification lenses found no executable
+changes to apply; two comment findings were retained at the proof boundary. These
+preflight checks do not replace qualification in the rebuilt images.
+
+The next CI and worker builds passed. In worker image
+`sha256:65bc6d7b1a5e8f2ec72f96c268580a22d90ccd1345ca7810d229a1dcb3d29c00`,
+real PID-1 console runs reject the invalid Redis setting at normal and verbose
+output levels without printing credentials. Both return status 2 and complete
+cleanup. CI image
+`sha256:d2d789d9d9d8bbff02c0d91e39ee2bdfe757a7eb4ed70fbac9ef86e9ce6351e3`
+passes 24 registry fixture tests with 126 assertions and 142 focused backend tests
+with 536 assertions. Application and tooling PHPStan, Deptrac, source policy,
+formatting of 411 tooling files and local dependency consistency pass.
+
+Reduced-runtime preflight reproduced five timeout and cancellation test failures
+caused by unconditional `pcntl` calls in child fixtures. The fixtures now use the
+required Swoole runtime, preserving their deadlines, stopped markers and zero
+exit status after SIGTERM. All five cases pass with 20 assertions on the NTS
+runtime without `pcntl`; cleanup completes. Focused PHPStan and formatting pass.
+The complete reduced tooling suite and remaining runtime gates stay open.
+
+CI image
+`sha256:7d6a10fb5c993816e365b78702b5f2ec3e1b59ad355984b37b94179c396c783c`
+also passes those five cases with 20 assertions, tooling PHPStan and formatting
+of 411 files. The worker command drill then exposed container setup overhead:
+creating an observer container for each journal operation consumed the original
+60-second outbox lease before the replacement worker reached its assertion.
+The runner now executes each journal command as a fresh PHP process in its owned
+preparation container. Production leases, deadlines and proof assertions remain
+unchanged. The complete drill passes claim, projection, transport handoff,
+consumer acknowledgement, replay, admission, scheduler failure, termination and
+lease-expiry checks against that CI image; cleanup reports no remaining resources.
+Evidence is retained in `var/test-runs/worker-command-1793449979-2081502`.
+Four applicable simplification lenses found no further changes; the other runtime
+gates remain open.
+
+The subsequent runtime queue passes worker inventory, production lifecycle,
+Messenger integration (165 tests, 2,490 assertions), Redis and PostgreSQL outage
+recovery, container startup, worker recovery, outbox and producer transactions,
+web streaming, security, graceful shutdown and WebSocket proxy logging. The
+development component suite passes 322 tests with 1,506 assertions and six
+prerequisite skips. Its following database drill exposed stale fixture metadata:
+manually created services lacked Compose discovery labels, and the fixture release
+omitted its cleanup budget. The drill now obtains service hashes from Compose,
+verifies discovery against the owned PostgreSQL container, and uses the resolved
+tooling budgets. Its checkpoint, migration rehearsal, idempotence, archive
+integrity, PGroonga, sequence and Redis restore checks pass with cleanup. The
+source-mount lifecycle and all 20 backend stack-isolation checks also pass.
+
+The fixture repairs pass focused PHPStan, formatting and four applicable
+simplification lenses. Rebuilt CI image
+`sha256:b8a4f6b13ac2ed5934605a3574e4d6d56213d5dab3153c4c208a91c47491ce7e`
+passes tooling PHPStan, architecture, source policy, formatting of 411 files and
+local dependency consistency. The worker image is
+`sha256:ffb71b638d829b2bc221ca60b8f2e1f44b37cc574e2ad2b59d6c604cd89e4449`;
+the operator image is
+`sha256:b6311220dc6408110efc7566de45f7a763f2d27c76f20e08baff60a9d3c255ca`.
+The first qualification of the six production recipes used a worker
+image without the operator's Docker CLI, so five cases passed and status invocation
+failed. Its retained IPC volume and temporary directory were recovered with
+verified cleanup. The repeated qualification uses the canonical operator image and
+passes all six cases with 78 assertions, no skips and completed cleanup. It runs as
+UID 1000 against the disposable migrated database and verifies the private transfer
+to the root operator.
+
+Wrap-up checkpoint, 2026-10-31: the registry release and sanitizer gates pass on
+the final qualification derivative. The release gate includes 32 native C++ tests,
+transport and API contracts, cluster recovery, restore, disk exhaustion and load
+checks. The thread gate was interrupted at the user's request; its container and
+the owned derivative image were removed with verified cleanup. Completed gate
+receipts remain in
+`/tmp/baander-php-refresh/final-gates/registry-attempt.Q3iLOT06`.
+The [registry reactor learning](docs/solutions/runtime-errors/registry-coroutine-work-must-preserve-the-signal-reactor.md)
+records why successful load assertions did not establish successful teardown.
+
+The complete backend result of 10,966 tests and 120,760 assertions applies to its
+recorded earlier tree. Later focused backend checks pass 142 tests and 536
+assertions; current tooling static, architecture and formatting checks pass.
+No final full backend or reduced-tooling rerun is claimed. The remaining media
+matrix, registry thread/fuzz/container/backup gates and preview refresh were not
+completed at this checkpoint. The preview and persistent instance retain their
+data. TSDuck native qualification remains blocked by the missing C++ polling
+bridge, as accepted by the user; the five profiler-pinned dependency upgrades
+remain reported exceptions.
+
+The wrap-up source review completed seven focused passes with no actionable
+findings. It covered the upgrade tree before the incoming AAC merge and did not
+establish final runtime qualification. Local dependency consistency passes with
+Composer 2.11.1 and 49 evidence records. The host's older Composer reports an
+unsupported-interface evidence gap as intended. Review and check receipts are
+retained under `/tmp/baander-php-refresh/compound-wrapup`.
 
 ## Cohesive live updates
 

@@ -73,7 +73,10 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT)');
-        $actor = new Uuid(); $video = new Uuid(); $job = new PublicId(); $session = new PublicId();
+        $actor = new Uuid();
+        $video = new Uuid();
+        $job = new PublicId();
+        $session = new PublicId();
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
         $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress']);
@@ -81,15 +84,24 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->insert('transcode_runtime_state', ['job_id' => 'job', 'session_id' => 'session']);
         $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class));
         try {
-            self::assertSame($session->toString(), $playback->findSessions($video)[$job->toString()]->toString());
+            self::assertSame($session->toString(), $this->currentSessions($playback, $video)[$job->toString()]->toString());
             $connection->update('transcode_sessions', ['user_id' => (new Uuid())->toString()], ['id' => 'session']);
-            self::assertSame([], $playback->findSessions($video));
+            self::assertSame([], $this->currentSessions($playback, $video));
             $connection->update('transcode_sessions', ['user_id' => $actor->toString()], ['id' => 'session']);
             $connection->update('transcode_runtime_state', ['session_id' => 'retired-session'], ['job_id' => 'job']);
-            self::assertSame([], $playback->findSessions($video));
+            self::assertSame([], $this->currentSessions($playback, $video));
         } finally {
             $connection->close();
         }
+    }
+
+    /**
+     * @return array<string, PublicId>
+     * @phpstan-impure
+     */
+    private function currentSessions(AuthorizedPlayback $playback, Uuid $video): array
+    {
+        return $playback->findSessions($video);
     }
 
     public function testFindsTheVideoATranscodeJobEncodes(): void

@@ -312,6 +312,27 @@ functional/integration lane owns a disposable Compose project with separate
 PostgreSQL, Redis and application containers. Together, the lane manifests must
 contain every discovered test file exactly once.
 
+## Dependency maintenance
+
+### Dependency policy
+
+The repository inventory that assigns ownership to Composer projects, runtime
+declarations, patches and forks. It records reviewed upstream references and
+justified exceptions; manifests, locks and build recipes still own version pins.
+
+### Dependency finding
+
+A reported difference or inconsistency supported by the requested evidence, such
+as an available stable upgrade or a changed patch hash. A recorded reason for
+retaining a dependency does not suppress the finding.
+
+### Evidence gap
+
+A requested dependency check that could not establish its result, for example
+because a source was unavailable or returned an unsupported format. A gap prevents
+a clean result and preserves findings already collected from other sources.
+Checks deliberately excluded by local mode are stated exclusions, not gaps.
+
 ## Live updates
 
 ### Principal session

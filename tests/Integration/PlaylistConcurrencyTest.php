@@ -128,15 +128,18 @@ final class PlaylistConcurrencyTest extends TestCase
         $visibility->method('isVisible')->willReturn(true);
 
         $result = (new AddSongHandler($repository, $visibility))(new AddSongCommand(
-            $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+            $this->playlistId,
+            $requested,
+            $this->ownerId,
+            LibraryReadScope::unrestricted(),
         ));
 
         self::assertSame('Winner', $result->getName());
         self::assertSame('Retain this description', $result->getDescription());
         self::assertTrue($result->isCollaborator($this->collaboratorId));
-        self::assertSame([0, 1, 2], array_map(static fn ($song): int => $song->getPosition(), $result->getSongs()));
+        self::assertSame([0, 1, 2], array_map(static fn($song): int => $song->getPosition(), $result->getSongs()));
         $fresh = $this->load($this->repository($this->manager()));
-        self::assertSame([$this->songIds[0]->toString(), $this->songIds[1]->toString(), $requested->toString()], array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame([$this->songIds[0]->toString(), $this->songIds[1]->toString(), $requested->toString()], array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
         self::assertSame($result->getRevision(), $fresh->getRevision());
     }
 
@@ -173,7 +176,10 @@ final class PlaylistConcurrencyTest extends TestCase
 
         try {
             (new AddSongHandler($repository, $visibility))(new AddSongCommand(
-                $this->playlistId, $this->songIds[$duplicate ? 0 : 1], $this->collaboratorId, LibraryReadScope::unrestricted(),
+                $this->playlistId,
+                $this->songIds[$duplicate ? 0 : 1],
+                $this->collaboratorId,
+                LibraryReadScope::unrestricted(),
             ));
             self::fail('The refreshed playlist must deny a former editor, including duplicate requests.');
         } catch (AccessDeniedException) {
@@ -200,7 +206,10 @@ final class PlaylistConcurrencyTest extends TestCase
 
         try {
             (new AddSongHandler($repository, $visibility))(new AddSongCommand(
-                $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+                $this->playlistId,
+                $requested,
+                $this->ownerId,
+                LibraryReadScope::unrestricted(),
             ));
             self::fail('An independent write after the mutation read must remain a conflict.');
         } catch (PlaylistWriteConflictException) {
@@ -223,13 +232,16 @@ final class PlaylistConcurrencyTest extends TestCase
         $visibility->method('isVisible')->willReturn(true);
 
         $result = (new AddSongHandler($repository, $visibility))(new AddSongCommand(
-            $this->playlistId, $requested, $this->ownerId, LibraryReadScope::unrestricted(),
+            $this->playlistId,
+            $requested,
+            $this->ownerId,
+            LibraryReadScope::unrestricted(),
         ));
 
-        self::assertSame([0, 2, 3], array_map(static fn ($song): int => $song->getPosition(), $result->getSongs()));
+        self::assertSame([0, 2, 3], array_map(static fn($song): int => $song->getPosition(), $result->getSongs()));
         $fresh = $this->load($this->repository($this->manager()));
-        self::assertSame([$this->songIds[0]->toString(), $survivor->toString(), $requested->toString()], array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
-        self::assertSame([0, 2, 3], array_map(static fn ($song): int => $song->getPosition(), $fresh->getSongs()));
+        self::assertSame([$this->songIds[0]->toString(), $survivor->toString(), $requested->toString()], array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame([0, 2, 3], array_map(static fn($song): int => $song->getPosition(), $fresh->getSongs()));
     }
 
     public function testAppendReportsNotFoundWhenThePlaylistWasDeletedAfterTheControllerRead(): void
@@ -246,7 +258,10 @@ final class PlaylistConcurrencyTest extends TestCase
 
         try {
             (new AddSongHandler($repository, $visibility))(new AddSongCommand(
-                $this->playlistId, $this->songIds[1], $this->ownerId, LibraryReadScope::unrestricted(),
+                $this->playlistId,
+                $this->songIds[1],
+                $this->ownerId,
+                LibraryReadScope::unrestricted(),
             ));
             self::fail('A playlist deleted before the mutation read must be not found.');
         } catch (NotFoundException) {
@@ -302,7 +317,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $playlist = $this->load($repository);
         $playlist->addSong($this->songIds[1], 1);
         $repository->save($playlist);
-        $child = $this->startChild('reorder', implode(',', array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)));
+        $child = $this->startChild('reorder', implode(',', array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)));
         $manager->getConnection()->beginTransaction();
         $playlist->reorderSongs(array_reverse($this->songIds));
         $repository->save($playlist);
@@ -315,7 +330,7 @@ final class PlaylistConcurrencyTest extends TestCase
         self::assertSame($before, $this->storedState());
         $fresh = $this->load($this->repository($this->manager()));
         self::assertSame($playlist->getRevision(), $fresh->getRevision());
-        self::assertSame(array_reverse(array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame(array_reverse(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
     }
 
     /** @return iterable<string, array{bool}> */
@@ -377,7 +392,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $playlist->addSong($this->songIds[1], 1);
         $repository->save($playlist);
         $expectedRevision = $playlist->getRevision();
-        $child = $this->startChild('handler-reorder', implode(',', array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)));
+        $child = $this->startChild('handler-reorder', implode(',', array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)));
         $connection = $manager->getConnection();
         $connection->beginTransaction();
         $winnerRevision = (new ReorderSongsHandler($repository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, array_reverse($this->songIds), $expectedRevision));
@@ -392,7 +407,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $fresh = $this->load($freshRepository);
         self::assertSame($winnerRevision, $fresh->getRevision());
         self::assertNotSame($expectedRevision, $winnerRevision);
-        self::assertSame(array_reverse(array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame(array_reverse(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
         try {
             (new ReorderSongsHandler($freshRepository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, $this->songIds, $expectedRevision));
             self::fail('A reorder starting after the winner commits must also reject its old client revision.');
@@ -740,7 +755,10 @@ final class PlaylistConcurrencyTest extends TestCase
         return $playlist;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @return array<string, mixed>
+     * @phpstan-impure
+     */
     private function storedState(): array
     {
         $id = $this->playlistId->toString();

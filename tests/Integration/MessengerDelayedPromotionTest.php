@@ -115,17 +115,19 @@ final class MessengerDelayedPromotionTest extends TestCase
         $transport->send($original);
         $member = $this->onlyMember();
         $this->makeDue($member);
-        try {
-            iterator_to_array($transport->get());
-            self::fail('Actual delayed removal must fail when Redis denies ZREM.');
-        } catch (TransportException $error) {
-            self::assertMatchesRegularExpression('/NOPERM|cannot run|can.t run|no permissions/i', $error->getMessage());
-        }
+        // A readable stream delivery takes precedence over a promotion error.
+        // The denied removal must still leave the accepted retry recoverable.
+        $interrupted = iterator_to_array($transport->get());
+        self::assertCount(1, $interrupted);
+        $this->assertPayloadPreserved($original, $interrupted[0]);
         self::assertSame([$member], $this->members(), 'Uncertain promotion must preserve the accepted retry.');
         self::assertGreaterThanOrEqual(1, $this->redis->xLen($this->stream), 'XADD succeeded before delayed removal was interrupted.');
+        $transport->ack($interrupted[0]);
+        self::assertSame([$member], $this->members(), 'Acknowledging the stream delivery must not remove the uncertain retry.');
+        self::assertSame(0, $this->redis->xLen($this->stream));
         $this->redis->rawCommand('ACL', 'SETUSER', $user, '+zrem');
 
-        $deliveries = 0;
+        $deliveries = 1;
         // At-least-once promotion may duplicate a payload when a writer succeeds
         // before removal fails.
         for ($attempt = 0; $attempt < 3; ++$attempt) {
@@ -139,7 +141,7 @@ final class MessengerDelayedPromotionTest extends TestCase
                 break;
             }
         }
-        self::assertGreaterThanOrEqual(1, $deliveries);
+        self::assertGreaterThanOrEqual(2, $deliveries, 'Recovery redelivers the retained retry even after the first copy was acknowledged.');
         self::assertSame([], $this->members());
         self::assertSame(0, $this->redis->xLen($this->stream));
     }

@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Redis;
 
 use InvalidArgumentException;
 use Redis;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -63,6 +64,7 @@ class RedisClientFactory
      * @param (callable(int): bool)|null $cidExistsFn Override coroutine existence check (for testing)
      */
     public function __construct(
+        #[SensitiveParameter]
         string $dsn,
         int $maxSize = 10,
         int $idleTimeoutSeconds = 30,
@@ -71,7 +73,7 @@ class RedisClientFactory
         ?callable $cidExistsFn = null,
     ) {
         if (!preg_match('#^redis://(?:[^:@]+:(?<pass>[^@]+)@)?(?<host>[^:]+):(?<port>\d+)$#', $dsn, $m)) {
-            throw new InvalidArgumentException(sprintf('Cannot parse Redis DSN: "%s"', $dsn));
+            throw new InvalidArgumentException('Cannot parse Redis DSN.');
         }
 
         $this->parsed = [

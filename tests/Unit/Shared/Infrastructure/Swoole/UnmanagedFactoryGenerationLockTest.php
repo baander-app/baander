@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use Laminas\Code\Generator\ClassGenerator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 use ProxyManager\Configuration;
 use ProxyManager\Factory\AccessInterceptorValueHolderFactory;
 use ProxyManager\GeneratorStrategy\EvaluatingGeneratorStrategy;
@@ -92,7 +92,7 @@ Swoole\Coroutine\run(static function () use ($instantiator, &$results, &$errors)
 });
 echo json_encode([$results, $errors, $strategy->generationLockStates, $mutex->isAcquired()], JSON_THROW_ON_ERROR);
 PHP;
-        $process = new Process([PHP_BINARY, '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php', __FILE__]);
+        $process = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php', __FILE__]);
         $process->setTimeout(5);
         self::assertSame(0, $process->run(), $process->getErrorOutput() . $process->getOutput());
         self::assertSame([['ready', 'ready'], [], [true, true], false], json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR));

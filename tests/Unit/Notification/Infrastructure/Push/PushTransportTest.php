@@ -31,7 +31,7 @@ final class PushTransportTest extends TestCase
     public function testMinishlinkEncryptsAndSignsTheOriginalUrlBeforePinnedDelivery(): void
     {
         $calls = 0;
-        $webPush = $this->webPush(static fn (): array => ['1.1.1.1', '2606:4700:4700::1111'], static function (RequestInterface $request, array $options) use (&$calls): PromiseInterface {
+        $webPush = $this->webPush(static fn(): array => ['1.1.1.1', '2606:4700:4700::1111'], static function (RequestInterface $request, array $options) use (&$calls): PromiseInterface {
             ++$calls;
             self::assertSame(self::ENDPOINT, (string) $request->getUri());
             self::assertSame('POST', $request->getMethod());
@@ -48,14 +48,11 @@ final class PushTransportTest extends TestCase
             self::assertFalse($options['allow_redirects']);
             self::assertTrue($options['verify']);
             self::assertSame(2, $options['_curl_retries']);
-            self::assertSame(CURL_HTTP_VERSION_1_1, $options['curl'][CURLOPT_HTTP_VERSION]);
+            self::assertSame('1.1', $request->getProtocolVersion());
+            self::assertSame(['https'], $options['protocols']);
+            self::assertSame([CURLOPT_RESOLVE, CURLOPT_FRESH_CONNECT, CURLOPT_FORBID_REUSE], array_keys($options['curl']));
             self::assertTrue($options['curl'][CURLOPT_FRESH_CONNECT]);
             self::assertTrue($options['curl'][CURLOPT_FORBID_REUSE]);
-            self::assertFalse($options['curl'][CURLOPT_FOLLOWLOCATION]);
-            self::assertSame('', $options['curl'][CURLOPT_PROXY]);
-            self::assertSame('*', $options['curl'][CURLOPT_NOPROXY]);
-            self::assertTrue($options['curl'][CURLOPT_SSL_VERIFYPEER]);
-            self::assertSame(2, $options['curl'][CURLOPT_SSL_VERIFYHOST]);
 
             return new FulfilledPromise(new Response(201));
         });
@@ -78,7 +75,7 @@ final class PushTransportTest extends TestCase
     public function testUnsafePersistedDestinationNeverReachesTransport(array $answers): void
     {
         $calls = 0;
-        $webPush = $this->webPush(static fn (): array => $answers, static function () use (&$calls): PromiseInterface {
+        $webPush = $this->webPush(static fn(): array => $answers, static function () use (&$calls): PromiseInterface {
             ++$calls;
 
             return new FulfilledPromise(new Response(201));
@@ -96,7 +93,7 @@ final class PushTransportTest extends TestCase
     public function testPersistedUnapprovedHostIsRejectedAtSendTime(): void
     {
         $calls = 0;
-        $webPush = $this->webPush(static fn (): array => ['1.1.1.1'], static function () use (&$calls): PromiseInterface {
+        $webPush = $this->webPush(static fn(): array => ['1.1.1.1'], static function () use (&$calls): PromiseInterface {
             ++$calls;
 
             return new FulfilledPromise(new Response(201));
@@ -128,6 +125,7 @@ final class PushTransportTest extends TestCase
     public static function responses(): iterable
     {
         yield 'accepted' => [201, true, false];
+        yield 'no content' => [204, true, false];
         yield 'redirect' => [302, false, false];
         yield 'temporary redirect' => [307, false, false];
         yield 'not found' => [404, false, true];
@@ -139,7 +137,7 @@ final class PushTransportTest extends TestCase
     public function testRedirectsFailAndProviderExpiryHandlingIsPreserved(int $status, bool $success, bool $expired): void
     {
         $calls = 0;
-        $webPush = $this->webPush(static fn (): array => ['1.1.1.1'], static function () use (&$calls, $status): PromiseInterface {
+        $webPush = $this->webPush(static fn(): array => ['1.1.1.1'], static function () use (&$calls, $status): PromiseInterface {
             ++$calls;
 
             return new FulfilledPromise(new Response($status, ['Location' => 'https://other.baander.app/target']));
@@ -149,24 +147,41 @@ final class PushTransportTest extends TestCase
 
         self::assertSame($success, $report->isSuccess());
         self::assertSame($expired, $report->isSubscriptionExpired());
+        self::assertSame($status >= 300 && $status < 400 ? null : $status, $report->getResponse()?->getStatusCode());
         self::assertStringNotContainsString('capability-secret', $report->getReason());
         self::assertSame(1, $calls, 'No redirect or retry may send another push.');
     }
 
+    public function testInstalledCurlFactoryAcceptsTheEnforcedTransportPolicy(): void
+    {
+        $transport = new PushTransport(new PublicDestinationPolicy(static fn(): array => ['1.1.1.1']), ['push.baander.app'], static function (RequestInterface $request, array $options): PromiseInterface {
+            $factory = new CurlFactory(1);
+            $easy = $factory->create($request, $options);
+            $factory->release($easy);
+
+            return new FulfilledPromise(new Response(201));
+        });
+
+        self::assertSame(201, $transport(new Request('POST', self::ENDPOINT), [])->wait()->getStatusCode());
+    }
+
     public function testCallerOptionsCannotReplacePinningTlsOrProxyPolicy(): void
     {
-        $transport = new PushTransport(new PublicDestinationPolicy(static fn (): array => ['2606:4700:4700::1111']), ['push.baander.app'], static function (RequestInterface $request, array $options): PromiseInterface {
+        $transport = new PushTransport(new PublicDestinationPolicy(static fn(): array => ['2606:4700:4700::1111']), ['push.baander.app'], static function (RequestInterface $request, array $options): PromiseInterface {
             self::assertSame(['push.baander.app:443:[2606:4700:4700::1111]'], $options['curl'][CURLOPT_RESOLVE]);
             self::assertSame('', $options['proxy']);
             self::assertTrue($options['verify']);
             self::assertFalse($options['allow_redirects']);
             self::assertSame(2, $options['_curl_retries']);
             self::assertArrayNotHasKey(CURLOPT_CONNECT_TO, $options['curl']);
+            self::assertSame('1.1', $request->getProtocolVersion());
+            self::assertSame(['https'], $options['protocols']);
 
             return new FulfilledPromise(new Response(201));
         });
 
-        $transport(new Request('POST', self::ENDPOINT), [
+        $transport(new Request('POST', self::ENDPOINT, version: '2'), [
+            'protocols' => ['http'],
             'proxy' => 'http://127.0.0.1:1234', 'verify' => false, 'allow_redirects' => true, '_curl_retries' => 0,
             'curl' => [CURLOPT_RESOLVE => ['push.baander.app:443:127.0.0.1'], CURLOPT_CONNECT_TO => ['push.baander.app:443:127.0.0.1:1234']],
         ])->wait();
@@ -205,7 +220,7 @@ final class PushTransportTest extends TestCase
     public function testInstalledCurlCompletionDoesNotReplayAnUncertainPush(int $errno): void
     {
         $replays = 0;
-        $webPush = $this->webPush(static fn (): array => ['1.1.1.1'], function (RequestInterface $request, array $options) use ($errno, &$replays): PromiseInterface {
+        $webPush = $this->webPush(static fn(): array => ['1.1.1.1'], function (RequestInterface $request, array $options) use ($errno, &$replays): PromiseInterface {
             $easy = new EasyHandle();
             $easy->handle = curl_init();
             $easy->request = $request;
@@ -216,11 +231,13 @@ final class PushTransportTest extends TestCase
                 unset($released->handle);
             });
 
-            return CurlFactory::finish(static function () use (&$replays): PromiseInterface {
+            $replay = static function () use (&$replays): never {
                 ++$replays;
 
-                return new FulfilledPromise(new Response(201));
-            }, $easy, $factory);
+                throw new \LogicException('Unexpected automatic replay.');
+            };
+
+            return CurlFactory::finish($replay, $easy, $factory);
         });
 
         $report = $webPush->sendOneNotification($this->subscription(), 'confidential-payload');

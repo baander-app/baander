@@ -108,10 +108,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(7, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(9, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(84, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000', 'DoctrineMigrations\\Version20261018130000', 'DoctrineMigrations\\Version20261021120000', 'DoctrineMigrations\\Version20261030210000', 'DoctrineMigrations\\Version20261031120000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(86, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -123,14 +123,95 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('cannot be downgraded', $failure);
+        self::assertStringContainsString('Captured changes and revision tombstones cannot be reconstructed.', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(8, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(10, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
+    }
+
+    public function testLiveCaptureUpgradePreservesAppliedHistoryDataAndPendingScopes(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261030210000'));
+        $admin = Uuid::generate()->toString();
+        $superAdmin = Uuid::generate()->toString();
+        foreach ([[$admin, 'ROLE_ADMIN'], [$superAdmin, 'ROLE_SUPER_ADMIN']] as [$user, $role]) {
+            $this->connection->executeStatement(
+                "INSERT INTO users (id, public_id, name, email, password, roles, created_at, updated_at) VALUES (?, ?, 'Capture upgrade', ?, 'hash', ?::jsonb, clock_timestamp(), clock_timestamp())",
+                [$user, (new PublicId())->toString(), 'capture-upgrade-' . $role . '@baander.app', json_encode([$role], JSON_THROW_ON_ERROR)],
+            );
+        }
+        $library = Uuid::generate()->toString();
+        $this->connection->executeStatement(
+            "INSERT INTO libraries (id, public_id, name, slug, path, type, created_at, updated_at) VALUES (?, ?, 'Capture upgrade', 'capture-upgrade', '/capture-upgrade', 'music', clock_timestamp(), clock_timestamp())",
+            [$library, (new PublicId())->toString()],
+        );
+        $file = Uuid::generate()->toString();
+        $this->connection->insert('library_file_index', [
+            'id' => $file, 'library_id' => $library, 'path' => '/capture-upgrade/unmatched.flac',
+            'hash' => 'capture-upgrade', 'size' => 100, 'extension' => 'flac',
+            'modified_at' => 1, 'discovered_at' => '2026-10-31 12:00:00+00',
+        ]);
+        $this->connection->insert('query_scope_revision', [
+            'family' => 'catalog', 'scope_kind' => 'library', 'scope_id' => $library, 'revision' => 17,
+        ]);
+        $readers = fn(): array => $this->connection->fetchFirstColumn(
+            "SELECT scope_id FROM query_live_recommendation_readers('song', :source, 'song', :target) ORDER BY scope_id",
+            ['source' => $file, 'target' => $file],
+        );
+        $settingsReaders = fn(): array => $this->connection->fetchFirstColumn(
+            "SELECT scope_id FROM query_live_capture('system_settings', '{}', '{recommendations}', '{}') ORDER BY scope_id",
+        );
+        $fileScopes = fn(): array => $this->connection->fetchAllAssociative(
+            "SELECT * FROM query_live_capture('library_file_index', :row::jsonb, '{catalog,libraries,recommendations,admin-media}', '{library}') ORDER BY family, scope_kind, scope_id",
+            ['row' => json_encode(['library_id' => $library, 'path' => '/capture-upgrade/unmatched.flac'], JSON_THROW_ON_ERROR)],
+        );
+        self::assertSame([$admin], $readers());
+        self::assertSame([$admin], $settingsReaders());
+        $scopes = $fileScopes();
+        self::assertSame([
+            ['family' => 'admin-media', 'scope_kind' => 'admin', 'scope_id' => '*'],
+            ['family' => 'catalog', 'scope_kind' => 'library', 'scope_id' => $library],
+            ['family' => 'libraries', 'scope_kind' => 'library', 'scope_id' => $library],
+        ], $scopes);
+        $snapshot = function (): array {
+            $rows = [];
+            foreach (['users', 'libraries', 'library_file_index', 'query_change_inbox'] as $table) {
+                $rows[$table] = $this->connection->fetchAllAssociative('SELECT * FROM ' . $table . ' ORDER BY id');
+            }
+            $rows['query_scope_revision'] = $this->connection->fetchAllAssociative('SELECT * FROM query_scope_revision ORDER BY family, scope_kind, scope_id');
+
+            return $rows;
+        };
+        $before = $snapshot();
+        $history = $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version');
+        $catalog = $this->catalog('public');
+
+        self::assertSame(0, $this->migrate($this->factory()));
+
+        self::assertSame($before, $snapshot(), 'Replacing capture functions preserves data, pending changes and revision tombstones.');
+        $afterHistory = $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version');
+        self::assertSame($history, array_slice($afterHistory, 0, count($history)));
+        self::assertSame('DoctrineMigrations\\Version20261031120000', $afterHistory[count($history)]['version']);
+        $afterCatalog = $this->catalog('public');
+        self::assertSame($catalog['relations'], $afterCatalog['relations']);
+        self::assertSame($catalog['types'], $afterCatalog['types']);
+        self::assertSame(array_column($catalog['routines'], 'oid'), array_column($afterCatalog['routines'], 'oid'));
+        $changed = [];
+        foreach ($catalog['routines'] as $index => $routine) {
+            if ($routine !== $afterCatalog['routines'][$index]) {
+                $changed[] = $routine['proname'];
+            }
+        }
+        self::assertEqualsCanonicalizing(['query_live_recommendation_readers', 'query_live_capture'], $changed);
+        self::assertEqualsCanonicalizing([$admin, $superAdmin], $readers());
+        self::assertEqualsCanonicalizing([$admin, $superAdmin], $settingsReaders());
+        self::assertSame($scopes, $fileScopes());
+        self::assertSame(0, $this->migrate($this->factory()));
+        self::assertSame($afterHistory, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version'));
     }
 
     public function testMediaUpgradeKeepsKnownReceiptsAndDerivesOnlyEstablishedJobOwners(): void
@@ -256,7 +337,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $before = $snapshot();
 
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame(7, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(9, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         $after = $snapshot();
         self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
         $withoutVersion = $after;
@@ -348,16 +429,16 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $created = '2026-10-17 10:20:30.123456+00';
         $intended = '2026-10-17 10:21:30.234567+00';
         $completed = '2026-10-17 10:22:30.345678+00';
-        $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash,created_at) VALUES (?,?,?,?,?)', [$namespace,$boot,$daemon,$recipe,$created]);
-        $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id,created_at,start_claimed_at) VALUES (?,?,?,?,?,?)', [$namespace,$boot,$daemon,$container,$created,$created]);
-        $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,intended_at,completed_at) VALUES (?,?,?,?,?,?)', [$namespace,$boot,$daemon,$container,$intended,$completed]);
-        $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,3,'available',?)", [$namespace,$boot,$completed]);
+        $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash,created_at) VALUES (?,?,?,?,?)', [$namespace, $boot, $daemon, $recipe, $created]);
+        $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id,created_at,start_claimed_at) VALUES (?,?,?,?,?,?)', [$namespace, $boot, $daemon, $container, $created, $created]);
+        $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,intended_at,completed_at) VALUES (?,?,?,?,?,?)', [$namespace, $boot, $daemon, $container, $intended, $completed]);
+        $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,3,'available',?)", [$namespace, $boot, $completed]);
         $before = [];
-        foreach (['creations','containers','retirements','leases'] as $table) {
+        foreach (['creations', 'containers', 'retirements', 'leases'] as $table) {
             $before[$table] = $this->connection->fetchAssociative('SELECT * FROM worker_deployment_' . $table);
         }
         self::assertSame(0, $this->migrate($this->factory()));
-        foreach (['creations','containers','retirements'] as $table) {
+        foreach (['creations', 'containers', 'retirements'] as $table) {
             $row = $this->connection->fetchAssociative("SELECT * FROM worker_deployment_" . $table . " WHERE unit = 'control'");
             self::assertIsArray($row);
             foreach ($before[$table] as $column => $value) {
@@ -391,21 +472,21 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $namespace = 'baander.app:blocked-upgrade';
         $boot = str_repeat('a', 32);
         if ($kind === 'active lease') {
-            $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,1,'active',clock_timestamp())", [$namespace,$boot]);
+            $this->connection->executeStatement("INSERT INTO worker_deployment_leases (namespace,owner_boot_id,epoch,state,expires_at) VALUES (?,?,1,'active',clock_timestamp())", [$namespace, $boot]);
         } else {
             if ($kind !== 'completed binding without recipe') {
-                $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash) VALUES (?,?,?,?)', [$namespace,$boot,'baander.app:daemon',str_repeat('f',64)]);
+                $this->connection->executeStatement('INSERT INTO worker_deployment_creations (namespace,boot_id,daemon_id,recipe_hash) VALUES (?,?,?,?)', [$namespace, $boot, 'baander.app:daemon', str_repeat('f', 64)]);
             }
             if ($kind !== 'uncertain unbound create') {
-                $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id) VALUES (?,?,?,?)', [$namespace,$boot,'baander.app:daemon',str_repeat('c',64)]);
+                $this->connection->executeStatement('INSERT INTO worker_deployment_containers (namespace,boot_id,daemon_id,container_id) VALUES (?,?,?,?)', [$namespace, $boot, 'baander.app:daemon', str_repeat('c', 64)]);
             }
             if ($kind === 'completed binding without recipe') {
-                $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,completed_at) VALUES (?,?,?,?,clock_timestamp())', [$namespace,$boot,'baander.app:daemon',str_repeat('c',64)]);
+                $this->connection->executeStatement('INSERT INTO worker_deployment_retirements (namespace,boot_id,daemon_id,container_id,completed_at) VALUES (?,?,?,?,clock_timestamp())', [$namespace, $boot, 'baander.app:daemon', str_repeat('c', 64)]);
             }
         }
         $snapshot = function (): array {
             $rows = [];
-            foreach (['worker_deployment_creations','worker_deployment_containers','worker_deployment_retirements','worker_deployment_leases','scheduled_jobs','doctrine_migration_versions'] as $table) {
+            foreach (['worker_deployment_creations', 'worker_deployment_containers', 'worker_deployment_retirements', 'worker_deployment_leases', 'scheduled_jobs', 'doctrine_migration_versions'] as $table) {
                 $rows[$table] = $this->connection->fetchAllAssociative('SELECT * FROM ' . $table);
             }
             return $rows;

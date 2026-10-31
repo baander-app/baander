@@ -48,8 +48,9 @@ final class HealthAlertServiceTest extends TestCase
         $this->clock->sleep(60);
         $service->evaluateAndAlert([$this->check('postgresql', HealthStatus::Healthy), $this->check('redis', HealthStatus::Healthy)]);
 
-        self::assertCount(1, $this->alerts->sent);
-        [$title, $body, $eventType, $reference] = $this->alerts->sent[0];
+        $sent = $this->alerts->deliveries();
+        self::assertCount(1, $sent);
+        [$title, $body, $eventType, $reference] = $sent[0];
         self::assertSame('postgresql health degraded', $title);
         self::assertStringContainsString('from 2026-10-10 12:00:00 UTC', $body);
         self::assertStringContainsString('until 2026-10-10 12:02:00 UTC', $body);
@@ -228,6 +229,14 @@ final class RecordingAdminAlerts implements AdminAlertPortInterface
         $this->sent[] = [$title, $body, $eventType, $referenceData];
     }
 
+    /**
+     * @return list<array{string, string, string, array<string, mixed>|null}>
+     */
+    public function deliveries(): array
+    {
+        return $this->sent;
+    }
+
     /** @return list<string> */
     public function titles(): array
     {
@@ -281,8 +290,8 @@ final class RecordingHealthLogger extends AbstractLogger
     public function lines(string $level): array
     {
         return array_values(array_map(
-            static fn (array $record): string => $record[1],
-            array_filter($this->records, static fn (array $record): bool => $record[0] === $level),
+            static fn(array $record): string => $record[1],
+            array_filter($this->records, static fn(array $record): bool => $record[0] === $level),
         ));
     }
 }

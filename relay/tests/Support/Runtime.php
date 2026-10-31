@@ -10,6 +10,8 @@ use Throwable;
 
 final class Runtime
 {
+    private static ?int $interruptedSignal = null;
+
     public static function baseline(): void
     {
         self::requireThat(
@@ -195,14 +197,110 @@ final class Runtime
         }
         return $values;
     }
+    /** Runs coroutine work without taking ownership of the harness signal reactor. */
+    public static function runCoroutines(callable $run, ?float $timeout = null): void
+    {
+        self::requireThat(self::coroutineCount() === 0, 'Coroutine scope requires an idle standalone harness.');
+        $previousHooks = \Swoole\Runtime::getHookFlags();
+        $hooks = SWOOLE_HOOK_ALL;
+        if (!extension_loaded('curl')) {
+            $hooks &= ~(SWOOLE_HOOK_CURL | SWOOLE_HOOK_NATIVE_CURL);
+        }
+        try {
+            \Swoole\Runtime::setHookFlags($hooks);
+            $failure = null;
+            $complete = false;
+            $deadline = $timeout === null ? null : self::now() + $timeout;
+            $task = \Swoole\Coroutine::create(static function () use ($run, &$failure, &$complete): void {
+                try {
+                    $run();
+                } catch (Throwable $error) {
+                    $failure ??= $error;
+                } finally {
+                    $complete = true;
+                }
+            });
+            self::requireThat($task !== false, 'Cannot start coroutine scope.');
+            try {
+                while (!$complete || self::coroutineCount() !== 0) {
+                    if ($complete && $failure !== null) {
+                        break;
+                    }
+                    if ($deadline !== null && self::now() >= $deadline) {
+                        throw new RuntimeException('Coroutine scope deadline exceeded.');
+                    }
+                    self::dispatch();
+                }
+            } catch (Throwable $error) {
+                $failure = $error;
+            } finally {
+                $cleanupDeadline = self::now() + 2;
+                while (self::coroutineCount() !== 0) {
+                    foreach (iterator_to_array(\Swoole\Coroutine::list(), false) as $id) {
+                        if (\Swoole\Coroutine::exists($id)) {
+                            \Swoole\Coroutine::cancel($id);
+                        }
+                    }
+                    if (self::coroutineCount() === 0) {
+                        break;
+                    }
+                    if (self::now() >= $cleanupDeadline) {
+                        throw new CleanupFailure([...($failure === null ? [] : [$failure]), new RuntimeException('Owned coroutines did not stop within two seconds.')]);
+                    }
+                    try {
+                        self::dispatch();
+                    } catch (Throwable $error) {
+                        $failure ??= $error;
+                    }
+                }
+            }
+            if ($failure !== null) {
+                throw $failure;
+            }
+        } finally {
+            \Swoole\Runtime::setHookFlags($previousHooks);
+        }
+    }
+
+    /** @phpstan-impure */
+    private static function coroutineCount(): int
+    {
+        return \Swoole\Coroutine::stats()['coroutine_num'];
+    }
+
+    private static function dispatch(): void
+    {
+        $wake = \Swoole\Timer::after(1, static function (): void {});
+        try {
+            \Swoole\Event::dispatch();
+        } finally {
+            if (\Swoole\Timer::exists($wake)) {
+                \Swoole\Timer::clear($wake);
+            }
+        }
+        self::throwIfInterrupted();
+    }
+    private static function throwIfInterrupted(): void
+    {
+        if (self::$interruptedSignal !== null) {
+            $signal = self::$interruptedSignal;
+            self::$interruptedSignal = null;
+            throw new Interrupted($signal);
+        }
+    }
     public static function main(callable $run): void
     {
         $exitCode = 0;
         try {
             self::baseline();
-            SwooleProcess::signal(2, static fn() => throw new Interrupted(2));
-            SwooleProcess::signal(15, static fn() => throw new Interrupted(15));
+            self::$interruptedSignal = null;
+            $receive = static function (int $signal): void {
+                self::$interruptedSignal ??= $signal;
+            };
+            SwooleProcess::signal(2, $receive);
+            SwooleProcess::signal(15, $receive);
             $run();
+            self::throwIfInterrupted();
         } catch (Throwable $failure) {
             fwrite(STDERR, $failure . "\n");
             $exitCode = $failure instanceof Interrupted ? 128 + $failure->signal

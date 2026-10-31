@@ -4,7 +4,8 @@
   "type": "library",
   "license": "Apache-2.0",
   "require": {
-    "php": ">=8.5"
+    "php": ">=8.5",
+    "composer/semver": "^3.6.0"
   },
   "autoload": {
     "psr-4": {

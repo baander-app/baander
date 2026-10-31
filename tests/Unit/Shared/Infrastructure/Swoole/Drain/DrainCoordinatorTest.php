@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole\Drain;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 /**
  * Each scenario runs a real process-mode Swoole server in its own PHP process, with a drain
@@ -261,8 +261,8 @@ final class DrainCoordinatorTest extends TestCase
         $root = dirname(__DIR__, 6);
         $directory = sys_get_temp_dir() . '/baander-drain-coordinator-' . bin2hex(random_bytes(8));
         self::assertTrue(mkdir($directory, 0700));
-        $process = new Process([
-            PHP_BINARY, '-r', self::SCENARIO,
+        $process = CoroutineProbe::create([
+            '-r', self::SCENARIO,
             $root . '/vendor/autoload.php',
             $root . '/tests/Fixtures/WebShutdown/drain-watchdog-console.php',
             $directory,
@@ -292,11 +292,17 @@ final class DrainCoordinatorTest extends TestCase
             foreach (is_file($directory . '/pids') ? file($directory . '/pids', FILE_IGNORE_NEW_LINES) : [] as $entry) {
                 [$pid, $start] = explode(' ', $entry);
                 $stat = @file_get_contents('/proc/' . $pid . '/stat');
-                if ($stat === false) { continue; }
+                if ($stat === false) {
+                    continue;
+                }
                 $fields = explode(' ', substr($stat, strrpos($stat, ')') + 2));
-                if ($fields[19] === $start) { \Swoole\Process::kill((int) $pid, SIGKILL); }
+                if ($fields[19] === $start) {
+                    \Swoole\Process::kill((int) $pid, SIGKILL);
+                }
             }
-            foreach (glob($directory . '/*') ?: [] as $file) { unlink($file); }
+            foreach (glob($directory . '/*') ?: [] as $file) {
+                unlink($file);
+            }
             rmdir($directory);
         }
     }

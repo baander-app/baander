@@ -197,6 +197,21 @@ deptrac:
           type: directory
           value: /packages/baander-tooling/src/Registry/
     -
+      name: Dependencies
+      collectors:
+        -
+          type: classLike
+          value: ^Baander\\Tooling\\Dependencies\\
+        -
+          type: directory
+          value: /packages/baander-tooling/src/Dependencies/
+    -
+      name: ComposerSemver
+      collectors:
+        -
+          type: classLike
+          value: ^Composer\\Semver\\
+    -
       name: CLI
       collectors:
         -
@@ -333,7 +348,15 @@ deptrac:
       - Process
       - Resources
       - Runtime
+    Dependencies:
+      - Configuration
+      - Docker
+      - Filesystem
+      - Process
+      - ComposerSemver
+    ComposerSemver: {  }
     CLI:
+      - Dependencies
       - Acceptance
       - Backend
       - Build
@@ -356,6 +379,7 @@ deptrac:
       - Runtime
       - Architecture
     ToolingTests:
+      - Dependencies
       - Acceptance
       - Backend
       - Build

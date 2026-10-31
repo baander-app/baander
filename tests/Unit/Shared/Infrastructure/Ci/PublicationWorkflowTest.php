@@ -53,8 +53,8 @@ final class PublicationWorkflowTest extends TestCase
         }
 
         $build = $this->step($publisher, 'Build production image');
+        self::assertStringContainsString('php scripts/build-application.php --buildx', $build['run']);
         self::assertStringContainsString('--target production', $build['run']);
-        self::assertStringContainsString('--load', $build['run']);
         self::assertArrayNotHasKey('if', $build);
 
         $inventory = $this->step($publisher, 'Collect and verify production packaged inventory');
@@ -390,15 +390,15 @@ SH;
     {
         $tools = $this->directory . '/tools';
         $root = dirname(__DIR__, 5);
-        (new Filesystem())->mkdir([$tools, $this->directory . '/scripts', $this->directory . '/relay/tests']);
+        (new Filesystem())->mkdir([$tools, $this->directory . '/scripts', $this->directory . '/relay/tests', $this->directory . '/relay/vendor']);
         foreach (['test-registry.sh', 'test-registry.php', 'bootstrap.php'] as $name) {
             copy($root . '/scripts/' . $name, $this->directory . '/scripts/' . $name);
         }
         symlink($root . '/scripts/vendor', $this->directory . '/scripts/vendor');
         // Keep the real launcher and orchestrator; isolate the dedicated mount and harness processes.
-        $bootstrap = <<<'PHP'
+        $storage = <<<'PHP'
 <?php
-namespace Baander\RegistryTests;
+namespace Baander\Registry\Qualification;
 final class BoundedStorage
 {
     public static function validateRoot(string $root): array
@@ -413,8 +413,15 @@ final class BoundedStorage
 }
 PHP;
         file_put_contents(
-            $this->directory . '/relay/tests/bootstrap.php',
-            $bootstrap . "\nrequire " . var_export($root . '/relay/tests/bootstrap.php', true) . ";\n",
+            $this->directory . '/relay/tests/BoundedStorage.php',
+            $storage,
+        );
+        file_put_contents(
+            $this->directory . '/relay/vendor/autoload.php',
+            "<?php\n\$loader = require " . var_export($root . '/relay/vendor/autoload.php', true) . ";\n"
+            . '$loader->addClassMap('
+            . var_export(['Baander\\Registry\\Qualification\\BoundedStorage' => $this->directory . '/relay/tests/BoundedStorage.php'], true)
+            . ");\nreturn \$loader;\n",
         );
         $contract = <<<'PHP'
 <?php

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
@@ -114,7 +116,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         if (isset($this->connection, $this->user)) {
             // Access tokens, with their refresh tokens and token metadata, authorization and
             // device codes, and passkeys cascade from the user; codes also cascade from their client.
-            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+            $this->removeUserFixture($this->user);
             foreach ($this->clients as $publicId) {
                 $this->connection->executeStatement('DELETE FROM oauth_clients WHERE public_id = ?', [$publicId]);
             }
@@ -126,6 +128,65 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             $this->kernel->shutdown();
         }
         parent::tearDown();
+    }
+
+    private function removeUserFixture(User $user): void
+    {
+        $userId = $user->getId()->toString();
+        // These production-kernel writes commit independently of DAMA. Durable events
+        // have no user foreign key and must leave with the account that produced them.
+        $this->connection->executeStatement(
+            "DELETE FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
+            ['userId' => $userId],
+        );
+        $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$userId]);
+    }
+
+    public function testCleanupRemovesItsCommittedEventsAndPreservesAnotherUsersEvent(): void
+    {
+        $suffix = random_bytes(8) |> bin2hex(...);
+        $other = User::register(
+            new Email('grant-path-cleanup-' . $suffix . '@baander.app'),
+            password_hash(self::PASSWORD, PASSWORD_BCRYPT),
+            'Unrelated grant path user',
+        );
+        $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+        self::assertInstanceOf(UserRepositoryInterface::class, $users);
+        $users->save($other);
+
+        try {
+            $event = new PasswordChanged($other->getId(), new Email($other->getEmail()));
+            (new OutboxRepository($this->connection))->append($event::class, $event->eventName(), $event->toPayload());
+            $otherEvent = $this->connection->fetchOne(
+                "SELECT id FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
+                ['userId' => $other->getId()->toString()],
+            );
+            self::assertNotFalse($otherEvent);
+
+            $web = new SignedDpopProof();
+            $login = $this->login($web);
+            $response = $this->asUser($login['accessToken'], $web, 'PUT', '/api/auth/me/password', json: [
+                'currentPassword' => self::PASSWORD,
+                'newPassword' => 'grant-path-cleanup-new-password',
+            ]);
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            self::assertSame('user.password_changed', $this->connection->fetchOne(
+                "SELECT event_name FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
+                ['userId' => $this->user->getId()->toString()],
+            ));
+
+            $this->removeUserFixture($this->user);
+
+            self::assertFalse($this->connection->fetchOne('SELECT id FROM users WHERE id = ?', [$this->user->getId()->toString()]));
+            self::assertFalse($this->connection->fetchOne(
+                "SELECT id FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
+                ['userId' => $this->user->getId()->toString()],
+            ));
+            self::assertSame($otherEvent, $this->connection->fetchOne('SELECT id FROM domain_event_outbox WHERE id = ?', [$otherEvent]));
+            self::assertSame($other->getId()->toString(), $this->connection->fetchOne('SELECT id FROM users WHERE id = ?', [$other->getId()->toString()]));
+        } finally {
+            $this->removeUserFixture($other);
+        }
     }
 
     public function testPasswordLoginPersistsTheProofKeyBindingOfTheIssuedAccessToken(): void

@@ -93,9 +93,15 @@ final class ApiLanguageListenerTest extends TestCase
         $resolver = $request->attributes->get(RequestLocale::ATTRIBUTE);
         self::assertSame(0, $reads);
 
-        self::assertSame('da', RequestLocale::of($resolver));
-        self::assertSame('da', RequestLocale::of($resolver));
+        self::assertSame('da', $this->resolvedLanguage($resolver));
+        self::assertSame('da', $this->resolvedLanguage($resolver));
         self::assertSame(1, $reads);
+    }
+
+    /** @phpstan-impure */
+    private function resolvedLanguage(mixed $resolver): string
+    {
+        return RequestLocale::of($resolver);
     }
 
     private static function language(?string $stored, string $source, bool $valid = true): UserSettingView
@@ -122,7 +128,7 @@ final class ApiLanguageListenerTest extends TestCase
             return new ApiLanguageListener(new TokenStorage(), $settings, new AcceptLanguageMatcher());
         }
 
-        $settings->method('setting')->willReturnCallback(static fn (string $userId, string $key): UserSettingView => $userId === self::USER_ID && $key === 'language'
+        $settings->method('setting')->willReturnCallback(static fn(string $userId, string $key): UserSettingView => $userId === self::USER_ID && $key === 'language'
             ? $language
             : throw new \LogicException(sprintf('Unexpected setting "%s" of "%s".', $key, $userId)));
 

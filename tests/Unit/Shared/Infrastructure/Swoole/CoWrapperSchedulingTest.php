@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Process\Process;
 
 final class CoWrapperSchedulingTest extends TestCase
 {
@@ -44,7 +44,7 @@ Swoole\Coroutine\run(static function () use ($wrapper, &$ran): void {
 if (!$ran) { exit(2); }
 echo "rejected exhaustion; scheduled normally\n";
 CHILD;
-        $process = new Process([PHP_BINARY, '-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
+        $process = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5) . '/vendor/autoload.php']);
         $process->setTimeout(5);
         $process->run();
 

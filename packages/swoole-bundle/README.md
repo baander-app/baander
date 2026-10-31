@@ -36,9 +36,9 @@ regression checks and upstream references for this fork and its dependencies.
 
 ## Requirements
 
-- PHP 8.3+
-- Swoole 6.2.0 (`ext-swoole`)
-- Symfony 7.4 | 8.0
+- PHP 8.5 (`^8.5`)
+- Swoole 6.2.4 (`ext-swoole`, with matching `upscale/ext-swoole` stubs)
+- Symfony 8.1 (`^8.1`)
 
 ## Installation
 

@@ -1,9 +1,13 @@
 import { defineConfig } from 'orval';
+import { normalizeOpenApiNullSchemas } from './openapi-transformer';
 
 export default defineConfig({
   baander: {
     input: {
       target: '../../openapi.json',
+      override: {
+        transformer: normalizeOpenApiNullSchemas,
+      },
     },
     output: {
       target: './src/shared/api-client/gen/endpoints/index.ts',

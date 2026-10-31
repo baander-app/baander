@@ -68,7 +68,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         self::assertSame(GovernorState::Active, $governor->getState());
         self::assertSame(1, $governor->getModel()->sampleCount());
-        self::assertSame(0, Timer::stats()['num']);
+        self::assertSame(0, $this->timerCount());
     }
 
     public function testTaskWorkersDoNotResolveQoLServices(): void
@@ -82,7 +82,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 4));
 
-        self::assertSame(0, Timer::stats()['num']);
+        self::assertSame(0, $this->timerCount());
     }
 
     public function testSavedActiveStreamsAreNotRestored(): void
@@ -127,7 +127,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         self::assertSame(GovernorState::Active, $governor->getState());
         self::assertFileExists($this->directory . '/governor_state.json');
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
     }
 
     public function testChangedEncoderResetsLearningAndRemovesStaleState(): void
@@ -145,7 +145,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertSame(GovernorState::Learning, $governor->getState());
         self::assertSame(0, $governor->getModel()->sampleCount());
         self::assertFileDoesNotExist($this->directory . '/governor_state.json');
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
     }
 
     public function testMissingSavedEncoderRetainsExistingRestorationBehavior(): void
@@ -166,7 +166,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
 
         self::assertSame(GovernorState::Learning, $governor->getState());
         self::assertFileDoesNotExist($this->directory . '/governor_state.json');
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
     }
 
     /** @return iterable<string, array{bool}> */
@@ -182,7 +182,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('error')->with(
             'QoL governor startup failed',
-            self::callback(static fn (array $context): bool => $context['exception'] instanceof \Throwable),
+            self::callback(static fn(array $context): bool => $context['exception'] instanceof \Throwable),
         );
         [$qol] = $this->fixture($logger, !$corruptState);
         if ($corruptState) {
@@ -200,7 +200,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         $dispatcher->dispatch(new WorkerStartedEvent($server, 0), WorkerStartedEvent::NAME);
 
         self::assertSame(7, $registry->getWorkerId());
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
     }
 
     public function testWorkerZeroSavesItsLearningStateWhenTheDrainStarts(): void
@@ -222,7 +222,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('error')->with(
             'QoL learning state was not saved during the drain',
-            self::callback(static fn (array $context): bool => $context['exception'] instanceof \RuntimeException),
+            self::callback(static fn(array $context): bool => $context['exception'] instanceof \RuntimeException),
         );
         [$subscriber] = $this->fixture($logger, failFingerprint: true);
 
@@ -237,16 +237,22 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         [$subscriber] = $this->fixture(drain: $drain);
         $server = new Server('127.0.0.1', 0);
         $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 0));
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
 
         // A reload: WorkerExit without the drain stops nothing.
         $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
-        self::assertSame(2, Timer::stats()['num']);
+        self::assertSame(2, $this->timerCount());
 
         $drain->draining = true;
         $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
         $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
-        self::assertSame(0, Timer::stats()['num']);
+        self::assertSame(0, $this->timerCount());
+    }
+
+    /** @phpstan-impure */
+    private function timerCount(): int
+    {
+        return Timer::stats()['num'];
     }
 
     /** @return array{QoLWorkerStartupSubscriber, StreamGovernor, LearningDataPersister} */
@@ -264,11 +270,11 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         $sampler->boot();
         $monitor = new MidStreamMonitor($governor, $sampler, new NullLogger());
         $locator = new ServiceLocator([
-            CpuGpuSampler::class => static fn (): CpuGpuSampler => $sampler,
-            MidStreamMonitor::class => static fn (): MidStreamMonitor => $monitor,
-            LearningDataPersister::class => static fn (): LearningDataPersister => $persister,
-            StreamGovernor::class => static fn (): StreamGovernor => $governor,
-            EncoderProfileFingerprintPortInterface::class => static fn (): EncoderProfileFingerprintPortInterface => $fingerprint,
+            CpuGpuSampler::class => static fn(): CpuGpuSampler => $sampler,
+            MidStreamMonitor::class => static fn(): MidStreamMonitor => $monitor,
+            LearningDataPersister::class => static fn(): LearningDataPersister => $persister,
+            StreamGovernor::class => static fn(): StreamGovernor => $governor,
+            EncoderProfileFingerprintPortInterface::class => static fn(): EncoderProfileFingerprintPortInterface => $fingerprint,
         ]);
 
         return [new QoLWorkerStartupSubscriber($locator, $logger ?? new NullLogger(), $drain), $governor, $persister];

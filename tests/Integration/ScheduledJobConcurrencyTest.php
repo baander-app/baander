@@ -63,7 +63,9 @@ final class ScheduledJobConcurrencyTest extends TestCase
         self::assertSame(0, $manager->getConnection()->getTransactionNestingLevel());
         self::assertSame($this->observer->fetchOne('SELECT current_database()'), $manager->getConnection()->fetchOne('SELECT current_database()'));
         $this->jobs = $container->get(ScheduledJobRepositoryInterface::class);
-        $this->otherManager = new EntityManager($this->otherConnection, $manager->getConfiguration(), $manager->getEventManager());
+        $eventManager = $manager->getEventManager();
+        self::assertInstanceOf(\Doctrine\Common\EventManager::class, $eventManager);
+        $this->otherManager = new EntityManager($this->otherConnection, $manager->getConfiguration(), $eventManager);
         $this->otherJobs = new ScheduledJobRepository($this->otherManager);
     }
 
@@ -77,7 +79,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
         $this->otherJobs->save($other);
         $committed = $this->row($stale->getId());
         $stale->markSuccess('Stale execution returned');
-        $this->assertConflict(fn () => $this->jobs->save($stale));
+        $this->assertConflict(fn() => $this->jobs->save($stale));
         self::assertSame($committed, $this->row($stale->getId()));
         self::assertSame('paused', $committed['status']);
         self::assertSame('app:other-writer', $committed['command']);
@@ -90,7 +92,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
         $this->manager->clear();
         $this->otherJobs->delete($this->otherJob($stale->getId()));
         $stale->markSuccess('Completed after deletion');
-        $this->assertConflict(fn () => $this->jobs->save($stale));
+        $this->assertConflict(fn() => $this->jobs->save($stale));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduled_jobs WHERE id = :id', ['id' => $stale->getId()->toString()]));
         self::assertNull($this->jobs->findByUuid($stale->getId()));
     }
@@ -100,30 +102,37 @@ final class ScheduledJobConcurrencyTest extends TestCase
         $job = $this->createJob();
         $snapshot = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $registeredCommand = new class extends Command implements SchedulableConsoleCommandInterface {
-            public function __construct() { parent::__construct('app:original'); }
+            public function __construct()
+            {
+                parent::__construct('app:original');
+            }
             /** @return array<string, array<string, mixed>> */
-            public static function schedulerParameters(): array { return []; }
+            public static function schedulerParameters(): array
+            {
+                return [];
+            }
         };
         $committed = null;
         $console = $this->createMock(ScheduledConsoleExecutorInterface::class);
         $console->expects(self::once())->method('execute')->willReturnCallback(
             /** @param array<array-key, mixed> $parameters */
             function (string $command, array $parameters) use ($job, &$committed): string {
-            self::assertSame('app:original', $command);
-            self::assertSame($job->getParameters(), $parameters);
-            $other = $this->otherJob($job->getId());
-            self::assertNotNull($other->getLastRunAt(), 'The handler running marker was committed before invoking the console effect.');
-            $other->update('Changed during execution', '*/5 * * * *', JobType::Console, 'app:replacement', null, ['address' => 'edited@baander.app']);
-            $other->pause();
-            $this->otherJobs->save($other);
-            $committed = $this->row($job->getId());
-            return 'Console returned after another writer paused';
-        });
+                self::assertSame('app:original', $command);
+                self::assertSame($job->getParameters(), $parameters);
+                $other = $this->otherJob($job->getId());
+                self::assertNotNull($other->getLastRunAt(), 'The handler running marker was committed before invoking the console effect.');
+                $other->update('Changed during execution', '*/5 * * * *', JobType::Console, 'app:replacement', null, ['address' => 'edited@baander.app']);
+                $other->pause();
+                $this->otherJobs->save($other);
+                $committed = $this->row($job->getId());
+                return 'Console returned after another writer paused';
+            },
+        );
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
         $jobPort = $this->kernel->getContainer()->get('test.service_container')->get(ScheduledJobPortInterface::class);
         $handler = new ExecuteScheduledJobHandler($jobPort, new SchedulerRegistry([], [$registeredCommand]), $bus, new NullLogger(), $console);
-        $this->assertConflict(fn () => $handler->executeOccurrence($snapshot));
+        $this->assertConflict(fn() => $handler->executeOccurrence($snapshot));
         self::assertIsArray($committed);
         self::assertSame($committed, $this->row($job->getId()));
         self::assertSame('paused', $committed['status']);
@@ -143,7 +152,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
         self::assertFalse($before->equals($other->getState()->revision));
         $this->manager->clear();
         $committed = $this->row($stale->getId());
-        $this->assertConflict(fn () => $this->jobs->save($stale));
+        $this->assertConflict(fn() => $this->jobs->save($stale));
         self::assertSame($committed, $this->row($stale->getId()));
     }
 
@@ -155,7 +164,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
         $other->disable();
         $this->otherJobs->save($other);
         $committed = $this->row($stale->getId());
-        $this->assertConflict(fn () => $this->jobs->delete($stale));
+        $this->assertConflict(fn() => $this->jobs->delete($stale));
         self::assertSame($committed, $this->row($stale->getId()));
         self::assertSame('disabled', $committed['status']);
     }
@@ -169,17 +178,24 @@ final class ScheduledJobConcurrencyTest extends TestCase
         $this->otherJobs->delete($this->otherJob($stale->getId()));
         $now = new \DateTimeImmutable();
         $replacement = ScheduledJob::reconstitute(new ScheduledJobState(
-            id: $stale->getId(), name: 'Explicit replacement', expression: '* * * * *', jobType: JobType::Console,
-            command: 'app:replacement', status: ScheduleStatus::Active, description: null,
-            parameters: ['address' => 'replacement@baander.app'], createdAt: $now, updatedAt: $now,
+            id: $stale->getId(),
+            name: 'Explicit replacement',
+            expression: '* * * * *',
+            jobType: JobType::Console,
+            command: 'app:replacement',
+            status: ScheduleStatus::Active,
+            description: null,
+            parameters: ['address' => 'replacement@baander.app'],
+            createdAt: $now,
+            updatedAt: $now,
         ));
         $this->otherJobs->save($replacement);
         self::assertInstanceOf(Uuid::class, $replacement->getState()->revision);
         self::assertFalse($oldRevision->equals($replacement->getState()->revision));
         $committed = $this->row($stale->getId());
         $stale->markSuccess('Old incarnation');
-        $this->assertConflict(fn () => $this->jobs->save($stale));
-        $this->assertConflict(fn () => $this->jobs->delete($stale));
+        $this->assertConflict(fn() => $this->jobs->save($stale));
+        $this->assertConflict(fn() => $this->jobs->delete($stale));
         self::assertSame($committed, $this->row($stale->getId()));
         self::assertSame('app:replacement', $committed['command']);
     }
@@ -205,7 +221,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
             }
         }
         $this->manager->clear();
-        $this->assertConflict(fn () => $this->jobs->save($job));
+        $this->assertConflict(fn() => $this->jobs->save($job));
         self::assertSame($committed, $this->row($job->getId()));
         $fresh = $this->jobs->findByUuid($job->getId());
         self::assertInstanceOf(ScheduledJob::class, $fresh);

@@ -82,6 +82,15 @@ final class DrainWorkerExitSubscriberTest extends TestCase
         rmdir($this->directory);
     }
 
+    /**
+     * @return array<int, int>
+     * @phpstan-impure
+     */
+    private function timerIds(): array
+    {
+        return iterator_to_array(Timer::list());
+    }
+
     public function testADrainingWorkerLeavesNoTimerWhenItExits(): void
     {
         [$server, $dispatcher] = $this->startWorkerZero();
@@ -90,10 +99,10 @@ final class DrainWorkerExitSubscriberTest extends TestCase
         $this->state->begin(hrtime(true));
         $dispatcher->dispatch(new WorkerExitedEvent($server, 0), WorkerExitedEvent::NAME);
 
-        self::assertSame([], iterator_to_array(Timer::list()));
+        self::assertSame([], $this->timerIds());
         // Swoole runs WorkerExit again until the event loop is empty.
         $dispatcher->dispatch(new WorkerExitedEvent($server, 0), WorkerExitedEvent::NAME);
-        self::assertSame([], iterator_to_array(Timer::list()));
+        self::assertSame([], $this->timerIds());
     }
 
     public function testAReloadingWorkerKeepsItsTimersOnWorkerExit(): void
@@ -143,11 +152,11 @@ final class DrainWorkerExitSubscriberTest extends TestCase
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());
 
         return new QoLWorkerStartupSubscriber(new ServiceLocator([
-            CpuGpuSampler::class => static fn (): CpuGpuSampler => $sampler,
-            MidStreamMonitor::class => static fn (): MidStreamMonitor => $monitor,
-            LearningDataPersister::class => static fn (): LearningDataPersister => $persister,
-            StreamGovernor::class => static fn (): StreamGovernor => $governor,
-            EncoderProfileFingerprintPortInterface::class => static fn (): EncoderProfileFingerprintPortInterface => $fingerprint,
+            CpuGpuSampler::class => static fn(): CpuGpuSampler => $sampler,
+            MidStreamMonitor::class => static fn(): MidStreamMonitor => $monitor,
+            LearningDataPersister::class => static fn(): LearningDataPersister => $persister,
+            StreamGovernor::class => static fn(): StreamGovernor => $governor,
+            EncoderProfileFingerprintPortInterface::class => static fn(): EncoderProfileFingerprintPortInterface => $fingerprint,
         ]), new NullLogger(), $this->state);
     }
 

@@ -3,14 +3,15 @@
 The `baander/tooling` Composer package maps `Baander\Tooling` to `src/`.
 Both the root manifest and `scripts/composer.json` require it through a local path
 repository, so PhpStorm and runtime loading use the same namespace. The library
-requires PHP 8.5 and has no external package dependencies. Generate the scripts
-loader with `composer --working-dir=scripts install --no-dev` or the root command
+requires PHP 8.5 and `composer/semver` for Composer constraint comparisons.
+Generate the scripts loader with
+`composer --working-dir=scripts install --no-dev` or the root command
 `composer tooling:autoload`, which installs both the `scripts/` and `relay/`
 Composer projects. `scripts/bootstrap.php` requires the scripts loader without
 booting the application kernel. Workflow entrypoints call
 `Runtime\Requirements::check()` before changing state. The baseline is PHP 8.5
-with Swoole. Leaf commands that do not run processes can pass `false`; commands
-needing additional extensions pass their names in the second argument.
+with Swoole. Commands that do not need Swoole pass `false`; commands needing
+additional extensions pass their names in the second argument.
 
 Production worker images install the standalone `scripts/` loader without
 development dependencies. The application loader also remains free of development
@@ -196,6 +197,82 @@ The filesystem helpers preserve private state with same-directory replacement,
 file and directory synchronization, and process-owned locks. They reject symlink
 paths. State directories belong to the current user; these checks do not isolate
 the files from other processes running as that same user.
+
+## PHP dependency maintenance
+
+Run the local check after changing PHP manifests, locks, runtime recipes, patches
+or the Swoole fork. Install the standalone loader first, then put PHP 8.5 or newer
+and exactly Composer 2.11.1 on `PATH`. The checker rejects other Composer versions
+because its validation and JSON parsers target that interface. Host PHP must also
+load Swoole: the process engine uses its signal and timer APIs.
+
+```bash
+composer run-script --timeout=720 check:php-dependencies:local
+composer run-script --timeout=720 check:php-dependencies
+php scripts/check-php-dependencies.php --local-only --format json
+php scripts/check-php-dependencies.php --format json
+```
+
+The local command discovers manifests and checks their classifications against
+[`resources/php-dependencies.json`](resources/php-dependencies.json). It reads
+production and development packages from the four owned locks, validates all seven
+manifests with Composer plugins, scripts and network access disabled, compares
+runtime source declarations, and checks patch hashes, targets, depth and proof
+ownership. Validation keeps `--strict` schema and lock checks, with
+`--no-check-all` disabling warnings about overly strict or loose requirements.
+Exact native and stub pins and classified local development constraints are
+intentional; independent stable-release and constraint checks assess currency.
+The fork check compares every current source file with the reviewed
+presence and SHA256 inventory. Generated trees need explicit policy exclusions;
+new source manifests need an owner and classification. Missing installed metadata
+does not replace or invalidate lock evidence.
+
+The online command compares fresh Packagist stable releases with every external
+direct requirement and locked production or development package. It fetches each
+package once while retaining each project and lock section as evidence. Direct
+requirements also retain their declared constraint eligibility; transitive lock
+entries have no direct manifest constraint to assess. The command adds Composer
+locked audit and outdated reports, runtime release metadata, and patch/fork
+upstream references.
+An empty owned lock is reported explicitly; Composer can skip its audit and return
+an empty outdated list.
+Latest stable availability and declared constraint eligibility are reported
+separately; a release blocked by the current PHP platform or an old major constraint
+still appears. Installing that release requires a separate solver assessment.
+
+Online inspection also requires a `curl` executable with HTTPS support, access to
+the named upstream sources, and the configured Docker CLI and target. Docker must
+have a Buildx plugin that supports
+`buildx imagetools inspect --format '{{json .Image}}'`. The checker uses it to read
+the declared Composer image's registry configuration for every returned platform
+and compare its embedded PHP version with the policy minimum. It does not build,
+pull or execute images. Local mode needs neither curl nor Docker and explicitly
+excludes online currency, advisories and registry image metadata. Neither mode
+qualifies installed extensions, native behavior or patch application.
+
+Each Composer call uses an explicit project directory, disabled plugins and scripts,
+no cache, and a private temporary Composer home. Ambient manifest, vendor, home and
+cache overrides are removed. Supported path, home, temporary-directory, locale,
+TLS certificate and HTTP(S) proxy settings pass through, as does `COMPOSER_AUTH`.
+The upstream curl calls disable curl configuration files and use bounded HTTPS
+requests. The checker does not update dependencies, apply patches or change project
+configuration.
+
+The shared `dependencies` workflow budget defaults to 600 seconds; each external
+operation also uses the `process` budget, which defaults to 120 seconds. Override
+these through `tooling.budgets` using the normal configuration precedence. The
+Composer examples allow 720 seconds for the outer script runner so its default
+300-second timeout does not interrupt the checker early. JSON and human output
+retain collected findings when another requested source fails.
+
+| Exit status | Meaning |
+| --- | --- |
+| `0` | Requested checks completed without findings; local mode still excludes online evidence. |
+| `1` | Requested checks completed and reported drift, advisories or other findings. |
+| `2` | Requested evidence is incomplete, including an unsupported interface, malformed response, timeout or cancellation. Earlier findings remain in the report. |
+
+CI runs the local command without network access alongside the tooling gates.
+Online assessment is an explicit maintenance action; it is not a scheduled CI gate.
 
 ## Checks
 
