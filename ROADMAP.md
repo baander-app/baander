@@ -611,6 +611,24 @@ The final ingress boundary also passes separately with 21 assertions. These are
 setup and identity proofs; actual CI capacity and populated-view measurements
 remain open.
 
+U9 login ownership checkpoint: the first actual CI capacity attempt stopped at
+the twenty-sixth browser's login destination, before any measured workload.
+The authenticated shell rendered at `/` with an empty main region. Investigation
+found competing redirects: `LoginPage` reacts to authenticated state, while
+`LoginForm` could navigate again after asynchronous persistence completed.
+The page now owns the redirect; the form submits credentials and handles errors.
+
+A deferred-persistence regression reproduces late navigation overwriting the
+visitor's subsequent destination: two cases fail before the fix. The affected
+selection passes 52 tests across five files, including guarded return paths and
+second-factor handling; scoped lint and whitespace checks pass. This establishes
+the duplicate-navigation defect, but does not reproduce the exact blank-root
+interleaving. The capacity destination assertion and its eight-second deadline
+remain unchanged. Actual CI capacity acceptance still requires a rebuilt rerun.
+Evidence is retained in `/tmp/live-u9-ci-capacity-first-results/`,
+`/tmp/live-u9-ci-login-route-diagnosis.md` and
+`/tmp/live-u9-login-route-green.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

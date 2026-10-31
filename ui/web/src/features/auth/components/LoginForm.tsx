@@ -1,11 +1,10 @@
 import { type FormEvent, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth-store';
 import { useTranslation } from '@/shared/i18n';
 import { Input } from '@/shared/components/ui/input';
 import { Button } from '@/shared/components/ui/button';
 import { parseApiError } from '../lib/parse-api-error';
-import { returnPathFrom } from '../lib/return-to';
 import styled from 'styled-components';
 
 const Form = styled.form`
@@ -59,8 +58,6 @@ const ForgotLink = styled(Link)`
 
 export function LoginForm() {
   const {t} = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
 
@@ -79,8 +76,6 @@ export function LoginForm() {
 
     try {
       await login(email, password, showTotp ? totpCode : undefined, honeypot);
-      // Continue where the sign-in guard stopped the visitor, such as /device?user_code=.
-      navigate(returnPathFrom(location.state), { replace: true });
     } catch (err: unknown) {
       const parsed = parseApiError(err, t('common.error'));
       if (parsed.code === 'AUTH_TOTP_REQUIRED') {
