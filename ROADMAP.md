@@ -52,9 +52,15 @@ No application build or test suite was run during planning.
 Implementation checkpoint: the standalone PHP renderer builds all 204 manual
 pages and validates their local links and fragments. Its CI-image tests pass
 (9 tests, 35 assertions), including preservation of the previous artifact on a
-failed build. Two obsolete manual section links were corrected. Homepage styling,
-search, Vercel packaging and full browser acceptance remain in progress; Vercel
-project/domain setup and live publication remain open.
+failed build. Two obsolete manual section links were corrected.
+
+Homepage and search checkpoint: the site uses the shared themes and the reviewed
+music screenshot captured after scanning the preview libraries. Pagefind indexes
+the maintained manual, and the build packages fonts, assets and Vercel routes
+together. Renderer and publication tests pass locally (11 tests, 47 assertions),
+as do tooling static analysis and source policy. Browser acceptance and CI
+integration remain in progress; Vercel project/domain setup and live publication
+remain open.
 
 ## PHP dependency and runtime refresh
 

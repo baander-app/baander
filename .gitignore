@@ -51,6 +51,11 @@ Thumbs.db
 /cert.pem
 /key.pem
 /node_modules/
+/ui/site/node_modules/
+/ui/site/.yarn/install-state.gz
+/ui/site/test-results/
+/ui/site/playwright-report/
+/ui/site/.vercel/
 ###< Docker ###
 
 ###> Storage ###

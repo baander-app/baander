@@ -128,6 +128,16 @@ source-docs:
 docs: ## Generate documentation site from source code and docs-book/
 	@make exec-bash cmd="php bin/console app:generate-docs"
 
+WEBSITE_PORT ?= 4177
+
+website-build: ## Build the public site and searchable manual
+	@php scripts/build-website.php
+
+website-preview: ## Serve the built public site locally (WEBSITE_PORT=4177)
+	@php -S 127.0.0.1:$(WEBSITE_PORT) -t var/website scripts/website-router.php
+
+.PHONY: website-build website-preview
+
 ci: ## Run static and backend checks in disposable CI containers
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer validate --no-check-version
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer normalize --dry-run

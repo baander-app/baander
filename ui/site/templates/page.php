@@ -1,2 +1,47 @@
-<?php declare(strict_types=1); ?>
-<!doctype html><html lang="en"><meta charset="utf-8"><title><?= htmlspecialchars($page['title']) ?> — Bånder</title><body><nav><a href="/">Bånder</a><a href="/docs/operator-guide/">Operator guide</a><a href="/docs/developer-guide/">Developer guide</a></nav><main><article data-pagefind-body><?= $page['html'] ?></article></main></body></html>
+<?php declare(strict_types=1);
+include __DIR__ . '/head.php';
+include __DIR__ . '/header.php';
+?>
+<div class="manual-layout">
+  <aside class="chapter-sidebar" aria-label="Manual navigation">
+    <section id="manual-search" aria-label="Search manuals"><noscript>Search needs JavaScript. Browse the chapters below to find a topic.</noscript></section>
+    <details class="chapter-navigation" open>
+      <summary>Manual chapters</summary>
+      <nav aria-label="Manual chapters">
+        <?php foreach (['operator' => 'Operator manual', 'developer' => 'Developer guide'] as $guide => $label): ?>
+          <div class="chapter-group">
+            <p class="eyebrow"><?= $label ?></p>
+            <ul>
+              <?php foreach ($navigation[$guide] as $chapter): ?>
+                <li><a href="<?= $escape($chapter['url']) ?>"<?= $chapter['url'] === $page['url'] ? ' aria-current="page"' : '' ?>><?= $escape($chapter['title']) ?></a></li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
+        <?php endforeach; ?>
+      </nav>
+    </details>
+  </aside>
+  <main id="main" class="manual-main">
+    <div class="manual-breadcrumb"><a href="/">Bånder</a><span aria-hidden="true">/</span><a href="<?= $page['guide'] === 'developer' ? '/docs/developer-guide/' : '/docs/operator-guide/' ?>"><?= $page['guide'] === 'developer' ? 'Developer guide' : 'Operator manual' ?></a></div>
+    <?php if (count($page['headings']) > 1): ?>
+      <details class="section-navigation">
+        <summary>On this page</summary>
+        <nav aria-label="On this page">
+          <ul>
+            <?php foreach ($page['headings'] as $heading): ?>
+              <?php if ($heading['level'] === 2): ?>
+                <li><a href="#<?= $escape($heading['id']) ?>"><?= $escape($heading['title']) ?></a></li>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </ul>
+        </nav>
+      </details>
+    <?php endif; ?>
+    <article class="manual-article" data-pagefind-body>
+      <span class="visually-hidden" data-pagefind-meta="guide"><?= $page['guide'] === 'developer' ? 'Developer guide' : 'Operator manual' ?></span>
+      <?= $page['html'] ?>
+    </article>
+    <div class="manual-source"><a href="<?= $escape(preg_replace('~/tree/~', '/blob/', $site['revisionUrl']) . '/docs-book/' . $page['source']) ?>">Read this page's source <span aria-hidden="true">↗</span></a></div>
+  </main>
+</div>
+<?php include __DIR__ . '/footer.php'; ?>

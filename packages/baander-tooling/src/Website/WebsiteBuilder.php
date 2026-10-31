@@ -14,8 +14,10 @@ use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\Table\TableExtension;
 use League\CommonMark\Extension\HeadingPermalink\HeadingPermalinkExtension;
+use League\CommonMark\Extension\HeadingPermalink\HeadingPermalink;
 use League\CommonMark\Node\Block\Document;
-use League\CommonMark\Node\Inline\Text;
+use League\CommonMark\Node\RawMarkupContainerInterface;
+use League\CommonMark\Node\StringContainerHelper;
 use League\CommonMark\Parser\MarkdownParser;
 use League\CommonMark\Renderer\HtmlRenderer;
 use RecursiveDirectoryIterator;
@@ -125,12 +127,7 @@ final class WebsiteBuilder
             if (!$node instanceof Heading) {
                 continue;
             }
-            $title = '';
-            foreach ($node->iterator() as $child) {
-                if ($child instanceof Text || $child instanceof \League\CommonMark\Extension\CommonMark\Node\Inline\Code) {
-                    $title .= $child->getLiteral();
-                }
-            }
+            $title = StringContainerHelper::getChildText($node, [RawMarkupContainerInterface::class]);
             $slug = (string) $node->data->get("attributes/id");
             $result[] = ['id' => $slug, 'title' => $title, 'level' => $node->getLevel()];
         }
@@ -150,6 +147,9 @@ final class WebsiteBuilder
         $errors = [];
         foreach ($this->documents as $source => $document) {
             foreach ($document->iterator() as $node) {
+                if ($node instanceof HeadingPermalink) {
+                    $node->data->set('attributes/data-pagefind-ignore', 'all');
+                }
                 if ($node instanceof Link || $node instanceof Image) {
                     try {
                         $node->setUrl($this->resolveLink($source, $node->getUrl(), $node instanceof Image));
@@ -316,33 +316,37 @@ final class WebsiteBuilder
                     if (!$node->hasAttribute($attribute)) {
                         continue;
                     }
-                    $url = $node->getAttribute($attribute);
-                    if (preg_match('~^(https?://|mailto:)~i', $url)) {
-                        continue;
-                    }
-                    if (preg_match('~^[a-z][a-z0-9+.-]*:~i', $url) || str_starts_with($url, '//')) {
-                        throw new RuntimeException('Unsafe artifact link: ' . $url);
-                    }
-                    [$path, $fragment] = array_pad(explode('#', $url, 2), 2, null);
-                    $path = explode('?', $path, 2)[0];
-                    $target = $path === '' ? $source : Paths::absolutePath((str_starts_with($path, '/') ? $directory : dirname($source)) . '/' . rawurldecode($path));
-                    if (is_dir($target)) {
-                        $target = rtrim($target, '/') . '/index.html';
-                    }
-                    if (!str_starts_with($target, $directory . '/') || !is_file($target)) {
-                        throw new RuntimeException('Missing artifact target in ' . substr($source, strlen($directory)) . ': ' . $url);
-                    }
-                    if ($fragment !== null && $fragment !== '' && isset($documents[$target])) {
-                        $found = false;
-                        foreach ($documents[$target]->getElementsByTagName('*') as $candidate) {
-                            $found = $found || $candidate->getAttribute('id') === rawurldecode($fragment);
-                        }
-                        if (!$found) {
-                            throw new RuntimeException('Missing artifact fragment: ' . $url);
-                        }
-                    }
+                    $this->validateArtifactLink($node->getAttribute($attribute), $source, $directory, $documents);
                 }
             }
+        }
+    }
+
+    /** @param array<string,DOMDocument> $documents */
+    private function validateArtifactLink(string $url, string $source, string $directory, array $documents): void
+    {
+        if (preg_match('~^(https?://|mailto:)~i', $url)) {
+            return;
+        }
+        if (preg_match('~^[a-z][a-z0-9+.-]*:~i', $url) || str_starts_with($url, '//')) {
+            throw new RuntimeException('Unsafe artifact link: ' . $url);
+        }
+        [$path, $fragment] = array_pad(explode('#', $url, 2), 2, null);
+        $path = explode('?', $path, 2)[0];
+        $target = $path === '' ? $source : Paths::absolutePath((str_starts_with($path, '/') ? $directory : dirname($source)) . '/' . rawurldecode($path));
+        if (is_dir($target)) {
+            $target = rtrim($target, '/') . '/index.html';
+        }
+        if (!str_starts_with($target, $directory . '/') || !is_file($target)) {
+            throw new RuntimeException('Missing artifact target in ' . substr($source, strlen($directory)) . ': ' . $url);
+        }
+        if ($fragment !== null && $fragment !== '' && isset($documents[$target])) {
+            foreach ($documents[$target]->getElementsByTagName('*') as $candidate) {
+                if ($candidate->getAttribute('id') === rawurldecode($fragment)) {
+                    return;
+                }
+            }
+            throw new RuntimeException('Missing artifact fragment: ' . $url);
         }
     }
 

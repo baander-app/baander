@@ -12,6 +12,21 @@ The product requirements below govern the web implementation. Implement them
 with styled-components, shared UI primitives, and theme tokens as described in
 `.agents/rules/frontend.md`; existing code deviations are not design exceptions.
 
+## Static public website
+
+The public website under `ui/site/` uses PHP templates, semantic HTML and static
+CSS instead of the application's React shell, styled-components and Radix
+primitives. Ordinary links, native disclosure elements and locally bundled scripts
+provide its navigation and manual search without application authentication or APIs.
+
+Its page composition adapts to a public introduction and long-form manuals. Body
+copy may use 16px text, the homepage may use larger responsive headings, and section
+spacing may use the shared 48px and 64px spacing tokens. Keep the shared typography,
+semantic color roles, radii, visible focus and restrained surfaces. Use the generated
+light and dark themes, local fonts and existing SVG branding. The website adds no
+surface gradients or shadows; the player material remains inside real application
+screenshots.
+
 ---
 
 ## Philosophy
