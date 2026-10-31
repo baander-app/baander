@@ -629,6 +629,27 @@ Evidence is retained in `/tmp/live-u9-ci-capacity-first-results/`,
 `/tmp/live-u9-ci-login-route-diagnosis.md` and
 `/tmp/live-u9-login-route-green.log`.
 
+U9 quiet-connection checkpoint: the rebuilt CI run completed all 32 logins, then
+failed the established-subscription check before measurement. Its 38 reconnect
+intervals were between 301.503 and 303.561 seconds. The shared transport sent no
+client keepalive, while Swoole's configured 300-second idle deadline considers
+received data. Server health messages cannot extend that deadline. The paced
+login cohorts therefore disconnected together during setup. All four workers
+remained present without projection or snapshot-read errors; owned cleanup left
+zero survivors and no scoped backlog.
+
+The shared transport now sends the existing ping message every 30 seconds after
+opening. One timer serves all retained subscribers. Socket and generation checks
+fence obsolete callbacks, and error, close, replacement and final release clear
+the timer. The receive-idle regression fails before the change and passes with
+165 tests across 13 affected auth, session and recovery files. Scoped lint, full
+TypeScript and whitespace checks pass. The capacity readiness assertion and
+deadlines are unchanged; actual CI capacity still requires another rebuilt run.
+Evidence is retained in `/tmp/live-u9-ci-login-fixed-capacity-results/`,
+`/tmp/live-u9-ci-idle-ready-analysis.json`,
+`/tmp/live-u9-ci-idle-keepalive-delivery.md` and
+`/tmp/live-u9-keepalive-auth-recovery-final.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

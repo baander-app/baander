@@ -13,7 +13,7 @@ export interface LiveTransportListener {
   onClose?: () => void
 }
 
-/** Owns one ticket, socket and reconnect timer for all retained subscribers. */
+/** Owns one ticket, socket and its reconnect/keepalive timers for all retained subscribers. */
 export class SharedLiveTransport {
   private readonly listeners = new Set<LiveTransportListener>()
   private references = 0
@@ -21,6 +21,7 @@ export class SharedLiveTransport {
   private socket: WebSocket | null = null
   private request: AbortController | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private retryDelay = 1_000
   private attempt = Promise.resolve()
 
@@ -82,6 +83,11 @@ export class SharedLiveTransport {
       socket.onopen = () => {
         if (!ownsSocket()) return
         this.retryDelay = 1_000
+        this.clearKeepalive()
+        // Server health pushes do not refresh Swoole's receive-idle deadline.
+        this.keepaliveTimer = setInterval(() => {
+          if (ownsSocket() && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ping' }))
+        }, 30_000)
         for (const listener of this.listeners) listener.onOpen?.()
       }
       socket.onmessage = event => {
@@ -95,10 +101,13 @@ export class SharedLiveTransport {
         for (const listener of this.listeners) listener.onMessage?.(message)
       }
       socket.onerror = () => {
-        if (ownsSocket()) this.reportError('WebSocket connection error')
+        if (!ownsSocket()) return
+        this.clearKeepalive()
+        this.reportError('WebSocket connection error')
       }
       socket.onclose = () => {
         if (!ownsSocket()) return
+        this.clearKeepalive()
         this.socket = null
         for (const listener of this.listeners) listener.onClose?.()
         this.scheduleReconnect()
@@ -127,8 +136,14 @@ export class SharedLiveTransport {
     for (const listener of this.listeners) listener.onError?.(new Error(message))
   }
 
+  private clearKeepalive(): void {
+    if (this.keepaliveTimer !== null) clearInterval(this.keepaliveTimer)
+    this.keepaliveTimer = null
+  }
+
   private stop(): void {
     this.generation++
+    this.clearKeepalive()
     this.request?.abort()
     this.request = null
     if (this.retryTimer !== null) clearTimeout(this.retryTimer)
