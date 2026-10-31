@@ -386,11 +386,15 @@ final class CommittedCaptureTest extends TestCase
         $partial = $this->user();
         $private = $this->user();
         $admin = $this->user();
+        $superAdmin = $this->user();
         $first = $this->library();
         $second = $this->library();
         $source = $this->song($this->album($first));
         $target = $this->song($this->album($second));
         $this->writer->executeStatement("UPDATE users SET roles = '[\"ROLE_ADMIN\"]' WHERE id = ?", [$admin]);
+        $this->writer->executeStatement("UPDATE users SET roles = '[\"ROLE_SUPER_ADMIN\"]' WHERE id = ?", [$superAdmin]);
+        self::assertEquals(0, $this->observer->fetchOne('SELECT count(*) FROM user_library_access WHERE user_id = ?', [$superAdmin]));
+        self::assertEquals(0, $this->observer->fetchOne('SELECT count(*) FROM recommendations WHERE user_id = ?', [$superAdmin]));
         foreach ([[$reader, $first], [$reader, $second], [$partial, $first]] as [$principal, $library]) {
             $this->writer->insert('user_library_access', ['user_id' => $principal, 'library_id' => $library]);
         }
@@ -398,7 +402,7 @@ final class CommittedCaptureTest extends TestCase
         $row = ['id' => $this->id(), 'public_id' => bin2hex(random_bytes(8)), 'source_type' => 'song', 'source_id' => $source, 'target_type' => 'song', 'target_id' => $target, 'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00'];
         $this->writer->insert('recommendations', $row);
         $recommendations = array_filter($this->scopes(), static fn(array $scope): bool => $scope['family'] === 'recommendations');
-        self::assertEqualsCanonicalizing([$reader, $admin], array_column($recommendations, 'scope_id'));
+        self::assertEqualsCanonicalizing([$reader, $admin, $superAdmin], array_column($recommendations, 'scope_id'));
         foreach ($recommendations as $scope) {
             self::assertSame('user', $scope['scope_kind']);
         }
@@ -437,6 +441,41 @@ final class CommittedCaptureTest extends TestCase
         $this->writer->insert('system_settings', ['key' => 'recommendation.fixture', 'value' => '{"secret":"never-in-inbox"}']);
         self::assertContains(['family' => 'recommendations', 'scope_kind' => 'user', 'scope_id' => $user], $this->scopes());
         self::assertStringNotContainsString('never-in-inbox', json_encode($this->observer->fetchAllAssociative('SELECT * FROM query_change_inbox'), JSON_THROW_ON_ERROR));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function globalRecommendationChanges(): iterable
+    {
+        yield 'settings' => ['settings'];
+        yield 'job' => ['job'];
+    }
+
+    #[DataProvider('globalRecommendationChanges')]
+    public function testGlobalRecommendationChangesIncludeInheritedAdministrators(string $source): void
+    {
+        $admin = $this->user();
+        $superAdmin = $this->user();
+        $unrelated = $this->user();
+        $this->writer->executeStatement("UPDATE users SET roles = '[\"ROLE_ADMIN\"]' WHERE id = ?", [$admin]);
+        $this->writer->executeStatement("UPDATE users SET roles = '[\"ROLE_SUPER_ADMIN\"]' WHERE id = ?", [$superAdmin]);
+        self::assertEquals(0, $this->observer->fetchOne('SELECT count(*) FROM user_library_access WHERE user_id = ?', [$superAdmin]));
+        self::assertEquals(0, $this->observer->fetchOne('SELECT count(*) FROM recommendations WHERE user_id = ?', [$superAdmin]));
+        $this->clearInbox();
+        match ($source) {
+            'settings' => $this->writer->insert('system_settings', ['key' => 'recommendation.fixture', 'value' => '{}']),
+            'job' => $this->writer->insert('recommendation_jobs', [
+                'id' => $this->id(), 'public_id' => bin2hex(random_bytes(8)),
+                'user_id' => null, 'is_full' => true, 'status' => 'pending',
+                'created_at' => '2026-10-30 12:00:00+00', 'updated_at' => '2026-10-30 12:00:00+00',
+            ]),
+            default => throw new \InvalidArgumentException('Unknown recommendation source: ' . $source),
+        };
+        $recommendations = array_filter($this->scopes(), static fn(array $scope): bool => $scope['family'] === 'recommendations');
+        self::assertEqualsCanonicalizing([$admin, $superAdmin], array_column($recommendations, 'scope_id'));
+        self::assertNotContains($unrelated, array_column($recommendations, 'scope_id'));
+        foreach ($recommendations as $scope) {
+            self::assertSame('user', $scope['scope_kind']);
+        }
     }
 
     public function testRejectedPreferenceVersionDoesNotCaptureAndSuccessfulCasDoes(): void

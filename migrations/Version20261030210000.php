@@ -80,7 +80,7 @@ final class Version20261030210000 extends AbstractMigration
             CREATE FUNCTION query_live_recommendation_readers(source_type text, source_id text, target_type text, target_id text)
             RETURNS TABLE(scope_id text) LANGUAGE sql STABLE AS $$
                 SELECT u.id::text FROM users u
-                WHERE u.roles @> '["ROLE_ADMIN"]'::jsonb
+                WHERE u.roles ?| ARRAY['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']
                    OR (EXISTS(SELECT 1 FROM query_live_entity_libraries(source_type,source_id) q JOIN user_library_access a ON a.library_id=q.scope_id::uuid WHERE a.user_id=u.id)
                    AND EXISTS(SELECT 1 FROM query_live_entity_libraries(target_type,target_id) q JOIN user_library_access a ON a.library_id=q.scope_id::uuid WHERE a.user_id=u.id))
             $$
@@ -187,7 +187,7 @@ final class Version20261030210000 extends AbstractMigration
                                 OR (r.source_type='movie' AND r.source_id=ANY(movie_ids)) OR (r.target_type='movie' AND r.target_id=ANY(movie_ids)))
                             UNION SELECT 'user',reader.scope_id FROM query_live_recommendation_readers(row_data->>'source_type',row_data->>'source_id',row_data->>'target_type',row_data->>'target_id') reader WHERE family_name='recommendations' AND source_table='recommendations' AND row_data->>'user_id' IS NULL
                             UNION SELECT 'user',u.id::text FROM users u WHERE family_name='recommendations' AND source_table IN ('recommendation_jobs','system_settings') AND row_data->>'user_id' IS NULL
-                                AND (u.roles @> '["ROLE_ADMIN"]'::jsonb OR EXISTS(SELECT 1 FROM user_library_access a WHERE a.user_id=u.id) OR EXISTS(SELECT 1 FROM recommendations r WHERE r.user_id=u.id))
+                                AND (u.roles ?| ARRAY['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] OR EXISTS(SELECT 1 FROM user_library_access a WHERE a.user_id=u.id) OR EXISTS(SELECT 1 FROM recommendations r WHERE r.user_id=u.id))
                         ) q WHERE q.id IS NOT NULL;
                     END IF;
                 END LOOP;

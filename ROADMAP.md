@@ -667,6 +667,26 @@ warnings. Evidence is retained in `/tmp/live-u9-coverage-inventory-green.log`,
 `/tmp/live-u9-keepalive-full-lint.log`. The rebuilt CI workload is still running;
 these checks do not close its capacity requirement.
 
+U9 independent-review checkpoint, 2026-10-31: `ce-code-review` completed against
+`e3379b93` with twelve review lenses and independent validation of all five
+actionable findings. Its receipt is
+`/tmp/compound-engineering-1000/ce-code-review/20261031-023737-ff389dd3/review.json`.
+Cross-model review was disabled by checkout configuration; the local adversarial
+reviewer ran. The review records the exact requirements and evidence limits.
+
+Review finding #3 is fixed: both recommendation capture predicates recognize
+accounts assigned only `ROLE_SUPER_ADMIN`, matching current read authorization.
+The regression excludes explicit library grants and private recommendation rows,
+and covers shared recommendations, global settings and jobs while preserving
+ordinary-user and private-owner isolation. All three selected cases failed before
+the fix. The disposable native CI capture suite then passed 21 tests with 845
+assertions; the final job fixture uses the real pending status and its affected
+case passed separately with 8 assertions. Targeted CI PHPStan, PHP syntax,
+formatting and whitespace checks pass. All owned runtimes completed cleanup;
+preview and persistent data were untouched. Evidence is retained in
+`/tmp/live-review-role-red/`, `/tmp/live-review-role-green/`,
+`/tmp/live-review-role-final/` and `/tmp/live-review-role-phpstan.log`.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
