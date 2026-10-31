@@ -97,6 +97,10 @@ PHP])->stdout, true, flags: JSON_THROW_ON_ERROR);
             foreach ($iterator as $entry) {
                 if ($entry->isFile()) {
                     $relative = substr($entry->getPathname(), strlen($root) + 1);
+                    // Symfony rewrites this generated reference when compiling the container.
+                    if ($relative === 'config/reference.php') {
+                        continue;
+                    }
                     $inventory[$relative] = hash_file('sha256', $entry->getPathname());
                 }
             }

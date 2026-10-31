@@ -594,6 +594,23 @@ lenses report no further changes. Evidence is retained in
 and `/tmp/live-u9-ingress-boundary-green.log`. CI capacity and populated-view
 acceptance remain open pending the real workloads through this ingress.
 
+U9 CI source-identity checkpoint: the isolated ingress starts correctly and the
+application runs in production mode with debugging disabled. The next setup
+check found one differing file between the pristine image and checkout:
+Symfony regenerates `config/reference.php` while compiling its container. All
+2,613 other covered files matched. Runtime identity now excludes only that exact
+generated reference; authored configuration, package files and the lock file
+remain covered.
+
+The regression fails before the correction and passes with the existing capacity
+tooling tests: 19 tests and 23 assertions. Scoped PHPStan, syntax, formatting,
+source policy and whitespace checks pass. The native comparison probe cleaned up
+successfully. Evidence is retained in `/tmp/live-u9-source-digest-probe/`,
+`/tmp/live-u9-source-digest-red.log` and `/tmp/live-u9-source-digest-green.log`.
+The final ingress boundary also passes separately with 21 assertions. These are
+setup and identity proofs; actual CI capacity and populated-view measurements
+remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

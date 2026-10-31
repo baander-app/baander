@@ -65,6 +65,23 @@ final class LiveCapacityWorkflowTest extends TestCase
         self::assertNotSame($configurationChanged, CapacityWorkflow::sourceDigest($this->directory));
     }
 
+    public function testSymfonyGeneratedReferenceIsExcludedWithoutExcludingAuthoredReferences(): void
+    {
+        foreach (['src', 'config', 'migrations', 'packages/example/src'] as $path) {
+            mkdir($this->directory . '/' . $path, 0700, true);
+        }
+        file_put_contents($this->directory . '/composer.lock', '{}');
+        file_put_contents($this->directory . '/config/reference.php', '<?php // generated before cache compilation');
+        $initial = CapacityWorkflow::sourceDigest($this->directory);
+        file_put_contents($this->directory . '/config/reference.php', '<?php // generated after cache compilation');
+        self::assertSame($initial, CapacityWorkflow::sourceDigest($this->directory));
+        file_put_contents($this->directory . '/config/authored-reference.php', '<?php // authored configuration');
+        $authored = CapacityWorkflow::sourceDigest($this->directory);
+        self::assertNotSame($initial, $authored);
+        file_put_contents($this->directory . '/packages/example/src/reference.php', '<?php // authored package source');
+        self::assertNotSame($authored, CapacityWorkflow::sourceDigest($this->directory));
+    }
+
     /** @return array{array<string,mixed>,array<string,mixed>} */
     private function ownership(): array
     {
