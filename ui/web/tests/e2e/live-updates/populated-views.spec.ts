@@ -1,5 +1,4 @@
-import type { Page, Request } from '@playwright/test'
-import { authenticatedGet } from './capacity-fixtures'
+import type { Locator, Page, Request } from '@playwright/test'
 import { test, expect, navigate, paint } from './recovery-fixtures'
 
 interface CatalogRead { page: number; cursor: string | null; start: number; end: number; count: number; status: number }
@@ -10,6 +9,7 @@ function catalogReads(page: Page, path: string) {
   const http: HttpSpan[] = []
   const errors: string[] = []
   const albumsByYear = new Map<string, { publicId: string; title: string }[]>()
+  const songsById = new Map<string, { publicId: string; title: string }>()
   const active = new Map<Request, number>()
   const networkActive = new Set<Request>()
   let maxInFlight = 0
@@ -50,6 +50,11 @@ function catalogReads(page: Page, path: string) {
           group.push({ publicId: album.publicId, title: album.title })
           albumsByYear.set(year, group)
         }
+      } else {
+        if (!params.get('cursor')) songsById.clear()
+        for (const song of result.data ?? []) {
+          songsById.set(song.publicId, { publicId: song.publicId, title: song.title })
+        }
       }
       reads.push({ page: Number(params.get('page') ?? 1), cursor: params.get('cursor'),
         start, end: Date.now(), count: result.data?.length ?? 0, status: response.status() })
@@ -65,7 +70,7 @@ function catalogReads(page: Page, path: string) {
     http.push({ path: url.pathname + url.search, start, end: Date.now(), status: 0, failed: true })
     active.delete(request)
   })
-  return { reads, http, errors, albumsByYear, get maxInFlight() { return maxInFlight },
+  return { reads, http, errors, albumsByYear, songsById, get maxInFlight() { return maxInFlight },
     get pendingReads() { return active.size } }
 }
 
@@ -91,7 +96,7 @@ async function listScroller(page: Page) {
 }
 
 test.describe('Populated live views', () => {
-  test.setTimeout(300_000)
+  test.setTimeout(process.env.BAANDER_LIVE_CAPACITY_MANIFEST ? 900_000 : 300_000)
 
   test('ten retained song pages keep their public-ID selection and scroll during refresh', async ({ run }) => {
     const catalog = await run.fixture.request({ op: 'catalog', albums: 10_000, songs: 1000 })
@@ -126,6 +131,7 @@ test.describe('Populated live views', () => {
     const initialReads = [...observer.reads]
     const initialCursors = retainedCursors()
     expect(initialCursors).toHaveLength(10)
+    expect(observer.songsById.size).toBe(1000)
     expect(initialReads.every(read => read.status === 200 && read.count === 100)).toBe(true)
     run.evidence.push({ kind: 'retained-song-pages-loaded', retainedPages: initialCursors.length,
       retainedSongs: await retainedSongs(), initialAttempts: initialReads.length,
@@ -147,16 +153,18 @@ test.describe('Populated live views', () => {
     expect(visibleIndex).toBeGreaterThanOrEqual(0)
     const selected = candidates.nth(visibleIndex)
     await selected.click()
-    const before = await page.evaluate(async () => {
-      const modulePath = '/src/features/catalog/stores/selection-store.ts'
-      const { useSelectionStore } = await import(/* @vite-ignore */ modulePath) as {
-        useSelectionStore: { getState: () => { selectedId: string | null } }
-      }
-      return useSelectionStore.getState().selectedId
-    })
+    await expect(selected).toHaveCSS('border-left-width', '2px')
+    const songInRow = async (row: Locator) => {
+      const labels = await row.locator('span').allTextContents()
+      const matches = [...observer.songsById.values()].filter(song =>
+        labels.includes(song.title) || labels.includes(`${song.title} · Unavailable`))
+      expect(matches, 'the selected row must uniquely identify a real HTTP song record').toHaveLength(1)
+      return matches[0]!
+    }
+    const selectedSong = await songInRow(selected)
+    const before = selectedSong.publicId
     expect(before).toBeTruthy()
-    const song = await authenticatedGet<{ data: { title: string } }>(page, `/api/songs/${before}`)
-    const escapedTitle = song.data.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const escapedTitle = selectedSong.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const retainedRow = page.getByRole('row').filter({
       has: page.getByText(new RegExp(`^${escapedTitle}(?: · Unavailable)?$`)),
     })
@@ -176,13 +184,8 @@ test.describe('Populated live views', () => {
     await expect(retainedRow).toBeVisible()
     await expect(retainedRow).toHaveCSS('border-left-width', '2px')
     await expect(retainedRow.getByText(albumTitle, { exact: true })).toBeVisible()
-    const after = await page.evaluate(async () => {
-      const modulePath = '/src/features/catalog/stores/selection-store.ts'
-      const { useSelectionStore } = await import(/* @vite-ignore */ modulePath) as {
-        useSelectionStore: { getState: () => { selectedId: string | null } }
-      }
-      return useSelectionStore.getState().selectedId
-    })
+    expect(observer.songsById.size).toBe(1000)
+    const after = (await songInRow(retainedRow)).publicId
     expect(after).toBe(before)
     expect(observer.errors).toEqual([])
     const frame = await paint(page)
@@ -190,7 +193,8 @@ test.describe('Populated live views', () => {
     run.evidence.push({ kind: 'ten-retained-pages', catalog: catalog.receipt, reads: observer.reads,
       initialAttempts: initialReads.length, logicalRetainedPages: initialCursors.length,
       refreshAttempts: refreshReads().length, refreshReads: refreshReads(),
-      maxInFlight: observer.maxInFlight, selection: before, scrollTop: position,
+      maxInFlight: observer.maxInFlight, selection: before, selectionAfter: after,
+      selectedSongSnapshot: selectedSong, scrollTop: position,
       refreshToPaintMs: Date.now() - refreshStart, frame })
   })
 
@@ -235,22 +239,22 @@ test.describe('Populated live views', () => {
     const list = page.getByRole('list', { name: 'Albums by year', exact: true })
     expect(await list.getByRole('list', { name: /^Albums from / })
       .locator(':scope > [role="listitem"]').count()).toBe(10_000)
-    const authoritative = await authenticatedGet<{ data: { title: string } }>(page,
-      `/api/albums/${run.manifest.album.publicId}`)
-    expect(authoritative.data.title).toBe(`Timeline final ${run.fixture.run}`)
     const year = [...observer.albumsByYear.entries()].find(([, albums]) =>
       albums.some(album => album.publicId === run.manifest.album.publicId))
     expect(year).toBeTruthy()
     const index = year![1].findIndex(album => album.publicId === run.manifest.album.publicId)
+    const authoritative = year![1][index]!
+    expect(authoritative.title).toBe(`Timeline final ${run.fixture.run}`)
     const thumbnail = list.getByRole('list', { name: `Albums from ${year![0]}`, exact: true })
       .getByRole('button').nth(index)
     await thumbnail.scrollIntoViewIfNeeded()
     await thumbnail.hover()
-    await expect(page.getByRole('tooltip').getByText(authoritative.data.title, { exact: true })).toBeVisible()
+    await expect(page.getByRole('tooltip').getByText(authoritative.title, { exact: true })).toBeVisible()
     const frame = await paint(page)
     expect(frame.visible).toBe(true)
     run.evidence.push({ kind: 'timeline-full-walk', reads: observer.reads, maxInFlight: observer.maxInFlight,
       http: observer.http, httpHops: observer.http.length, logicalPages: observer.reads.length,
+      albumSnapshot: authoritative,
       initialWalkMs: observer.reads[99]!.end - observer.reads[0]!.start,
       finalWalkMs: observer.reads[199]!.end - observer.reads[100]!.start,
       hintAmplification: observer.reads.length / 100, completeToPaintMs: Date.now() - started, frame })

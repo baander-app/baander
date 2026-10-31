@@ -69,7 +69,8 @@ PHP])->stdout, true, flags: JSON_THROW_ON_ERROR);
             fwrite(STDOUT, 'Capacity browser log: ' . $browserLog . "\n");
             $web->runtime->run([
                 $frontend, 'yarn', '--cwd', 'ui/web', 'e2e:headless',
-                'tests/e2e/live-updates/capacity.spec.ts', '--retries=0',
+                'tests/e2e/live-updates/capacity.spec.ts',
+                'tests/e2e/live-updates/populated-views.spec.ts', '--retries=0',
             ], cwd: $root, env: array_replace($web->runtime->environment, [
                 'E2E_BASE_URL' => $web->capacityOrigin(),
                 'BAANDER_LIVE_CAPACITY_MANIFEST' => $manifestPath,

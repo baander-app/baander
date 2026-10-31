@@ -11,8 +11,16 @@ interface ScanStatus {
   [key: string]: unknown
 }
 
-test('a real console scan and asynchronous ingest refresh the mounted album', async ({ run }) => {
+test('a real console scan and asynchronous ingest refresh the mounted album', async ({ run, request }) => {
   test.setTimeout(300_000)
+  const healthResponse = await request.get('/health')
+  expect(healthResponse.ok()).toBe(true)
+  const health = await healthResponse.json() as {
+    checks: { component: string; status: string; details: unknown }[]
+  }
+  run.evidence.push({ kind: 'worker-health-before-scan', health })
+  expect(health.checks.find(check => check.component === 'messenger'),
+    'asynchronous ingestion requires a live admitted worker').toMatchObject({ status: 'healthy' })
   const { receipt: source } = await run.fixture.request<ScanPreparation>({ op: 'prepare-scan' })
   const page = await run.open(1)
   const albumPath = `/api/albums/${run.manifest.album.publicId}`

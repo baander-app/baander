@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { test as base, expect, type BrowserContext, type Page, type Route } from '@playwright/test'
-import { FixtureClient, login, redact, type FixtureManifest } from './capacity-fixtures'
+import { FixtureClient, LoginAdmission, login, redact, type FixtureManifest } from './capacity-fixtures'
 import { RECOVERY_TEARDOWN_MS, startManagedLifecycle, type ManagedReceipt } from './managed-lifecycle'
 
 export interface RecoveryRun {
@@ -21,6 +21,10 @@ export const test = base.extend<{ run: RecoveryRun }>({
     const contexts: BrowserContext[] = []
     const pages: Page[] = []
     const evidence: unknown[] = []
+    const loginAdmission = process.env.BAANDER_LIVE_CAPACITY_MANIFEST
+      ? new LoginAdmission(Date.now() + 900_000)
+      : undefined
+    if (loginAdmission) evidence.push({ kind: 'production-login-admission', admission: loginAdmission })
     const controller = new AbortController()
     let closing = false
     let fixtureOpen = true
@@ -61,7 +65,7 @@ export const test = base.extend<{ run: RecoveryRun }>({
         const page = await context.newPage()
         pages.push(page)
         await beforeLogin?.(page)
-        await login(page, user)
+        await login(page, user, loginAdmission)
         return page
       }, managed: async (arguments_) => {
         if (closing || commandRunning || (active && !active.owned.canResumeFixture)) {

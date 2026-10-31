@@ -541,6 +541,33 @@ is under investigation; the earlier scanner pass does not close this failure.
 Both passing and failing evidence is retained in
 `/tmp/live-u9-preview-final-three-results/`.
 
+U9 built-frontend qualification checkpoint: the CI runner now selects capacity
+and both populated-view cases. Song selection is checked against actual HTTP
+records and the selected row's rendered state; Timeline compares the final HTTP
+album snapshot with its visible tooltip. These checks no longer import Vite
+source modules. The existing page counts, sequential reads, scroll retention and
+latency assertions remain. Real login throttling remains enabled; the outer
+4,200-second budget covers the 1,800-second capacity case, two 900-second populated
+cases and 600 seconds for setup and cleanup. Preview populated cases retain their
+300-second deadlines.
+
+The scanner now records a fresh worker-health response and requires the
+`messenger` component to be healthy before preparing scan media. This correctly
+fails against the exited preview worker pair; its new fixture cleans up without
+starting another scan. The retained earlier scan and its pending events remain
+available for recovery. The observed worker exit preceded the current reload;
+its generic autoscaler failure does not establish the underlying exception.
+
+Verification: the final tooling selection passes 39 tests with 101 assertions.
+The pool provider passes its native CI test with seven assertions; full backend
+and tooling PHPStan report no errors. The frontend build and both TypeScript
+projects pass; full lint reports no errors and eight existing warnings. Scoped
+browser types, lint, formatting and source policy pass. Evidence is retained in
+`/tmp/live-u9-final-tooling-selection.log`, `/tmp/live-u9-pool-main-phpstan.log`,
+`/tmp/live-u9-pool-tooling-phpstan.log`, `/tmp/live-u9-pool-populated-lint.log`
+and `/tmp/live-u9-scan-health-precondition-red-results/`. The actual CI workloads
+and a fresh scan after managed worker recovery remain open.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed
