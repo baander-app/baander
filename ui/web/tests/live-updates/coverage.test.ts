@@ -128,7 +128,7 @@ describe('registered application coverage', () => {
     }
   })
 
-  it('declares the agreed vocabulary, explicit policies and separate verification status', () => {
+  it('declares the agreed vocabulary, explicit policies and existing unit proof paths', () => {
     expect([...new Set(LIVE_COVERAGE.map((row) => row.family))].sort()).toEqual([...LIVE_FAMILIES].sort())
     expect(new Set(LIVE_COVERAGE.map((row) => row.id)).size).toBe(LIVE_COVERAGE.length)
     expect(new Set(LIVE_COVERAGE.map((row) => row.policy.kind))).toEqual(new Set(['stored', 'sampled', 'demand', 'deployment']))
@@ -136,15 +136,13 @@ describe('registered application coverage', () => {
       expect(descriptor.policy.reason.length).toBeGreaterThan(20)
       expect(descriptor.audiences.length).toBeGreaterThan(0)
       expect(descriptor.consumers.length).toBeGreaterThan(0)
-      if (descriptor.behaviorVerification !== 'pending-adoption') {
-        expect(descriptor.behaviorVerification.endToEnd, descriptor.id).toBe('pending')
-        expect(descriptor.behaviorVerification.unitProofs.length, descriptor.id).toBeGreaterThan(0)
-        for (const proof of descriptor.behaviorVerification.unitProofs) {
-          const source = Object.entries(proofSources).find(([file]) =>
-            new URL(file, import.meta.url).pathname.endsWith(`/${proof}`),
-          )?.[1]
-          expect(source, `${descriptor.id}: ${proof}`).toBeDefined()
-        }
+      expect(Object.keys(descriptor.behaviorVerification), descriptor.id).toEqual(['unitProofs'])
+      expect(descriptor.behaviorVerification.unitProofs.length, descriptor.id).toBeGreaterThan(0)
+      for (const proof of descriptor.behaviorVerification.unitProofs) {
+        const source = Object.entries(proofSources).find(([file]) =>
+          new URL(file, import.meta.url).pathname.endsWith(`/${proof}`),
+        )?.[1]
+        expect(source, `${descriptor.id}: ${proof}`).toBeDefined()
       }
       expect(descriptor.coverageVerification).toContain('tests/live-updates/coverage.test.ts')
       if (descriptor.policy.kind === 'stored') expect(descriptor.sourceTables.length).toBeGreaterThan(0)

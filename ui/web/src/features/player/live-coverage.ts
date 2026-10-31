@@ -22,7 +22,7 @@ export const playerLiveCoverage = [
       "src/features/player/services/wasm-loader.ts#fetch:url",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/features/player/services/wasm-loader.test.ts", "tests/features/player/services/audio-processor-lifecycle.test.ts"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/features/player/services/wasm-loader.test.ts", "tests/features/player/services/audio-processor-lifecycle.test.ts"] },
   },
   {
     id: "player.stream-forwarding",
@@ -44,7 +44,7 @@ export const playerLiveCoverage = [
       "src/features/player/services/auth-stream-worker.ts#fetch:event.request",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/features/player/auth-stream-worker.test.ts"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/features/player/auth-stream-worker.test.ts"] },
   },
   {
     id: "player.liveness",
@@ -63,7 +63,7 @@ export const playerLiveCoverage = [
     responseCaches: [],
     consumers: ["src/features/player/services/server-liveness.ts#AXIOS_INSTANCE.get:LIVE_PATH"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/features/player/services/server-liveness.test.ts"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/features/player/services/server-liveness.test.ts"] },
   },
   {
     id: "player.catalog-demand",
@@ -82,6 +82,6 @@ export const playerLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/player/stores/player-availability.ts#getSongIndex:generated"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["src/features/player/stores/__tests__/player-availability.test.ts"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["src/features/player/stores/__tests__/player-availability.test.ts"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

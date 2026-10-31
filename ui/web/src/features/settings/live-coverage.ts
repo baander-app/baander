@@ -54,7 +54,6 @@ export const settingsLiveCoverage = [
         "src/features/settings/__tests__/preference-conflict-lifecycle.test.ts",
         "src/features/settings/__tests__/use-preference-bootstrap.test.tsx",
       ],
-      endToEnd: 'pending',
     },
   },
   {
@@ -82,7 +81,6 @@ export const settingsLiveCoverage = [
         "tests/live-updates/preferences-consumers.test.tsx",
         "src/features/settings/hooks/__tests__/use-passkey-registration.test.ts",
       ],
-      endToEnd: 'pending',
     },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

@@ -20,9 +20,8 @@ export interface LiveCoverageDescriptor {
   responseCaches: readonly string[]
   consumers: readonly string[]
   coverageVerification: readonly string[]
-  behaviorVerification: 'pending-adoption' | {
-    unitProofs: readonly string[]
-    endToEnd: 'pending'
+  behaviorVerification: {
+    unitProofs: readonly [string, ...string[]]
   }
 }
 

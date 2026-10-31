@@ -22,7 +22,7 @@ export const authLiveCoverage = [
       "src/features/auth/components/OAuthConsent.tsx#useQuery:['oauth-authorize',query]",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"], endToEnd: "pending" },
+    behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"] },
   },
   {
     id: "auth.account",
@@ -44,6 +44,6 @@ export const authLiveCoverage = [
       "src/features/auth/hooks/use-current-user-refresh.ts#useGetAuthMe:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"], endToEnd: "pending" },
+    behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

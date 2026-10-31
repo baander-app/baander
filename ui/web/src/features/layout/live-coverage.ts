@@ -23,7 +23,6 @@ export const layoutLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: ["tests/live-updates/catalog-consumers.test.tsx"],
-      endToEnd: 'pending',
     },
   },
   {
@@ -80,7 +79,6 @@ export const layoutLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: ["tests/live-updates/catalog-consumers.test.tsx"],
-      endToEnd: 'pending',
     },
   },
   {
@@ -103,7 +101,7 @@ export const layoutLiveCoverage = [
       "src/features/layout/hooks/use-recent-items.ts#AXIOS_INSTANCE.get:`/api/user/recent?${params}`",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/features/layout/hooks/use-recent-items.test.tsx"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/features/layout/hooks/use-recent-items.test.tsx"] },
   },
   {
     id: "layout.preferences",
@@ -137,7 +135,6 @@ export const layoutLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: ["tests/live-updates/preferences-consumers.test.tsx"],
-      endToEnd: 'pending',
     },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

@@ -23,7 +23,6 @@ export const sharedLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: ["src/shared/hooks/__tests__/use-image-blob.test.ts", "src/features/visualizer/hooks/use-album-palette.test.tsx", "tests/live-updates/client-lifecycle.test.tsx"],
-      endToEnd: 'pending',
     },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

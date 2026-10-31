@@ -650,6 +650,23 @@ Evidence is retained in `/tmp/live-u9-ci-login-fixed-capacity-results/`,
 `/tmp/live-u9-ci-idle-keepalive-delivery.md` and
 `/tmp/live-u9-keepalive-auth-recovery-final.log`.
 
+U9 inventory checkpoint: all 52 reader descriptors now require a nonempty list
+of unit-proof paths. The census verifies every referenced proof without an adoption
+bypass. Unused pending end-to-end status fields have been removed. These files
+serve the inventory tests; production refresh descriptors are separate and unchanged.
+The inventory records unit evidence, while representative browser flows and capacity
+retain their own acceptance records.
+
+The strengthened inventory check fails before the metadata correction and passes
+all 11 tests afterward. Application TypeScript, scoped ESLint and whitespace checks
+pass. The preceding keepalive change also passes the full frontend suite: 2,938
+tests across 237 files, with six existing JSDOM media warnings. The production build
+and both TypeScript projects pass; full ESLint reports zero errors and eight existing
+warnings. Evidence is retained in `/tmp/live-u9-coverage-inventory-green.log`,
+`/tmp/live-u9-keepalive-frontend-full.log`, `/tmp/live-u9-keepalive-build.log` and
+`/tmp/live-u9-keepalive-full-lint.log`. The rebuilt CI workload is still running;
+these checks do not close its capacity requirement.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

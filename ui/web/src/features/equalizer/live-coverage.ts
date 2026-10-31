@@ -31,7 +31,6 @@ export const equalizerLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: ["tests/live-updates/preferences-consumers.test.tsx"],
-      endToEnd: 'pending',
     },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

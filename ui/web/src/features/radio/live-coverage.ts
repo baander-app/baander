@@ -24,7 +24,7 @@ export const radioLiveCoverage = [
       "src/features/radio/hooks/use-radio-stations.ts#useQuery:[...STATIONS_KEY,{country,query}];STATIONS_KEY=['radio','stations']asconst",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"] },
   },
   {
     id: "radio.radio-user",
@@ -52,6 +52,6 @@ export const radioLiveCoverage = [
       "src/features/radio/hooks/use-radio-stations.ts#useQuery:[...STARRED_KEY];STARRED_KEY=['radio','starred']asconst",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"], endToEnd: 'pending' },
+    behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

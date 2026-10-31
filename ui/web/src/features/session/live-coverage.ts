@@ -23,7 +23,7 @@ export const sessionLiveCoverage = [
       "src/features/session/hooks/use-session.ts#AXIOS_INSTANCE.get:'/api/devices'",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"], endToEnd: "pending" },
+    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"] },
   },
   {
     id: "session.sessions",
@@ -47,7 +47,7 @@ export const sessionLiveCoverage = [
       "src/features/session/hooks/use-session.ts#AXIOS_INSTANCE.get:'/api/session'",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"], endToEnd: "pending" },
+    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"] },
   },
   {
     id: "session.catalog-demand",
@@ -66,6 +66,6 @@ export const sessionLiveCoverage = [
     responseCaches: ["authoritative-read"],
     consumers: ["src/features/session/hooks/use-session-claim.ts#AXIOS_INSTANCE.get:'/api/songs/'"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
-    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"], endToEnd: "pending" },
+    behaviorVerification: { unitProofs: ["tests/live-updates/personal-state.test.tsx", "src/features/session/components/__tests__/DeviceManagement.test.tsx", "src/features/session/__tests__/use-session.test.tsx"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

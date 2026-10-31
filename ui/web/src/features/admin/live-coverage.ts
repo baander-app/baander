@@ -43,7 +43,6 @@ export const adminLiveCoverage = [
       unitProofs: [
         "tests/live-updates/admin-routing.test.ts",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -92,7 +91,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "src/features/admin/components/media/__tests__/GenreDialog.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -123,7 +121,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -162,7 +159,6 @@ export const adminLiveCoverage = [
       unitProofs: [
         "tests/live-updates/admin-routing.test.ts",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -191,7 +187,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -230,7 +225,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -259,7 +253,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -297,7 +290,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -343,7 +335,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -370,7 +361,6 @@ export const adminLiveCoverage = [
       unitProofs: [
         "tests/live-updates/admin-routing.test.ts",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -431,7 +421,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -474,7 +463,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -502,7 +490,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-demand.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -533,7 +520,6 @@ export const adminLiveCoverage = [
       unitProofs: [
         "tests/live-updates/admin-routing.test.ts",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -562,7 +548,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-sampling.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -599,7 +584,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "src/features/admin/components/scheduler/__tests__/EditJobDialog.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -644,7 +628,6 @@ export const adminLiveCoverage = [
         "src/features/admin/components/users/__tests__/LibraryAccessDialog.test.tsx",
         "src/features/admin/pages/__tests__/OAuthClientsPage.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -671,7 +654,6 @@ export const adminLiveCoverage = [
       unitProofs: [
         "tests/live-updates/admin-routing.test.ts",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -696,7 +678,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "tests/live-updates/admin-demand.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
   {
@@ -724,7 +705,6 @@ export const adminLiveCoverage = [
         "tests/live-updates/admin-routing.test.ts",
         "src/features/admin/pages/__tests__/AdminSettingsPage.test.tsx",
       ],
-      endToEnd: "pending",
     },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]
