@@ -98,6 +98,9 @@ This procedure needs a Vercel account with access to the intended project and
 control of `baander.app` DNS. Project creation, account login, domain connection
 and live deployment are user-operated steps; CI only retains the artifact.
 
+The production project is `martin-juuls-projects/baander`. Its Vercel hostname is
+`https://baander.vercel.app`; `baander.app` is attached to the same project.
+
 Publish an artifact built from a commit available in the public GitHub repository.
 Manual source links point to that exact commit; they can return 404 in a local
 preview built from an unpushed branch. The general Source links open the repository
@@ -108,12 +111,15 @@ home page.
 
    ```bash
    (cd ui/site && corepack yarn vercel login)
-   (cd ui/site && corepack yarn vercel link --cwd ../../var/website)
+   (cd ui/site && corepack yarn vercel link --cwd ../../var/website --scope martin-juuls-projects --project baander --yes)
    ```
 
-   Inspect the selected team and project before completing the prompts. Linking
+   Confirm the team and project in the command before running it. Linking
    writes local project metadata under `var/website/.vercel/`. Rebuilds replace
    the artifact directory, so repeat linking after a rebuild or extraction.
+   Linking can also create `var/website/.env.local` with an authentication token;
+   keep that file out of shared archives. The prebuilt deployment uploads the
+   generated build output.
 
 2. Upload the existing build as a preview:
 
@@ -125,6 +131,8 @@ home page.
    URL, a section fragment, a real search result and an unknown URL returning HTTP
    404. Inspect light and dark presentation and narrow-screen navigation. Links
    stay on the preview origin; canonical metadata names `https://baander.app`.
+   Vercel assigns a project's first deployment to production even without
+   `--prod`; subsequent deployments use preview unless production is requested.
 
 3. Connect `baander.app` to the selected project in Vercel's domain settings and
    apply the DNS records Vercel supplies. After the preview checks pass and the
@@ -137,6 +145,15 @@ home page.
    Repeat the URL, search and 404 checks over `https://baander.app` and confirm
    valid HTTPS. Record the deployment URL and checks in the delivery checkpoint.
 
-Do not commit Vercel credentials or project metadata. This handoff procedure has
-not been exercised against a Vercel project; successful local and CI builds do
-not establish that the public domain is live.
+Do not commit Vercel credentials or project metadata. The prebuilt publication
+flow was exercised on 2026-10-31 with revision
+`c89470b054e4996a952a11c8a73bb1e48cdcf39a`. Both `https://baander.app` and the
+Vercel hostname passed live page, redirect, search, fragment, theme, mobile and
+404 checks with valid HTTPS. The delivery checkpoint is recorded in `ROADMAP.md`.
+
+When moving a domain to Vercel nameservers, check for an old DNSSEC DS record at
+the registrar. During the initial publication, `baander.app` had an old DS record
+but no matching key in its Vercel DNS zone. Validating resolvers returned
+`SERVFAIL` until the owner removed that record in Spaceship's Advanced DNS
+settings. `vercel domains verify baander.app --scope martin-juuls-projects`
+then confirmed the domain configuration; certificate issuance followed separately.

@@ -94,8 +94,8 @@ tests, 66 shared-token tests, formatting across 431 PHP files, source policy,
 architecture checks, PHPStan and the local dependency inventory pass. The build
 produces all 204 manual pages and preserves the previous artifact on failure.
 Site prose and the new diagram descriptions were reviewed with `prose-fix`;
-existing manual chapters were not rewritten wholesale. Vercel project/domain
-setup and live publication remain open.
+existing manual chapters were not rewritten wholesale. The publication checkpoint
+below records the subsequent Vercel setup and live checks.
 
 Final tooling checkpoint: the full run completed 1,224 tests and 6,456 assertions
 with no failures and seven environment-dependent skips: six require a qualified
@@ -104,6 +104,22 @@ run includes the subsequently added vendor-identity regression. All seven code
 review lenses returned no findings; the simplification pass retained the tested
 implementation without changes. Native codec qualification and live deployment
 were not part of these checks.
+
+Publication checkpoint, 2026-10-31: deployed revision
+`c89470b054e4996a952a11c8a73bb1e48cdcf39a` as Vercel deployment
+`dpl_5LsHpYEZy6J2dx9VDfZUQaTL3c2U` in `martin-juuls-projects/baander`.
+The site is live at [baander.app](https://baander.app/) with valid HTTPS; its
+Vercel hostname is [baander.vercel.app](https://baander.vercel.app/).
+Twelve live browser cases passed on each hostname across the homepage, bAAC and
+a manual page containing a diagram, at 1440px and 390px in both themes. Real search results, section
+fragments, carousel controls, canonical redirects, unknown-page 404 responses
+and private-file 404 responses also passed.
+
+The custom domain is attached. Its owner removed an old DNSSEC DS record at
+Spaceship after validating resolvers reported a missing matching DNS key.
+Cloudflare and Google resolvers now return answers, and Vercel verifies the
+domain configuration. Certificate issuance completed, and the custom domain
+passed the page, search, fragment, carousel, redirect and 404 checks above.
 
 ## PHP dependency and runtime refresh
 
