@@ -29,18 +29,17 @@ final class Symfony63PlusBuilder implements Builder
         $classParts = explode('\\', $containerFqcn);
         $containerClass = array_pop($classParts);
         $overriddenClass = $containerClass . '_Overridden';
-        $containerFile = $cacheDir . DIRECTORY_SEPARATOR . str_replace(
-            '\\',
-            DIRECTORY_SEPARATOR,
-            $containerFqcn
-        ) . '.php';
-        $overriddenFile = $cacheDir . DIRECTORY_SEPARATOR . str_replace(
-            '\\',
-            DIRECTORY_SEPARATOR,
-            $overriddenFqcn
-        ) . '.php';
+        $containerFile = $this->getContainerFile($reflContainer);
+        $containerDirectory = dirname($containerFile);
+        $cacheDir = $reflContainer->getNamespaceName() === '' ? $containerDirectory : dirname($containerDirectory);
+        $overriddenFile = $containerDirectory . DIRECTORY_SEPARATOR . $overriddenClass . '.php';
 
-        if (file_exists($overriddenFile)) {
+        if ($this->isAlreadyOverridden($containerFile, $overriddenClass)) {
+            if (!is_file($overriddenFile)) {
+                throw new RuntimeException(sprintf('Generated container parent "%s" is missing.', $overriddenFile));
+            }
+            $this->overrideCachedEntrypoint($fs, $cacheDir, $containerClass, $overriddenFqcn, $isDebug);
+
             return;
         }
 
@@ -56,7 +55,7 @@ final class Symfony63PlusBuilder implements Builder
         // dump opcache.blacklist_filename
         $blacklistFile = implode(
             DIRECTORY_SEPARATOR,
-            [$cacheDir, ContainerConstants::PARAM_CACHE_FOLDER, 'opcache', 'blacklist.txt']
+            [$cacheDir, ContainerConstants::PARAM_CACHE_FOLDER, 'opcache', 'blacklist.txt'],
         );
         $blacklistFiles = [$containerFile, $overriddenFile];
         $blacklistFileContent = implode(PHP_EOL, $blacklistFiles) . PHP_EOL;
@@ -95,13 +94,10 @@ final class Symfony63PlusBuilder implements Builder
 
             class $containerClass extends $overriddenClass
             {
-                protected \$lazyInitializedShared = [];
-
             $methodsCode
             }
             EOF;
 
-        $fs->copy($containerFile, $overriddenFile);
         $fs->dumpFile($overriddenFile, $overriddenSource);
         $fs->dumpFile($containerFile, $newContainerSource);
         $this->overrideCachedEntrypoint($fs, $cacheDir, $containerClass, $overriddenFqcn, $isDebug);
@@ -111,14 +107,34 @@ final class Symfony63PlusBuilder implements Builder
     {
         $fs = new Filesystem();
         $containerNamespace = $reflContainer->getNamespaceName();
-        $containerDirectory = $cacheDir . DIRECTORY_SEPARATOR . $containerNamespace;
+        $containerDirectory = dirname($this->getContainerFile($reflContainer));
         $files = scandir($containerDirectory);
 
         if ($files === false) {
             throw new RuntimeException(sprintf('Could not read container directory "%s".', $containerDirectory));
         }
 
-        $filteredFiles = array_filter($files, static fn(string $fileName): bool => str_starts_with($fileName, 'get'));
+        $filteredFiles = array_filter(
+            $files,
+            static fn(string $fileName): bool => str_starts_with($fileName, 'get') && str_ends_with($fileName, '.php'),
+        );
+
+        foreach ($filteredFiles as $fileName) {
+            if (!str_ends_with($fileName, '__Overridden.php')) {
+                continue;
+            }
+            $originalFile = str_replace('__Overridden.php', '.php', $fileName);
+            $originalPath = $containerDirectory . DIRECTORY_SEPARATOR . $originalFile;
+            if (!is_file($originalPath)) {
+                $parentPath = $containerDirectory . DIRECTORY_SEPARATOR . $fileName;
+                $parentSource = file_get_contents($parentPath);
+                if ($parentSource === false) {
+                    throw new RuntimeException(sprintf('Could not read generated service parent "%s".', $parentPath));
+                }
+                $fs->dumpFile($originalPath, str_replace(substr($fileName, 0, -4), substr($originalFile, 0, -4), $parentSource));
+                $filteredFiles[] = $originalFile;
+            }
+        }
 
         foreach ($filteredFiles as $fileName) {
             $class = str_replace('.php', '', $fileName);
@@ -239,6 +255,9 @@ final class Symfony63PlusBuilder implements Builder
 
             EOF;
 
+        if (str_contains($content, "require_once __DIR__.'/$overriddenFile';")) {
+            return;
+        }
         $replacedContent = str_replace($header, $newHeader, $content);
         $fs->dumpFile($cachePath, $replacedContent);
     }
@@ -246,7 +265,7 @@ final class Symfony63PlusBuilder implements Builder
     private function generateOverriddenGetter(ReflectionMethod $method, ContainerSourceCodeExtractor $extractor): string
     {
         $methodName = $method->getName();
-        $internals = $extractor->getContainerInternalsForMethod($method);
+        $internals = $extractor->getContainerInternalsForMethod($method, $method->isStatic());
 
         if (isset($internals['type']) && $internals['type'] === 'factories') {
             $internals = [];
@@ -270,11 +289,11 @@ final class Symfony63PlusBuilder implements Builder
 
             $arrayKey = "['{$internals['key']}']" . (isset($internals['key2']) ? "['{$internals['key2']}']" : '');
             $sharedCheck = <<<EOF
-                                        if (isset(\$this->{$internals['type']}{$arrayKey})) {
-                                            if (\$lazyLoad) {
-                                                return \$this->{$internals['type']}{$arrayKey};
-                                            } elseif (isset(\$this->lazyInitializedShared['$methodName'])) {
-                                                return \$this->lazyInitializedShared['$methodName'];
+                                        if (isset(\$container->{$internals['type']}{$arrayKey})) {
+                                            if (\$lazyLoad === true) {
+                                                return \$container->{$internals['type']}{$arrayKey};
+                                            } elseif (\$lazyLoad === false && isset(\$container->lazyInitializedShared['$methodName'])) {
+                                                return \$container->lazyInitializedShared['$methodName'];
                                             }
                                         }
 
@@ -283,8 +302,6 @@ final class Symfony63PlusBuilder implements Builder
 
         return <<<EOF
                     protected static function $methodName(\$container, \$lazyLoad = true) {
-                        // this might be a weird SF container bug or idk... but SF container keeps calling
-                        // this factory method with service id
                         if (is_string(\$lazyLoad)) {
                             \$lazyLoad = true;
                         }
@@ -296,7 +313,7 @@ final class Symfony63PlusBuilder implements Builder
 
                             \$return = parent::{$methodName}(\$container, \$lazyLoad);
 
-                            if (!\$lazyLoad) \$this->lazyInitializedShared['$methodName'] = \$return;
+                            if (\$lazyLoad !== true) \$container->lazyInitializedShared['$methodName'] = \$return;
                         } finally {
                             self::\$mutex->release();
                         }
@@ -320,8 +337,8 @@ final class Symfony63PlusBuilder implements Builder
             $arrayKey = "['{$internals['key']}']" . (isset($internals['key2']) ? "['{$internals['key2']}']" : '');
             $sharedCheck = <<<EOF
 
-                                        if (isset(\$this->{$internals['type']}{$arrayKey})) {
-                                            return \$this->{$internals['type']}{$arrayKey};
+                                        if (isset(\$container->{$internals['type']}{$arrayKey})) {
+                                            return \$container->{$internals['type']}{$arrayKey};
                                         }
 
                 EOF;
@@ -358,11 +375,15 @@ final class Symfony63PlusBuilder implements Builder
 
         $fullOverriddenPath = str_replace('.php', '__Overridden.php', $fullPath);
 
-        if (file_exists($fullOverriddenPath)) {
+        $overriddenClass = $class . '__Overridden';
+        if ($this->isAlreadyOverridden($fullPath, $overriddenClass)) {
+            if (!is_file($fullOverriddenPath)) {
+                throw new RuntimeException(sprintf('Generated service parent "%s" is missing.', $fullOverriddenPath));
+            }
+
             return;
         }
 
-        $overriddenClass = $class . '__Overridden';
         $overriddenFqcn = $namespace . '\\' . $overriddenClass;
         $origContent = file_get_contents($fullPath);
 
@@ -373,7 +394,6 @@ final class Symfony63PlusBuilder implements Builder
         $codeExtractor = new ContainerSourceCodeExtractor($origContent);
         $overriddenContent = str_replace($class, $overriddenClass, $origContent);
         $overriddenContent = str_replace('self::do(', 'static::do(', $overriddenContent);
-        $fs->rename($fullPath, $fullOverriddenPath, true);
         $fs->dumpFile($fullOverriddenPath, $overriddenContent);
         require_once $fullOverriddenPath;
         $reflClass = new ReflectionClass($overriddenFqcn);
@@ -390,9 +410,9 @@ final class Symfony63PlusBuilder implements Builder
             $arrayKey = "['{$internals['key']}']" . (isset($internals['key2']) ? "['{$internals['key2']}']" : '');
             $sharedCheck = <<<EOF
                 if (isset(\$container->{$internals['type']}{$arrayKey})) {
-                    if (\$lazyLoad) {
+                    if (\$lazyLoad === true) {
                         return \$container->{$internals['type']}{$arrayKey};
-                    } elseif (isset(\$container->lazyInitializedShared['$overriddenClass'])) {
+                    } elseif (\$lazyLoad === false && isset(\$container->lazyInitializedShared['$overriddenClass'])) {
                         return \$container->lazyInitializedShared['$overriddenClass'];
                     }
                 }
@@ -412,6 +432,10 @@ final class Symfony63PlusBuilder implements Builder
             {
                 public static function do(\$container, \$lazyLoad = true)
                 {
+                    if (is_string(\$lazyLoad)) {
+                        \$lazyLoad = true;
+                    }
+
                     $sharedCheck
 
                     try {
@@ -420,7 +444,7 @@ final class Symfony63PlusBuilder implements Builder
                         $sharedCheck
 
                         \$return = parent::do(\$container, \$lazyLoad);
-                        if (!\$lazyLoad) \$container->lazyInitializedShared['$overriddenClass'] = \$return;
+                        if (\$lazyLoad !== true) \$container->lazyInitializedShared['$overriddenClass'] = \$return;
                     } finally {
                         \$container::\$mutex->release();
                     }
@@ -435,6 +459,31 @@ final class Symfony63PlusBuilder implements Builder
         require_once $fullPath;
     }
 
+    private function getContainerFile(ReflectionClass $container): string
+    {
+        $file = $container->getFileName();
+        if (!is_string($file) || !is_file($file)) {
+            throw new RuntimeException('The reflected generated container source file is missing.');
+        }
+
+        $resolved = realpath($file);
+        if ($resolved === false) {
+            throw new RuntimeException(sprintf('Could not resolve generated container source "%s".', $file));
+        }
+
+        return $resolved;
+    }
+
+    private function isAlreadyOverridden(string $file, string $parentClass): bool
+    {
+        $source = file_get_contents($file);
+        if ($source === false) {
+            throw new RuntimeException(sprintf('Could not read generated source "%s".', $file));
+        }
+
+        return preg_match('/\\bclass\\s+\\w+\\s+extends\\s+' . preg_quote($parentClass, '/') . '\\b/', $source) === 1;
+    }
+
     /**
      * @return array<string>
      */
@@ -446,7 +495,7 @@ final class Symfony63PlusBuilder implements Builder
         $methodNames = array_merge($methodNames, get_class_methods(BlockingContainer::class));
         $getters = array_filter(
             $methodNames,
-            static fn(string $methodName): bool => str_starts_with($methodName, 'get')
+            static fn(string $methodName): bool => str_starts_with($methodName, 'get'),
         );
         $getters[] = 'getDefaultParameters';
 

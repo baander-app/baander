@@ -6,18 +6,19 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy;
 
 use ProxyManager\Factory\AccessInterceptorValueHolderFactory;
 use ProxyManager\Proxy\AccessInterceptorInterface;
-use ProxyManager\Proxy\AccessInterceptorValueHolderInterface;
-use ProxyManager\Proxy\ValueHolderInterface;
 use RuntimeException;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Initializer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Resetter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\UnmanagedFactoryServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
+use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
 use SwooleBundle\SwooleBundle\Component\Locking\MutexFactory;
 
 final readonly class UnmanagedFactoryInstantiator
 {
+    private Mutex $instantiation;
+
     public function __construct(
         private AccessInterceptorValueHolderFactory $proxyFactory,
         private Instantiator $instantiator,
@@ -25,7 +26,10 @@ final readonly class UnmanagedFactoryInstantiator
         private MutexFactory $limitLocking,
         private MutexFactory $newInstanceLocking,
         private Swoole $swoole,
-    ) {}
+        MutexFactory $instantiationLocking,
+    ) {
+        $this->instantiation = $instantiationLocking->newMutex();
+    }
 
     /**
      * @template RealObjectType of object
@@ -37,7 +41,7 @@ final readonly class UnmanagedFactoryInstantiator
      *     resetter?: Resetter,
      *     initializer?: Initializer
      * }> $factoryConfigs
-     * @return AccessInterceptorInterface<RealObjectType>&AccessInterceptorValueHolderInterface<RealObjectType>&RealObjectType&ValueHolderInterface<RealObjectType>
+     * @return RealObjectType
      */
     public function newInstance(object $instance, array $factoryConfigs, int $globalInstancesLimit): object
     {
@@ -96,30 +100,36 @@ final readonly class UnmanagedFactoryInstantiator
 
                     return $service;
                 };
-                // currently a separate service pool is used for each factory method of the factory, which may
-                // mess with the instances limit when same service instance is being created
-                // this might need refactoring later...
-                // unique locking key for each managed instance of the new service pool
-                $limitMutex = $this->limitLocking->newMutex();
-                $instancesLimit = $factoryConfig['limit'] ?? $globalInstancesLimit;
-                $resetter = $factoryConfig['resetter'] ?? null;
-                $initializer = $factoryConfig['initializer'] ?? null;
-                $servicePool = new UnmanagedFactoryServicePool(
-                    $factoryInstantiator,
-                    $swoole,
-                    $limitMutex,
-                    $instancesLimit,
-                    $resetter,
-                    $initializer,
-                );
-                $servicePoolContainer->addPool($servicePool);
+                $this->instantiation->acquire();
+                try {
+                    $limitMutex = $this->limitLocking->newMutex();
+                    $instancesLimit = $factoryConfig['limit'] ?? $globalInstancesLimit;
+                    $resetter = $factoryConfig['resetter'] ?? null;
+                    $initializer = $factoryConfig['initializer'] ?? null;
+                    $servicePool = new UnmanagedFactoryServicePool(
+                        $factoryInstantiator,
+                        $swoole,
+                        $limitMutex,
+                        $instancesLimit,
+                        $resetter,
+                        $initializer,
+                    );
+                    $servicePoolContainer->addPool($servicePool);
 
-                return $instantiator->newInstance($servicePool, $factoryConfig['returnType']);
+                    return $instantiator->newInstance($servicePool, $factoryConfig['returnType']);
+                } finally {
+                    $this->instantiation->release();
+                }
             };
 
             $prefixInterceptors[$factoryMethod] = $interceptor;
         }
 
-        return $this->proxyFactory->createProxy($instance, $prefixInterceptors);
+        $this->instantiation->acquire();
+        try {
+            return $this->proxyFactory->createProxy($instance, $prefixInterceptors);
+        } finally {
+            $this->instantiation->release();
+        }
     }
 }

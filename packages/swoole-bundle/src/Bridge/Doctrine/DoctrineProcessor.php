@@ -66,22 +66,12 @@ final class DoctrineProcessor implements CompileProcessor
             $this->decorateRepositoryFactory($container, $emName, $emSvcId);
         }
 
-        $this->fixDebugDataHolderResetter($container, $proxifier);
+        $this->fixDebugDataHolderResetter($container);
     }
 
     private function createEntityManagerResetterDefinition(ContainerBuilder $container): void
     {
-        $resetterDef = new Definition(EntityManagerResetter::class);
-        $resetterDef->setClass(EntityManagerResetter::class);
-
-        // Wire the swoole logger when MonologBundle is available
-        if ($container->has('monolog.logger.swoole')) {
-            $resetterDef->addArgument(new Reference('monolog.logger.swoole'));
-        } else {
-            $resetterDef->addArgument(null);
-        }
-
-        $container->setDefinition(EntityManagerResetter::class, $resetterDef);
+        $container->setDefinition(EntityManagerResetter::class, new Definition(EntityManagerResetter::class));
     }
 
     private function overrideEmConfigurator(ContainerBuilder $container, Definition $emDef): void
@@ -127,11 +117,13 @@ final class DoctrineProcessor implements CompileProcessor
                 $tagParams['initializer'] = $this->tryToCreateKeepAliveInitializer(
                     $container,
                     $connectionName,
-                    $aliveKeepers[$connectionName]
+                    $aliveKeepers[$connectionName],
                 );
             }
 
             $connectionDef->addTag(ContainerConstants::TAG_STATEFUL_SERVICE, $tagParams);
+            $eventManager = $container->findDefinition(sprintf('doctrine.dbal.%s_connection.event_manager', $connectionName));
+            $eventManager->addTag(ContainerConstants::TAG_STATEFUL_SERVICE, $limit ? ['limit' => $limit] : []);
         }
     }
 
@@ -145,19 +137,19 @@ final class DoctrineProcessor implements CompileProcessor
         return $statefulSvcTag && isset($statefulSvcTag[0]['limit']) ? $statefulSvcTag[0]['limit'] : null;
     }
 
-    private function fixDebugDataHolderResetter(ContainerBuilder $container, Proxifier $proxifier): void
+    private function fixDebugDataHolderResetter(ContainerBuilder $container): void
     {
         if (!$container->has('doctrine.debug_data_holder')) {
             return;
         }
 
         $dataHolderDef = $container->findDefinition('doctrine.debug_data_holder');
+        $dataHolderDef->addTag(ContainerConstants::TAG_STATEFUL_SERVICE, ['reset_on_each_request' => true]);
 
         if ($dataHolderDef->hasTag('kernel.reset')) {
             return;
         }
 
-        $proxifier->proxifyService('doctrine.debug_data_holder');
         $resetterDef = $container->findDefinition('services_resetter');
 
         if ($resetterDef->hasTag('kernel.reset')) {

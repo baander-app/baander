@@ -45,18 +45,7 @@ final class SymfonyAccessLogDataMap implements AccessLogDataMap
      */
     public function getClientIp(): string
     {
-        $headers = ['x-real-ip', 'client-ip', 'x-forwarded-for'];
-
-        foreach ($headers as $header) {
-            if ($this->request->headers->has($header)) {
-                $ip = (string) $this->request->headers->get($header);
-                Assertion::ip($ip);
-
-                return $ip;
-            }
-        }
-
-        return $this->getServerParamIp('REMOTE_ADDR');
+        return $this->request->getClientIp() ?? '-';
     }
 
     /**
@@ -164,7 +153,7 @@ final class SymfonyAccessLogDataMap implements AccessLogDataMap
                 preg_match(
                     self::HOST_PORT_REGEX,
                     (string) $this->request->headers->get(strtolower('host'), ''),
-                    $matches
+                    $matches,
                 );
                 $port = $matches['port'] ?? null;
                 $port = $port ?: $this->getServerParam('SERVER_PORT', '80');
@@ -241,7 +230,7 @@ final class SymfonyAccessLogDataMap implements AccessLogDataMap
             $this->getMethod(),
             $this->getPath(),
             $this->getQuery(),
-            $this->getProtocol()
+            $this->getProtocol(),
         );
     }
 
@@ -256,7 +245,7 @@ final class SymfonyAccessLogDataMap implements AccessLogDataMap
             '%s %d %s',
             $this->getProtocol(),
             $this->getStatus(),
-            $reasonPhrase
+            $reasonPhrase,
         );
     }
 
@@ -341,7 +330,7 @@ final class SymfonyAccessLogDataMap implements AccessLogDataMap
                         IntlDateFormatter::FULL,
                         date_default_timezone_get(),
                         null,
-                        $icuFormat
+                        $icuFormat,
                     );
                     $this->dateFormatterIcuFormat = $icuFormat;
                 }

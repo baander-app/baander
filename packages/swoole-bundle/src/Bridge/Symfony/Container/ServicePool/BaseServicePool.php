@@ -12,9 +12,9 @@ use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
 
 /**
  * @template T of object
- * @template-implements ServicePool<T>
+ * @template-implements LifecycleServicePool<T>
  */
-abstract class BaseServicePool implements ServicePool
+abstract class BaseServicePool implements LifecycleServicePool
 {
     private int $assignedCount = 0;
 
@@ -27,6 +27,12 @@ abstract class BaseServicePool implements ServicePool
      * @var array<int, T>
      */
     private array $assignedPool = [];
+
+    /** @var array<int, array{service: T, reusable: bool}> */
+    private array $prepared = [];
+
+    /** @var array<int, true> */
+    private array $resetting = [];
 
     public function getAssignedCount(): int
     {
@@ -75,50 +81,61 @@ abstract class BaseServicePool implements ServicePool
 
     public function releaseFromCoroutine(int $cId): void
     {
-        if (!isset($this->assignedPool[$cId])) {
-            return;
+        try {
+            $this->resetAssigned($cId);
+        } finally {
+            $this->releaseAssigned($cId);
         }
-
-        $service = $this->assignedPool[$cId];
-        unset($this->assignedPool[$cId]);
-        $this->assignedCount--;
-
-        if (!$this->isServiceStable($service)) {
-            $this->unlockPool();
-
-            return;
-        }
-
-        $this->safeReset($service);
-
-        $this->freePool[] = $service;
-        $this->unlockPool();
     }
 
-    /**
-     * Reset the service, catching any errors from re-entrant pool acquisition.
-     *
-     * If the resetter itself needs pooled services (e.g., a Logger), and the
-     * pool is near capacity, the resetter's pool acquire may deadlock waiting
-     * for slots that won't be freed until THIS release completes. We catch
-     * that scenario and skip the reset rather than killing the worker.
-     */
-    private function safeReset(object $service): void
+    public function resetAssigned(int $cId): void
     {
-        if ($this->resetter === null) {
+        $service = $this->assignedPool[$cId] ?? null;
+        if ($service === null || ($this->prepared[$cId]['service'] ?? null) === $service) {
             return;
         }
 
+        $this->prepared[$cId] = ['service' => $service, 'reusable' => false];
+        $this->resetting[$cId] = true;
         try {
-            $this->resetter->reset($service);
-        } catch (\RuntimeException $e) {
-            // Pool mutex timeout during reset — skip reset rather than crash.
-            // The service will be discarded and a fresh one created on next get().
-            error_log(sprintf(
-                '[swoole] Skipping service reset due to pool contention: %s',
-                $e->getMessage(),
-            ));
+            $this->resetter?->reset($service);
+            $this->prepared[$cId]['reusable'] = true;
+        } catch (\Throwable $error) {
+            error_log(sprintf('Service pool reset failed for %s: %s: %s', $service::class, $error::class, $error->getMessage()));
+        } finally {
+            unset($this->resetting[$cId]);
         }
+    }
+
+    public function releaseAssigned(int $cId): void
+    {
+        if (isset($this->resetting[$cId])) {
+            return;
+        }
+
+        $service = $this->assignedPool[$cId] ?? null;
+        $prepared = $this->prepared[$cId] ?? null;
+        unset($this->prepared[$cId]);
+        if ($service === null) {
+            return;
+        }
+
+        unset($this->assignedPool[$cId]);
+        $this->assignedCount--;
+        try {
+            if ($prepared !== null && $prepared['service'] === $service && $prepared['reusable'] && $this->isServiceStable($service)) {
+                $this->freePool[] = $service;
+            }
+        } catch (\Throwable $error) {
+            error_log(sprintf('Service pool release failed for %s: %s: %s', $service::class, $error::class, $error->getMessage()));
+        } finally {
+            $this->unlockPool();
+        }
+    }
+
+    public function drainFree(): void
+    {
+        $this->freePool = [];
     }
 
     /**

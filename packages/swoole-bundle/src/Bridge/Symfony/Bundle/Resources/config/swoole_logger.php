@@ -9,7 +9,6 @@ return static function (ContainerConfigurator $container): void {
     // - CoroutineWatchdog: stall detection events
     // - Thread-safety warnings: cross-thread violations, pool exhaustion
     // - Settings validation: unrecognized or deprecated settings
-    // - EntityManagerResetter: debug logging on EM reset
     //
     // The monolog.logger.swoole service is auto-created by MonologBundle's
     // LoggerChannelPass from the monolog.logger tag applied to services

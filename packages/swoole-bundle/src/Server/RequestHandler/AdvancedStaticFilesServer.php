@@ -125,18 +125,25 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
         if (!$this->configuration->hasPublicDir()) {
             throw new RuntimeException(
                 'AdvancedStaticFilesHandler requires setting "public_dir", which is unavailable. '
-                . 'Either disable driver or fill "public_dir" setting.'
+                . 'Either disable driver or fill "public_dir" setting.',
             );
         }
 
-        $this->publicDir = $this->configuration->getPublicDir();
+        $publicDir = realpath($this->configuration->getPublicDir());
+        if ($publicDir === false || !is_dir($publicDir)) {
+            throw new RuntimeException('The static public directory must exist.');
+        }
+        $this->publicDir = $publicDir;
     }
 
     public function handle(Request $request, Response $response): void
     {
         if ($request->server['request_method'] === 'GET') {
             $path = $this->publicDir . $request->server['request_uri'];
-            if (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path)) {
+            $resolved = realpath($path);
+            if ($resolved !== false
+                && str_starts_with($resolved, rtrim($this->publicDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)
+                && (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path))) {
                 $response->header('Content-Type', $this->cachedMimeTypes[$path]);
                 $response->sendfile($path);
 

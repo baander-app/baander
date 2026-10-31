@@ -6,6 +6,8 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection;
 
 interface ContainerConstants
 {
+    public const string PARAM_COROUTINES_FINAL_CLASSES = 'swoole_bundle.coroutines_support.final_classes';
+
     public const string PARAM_COROUTINES_ENABLED = 'swoole_bundle.coroutines_support.enabled';
 
     public const string PARAM_COROUTINES_MAX_SVC_INSTANCES = 'swoole_bundle.coroutines_support.max_service_instances';
@@ -14,8 +16,8 @@ interface ContainerConstants
 
     public const string PARAM_COROUTINES_COMPILE_PROCESSORS = 'swoole_bundle.coroutines_support.compile_processors';
 
-    public const string PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG =
-        'swoole_bundle.coroutines_support.doctrine_compile_processor.config';
+    public const string PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG
+        = 'swoole_bundle.coroutines_support.doctrine_compile_processor.config';
 
     public const string PARAM_CACHE_FOLDER = 'swoole_bundle';
 

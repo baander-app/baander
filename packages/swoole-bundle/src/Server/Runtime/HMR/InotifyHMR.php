@@ -7,7 +7,6 @@ namespace SwooleBundle\SwooleBundle\Server\Runtime\HMR;
 use Assert\Assertion;
 use Assert\AssertionFailedException;
 use Swoole\Server;
-use Swoole\Timer;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 
 final class InotifyHMR implements HotModuleReloader, Bootable
@@ -40,11 +39,13 @@ final class InotifyHMR implements HotModuleReloader, Bootable
      * @param array<string> $nonReloadableFiles
      * @throws AssertionFailedException
      */
-    public function __construct(array $nonReloadableFiles = [])
-    {
+    public function __construct(
+        private readonly HotModuleReloadTimer $timer,
+        array $nonReloadableFiles = [],
+    ) {
         Assertion::extensionLoaded(
             'inotify',
-            'Swoole HMR requires "inotify" PHP Extension present and loaded in the system.'
+            'Swoole HMR requires "inotify" PHP Extension present and loaded in the system.',
         );
         $this->watchMask = defined('IN_CLOSE_WRITE') ? (int) constant('IN_CLOSE_WRITE') : 8;
 
@@ -75,10 +76,13 @@ final class InotifyHMR implements HotModuleReloader, Bootable
 
         if ($hasEvents && !$this->reloadPending) {
             $this->reloadPending = true;
-            Timer::after(self::DEBOUNCE_MS, function () use ($server): void {
+            $scheduled = $this->timer->after(self::DEBOUNCE_MS, function () use ($server): void {
                 $this->reloadPending = false;
                 $server->reload();
             });
+            if (!$scheduled) {
+                $this->reloadPending = false;
+            }
         }
 
         $this->watchFiles(get_included_files());

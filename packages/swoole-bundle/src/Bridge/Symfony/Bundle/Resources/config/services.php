@@ -8,8 +8,6 @@ use ProxyManager\FileLocator\FileLocator;
 use ProxyManager\GeneratorStrategy\FileWriterGeneratorStrategy;
 use SwooleBundle\SwooleBundle\Bridge\Doctrine\ORM\EntityManagerStabilityChecker;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Metrics\MetricsProvider as SwooleMetricsProvider;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices\{
-    NonSharedSvcPoolConfigurator,};
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingServerStartHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingWorkerErrorHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingWorkerExitHandler;
@@ -22,6 +20,9 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\Instantiator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\ProxyDirectoryHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\UnmanagedFactoryInstantiator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\DrainServicePoolsOnWorkerExit;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Router\LockingConfigCacheFactory;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Router\LockingLoader;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\DefaultRequestFactory;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\DefaultResponseProcessorInjector;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\EndResponseProcessor;
@@ -45,9 +46,11 @@ use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Component\AtomicCounter;
 use SwooleBundle\SwooleBundle\Component\ExceptionArrayTransformer;
 use SwooleBundle\SwooleBundle\Component\GeneratedCollection;
+use SwooleBundle\SwooleBundle\Component\Locking\Channel\ChannelMutex;
 use SwooleBundle\SwooleBundle\Component\Locking\Channel\ChannelMutexFactory;
 use SwooleBundle\SwooleBundle\Component\Locking\Channel\ChannelPool;
 use SwooleBundle\SwooleBundle\Component\Locking\FirstTimeOnly\FirstTimeOnlyMutexFactory;
+use SwooleBundle\SwooleBundle\Component\Locking\RecursiveOwner\RecursiveOwnerMutexFactory;
 use SwooleBundle\SwooleBundle\Metrics\MetricsProvider;
 use SwooleBundle\SwooleBundle\Metrics\SystemMetricsProviderRegistry;
 use SwooleBundle\SwooleBundle\Server\Api\Api;
@@ -109,6 +112,7 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\HttpKernel\KernelInterface;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\inline_service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\tagged_iterator;
 
@@ -254,7 +258,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $services->alias(WorkerErrorHandler::class, EventDispatchingWorkerErrorHandler::class);
 
-    $services->alias(WorkerExitHandler::class, EventDispatchingWorkerExitHandler::class);
+    $services->alias(WorkerExitHandler::class, DrainServicePoolsOnWorkerExit::class);
 
     $services->alias(ServerStartHandler::class, EventDispatchingServerStartHandler::class);
 
@@ -266,6 +270,12 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $services->set(EventDispatchingWorkerExitHandler::class)
         ->arg('$eventDispatcher', service('event_dispatcher'));
+
+    $services->set(DrainServicePoolsOnWorkerExit::class)
+        ->arg('$servicePools', service(ServicePoolContainer::class))
+        ->arg('$coWrapper', service(CoWrapper::class))
+        ->arg('$swoole', service(Swoole::class))
+        ->arg('$decorated', service(EventDispatchingWorkerExitHandler::class));
 
     $services->set(EventDispatchingWorkerErrorHandler::class)
         ->arg('$eventDispatcher', service('event_dispatcher'));
@@ -388,7 +398,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $services->set(
         'swoole_bundle.server.http_server.configurator.with_limited_request_handler',
-        WithRequestHandler::class
+        WithRequestHandler::class,
     )
         ->arg('$requestHandler', service(LimitedRequestHandler::class));
 
@@ -412,6 +422,10 @@ return static function (ContainerConfigurator $containerConfigurator): void {
     $services->set('swoole_bundle.unmanaged_factory_first_time.locking', FirstTimeOnlyMutexFactory::class)
         ->arg('$wrapped', service('swoole_bundle.service_pool.locking'));
 
+    $services->set('swoole_bundle.unmanaged_factory_instantiation.locking', RecursiveOwnerMutexFactory::class)
+        ->arg('$swoole', service(Swoole::class))
+        ->arg('$wrapped', service('swoole_bundle.service_pool.locking'));
+
     $services->set(Instantiator::class)
         ->arg('$proxyGenerator', service(Generator::class));
 
@@ -421,6 +435,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->arg('$servicePoolContainer', service(ServicePoolContainer::class))
         ->arg('$limitLocking', service('swoole_bundle.service_pool.locking'))
         ->arg('$newInstanceLocking', service('swoole_bundle.unmanaged_factory_first_time.locking'))
+        ->arg('$instantiationLocking', service('swoole_bundle.unmanaged_factory_instantiation.locking'))
         ->arg('$swoole', service(Swoole::class));
 
     $services->set('swoole_bundle.filesystem', Filesystem::class);
@@ -460,6 +475,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ->arg('$pools', [
         ]);
 
+    $services->set(LockingLoader::class)
+        ->arg('$mutex', inline_service(ChannelMutex::class)
+            ->factory([service('swoole_bundle.service_pool.locking'), 'newMutex']));
+
+    $services->set(LockingConfigCacheFactory::class)
+        ->arg('$mutex', inline_service(ChannelMutex::class)
+            ->factory([service('swoole_bundle.service_pool.locking'), 'newMutex']));
+
     $services->set(EntityManagerStabilityChecker::class)
         ->tag('swoole_bundle.stability_checker');
 
@@ -475,9 +498,6 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $services->set('kernel_proxy', Kernel::class)
         ->factory([service(KernelCloner::class), 'clone']);
-
-    $services->set(NonSharedSvcPoolConfigurator::class)
-        ->arg('$container', service(ServicePoolContainer::class));
 
     $services->set(SwooleMetricsProvider::class);
 

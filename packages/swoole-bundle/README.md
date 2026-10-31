@@ -9,10 +9,24 @@ comparison is [v0.35.6](https://github.com/symfony-swoole/swoole-bundle/tree/81f
 revision `81f35b1fac4f7df2a173b6ae83a194e2ad6d8047`. The historical fork base is
 unknown; this revision is a comparison point, not a claim of ancestry.
 
-The [source comparison](upstream-review.json) records all 403 source files,
-including 126 identical files and 277 differences, with local/upstream hashes
-and a recommended disposition. These recommendations describe the initial audit;
-they do not assert that a change has already been adopted or qualified.
+The [source comparison](upstream-review.json) preserves the initial audit of 403
+source files: 126 identical files and 277 differences. Each record also identifies
+the final source decision and current local hash; two additional local files bring
+the final inventory to 405 entries. Source decisions and runtime qualification
+are recorded separately.
+
+The reconciled fork owns coroutine lock handoff, service reset and release,
+worker-exit cleanup, generated-container initialization and warm-start metadata.
+Framework processors isolate mutable HTTP, Doctrine, SMTP and profiling services.
+Logging serializes writes and stream cleanup, while PHP error-handler stacks stay
+local to their coroutine. Hot reload stops its polling and delayed reload timers
+before worker-exit draining. The application kernel uses the bundle's initialization
+path so these rules apply on both cold and warm starts.
+
+Readonly proxy generation remains unsupported for the selected consumers. The
+comparison also records unconfigured table-session defects as deferred defects;
+Baander uses native Redis sessions. These exclusions are not claims of equivalent
+behavior or completed fixes.
 
 Upstream changes must preserve coroutine-specific service release, pool
 diagnostics, authenticated WebSocket handshakes, the application's ownership of

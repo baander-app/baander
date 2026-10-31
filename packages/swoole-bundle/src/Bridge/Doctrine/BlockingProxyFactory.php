@@ -97,13 +97,13 @@ if (version_compare(InstalledVersions::getVersion('doctrine/orm'), '3.0.0', '<')
          * @return InternalProxy<T>
          */
         #[Override]
-        public function getProxy(string $className, array $identifier): InternalProxy
+        public function getProxy(string $className, array $identifier, bool $assignIdentifiers = true): InternalProxy
         {
             $mutex = $this->getMutex($className);
 
             try {
                 $mutex->acquire();
-                $proxy = $this->wrapped->getProxy($className, $identifier);
+                $proxy = $this->wrapped->getProxy($className, $identifier, $assignIdentifiers);
             } finally {
                 $mutex->release();
             }

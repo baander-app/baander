@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Kernel;
 
+use RuntimeException;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\ContainerConstants;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\BlockingContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Modifier\Modifier;
 use SwooleBundle\SwooleBundle\Reflection\ClassModifier;
+use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * @phpstan-ignore trait.unused
@@ -40,20 +42,45 @@ trait CoroutinesSupportingKernel
      */
     protected function initializeContainer(): void
     {
-        ClassModifier::initialize($this->getCacheDir());
-        $cacheDir = $this->getCacheDir();
-        $swooleFactory = new Swoole();
-        BlockingContainer::initializeMutex($swooleFactory);
+        $lockDirectory = $this->getBuildDir();
+        (new Filesystem())->mkdir($lockDirectory);
+        $lockPath = $lockDirectory . DIRECTORY_SEPARATOR . $this->getContainerClass() . '.php.swoole.lock';
+        $lock = @fopen($lockPath, 'c+');
 
-        parent::initializeContainer();
-
-        if (!$this->areCoroutinesEnabled()) {
-            return;
+        if ($lock === false) {
+            throw new RuntimeException(sprintf('Could not open container initialization lock "%s".', $lockPath));
         }
 
-        Modifier::modifyContainer($this->container, $cacheDir, $this->isDebug());
-        $this->container->set('kernel_original', $this);
-        $this->container->set('kernel', $this->container->get('kernel_proxy'));
+        try {
+            if (!flock($lock, LOCK_EX)) {
+                throw new RuntimeException(sprintf('Could not acquire container initialization lock "%s".', $lockPath));
+            }
+
+            ClassModifier::initialize();
+            BlockingContainer::initializeMutex(new Swoole());
+            parent::initializeContainer();
+
+            if (!$this->areCoroutinesEnabled()) {
+                return;
+            }
+
+            if (!$this->container instanceof BlockingContainer) {
+                throw new \LogicException('Coroutine support requires a blocking service container.');
+            }
+
+            if ($this->container->hasParameter(ContainerConstants::PARAM_COROUTINES_FINAL_CLASSES)) {
+                /** @var list<class-string> $finalClasses */
+                $finalClasses = $this->container->getParameter(ContainerConstants::PARAM_COROUTINES_FINAL_CLASSES);
+                ClassModifier::removeFinalFlagsFromClasses($finalClasses);
+            }
+
+            Modifier::modifyContainer($this->container, $this->getCacheDir(), $this->isDebug());
+            $this->container->set('kernel_original', $this);
+            $this->container->set('kernel', $this->container->get('kernel_proxy'));
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     private function areCoroutinesEnabled(): bool

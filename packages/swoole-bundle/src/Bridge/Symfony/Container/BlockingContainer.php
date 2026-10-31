@@ -19,6 +19,9 @@ abstract class BlockingContainer extends Container
 
     protected static string $buildContainerNs = '';
 
+    /** @var array<string, object> */
+    protected array $lazyInitializedShared = [];
+
     #[Override]
     public function get(string $id, int $invalidBehavior = self::EXCEPTION_ON_INVALID_REFERENCE): ?object
     {

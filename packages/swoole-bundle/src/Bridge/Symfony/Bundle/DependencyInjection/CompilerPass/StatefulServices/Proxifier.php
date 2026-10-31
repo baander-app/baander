@@ -98,7 +98,6 @@ final class Proxifier
         $wrappedServiceId = sprintf('%s.swoole_coop.wrapped', $serviceId);
         $svcPoolDef = $this->prepareServicePool($wrappedServiceId, $serviceDef, $externalResetter);
         $svcPoolServiceId = sprintf('%s.swoole_coop.service_pool', $serviceId);
-        $wasShared = $serviceDef->isShared();
         $proxyDef = $this->prepareProxy($svcPoolServiceId, $serviceDef);
         $this->prepareProxifiedService($serviceDef);
         $serviceDef->clearTags();
@@ -106,11 +105,6 @@ final class Proxifier
         $this->container->setDefinition($svcPoolServiceId, $svcPoolDef);
         $this->container->setDefinition($serviceId, $proxyDef); // proxy swap
         $this->container->setDefinition($wrappedServiceId, $serviceDef); // old service for copying
-
-        // new pools will be registered in the container on their instantiation
-        if (!$wasShared) {
-            return;
-        }
 
         $this->registerProxifiedServicePoolRef(new Reference($svcPoolServiceId), $resetPriority);
     }
@@ -156,11 +150,7 @@ final class Proxifier
         ?string $externalResetter = null,
     ): Definition {
         $svcPoolDef = new Definition(DiServicePool::class);
-        $svcPoolDef->setShared($serviceDef->isShared());
-
-        if (!$serviceDef->isShared()) {
-            $svcPoolDef->setConfigurator([new Reference(NonSharedSvcPoolConfigurator::class), 'configure']);
-        }
+        $svcPoolDef->setShared(true);
 
         $svcPoolDef->setArgument(0, $wrappedServiceId);
         $svcPoolDef->setArgument(1, new Reference('service_container'));
@@ -170,7 +160,7 @@ final class Proxifier
 
         if (!is_int($instanceLimit)) {
             throw new UnexpectedValueException(
-                sprintf('Parameter %s must be an integer', ContainerConstants::PARAM_COROUTINES_MAX_SVC_INSTANCES)
+                sprintf('Parameter %s must be an integer', ContainerConstants::PARAM_COROUTINES_MAX_SVC_INSTANCES),
             );
         }
 

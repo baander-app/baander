@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServices;
 
-use RuntimeException;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\ContainerConstants;
 use SwooleBundle\SwooleBundle\Reflection\ClassModifier;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 final class ClassModificationProcessor
 {
-    private string $cacheDir;
-
     /**
      * @var array<string, true>
      */
     private array $processedClasses = [];
 
-    public function __construct(ContainerBuilder $container)
+    public function __construct(private readonly ContainerBuilder $container)
     {
-        $this->setCacheDir($container);
+        $container->setParameter(ContainerConstants::PARAM_COROUTINES_FINAL_CLASSES, []);
     }
 
     /**
@@ -32,18 +30,11 @@ final class ClassModificationProcessor
         }
 
         $this->processedClasses[$className] = true;
-        ClassModifier::removeFinalFlagsFromClass($className);
-        ClassModifier::dumpCache($this->cacheDir);
-    }
-
-    private function setCacheDir(ContainerBuilder $container): void
-    {
-        $cacheDir = $container->getParameter('kernel.cache_dir');
-
-        if (!is_string($cacheDir)) {
-            throw new RuntimeException('Kernel cache directory is not a string.');
+        if (ClassModifier::removeFinalFlagsFromClass($className)) {
+            /** @var list<class-string> $classes */
+            $classes = $this->container->getParameter(ContainerConstants::PARAM_COROUTINES_FINAL_CLASSES);
+            $classes[] = $className;
+            $this->container->setParameter(ContainerConstants::PARAM_COROUTINES_FINAL_CLASSES, $classes);
         }
-
-        $this->cacheDir = $cacheDir;
     }
 }

@@ -72,6 +72,28 @@ are recorded below. Complete upgraded-stack qualification remains open.
 | Registry inventory PHP | `sha256:243527053dc3902b406dc8c74dc269b78032041e42a8fb209ab0934f2a4639a5` |
 | Registry qualification PHP | `sha256:b83ca8c055f6ce912e1b0a380002d82f2623c283e63d2e6c75001adcdd553ab0` |
 
+U3 bundle checkpoint: reconciled the upstream source comparison with explicit
+decisions for all 405 final entries, preserving the original 403-file audit.
+Adopted lock handoff, two-phase pool cleanup, bounded pool registration, generated
+container locking and warm-start replay, framework service isolation, serialized
+logging, coroutine-local error handlers, SMTP/validator isolation and hot-reload
+timer cleanup. Removed the application's duplicate container initialization so
+the bundle owns cold and warm startup. Local authentication, transaction cleanup,
+stream interruption and shutdown ownership remain covered. Unconfigured session
+defects are recorded as deferred defects; readonly proxy support remains unselected.
+
+Verification on PHP 8.5.12 ZTS and Swoole 6.2.4 passes 321 tests with 2,490
+assertions: 74 ordinary tests, 245 native tests and two live-update integration
+tests against disposable services. Cleanup completed successfully in
+`var/test-runs/20261031-080242-6a89c25a`. The actual application-kernel cold/warm
+proof passes; a final five-test check passes 28 assertions after static-type
+assertions were added. All new regression files pass scoped PHPStan. PHP syntax,
+formatting, source-hash reconciliation, prose preservation and whitespace checks
+pass. Five simplification lenses reviewed both source cohorts; redundant comments
+and an obsolete PHP compatibility branch were removed without weakening the proofs.
+These checks use the existing Composer lock; upgraded dependency qualification
+and final code review remain open.
+
 ## Cohesive live updates
 
 Implementation plan delivered, 2026-10-30, in the

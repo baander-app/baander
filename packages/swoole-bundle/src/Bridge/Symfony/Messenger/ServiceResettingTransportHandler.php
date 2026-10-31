@@ -7,13 +7,13 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger;
 use Exception;
 use Swoole\Server;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
-use Symfony\Component\HttpKernel\DependencyInjection\ServicesResetter;
+use Symfony\Contracts\Service\ResetInterface;
 
 final readonly class ServiceResettingTransportHandler implements TaskHandler
 {
     public function __construct(
         private TaskHandler $decorated,
-        private ServicesResetter $resetter,
+        private ResetInterface $resetter,
     ) {}
 
     /**

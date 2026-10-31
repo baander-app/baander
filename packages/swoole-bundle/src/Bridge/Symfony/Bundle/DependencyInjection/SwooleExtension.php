@@ -38,10 +38,13 @@ use SwooleBundle\SwooleBundle\Server\RequestHandler\ExceptionHandler\ProductionE
 use SwooleBundle\SwooleBundle\Server\RequestHandler\RequestHandler;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 use SwooleBundle\SwooleBundle\Server\Runtime\HMR\HotModuleReloader;
+use SwooleBundle\SwooleBundle\Server\Runtime\HMR\HotModuleReloadTimer;
 use SwooleBundle\SwooleBundle\Server\Runtime\HMR\InotifyHMR;
 use SwooleBundle\SwooleBundle\Server\Runtime\HMR\NonReloadableFiles;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
 use SwooleBundle\SwooleBundle\Server\WorkerHandler\HMRWorkerStartHandler;
+use SwooleBundle\SwooleBundle\Server\WorkerHandler\HMRWorkerExitHandler;
+use SwooleBundle\SwooleBundle\Server\WorkerHandler\WorkerExitHandler;
 use SwooleBundle\SwooleBundle\Server\WorkerHandler\WorkerStartHandler;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -222,6 +225,13 @@ final class SwooleExtension extends Extension
 
         $swooleSettings['max_coroutine'] = $coroutineSettings['max_coroutines'];
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_ENABLED, true);
+        if (class_exists(\Symfony\Component\Mime\Address::class) && class_exists(\Egulias\EmailValidator\EmailValidator::class)) {
+            $container->register('swoole_bundle.mime.email_validator', \Egulias\EmailValidator\EmailValidator::class)
+                ->addTag(ContainerConstants::TAG_STATEFUL_SERVICE);
+            $container->register(\SwooleBundle\SwooleBundle\Bridge\Symfony\Mime\MimeAddressValidatorInstaller::class)
+                ->setArgument('$validator', new Reference('swoole_bundle.mime.email_validator'))
+                ->addTag('swoole_bundle.bootable_service');
+        }
         $maxServiceInstances = $maxConcurrency ?? $swooleSettings['max_coroutine'];
 
         if (isset($coroutineSettings['max_service_instances'])) {
@@ -358,8 +368,8 @@ final class SwooleExtension extends Extension
     {
         [
             'handler_id' => $handlerId,
-            'type'       => $type,
-            'verbosity'  => $verbosity,
+            'type' => $type,
+            'verbosity' => $verbosity,
         ] = $config;
 
         if ($type === 'auto') {
@@ -391,7 +401,7 @@ final class SwooleExtension extends Extension
         if ($verbosity === 'auto') {
             if ($this->isProd($container)) {
                 $verbosity = 'production';
-            } else if ($this->isDebug($container)) {
+            } elseif ($this->isDebug($container)) {
                 $verbosity = 'trace';
             } else {
                 $verbosity = 'verbose';
@@ -450,7 +460,7 @@ final class SwooleExtension extends Extension
 
     private function isDebug(ContainerBuilder $container): bool
     {
-        return (bool)$container->getParameter('kernel.debug');
+        return (bool) $container->getParameter('kernel.debug');
     }
 
     /**
@@ -460,14 +470,14 @@ final class SwooleExtension extends Extension
     private function prepareHttpServerConfiguration(array $config, ContainerBuilder $container): array
     {
         [
-            'api'         => $api,
-            'hmr'         => $hmr,
-            'host'        => $host,
-            'port'        => $port,
-            'settings'    => $settings,
+            'api' => $api,
+            'hmr' => $hmr,
+            'host' => $host,
+            'port' => $port,
+            'settings' => $settings,
             'socket_type' => $socketType,
             'ssl_enabled' => $sslEnabled,
-            'static'      => $static,
+            'static' => $static,
         ] = $config;
 
         if ($static['strategy'] === 'auto') {
@@ -491,7 +501,7 @@ final class SwooleExtension extends Extension
             $settings['log_level'] = $this->isDebug($container) ? 'debug' : 'notice';
         }
 
-        if ((bool)$container->getParameter(ContainerConstants::PARAM_COROUTINES_ENABLED)) {
+        if ((bool) $container->getParameter(ContainerConstants::PARAM_COROUTINES_ENABLED)) {
             $settings['enable_coroutine'] = true;
 
             $kernelProxy = $container->findDefinition('kernel_proxy');
@@ -560,8 +570,12 @@ final class SwooleExtension extends Extension
             return;
         }
 
+        $container->register(HotModuleReloadTimer::class)
+            ->setArgument('$swoole', new Reference(Swoole::class));
+
         if ($hmr['enabled'] === 'inotify') {
             $container->register(HotModuleReloader::class, InotifyHMR::class)
+                ->setArgument('$timer', new Reference(HotModuleReloadTimer::class))
                 ->addTag('swoole_bundle.bootable_service');
         }
 
@@ -569,9 +583,16 @@ final class SwooleExtension extends Extension
             ->setPublic(false)
             ->setAutoconfigured(false)
             ->setArgument('$hmr', new Reference(HotModuleReloader::class))
-            ->setArgument('$swoole', new Reference(Swoole::class))
+            ->setArgument('$timer', new Reference(HotModuleReloadTimer::class))
             ->setArgument('$decorated', new Reference(HMRWorkerStartHandler::class . '.inner'))
             ->setDecoratedService(WorkerStartHandler::class);
+
+        $container->register(HMRWorkerExitHandler::class)
+            ->setPublic(false)
+            ->setAutoconfigured(false)
+            ->setArgument('$timer', new Reference(HotModuleReloadTimer::class))
+            ->setArgument('$decorated', new Reference(HMRWorkerExitHandler::class . '.inner'))
+            ->setDecoratedService(WorkerExitHandler::class);
     }
 
     /**
@@ -589,7 +610,7 @@ final class SwooleExtension extends Extension
         $settings['task_use_object'] = true;
         $this->configureTaskWorkerServices($config['services'], $container);
 
-        if ((bool)$container->getParameter(ContainerConstants::PARAM_COROUTINES_ENABLED)) {
+        if ((bool) $container->getParameter(ContainerConstants::PARAM_COROUTINES_ENABLED)) {
             $settings['task_enable_coroutine'] = true;
         }
 
@@ -629,8 +650,7 @@ final class SwooleExtension extends Extension
         ?int $maxConcurrency,
         string $fiberContext,
         ContainerBuilder $container,
-    ): void
-    {
+    ): void {
         $container->getDefinition(HttpServerConfiguration::class)
             ->addArgument(new Reference(Swoole::class))
             ->addArgument(new Reference(Sockets::class))

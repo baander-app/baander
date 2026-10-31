@@ -12,12 +12,7 @@ use ZEngine\Reflection\ReflectionClass;
 
 final class Modifier
 {
-    /**
-     * @var array<string, true>
-     */
-    private static array $alreadyOverridden = [];
-
-    public static function modifyContainer(BlockingContainer|null $container, string $cacheDir, bool $isDebug): void
+    public static function modifyContainer(?BlockingContainer $container, string $cacheDir, bool $isDebug): void
     {
         if (!$container) {
             throw new \RuntimeException('You must provide a blocking container');
@@ -26,15 +21,10 @@ final class Modifier
         $reflContainer = new ReflectionClass($container);
         BlockingContainer::setBuildContainerNs($reflContainer->getNamespaceName());
 
-        if (isset(self::$alreadyOverridden[$reflContainer->getName()])) {
-            return;
-        }
-
         $realVersion = InstalledVersions::getVersion('symfony/dependency-injection');
         Assertion::string($realVersion);
         $builder = new Symfony63PlusBuilder();
         $builder->overrideGeneratedContainer($reflContainer, $cacheDir, $isDebug);
         $builder->overrideGeneratedContainerGetters($reflContainer, $cacheDir);
-        self::$alreadyOverridden[$reflContainer->getName()] = true;
     }
 }

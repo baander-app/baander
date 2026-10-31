@@ -20,12 +20,18 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Cache\CacheAdapterProcessor;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\BlockingContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\StabilityChecker;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Router\RouterProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\EventDispatcher\EventDispatcherProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpClient\HttpClientProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Mailer\MailerProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Security\SecurityProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Twig\TwigProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\WebProfiler\WebProfilerProcessor;
 use Symfony\Component\Config\Resource\FileResource;
 use Symfony\Component\DependencyInjection\Argument\ServiceLocatorArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use UnexpectedValueException;
+use Symfony\Contracts\Service\ResetInterface;
 
 final class StatefulServicesPass implements CompilerPassInterface
 {
@@ -51,8 +57,28 @@ final class StatefulServicesPass implements CompilerPassInterface
     ];
 
     private const array COMPILE_PROCESSORS = [
-        RouterProcessor::class => [
-            'class' => RouterProcessor::class,
+        EventDispatcherProcessor::class => [
+            'class' => EventDispatcherProcessor::class,
+            'priority' => 0,
+        ],
+        HttpClientProcessor::class => [
+            'class' => HttpClientProcessor::class,
+            'priority' => 0,
+        ],
+        MailerProcessor::class => [
+            'class' => MailerProcessor::class,
+            'priority' => 0,
+        ],
+        SecurityProcessor::class => [
+            'class' => SecurityProcessor::class,
+            'priority' => 0,
+        ],
+        TwigProcessor::class => [
+            'class' => TwigProcessor::class,
+            'priority' => 0,
+        ],
+        WebProfilerProcessor::class => [
+            'class' => WebProfilerProcessor::class,
             'priority' => 0,
         ],
         CacheAdapterProcessor::class => [
@@ -100,7 +126,7 @@ final class StatefulServicesPass implements CompilerPassInterface
 
         /** @var array<string, mixed>|null $doctrineConfig */
         $doctrineConfig = $container->hasParameter(
-            ContainerConstants::PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG
+            ContainerConstants::PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG,
         )
             ? $container->getParameter(ContainerConstants::PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG)
             : null;
@@ -131,7 +157,7 @@ final class StatefulServicesPass implements CompilerPassInterface
         $compileProcessors = array_reduce(
             $compileProcessors,
             $reducer,
-            []
+            [],
         );
         /**
          * @var array<int, array{
@@ -200,9 +226,22 @@ final class StatefulServicesPass implements CompilerPassInterface
                 }
             }
 
+            $resetter ??= $this->resolveResetInterfaceResetter($container, $serviceId);
             $resetPriority = self::SERVICE_RESETTING_PRIORITIES[$serviceId] ?? 0;
             $proxifier->proxifyService($serviceId, $resetter, $resetPriority);
         }
+    }
+
+    private function resolveResetInterfaceResetter(ContainerBuilder $container, string $serviceId): ?string
+    {
+        $class = $container->findDefinition($serviceId)->getClass();
+
+        if ($class === null || !class_exists($class)) {
+            return null;
+        }
+
+        // Decoration can move kernel.reset to the outer wrapper while this inner service is pooled too.
+        return is_a($class, ResetInterface::class, true) ? 'reset' : null;
     }
 
     /**

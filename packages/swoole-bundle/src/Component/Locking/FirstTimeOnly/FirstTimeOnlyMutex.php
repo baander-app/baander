@@ -17,8 +17,6 @@ final class FirstTimeOnlyMutex implements Mutex
 
     private int $lockState = self::NEW;
 
-    private int $waitingCount = 0;
-
     public function __construct(private ?Mutex $wrapped) {}
 
     public function acquire(): void
@@ -27,29 +25,33 @@ final class FirstTimeOnlyMutex implements Mutex
             return;
         }
 
+        $wrapped = $this->wrapped;
+        Assertion::notNull($wrapped);
+
         if ($this->lockState === self::NEW) {
             $this->lockState = self::LOCKED;
-        } else {
-            ++$this->waitingCount;
+            $wrapped->acquire();
+
+            return;
         }
 
-        Assertion::notNull($this->wrapped);
-        $this->wrapped->acquire();
+        $wrapped->acquire();
+        $wrapped->release();
     }
 
     public function release(): void
     {
-        if ($this->lockState === self::RELEASED) {
+        if ($this->lockState !== self::LOCKED) {
             return;
         }
 
-        Assertion::notNull($this->wrapped);
-        for ($i = 0; $i < $this->waitingCount; ++$i) {
-            $this->wrapped->release();
-        }
+        $wrapped = $this->wrapped;
+        Assertion::notNull($wrapped);
 
-        $this->wrapped = null;
+        // Releasing the channel can resume a waiter immediately.
         $this->lockState = self::RELEASED;
+        $this->wrapped = null;
+        $wrapped->release();
     }
 
     public function isAcquired(): bool
