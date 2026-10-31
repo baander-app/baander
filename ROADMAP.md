@@ -828,6 +828,13 @@ and definition of done were reconciled against the recorded evidence. All nine
 units and the five independently confirmed review fixes are complete locally;
 there are no deferred required findings. No push or merge ran.
 
+Publication checkpoint, 2026-10-31: the full branch comparison found trailing
+spaces on three blank migration lines and extra terminal blank lines in three
+protocol files. The cleanup changes whitespace only; decoded JSON is identical,
+PHP syntax passes, and the full branch whitespace check passes. No functional
+tests were repeated for this mechanical change. The qualified runtime evidence
+above applies to the unchanged behavior, not a byte-identical source digest.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

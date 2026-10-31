@@ -122,7 +122,7 @@ final class Version20261030210000 extends AbstractMigration
                     UNION SELECT c.user_id::text FROM playlist_collaborators c WHERE c.playlist_id=ANY(playlist_ids::uuid[])
                     UNION SELECT row_data->>'user_id' WHERE source_table='playlists'
                 ) q;
-            
+
                 song_ids:=ARRAY[]::text[];
                 album_ids:=ARRAY[]::text[];
                 artist_ids:=ARRAY[]::text[];
@@ -158,9 +158,9 @@ final class Version20261030210000 extends AbstractMigration
                    OR (source_table='genres' AND EXISTS(SELECT 1 FROM genre_movie gm WHERE gm.movie_id=m.id AND gm.genre_id = nullif(row_data->>'id','')::uuid))
                    OR (source_table='libraries' AND m.library_id = nullif(row_data->>'id','')::uuid);
                 IF source_table='movies' THEN movie_ids:=array_append(movie_ids,row_data->>'id'); END IF;
-            
+
                 END IF;
-            
+
                 FOREACH family_name IN ARRAY families LOOP
                     IF family_name LIKE 'admin-%' THEN
                         RETURN QUERY SELECT family_name,'admin'::text,'*'::text;

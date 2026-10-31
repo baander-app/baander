@@ -23,4 +23,3 @@ describe('live update protocol', () => {
     expect(liveSubscription()).toEqual({ type: 'live.subscribe', version: 1 });
   });
 });
-
