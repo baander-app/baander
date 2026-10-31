@@ -40,12 +40,20 @@ cleanup() {
     exit "$status"
 }
 trap cleanup EXIT
+browser_image="$(php -r '
+require "scripts/bootstrap.php";
+$image = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role("browser");
+$package = json_decode(file_get_contents("ui/web/node_modules/playwright-core/package.json"), true, flags: JSON_THROW_ON_ERROR);
+$image->assertPlaywrightVersion($package["version"]);
+echo $image->reference;
+')"
 mkdir -p "$workspace/assets" "$workspace/browser/node_modules"
 node - "$workspace/assets/versions.json" <<'JS'
 const { readFileSync, writeFileSync } = require('node:fs')
 const dashjs = JSON.parse(readFileSync('ui/web/node_modules/dashjs/package.json')).version
 const playwright = JSON.parse(readFileSync('ui/web/node_modules/playwright-core/package.json')).version
-if (dashjs !== '5.2.1' || playwright !== '1.60.0') throw new Error('Install the pinned dash.js 5.2.1 and Playwright 1.60.0 dependencies.')
+const declared = JSON.parse(readFileSync('ui/web/package.json')).devDependencies.dashjs
+if (dashjs !== declared) throw new Error(`Install the declared dash.js ${declared} dependency.`)
 writeFileSync(process.argv[2], JSON.stringify({ dashjs, playwright }))
 JS
 cp ui/web/node_modules/dashjs/dist/modern/umd/dash.all.min.js "$workspace/assets/"
@@ -71,7 +79,7 @@ done
 if [ "$ready" != 1 ]; then echo 'The real publication fixture did not become ready.' >&2; exit 1; fi
 docker cp "$fixture:/tmp/baander-publication/ready.json" "$workspace/browser/ready.json"
 timeout 30s docker create --name "$browser" --network "container:$fixture" --memory=1g --pids-limit=256 \
-    --entrypoint node mcr.microsoft.com/playwright:v1.60.0-noble /work/browser.mjs >/dev/null
+    --entrypoint node "$browser_image" /work/browser.mjs >/dev/null
 browser_created=1
 docker cp "$workspace/browser" "$browser:/work"
 echo "Publication browser evidence: $artifacts"

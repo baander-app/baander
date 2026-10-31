@@ -843,7 +843,7 @@ $runner = new ProcessRunner();',
             'path' => 'scripts/tests/php/ImageCatalogTest.php',
             'rule' => 'default-image',
             'anchor' => '        self::assertSame(\'redis/redis-stack-server:edge\', $images->role(\'fixtureRedis\')->reference);
-        self::assertSame(\'mcr.microsoft.com/playwright:v1.60.0-noble\', $images->role(\'browser\')->reference);',
+        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble\', $images->role(\'browser\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],

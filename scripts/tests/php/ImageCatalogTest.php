@@ -25,8 +25,8 @@ final class ImageCatalogTest extends TestCase
         $images = ToolingConfiguration::resolve()->images;
         self::assertSame('redis:7-alpine', $images->role('developmentRedis')->reference);
         self::assertSame('redis/redis-stack-server:edge', $images->role('fixtureRedis')->reference);
-        self::assertSame('mcr.microsoft.com/playwright:v1.60.0-noble', $images->role('browser')->reference);
-        $images->role('browser')->assertPlaywrightVersion('1.60.0');
+        self::assertSame('mcr.microsoft.com/playwright:v1.64.1-noble', $images->role('browser')->reference);
+        $images->role('browser')->assertPlaywrightVersion('1.64.1');
     }
 
     public function testMirrorDigestAndDeclaredCompatibilityNeedNoPhpChanges(): void

@@ -43,11 +43,11 @@
             ]
         },
         "browser": {
-            "reference": "mcr.microsoft.com/playwright:v1.60.0-noble",
+            "reference": "mcr.microsoft.com/playwright:v1.64.1-noble",
             "capabilities": [
                 "browser"
             ],
-            "playwrightVersion": "1.60.0"
+            "playwrightVersion": "1.64.1"
         },
         "operatorHelper": {
             "reference": "docker:29.7.2-cli",

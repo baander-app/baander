@@ -60,6 +60,13 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+browser_image="$(php -r '
+require "scripts/bootstrap.php";
+$image = \Baander\Tooling\Configuration\ToolingConfiguration::forRepository(getcwd(), getenv())->images->role("browser");
+$package = json_decode(file_get_contents("ui/web/node_modules/playwright-core/package.json"), true, flags: JSON_THROW_ON_ERROR);
+$image->assertPlaywrightVersion($package["version"]);
+echo $image->reference;
+')"
 mkdir -p "$workspace/assets" "$workspace/browser/node_modules" "$workspace/media"
 node --input-type=module - "$workspace" <<'JS'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -69,7 +76,8 @@ import { build } from './ui/web/node_modules/esbuild/lib/main.js'
 const workspace = process.argv[2]
 const hls = JSON.parse(readFileSync('ui/web/node_modules/hls.js/package.json')).version
 const playwright = JSON.parse(readFileSync('ui/web/node_modules/playwright-core/package.json')).version
-if (hls !== '1.7.3' || playwright !== '1.60.0') throw new Error('Install the pinned HLS.js 1.7.3 and Playwright 1.60.0 dependencies.')
+const declared = JSON.parse(readFileSync('ui/web/package.json')).dependencies['hls.js']
+if (hls !== declared) throw new Error(`Install the declared HLS.js ${declared} dependency.`)
 const versions = { hls, playwright, sourceRevision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() }
 writeFileSync(`${workspace}/browser/versions.json`, JSON.stringify(versions))
 const bundle = await build({ entryPoints: ['ui/web/tests/e2e/transcode-adaptive/entry.ts'], bundle: true,
@@ -112,7 +120,7 @@ done
 if [ "$ready" != 1 ]; then echo 'The real adaptive media fixture did not become ready.' >&2; exit 1; fi
 docker cp "$fixture:/tmp/baander-adaptive/ready.json" "$workspace/browser/ready.json"
 timeout 30s docker create --name "$browser" --network "container:$fixture" --memory=1g --pids-limit=256 \
-    --entrypoint node mcr.microsoft.com/playwright:v1.60.0-noble /work/browser.mjs >/dev/null
+    --entrypoint node "$browser_image" /work/browser.mjs >/dev/null
 browser_created=1
 docker cp "$workspace/browser" "$browser:/work"
 echo "Adaptive browser evidence: $artifacts"

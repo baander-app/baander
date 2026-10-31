@@ -638,8 +638,8 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
 
 USER www-data
 
-FROM node:22-bookworm-slim AS dev-tools
-RUN corepack enable && corepack prepare yarn@4.14.1 --activate && mkdir -p /work
+FROM node:24.22.2-bookworm-slim AS dev-tools
+RUN corepack enable && corepack prepare yarn@4.18.1 --activate && mkdir -p /work
 WORKDIR /work
 
 FROM dev AS dev-runtime

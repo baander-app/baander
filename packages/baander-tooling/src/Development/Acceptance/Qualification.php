@@ -387,7 +387,10 @@ final class Qualification
     private function commit(string $label, int $delay = 0, bool $brokenBuild = false): string
     {
         $content = $this->originalDockerfile;
-        $stage = 'FROM node:22-bookworm-slim AS dev-tools';
+        if (preg_match('/^FROM [^\r\n]+ AS dev-tools$/m', $content, $matches) !== 1) {
+            throw new \RuntimeException('The development tools build stage is missing.');
+        }
+        $stage = $matches[0];
         if ($delay !== 0) {
             $content = str_replace($stage, $stage . "\nRUN sleep " . $delay . ' && echo ' . $label, $content);
         }
