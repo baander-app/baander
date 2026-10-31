@@ -568,6 +568,32 @@ browser types, lint, formatting and source policy pass. Evidence is retained in
 and `/tmp/live-u9-scan-health-precondition-red-results/`. The actual CI workloads
 and a fresh scan after managed worker recovery remain open.
 
+U9 recovered-scanner checkpoint: managed preview refresh restored the exited
+worker pair without resetting data. Both retained scan events were relayed, the
+track was ingested, and all owned work drained before cleanup completed with zero
+survivors. A fresh real-browser scan passes in 9.5 seconds and also cleans up.
+The original autoscaler exception remains unidentified; this verifies recovery
+under healthy workers, not a correction to that exception. Retained evidence is
+`/tmp/live-u9-scan-recovered-status.jsonl`,
+`/tmp/live-u9-scan-recovered-cleanup.jsonl` and
+`/tmp/live-u9-scan-after-worker-recovery-results/`.
+
+The first actual CI setup stopped before application startup because Docker did
+not publish the requested loopback port on an internal-only network. A disposable
+native probe reproduced that behavior and cleaned up successfully. The runner now
+uses a separate owned ingress container on an ingress network and the internal
+network; the application and dependencies remain internal-only. The ingress uses
+the selected immutable application image. Its exact internal IP is the trusted
+proxy, and the loopback-only publication check remains unchanged.
+
+The boundary regression reproduces the original failure, then passes together
+with the 18 existing capacity checks: 19 tests and 40 assertions. Full tooling
+PHPStan, source policy, formatting and whitespace checks pass. Five simplification
+lenses report no further changes. Evidence is retained in
+`/tmp/live-u9-ingress-probe-artifacts/`, `/tmp/live-u9-ingress-boundary-red.log`
+and `/tmp/live-u9-ingress-boundary-green.log`. CI capacity and populated-view
+acceptance remain open pending the real workloads through this ingress.
+
 ## Baander loudness levels
 
 Delivered, 2026-10-30, under the reviewed

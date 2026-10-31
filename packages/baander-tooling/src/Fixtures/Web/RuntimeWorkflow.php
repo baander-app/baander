@@ -24,6 +24,7 @@ final class RuntimeWorkflow
     private ?string $archive = null;
     private ?string $archiveDirectory = null;
     private ?string $capacityOrigin = null;
+    private ?string $capacityProxyIp = null;
     public readonly string $artifacts;
     public function __construct(private readonly string $root, private readonly bool $security = false, private readonly bool $capacity = false)
     {
@@ -120,6 +121,7 @@ final class RuntimeWorkflow
             '-e', 'APP_URL=' . $this->capacityOrigin,
             '-e', 'DEFAULT_URI=' . $this->capacityOrigin,
             '-e', 'APP_DOMAIN=' . $this->capacityOrigin,
+            '-e', 'TRUSTED_PROXIES=' . $this->capacityProxyIp,
         ];
     }
 
@@ -163,6 +165,9 @@ final class RuntimeWorkflow
     private function prepare(): void
     {
         $this->resources->create(ResourceKind::Network, $this->id, ['--internal']);
+        if ($this->capacity) {
+            $this->resources->create(ResourceKind::Network, $this->id . '-ingress', []);
+        }
         $this->container($this->id . '-redis', [
             '--network',
             $this->id,
@@ -199,6 +204,9 @@ final class RuntimeWorkflow
         Runtime::require($this->redisReady(), 'Redis did not answer PONG.');
         $this->mailReady(check: true);
         $this->startApp();
+        if ($this->capacity) {
+            $this->startCapacityIngress();
+        }
         $this->stageCheckout();
         $this->app(['mkdir', '-p', 'storage/media', 'storage/conversions', ...$this->security ? ['var/log'] : []]);
         $this->app([
@@ -273,9 +281,7 @@ final class RuntimeWorkflow
             'sleep',
         ];
         if ($this->capacity) {
-            $this->docker->assertLocalPublishedPorts();
-            array_push($arguments, '--publish', '127.0.0.1::9443');
-            $environment[] = 'TRUSTED_PROXIES=127.0.0.1';
+            array_push($arguments, '--network-alias', 'app');
         }
         foreach ($environment as $variable) {
             array_push($arguments, '-e', $variable);
@@ -285,14 +291,29 @@ final class RuntimeWorkflow
             $this->runtime->image('application')->id,
             'infinity',
         ]);
-        if ($this->capacity) {
-            $inspection = json_decode($this->docker(['inspect', $this->id . '-app'])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
-            $bindings = $inspection['NetworkSettings']['Ports']['9443/tcp'] ?? [];
-            Runtime::require(count($bindings) === 1 && $bindings[0]['HostIp'] === '127.0.0.1', 'Capacity ingress must publish only on loopback.');
-            $port = $bindings[0]['HostPort'] ?? '';
-            Runtime::require(is_string($port) && ctype_digit($port) && (int) $port > 0 && (int) $port <= 65535, 'Docker returned no capacity ingress port.');
-            $this->capacityOrigin = 'https://127.0.0.1:' . $port;
-        }
+    }
+
+    private function startCapacityIngress(): void
+    {
+        $this->docker->assertLocalPublishedPorts();
+        $name = $this->id . '-ingress';
+        $this->resources->create(ResourceKind::Container, $name, [
+            '--network', $this->id,
+            '--publish', '127.0.0.1::9443',
+            '--entrypoint', 'sleep',
+            $this->runtime->image('application')->id, 'infinity',
+        ]);
+        $this->docker(['network', 'connect', $name, $name]);
+        $this->docker(['start', $name]);
+        $inspection = json_decode($this->docker(['inspect', $name])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
+        $bindings = $inspection['NetworkSettings']['Ports']['9443/tcp'] ?? [];
+        Runtime::require(count($bindings) === 1 && $bindings[0]['HostIp'] === '127.0.0.1', 'Capacity ingress must publish only on loopback.');
+        $port = $bindings[0]['HostPort'] ?? '';
+        Runtime::require(is_string($port) && ctype_digit($port) && (int) $port > 0 && (int) $port <= 65535, 'Docker returned no capacity ingress port.');
+        $proxyIp = $inspection['NetworkSettings']['Networks'][$this->id]['IPAddress'] ?? null;
+        Runtime::require(is_string($proxyIp) && filter_var($proxyIp, FILTER_VALIDATE_IP) !== false, 'Docker returned no internal capacity proxy address.');
+        $this->capacityProxyIp = $proxyIp;
+        $this->capacityOrigin = 'https://127.0.0.1:' . $port;
     }
 
     private function stageCheckout(): void

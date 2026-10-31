@@ -8,6 +8,7 @@ use Baander\Tooling\Configuration\ApplicationLayout;
 use Baander\Tooling\Docker\Target;
 use Baander\Tooling\Filesystem\{AtomicFile, PrivateDirectory};
 use Baander\Tooling\Fixtures\Runtime;
+use Baander\Tooling\Process\ProcessResult;
 
 final class CapacityWorkflow
 {
@@ -107,18 +108,24 @@ PHP])->stdout, true, flags: JSON_THROW_ON_ERROR);
 
     private static function startIngress(RuntimeWorkflow $web): void
     {
-        $web->app(['mkdir', '-p', '/tmp/baander-capacity-tls']);
-        $web->app([
+        self::ingress($web, ['mkdir', '-p', '/tmp/baander-capacity-tls']);
+        self::ingress($web, [
             'openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
             '-keyout', '/tmp/baander-capacity-tls/key.pem',
             '-out', '/tmp/baander-capacity-tls/cert.pem', '-days', '1',
             '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1',
         ]);
-        $web->app(['chmod', '600', '/tmp/baander-capacity-tls/key.pem']);
-        $web->app(['php', '-r', 'if (file_put_contents("/tmp/baander-capacity-tls/nginx.conf", stream_get_contents(STDIN)) === false) { exit(1); }'], self::ingressConfiguration());
-        $web->app(['nginx', '-c', '/tmp/baander-capacity-tls/nginx.conf']);
-        $web->attempts(fn(): bool => $web->app(['curl', '-kfsS', '-o', '/dev/null', 'https://127.0.0.1:9443/live'], check: false)->exitCode === 0, 20, .25);
-        $web->app(['curl', '-kfsS', '-o', '/dev/null', 'https://127.0.0.1:9443/live']);
+        self::ingress($web, ['chmod', '600', '/tmp/baander-capacity-tls/key.pem']);
+        self::ingress($web, ['php', '-r', 'if (file_put_contents("/tmp/baander-capacity-tls/nginx.conf", stream_get_contents(STDIN)) === false) { exit(1); }'], self::ingressConfiguration());
+        self::ingress($web, ['nginx', '-c', '/tmp/baander-capacity-tls/nginx.conf']);
+        $web->attempts(fn(): bool => self::ingress($web, ['curl', '-kfsS', '-o', '/dev/null', 'https://127.0.0.1:9443/live'], check: false)->exitCode === 0, 20, .25);
+        self::ingress($web, ['curl', '-kfsS', '-o', '/dev/null', 'https://127.0.0.1:9443/live']);
+    }
+
+    /** @param non-empty-list<string> $arguments */
+    private static function ingress(RuntimeWorkflow $web, array $arguments, ?string $input = null, bool $check = true): ProcessResult
+    {
+        return $web->docker(['exec', '-i', $web->id . '-ingress', ...$arguments], input: $input, check: $check);
     }
 
     public static function ingressConfiguration(): string
@@ -140,7 +147,7 @@ http {
         ssl_certificate /tmp/baander-capacity-tls/cert.pem;
         ssl_certificate_key /tmp/baander-capacity-tls/key.pem;
         location / {
-            proxy_pass http://127.0.0.1:9501;
+            proxy_pass http://app:9501;
             proxy_http_version 1.1;
             proxy_set_header Host $http_host;
             proxy_set_header X-Forwarded-Host $http_host;

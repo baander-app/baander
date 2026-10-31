@@ -49,7 +49,9 @@ final class WebRuntimeWorkflowTest extends TestCase
         $environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] = $baked ? '1' : '0';
         unset($environment['DOCKER_HOST'], $environment['DOCKER_CONTEXT'], $environment['BAANDER_TEST_DOCKER_ENDPOINT']);
         $result = (new ProcessRunner())->run(new ProcessSpec(
-            ['bash', dirname(__DIR__, 2) . '/test-' . $name . '-runtime-container.sh'],
+            $name === 'capacity'
+                ? ['php', $this->directory . '/capacity.php', dirname(__DIR__, 3)]
+                : ['bash', dirname(__DIR__, 2) . '/test-' . $name . '-runtime-container.sh'],
             cwd: dirname(__DIR__, 3),
             environment: $environment,
             timeout: 80,
@@ -183,5 +185,73 @@ final class WebRuntimeWorkflowTest extends TestCase
             }
         }
         self::assertSame(['login', 'outage', 'recovered'], $phases);
+    }
+
+    public function testCapacityPublishesOnlyAnOwnedIngressWhileApplicationAndDependenciesStayInternal(): void
+    {
+        $source = file_get_contents($this->directory . '/docker');
+        $handler = <<<'PHP'
+if ($arguments[0] === 'network' && ($arguments[1] ?? '') === 'connect') {
+    file_put_contents(getenv('WEB_RUNTIME_CALLS') . '.front-attached', 'yes');
+    exit(0);
+}
+if ($arguments[0] === 'inspect') {
+    $name = end($arguments);
+    $instance = str_ends_with($name, '-ingress') ? substr($name, 0, -8) : substr($name, 0, -4);
+    $published = is_file(getenv('WEB_RUNTIME_CALLS') . '.front-attached');
+    echo json_encode([[
+        'NetworkSettings' => [
+            'Ports' => ['9443/tcp' => $published ? [['HostIp' => '127.0.0.1', 'HostPort' => '32796']] : null],
+            'Networks' => [$instance => ['IPAddress' => '172.31.0.3']],
+        ],
+        'HostConfig' => ['PortBindings' => ['9443/tcp' => [['HostIp' => '127.0.0.1', 'HostPort' => '']]]],
+    ]]);
+    exit(0);
+}
+PHP;
+        $boundary = '\Baander\Tooling\Tests\Fixtures\WebDockerState::handle($arguments, getenv(\'WEB_RUNTIME_CALLS\'));';
+        file_put_contents($this->directory . '/docker', str_replace($boundary, $handler . "\n" . $boundary, $source));
+        file_put_contents($this->directory . '/capacity.php', <<<'PHP'
+<?php
+require $_SERVER['argv'][1] . '/vendor/autoload.php';
+try {
+    exit((new Baander\Tooling\Fixtures\Web\RuntimeWorkflow($_SERVER['argv'][1], capacity: true))->execute(
+        static function (Baander\Tooling\Fixtures\Web\RuntimeWorkflow $web): void {
+            echo 'Capacity prepared: ', $web->capacityOrigin(), "\n";
+        },
+    ));
+} catch (Throwable $error) {
+    fwrite(STDERR, $error->getMessage());
+    exit(1);
+}
+PHP);
+        [$status, $output, $calls] = $this->runWorkflow('capacity', 'capacity', baked: true);
+        self::assertSame(0, $status, $output);
+        self::assertStringContainsString('Capacity prepared: https://127.0.0.1:32796', $output);
+        $commands = self::dockerCalls($calls);
+        $networks = array_values(array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'create']));
+        self::assertCount(2, $networks);
+        self::assertContains('--internal', $networks[0]);
+        self::assertNotContains('--internal', $networks[1]);
+        $internal = $networks[0][array_key_last($networks[0])];
+        $connections = array_values(array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'connect']));
+        self::assertCount(1, $connections);
+        self::assertStringEndsWith('-ingress', $connections[0][3]);
+        self::assertSame($networks[1][array_key_last($networks[1])], $connections[0][2]);
+        foreach ($commands as $command) {
+            if ($command[0] !== 'create') {
+                continue;
+            }
+            $name = $command[array_search('--name', $command, true) + 1];
+            self::assertSame($internal, $command[array_search('--network', $command, true) + 1]);
+            if (str_ends_with($name, '-ingress')) {
+                self::assertContains('127.0.0.1::9443', $command);
+            } else {
+                self::assertNotContains('--publish', $command);
+            }
+        }
+        self::assertTrue(array_any($commands, static fn(array $command): bool => $command[0] === 'exec' && in_array('TRUSTED_PROXIES=172.31.0.3', $command, true)));
+        self::assertLessThan(array_search(['start', $connections[0][3]], $commands, true), array_search($connections[0], $commands, true));
+        self::assertFileDoesNotExist($this->directory . '/artifacts/resources.json');
     }
 }
