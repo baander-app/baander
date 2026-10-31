@@ -140,10 +140,6 @@ const SongDuration = styled.span`
 
 const EMPTY_SONGS: GetPlaylistShow200DataSongsItem[] = []
 
-function formatTrackDuration(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
-}
-
 export function PlaylistDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
   const navigate = useNavigate()
@@ -223,7 +219,7 @@ export function PlaylistDetailPage() {
           <MetaRow>
             <MetaText>
               {songs.length} {songs.length === 1 ? 'song' : 'songs'}
-              {totalDuration > 0 && ` · ${formatTrackDuration(totalDuration)}`}
+              {totalDuration > 0 && ` · ${formatDuration(totalDuration)}`}
             </MetaText>
             {playlist.isSmart && <Badge variant="secondary" style={{ fontSize: '10px' }}>Smart</Badge>}
           </MetaRow>
