@@ -27,6 +27,11 @@ light and dark themes, local fonts and existing SVG branding. The website adds n
 surface gradients or shadows; the player material remains inside real application
 screenshots.
 
+Codec comparison charts use a distinct color for each vendor, consistent across
+profiles and encoding or decoding views. These data colors have light and dark
+variants and do not replace the site's semantic colors. Keep vendor labels,
+marker shapes and line patterns so color is not the only way to identify a series.
+
 ---
 
 ## Philosophy

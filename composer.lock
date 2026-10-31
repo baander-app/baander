@@ -12889,10 +12889,11 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-tooling",
-                "reference": "804eb405355c95660bef4484c9a1759f6ed69a37"
+                "reference": "66d1e247d85eb85ca0fe6f7f0c6f5c1bf5d492d5"
             },
             "require": {
                 "composer/semver": "^3.6.0",
+                "enshrined/svg-sanitize": "1.1.1",
                 "league/commonmark": "^2.8",
                 "php": ">=8.5"
             },
@@ -13425,6 +13426,52 @@
             },
             "time": "2024-07-08T12:26:09+00:00",
             "published-time": "2024-07-08T12:27:13+00:00"
+        },
+        {
+            "name": "enshrined/svg-sanitize",
+            "version": "1.1.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/darylldoyle/svg-sanitizer.git",
+                "reference": "1976ff93c8d8a234cdd3ff99626bd43ecf11bf49"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/darylldoyle/svg-sanitizer/zipball/1976ff93c8d8a234cdd3ff99626bd43ecf11bf49",
+                "reference": "1976ff93c8d8a234cdd3ff99626bd43ecf11bf49",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-libxml": "*",
+                "php": "^7.1 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^6.5 || ^8.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "enshrined\\svgSanitize\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Daryll Doyle",
+                    "email": "daryll@enshrined.co.uk"
+                }
+            ],
+            "description": "An SVG sanitizer for PHP",
+            "support": {
+                "issues": "https://github.com/darylldoyle/svg-sanitizer/issues",
+                "source": "https://github.com/darylldoyle/svg-sanitizer/tree/1.1.1"
+            },
+            "time": "2026-10-20T09:45:10+00:00",
+            "published-time": "2026-10-20T09:46:58+00:00"
         },
         {
             "name": "ergebnis/composer-normalize",

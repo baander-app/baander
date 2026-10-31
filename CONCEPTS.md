@@ -391,6 +391,12 @@ initial scope is the catalog selection store's `select` and `clear` actions.
 
 ## Audio codec
 
+### bAAC
+
+The public name of Bånder's AAC encoder and decoder library. Its package directory
+and technical identifiers retain `baander-aac`; page titles, prose and chart labels
+use **bAAC**.
+
 ### HE-AAC profile
 
 The object type an AAC stream or encoder session uses: AAC-LC codes the whole spectrum; HE-AAC v1 adds spectral band replication, HE-AAC v2 adds parametric stereo on top. The native binding and the Electron service name them `lc`, `he` and `hev2`. The ADTS header of an HE-AAC stream still names the AAC-LC profile and the core rate; a decoder recognises the profile from the data it carries.

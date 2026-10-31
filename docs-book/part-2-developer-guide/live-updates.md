@@ -13,6 +13,8 @@ contents or replay user actions.
 
 ```mermaid
 flowchart TD
+    accTitle: From a committed change to a refreshed view
+    accDescr: A business transaction captures changes in an inbox. The revision projector updates scoped revisions. Authorized subscriptions send WebSocket hints so the browser can reread resources and refresh mounted views.
     subgraph transaction[Business transaction]
         write[Business write] --> capture[Capture trigger]
         capture --> inbox[Change inbox]

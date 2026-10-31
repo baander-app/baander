@@ -15,8 +15,143 @@ include __DIR__ . '/header.php';
       <p class="release-note">Pre-release · Current installation builds from source</p>
     </div>
     <figure class="app-screenshot hero-screenshot">
-      <img src="/assets/site/screenshots/music.png" width="1600" height="1000" alt="Bånder's music library in the browser, with album artwork and playback controls.">
+      <?php
+      $screenshot = [
+          'name' => 'music',
+          'alt' => "Bånder's music library in the browser, with album artwork and playback controls.",
+          'width' => 1600,
+          'height' => 1000,
+      ];
+      include __DIR__ . '/screenshot.php';
+      ?>
       <figcaption>Music browsing and playback · Captured in Bånder</figcaption>
+    </figure>
+  </section>
+
+  <section class="home-section eq-carousel" aria-labelledby="equalizer-title" data-carousel>
+    <div class="section-intro carousel-intro">
+      <p class="eyebrow">The equalizer</p>
+      <h2 id="equalizer-title">Find your sound.</h2>
+      <p>Start with a preset or adjust the sound yourself. Compare settings and save profiles for the way you listen.</p>
+    </div>
+    <div class="carousel-slides">
+      <div class="experience-feature carousel-slide" id="eq-graphic" data-carousel-slide data-slide-title="Graphic EQ and input analyzer">
+        <div class="section-intro">
+          <p class="eyebrow">Graphic EQ and presets</p>
+          <h3>A starting point.<br>Then your own adjustments.</h3>
+          <p>Choose a preset, then adjust ten frequency bands to shape bass, mids and treble.</p>
+          <p>The live input analyzer shows the signal before EQ and gain. View its spectrum alongside the configured EQ curve, check left and right levels, or inspect the stereo phase.</p>
+        </div>
+        <figure class="app-screenshot feature-screenshot">
+          <?php
+          $screenshot = [
+              'name' => 'equalizer',
+              'alt' => "Bånder's graphic equalizer, presets and live input analyzer.",
+              'width' => 1600,
+              'height' => 1000,
+              'loading' => 'lazy',
+          ];
+          include __DIR__ . '/screenshot.php';
+          ?>
+          <figcaption>Graphic EQ and input analyzer · Captured in Bånder</figcaption>
+        </figure>
+      </div>
+      <div class="experience-feature carousel-slide" id="eq-parametric" data-carousel-slide data-slide-title="Parametric controls">
+        <div class="section-intro">
+          <p class="eyebrow">Parametric controls</p>
+          <h3>See the shape of your EQ.</h3>
+          <p>Switch to the parametric view to work with bands on a response graph. Drag a point to adjust its position and gain, and inspect the selected band's frequency, gain and Q value.</p>
+          <p>The curve shows the bands together, so you can see their boosts and cuts in one view.</p>
+        </div>
+        <figure class="app-screenshot feature-screenshot">
+          <?php
+          $screenshot = [
+              'name' => 'equalizer-parametric',
+              'alt' => "Bånder's parametric equalizer with a response curve and selectable band points.",
+              'width' => 1600,
+              'height' => 1000,
+              'loading' => 'lazy',
+          ];
+          include __DIR__ . '/screenshot.php';
+          ?>
+          <figcaption>Parametric EQ · Captured in Bånder</figcaption>
+        </figure>
+      </div>
+      <div class="experience-feature carousel-slide" id="eq-processing" data-carousel-slide data-slide-title="Audio processing">
+        <div class="section-intro">
+          <p class="eyebrow">Audio processing</p>
+          <h3>More than frequency bands.</h3>
+          <p>Adjust the compressor's threshold, ratio, knee, attack and release. Change stereo width or choose a crossfeed preset for headphone listening.</p>
+          <p>A loudness contour boosts bass and treble at low volume. Master gain and optional normalization with a loudness target give you separate controls over level.</p>
+        </div>
+        <figure class="app-screenshot feature-screenshot">
+          <?php
+          $screenshot = [
+              'name' => 'equalizer-processing',
+              'alt' => "Bånder's audio processing controls for compression, stereo width, crossfeed, loudness and master gain.",
+              'width' => 652,
+              'height' => 517,
+              'loading' => 'lazy',
+          ];
+          include __DIR__ . '/screenshot.php';
+          ?>
+          <figcaption>Audio processing · Captured in Bånder</figcaption>
+        </figure>
+      </div>
+      <div class="experience-feature carousel-slide" id="eq-profiles" data-carousel-slide data-slide-title="A/B comparison and device profiles">
+        <div class="section-intro">
+          <p class="eyebrow">Compare and keep</p>
+          <h3>Hear the difference.<br>Keep what works.</h3>
+          <p>Capture two sets of EQ and processing settings in A and B, then switch between them to compare.</p>
+          <p>Save your current settings to named device profiles. Keep a profile for your headphones and another for your speakers, and activate the one you want to use.</p>
+        </div>
+        <figure class="app-screenshot feature-screenshot">
+          <?php
+          $screenshot = [
+              'name' => 'equalizer-profiles',
+              'alt' => "Bånder's A/B comparison slots and named device profiles.",
+              'width' => 1600,
+              'height' => 1000,
+              'loading' => 'lazy',
+          ];
+          include __DIR__ . '/screenshot.php';
+          ?>
+          <figcaption>A/B comparison and device profiles · Captured in Bånder</figcaption>
+        </figure>
+      </div>
+    </div>
+    <div class="carousel-controls" data-carousel-controls hidden>
+      <button type="button" class="carousel-arrow" data-carousel-previous aria-label="Previous equalizer feature"><span aria-hidden="true">←</span></button>
+      <div class="carousel-dots" role="group" aria-label="Choose an equalizer feature">
+        <button type="button" data-carousel-index="0" aria-label="Show graphic EQ and input analyzer" aria-controls="eq-graphic"><span aria-hidden="true"></span></button>
+        <button type="button" data-carousel-index="1" aria-label="Show parametric controls" aria-controls="eq-parametric"><span aria-hidden="true"></span></button>
+        <button type="button" data-carousel-index="2" aria-label="Show audio processing" aria-controls="eq-processing"><span aria-hidden="true"></span></button>
+        <button type="button" data-carousel-index="3" aria-label="Show A/B comparison and device profiles" aria-controls="eq-profiles"><span aria-hidden="true"></span></button>
+      </div>
+      <button type="button" class="carousel-arrow" data-carousel-next aria-label="Next equalizer feature"><span aria-hidden="true">→</span></button>
+      <p class="carousel-status" role="status" data-carousel-status></p>
+    </div>
+  </section>
+
+  <section class="home-section experience-feature experience-feature-reversed" aria-labelledby="playlists-title">
+    <div class="section-intro">
+      <p class="eyebrow">Your playlists</p>
+      <h2 id="playlists-title">Choose the songs.<br>Or set the rules.</h2>
+      <p>Pick songs yourself, or create smart playlists with rules that select music from your catalog.</p>
+      <p>Share playlists with other people on your server, and choose whether collaborators can change the track list.</p>
+    </div>
+    <figure class="app-screenshot feature-screenshot">
+      <?php
+      $screenshot = [
+          'name' => 'playlists',
+          'alt' => "Bånder's playlists view in the browser.",
+          'width' => 1600,
+          'height' => 1000,
+          'loading' => 'lazy',
+      ];
+      include __DIR__ . '/screenshot.php';
+      ?>
+      <figcaption>Playlists · Captured in Bånder</figcaption>
     </figure>
   </section>
 
@@ -38,7 +173,7 @@ include __DIR__ . '/header.php';
     <div class="section-intro">
       <p class="eyebrow">Running Bånder</p>
       <h2 id="hosting-title">Know what you're hosting.</h2>
-      <p>Bånder is pre-release software. The current installation builds from source and adapts a development-oriented Compose stack, with explicit network, storage and credential preparation.</p>
+      <p>Bånder is pre-release software. The current installation builds from source using a development-oriented Compose stack. You need to prepare the network, storage and credentials before starting it.</p>
       <p>The web application uses PostgreSQL and Redis. Background work needs a separate control and execution deployment pair, shared media paths and output storage. Starting the web service alone does not start that pair.</p>
       <a class="button" href="/docs/operator-guide/getting-started/">Read the installation guide <span aria-hidden="true">→</span></a>
     </div>
@@ -47,7 +182,7 @@ include __DIR__ . '/header.php';
       <a href="/docs/operator-guide/understanding-baander/"><span>The components</span><span aria-hidden="true">↗</span></a>
       <a href="/docs/operator-guide/storage-and-data/"><span>Storage and data</span><span aria-hidden="true">↗</span></a>
       <a href="/docs/operator-guide/background-work/"><span>Background work</span><span aria-hidden="true">↗</span></a>
-      <p>Follow the guide's checkpoints to check your installation, catalog and playback.</p>
+      <p>Use the guide's checkpoints to verify your installation, catalog and playback.</p>
     </div>
   </section>
 

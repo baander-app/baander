@@ -65,6 +65,35 @@ final class WebsiteBuilderTest extends TestCase
         self::assertStringContainsString('# Changed', file_get_contents($this->root . '/docs-book/README.md'));
     }
 
+    public function testPublicPageReceivesDataWithoutJoiningManualManifest(): void
+    {
+        file_put_contents($this->root . '/ui/site/templates/baac.php', '<?php echo htmlspecialchars($data["name"]);');
+        $pages = $this->builder()->build(publicPages: [[
+            'template' => 'baac', 'url' => '/baac/', 'title' => 'bAAC',
+            'description' => 'Codec measurements', 'data' => ['name' => 'bAAC'],
+        ]]);
+        self::assertCount(5, $pages);
+        self::assertSame('bAAC', file_get_contents($this->root . '/var/website/baac/index.html'));
+    }
+
+    public function testInvalidPublicRouteKeepsPreviousArtifact(): void
+    {
+        $this->builder()->build();
+        $previous = file_get_contents($this->root . '/var/website/docs/index.html');
+        foreach (['/', '/docs/other/', '/../outside/'] as $url) {
+            try {
+                $this->builder()->build(publicPages: [[
+                    'template' => 'home', 'url' => $url, 'title' => 'Invalid',
+                    'description' => '', 'data' => [],
+                ]]);
+                self::fail('Invalid public route must fail: ' . $url);
+            } catch (\RuntimeException $error) {
+                self::assertStringContainsString('public page URL', $error->getMessage());
+            }
+            self::assertSame($previous, file_get_contents($this->root . '/var/website/docs/index.html'));
+        }
+    }
+
     public function testRejectsUnsafeLinksAndMissingFragments(): void
     {
         foreach (['javascript:alert(1)', '#absent'] as $link) {

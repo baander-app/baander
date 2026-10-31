@@ -63,6 +63,7 @@
     },
     "budgets": {
         "process": 120,
+        "website": 600,
         "cleanup": 120,
         "backend": 3600,
         "messaging": 600,

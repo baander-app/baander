@@ -37,6 +37,8 @@ ordinary API authorization.
 
 ```mermaid
 flowchart LR
+    accTitle: Application trust boundaries
+    accDescr: Browser requests reach Swoole directly or through a trusted proxy, then pass through the Symfony firewall and application ports. The application and workers use PostgreSQL, Redis and media storage; workers also contact external services.
     Browser[Browser and service worker] --> Proxy[Optional trusted reverse proxy]
     Browser --> Web[Swoole HTTP and WebSocket]
     Proxy --> Web

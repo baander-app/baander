@@ -1,0 +1,100 @@
+name: Public website
+
+on:
+    push:
+        branches:
+            - master
+        paths:
+            - 'docs-book/**'
+            - 'ui/site/**'
+            - 'ui/design-tokens/**'
+            - 'ui/web/public/*.svg'
+            - 'packages/baander-tooling/**'
+            - 'packages/baander-aac/**'
+            - 'ui/electron/src/**'
+            - 'scripts/build-website.php'
+            - 'scripts/website-router.php'
+            - 'scripts/bootstrap.php'
+            - 'scripts/composer.*'
+            - 'composer.*'
+            - 'Makefile'
+            - 'docker/runner/Dockerfile'
+            - '.forgejo/workflows/website.yaml'
+    pull_request:
+        types: [ opened, synchronize, reopened ]
+        paths:
+            - 'docs-book/**'
+            - 'ui/site/**'
+            - 'ui/design-tokens/**'
+            - 'ui/web/public/*.svg'
+            - 'packages/baander-tooling/**'
+            - 'packages/baander-aac/**'
+            - 'ui/electron/src/**'
+            - 'scripts/build-website.php'
+            - 'scripts/website-router.php'
+            - 'scripts/bootstrap.php'
+            - 'scripts/composer.*'
+            - 'composer.*'
+            - 'Makefile'
+            - 'docker/runner/Dockerfile'
+            - '.forgejo/workflows/website.yaml'
+
+jobs:
+    website:
+        runs-on: docker-cli
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+
+            -   name: Check website PHP runtime
+                run: php -r 'if (PHP_VERSION_ID < 80500 || !extension_loaded("dom") || !extension_loaded("mbstring") || !extension_loaded("tokenizer")) { throw new RuntimeException("Website builds require PHP 8.5, DOM, mbstring and tokenizer."); }'
+
+            -   name: Install standalone PHP tooling
+                run: composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+
+            -   name: Install site dependencies
+                working-directory: ui/site
+                run: corepack yarn install --immutable
+
+            -   name: Check shared design tokens
+                working-directory: ui/design-tokens
+                run: |
+                    node build.mjs --check
+                    node --test tests/*.test.mjs
+
+            -   name: Install browser runtime
+                working-directory: ui/site
+                run: corepack yarn playwright install --with-deps chromium
+
+            -   name: Check code and diagram rendering
+                working-directory: ui/site
+                run: node --test scripts/*.test.mjs
+
+            -   name: Build and validate static website
+                run: php scripts/build-website.php
+
+            -   name: Verify static website in Chromium
+                working-directory: ui/site
+                run: corepack yarn test:browser
+
+            -   name: Archive verified website
+                run: |
+                    tar -czf var/website.tar.gz -C var/website .
+                    sha256sum var/website.tar.gz > var/website.tar.gz.sha256
+
+            -   name: Retain verified website
+                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+                with:
+                    name: public-website-${{ forgejo.sha }}
+                    path: |
+                        var/website.tar.gz
+                        var/website.tar.gz.sha256
+                    if-no-files-found: error
+                    retention-days: 14

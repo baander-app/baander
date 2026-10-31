@@ -16,6 +16,9 @@ use PHPUnit\Framework\TestCase;
 
 final class ControllerPayloadTest extends TestCase
 {
+    // The parent copies the Composer payload; child budgets measure the actual drain.
+    private const float ORCHESTRATION_SECONDS = 30;
+
     private string $root;
     private ControllerPayload $payload;
 
@@ -303,7 +306,7 @@ CODE);
     {
         $old = $this->payload->publish($this->root . '/source');
         $original = $this->retainedRecord();
-        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        $executor = new EngineExecutor(ExecutionContext::bounded(self::ORCHESTRATION_SECONDS, Environment::clean()));
         try {
             [$child, $directory] = $this->conversionChild($executor, 'convert', 2);
             $selected = $this->payload->publish($this->root . '/source');
@@ -328,7 +331,7 @@ CODE);
     {
         $old = $this->payload->publish($this->root . '/source');
         $original = $this->retainedRecord();
-        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        $executor = new EngineExecutor(ExecutionContext::bounded(self::ORCHESTRATION_SECONDS, Environment::clean()));
         try {
             [$older, $olderDirectory] = $this->conversionChild($executor, 'convert', 2);
             $this->payload->publish($this->root . '/source');
@@ -360,7 +363,7 @@ CODE);
     {
         $old = $this->payload->publish($this->root . '/source');
         $original = $this->retainedRecord();
-        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        $executor = new EngineExecutor(ExecutionContext::bounded(self::ORCHESTRATION_SECONDS, Environment::clean()));
         try {
             [$reader, $readerDirectory] = $this->conversionChild($executor, 'drain', 2);
             $this->payload->publish($this->root . '/source');
@@ -384,7 +387,7 @@ CODE);
     {
         $old = $this->payload->publish($this->root . '/source');
         $original = $this->retainedRecord();
-        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        $executor = new EngineExecutor(ExecutionContext::bounded(self::ORCHESTRATION_SECONDS, Environment::clean()));
         try {
             $this->conversionChild($executor, 'drain', 2);
             $this->payload->publish($this->root . '/source');
@@ -407,7 +410,7 @@ CODE);
     {
         $this->payload->publish($this->root . '/source');
         $original = $this->retainedRecord();
-        $executor = new EngineExecutor(ExecutionContext::bounded(5, Environment::clean()));
+        $executor = new EngineExecutor(ExecutionContext::bounded(self::ORCHESTRATION_SECONDS, Environment::clean()));
         try {
             $this->conversionChild($executor, 'drain', 2);
             $this->payload->publish($this->root . '/source');

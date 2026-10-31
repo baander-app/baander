@@ -6,6 +6,7 @@
   "require": {
     "php": ">=8.5",
     "composer/semver": "^3.6.0",
+    "enshrined/svg-sanitize": "1.1.1",
     "league/commonmark": "^2.8"
   },
   "autoload": {

@@ -10,6 +10,7 @@ use DOMDocument;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
+use League\CommonMark\Extension\CommonMark\Node\Block\FencedCode;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\Table\TableExtension;
@@ -53,15 +54,18 @@ final class WebsiteBuilder
         $this->environment->addExtension(new CommonMarkCoreExtension());
         $this->environment->addExtension(new TableExtension());
         $this->environment->addExtension(new HeadingPermalinkExtension());
+        $this->environment->addRenderer(FencedCode::class, new RenderedCode(), 100);
     }
 
     /**
      * The callback completes search or packaging inside the unpublished staging tree.
      * Any exception retains the previous complete artifact.
      * @param ?Closure(string,array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>):void $afterRender
+     * @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks
+     * @param list<array{template:string,url:string,title:string,description:string,stylesheet?:string,data:array<string,mixed>}> $publicPages
      * @return array<string,array{source:string,url:string,title:string,guide:?string,html:string,headings:list<array{id:string,title:string,level:int}>}>
      */
-    public function build(?Closure $afterRender = null): array
+    public function build(?Closure $afterRender = null, ?Closure $renderBlocks = null, array $publicPages = []): array
     {
         $this->pages = $this->documents = $this->assets = [];
         $this->navigation = ['operator' => [], 'developer' => []];
@@ -72,6 +76,7 @@ final class WebsiteBuilder
         $staging = $this->root . '/var/website-build-' . bin2hex(random_bytes(8));
         mkdir($staging, 0755, true);
         try {
+            $this->renderBlocks($staging, $renderBlocks);
             $renderer = new HtmlRenderer($this->environment);
             foreach ($this->pages as $source => &$page) {
                 $page['html'] = (string) $renderer->renderDocument($this->documents[$source]);
@@ -80,6 +85,20 @@ final class WebsiteBuilder
             unset($page);
             $this->write($staging . '/index.html', $this->template('home', ['source' => '', 'url' => '/', 'title' => 'Bånder', 'guide' => null, 'html' => '', 'headings' => []]));
             $this->write($staging . '/404.html', $this->template('404', ['source' => '', 'url' => '/404.html', 'title' => 'Page not found', 'guide' => null, 'html' => '', 'headings' => []]));
+            $routes = array_fill_keys(array_column($this->pages, 'url'), true);
+            $routes['/'] = $routes['/404.html'] = true;
+            foreach ($publicPages as $descriptor) {
+                $url = $descriptor['url'];
+                if (!preg_match('~^/(?:[a-z0-9]+(?:-[a-z0-9]+)*/)+$~', $url) || isset($routes[$url]) || str_starts_with($url, '/docs/')) {
+                    throw new RuntimeException('Invalid or duplicate public page URL: ' . $url);
+                }
+                if (!preg_match('/^[a-z][a-z0-9-]*$/', $descriptor['template'])) {
+                    throw new RuntimeException('Invalid public page template.');
+                }
+                $routes[$url] = true;
+                $page = $descriptor + ['source' => '', 'guide' => null, 'html' => '', 'headings' => []];
+                $this->write($staging . $url . 'index.html', $this->template($descriptor['template'], $page, $descriptor['data']));
+            }
             foreach ($this->assets as $url => $source) {
                 $this->write($staging . $url, (string) file_get_contents($source));
             }
@@ -92,6 +111,63 @@ final class WebsiteBuilder
             throw $error;
         }
         return $this->pages;
+    }
+
+    /** @param ?Closure(list<array{id:string,source:string,language:string,page:string,ordinal:int}>,string):array<string,string> $renderBlocks */
+    private function renderBlocks(string $staging, ?Closure $renderBlocks): void
+    {
+        $blocks = [];
+        $nodes = [];
+        foreach ($this->documents as $source => $document) {
+            $ordinal = 0;
+            foreach ($document->iterator() as $node) {
+                if (!$node instanceof FencedCode) {
+                    continue;
+                }
+                ++$ordinal;
+                $language = strtolower($node->getInfoWords()[0] ?? '');
+                if (str_starts_with($language, 'language-')) {
+                    $language = substr($language, strlen('language-'));
+                }
+                $id = 'block-' . substr(hash('sha256', $source . ':' . $ordinal), 0, 16);
+                if ($language === 'php') {
+                    try {
+                        $html = new CodeHighlighter()->highlight($node->getLiteral());
+                    } catch (\Throwable $error) {
+                        fwrite(STDERR, $source . ', block ' . $ordinal . ': PHP highlighting failed; using escaped source: ' . $error->getMessage() . "\n");
+                        $html = htmlspecialchars($node->getLiteral(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                    }
+                    $node->data->set('website/html', '<pre><code class="language-php">' . $html . '</code></pre>');
+                    continue;
+                }
+                if ($renderBlocks === null) {
+                    if ($language === 'mermaid') {
+                        throw new RuntimeException($source . ', block ' . $ordinal . ': Mermaid rendering requires the local build helper.');
+                    }
+                    continue;
+                }
+                $blocks[] = ['id' => $id, 'source' => $node->getLiteral(), 'language' => $language, 'page' => $source, 'ordinal' => $ordinal];
+                $nodes[$id] = $node;
+            }
+        }
+        if ($blocks === []) {
+            return;
+        }
+        $context = $blocks[0]['page'] . ', block ' . $blocks[0]['ordinal'];
+        try {
+            $results = $renderBlocks($blocks, $staging);
+            if (count($results) !== count($blocks) || array_diff_key($results, $nodes) !== []) {
+                throw new RuntimeException('Block renderer returned missing or unknown block results.');
+            }
+            foreach ($blocks as $block) {
+                if (!isset($results[$block['id']])) {
+                    throw new RuntimeException($block['page'] . ', block ' . $block['ordinal'] . ': Block renderer omitted rendered HTML.');
+                }
+                $nodes[$block['id']]->data->set('website/html', $results[$block['id']]);
+            }
+        } catch (Throwable $error) {
+            throw new RuntimeException($context . ': ' . $error->getMessage(), 0, $error);
+        }
     }
 
     private function discover(): void
@@ -234,11 +310,13 @@ final class WebsiteBuilder
         }
     }
 
-    /** @param array<string,mixed> $page */
-    private function template(string $name, array $page): string
+    /** @param array<string,mixed> $page
+     * @param array<string,mixed> $data
+     */
+    private function template(string $name, array $page, array $data = []): string
     {
         $navigation = $this->navigation;
-        $site = ['revisionUrl' => $this->revisionUrl];
+        $site = ['repositoryUrl' => 'https://github.com/baander-app/baander', 'revisionUrl' => $this->revisionUrl];
         $template = $this->checkedSource($this->root . '/ui/site/templates/' . $name . '.php');
         if (function_exists('opcache_invalidate')) {
             opcache_invalidate($template, true);

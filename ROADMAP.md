@@ -58,9 +58,52 @@ Homepage and search checkpoint: the site uses the shared themes and the reviewed
 music screenshot captured after scanning the preview libraries. Pagefind indexes
 the maintained manual, and the build packages fonts, assets and Vercel routes
 together. Renderer and publication tests pass locally (11 tests, 47 assertions),
-as do tooling static analysis and source policy. Browser acceptance and CI
-integration remain in progress; Vercel project/domain setup and live publication
-remain open.
+as do tooling static analysis and source policy.
+
+Site implementation checkpoint, 2026-10-31: delivered the four-part EQ carousel,
+playlist showcase, manual appearance control and matching dark/light captures.
+Each screenshot pair retains the same items, paused playback position and scroll
+position. The processing slide shows its complete panel; carousel and appearance
+transitions use temporary animation hints and respect reduced motion. General
+Source links open the repository, and the footer credits Martin Juul. The playlist
+header now uses the shared duration formatter, correcting fractional seconds in
+the captured application view (26 focused tests passed).
+
+The [manual rendering plan](docs/plans/2026-10-31-1700-feat-public-manual-rendering-plan.md)
+is implemented: PHP 8.5 tokenization, Shiki highlighting and sanitized, themed
+Mermaid SVGs render during the build. Diagrams use Inter, readable scrolling
+regions and the classic appearance without node shadows. Code and diagrams remain
+readable without JavaScript. The configurable website budget defaults to 600
+seconds. CI installs Chromium before rendering, checks the artifact in a browser
+and retains its Vercel package and checksum; it does not deploy automatically.
+
+The [bAAC page plan](docs/plans/2026-10-31-1800-feat-public-aac-page-plan.md)
+is implemented at `/baac/`. Eight quality plots and eight throughput charts share
+validated data with their tables: 55 quality configurations with 550 supporting
+rows, 33 speed observations and four separate lossless references. Vendor colors,
+shapes and line patterns stay consistent across profiles and operations. The page
+states measurement limits, current Electron integration and planned transcoder
+and FFmpeg integration. Source links use the package's latest commit; the source
+guide returned HTTP 200 after correcting the unpublished website revision link.
+Public spelling is bAAC; technical package identifiers remain `baander-aac`.
+
+Verification checkpoint: 54 website PHP tests pass with 1,045 assertions; the
+complete browser suite passes 39 cases, followed by eight bAAC cases after the
+source-link, planned-integration and vendor-color corrections. Four Node rendering
+tests, 66 shared-token tests, formatting across 431 PHP files, source policy,
+architecture checks, PHPStan and the local dependency inventory pass. The build
+produces all 204 manual pages and preserves the previous artifact on failure.
+Site prose and the new diagram descriptions were reviewed with `prose-fix`;
+existing manual chapters were not rewritten wholesale. Vercel project/domain
+setup and live publication remain open.
+
+Final tooling checkpoint: the full run completed 1,224 tests and 6,456 assertions
+with no failures and seven environment-dependent skips: six require a qualified
+operator image, and one requires `clang-tidy-19`. The final 54-test website fixture
+run includes the subsequently added vendor-identity regression. All seven code
+review lenses returned no findings; the simplification pass retained the tested
+implementation without changes. Native codec qualification and live deployment
+were not part of these checks.
 
 ## PHP dependency and runtime refresh
 

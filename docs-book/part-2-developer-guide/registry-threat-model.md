@@ -43,6 +43,8 @@ provides no per-owner database isolation.
 
 ```mermaid
 flowchart LR
+    accTitle: Registry enrollment, storage and recovery
+    accDescr: Owners and anonymous readers reach the registry TLS API. Operator-issued enrollment capabilities use a shared HMAC key. Authenticated connections reach rqlite voters, and backups are encrypted for offline recovery.
     Owner[Owner with apiKey] --> API[Registry TLS API]
     Reader[Anonymous reader] --> API
     Issuer[Operator enrollment issuer] --> Owner
