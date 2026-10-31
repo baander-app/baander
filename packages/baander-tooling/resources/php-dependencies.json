@@ -50,7 +50,8 @@
                 {"path": "docker/runner/Dockerfile", "kind": "assignment", "key": "PHP_VERSION"},
                 {"path": "relay/docker/build-tooling-php.sh", "kind": "assignment", "key": "version"},
                 {"path": "relay/docker/build-qualification-php.sh", "kind": "assignment", "key": "php_version"},
-                {"path": "docker/nginx/Dockerfile.test", "kind": "alpine-php"}
+                {"path": "docker/nginx/Dockerfile.test", "kind": "assignment", "key": "PHP_VERSION"},
+                {"path": "docker/nginx/Dockerfile.test", "kind": "alpine-package", "key": "PHP_PACKAGE_VERSION"}
             ]
         },
         "swoole": {
@@ -83,7 +84,7 @@
             "reviewedReference": "5c06419c4a1aaf87fda0d8065dd050c7e3d5380e",
             "reviewedVersion": "8.5.2",
             "reason": "Stable upstream still rejects thread-safe PHP and lacks the typed-static initialization and TLS globals handling required by the application ZTS runtime.",
-            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php", "scripts/test-web-runtime-container.php"]
+            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/ZEngineBootstrapRuntimeTest.php", "tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php", "scripts/test-web-runtime-container.php"]
         },
         "patches/symfony-redis-messenger-recoverable-delays.patch": {
             "package": "symfony/redis-messenger",

@@ -1,9 +1,9 @@
 FROM debian:trixie-slim AS tooling-build
 
-ARG PHP_VERSION=8.5.2
-ARG PHP_SHA256=cb75a9b00a2806f7390dd64858ef42a47b443b3475769c8af6af33a18b1381f1
-ARG SWOOLE_VERSION=6.2.0
-ARG SWOOLE_SHA256=b66bf449440c1ba2727314e1e9c4c078978e7def21a02b729bbfec35601ae2ee
+ARG PHP_VERSION=8.5.12
+ARG PHP_SHA256=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
+ARG SWOOLE_VERSION=6.2.4
+ARG SWOOLE_SHA256=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 ARG YAML_VERSION=2.3.0
 ARG YAML_SHA256=bc8404807a3a4dc896b310af21a7f8063aa238424ff77f27eb6ffa88b5874b8a
 ARG TOOLING_BUILD_JOBS=4
@@ -54,6 +54,8 @@ RUN curl -fsSL "https://pecl.php.net/get/yaml-${YAML_VERSION}.tgz" -o /tmp/yaml.
     && echo 'extension=yaml.so' > /opt/php/etc/conf.d/yaml.ini \
     && rm -rf /tmp/yaml /tmp/yaml.tgz
 
+RUN /opt/php/bin/php -r 'if (PHP_VERSION !== $argv[1] || PHP_ZTS || phpversion("swoole") !== $argv[2]) { exit(1); }' "$PHP_VERSION" "$SWOOLE_VERSION"
+
 FROM debian:trixie-slim AS tooling
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,7 +64,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=tooling-build /opt/php /opt/php
-COPY --from=composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 /usr/bin/composer /usr/local/bin/composer
 ENV PATH="/opt/php/bin:${PATH}"
 
 RUN php -v && php --ri swoole && php --ri yaml \

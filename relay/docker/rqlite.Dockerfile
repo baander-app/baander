@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY docker/build-tooling-php.sh /tmp/build-tooling-php.sh
 RUN sh /tmp/build-tooling-php.sh
 
-FROM composer:2@sha256:b6dcd72ca98fa19d0e5b8476de179859704891fad06dd9e0b96833d4c430a5fc AS inventory-loader
+FROM composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 AS inventory-loader
 WORKDIR /tooling
 COPY composer.json composer.lock ./
 COPY tools ./tools

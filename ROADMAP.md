@@ -52,6 +52,16 @@ the regressions required before removal. Baseline validation on `baander-ci:loca
 native and Redis stack lanes. This establishes pre-upgrade behavior; it does not
 qualify the new runtime or dependency set.
 
+U2 native checkpoint: the application CI image
+`sha256:8885a1091dcc844fed4c25ed85ec9701c5def496a4d5b6f1d1a284e3dcdb6ffc`
+built with PHP 8.5.12 ZTS, Swoole 6.2.4 and Composer 2.11.1. Its cache compilation
+completed, and all 19 selected regressions passed with 385 assertions. The new
+required native proof exercised FFI initialization and Zend class/method metadata
+mutation; it first failed at the version floor on the old image. Build contract
+checks passed 16 tests with 121 assertions. Scoped formatting, shell syntax and
+whitespace checks pass; focused runtime review has no remaining findings.
+The smaller runtime builds and complete upgraded-stack qualification remain open.
+
 ## Cohesive live updates
 
 Implementation plan delivered, 2026-10-30, in the

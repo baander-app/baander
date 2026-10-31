@@ -1,10 +1,10 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 set -eu
-php_version=8.5.2
-php_checksum=cb75a9b00a2806f7390dd64858ef42a47b443b3475769c8af6af33a18b1381f1
-swoole_version=6.2.0
-swoole_checksum=b66bf449440c1ba2727314e1e9c4c078978e7def21a02b729bbfec35601ae2ee
+php_version=8.5.12
+php_checksum=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
+swoole_version=6.2.4
+swoole_checksum=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 curl --fail --silent --show-error --location --max-time 180 \
     "https://www.php.net/distributions/php-${php_version}.tar.xz" -o /tmp/php.tar.xz
 printf '%s  /tmp/php.tar.xz\n' "$php_checksum" | sha256sum -c -
@@ -30,3 +30,4 @@ cd /tmp/swoole
 make -j4
 make install
 printf 'extension=swoole.so\n' > /opt/php/etc/conf.d/swoole.ini
+/opt/php/bin/php -r 'if (PHP_VERSION !== $argv[1] || PHP_ZTS || phpversion("swoole") !== $argv[2]) { exit(1); }' "$php_version" "$swoole_version"

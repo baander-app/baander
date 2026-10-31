@@ -13,7 +13,7 @@
 # FFmpeg is installed from Debian apt (build with: make build-ffmpeg for static).
 # -----------------------------------------------------------------------------
 ARG OPERATOR_HELPER_IMAGE=scratch
-FROM php:8.5.2-zts-bookworm AS base
+FROM php:8.5.12-zts-bookworm AS base
 
 ARG LIBURING_VERSION=2.13
 ARG TARGETPLATFORM
@@ -223,7 +223,7 @@ RUN set -xe && \
     docker-php-source delete
 
 # Install Composer from official image
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 /usr/bin/composer /usr/bin/composer
 RUN chmod +x /usr/bin/composer
 
 # -----------------------------------------------------------------------------
@@ -259,7 +259,7 @@ COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
 RUN --mount=type=cache,target=/root/.cache/pie \
     set -xe && \
     export PIE_WORKING_DIRECTORY=/tmp/pie-evidence && \
-    pie download swoole/swoole:6.2.0 && \
+    pie download swoole/swoole:6.2.4 && \
     for source in /tmp/pie-evidence/php*/vendor/swoole/swoole; do \
         php /usr/local/bin/retain-build-evidence.php collect \
             --output /tmp/build-evidence-swoole --id swoole --name Swoole \
@@ -267,7 +267,7 @@ RUN --mount=type=cache,target=/root/.cache/pie \
             --source-url https://github.com/swoole/swoole-src \
             --artifact '/usr/local/lib/php/extensions/*/swoole.so'; \
     done && \
-    pie install swoole/swoole:6.2.0 \
+    pie install swoole/swoole:6.2.4 \
         --enable-swoole-thread \
         --enable-sockets \
         --enable-swoole-curl \

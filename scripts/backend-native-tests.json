@@ -1,4 +1,5 @@
 {
+  "tests/Unit/Shared/Infrastructure/Swoole/ZEngineBootstrapRuntimeTest.php": "Requires the application ZTS runtime and mutates Zend class/method metadata through FFI in an isolated process.",
   "tests/Unit/Shared/LiveUpdates/LiveRuntimeTest.php": "Owns native coroutine suspension and resumption while a WebSocket subscription is replaced.",
   "tests/Unit/Shared/LiveUpdates/LiveRuntimeDiagnosticsTest.php": "Reads native worker diagnostics and owns coroutine send scheduling and timer lifecycle.",
   "tests/Integration/NativeExecutionDaemonTest.php": "Owns a Unix socket daemon and real FFmpeg process groups.",

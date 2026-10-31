@@ -1,10 +1,12 @@
-FROM nginx:alpine
+FROM nginx:alpine3.24
 
-ARG SWOOLE_VERSION=6.2.0
-ARG SWOOLE_SHA256=b66bf449440c1ba2727314e1e9c4c078978e7def21a02b729bbfec35601ae2ee
+ARG PHP_VERSION=8.5.12
+ARG PHP_PACKAGE_VERSION=8.5.12-r0
+ARG SWOOLE_VERSION=6.2.4
+ARG SWOOLE_SHA256=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 
-RUN apk add --no-cache bash coreutils curl libstdc++ openssl php85 php85-sockets util-linux \
-    && apk add --no-cache --virtual .php-build autoconf g++ linux-headers make openssl-dev php85-dev pkgconf \
+RUN apk add --no-cache bash coreutils curl libstdc++ openssl "php85=${PHP_PACKAGE_VERSION}" "php85-sockets=${PHP_PACKAGE_VERSION}" util-linux \
+    && apk add --no-cache --virtual .php-build autoconf g++ linux-headers make openssl-dev "php85-dev=${PHP_PACKAGE_VERSION}" pkgconf \
     && curl -fsSL "https://pecl.php.net/get/swoole-${SWOOLE_VERSION}.tgz" -o /tmp/swoole.tgz \
     && echo "${SWOOLE_SHA256}  /tmp/swoole.tgz" | sha256sum -c - \
     && mkdir /tmp/swoole \
@@ -15,6 +17,6 @@ RUN apk add --no-cache bash coreutils curl libstdc++ openssl php85 php85-sockets
     && make -j4 \
     && make install \
     && echo 'extension=swoole.so' > /etc/php85/conf.d/99_swoole.ini \
-    && php -r 'if (PHP_VERSION_ID < 80500 || !extension_loaded("swoole")) { exit(1); }' \
+    && php -r 'if (PHP_VERSION !== $argv[1] || PHP_ZTS || phpversion("swoole") !== $argv[2]) { exit(1); }' "$PHP_VERSION" "$SWOOLE_VERSION" \
     && apk del .php-build \
     && rm -rf /tmp/swoole /tmp/swoole.tgz
