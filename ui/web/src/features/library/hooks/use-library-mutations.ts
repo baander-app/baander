@@ -26,8 +26,9 @@ function useLibraryMutation<TData, TVariables>(write: (variables: TVariables) =>
       }
     },
   })
-  const mutate: UseMutateFunction<TData, Error, TVariables> = (variables, callbacks) => {
-    mutation.mutate(variables, callbacks ? guardMutationCallbacks(callbacks) : undefined)
+  const mutate: UseMutateFunction<TData, Error, TVariables> = (...args) => {
+    if (args[1]) args[1] = guardMutationCallbacks(args[1])
+    mutation.mutate(...args)
   }
   return { ...mutation, mutate }
 }

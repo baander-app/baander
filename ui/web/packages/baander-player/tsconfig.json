@@ -22,7 +22,7 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "jsx": "preserve",
-    "types": ["vitest/globals"]
+    "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "__tests__"]

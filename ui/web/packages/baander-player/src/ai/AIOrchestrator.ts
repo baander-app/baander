@@ -19,6 +19,7 @@
  * WebGL compute, then CPU.
  */
 
+import aiWorkerUrl from '../workers/ai-worker?worker&url';
 import type {
   AIMode,
   ContentHint,
@@ -95,7 +96,7 @@ export class AIOrchestrator {
     try {
       // Create a dedicated worker for AI inference
       this.worker = new Worker(
-        new URL('../workers/ai-worker.ts', import.meta.url),
+        aiWorkerUrl,
         { type: 'module' },
       );
 
