@@ -3,21 +3,32 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "packageManager": "yarn@4.14.1",
+  "packageManager": "yarn@4.18.1",
   "scripts": {
     "build": "yarn typecheck && esbuild src/search.ts --bundle --format=esm --target=es2022 --minify --outfile=$0",
     "typecheck": "tsc --noEmit",
     "test:browser": "playwright test --config tests/playwright.config.ts"
   },
   "devDependencies": {
-    "@fontsource/inter": "5.2.8",
-    "@fontsource/jetbrains-mono": "5.2.8",
-    "@playwright/test": "1.60.0",
-    "esbuild": "0.25.12",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@playwright/test": "1.64.1",
+    "esbuild": "0.28.2",
     "mermaid": "12.2.0",
     "pagefind": "1.5.2",
     "shiki": "4.5.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vercel": "65.9.0"
+  },
+  "resolutions": {
+    "ajv@npm:8.6.3": "npm:8.20.0",
+    "js-yaml@npm:4.1.1": "npm:4.3.2",
+    "minimatch@npm:10.1.1": "npm:10.2.6",
+    "path-to-regexp@npm:6.1.0": "npm:6.3.0",
+    "path-to-regexp@npm:8.3.0": "npm:8.4.2",
+    "smol-toml@npm:1.5.2": "npm:1.9.1",
+    "tar@npm:7.5.11": "npm:7.5.22",
+    "undici@npm:5.28.4": "npm:5.29.0",
+    "zod@npm:4.1.11": "npm:4.6.7"
   }
 }
