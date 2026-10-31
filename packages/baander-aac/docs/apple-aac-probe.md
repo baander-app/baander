@@ -143,23 +143,85 @@ None of these improved PEAQ on the ten items; most made it worse.
   normalised to the thresholds. All scored well below CBR at the same
   mean rate.
 
+## True VBR
+
+At 136 kbit/s Apple's true VBR (quality 63) leads our CBR by
+0.21 ± 0.13 PEAQ. Our CBR leads it on ViSQOL by 0.08, and it is level
+with Apple's own CBR on PEAQ. The study below aligned our encoder's
+frames with Apple's, by delaying our input 64 samples. It then compared
+the noise Apple left in each band with our encoder's masking
+threshold for the same band.
+
+What Apple's noise follows:
+
+- **Energy and threshold together.** Across bands, Apple's noise fits
+  sqrt(energy × our threshold) better than either alone. It sits a
+  median 11.5 dB above our threshold. The residual is still 5.4 dB.
+- **Tonality.** Apple's SNR rises steeply as a band gets more tonal.
+  Our energy-to-threshold ratio barely moves:
+
+  | Band flatness | Apple SNR | Our energy / threshold |
+  |---|---|---|
+  | -40 to -20 dB | 24.1 dB | 29.0 dB |
+  | -20 to -12 dB | 17.8 dB | 28.6 dB |
+  | -12 to -8 dB | 13.1 dB | 27.1 dB |
+  | -8 to -5 dB | 8.9 dB | 25.6 dB |
+
+- **Per-item level.** Glockenspiel is coded about 5 dB finer than any
+  of these rules predict.
+- **Frame bits.** Frame bits grow only with about the 0.4th power of
+  our perceptual entropy.
+
+Every VBR built on these findings lost to our CBR at the same mean
+rate, or at best matched it:
+
+| Design | PEAQ vs CBR | ViSQOL vs CBR |
+|---|---|---|
+| Noise = k · sqrt(energy × threshold) | -0.47 ± 0.47 | -0.04 |
+| Same, with tonality-weighted thresholds | -0.22 ± 0.22 | -0.04 |
+| Frame bits = k · PE^0.41, rate loop per frame | +0.02 ± 0.09 | not measured |
+| Frame bits from PE relative to the item's mean, rate-matched | +0.01 ± 0.10 | -0.09 ± 0.06 |
+| Tonality-weighted thresholds in CBR | +0.03 ± 0.06 | -0.01 ± 0.01 |
+
+The model-based rules starve tonal, sparse items: glockenspiel fell to
+87 to 98 kbit/s where Apple gives it 134. The PE-relative rule keeps
+each item's rate. It gains 0.3 to 0.4 on glockenspiel and loses
+elsewhere. The evidence points at Apple's perceptual model, not its
+bit allocation. Its tonality dependence explains part of the noise
+placement, but our thresholds with tonality added did not reproduce
+the gain.
+
 ## Remaining gaps
 
-- **True VBR.** At an equal mean rate of 136 kbit/s Apple's VBR scores
-  -0.409 PEAQ and our CBR -0.639, a gap of 0.23 ± 0.11. ViSQOL differs
-  by 0.083. Steely Dan, castanets and glockenspiel carry most of it. Our
-  quality scale is also off: quality 60 gives about 294 kbit/s. Apple's
-  scale invariance and square-root noise rule suggest its VBR sets
-  noise from band energy and not from a masking model; our thresholds
-  do not reproduce it.
-- **The psychoacoustic model.** The probe shows where Apple puts its
-  noise but not why. Copying the observed noise shape into our
-  thresholds did not raise PEAQ.
-- **Speed.** Apple encodes at about 94 times realtime and we at about
-  34. Sectioning is now 37 % of our encode time and band quantization
-  16 %.
+- **True VBR.** Apple's VBR leads by about 0.2 PEAQ. Closing that needs
+  a perceptual model with tonality and probably temporal masking, not
+  a new allocation rule (see above). Our quality scale is also off:
+  quality 60 gives about 294 kbit/s.
 - **Bandwidth at 192 kbit/s and up.** Apple codes sparse bands to
   19.5 kHz there. PEAQ penalises it in our encoder and ViSQOL rewards
   it; a listening test would decide.
 - **Window shape.** Apple's switch to KBD on sustained glockenspiel
   passages is not reproduced.
+
+## Speed
+
+A second round reuses work between the rate loop's passes. A band
+keeps its codebook bit counts, its scalefactor and its quantized values
+while its allowance or scalefactor does not change. Sectioning also
+runs in linear time per band. Output is byte-identical:
+
+| Profile | CPU before | CPU after |
+|---|---|---|
+| AAC-LC 128 kbit/s | 1.20 s | 0.55 s |
+| AAC-LC 256 kbit/s | 1.24 s | 0.58 s |
+| HE-AAC 48 kbit/s | 0.89 s | 0.48 s |
+
+These are CPU seconds for the same 45 s excerpt. The comparison
+harness's speed stage, on its 130 s corpus at 128 kbit/s, now gives:
+
+| Encoder | CPU |
+|---|---|
+| Ours | 1.71 s |
+| Apple | 1.61 s |
+| FDK | 1.64 s |
+| libxaac | 0.90 s |

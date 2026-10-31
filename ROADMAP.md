@@ -1783,6 +1783,21 @@ kbit/s, and our quality scale is off), bandwidth at 192 kbit/s and up
 (PEAQ and ViSQOL disagree), encode speed (Apple about 94 times realtime,
 ours about 34). Not run: listening tests, mono.
 
+Checkpoint, 2026-10-31, true VBR and encoder speed: a study of Apple's
+true VBR against our thresholds, on frame-aligned streams, found its
+noise follows sqrt(energy × threshold) and rises with band flatness
+(tonal bands near 24 dB SNR, noisy ones near 9). Five VBR designs built
+on that matched our CBR at best at an equal mean rate. They are
+recorded in [apple-aac-probe.md](packages/baander-aac/docs/apple-aac-probe.md)
+and none landed. Delivered: the rate loop reuses per-band codebook
+bits, scalefactors and quantized values between passes, and sectioning
+runs in linear time per band. Output is byte-identical. AAC-LC 128
+kbit/s goes from 37 to 82 times realtime. The harness's speed stage
+puts it at 1.71 CPU seconds against Apple's 1.61 and FDK's 1.64. CTest
+46/46, Node smoke tests 14/14, clean under ASan and UBSan. Open: true
+VBR needs a perceptual model with tonality; quality scale of the TVBR
+mode.
+
 ## Roadmap maintenance
 
 Cleanup, 2026-10-26: removed completed checkpoint narratives and superseded
