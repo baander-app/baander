@@ -1,5 +1,26 @@
 # Dependency patches
 
+## PHP 8.5 ZTS initialization
+
+`swoole-bundle-z-engine-php85-zts-init.patch` initializes nullable typed static
+properties and resolves Zend executor/compiler globals through thread-local
+storage on ZTS builds. Stable upstream 8.5.2, revision
+`5c06419c4a1aaf87fda0d8065dd050c7e3d5380e`, still rejects thread-safe PHP and
+does not contain these changes. The patch remains necessary for Baander's ZTS
+application image; its hash is recorded in `patches.lock.json`.
+
+Clean patch application proves source compatibility only. Qualification must
+initialize z-engine through FFI inside the rebuilt application image and boot the
+generated container. Host NTS execution cannot establish that the ZTS globals
+and native layouts are correct.
+
+## Review inventory
+
+The tooling [dependency policy](../packages/baander-tooling/resources/php-dependencies.json)
+classifies Composer projects, runtime declarations, patches and forks. Reviewed
+upstream references identify comparison points; a changed reference requires a
+new review and does not establish that a patch is obsolete.
+
 ## Symfony Redis Messenger delayed promotion
 
 `symfony-redis-messenger-recoverable-delays.patch` targets the locked

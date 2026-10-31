@@ -43,6 +43,15 @@ and acceptance entries remain unchanged. Patch applicability, solver compatibili
 and native behavior remain execution-time checks. No dependency updates,
 application tests or image builds ran for this documentation change.
 
+U1 inventory checkpoint: seven Composer manifests and four independent locks
+are classified in the tooling policy. The bundle comparison records all 403
+source files against upstream v0.35.6, including 277 differences; its historical
+fork base remains unknown. Patch records identify upstream comparison points and
+the regressions required before removal. Baseline validation on `baander-ci:local`
+(`a591d2f47185`, PHP 8.5.2) passed 18 tests with 371 assertions across the ordinary,
+native and Redis stack lanes. This establishes pre-upgrade behavior; it does not
+qualify the new runtime or dependency set.
+
 ## Cohesive live updates
 
 Implementation plan delivered, 2026-10-30, in the

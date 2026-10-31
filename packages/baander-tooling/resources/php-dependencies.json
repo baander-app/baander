@@ -1,0 +1,118 @@
+{
+    "version": 1,
+    "projects": {
+        "composer.json": {
+            "kind": "locked",
+            "owner": "application",
+            "lock": "composer.lock"
+        },
+        "scripts/composer.json": {
+            "kind": "locked",
+            "owner": "development workflows",
+            "lock": "scripts/composer.lock"
+        },
+        "relay/composer.json": {
+            "kind": "locked",
+            "owner": "registry qualification",
+            "lock": "relay/composer.lock"
+        },
+        "packages/tsduck-php-ffi/composer.json": {
+            "kind": "locked",
+            "owner": "TSDuck bindings",
+            "lock": "packages/tsduck-php-ffi/composer.lock"
+        },
+        "packages/baander-tooling/composer.json": {
+            "kind": "package",
+            "owner": "standalone tooling",
+            "consumers": ["composer.json", "scripts/composer.json"],
+            "development": "No separate development requirements."
+        },
+        "packages/baander-phpstan-rules/composer.json": {
+            "kind": "package",
+            "owner": "PHPStan rules",
+            "consumers": ["composer.json"],
+            "development": "Validate independent development constraints in a disposable install; the root static-analysis suite exercises the rules."
+        },
+        "packages/swoole-bundle/composer.json": {
+            "kind": "fork",
+            "owner": "Swoole runtime integration",
+            "consumers": ["composer.json"],
+            "development": "Validate the package's own development constraints and Flex/platform configuration in a disposable install."
+        }
+    },
+    "internalPackages": ["baander/tooling", "baander/phpstan-rules", "tsduck/php"],
+    "runtimes": {
+        "php": {
+            "minimum": "8.5.12",
+            "source": "https://www.php.net/releases/index.php?json&version=8",
+            "declarations": [
+                {"path": "Dockerfile", "kind": "php-image"},
+                {"path": "docker/runner/Dockerfile", "kind": "assignment", "key": "PHP_VERSION"},
+                {"path": "relay/docker/build-tooling-php.sh", "kind": "assignment", "key": "version"},
+                {"path": "relay/docker/build-qualification-php.sh", "kind": "assignment", "key": "php_version"},
+                {"path": "docker/nginx/Dockerfile.test", "kind": "alpine-php"}
+            ]
+        },
+        "swoole": {
+            "source": "https://pecl.php.net/rest/r/swoole/allreleases.xml",
+            "declarations": [
+                {"path": "Dockerfile", "kind": "swoole-install"},
+                {"path": "docker/runner/Dockerfile", "kind": "assignment", "key": "SWOOLE_VERSION"},
+                {"path": "docker/nginx/Dockerfile.test", "kind": "assignment", "key": "SWOOLE_VERSION"},
+                {"path": "relay/docker/build-qualification-php.sh", "kind": "assignment", "key": "swoole_version"},
+                {"path": "composer.json", "kind": "json", "pointer": "/config/platform/ext-swoole"},
+                {"path": "packages/swoole-bundle/composer.json", "kind": "json", "pointer": "/require/upscale~1ext-swoole"},
+                {"path": "packages/swoole-bundle/composer.json", "kind": "json", "pointer": "/config/platform/ext-swoole"}
+            ]
+        },
+        "composer": {
+            "source": "https://getcomposer.org/versions",
+            "declarations": [
+                {"path": "Dockerfile", "kind": "composer-image"},
+                {"path": "docker/runner/Dockerfile", "kind": "composer-image"},
+                {"path": "relay/docker/Dockerfile", "kind": "composer-image"},
+                {"path": "relay/docker/backup.Dockerfile", "kind": "composer-image"},
+                {"path": "relay/docker/rqlite.Dockerfile", "kind": "composer-image"}
+            ]
+        }
+    },
+    "patches": {
+        "patches/swoole-bundle-z-engine-php85-zts-init.patch": {
+            "package": "swoole-bundle/z-engine",
+            "upstream": "https://github.com/symfony-swoole/z-engine",
+            "reviewedReference": "5c06419c4a1aaf87fda0d8065dd050c7e3d5380e",
+            "reviewedVersion": "8.5.2",
+            "reason": "Stable upstream still rejects thread-safe PHP and lacks the typed-static initialization and TLS globals handling required by the application ZTS runtime.",
+            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php", "scripts/test-web-runtime-container.php"]
+        },
+        "patches/symfony-redis-messenger-recoverable-delays.patch": {
+            "package": "symfony/redis-messenger",
+            "upstream": "https://github.com/symfony/redis-messenger",
+            "reviewedReference": "v8.1.10",
+            "reviewedVersion": "8.1.10",
+            "reason": "Upstream has lease-based recovery but does not preserve the bounded promotion and malformed-member retention required by the local delayed-delivery contract.",
+            "proofs": ["tests/Integration/MessengerDelayedPromotionTest.php"]
+        }
+    },
+    "forks": {
+        "swoole-bundle/swoole-bundle": {
+            "path": "packages/swoole-bundle",
+            "upstream": "https://github.com/symfony-swoole/swoole-bundle",
+            "reviewedReference": "81f35b1fac4f7df2a173b6ae83a194e2ad6d8047",
+            "reviewedVersion": "v0.35.6",
+            "historicalBase": null,
+            "comparison": "packages/swoole-bundle/upstream-review.json",
+            "reason": "Local coroutine ownership, authenticated WebSockets, drain and streaming behavior require selective reconciliation against upstream.",
+            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/CoWrapperSchedulingTest.php", "tests/Unit/Shared/Infrastructure/Swoole/WithWebSocketHandlerHandshakeTest.php", "tests/Unit/Shared/Infrastructure/Http/StreamedResponseProcessorTest.php", "scripts/test-web-shutdown-container.php"]
+        },
+        "upscale/swoole-reflection": {
+            "upstream": "https://github.com/upscalesoftware/swoole-reflection",
+            "reviewedReference": "8e33b2d8458953e6bbf01189785b92e3ad369f78",
+            "reviewedVersion": "3.2.0",
+            "source": "https://github.com/Rastusik/swoole-reflection",
+            "sourceReference": "5e318ae5d92f4c7b7eae8f2525446551db9495d5",
+            "reason": "The fork avoids deprecated accessibility calls. Repository and installed-package tracing found no consumers outside its own tests and generated Composer maps; its PSR-4-only autoload has no registration side effects. Remove the unused dependency during resolution and verify fresh autoload/container behavior.",
+            "proofs": ["tests/Unit/Shared/Infrastructure/Swoole/GeneratedContainerLoadTest.php"]
+        }
+    }
+}

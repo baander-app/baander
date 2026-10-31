@@ -2,6 +2,24 @@
 
 A Symfony bundle that runs your application on the [Swoole](https://www.swoole.co.uk/) async HTTP/WebSocket server. Enables coroutines, hot module reloading, service pooling, and Swoole task workers within the Symfony ecosystem.
 
+## Baander fork maintenance
+
+Baander maintains this source tree as a local fork. The reviewed upstream
+comparison is [v0.35.6](https://github.com/symfony-swoole/swoole-bundle/tree/81f35b1fac4f7df2a173b6ae83a194e2ad6d8047),
+revision `81f35b1fac4f7df2a173b6ae83a194e2ad6d8047`. The historical fork base is
+unknown; this revision is a comparison point, not a claim of ancestry.
+
+The [source comparison](upstream-review.json) records all 403 source files,
+including 126 identical files and 277 differences, with local/upstream hashes
+and a recommended disposition. These recommendations describe the initial audit;
+they do not assert that a change has already been adopted or qualified.
+
+Upstream changes must preserve coroutine-specific service release, pool
+diagnostics, authenticated WebSocket handshakes, the application's ownership of
+`BeforeShutdown`, and errors on interrupted streaming responses. The
+[dependency policy](../baander-tooling/resources/php-dependencies.json) names the
+regression checks and upstream references for this fork and its dependencies.
+
 ## Requirements
 
 - PHP 8.3+
