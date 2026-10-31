@@ -83,7 +83,26 @@ struct ChannelWork {
   int max_mag[AAC_MAX_BANDS];
   int band_bits[AAC_MAX_BANDS][AAC_NUM_CODEBOOKS + 1]; /* spectral bits per book */
   int has_noise_band;
+  /* Section, scalefactor and spectral bits at max_sfb counted_max_sfb,
+   * valid while the channel is unchanged since. */
+  int counted_bits;
+  int counted_max_sfb;
+  /* The coded bands before and after each band in the scalefactor
+   * chain, -1 at either end. */
+  int chain_before[AAC_MAX_BANDS];
+  int chain_after[AAC_MAX_BANDS];
 };
+
+/* A band quantized at one scalefactor: depends on the spectrum alone, so
+ * it holds for the whole frame. */
+struct TrialEntry {
+  int sf; /* -1 when empty */
+  int max_mag;
+  float noise;
+  int bits;                             /* spectral bits with the cheapest book */
+  int book_bits[AAC_NUM_CODEBOOKS + 1]; /* spectral bits per book */
+};
+constexpr int kTrialWays = 4;
 
 /* What a move changes in one band, kept for undoing it. */
 struct BandSnapshot {
@@ -97,7 +116,8 @@ struct BandSnapshot {
 /* One candidate scalefactor move. */
 struct Move {
   int ch, idx;
-  int sf; /* target scalefactor, -1 when the band leaves the chain */
+  int sf;  /* target scalefactor, -1 when the band leaves the chain */
+  int qsf; /* scalefactor of the trial quantization */
   int max_mag;
   float noise, ratio_log2;
   int local_bits; /* estimated change of the frame's bits */
@@ -114,6 +134,7 @@ struct Frame {
   int quant_scratch[kMaxLines]; /* trial quantization of one band */
   Move donors[AAC_MAX_CHANNELS * AAC_MAX_BANDS];
   bool blocked[AAC_MAX_CHANNELS][AAC_MAX_BANDS]; /* no move of the band fits any more */
+  TrialEntry trials[AAC_MAX_CHANNELS][AAC_MAX_BANDS][kTrialWays]; /* by scalefactor modulo ways */
 };
 
 int group_of(const ChannelWork* w, int idx) { return idx / w->nswb; }
@@ -180,24 +201,13 @@ int band_max_mag(const ChannelWork* w, int idx, const int* q) {
  * max_mag, kInfBits for the others.  A zero band coded with a real book
  * also carries a scalefactor (a zero difference, one bit). */
 void count_band_bits(const ChannelWork* w, int idx, const int* q, int max_mag, int* bits) {
-  const AacIcsInfo* ics = &w->c->ics;
   const int g = group_of(w, idx);
-  const int b = band_of(w, idx);
+  aac_enc_band_book_bits(&w->c->ics, q, g, w->w0[g], band_of(w, idx), max_mag, bits);
   bits[0] = kInfBits;
-  for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
-    if (kCodebookMaxVal[cb] < max_mag) {
-      bits[cb] = kInfBits;
-      continue;
+  if (max_mag == 0) {
+    for (int cb = 1; cb <= AAC_NUM_CODEBOOKS; cb++) {
+      bits[cb] += 1;
     }
-    const int dim = aac_codebook_info[cb].dim;
-    int n = 0;
-    for (int win = w->w0[g]; win < w->w0[g] + ics->group_len[g]; win++) {
-      for (int i = win * 128 + ics->swb_offset[b]; i < win * 128 + ics->swb_offset[b + 1];
-           i += dim) {
-        n += aac_huffman_bits(cb, q + i);
-      }
-    }
-    bits[cb] = n + (max_mag == 0 ? 1 : 0);
   }
 }
 
@@ -430,7 +440,12 @@ int recount_frame(Frame* f) {
       total += f->ch[el->ch[0]].ngroups * (max_sfb - f->elem_max_sfb[e]);
     }
     for (int k = 0; k < el->num_ch; k++) {
-      total += finish_channel(&f->ch[el->ch[k]], max_sfb);
+      ChannelWork* w = &f->ch[el->ch[k]];
+      if (w->counted_max_sfb != max_sfb) {
+        w->counted_bits = finish_channel(w, max_sfb);
+        w->counted_max_sfb = max_sfb;
+      }
+      total += w->counted_bits;
     }
   }
   return total;
@@ -454,24 +469,28 @@ void commit_max_sfb(Frame* f) {
 
 /* ── chain constraints ─────────────────────────────────────────── */
 
-/* The coded band before idx in the scalefactor chain, or -1. */
-int chain_prev(const ChannelWork* w, int idx) {
-  for (int i = idx - 1; i >= 0; i--) {
+/* Rebuilds the chain neighbours after a band joined or left the chain. */
+void relink(ChannelWork* w) {
+  int last = -1;
+  for (int i = 0; i < w->nbands; i++) {
+    w->chain_before[i] = last;
     if (w->coded[i]) {
-      return i;
+      last = i;
     }
   }
-  return -1;
+  last = -1;
+  for (int i = w->nbands - 1; i >= 0; i--) {
+    w->chain_after[i] = last;
+    if (w->coded[i]) {
+      last = i;
+    }
+  }
 }
 
-int chain_next(const ChannelWork* w, int idx) {
-  for (int i = idx + 1; i < w->nbands; i++) {
-    if (w->coded[i]) {
-      return i;
-    }
-  }
-  return -1;
-}
+/* The coded band before idx in the scalefactor chain, or -1. */
+int chain_prev(const ChannelWork* w, int idx) { return w->chain_before[idx]; }
+
+int chain_next(const ChannelWork* w, int idx) { return w->chain_after[idx]; }
 
 /* Whether the first noise band's 9-bit value, a difference to the global
  * gain, still fits when the global gain becomes global_gain. */
@@ -551,6 +570,8 @@ void snapshot(const Frame* f, int ch, int idx, BandSnapshot* snap) {
 void restore(Frame* f, const BandSnapshot* snap) {
   ChannelWork* w = &f->ch[snap->ch];
   const int idx = snap->idx;
+  w->counted_max_sfb = -1;
+  const bool relinked = w->coded[idx] != snap->coded;
   w->coded[idx] = snap->coded;
   w->sf[idx] = snap->sf;
   w->max_mag[idx] = snap->max_mag;
@@ -559,31 +580,47 @@ void restore(Frame* f, const BandSnapshot* snap) {
   memcpy(w->band_bits[idx], snap->band_bits, sizeof(snap->band_bits));
   int n = 0;
   for_lines(w, idx, [&](int i) { w->c->quant[i] = snap->quant[n++]; });
+  if (relinked) {
+    relink(w);
+  }
+}
+
+/* Band idx of channel ch quantized at sf, from the frame's trial cache. */
+const TrialEntry* trial_at(Frame* f, int ch, int idx, int sf) {
+  TrialEntry* e = &f->trials[ch][idx][sf % kTrialWays];
+  if (e->sf != sf) {
+    ChannelWork* w = &f->ch[ch];
+    e->sf = sf;
+    e->max_mag = quantize_band(w, idx, sf, f->quant_scratch);
+    e->noise = e->max_mag > 0 ? band_noise(w, idx, sf, f->quant_scratch) : w->c->energy[idx];
+    count_band_bits(w, idx, f->quant_scratch, e->max_mag, e->book_bits);
+    e->bits = e->max_mag > 0 ? best_bits(e->book_bits) : 0;
+  }
+  return e;
 }
 
 /* Puts band idx at scalefactor sf with the quantization in
  * f->quant_scratch, or takes it out of the chain when max_mag is 0. */
 void apply_band(Frame* f, int ch, int idx, int sf, int max_mag) {
   ChannelWork* w = &f->ch[ch];
+  w->counted_max_sfb = -1;
   const int* q = f->quant_scratch;
   for_lines(w, idx, [&](int i) { w->c->quant[i] = q[i]; });
   w->max_mag[idx] = max_mag;
-  count_band_bits(w, idx, w->c->quant, max_mag, w->band_bits[idx]);
-  if (max_mag == 0) {
-    w->coded[idx] = 0;
-    w->sf[idx] = -1;
-    w->noise[idx] = w->c->energy[idx];
-  } else {
-    w->coded[idx] = 1;
-    w->sf[idx] = sf;
-    w->noise[idx] = band_noise(w, idx, sf, q);
-  }
+  const TrialEntry* t = trial_at(f, ch, idx, sf);
+  memcpy(w->band_bits[idx], t->book_bits, sizeof(w->band_bits[idx]));
+  w->noise[idx] = t->noise;
+  const bool relinked = w->coded[idx] != (max_mag > 0);
+  w->coded[idx] = max_mag > 0;
+  w->sf[idx] = max_mag > 0 ? sf : -1;
   w->ratio_log2[idx] = ratio_log2_of(w, idx, w->noise[idx]);
+  if (relinked) {
+    relink(w);
+  }
 }
 
 /* Evaluates moving band idx of channel ch to scalefactor sf: fills the
- * move, leaves the trial quantization in f->quant_scratch, and returns
- * whether the chain allows it.  The bit estimate counts the band's
+ * move and returns whether the chain allows it.  The bit estimate counts the band's
  * cheapest book and its scalefactor differences; the exact count after
  * sectioning decides. */
 bool evaluate_move(Frame* f, int ch, int idx, int sf, Move* m) {
@@ -593,7 +630,9 @@ bool evaluate_move(Frame* f, int ch, int idx, int sf, Move* m) {
   }
   m->ch = ch;
   m->idx = idx;
-  m->max_mag = quantize_band(w, idx, sf, f->quant_scratch);
+  m->qsf = sf;
+  const TrialEntry* t = trial_at(f, ch, idx, sf);
+  m->max_mag = t->max_mag;
   const int old_bits = w->coded[idx] ? best_bits(w->band_bits[idx]) + chain_bits(w, idx, w->sf[idx])
                                      : chain_bits(w, idx, -1);
   if (m->max_mag == 0) {
@@ -604,11 +643,9 @@ bool evaluate_move(Frame* f, int ch, int idx, int sf, Move* m) {
     m->noise = w->c->energy[idx];
     m->local_bits = chain_bits(w, idx, -1) - old_bits;
   } else {
-    int trial_bits[AAC_NUM_CODEBOOKS + 1];
     m->sf = sf;
-    m->noise = band_noise(w, idx, sf, f->quant_scratch);
-    count_band_bits(w, idx, f->quant_scratch, m->max_mag, trial_bits);
-    m->local_bits = best_bits(trial_bits) + chain_bits(w, idx, sf) - old_bits;
+    m->noise = t->noise;
+    m->local_bits = t->bits + chain_bits(w, idx, sf) - old_bits;
   }
   m->ratio_log2 = ratio_log2_of(w, idx, m->noise);
   return true;
@@ -617,7 +654,7 @@ bool evaluate_move(Frame* f, int ch, int idx, int sf, Move* m) {
 /* Applies a move and counts the frame exactly: returns whether it still
  * fits the budget, with the band restored from snap when it does not. */
 bool try_move(Frame* f, const Move* m, BandSnapshot* snap, int* frame_bits) {
-  const int sf = m->sf < 0 ? f->ch[m->ch].sf[m->idx] + 1 : m->sf;
+  const int sf = m->qsf;
   const int max_mag = quantize_band(&f->ch[m->ch], m->idx, sf, f->quant_scratch);
   snapshot(f, m->ch, m->idx, snap);
   apply_band(f, m->ch, m->idx, sf, max_mag);
@@ -721,7 +758,11 @@ void init_channel(Frame* f, int ch) {
     win += ics->group_len[g];
   }
   w->has_noise_band = 0;
+  w->counted_max_sfb = -1;
   for (int idx = 0; idx < w->nbands; idx++) {
+    for (int k = 0; k < kTrialWays; k++) {
+      f->trials[ch][idx][k].sf = -1;
+    }
     const int g = group_of(w, idx);
     const int b = band_of(w, idx);
     w->lines[idx] = ics->group_len[g] * (ics->swb_offset[b + 1] - ics->swb_offset[b]);
@@ -750,6 +791,7 @@ void init_channel(Frame* f, int ch) {
       count_band_bits(w, idx, c->quant, w->max_mag[idx], w->band_bits[idx]);
     }
   }
+  relink(w);
 }
 
 }  // namespace

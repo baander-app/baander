@@ -289,14 +289,14 @@ int band_max_mag(const AacEncChannel* c, int g, int w0, int b) {
  * its largest magnitude (cost[cb], kInfBits for the others).  The books
  * come in pairs that index the same tuples, so each pair takes one pass
  * over the band. */
-void band_book_bits(const AacEncChannel* c, int g, int w0, int b, int max_mag, int* cost) {
-  const AacIcsInfo* ics = &c->ics;
+void band_book_bits(const AacIcsInfo* ics, const int* quant, int g, int w0, int b, int max_mag,
+                    int* cost) {
   for (int cb = 0; cb <= AAC_NUM_CODEBOOKS; cb++) {
     cost[cb] = kInfBits;
   }
   int b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, b7 = 0, b8 = 0, b9 = 0, b10 = 0, b11 = 0;
   for (int w = w0; w < w0 + ics->group_len[g]; w++) {
-    const int* q = c->quant + w * 128;
+    const int* q = quant + w * 128;
     const int lo = ics->swb_offset[b], hi = ics->swb_offset[b + 1];
     if (max_mag <= 1) {
       for (int i = lo; i < hi; i += 4) {
@@ -378,7 +378,7 @@ const int* band_bits_at(AacEncChannel* c, int g, int w0, int b, int sf, int* max
   const int k = c->bits_next[idx];
   c->bits_next[idx] = (unsigned char)((k + 1) & 3);
   const int m = band_max_mag(c, g, w0, b);
-  band_book_bits(c, g, w0, b, m, c->bits_book[idx][k]);
+  band_book_bits(&c->ics, c->quant, g, w0, b, m, c->bits_book[idx][k]);
   c->bits_sf[idx][k] = sf;
   c->bits_max[idx][k] = m;
   *max_mag = m;
@@ -1886,6 +1886,11 @@ void apply_usac_tools(AacEncoderState* s) {
 }
 
 }  // namespace
+
+void aac_enc_band_book_bits(const AacIcsInfo* ics, const int* quant, int g, int w0, int b,
+                            int max_mag, int* cost) {
+  band_book_bits(ics, quant, g, w0, b, max_mag, cost);
+}
 
 AacEncoderState* aac_encoder_state_create(int sr, int ch, int br, AacObjectType aot,
                                           AacRateControl rc, const AacDSP* dsp) {

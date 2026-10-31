@@ -318,6 +318,12 @@ int aac_encoder_vbr_mode_bitrate(int mode, int channels);
  * channels: the frame's bit budget less what the core keeps. */
 int aac_encoder_state_extension_budget_bits(const AacEncoderState* s);
 
+/* Spectral bits of band b of group g (first window w0) of the quantized
+ * values `quant` (indexed like the spectrum) with every codebook whose
+ * range covers max_mag; 1 << 28 for the others and for book 0. */
+void aac_enc_band_book_bits(const AacIcsInfo* ics, const int* quant, int g, int w0, int b,
+                            int max_mag, int* cost);
+
 /* Consumes one block of frame_size interleaved input samples (NULL for silence)
  * and writes the next ADTS frame to s->output_buf.  Returns its length in
  * bytes or a negative AacError. */
