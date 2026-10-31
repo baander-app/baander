@@ -1,33 +1,51 @@
 import type { Locator, Page, Request } from '@playwright/test'
 import { test, expect, navigate, paint } from './recovery-fixtures'
+import { CatalogReadTiming } from './catalog-read-timing'
 
 interface CatalogRead { page: number; cursor: string | null; start: number; end: number; count: number; status: number }
 interface HttpSpan { path: string; start: number; end: number; status: number; failed: boolean }
 
-function catalogReads(page: Page, path: string) {
+async function catalogReads(page: Page, path: string) {
   const reads: CatalogRead[] = []
   const http: HttpSpan[] = []
   const errors: string[] = []
   const albumsByYear = new Map<string, { publicId: string; title: string }[]>()
   const songsById = new Map<string, { publicId: string; title: string }>()
   const active = new Map<Request, number>()
-  const networkActive = new Set<Request>()
-  let maxInFlight = 0
-  const matches = (request: Request) => {
-    const url = new URL(request.url())
+  const timing = new CatalogReadTiming()
+  const requestIds = new WeakMap<Request, number>()
+  const nativeRequests: { requestId: number; path: string; timing: ReturnType<Request['timing']> | null; failed: boolean | null }[] = []
+  const hostEvents: { requestId: number; phase: string; epochMs: number }[] = []
+  const hostActive = new Set<number>()
+  let hostMaxInFlight = 0
+  let nextRequestId = 0
+  const matchesUrl = (source: string) => {
+    const url = new URL(source)
     if (url.pathname.replace(/\/$/, '') !== path.replace(/\/$/, '')) return false
     if (url.searchParams.get('limit') !== '100') return false
     return path !== '/api/albums' || (url.searchParams.get('sort') === 'year'
       && url.searchParams.get('order') === 'asc')
   }
   page.on('request', request => {
-    if (!matches(request)) return
+    if (request.method() !== 'GET' || !matchesUrl(request.url())) return
     active.set(request, Date.now())
-    networkActive.add(request)
-    maxInFlight = Math.max(maxInFlight, networkActive.size)
+    const id = ++nextRequestId
+    requestIds.set(request, id)
+    nativeRequests.push({ requestId: id, path: request.url(), timing: null, failed: null })
+    hostActive.add(id)
+    hostMaxInFlight = Math.max(hostMaxInFlight, hostActive.size)
+    hostEvents.push({ requestId: id, phase: 'request', epochMs: Date.now() })
   })
-  // Browser transfer completion ends concurrency before any body-reading RPC.
-  page.on('requestfinished', request => { networkActive.delete(request) })
+  const finished = (request: Request, failed: boolean) => {
+    const id = requestIds.get(request)
+    if (id === undefined) return
+    const receipt = nativeRequests.find(item => item.requestId === id)!
+    receipt.timing = { ...request.timing() }
+    receipt.failed = failed
+    hostActive.delete(id)
+    hostEvents.push({ requestId: id, phase: failed ? 'requestfailed' : 'requestfinished', epochMs: Date.now() })
+  }
+  page.on('requestfinished', request => { finished(request, false) })
   page.on('response', async response => {
     const request = response.request()
     const start = active.get(request)
@@ -63,14 +81,48 @@ function catalogReads(page: Page, path: string) {
     } finally { active.delete(request) }
   })
   page.on('requestfailed', request => {
-    networkActive.delete(request)
+    finished(request, true)
     const start = active.get(request)
     if (start === undefined) return
     const url = new URL(request.url())
     http.push({ path: url.pathname + url.search, start, end: Date.now(), status: 0, failed: true })
     active.delete(request)
   })
-  return { reads, http, errors, albumsByYear, songsById, get maxInFlight() { return maxInFlight },
+  const cdp = await page.context().newCDPSession(page)
+  const cdpActive = new Map<string, { id: number; startSeconds: number }>()
+  const cdpEvents: unknown[] = []
+  const cdpErrors: string[] = []
+  let nextCdpId = 0
+  cdp.on('Network.requestWillBeSent', event => {
+    if (event.request.method !== 'GET' || !matchesUrl(event.request.url)) return
+    cdpEvents.push({ phase: 'requestWillBeSent', requestId: event.requestId,
+      timestamp: event.timestamp, wallTime: event.wallTime, url: event.request.url,
+      redirectStatus: event.redirectResponse?.status ?? null })
+    if (event.redirectResponse || cdpActive.has(event.requestId)) {
+      cdpErrors.push(`Unexpected catalog redirect or repeated CDP request ${event.requestId}`)
+      return
+    }
+    const id = ++nextCdpId
+    cdpActive.set(event.requestId, { id, startSeconds: event.timestamp })
+    timing.start(id, event.request.url, Date.now())
+  })
+  const cdpFinished = (requestId: string, timestamp: number, failed: boolean) => {
+    const request = cdpActive.get(requestId)
+    if (!request) return
+    cdpEvents.push({ phase: failed ? 'loadingFailed' : 'loadingFinished', requestId, timestamp })
+    timing.finish(request.id, { startSeconds: request.startSeconds, endSeconds: timestamp }, failed, Date.now())
+    cdpActive.delete(requestId)
+  }
+  cdp.on('Network.loadingFinished', event => { cdpFinished(event.requestId, event.timestamp, false) })
+  cdp.on('Network.loadingFailed', event => { cdpFinished(event.requestId, event.timestamp, true) })
+  await cdp.send('Network.enable')
+  return { reads, http, errors, albumsByYear, songsById,
+    nativeRequests, hostEvents, cdpRequests: timing.requests, cdpEvents,
+    concurrencyClock: 'CDP Network monotonic seconds',
+    get hostMaxInFlight() { return hostMaxInFlight },
+    get maxInFlight() { return timing.concurrency.maxInFlight },
+    get timingErrors() { return [...cdpErrors, ...timing.concurrency.errors] },
+    get pendingRequests() { return timing.pendingRequests + hostActive.size },
     get pendingReads() { return active.size } }
 }
 
@@ -111,7 +163,7 @@ test.describe('Populated live views', () => {
       }))
     })
     await navigate(page, '/music/browse')
-    const observer = catalogReads(page, '/api/songs/')
+    const observer = await catalogReads(page, '/api/songs/')
     run.evidence.push({ kind: 'song-read-observer', observer, delivery })
     await page.getByRole('button', { name: 'List view', exact: true }).click()
     const scroll = await listScroller(page)
@@ -188,6 +240,10 @@ test.describe('Populated live views', () => {
     const after = (await songInRow(retainedRow)).publicId
     expect(after).toBe(before)
     expect(observer.errors).toEqual([])
+    await expect.poll(() => observer.cdpRequests.length).toBe(observer.nativeRequests.length)
+    await expect.poll(() => observer.pendingRequests).toBe(0)
+    expect(observer.timingErrors).toEqual([])
+    expect(observer.cdpRequests.map(request => request.path)).toEqual(observer.nativeRequests.map(request => request.path))
     const frame = await paint(page)
     expect(frame.visible).toBe(true)
     run.evidence.push({ kind: 'ten-retained-pages', catalog: catalog.receipt, reads: observer.reads,
@@ -203,7 +259,7 @@ test.describe('Populated live views', () => {
     await drainCatalogSeed(run)
     const page = await run.open(1)
     await navigate(page, '/music/browse')
-    const observer = catalogReads(page, '/api/albums')
+    const observer = await catalogReads(page, '/api/albums')
     run.evidence.push({ kind: 'timeline-read-observer', observer })
     let release: () => void = () => {}
     const held = new Promise<void>(resolve => { release = resolve })
@@ -228,6 +284,10 @@ test.describe('Populated live views', () => {
     } finally { release() }
     await expect(page.getByRole('list', { name: 'Albums by year', exact: true })).toBeVisible({ timeout: 90_000 })
     await expect.poll(() => observer.reads.length, { timeout: 90_000 }).toBe(200)
+    await expect.poll(() => observer.cdpRequests.length).toBe(observer.nativeRequests.length)
+    await expect.poll(() => observer.pendingRequests).toBe(0)
+    expect(observer.timingErrors).toEqual([])
+    expect(observer.cdpRequests.map(request => request.path)).toEqual(observer.nativeRequests.map(request => request.path))
     expect(observer.maxInFlight).toBe(1)
     expect(observer.reads.map(read => read.page)).toEqual([
       ...Array.from({ length: 100 }, (_, index) => index + 1),

@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-30. This roadmap selects future work and records unresolved
+Updated: 2026-10-31. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
 
@@ -31,7 +31,8 @@ The confirmed scope covers all React Query server state and related readers such
 as sidebar Recents. Nine units in three dependent review groups cover transactional
 change capture, scoped revisions, shared WebSocket delivery, targeted query
 refresh, recovery, and authorization. Unsaved edits and active playback remain
-protected. Runtime implementation and acceptance are still open.
+protected. Runtime implementation and acceptance completed locally on 2026-10-31;
+the final verification checkpoints follow below.
 
 Verification checkpoint: an independent source check confirmed six grounding
 claims with their scope limits. Repository, PostgreSQL, framework, and flow
@@ -719,6 +720,113 @@ findings. Evidence is retained in `/tmp/live-review-transport-{red,green}.log`,
 `/tmp/live-review-fixes-typecheck.log`, `/tmp/live-review-fixes-lint.log` and
 `/tmp/live-review-fixes-build.log`. No review finding remains unapplied. The final
 CI-image capacity/populated qualification is a separate checkpoint below.
+
+U9 final CI capacity checkpoint, 2026-10-31: the rebuilt immutable image
+`sha256:a591d2f471859c98c0eae1c474d6ffc30b2825d596f332d5f371dda3dab48526`
+contains the reviewed runtime fixes. Its backend source digest, frontend manifest
+and capacity fixture match checkout `db2c5cd2d`; it runs PHP 8.5.2 and Swoole
+6.2.0 with `APP_ENV=prod`, `APP_DEBUG=0`, and built frontend assets without Vite.
+Capacity and retained song pages passed. The same invocation failed Timeline's
+host-event concurrency assertion; that failed receipt remains preserved.
+
+The 32-client capacity case passed in 957.117 seconds. The production login
+limiter remained enabled: setup took 918.557 seconds, including 874.974 seconds
+of admission waits. Every client recorded exactly one readiness cycle; the oldest
+connection was 906.980 seconds old at measurement start. Across 320 ordinary
+visible observations, p95 was 892ms and the worst-principal p95 and overall
+maximum were 950ms. All 1,344 source GETs returned 200 with valid native timings;
+the maximum was 196.982ms, satisfying the one-second source-read premise. Each
+SPA peaked at two measured GETs in flight and four starts per second.
+
+The producer committed 10,000 capture rows in 100 batches over 10,029.440ms.
+All clients reached the final exact count and visible marker within a conservative
+1,187.106ms bound anchored to the final commit's start. The same host anchor
+bounds the observed empty inbox at 2,223.106ms; these bounds do not assume aligned
+producer and observer clocks. Sampled scoped backlog peaked at 300 rows.
+Subscriptions returned from 32 to zero, all four worker PIDs stayed stable, pool
+assignments met their warmed envelopes, and each worker retained one coroutine.
+Two lazily registered pools per worker ended with zero active assignments. Memory
+reclamation was observed; warm byte counts exceeded cold baselines. This finite
+workload does not establish indefinite memory stability. Owned cleanup left zero
+users, tokens, survivors and capture backlog and removed its manifest.
+
+The song view retained ten pages and 1,000 songs after eleven initial HTTP
+attempts, including one repeated startup cursor. Exactly ten refresh attempts
+preserved selected public ID and scroll position and painted the updated album
+title within 2,933ms. Its fixture also cleaned completely.
+
+Final capacity receipts are under `/tmp/live-review-final-ci-capacity-results/`;
+the complete invocation, including the failed Timeline case, is preserved under
+`/tmp/live-review-final-ci-results/`. Recomputed measurements and their clock
+formula are in `/tmp/live-review-final-capacity-measurements.json`.
+
+U9 observer correction checkpoint: the first targeted rerun passed retained songs
+but failed Timeline's reconstructed timing peak. All 200 Timeline requests
+returned 200 with 100 albums in exact page order, but the final DOM and paint
+assertions were not reached. Both fixtures cleaned completely. The pinned
+Playwright Chromium adapter gives `startTime` and `responseEnd` different origins;
+adding them counted the deliberate page-25 hold twice and placed its constructed
+end 449.305ms after the recorded completion callback.
+
+The observer now calculates concurrency from raw CDP network start and completion
+timestamps on one monotonic clock. It retains the earlier timing fields and host
+event order for diagnosis. Missing receipts, unexpected redirects, request-count
+or URL-order mismatches fail qualification; Timeline still requires peak one.
+Nine focused tests pass, including reordered callbacks, true overlap, a held
+request and invalid/missing timing. Both TypeScript projects, helper/test
+compilation, full ESLint (zero errors, eight existing warnings), five
+simplification lenses and focused independent source review pass. The previous
+failed receipts remain at `/tmp/live-review-populated-native-results/`; source
+and receipt analysis is in `/tmp/live-review-populated-native-analysis.md`.
+The corrected browser run is recorded separately below.
+
+U9 final populated-view checkpoint, 2026-10-31: both corrected cases passed in
+one targeted invocation (2 tests, 6.9 minutes) against the same immutable
+`a591d2f` CI image used for the passing capacity workload. Backend source,
+frontend manifest and fixture identities match; no application code changed
+between these runs. The existing owned workflow selected both populated cases
+through an explicit temporary PHP frontend forwarder with Playwright's
+`--grep 'Populated live views'`; capacity was not repeated.
+
+Songs retained ten pages and 1,000 rows after twelve initial attempts, then
+refreshed exactly ten pages in 1,931ms while preserving selected public ID and
+scroll position. All 22 requests had matching CDP and host receipts. Timeline
+rendered 10,000 albums through two 100-page walks after a mid-walk hint: all
+200 requests returned 200 with 100 rows in exact page order. Walks took
+17,341/15,074ms; the final visible-title frame arrived at 38,262ms. Both cases
+had CDP peak concurrency one, zero missing timings and zero observer errors;
+host callbacks reported a peak of two. The assertion remains strict, with no
+overlap tolerance. Both fixtures completed cleanup with zero survivors, empty
+scoped/global inboxes and no retained manifest.
+
+Final receipts are under `/tmp/live-review-populated-cdp-results/`; runtime
+identity is retained in
+`var/test-runs/baander-web-1793414485-228305-1793414486-228305/`.
+The failed host-counter and mixed-origin runs remain separate historical results.
+The application now has passing capacity and populated-view qualification on
+one verified CI image; no single-invocation three-pass claim is made.
+
+The runner exited successfully and removed its owned runtime ledger.
+
+The final coverage inventory links all 52 reader descriptors to concrete proof
+paths. Real browser qualification covers Recents during delivery outage,
+cross-client playlist and notification changes, denied observers, real console
+scanning and asynchronous ingest, failed-read retry, projector stalls, frozen-page
+recovery, managed worker reload and server restart, and access revocation during
+a held response. Dirty editor input and the same advancing audio survive unrelated
+refresh and reconnect. Remote metadata conflict/deletion and preference conflicts
+use component/coordinator and hook proofs; these are not browser conflict tests.
+The 10,000-album Timeline fixture has no covers, so it does not measure image
+fanout. The earlier exited scan-worker pair's cause remains unidentified; fresh
+worker health and the subsequent real scan pass are the recorded qualification.
+
+The extension and operator guides now explain capture, audiences, revision
+projection, transport ownership, reader registration, local mutation feedback,
+draft protection, recovery and diagnostics. Documentation preservation and local
+links pass. The active requirements, implementation units, verification contract
+and definition of done were reconciled against the recorded evidence. All nine
+units and the five independently confirmed review fixes are complete locally;
+there are no deferred required findings. No push or merge ran.
 
 ## Baander loudness levels
 
