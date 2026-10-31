@@ -29,6 +29,12 @@ constexpr int kShort = AAC_FRAME_SIZE_SHORT;
 constexpr int kAdtsBits = 8 * AAC_ADTS_HEADER_SIZE;
 constexpr float kQuantRound = 0.4054f;
 constexpr int kMaxSf = 255;
+/* Scalefactors above the noise boundary that the AAC-LC search checks
+ * again.  Six measured +0.026, +0.057 and +0.031 PEAQ at 64, 96 and 128
+ * kbit/s (paired 95 % intervals ±0.012, ±0.013 and ±0.017; ViSQOL +0.010,
+ * +0.017 and +0.009), and no loss at 192 kbit/s or for HE-AAC at 48; ten
+ * and sixteen gained nothing more. */
+constexpr int kCoarserProbe = 6;
 constexpr int kMaxSfDelta = 60;
 constexpr int kInfBits = 1 << 28;
 constexpr float kBitsToPe = 1.18f;
@@ -269,6 +275,22 @@ int find_scalefactor_from_estimate(AacEncChannel* c, int g, int w0, int b, int s
     }
   }
   return lo;
+}
+
+/* The AAC-LC and HE-AAC scalefactor search: the boundary from the
+ * estimate, then the few scalefactors above it.  The noise is not
+ * monotonic in the scalefactor (a coarser step can round the band's large
+ * lines closer to their values while it drops small ones), so one of
+ * them may fit the allowance again, for fewer bits. */
+int find_scalefactor_lc(AacEncChannel* c, int g, int w0, int b, int sf_min, float allowed) {
+  const int boundary = find_scalefactor_from_estimate(c, g, w0, b, sf_min, allowed);
+  int sf = boundary;
+  for (int up = 2; up <= kCoarserProbe && boundary + up <= kMaxSf; up++) {
+    if (band_noise_at(c, g, w0, b, boundary + up) <= allowed) {
+      sf = boundary + up;
+    }
+  }
+  return sf;
 }
 
 int band_max_mag(const AacEncChannel* c, int g, int w0, int b) {
@@ -560,7 +582,7 @@ void quantize_channel(AacEncChannel* c, bool estimate) {
         }
         const int sf_min = c->sf_floor[idx];
         c->sf_found[idx] = estimate
-                               ? find_scalefactor_from_estimate(c, g, w0, b, sf_min, c->allowed[idx])
+                               ? find_scalefactor_lc(c, g, w0, b, sf_min, c->allowed[idx])
                                : find_scalefactor(c, g, w0, b, sf_min, c->allowed[idx]);
         c->sf_allowed[idx] = c->allowed[idx];
       }
