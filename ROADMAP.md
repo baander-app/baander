@@ -23,6 +23,39 @@ and the [testing guide](docs-book/part-2-developer-guide/testing.md) for current
 runners and verification boundaries. Historical suite counts apply to their own
 trees; they are not acceptance evidence for a new change.
 
+## Public project website and documentation
+
+Implementation plan delivered locally, 2026-10-31, in the
+[public project website plan](docs/plans/2026-10-31-1530-feat-public-project-website-plan.md).
+The intended audience is prospective hosts familiar with personal media servers.
+Direction A introduces the interface and playback experience, then connects the
+project explanation to installation and the hosted operator and developer guides.
+The scope keeps one documentation source, adopts the existing design language,
+and excludes competing-server names and comparisons from the public site.
+
+Verification checkpoint: seven repository claim groups were independently checked.
+The plan records ten requirements, three flows and six acceptance examples;
+the completeness, consistency, focus and planning-usability checks pass. The three
+temporary homepage sketches were browser-checked at desktop and mobile widths for
+page overflow and clipped content. Documentation prose, frontmatter, references
+and whitespace checks pass. No application tests or production deployment ran.
+The implementation plan preserves those requirements and acceptance examples.
+Five units cover PHP static generation, the homepage and manual layout, Pagefind
+search, Vercel artifact packaging, and complete browser/build verification.
+Vercel is the user-selected host; the plan provides a prebuilt artifact and a
+publishing procedure without requiring PHP on Vercel.
+
+Planning verification: six document-review lenses returned no findings. Product
+contract preservation, plan structure, YAML metadata and prose checks pass.
+No application build or test suite was run during planning.
+
+Implementation checkpoint: the standalone PHP renderer builds all 204 manual
+pages and validates their local links and fragments. Its CI-image tests pass
+(9 tests, 35 assertions), including preservation of the previous artifact on a
+failed build. Two obsolete manual section links were corrected. Homepage styling,
+search, Vercel packaging and full browser acceptance remain in progress; Vercel
+project/domain setup and live publication remain open.
+
 ## PHP dependency and runtime refresh
 
 Implementation plan delivered locally, 2026-10-31, in the

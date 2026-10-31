@@ -9,6 +9,13 @@ final class SourceExceptions
     /** @var list<array{path:string,rule:string,anchor:string,count:int,reason:string}> */
     private const array CALLSITES = [
         [
+            'path' => 'packages/baander-tooling/src/Website/WebsiteBuilder.php',
+            'rule' => 'manual-loader',
+            'anchor' => '            include $template;',
+            'count' => 1,
+            'reason' => 'Render a repository-owned website template after source containment checks; implementation classes still load through Composer.',
+        ],
+        [
             'path' => 'scripts/tests/php/DevelopmentRetainedStateTest.php',
             'rule' => 'application-root',
             'anchor' => '        yield \'literal environment\' => ["ENV APP_HOME=/var/www/html \\\\\\n    APP_ENV=prod\\nWORKDIR \\${APP_HOME}\\n", true];',

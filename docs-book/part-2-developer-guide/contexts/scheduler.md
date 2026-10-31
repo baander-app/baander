@@ -87,4 +87,4 @@ All endpoints are prefixed with `/api` and live under the admin namespace.
 | `app:scheduler:list` (`SchedulerListCommand`) | List scheduled jobs |
 | `app:scheduler:run` (`SchedulerRunCommand`) | Run due jobs |
 
-See the [Architecture](../architecture.md#async-runtime) page for details on the Swoole scheduler process and the CPU process pool.
+See [Architecture](../architecture.md) for the project's layer and context boundaries.

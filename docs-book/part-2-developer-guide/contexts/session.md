@@ -78,4 +78,4 @@ All endpoints are prefixed with `/api`.
 | `SessionAdapter` | Adapter | Session port infrastructure adapter |
 | `SessionEventSubscriber` | Event subscriber | Broadcasts `SessionClaimed` / `SessionUpdated` over WebSocket via `WebSocketPusher` |
 
-See the [Architecture](../architecture.md#async-runtime) page for details on WebSocket broadcasting and the async runtime.
+See [Live updates](../live-updates.md) for the WebSocket delivery model and its runtime ownership.
