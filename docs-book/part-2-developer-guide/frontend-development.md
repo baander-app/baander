@@ -228,27 +228,36 @@ lint, Vitest, build, and build-verification checks.
 
 ## Desktop native codec
 
-The Electron app ships the AAC codec from `packages/codecs/baander-aac` as a
+The Electron app ships the AAC codec from `packages/baander-aac` as a
 native Node-API module, `@baander/aac-native`, declared as a `file:`
-dependency in `ui/electron/package.json`. `yarn install` builds it with
-node-gyp from the C++ sources; `yarn electron-rebuild` rebuilds it for the
-Electron ABI, and electron-builder (`ui/electron/electron-builder.yml`, the
-only packaging configuration) bundles only its ESM entry, types and compiled
-binding. The package is ESM-only and targets Node 26; the desktop toolchain is
-Electron 45. A Node-API module is ABI-stable, so a binding built against Node
-headers loads in Electron unchanged. The application icon is
+dependency in `ui/electron/package.json`. On `yarn install` the package's
+install script fetches the prebuilt binding for the platform from the newest
+`aac-native-v*` GitHub release (built by `.github/workflows/aac-native.yml`)
+into `prebuilds/<platform>-<arch>/`, and builds it with node-gyp from the C++
+sources when that is not possible; `yarn electron-rebuild` builds it for the
+Electron ABI into `build/Release/`, which the loader tries after `prebuilds/`
+(set `BAANDER_AAC_NATIVE_BINDING` to a file to make a local build win).
+electron-builder (`ui/electron/electron-builder.yml`, the only packaging
+configuration) bundles only its ESM entry, types and the binding, prebuilt or
+local, unpacked from the asar archive. The package is ESM-only and targets
+Node 26; the desktop toolchain is Electron 45. A Node-API module is
+ABI-stable, so one binding serves both runtimes. The application icon is
 `ui/electron/build/app-icons/icon.png`, rendered from the web app's
 `icon.svg`; electron-builder derives the platform formats from it.
 
 The main process loads the binding lazily in `AacService`
 (`src/main/services/aac.service.ts`); when the binding is missing the service
 reports itself unavailable instead of failing startup. The renderer reaches it
-through `window.electron.aac`: one-shot `decode(adts)` and `encode(pcm, options)`
-calls, and chunked decoder and encoder sessions (`openDecoder`, `decodeChunk`,
-`closeDecoder`, `openEncoder`, `encodeChunk`, `flushEncoder`, `closeEncoder`).
-PCM is interleaved `Float32Array` at full scale; AAC data is an ADTS stream. The
-IPC module validates every payload before the service runs. See the codec's
-[README](../../packages/codecs/baander-aac/docs/README.md) for the C API, the
+through `window.electron.aac`: one-shot `decode(adts)`, `encode(pcm, options)`
+and `measureLoudness(pcm, sampleRate, channels)` calls, and chunked decoder and
+encoder sessions (`openDecoder`, `decodeChunk`, `closeDecoder`, `openEncoder`,
+`encodeChunk`, `flushEncoder`, `encoderLoudness`, `closeEncoder`). PCM is
+interleaved `Float32Array` at full scale; AAC data is an ADTS stream, or LOAS
+for the low-delay and xHE-AAC (`profile: 'xhe'`) profiles, whose encoder
+options add the USAC settings (`usac`), a `loudnessInfo` set written into the
+stream and `measureLoudness` for the meter inside a session. The IPC module
+validates every payload before the service runs. See the codec's
+[README](../../packages/baander-aac/docs/README.md) for the C API, the
 command-line tool and the measured interoperability with FFmpeg.
 
 ## Component Library

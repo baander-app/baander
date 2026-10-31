@@ -9,7 +9,7 @@ notices belonging to bundled or installed dependencies.
 - `packages/tsduck-php-ffi` retains its declared BSD-2-Clause license and Martin
   Christiansen’s copyright attribution in its [LICENSE](packages/tsduck-php-ffi/LICENSE).
   TSDuck binaries and libraries have their own distribution notices.
-- `packages/codecs/baander-aac` is Apache-2.0. Its ISO/IEC 14496-3 tables
+- `packages/baander-aac` is Apache-2.0. Its ISO/IEC 14496-3 tables
   (Huffman codebooks and scalefactor bands) were transcribed from FFmpeg's
   `libavcodec/aactab.c` (LGPL 2.1 or later) and verified against it; the
   encoder's allocation design follows the Fraunhofer FDK AAC encoder and

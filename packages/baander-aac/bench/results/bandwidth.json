@@ -1,0 +1,326 @@
+{
+ "he-apple-cbr32": {
+  "median_hz": 13822.265625,
+  "min_hz": 13781.25
+ },
+ "he-apple-cbr48": {
+  "median_hz": 21978.515625,
+  "min_hz": 19839.84375
+ },
+ "he-apple-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22078.125
+ },
+ "he-fdk-cbr32": {
+  "median_hz": 14935.546875,
+  "min_hz": 13136.71875
+ },
+ "he-fdk-cbr48": {
+  "median_hz": 16482.421875,
+  "min_hz": 16441.40625
+ },
+ "he-fdk-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22089.84375
+ },
+ "he-libxaac-cbr32": {
+  "median_hz": 14917.96875,
+  "min_hz": 13394.53125
+ },
+ "he-libxaac-cbr48": {
+  "median_hz": 16464.84375,
+  "min_hz": 16429.6875
+ },
+ "he-libxaac-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22136.71875
+ },
+ "he-ours-cbr32": {
+  "median_hz": 14970.703125,
+  "min_hz": 13242.1875
+ },
+ "he-ours-cbr48": {
+  "median_hz": 16476.5625,
+  "min_hz": 16441.40625
+ },
+ "he-ours-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22078.125
+ },
+ "he-oursab-cbr32": {
+  "median_hz": 14970.703125,
+  "min_hz": 13535.15625
+ },
+ "he-oursab-cbr48": {
+  "median_hz": 16476.5625,
+  "min_hz": 16441.40625
+ },
+ "he-oursab-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22078.125
+ },
+ "hev2-fdk-cbr24": {
+  "median_hz": 14935.546875,
+  "min_hz": 13171.875
+ },
+ "hev2-fdk-cbr32": {
+  "median_hz": 16476.5625,
+  "min_hz": 16394.53125
+ },
+ "hev2-libxaac-cbr24": {
+  "median_hz": 14941.40625,
+  "min_hz": 13722.65625
+ },
+ "hev2-libxaac-cbr32": {
+  "median_hz": 16476.5625,
+  "min_hz": 16394.53125
+ },
+ "hev2-ours-cbr24": {
+  "median_hz": 14953.125,
+  "min_hz": 13675.78125
+ },
+ "hev2-ours-cbr32": {
+  "median_hz": 16470.703125,
+  "min_hz": 16417.96875
+ },
+ "lc-apple-cbr128": {
+  "median_hz": 17279.296875,
+  "min_hz": 16839.84375
+ },
+ "lc-apple-cbr192": {
+  "median_hz": 18978.515625,
+  "min_hz": 18597.65625
+ },
+ "lc-apple-cbr256": {
+  "median_hz": 24000.0,
+  "min_hz": 21292.96875
+ },
+ "lc-apple-cbr64": {
+  "median_hz": 11560.546875,
+  "min_hz": 11378.90625
+ },
+ "lc-apple-cbr96": {
+  "median_hz": 15175.78125,
+  "min_hz": 15140.625
+ },
+ "lc-fdk-cbr128": {
+  "median_hz": 15046.875,
+  "min_hz": 15011.71875
+ },
+ "lc-fdk-cbr192": {
+  "median_hz": 16535.15625,
+  "min_hz": 16523.4375
+ },
+ "lc-fdk-cbr256": {
+  "median_hz": 16535.15625,
+  "min_hz": 16523.4375
+ },
+ "lc-fdk-cbr64": {
+  "median_hz": 12632.8125,
+  "min_hz": 12562.5
+ },
+ "lc-fdk-cbr96": {
+  "median_hz": 13839.84375,
+  "min_hz": 13781.25
+ },
+ "lc-fdknoab-cbr128": {
+  "median_hz": 15064.453125,
+  "min_hz": 15023.4375
+ },
+ "lc-fdknoab-cbr64": {
+  "median_hz": 12650.390625,
+  "min_hz": 12574.21875
+ },
+ "lc-fdknoab-cbr96": {
+  "median_hz": 13839.84375,
+  "min_hz": 13781.25
+ },
+ "lc-ffmpeg-cbr128": {
+  "median_hz": 17542.96875,
+  "min_hz": 16781.25
+ },
+ "lc-ffmpeg-cbr192": {
+  "median_hz": 21433.59375,
+  "min_hz": 19031.25
+ },
+ "lc-ffmpeg-cbr256": {
+  "median_hz": 24000.0,
+  "min_hz": 21281.25
+ },
+ "lc-ffmpeg-cbr64": {
+  "median_hz": 11970.703125,
+  "min_hz": 11531.25
+ },
+ "lc-ffmpeg-cbr96": {
+  "median_hz": 17373.046875,
+  "min_hz": 15281.25
+ },
+ "lc-libxaac-cbr128": {
+  "median_hz": 15035.15625,
+  "min_hz": 15000.0
+ },
+ "lc-libxaac-cbr192": {
+  "median_hz": 19546.875,
+  "min_hz": 18128.90625
+ },
+ "lc-libxaac-cbr256": {
+  "median_hz": 19541.015625,
+  "min_hz": 19054.6875
+ },
+ "lc-libxaac-cbr64": {
+  "median_hz": 12574.21875,
+  "min_hz": 12562.5
+ },
+ "lc-libxaac-cbr96": {
+  "median_hz": 13851.5625,
+  "min_hz": 13781.25
+ },
+ "lc-ours-cbr128": {
+  "median_hz": 17566.40625,
+  "min_hz": 15281.25
+ },
+ "lc-ours-cbr192": {
+  "median_hz": 17566.40625,
+  "min_hz": 16781.25
+ },
+ "lc-ours-cbr256": {
+  "median_hz": 24000.0,
+  "min_hz": 20390.625
+ },
+ "lc-ours-cbr64": {
+  "median_hz": 14613.28125,
+  "min_hz": 13031.25
+ },
+ "lc-ours-cbr96": {
+  "median_hz": 14619.140625,
+  "min_hz": 13781.25
+ },
+ "lc-oursab-cbr128": {
+  "median_hz": 17560.546875,
+  "min_hz": 15281.25
+ },
+ "lc-oursab-cbr192": {
+  "median_hz": 17566.40625,
+  "min_hz": 16781.25
+ },
+ "lc-oursab-cbr256": {
+  "median_hz": 24000.0,
+  "min_hz": 20390.625
+ },
+ "lc-oursab-cbr64": {
+  "median_hz": 14589.84375,
+  "min_hz": 13031.25
+ },
+ "lc-oursab-cbr96": {
+  "median_hz": 14613.28125,
+  "min_hz": 13781.25
+ },
+ "lc-oursbw-cbr128": {
+  "median_hz": 14607.421875,
+  "min_hz": 14531.25
+ },
+ "lc-oursbw-cbr64": {
+  "median_hz": 12322.265625,
+  "min_hz": 12281.25
+ },
+ "lc-oursbw-cbr96": {
+  "median_hz": 14619.140625,
+  "min_hz": 13781.25
+ },
+ "lcvbr-apple-tvbr100": {
+  "median_hz": 22183.59375,
+  "min_hz": 20050.78125
+ },
+ "lcvbr-apple-tvbr45": {
+  "median_hz": 15175.78125,
+  "min_hz": 15140.625
+ },
+ "lcvbr-apple-tvbr63": {
+  "median_hz": 17408.203125,
+  "min_hz": 16839.84375
+ },
+ "lcvbr-apple-tvbr82": {
+  "median_hz": 18140.625,
+  "min_hz": 17484.375
+ },
+ "lcvbr-fdk-vbr2": {
+  "median_hz": 12556.640625,
+  "min_hz": 12515.625
+ },
+ "lcvbr-fdk-vbr3": {
+  "median_hz": 15339.84375,
+  "min_hz": 15281.25
+ },
+ "lcvbr-fdk-vbr4": {
+  "median_hz": 16072.265625,
+  "min_hz": 16031.25
+ },
+ "lcvbr-fdk-vbr5": {
+  "median_hz": 18832.03125,
+  "min_hz": 18820.3125
+ },
+ "lcvbr-ours-vbr2": {
+  "median_hz": 14619.140625,
+  "min_hz": 13031.25
+ },
+ "lcvbr-ours-vbr3": {
+  "median_hz": 17578.125,
+  "min_hz": 15281.25
+ },
+ "lcvbr-ours-vbr4": {
+  "median_hz": 17566.40625,
+  "min_hz": 16031.25
+ },
+ "lcvbr-ours-vbr5": {
+  "median_hz": 17589.84375,
+  "min_hz": 16781.25
+ },
+ "xhe-fdk-cbr24": {
+  "median_hz": 17976.5625,
+  "min_hz": 17847.65625
+ },
+ "xhe-fdk-cbr32": {
+  "median_hz": 17976.5625,
+  "min_hz": 17859.375
+ },
+ "xhe-fdk-cbr48": {
+  "median_hz": 16482.421875,
+  "min_hz": 16453.125
+ },
+ "xhe-fdk-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 19875.0
+ },
+ "xhe-fdk-cbr96": {
+  "median_hz": 14548.828125,
+  "min_hz": 14531.25
+ },
+ "xhe-libxaac-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22242.1875
+ },
+ "xhe-libxaac-cbr96": {
+  "median_hz": 24000.0,
+  "min_hz": 22242.1875
+ },
+ "xhe-ours-cbr24": {
+  "median_hz": 12714.84375,
+  "min_hz": 11050.78125
+ },
+ "xhe-ours-cbr32": {
+  "median_hz": 14970.703125,
+  "min_hz": 13570.3125
+ },
+ "xhe-ours-cbr48": {
+  "median_hz": 16476.5625,
+  "min_hz": 16441.40625
+ },
+ "xhe-ours-cbr64": {
+  "median_hz": 24000.0,
+  "min_hz": 22207.03125
+ },
+ "xhe-ours-cbr96": {
+  "median_hz": 24000.0,
+  "min_hz": 22183.59375
+ }
+}

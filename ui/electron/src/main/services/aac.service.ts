@@ -6,11 +6,24 @@
  * every operation rejects with a descriptive error instead of crashing
  * the app.
  */
-import type { AacDecoder, AacDecoderOptions, AacEncoder, AacEncoderOptions, AacProfile } from '@baander/aac-native';
+import type {
+  AacChannelMode,
+  AacLoudness,
+  AacLoudnessMeasurement,
+  AacObjectType,
+  AacDecoder,
+  AacDecoderOptions,
+  AacEncoder,
+  AacEncoderFrameInfo,
+  AacEncoderOptions,
+  AacProfile,
+  measureLoudness,
+} from '@baander/aac-native';
 
 type Native = {
   AacDecoder: typeof AacDecoder;
   AacEncoder: typeof AacEncoder;
+  measureLoudness: typeof measureLoudness;
   version: string;
 };
 
@@ -27,18 +40,54 @@ export interface AacDecodeResult {
   channels: number;
   /** Channels coded in the stream. */
   streamChannels: number;
+  /** The stream's 7.1 layout, or 'default'. */
+  channelMode: AacChannelMode;
   frameSize: number;
+  /** Frames that failed (concealment off). */
   errors: number;
+  /** Frames concealed so far. */
+  concealedFrames: number;
+  /**
+   * Samples per channel the decoder delays its output by beyond the
+   * encoder's priming: the limiter's look-ahead, plus the surround
+   * decoder's delay for an MPEG Surround stream. A flush returns this
+   * many samples.
+   */
+  delay: number;
   hasSbr: boolean;
   hasPs: boolean;
+  /** The object type of the stream: 'lc', 'er-lc', 'ld', 'eld', 'usac' or 'unknown'. */
+  objectType: AacObjectType;
+  /** The program reference level the last frame carried, or -1. */
+  programRefLevel: number;
+  /** The last frame carried dynamic range control data. */
+  hasDrc: boolean;
+  /**
+   * The MPEG-D loudness of a USAC stream: the declared program loudness in
+   * LUFS (null when none, and for every other object type) and the
+   * normalisation gain applied in dB.
+   */
+  loudness: AacLoudness;
   pcm: Float32Array;
 }
 
 export interface AacEncoderSession {
   id: number;
   profile: AacProfile;
+  /**
+   * Samples per channel per frame: 1024, or 2048 for the HE-AAC profiles
+   * and for 'xhe' while it runs SBR (by default stereo below 128 kbit/s
+   * and mono below 64 kbit/s, or as the `sbr` option says).
+   */
   frameSize: number;
+  /**
+   * Samples of lead-in before the first input sample in the decoded
+   * output: 2048 for AAC-LC, 5635 for the HE-AAC profiles and for 'xhe'
+   * while it runs SBR.
+   */
   delay: number;
+  /** The AudioSpecificConfig of the stream. */
+  config: Uint8Array;
 }
 
 const MAX_SESSIONS = 64;
@@ -88,13 +137,26 @@ export class AacService {
     return native;
   }
 
-  /** Decodes a complete ADTS stream. */
+  /** Decodes a complete stream (ADTS, LOAS, or one LATM element or access unit). */
   async decode(data: Uint8Array, options: AacDecoderOptions = {}): Promise<AacDecodeResult> {
     const decoder = new (await this.native()).AacDecoder(options);
     return describe(decoder, decoder.decode(data));
   }
 
-  /** Encodes interleaved PCM into a complete ADTS stream. */
+  /**
+   * Measures a whole interleaved signal with the BS.1770-4 loudness meter
+   * (1 to 6 channels in the canonical order); the result is the
+   * `loudnessInfo` of an xHE-AAC encode that follows.
+   */
+  async measureLoudness(pcm: Float32Array, sampleRate: number, channels: number): Promise<AacLoudnessMeasurement> {
+    return (await this.native()).measureLoudness(pcm, sampleRate, channels);
+  }
+
+  /**
+   * Encodes interleaved PCM into a complete stream in the chosen
+   * transport. With `profile: 'xhe'` the options take the USAC settings
+   * (`usac`) and a `loudnessInfo` set written into the stream.
+   */
   async encode(pcm: Float32Array, options: AacEncoderOptions): Promise<Uint8Array> {
     const encoder = new (await this.native()).AacEncoder(options);
     const body = encoder.encode(pcm);
@@ -114,9 +176,31 @@ export class AacService {
   }
 
   async decodeChunk(id: number, chunk: Uint8Array): Promise<AacDecodeResult> {
-    const decoder = this.decoders.get(id);
-    if (!decoder) throw new Error(`AAC decoder session ${id} does not exist`);
+    const decoder = this.decoder(id);
     return describe(decoder, decoder.decode(chunk));
+  }
+
+  /**
+   * Ends the stream: the result carries the last `delay` samples per
+   * channel the decoder still held (none without a limiter or surround),
+   * described as the stream was before the end. The session stays open
+   * for another stream, starting over.
+   */
+  async flushDecoder(id: number): Promise<AacDecodeResult> {
+    const decoder = this.decoder(id);
+    const result = describe(decoder, new Float32Array(0));
+    result.pcm = decoder.flush();
+    return result;
+  }
+
+  /**
+   * Prepares a seek: drops the pending bytes and the decoder's memory of
+   * the audio before, keeping the stream's configuration, so that the
+   * chunks from the new position decode as in a fresh session. An
+   * xHE-AAC stream resumes at an independent frame.
+   */
+  async clearDecoderHistory(id: number): Promise<void> {
+    this.decoder(id).clearHistory();
   }
 
   async closeDecoder(id: number): Promise<boolean> {
@@ -128,7 +212,13 @@ export class AacService {
     const encoder = new (await this.native()).AacEncoder(options);
     const id = this.nextId++;
     this.encoders.set(id, encoder);
-    return { id, profile: encoder.profile, frameSize: encoder.frameSize, delay: encoder.delay };
+    return {
+      id,
+      profile: encoder.profile,
+      frameSize: encoder.frameSize,
+      delay: encoder.delay,
+      config: toBytes(encoder.config),
+    };
   }
 
   async encodeChunk(id: number, pcm: Float32Array): Promise<Uint8Array> {
@@ -140,6 +230,34 @@ export class AacService {
     return toBytes(this.encoder(id).flush());
   }
 
+  /**
+   * The loudness of the input encoded so far by a session opened with
+   * `measureLoudness: true`: null before 400 ms of input and for a
+   * session without the meter.
+   */
+  async encoderLoudness(id: number): Promise<AacLoudnessMeasurement | null> {
+    return this.encoder(id).loudness;
+  }
+
+  /**
+   * xHE-AAC only: makes the next frame independent, so that the immediate
+   * playout frame with the pre-roll follows it; the binding throws for
+   * the other profiles.
+   */
+  async requestIndependentFrame(id: number): Promise<void> {
+    this.encoder(id).requestIndependentFrame();
+  }
+
+  /**
+   * xHE-AAC only: the last frame the session produced (its index, whether
+   * it is independent, the pre-roll and frame sizes and its sample
+   * position), for a muxer that cuts segments; null before the first
+   * frame and for the other profiles.
+   */
+  async encoderLastFrame(id: number): Promise<AacEncoderFrameInfo | null> {
+    return this.encoder(id).lastFrame;
+  }
+
   async closeEncoder(id: number): Promise<boolean> {
     return this.encoders.delete(id);
   }
@@ -148,6 +266,12 @@ export class AacService {
   closeAll(): void {
     this.decoders.clear();
     this.encoders.clear();
+  }
+
+  private decoder(id: number): AacDecoder {
+    const decoder = this.decoders.get(id);
+    if (!decoder) throw new Error(`AAC decoder session ${id} does not exist`);
+    return decoder;
   }
 
   private encoder(id: number): AacEncoder {
@@ -168,10 +292,17 @@ function describe(decoder: AacDecoder, pcm: Float32Array): AacDecodeResult {
     sampleRate: decoder.sampleRate,
     channels: decoder.channels,
     streamChannels: decoder.streamChannels,
+    channelMode: decoder.channelMode,
     frameSize: decoder.frameSize,
     errors: decoder.errors,
+    concealedFrames: decoder.concealedFrames,
+    delay: decoder.delay,
     hasSbr: decoder.hasSbr,
     hasPs: decoder.hasPs,
+    objectType: decoder.objectType,
+    programRefLevel: decoder.programRefLevel,
+    hasDrc: decoder.hasDrc,
+    loudness: decoder.loudness(),
     pcm,
   };
 }

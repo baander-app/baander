@@ -26,6 +26,12 @@ files:
     - "node_modules/@baander/aac-native/node/index.d.ts"
     - "node_modules/@baander/aac-native/build/Release/*.node"
 
+# The binding is loaded with process.dlopen, which cannot read from inside
+# the asar archive, so both places the loader looks are unpacked next to it.
+asarUnpack:
+    - "node_modules/@baander/aac-native/build/Release/*.node"
+    - "node_modules/@baander/aac-native/prebuilds/**/*.node"
+
 extraResources:
     -   from: "public/dsp"
         to: "dsp"
@@ -38,6 +44,12 @@ win:
         - nsis
         - zip
     icon: build/app-icons/icon.png
+    # The prebuilt binding the package's install script fetched for this
+    # platform, next to the build/Release fallback above.  electron-builder
+    # expands ${arch} in file patterns; ${platform} names the build host,
+    # so each OS block spells out its process.platform value.
+    files:
+        - "node_modules/@baander/aac-native/prebuilds/win32-${arch}/*.node"
 
 nsis:
     oneClick: false                       # show wizard UI
@@ -54,9 +66,13 @@ mac:
         - dmg
         - zip
     icon: build/app-icons/icon.png
+    files:
+        - "node_modules/@baander/aac-native/prebuilds/darwin-${arch}/*.node"
 
 linux:
     target:
         - AppImage
         - deb
     icon: build/app-icons/icon.png
+    files:
+        - "node_modules/@baander/aac-native/prebuilds/linux-${arch}/*.node"
