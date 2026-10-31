@@ -1,6 +1,6 @@
 # Apple AAC probe
 
-Measured on 2026-10-30. This note records what Apple's Core Audio AAC
+Measured on 2026-10-30 and 2026-10-31. This note records what Apple's Core Audio AAC
 encoder does, as far as its output bitstreams show it, and which of
 those behaviours improved baander-aac. It follows the
 [codec comparison](codec-comparison.md), which found Apple ahead of us
@@ -247,6 +247,93 @@ stop at the noise their quality asks for. On the 45 s excerpt, quality
 10 now gives 97 kbit/s instead of 131. Quality 50 gives 230 instead of
 240.
 
+## Beyond FDK's afterburner
+
+The [codec comparison](codec-comparison.md) traced most of FDK's AAC-LC
+lead to its afterburner. FDK without it scored below ours. Two changes
+now put our rate loop past that point.
+
+**Coarser scalefactors above the noise boundary.** A band's
+quantization noise does not rise steadily with its scalefactor:
+rounding can land a coarser step closer to the spectrum than a finer
+one. The scalefactor search used to stop at the finest scalefactor that
+met the band's allowance. It now also tries two to six steps coarser
+and keeps the coarsest that still meets it, which frees bits for other
+bands. Trying ten or sixteen steps gained nothing more.
+
+| Rate | PEAQ | ViSQOL |
+|---|---|---|
+| 64k | +0.026 ± 0.012 | +0.010 |
+| 96k | +0.057 ± 0.013 | +0.017 |
+| 128k | +0.031 ± 0.017 | +0.009 |
+
+192 kbit/s and HE-AAC at 48 kbit/s are level.
+
+**The afterburner on by default.** Our afterburner moves the
+scalefactor of the band with the worst noise-to-mask ratio and pays for
+it from slack or from other bands, with an exact recount of the frame's
+bits after each move. It now keeps each band's trial quantizations per
+scalefactor and each channel's bit count instead of recounting them.
+The output is byte-identical, and the afterburner costs about 85 % more
+encoder instructions than no afterburner, down from about 390 %. With
+the coarser scalefactors in place it measured:
+
+| Rate | PEAQ | ViSQOL |
+|---|---|---|
+| 64k | +0.067 ± 0.025 | +0.000 ± 0.005 |
+| 96k, 128k | +0.05 to +0.07 | level |
+| 192k | +0.017 ± 0.016 | +0.001 ± 0.002 |
+| HE-AAC 48k | +0.027 ± 0.009 | -0.001 ± 0.003 |
+
+It is on for AAC-LC and HE-AAC and off for AAC-LD and AAC-ELD.
+`baac enc --no-afterburner` and `afterburner: false` in the binding
+turn it off. Its limits on moves per frame, scalefactor range and donor
+window are saturated: larger values gain nothing, and fewer moves lose
+quality.
+
+## HE-AAC
+
+Apple's HE-AAC streams were parsed for their SBR headers and frame
+data at 32, 48 and 64 kbit/s stereo, next to ours:
+
+| | Apple 32k | Ours 32k | Apple 48k | Ours 48k (before) | Apple 64k | Ours 64k |
+|---|---|---|---|---|---|---|
+| Crossover | 6.0 kHz | 5.6 kHz | 9.0 kHz | 8.3 kHz | 10.1 kHz | 10.1 kHz |
+| SBR stop | 14.3 kHz | 15.4 kHz | 20.3 kHz | 16.9 kHz | 22.1 kHz | 22.1 kHz |
+| Noise bands | 2 | 3 | 2 | 3 | 3 | 3 |
+| Coupled stereo SBR | 87 % of frames | never | 90 % | never | never | never |
+| Two or more envelopes | 29 % | 10 % | 24 % | 12 % | 24 % | 12 % |
+| Additional sinusoids | 14 % of frames | never | 11 % | never | 10 % | never |
+| Smoothing mode | on | off | on | off | on | off |
+
+At 64 kbit/s both use the same frequency tables. At 48 kbit/s Apple
+codes SBR to 20.3 kHz with two noise bands, where ours stopped at
+16.9 kHz.
+
+Following Apple, the stereo rows for a 24 kHz core now stop SBR higher,
+with two noise bands. Against the previous rows:
+
+| Rate | SBR stop | PEAQ | ViSQOL |
+|---|---|---|---|
+| 40k | 16.9 → 18.4 kHz | +0.127 ± 0.050 | +0.104 ± 0.084 |
+| 48k | 16.9 → 20.3 kHz | +0.363 ± 0.148 | +0.147 ± 0.124 |
+| 56k | 18.4 → 20.3 kHz | +0.276 ± 0.081 | +0.020 ± 0.089 |
+
+Raising the crossover to Apple's at 48 kbit/s (start 13) lost
+0.034 ± 0.049. At 32 kbit/s neither Apple's narrower range nor a wider
+one changed PEAQ (+0.017 ± 0.028 for the wider; ViSQOL +0.12 ± 0.08), so
+that row stays.
+
+A steady frame whose level changes between its halves now gets two
+envelopes instead of one, when the energy-weighted change over the
+low-resolution bands exceeds 3 dB. Pooled over 32, 48 and 64 kbit/s
+(30 item pairs) it measured PEAQ +0.012 ± 0.010 and ViSQOL
++0.017 ± 0.008, with no rate worse.
+
+Apple's smoothing mode measured nothing (+0.000 ± 0.006), nor did a
+different inverse-filtering threshold (+0.004 ± 0.017). Coupled stereo
+SBR and additional sinusoids were not tried.
+
 ## Remaining gaps
 
 - **True VBR.** Apple's VBR leads by about 0.2 PEAQ. Neither a new
@@ -259,6 +346,10 @@ stop at the noise their quality asks for. On the 45 s excerpt, quality
   it; a listening test would decide.
 - **Window shape.** Apple's switch to KBD on sustained glockenspiel
   passages is not reproduced.
+- **HE-AAC at 48 kbit/s.** Apple scored 0.51 ± 0.39 PEAQ above our
+  encoder before the SBR changes (at 49.9 kbit/s against our 48.1).
+  The higher SBR range and the frame split recover about 0.38 of that.
+  Apple's coupled stereo SBR and additional sinusoids are untried.
 
 ## Speed
 
