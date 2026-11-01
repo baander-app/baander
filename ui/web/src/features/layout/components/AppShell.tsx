@@ -1,3 +1,4 @@
+import { NotificationReader } from '@/features/notification/components/NotificationReader'
 import styled from 'styled-components'
 import { useState, useCallback } from 'react'
 import { Outlet } from 'react-router-dom'
@@ -80,35 +81,37 @@ export function AppShell() {
   })
 
   return (
-    <Shell>
-      {window.BaanderElectron && <TitleBar />}
-      <ShellRow>
-        <ConnectionStatus><LiveConnectionStatus /></ConnectionStatus>
-        <Sidebar />
-        <MainContent>
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
-        </MainContent>
-        <ContextPanel />
-      </ShellRow>
-      <NowPlayingBar />
-      <SidebarEditor />
-      <LyricsFullscreenOverlay />
-      <SpotlightOverlay />
-      <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
-      <Toaster />
-      <MediatorDevPanel />
-      <SessionTransferPrompt
-        open={showTransferPrompt}
-        session={pendingSession}
-        onClaim={() => claim()}
-        onClaimWithQueue={() => claimWithQueue()}
-        onNew={() => newSession()}
-        onDismiss={dismissTransfer}
-        isClaiming={isClaiming}
-        isCreating={isCreating}
-      />
-    </Shell>
+    <NotificationReader>
+      <Shell>
+        {window.BaanderElectron && <TitleBar />}
+        <ShellRow>
+          <ConnectionStatus><LiveConnectionStatus /></ConnectionStatus>
+          <Sidebar />
+          <MainContent>
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </MainContent>
+          <ContextPanel />
+        </ShellRow>
+        <NowPlayingBar />
+        <SidebarEditor />
+        <LyricsFullscreenOverlay />
+        <SpotlightOverlay />
+        <KeyboardShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
+        <Toaster />
+        <MediatorDevPanel />
+        <SessionTransferPrompt
+          open={showTransferPrompt}
+          session={pendingSession}
+          onClaim={() => claim()}
+          onClaimWithQueue={() => claimWithQueue()}
+          onNew={() => newSession()}
+          onDismiss={dismissTransfer}
+          isClaiming={isClaiming}
+          isCreating={isCreating}
+        />
+      </Shell>
+    </NotificationReader>
   )
 }

@@ -1,8 +1,18 @@
+import { Popover } from 'radix-ui'
+import { NotificationBell } from '@/features/notification/components/NotificationBell'
+import { NotificationPopout } from '@/features/notification/components/NotificationPopout'
+import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import styled from 'styled-components'
 import { NavLink } from 'react-router-dom'
 import { useMediaModeStore, type MediaType } from '../stores/media-mode-store'
 
 const FooterWrapper = styled.div`
+  margin-top: auto;
+  @media (max-width: 767px) {
+    &[data-collapsed="true"] { padding: 0.5rem; }
+    &[data-collapsed="true"] [data-utility-links] { display: none; }
+    &[data-collapsed="true"] > div { justify-content: center; }
+  }
   flex-shrink: 0;
   border-top: 1px solid var(--color-border);
   padding: 0.5rem 1rem;
@@ -33,6 +43,10 @@ const Separator = styled.span`
   color: var(--color-muted-foreground);
 `
 
+const UtilityLink = styled.span`
+  display: contents;
+`
+
 interface PinnedLink {
   label: string
   route: string
@@ -61,21 +75,29 @@ const PINNED_FOOTER_LINKS: Record<MediaType, PinnedLink[]> = {
   ],
 }
 
-export function SidebarPinnedFooter() {
+export function SidebarPinnedFooter({ collapsed = false }: { collapsed?: boolean }) {
+  const isOpen = useNotificationStore((s) => s.isPopoutOpen)
+  const setOpen = useNotificationStore((s) => s.setPopoutOpen)
   const activeMedia = useMediaModeStore((s) => s.activeMedia)
   const links = PINNED_FOOTER_LINKS[activeMedia]
 
   return (
-    <FooterWrapper>
+    <FooterWrapper data-sidebar-utilities data-collapsed={collapsed}>
       <FooterLinks>
         {links.map((link, i) => (
-          <span key={link.route} style={{ display: 'contents' }}>
+          <UtilityLink data-utility-links key={link.route}>
             {i > 0 && <Separator>·</Separator>}
             <StyledNavLink to={link.route}>
               {link.label}
             </StyledNavLink>
-          </span>
+          </UtilityLink>
         ))}
+        <Popover.Root open={isOpen} onOpenChange={setOpen}>
+          <Popover.Trigger asChild>
+            <NotificationBell />
+          </Popover.Trigger>
+          <NotificationPopout />
+        </Popover.Root>
       </FooterLinks>
     </FooterWrapper>
   )

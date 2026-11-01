@@ -32,7 +32,7 @@ const SidebarAside = styled.aside<{ $expanded: boolean }>`
   @media (max-width: 767px) {
     width: ${({ $expanded }) => $expanded ? '14rem' : '3.5rem'};
     ${({ $expanded }) => $expanded && 'position: absolute; inset: 0 auto 0 0;'}
-    &[data-collapsed="true"] > :not([data-navigation-toggle]) { display: none; }
+    &[data-collapsed="true"] > :not([data-navigation-toggle]):not([data-sidebar-utilities]) { display: none; }
   }
   display: flex;
   height: 100%;
@@ -225,7 +225,7 @@ export function Sidebar() {
       )}
 
       {/* Pinned Footer */}
-      <SidebarPinnedFooter />
+      <SidebarPinnedFooter collapsed={!navigationExpanded} />
 
       {/* Configure sidebar */}
       <ConfigureWrapper>

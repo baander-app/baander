@@ -1,10 +1,9 @@
-import { focusVisibleRing } from '@/shared/theme'
+import { Button } from '@/shared/components/ui/button'
 import styled from 'styled-components'
 import { Bell } from 'lucide-react'
 import { useNotificationStore } from '../stores/notification-store'
 
-const BellButton = styled.button`
-  ${focusVisibleRing}
+const BellButton = styled(Button).attrs({ variant: 'ghost', size: 'icon-xs' })`
   border: 0;
   background-color: transparent;
   color: var(--color-foreground);
@@ -44,14 +43,13 @@ const UnreadBadge = styled.span`
   color: var(--color-destructive-foreground);
 `
 
-export function NotificationBell() {
+export function NotificationBell(props: React.ComponentProps<typeof Button>) {
   const unreadCount = useNotificationStore((s) => s.unreadCount)
-  const togglePopout = useNotificationStore((s) => s.togglePopout)
   const isPopoutOpen = useNotificationStore((s) => s.isPopoutOpen)
 
   return (
     <BellButton
-      onClick={togglePopout}
+      {...props}
       aria-label={`${unreadCount} unread notifications`}
       aria-expanded={isPopoutOpen}
     >

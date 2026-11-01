@@ -1,24 +1,17 @@
-import { focusVisibleRing } from '@/shared/theme'
-import { useEffect, useRef } from 'react'
+import { Popover } from 'radix-ui'
 import styled from 'styled-components'
-import { useNotificationStore } from '../stores/notification-store'
-import { useNotifications } from '../hooks/use-notifications'
+import { useNotificationReader } from '../hooks/use-notification-reader'
 import { useNotificationActions } from '../hooks/use-notification-actions'
 import { Button } from '@/shared/components/ui/button'
 import { NotificationItem } from './NotificationItem'
 
-const Popover = styled.div`
-  position: absolute;
-  right: 0;
-  top: 100%;
+const PopoutContent = styled(Popover.Content)`
   z-index: 50;
-  margin-top: 0.25rem;
   width: min(20rem, calc(100vw - 2rem));
   overflow: hidden;
   border-radius: var(--radius-xl);
   border: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   background-color: var(--color-popover);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 `
 
 const Header = styled.div`
@@ -38,11 +31,7 @@ const HeaderLabel = styled.span`
   color: var(--color-muted-foreground);
 `
 
-const MarkAllButton = styled.button`
-  ${focusVisibleRing}
-  border: 0;
-  background-color: transparent;
-  color: var(--color-foreground);
+const MarkAllButton = styled(Button).attrs({ variant: 'ghost', size: 'sm' })`
   font-size: 11px;
   color: var(--color-muted-foreground);
   transition: color var(--duration-hover) ease-out;
@@ -53,7 +42,7 @@ const MarkAllButton = styled.button`
 `
 
 const ScrollArea = styled.div`
-  max-height: 20rem;
+  max-height: min(20rem, calc(var(--radix-popover-content-available-height) - 2rem));
   overflow-y: auto;
 `
 
@@ -65,77 +54,46 @@ const EmptyState = styled.div`
 `
 
 export function NotificationPopout() {
-  const isPopoutOpen = useNotificationStore((s) => s.isPopoutOpen)
-  const setPopoutOpen = useNotificationStore((s) => s.setPopoutOpen)
-  const { notifications, unreadCount, isLoading, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, loadMore, refetch } = useNotifications()
+  const { notifications, unreadCount, isLoading, isError, hasNextPage, isFetchingNextPage, isFetchNextPageError, loadMore, refetch } = useNotificationReader()
   const { markAllRead } = useNotificationActions()
-  const ref = useRef<HTMLDivElement>(null)
-
-  // Close on click outside
-  useEffect(() => {
-    if (!isPopoutOpen) return
-
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setPopoutOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isPopoutOpen, setPopoutOpen])
-
-  // Close on Escape
-  useEffect(() => {
-    if (!isPopoutOpen) return
-
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        setPopoutOpen(false)
-      }
-    }
-
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [isPopoutOpen, setPopoutOpen])
-
-  if (!isPopoutOpen) return null
 
   return (
-    <Popover ref={ref}>
-      <Header>
-        <HeaderLabel>
-          Notifications
-        </HeaderLabel>
-        {unreadCount > 0 && (
-          <MarkAllButton onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
-            Mark all read
-          </MarkAllButton>
-        )}
-      </Header>
+    <Popover.Portal>
+      <PopoutContent side="top" align="start" sideOffset={8} collisionPadding={8} aria-label="Notifications">
+        <Header>
+          <HeaderLabel>
+            Notifications
+          </HeaderLabel>
+          {unreadCount > 0 && (
+            <MarkAllButton onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
+              Mark all read
+            </MarkAllButton>
+          )}
+        </Header>
 
-      <ScrollArea>
-        {isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : isError && notifications.length === 0 ? (
-          <EmptyState role="alert">Could not load notifications. <Button variant="ghost" onClick={() => void refetch()}>Retry</Button></EmptyState>
-        ) : notifications.length === 0 ? (
-          <EmptyState>
-            No notifications
-          </EmptyState>
-        ) : (
-          notifications.map((notification) => (
-            <NotificationItem key={notification.publicId} notification={notification} />
-          ))
-        )}
-        {markAllRead.isError && <EmptyState role="alert">Could not mark notifications as read. Try again.</EmptyState>}
-        {hasNextPage && (
-          <EmptyState>
-            {isFetchNextPageError && <p role="alert">Could not load more notifications.</p>}
-            <Button variant="ghost" disabled={isFetchingNextPage} onClick={loadMore}>
-              {isFetchingNextPage ? 'Loading…' : isFetchNextPageError ? 'Retry' : 'Load more'}
-            </Button>
-          </EmptyState>
-        )}
-      </ScrollArea>
-    </Popover>
+        <ScrollArea>
+          {isLoading ? <EmptyState role="status">Loading notifications…</EmptyState> : isError && notifications.length === 0 ? (
+            <EmptyState role="alert">Could not load notifications. <Button variant="ghost" onClick={() => { refetch().catch(() => {}) }}>Retry</Button></EmptyState>
+          ) : notifications.length === 0 ? (
+            <EmptyState>
+              No notifications
+            </EmptyState>
+          ) : (
+            notifications.map((notification) => (
+              <NotificationItem key={notification.publicId} notification={notification} />
+            ))
+          )}
+          {markAllRead.isError && <EmptyState role="alert">Could not mark notifications as read. Try again.</EmptyState>}
+          {hasNextPage && (
+            <EmptyState>
+              {isFetchNextPageError && <p role="alert">Could not load more notifications.</p>}
+              <Button variant="ghost" disabled={isFetchingNextPage} onClick={loadMore}>
+                {isFetchingNextPage ? 'Loading…' : isFetchNextPageError ? 'Retry' : 'Load more'}
+              </Button>
+            </EmptyState>
+          )}
+        </ScrollArea>
+      </PopoutContent>
+    </Popover.Portal>
   )
 }

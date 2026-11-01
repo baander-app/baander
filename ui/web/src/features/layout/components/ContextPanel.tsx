@@ -10,10 +10,6 @@ import { QueueTab } from './QueueTab'
 import { LyricsTab } from './LyricsTab'
 import { DetailsTab } from './DetailsTab'
 import { PlayerBar } from './PlayerBar'
-import { NotificationBell } from '@/features/notification/components/NotificationBell'
-import { NotificationPopout } from '@/features/notification/components/NotificationPopout'
-import { useNotifications } from '@/features/notification/hooks/use-notifications'
-import { DevicePicker } from '@/features/session/components/DevicePicker'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 
@@ -209,7 +205,6 @@ export function ContextPanel() {
   const setWidth = useContextPanelStore((s) => s.setWidth)
 
   // Initialize notification fetching
-  useNotifications()
 
   useEffect(() => {
     const narrow = window.matchMedia('(max-width: 1023px)')
@@ -242,7 +237,6 @@ export function ContextPanel() {
     }}>
       {mode !== 'compact' && <ResizeHandle width={width} onWidthChange={(w) => setWidth(Math.min(w, effectiveMax))} />}
 
-      {/* Panel header — notification bell replaces "Now Playing" text */}
       <PanelHeader>
         {mode === 'compact' ? (
           <CompactLabel>Now Playing</CompactLabel>
@@ -260,9 +254,6 @@ export function ContextPanel() {
               <TooltipContent>Close context panel</TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <DevicePicker />
-          <NotificationBell />
-          <NotificationPopout />
         </HeaderActions>
       </PanelHeader>
 

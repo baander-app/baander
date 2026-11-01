@@ -25,6 +25,23 @@ Seven document-review lenses completed with no actionable findings; cross-model 
 Plan structure, requirement references, prose preservation and whitespace checks passed.
 Runtime implementation, hardware qualification and Cast registration/hosting remain outstanding; no application tests, registrations or deployments were performed during planning.
 
+Sidebar notification checkpoint, 2026-11-01 (U1): notifications now sit beside
+Settings and Equalizer, with the unread badge available in collapsed navigation.
+The authenticated shell owns one reader; opening the popover adds no query
+observers. The right pane no longer contains notifications or device selection.
+
+Verification: 42 notification and live-reader tests passed, including account
+replacement, keyboard dismissal and mark-as-read. Web typecheck passed; lint
+reported zero errors and eight existing warnings. Two Playwright checks passed
+against the isolated preview at 390px and 1280px, covering dark/light contrast,
+popover containment, collapsed/expanded navigation and focus restoration.
+The browser checks caught and verified fixes for collapsed utility-link visibility
+and popover overflow. Playback transfer implementation remains in progress.
+
+Available hardware is now confirmed as an iPhone 13 and Apple TV 4K, alongside
+Linux. AirPlay hardware qualification remains outstanding; physical Chromecast
+and DLNA receiver checks remain open because suitable receivers have not been identified.
+
 ## Learning and plan maintenance
 
 Checkpoint, 2026-10-31: reviewed all eight documents in `docs/solutions/` against
