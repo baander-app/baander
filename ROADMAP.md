@@ -1,8 +1,29 @@
 # Baander roadmap
 
-Updated: 2026-10-31. This roadmap selects future work and records unresolved
+Updated: 2026-11-01. This roadmap selects future work and records unresolved
 acceptance. Current operating contracts belong in the linked guides; completed
 milestones and their verification evidence remain in Git history.
+
+## Playback destinations and notifications
+
+Requirements checkpoint, 2026-11-01: the user confirmed the
+[playback destinations and notifications plan](docs/plans/2026-11-01-1840-feat-playback-destinations-and-notifications-plan.md).
+It covers player-owned destination selection, sidebar notifications, music and video transfer, and AirPlay, Chromecast and DLNA alongside Bånder devices.
+Local and remotely hosted servers are included, with a local casting companion where needed.
+
+The contract contains 21 requirements, four flows and eight acceptance examples.
+Four source claims were independently verified; completeness, consistency, focus and planning-usability checks passed.
+Prose preservation audits and whitespace checks passed.
+This checkpoint covered requirements only; no application tests were run for this documentation change.
+Available client hardware is Linux and an iPhone, with no Android device; receiver models still need to be identified before hardware qualification.
+
+Implementation planning checkpoint, 2026-11-01: the same plan now defines eight implementation units in three ordered PR groups, with playback ownership, receiver grants, a paired Go companion and browser-specific casting adapters.
+The user confirmed the sender matrix and paused recovery when a target may have started without acknowledging it.
+The plan preserves the requirements and their identifiers, with those clarifications applied to sender coverage and failed-transfer behavior.
+
+Seven document-review lenses completed with no actionable findings; cross-model review was disabled by repository configuration.
+Plan structure, requirement references, prose preservation and whitespace checks passed.
+Runtime implementation, hardware qualification and Cast registration/hosting remain outstanding; no application tests, registrations or deployments were performed during planning.
 
 ## Learning and plan maintenance
 

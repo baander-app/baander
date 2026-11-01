@@ -170,6 +170,28 @@ when its content is unchanged. This observation does not diagnose a failed mount
 or guarantee that the file is still reachable at playback time. A catalog track
 without an index observation is unavailable until a scan confirms its source.
 
+## Playback destinations
+
+### Playback destination
+
+The Bånder client or external receiver selected to play a listener's media.
+An external receiver may use AirPlay, Chromecast or DLNA; it is not necessarily a registered Bånder device.
+
+### Local casting companion
+
+A Bånder component on the receiver's network that supplies discovery and control when the browser or remote server cannot provide them directly.
+It connects the listener's home receivers to playback controlled through Bånder.
+
+### Playback endpoint
+
+A live player instance that can execute and report playback for a destination, such as one browser tab, a companion process or a Cast receiver application.
+Its incarnation identifies that instance's current connection lifetime, separately from the saved browser device token or destination identity.
+
+### Uncertain transfer
+
+A playback handoff whose target may have started but has not confirmed its state.
+The source retains its media and cursor while paused until reconciliation establishes whether it can resume without overlapping the target.
+
 ## Audio playback
 
 ### Loudness target
